@@ -5,13 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"measix/platform/ent"
 	"measix/platform/internal/hub/usage"
 	"measix/platform/internal/wire/adminapi"
 )
 
 func (h *fullAdminHandler) ListUsageRequests(w http.ResponseWriter, r *http.Request, params adminapi.ListUsageRequestsParams) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -32,7 +31,7 @@ func (h *fullAdminHandler) ListUsageRequests(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *fullAdminHandler) GetUsageRequest(w http.ResponseWriter, r *http.Request, requestID adminapi.RequestId) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -45,7 +44,7 @@ func (h *fullAdminHandler) GetUsageRequest(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -94,7 +93,7 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *fullAdminHandler) GetPricing(w http.ResponseWriter, r *http.Request) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -107,7 +106,7 @@ func (h *fullAdminHandler) GetPricing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *fullAdminHandler) PutPricing(w http.ResponseWriter, r *http.Request, params adminapi.PutPricingParams) {
-	if _, _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -146,14 +145,14 @@ func (h *fullAdminHandler) PutPricing(w http.ResponseWriter, r *http.Request, pa
 	writeJSON(w, http.StatusOK, pricingSetWire(revision, rows))
 }
 
-func requestUsageWire(row *ent.RequestUsage) adminapi.RequestUsageView {
+func requestUsageWire(row usage.RequestView) adminapi.RequestUsageView {
 	return adminapi.RequestUsageView{
 		RequestId: row.RequestID, InteractionId: row.InteractionID, DeploymentId: row.DeploymentID,
 		UserId: row.UserID, DeviceId: row.DeviceID, ResourceId: row.ResourceID, RuntimeRouteId: row.RuntimeRouteID,
-		UpstreamId: row.UpstreamID, ManagedGeneration: int(row.ManagedGeneration), ControlRevision: int(row.ControlRevision),
+		UpstreamId: row.UpstreamID, ManagedGeneration: row.ManagedGeneration, ControlRevision: row.ControlRevision,
 		StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, Forwarded: row.Forwarded,
 		HttpStatus: row.HTTPStatus, UpstreamHttpStatus: row.UpstreamHTTPStatus,
-		RequestBytes: int(row.RequestBytes), ResponseBytes: int(row.ResponseBytes), DurationMs: int(row.DurationMs), ErrorClass: row.ErrorClass,
+		RequestBytes: row.RequestBytes, ResponseBytes: row.ResponseBytes, DurationMs: row.DurationMs, ErrorClass: row.ErrorClass,
 	}
 }
 

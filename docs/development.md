@@ -147,6 +147,25 @@ Frontend tests may stub Hub for component-level T1/T2, but system/RC browser lan
 
 Relay data-path changes must be tested against real HTTP/TCP boundaries for streaming, cancellation, header handling and forwarding behavior. In-memory mocks do not replace required Relay T2/T3 scenarios.
 
-## 10. Keeping docs accurate
+## 11. Local runtime and dev commands
+
+The repository root is npm-orchestrated (`package.json`); the Admin Console itself uses pnpm (`console/pnpm-lock.yaml`). Required local toolchain: Go 1.26.x, Node 24 LTS, pnpm 11.
+
+```bash
+npm run setup             # one-shot bootstrap: keys (.secrets/), migration (.data/hub.db), admin user
+npm start                 # start control-hub + runtime-relay + Quasar dev server (concurrently)
+npm run start:hub         # control-hub only      (http://localhost:8080)
+npm run start:relay       # runtime-relay only    (:8090 public / 127.0.0.1:8091 internal)
+npm run start:console     # Quasar dev server only (http://localhost:9000/admin/, proxies /api -> hub)
+```
+
+Notes:
+
+- `npm run setup` is idempotent; generated secrets/passwords live under gitignored `.secrets/`, local databases under `.data/`.
+- The Quasar dev server proxies `/api`, `/live`, `/ready`, `/.well-known` to the Hub (port 8080) and `/runtime` to the Relay (8090). Dev proxy is dev-only; production serves the SPA from the same origin as the Hub.
+- `backend/cmd/devmigrate` applies the published Atlas migration SQL verbatim for local development only because the Atlas CLI cannot currently be installed alongside the local Go 1.26 toolchain. CI keeps executing the real `atlas migrate apply` replay (`make migration-replay`); `devmigrate` is not a replacement and never runs in CI.
+- Other orchestration scripts: `npm run test` (backend + console), `npm run contract`, `npm run generate`, `npm run drift`, `npm run build`, `npm run ci` (delegates to the Makefile targets that CI executes).
+
+## 12. Keeping docs accurate
 
 When implementation changes how developers actually build/run/test/operate the repository, update the owning implementation document in the same PR. When behavior meaning changes, update architecture first instead.

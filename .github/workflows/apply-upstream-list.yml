@@ -1,9 +1,11 @@
 name: Apply Upstream List Green
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/s0-platform-core
+      - main
+    types:
+      - synchronize
     paths:
       - .github/patches/apply-upstream-list.patch
       - .github/workflows/apply-upstream-list.yml
@@ -18,10 +20,12 @@ env:
 
 jobs:
   apply-and-generate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
@@ -55,4 +59,4 @@ jobs:
           git add api backend console
           git diff --cached --check
           git commit -m 'feat: 补齐 Admin Upstream 分页列表契约'
-          git push origin HEAD:agent/s0-platform-core
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}

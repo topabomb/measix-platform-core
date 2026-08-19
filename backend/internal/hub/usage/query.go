@@ -35,19 +35,66 @@ type CostSummary struct {
 	Currency string
 }
 
-func (s *Service) ListRequests(ctx context.Context, limit int) ([]*ent.RequestUsage, error) {
+type RequestView struct {
+	RequestID          string
+	InteractionID      *string
+	DeploymentID       string
+	UserID             string
+	DeviceID           *string
+	ResourceID         string
+	RuntimeRouteID     string
+	UpstreamID         string
+	ManagedGeneration  int
+	ControlRevision    int
+	StartedAt          time.Time
+	CompletedAt        time.Time
+	Forwarded          bool
+	HTTPStatus         int
+	UpstreamHTTPStatus *int
+	RequestBytes       int
+	ResponseBytes      int
+	DurationMs         int
+	ErrorClass         *string
+}
+
+func requestView(row *ent.RequestUsage) RequestView {
+	var upstreamStatus *int
+	if row.UpstreamHTTPStatus != nil {
+		value := int(*row.UpstreamHTTPStatus)
+		upstreamStatus = &value
+	}
+	return RequestView{
+		RequestID: row.RequestID, InteractionID: row.InteractionID, DeploymentID: row.DeploymentID, UserID: row.UserID, DeviceID: row.DeviceID,
+		ResourceID: row.ResourceID, RuntimeRouteID: row.RuntimeRouteID, UpstreamID: row.UpstreamID, ManagedGeneration: int(row.ManagedGeneration), ControlRevision: int(row.ControlRevision),
+		StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, Forwarded: row.Forwarded, HTTPStatus: row.HTTPStatus, UpstreamHTTPStatus: upstreamStatus,
+		RequestBytes: int(row.RequestBytes), ResponseBytes: int(row.ResponseBytes), DurationMs: int(row.DurationMs), ErrorClass: row.ErrorClass,
+	}
+}
+
+func (s *Service) ListRequests(ctx context.Context, limit int) ([]RequestView, error) {
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
-	return s.Client.RequestUsage.Query().Order(ent.Desc(requestusage.FieldCompletedAt)).Limit(limit).All(ctx)
+	rows, err := s.Client.RequestUsage.Query().Order(ent.Desc(requestusage.FieldCompletedAt)).Limit(limit).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]RequestView, 0, len(rows))
+	for _, row := range rows {
+		views = append(views, requestView(row))
+	}
+	return views, nil
 }
 
-func (s *Service) GetRequest(ctx context.Context, requestID string) (*ent.RequestUsage, error) {
+func (s *Service) GetRequest(ctx context.Context, requestID string) (RequestView, error) {
 	row, err := s.Client.RequestUsage.Query().Where(requestusage.RequestIDEQ(requestID)).Only(ctx)
 	if ent.IsNotFound(err) {
-		return nil, ErrInvalidBatch
+		return RequestView{}, ErrInvalidBatch
 	}
-	return row, err
+	if err != nil {
+		return RequestView{}, err
+	}
+	return requestView(row), nil
 }
 
 func (s *Service) Summary(ctx context.Context, from, to time.Time) (Summary, error) {

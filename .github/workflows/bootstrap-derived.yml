@@ -11,10 +11,10 @@ permissions:
 jobs:
   generate:
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/s0-platform-core' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: ${{ github.repository }}
           ref: agent/s0-platform-core
@@ -37,12 +37,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          old='github.com/topabomb/measix-platform-core/backend'
-          new='measix-platform-core/backend'
-          sed -i "s#^module ${old}$#module ${new}#" backend/go.mod
-          grep -RIl --include='*.go' "$old" backend | while read -r file; do
-            sed -i "s#${old}#${new}#g" "$file"
+          for old in 'github.com/topabomb/measix-platform-core/backend' 'measix-platform-core/backend'; do
+            if grep -q "^module ${old}$" backend/go.mod; then
+              sed -i "s#^module ${old}$#module measix/platform#" backend/go.mod
+            fi
+            grep -RIl --include='*.go' "$old" backend | while read -r file; do
+              sed -i "s#${old}#measix/platform#g" "$file"
+            done || true
           done
+          find backend -name '*.go' -type f -print0 | xargs -0 gofmt -w
       - name: 生成派生产物
         run: make generate
       - name: 提交迁移与派生产物
@@ -53,5 +56,5 @@ jobs:
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "refactor: decouple Go module namespace from GitHub"
+          git commit -m "refactor: use host-independent Go module namespace"
           git push origin HEAD:agent/s0-platform-core

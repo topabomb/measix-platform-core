@@ -16,14 +16,14 @@ func TestHUBI5SemanticUsageDedupeAndCompleteness(t *testing.T) {
 	service := NewService(store.Client)
 
 	input := SemanticInput{
-		UpstreamID: upstreamID,
-		ResourceID: platformid.New(platformid.Model),
-		SourceEventID: "provider-event-42",
-		Meter: "input_tokens",
+		UpstreamID:      upstreamID,
+		ResourceID:      platformid.New(platformid.Model),
+		SourceEventID:   "provider-event-42",
+		Meter:           "input_tokens",
 		QuantityDecimal: "1234",
-		Completeness: CompletenessPartial,
-		Source: "provider_response",
-		OccurredAt: now,
+		Completeness:    CompletenessPartial,
+		Source:          "provider_response",
+		OccurredAt:      now,
 	}
 	first, duplicate, err := service.RecordSemantic(context.Background(), input)
 	if err != nil || duplicate || first == "" {
@@ -44,7 +44,7 @@ func TestHUBI5PricingUsesSpecificEffectiveRuleAndDecimalArithmetic(t *testing.T)
 
 	if _, err := service.CreatePricingRule(context.Background(), PricingRuleInput{
 		UpstreamID: &upstreamID,
-		Meter: "input_tokens", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.0015", Currency: "USD",
+		Meter:      "input_tokens", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.0015", Currency: "USD",
 		EffectiveFrom: now.Add(-24 * time.Hour),
 	}); err != nil {
 		t.Fatal(err)

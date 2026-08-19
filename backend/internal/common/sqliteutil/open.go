@@ -16,7 +16,7 @@ func Open(path string) (*sql.DB, error) {
 	if path == "" {
 		return nil, fmt.Errorf("sqlite path is required")
 	}
-	db, err := sql.Open("sqlite", "file:"+path)
+	db, err := sql.Open("sqlite", "file:"+path+"?_time_format=sqlite&_timezone=UTC")
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}

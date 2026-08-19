@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  ApiProblem,
   apiFetch,
   createCandidateId,
   createIdempotencyKey,
@@ -39,7 +38,7 @@ describe('Admin API workflow primitives', () => {
       { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
     )))
 
-    await expect(apiFetch('/api/admin/v1/system/status')).rejects.toEqual(expect.objectContaining<ApiProblem>({
+    await expect(apiFetch('/api/admin/v1/system/status')).rejects.toEqual(expect.objectContaining({
       status: 401,
       code: 'invalid_admin_session',
     }))

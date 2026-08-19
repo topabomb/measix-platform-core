@@ -1,13 +1,13 @@
 # S0 / S0.1 Platform Core 开发计划与当前进展
 
 > 架构权威：`topabomb/measix-architecture@main`。  
-> 当前架构基线：`e9d5ee4d011a07b438edf2e6f7708457fc6dc8d5`（S0.1/S0.2 delivery sub-stage 已合并）。  
+> 当前架构基线：`6de9bfb794e60e9bb6c62501263cc1518e4f5ee3`（S0.1/S0.2 delivery sub-stage + Admin Console Product/UX Requirements 已合并）。  
 > 当前交付阶段：**S0.1 Managed Capability Delivery**。  
 > 本仓库范围：`measix-platform-core`（Control Hub + Runtime Relay + Admin Console + executable contracts/tests）；S0.2 Android 实现在 `rikkahub_mcp`，S1 Agent Space 不属于当前阶段。
 
 ## 1. 当前结论
 
-当前代码不能再描述为“platform-core I0–I5 已完成，只剩 Android/最终 RC”。新的架构权威把 S0 的实际交付顺序固定为：
+当前代码不能再描述为“platform-core I0–I5 已完成，只剩 Android/最终 RC”。架构权威把 S0 的实际交付顺序固定为：
 
 ```text
 S0 Core foundation
@@ -24,7 +24,8 @@ S0.1 的目标不是继续增加后端 CRUD，而是把现有基础收敛成真�
 Admin Console
   → Upstream / Secret
   → Managed Model / TTS / ASR / MCP / Policy
-  → Validate / Client Snapshot Preview
+  → Relationship View
+  → Validate / Review / Client Snapshot Preview
   → Publish
   → Runtime Relay
   → deterministic / qualified Upstream Adapter
@@ -32,7 +33,9 @@ Admin Console
   → Client Contract Freeze Manifest
 ```
 
-语义、required profile、字段和 Gate 以 `measix-architecture` 的 S0.1 文档为唯一权威；本文只记录本仓库的实现状态和证据。
+Admin Console 现在有独立的 architecture Product/UX authority：`measix-s0-admin-console-product-requirements.md`；本仓库的具体 Vue/Quasar/依赖/组件实现以 `docs/admin-console-implementation.md` 为权威。
+
+语义、required profile、字段、产品体验和 Gate 以 `measix-architecture` 的 S0.1 文档为唯一上位权威；本文只记录本仓库的实现状态和证据。
 
 ## 2. 执行规则
 
@@ -40,6 +43,8 @@ Admin Console
 - docs-only 同步不制造人工 Red，但最新提交仍必须经过仓库 CI；
 - OpenAPI/fixture/codegen 修改必须同提交保持 generated drift Green；
 - 任何 Android-visible semantic change 必须先有 architecture authority；
+- Admin required workflow/information architecture/UX Exit 改变必须先更新 architecture Product Requirements；
+- 正常 Vue component、chart/topology/date/helper package 选择属于本仓库 concrete implementation，不要求 architecture npm 白名单；
 - Runtime Relay 保持 provider-agnostic，不加入 OpenAI/Anthropic/Google body translation；
 - S0.1 Freeze Gate 之前，`client-control.openapi.yaml`/Snapshot v1 视为 pre-freeze；
 - S0.1 Freeze Gate 之后，不允许静默破坏已冻结 v1 后再要求 Android 跟随 latest。
@@ -52,10 +57,10 @@ Admin Console
 |---|---|---|
 | I0 Engineering & Executable Contracts | 基础已完成 | 四份 OpenAPI、fixtures、codegen、platformid、SQLite/Ent/Atlas、Hub/Relay health、Quasar/CI 基础已存在；但 Client OpenAPI 仍需按 S0.1 authority 完成 pre-freeze schema closure |
 | I1 Identity & Enrollment | 核心已完成 | User/Enrollment/Device/Session/Admin auth/revoke 等已有实现和测试；继续作为 S0.1 regression baseline |
-| I2 Draft & Snapshot | **核心 domain 已有，S0.1 产品契约未完成** | Draft/Snapshot compiler、reference validation、deterministic hash 已有；Android-visible resource fields/enums、Admin 完整资源编辑、Snapshot Preview 仍缺 |
+| I2 Draft & Snapshot | **核心 domain 已有，S0.1 产品契约未完成** | Draft/Snapshot compiler、reference validation、deterministic hash 已有；Android-visible resource fields/enums、Admin 完整资源编辑、Review/Snapshot Preview 仍缺 |
 | I3 Relay & Publish | 核心已完成 | desired-state apply、ACK/finalize、reconcile、generation admission、routing/security 已有；继续作为 S0.1 runtime foundation |
 | I4 Relay Transport | Relay 侧基础已完成 | SSE/binary/multipart/MCP Streamable HTTP/cancel 等已有测试；这不等于四类 S0.1 required profile 已完成真实产品闭环，也不等于 Android I4/S0.2 |
-| I5 Metering/Admin/Hardening | **后端核心已有，产品闭环未完成** | spool/ingest/dedupe/pricing/DB/security 等已有；Admin Usage/Resources/Upstreams/Preview/filters 与 S0.1 browser/system gate 仍明显不足 |
+| I5 Metering/Admin/Hardening | **后端核心已有，产品闭环未完成** | spool/ingest/dedupe/pricing/DB/security 等已有；Admin Usage/Resources/Upstreams/Preview/relationship/filters 与 S0.1 browser/system gate 仍明显不足 |
 
 历史 Green 证据仍有效作为回归基线，例如：
 
@@ -71,7 +76,7 @@ Admin Console
 
 ### C0 — Contract Audit & Freeze Preparation — **未完成**
 
-当前 `api/client/client-control.openapi.yaml` 与新 architecture authority 仍有明确差距：
+当前 `api/client/client-control.openapi.yaml` 与 architecture authority 仍有明确差距：
 
 - `ProviderDefinition.clientProtocol` 仍是自由字符串；
 - Model `inputModalities/outputModalities/capabilities` 仍是自由字符串数组，尚未形成冻结 vocabulary/schema；
@@ -90,6 +95,7 @@ Admin Console
 - Create 表单只提交 `name/baseUrl/providerKind`；
 - `providerKind` 是旧 UI 概念，不是当前正式 Upstream executable config 的核心字段；
 - transport capabilities、auth/SecretRef、correlation mode、usage capability、timeouts 未形成完整可编辑 workflow；
+- Test 结果没有形成结构化 verification 体验；
 - Qualification/profile verification 没有形成 S0.1 真实操作与证据闭环。
 
 C1 必须让管理员不用 JSON/DB/内部 API 就能建立真正可运行的 Upstream。
@@ -102,7 +108,8 @@ C1 必须让管理员不用 JSON/DB/内部 API 就能建立真正可运行的 Up
 - 没有完整 Provider editor/selector；
 - 没有正式 Models / TTS / ASR / MCP / Policy 五类编辑 workflow；
 - 没有完整 Upstream binding/transport/path/method 配置体验；
-- 不能通过 UI 组织 architecture 要求的四类受管能力。
+- 没有 architecture Product Requirements 要求的 Resource→Upstream→Runtime relationship view；
+- 不能通过现代、可理解的 UI 组织 architecture 要求的四类受管能力。
 
 因此旧进度中“ResourcesPage 已实现”只能解释为页面骨架/基础 Draft workflow 已实现，不能解释为 S0.1 Resource product completion。
 
@@ -113,6 +120,7 @@ C1 必须让管理员不用 JSON/DB/内部 API 就能建立真正可运行的 Up
 仍缺：
 
 - S0.1 新字段/schema closure；
+- Admin structured Review flow；
 - Admin “Client will receive” Snapshot Preview；
 - Preview 与 Release Snapshot 必须调用同一 canonical projection/compiler 的 executable proof；
 - 明确展示不会下发 Android 的 Upstream/Secret/RuntimeRoute/Pricing 等内部数据；
@@ -138,11 +146,14 @@ Relay generic transport 已具备较完整基础，但 S0.1 需要证明的不�
 - request row 仍使用 `modelId` 语义，未正确围绕通用 `resourceId/resource kind` 组织；
 - 缺 architecture 要求的 User/Resource/Resource Kind/Upstream/Status/Completeness 等主要过滤；
 - Model/TTS/ASR/MCP 的 semantic meter/Unknown/Partial/Cost 观察不完整；
+- 缺少有决策价值的 Usage/Overview 趋势/比较可视化；
 - Pricing 编辑和 request detail/correlation 仍需形成管理员可用闭环。
 
 ### C6 — Browser + Hub + Relay + Test Adapter/Test Client E2E — **未完成**
 
 已有本地 Hub/Relay/Console 启动链和组件测试，但没有证据证明 architecture S0.1 全套 `CAP-*` 场景已经通过真实浏览器 + real Hub/Relay + deterministic Test Client/Test Adapter 的完整拓扑。
+
+Admin browser flow 还必须覆盖 Product Requirements 的 loading/empty/error/degraded、relationship view、Review/Preview、Apply/Publish recovery 和 Usage/Pricing 关键交互。
 
 ### C7 — S0.1 Client Contract Freeze Gate — **未开始**
 
@@ -172,6 +183,8 @@ C7 S0.1 Client Contract Freeze Gate
 
 允许在实现层做不破坏依赖关系的并行工作，但 Gate 不得倒置：尤其不能跳过 C0 的 Client contract closure，也不能在 C7 前把 Android integration 当作当前实现目标。
 
+Admin 前端内部实施顺序由 `docs/admin-console-implementation.md` 进一步细化为：shared primitives → Upstream → Resources → relationship → Review/Preview/Publish → Pricing → Usage/Overview/System visualization → browser E2E hardening。
+
 ## 6. S0.1 Exit 必须产出的本仓库证据
 
 至少包括：
@@ -200,7 +213,8 @@ S0.1 不修改：
 - S3 Runtime Hook；
 - Phase 2 RBAC/Group/SSO/User Sync/Quota platform；
 - Runtime Relay WebSocket/realtime tunnel；
-- provider-specific body translation in Relay。
+- provider-specific body translation in Relay；
+- drag-and-drop workflow builder/custom dashboard designer 等 Product Requirements 明确不属于 S0.1 的管理平台功能。
 
 S0.2 Android 接入只在 C7 freeze manifest 完成后启动。
 
@@ -228,9 +242,10 @@ S0.2 Android 接入只在 C7 freeze manifest 完成后启动。
 
 当前唯一正确的开发入口是 **C0 Contract Audit & Freeze Preparation**：
 
-1. 按 architecture commit `e9d5ee4d011a07b438edf2e6f7708457fc6dc8d5` 对 Client/Admin executable contract 建立 failing contract tests；
+1. 按 architecture commit `6de9bfb794e60e9bb6c62501263cc1518e4f5ee3` 对 Client/Admin executable contract 建立 failing contract tests；
 2. 修正 Client Snapshot/OpenAPI/fixtures/generated artifacts；
 3. 让新的 Android-visible contract 在 core 内部达到确定、可测试状态；
-4. 然后依次推进 C1–C7。
+4. 后续 C1/C2 的 Admin 实现同时遵循 architecture Product Requirements 与 `docs/admin-console-implementation.md`；
+5. 然后依次推进 C1–C7。
 
 在 C7 完成前，不再使用“platform-core S0 已完成”“可以直接开始 Android”之类表述。

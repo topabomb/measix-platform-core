@@ -7,16 +7,19 @@ on:
     types:
       - synchronize
     paths:
-      - .github/patches/apply-upstream-list.patch
       - .github/workflows/apply-upstream-list.yml
+
+permissions:
+  contents: write
 
 env:
   GO_VERSION: '1.26.5'
   NODE_VERSION: '24'
   PNPM_VERSION: '11.0.0'
+  CLEAN_BASE: '7e074bb9866ab5e5703879751275b4e8698234d3'
 
 jobs:
-  apply-and-generate:
+  product-only:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
@@ -24,6 +27,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+      - name: Preserve verified source patch and reset to clean product base
+        run: |
+          cp .github/patches/apply-upstream-list.patch /tmp/apply-upstream-list.patch
+          git checkout ${CLEAN_BASE}
+          git apply /tmp/apply-upstream-list.patch
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -39,23 +47,18 @@ jobs:
       - uses: ariga/setup-atlas@v0
         with:
           version: v1.2.0
-      - name: Apply source patch
-        run: git apply .github/patches/apply-upstream-list.patch
-      - name: Run canonical generators
-        run: make generate
-      - name: Verify focused Green
+      - name: Run canonical generators and focused Green
         run: |
+          make generate
           cd backend
           go test ./internal/contract ./internal/hub/upstream -count=1
           cd ../console
           pnpm test --run
-      - name: Export exact verified changes
+      - name: Commit and push product-only branch
         run: |
-          git diff --binary HEAD -- api backend console > /tmp/upstream-list-generated.patch
-          test -s /tmp/upstream-list-generated.patch
-      - uses: actions/upload-artifact@v4
-        with:
-          name: upstream-list-generated
-          path: /tmp/upstream-list-generated.patch
-          if-no-files-found: error
-          retention-days: 1
+          git config user.name 'measix-ci'
+          git config user.email 'actions@users.noreply.github.com'
+          git add api backend console
+          git diff --cached --check
+          git commit -m 'feat: 补齐 Admin Upstream 分页列表契约'
+          git push --force origin HEAD:refs/heads/agent/s0-upstream-list-generated

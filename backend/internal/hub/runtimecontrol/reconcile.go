@@ -44,7 +44,7 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 		if relayMatches(status, pending.ControlRevision, pending.BundleHash, pending.TargetGeneration) {
 			return s.finalizePending(ctx, pending.ID)
 		}
-		if !status.Ready || status.AppliedControlRevision < pending.ControlRevision {
+		if !status.Ready || status.AppliedControlRevision < int(pending.ControlRevision) {
 			if err := s.reapplyPending(ctx, pending.ID); err != nil {
 				return nil, err
 			}
@@ -69,7 +69,7 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 		}
 		return nil, nil
 	}
-	if !status.Ready || status.AppliedControlRevision < managed.DesiredControlRevision {
+	if !status.Ready || status.AppliedControlRevision < int(managed.DesiredControlRevision) {
 		if err := s.rehydrateActive(ctx, managed.ActiveReleaseID, int(managed.ActiveManagedGeneration), int(managed.DesiredControlRevision), stringPointer(managed.DesiredBundleHash)); err != nil {
 			_ = s.setRuntimeStatus(ctx, "DEGRADED")
 			return nil, err

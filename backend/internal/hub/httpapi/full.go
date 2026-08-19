@@ -7,6 +7,7 @@ import (
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/hub/system"
 	"measix/platform/internal/hub/upstream"
 	"measix/platform/internal/hub/usage"
 	"measix/platform/internal/wire/adminapi"
@@ -19,6 +20,7 @@ type Services struct {
 	Upstream       *upstream.Service
 	RuntimeControl *runtimecontrol.Service
 	Usage          *usage.Service
+	System         *system.Service
 	BuildVersion   string
 }
 

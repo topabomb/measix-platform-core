@@ -7,6 +7,20 @@ import (
 	"measix/platform/internal/wire/adminapi"
 )
 
+func (h *fullAdminHandler) SystemHealth(w http.ResponseWriter, r *http.Request) {
+	if h.services.System == nil {
+		writeJSON(w, http.StatusServiceUnavailable, adminapi.Health{Live: true, Ready: false})
+		return
+	}
+	status, err := h.services.System.Status(r.Context())
+	ready := err == nil && status.DBHealth == "OK"
+	code := http.StatusOK
+	if !ready {
+		code = http.StatusServiceUnavailable
+	}
+	writeJSON(w, code, adminapi.Health{Live: true, Ready: ready})
+}
+
 func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) {
 	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)

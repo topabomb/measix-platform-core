@@ -48,8 +48,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 	g, runCtx := errgroup.WithContext(ctx)
-	g.Go(func() error { return server.NewWithGrace(cfg.PublicListenAddr, a.Public, cfg.ShutdownGrace).Run(runCtx, log) })
-	g.Go(func() error { return server.NewWithGrace(cfg.InternalListenAddr, a.Internal, cfg.ShutdownGrace).Run(runCtx, log) })
+	g.Go(func() error {
+		return server.NewWithGrace(cfg.PublicListenAddr, a.Public, cfg.ShutdownGrace).Run(runCtx, log)
+	})
+	g.Go(func() error {
+		return server.NewWithGrace(cfg.InternalListenAddr, a.Internal, cfg.ShutdownGrace).Run(runCtx, log)
+	})
 	g.Go(func() error {
 		err := sender.Run(runCtx, cfg.UsageFlushInterval)
 		if errors.Is(err, context.Canceled) {

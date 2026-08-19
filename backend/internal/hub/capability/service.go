@@ -19,7 +19,7 @@ import (
 
 var (
 	ErrRevisionConflict = errors.New("draft revision conflict")
-	ErrInvalidDraft      = errors.New("invalid managed draft")
+	ErrInvalidDraft     = errors.New("invalid managed draft")
 )
 
 type DraftView struct {

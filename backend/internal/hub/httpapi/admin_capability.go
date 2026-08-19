@@ -5,15 +5,13 @@ import (
 	"errors"
 	"net/http"
 
-	"measix/platform/ent"
-	"measix/platform/ent/managedrelease"
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/wire/adminapi"
 )
 
 func (h *fullAdminHandler) GetDraft(w http.ResponseWriter, r *http.Request) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -26,7 +24,7 @@ func (h *fullAdminHandler) GetDraft(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *fullAdminHandler) PutDraft(w http.ResponseWriter, r *http.Request, params adminapi.PutDraftParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -36,7 +34,7 @@ func (h *fullAdminHandler) PutDraft(w http.ResponseWriter, r *http.Request, para
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	view, err := h.services.Capability.PutDraft(r.Context(), admin.ID, request.ExpectedDraftRevision, request.Content)
+	view, err := h.services.Capability.PutDraft(r.Context(), admin.UserID, request.ExpectedDraftRevision, request.Content)
 	if errors.Is(err, capability.ErrRevisionConflict) {
 		writeProblem(w, http.StatusConflict, "stale_draft_revision", "Draft revision conflict")
 		return
@@ -49,7 +47,7 @@ func (h *fullAdminHandler) PutDraft(w http.ResponseWriter, r *http.Request, para
 }
 
 func (h *fullAdminHandler) ValidateDraft(w http.ResponseWriter, r *http.Request, params adminapi.ValidateDraftParams) {
-	if _, _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -71,7 +69,7 @@ func (h *fullAdminHandler) ValidateDraft(w http.ResponseWriter, r *http.Request,
 }
 
 func (h *fullAdminHandler) PublishDraft(w http.ResponseWriter, r *http.Request, params adminapi.PublishDraftParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -82,7 +80,7 @@ func (h *fullAdminHandler) PublishDraft(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	result, err := h.services.RuntimeControl.Publish(r.Context(), runtimecontrol.PublishRequest{
-		AdminUserID: admin.ID, IdempotencyKey: params.IdempotencyKey,
+		AdminUserID: admin.UserID, IdempotencyKey: params.IdempotencyKey,
 		ExpectedDraftRevision: request.ExpectedDraftRevision, AcknowledgedWarnings: request.AcknowledgedWarningCodes,
 	})
 	if err != nil {
@@ -93,7 +91,7 @@ func (h *fullAdminHandler) PublishDraft(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *fullAdminHandler) ListReleases(w http.ResponseWriter, r *http.Request, params adminapi.ListReleasesParams) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -101,7 +99,7 @@ func (h *fullAdminHandler) ListReleases(w http.ResponseWriter, r *http.Request, 
 	if params.Limit != nil {
 		limit = *params.Limit
 	}
-	rows, err := h.services.Identity.Client.ManagedRelease.Query().Order(ent.Desc(managedrelease.FieldManagedGeneration)).Limit(limit).All(r.Context())
+	rows, err := h.services.Capability.ListReleases(r.Context(), limit)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
@@ -114,12 +112,12 @@ func (h *fullAdminHandler) ListReleases(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *fullAdminHandler) GetRelease(w http.ResponseWriter, r *http.Request, releaseID adminapi.ReleaseId) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	row, err := h.services.Identity.Client.ManagedRelease.Get(r.Context(), releaseID)
-	if ent.IsNotFound(err) {
+	row, err := h.services.Capability.GetRelease(r.Context(), releaseID)
+	if errors.Is(err, capability.ErrReleaseNotFound) {
 		writeProblem(w, http.StatusNotFound, "release_not_found", "Release not found")
 		return
 	}
@@ -131,12 +129,12 @@ func (h *fullAdminHandler) GetRelease(w http.ResponseWriter, r *http.Request, re
 }
 
 func (h *fullAdminHandler) GetActivation(w http.ResponseWriter, r *http.Request, activationID adminapi.ActivationId) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	row, err := h.services.Identity.Client.Activation.Get(r.Context(), activationID)
-	if ent.IsNotFound(err) {
+	result, err := h.services.RuntimeControl.GetActivation(r.Context(), activationID)
+	if entNotFoundActivation(err) {
 		writeProblem(w, http.StatusNotFound, "activation_not_found", "Activation not found")
 		return
 	}
@@ -144,26 +142,16 @@ func (h *fullAdminHandler) GetActivation(w http.ResponseWriter, r *http.Request,
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
-	result := runtimecontrol.ActivationResult{
-		ActivationID: row.ID, Kind: row.Kind, State: row.State, DesiredControlRevision: int(row.ControlRevision),
-		BundleHash: row.BundleHash, CreatedAt: row.CreatedAt, CompletedAt: row.CompletedAt, ErrorCode: row.ErrorCode,
-	}
-	if row.SubjectID != nil {
-		result.ReleaseID = *row.SubjectID
-	}
-	if row.TargetGeneration != nil {
-		result.TargetManagedGeneration = int(*row.TargetGeneration)
-	}
 	writeJSON(w, http.StatusOK, activationWire(result))
 }
 
 func (h *fullAdminHandler) RepublishRelease(w http.ResponseWriter, r *http.Request, releaseID adminapi.ReleaseId, params adminapi.RepublishReleaseParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	result, err := h.services.RuntimeControl.Republish(r.Context(), admin.ID, params.IdempotencyKey, releaseID)
+	result, err := h.services.RuntimeControl.Republish(r.Context(), admin.UserID, params.IdempotencyKey, releaseID)
 	if err != nil {
 		writeRuntimeControlError(w, err)
 		return
@@ -195,12 +183,14 @@ func activationWire(result runtimecontrol.ActivationResult) adminapi.Activation 
 	return wire
 }
 
-func releaseWire(row *ent.ManagedRelease) adminapi.Release {
+func releaseWire(row capability.ReleaseView) adminapi.Release {
 	return adminapi.Release{
-		ReleaseId: row.ID, ManagedGeneration: int(row.ManagedGeneration), SnapshotHash: row.SnapshotHash,
+		ReleaseId: row.ReleaseID, ManagedGeneration: row.ManagedGeneration, SnapshotHash: row.SnapshotHash,
 		Status: adminapi.ReleaseStatus(row.Status), CreatedAt: row.CreatedAt,
 	}
 }
+
+func entNotFoundActivation(err error) bool { return runtimecontrol.IsActivationNotFound(err) }
 
 func writeRuntimeControlError(w http.ResponseWriter, err error) {
 	switch {

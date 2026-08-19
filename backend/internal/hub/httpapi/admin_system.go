@@ -22,7 +22,7 @@ func (h *fullAdminHandler) SystemHealth(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}

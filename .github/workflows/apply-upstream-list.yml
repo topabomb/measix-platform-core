@@ -1,0 +1,57 @@
+name: Apply Upstream List Green
+
+on:
+  push:
+    branches:
+      - agent/s0-platform-core
+    paths:
+      - .github/patches/apply-upstream-list.patch
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.26.5'
+  NODE_VERSION: '24'
+  PNPM_VERSION: '11.0.0'
+
+jobs:
+  apply-and-generate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - name: Pin pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+      - uses: ariga/setup-atlas@v0
+        with:
+          version: v1.2.0
+      - name: Apply source patch
+        run: git apply --index .github/patches/apply-upstream-list.patch
+      - name: Run canonical generators
+        run: make generate
+      - name: Verify focused Green
+        run: |
+          cd backend
+          go test ./internal/contract ./internal/hub/upstream -count=1
+          cd ../console
+          pnpm test --run
+      - name: Commit generated Green
+        run: |
+          git config user.name 'measix-ci'
+          git config user.email 'actions@users.noreply.github.com'
+          git add api backend console
+          git diff --cached --check
+          git commit -m 'feat: 补齐 Admin Upstream 分页列表契约'
+          git push origin HEAD:agent/s0-platform-core

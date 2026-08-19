@@ -9,20 +9,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
 	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
 )
 
 type PricingRuleRecord struct {
-	ID             string
-	ResourceID     *string
-	UpstreamID     *string
-	Meter          string
-	UnitSize       string
-	UnitPrice      string
-	Currency       string
-	EffectiveFrom  time.Time
-	EffectiveTo    *time.Time
+	ID            string
+	ResourceID    *string
+	UpstreamID    *string
+	Meter         string
+	UnitSize      string
+	UnitPrice     string
+	Currency      string
+	EffectiveFrom time.Time
+	EffectiveTo   *time.Time
 }
 
 func (s *Service) PricingSet(ctx context.Context) (int, []PricingRuleRecord, error) {
@@ -128,5 +127,3 @@ func pricingRevision(rules []PricingRuleRecord) int {
 	}
 	return int(value)
 }
-
-var _ = ent.IsNotFound

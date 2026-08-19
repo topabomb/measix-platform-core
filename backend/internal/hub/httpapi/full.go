@@ -34,7 +34,7 @@ func RegisterFull(router chi.Router, services Services, options Options) {
 		adminHandler: &adminHandler{identity: services.Identity},
 		services:     services,
 	}
-	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity, options: options}}
+	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity, options: options}, capability: services.Capability}
 	adminapi.HandlerFromMux(admin, router)
 	clientapi.HandlerFromMux(client, router)
 }

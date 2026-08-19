@@ -23,5 +23,5 @@
   "operationalLimits": {
     "maxRequestBytes": 10485760
   },
-  "bundleHash": "sha256:72498261c307a4c968bb0930b7bdee233dd6a6e2a11f1435f3080eefef469b0c"
+  "bundleHash": "sha256:69f5c6a3bffa37b35167b8b2d789dbcd89d0604bee90c921c8234b1888cd0808"
 }

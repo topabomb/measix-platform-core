@@ -20,6 +20,7 @@ import (
 var (
 	ErrRevisionConflict = errors.New("draft revision conflict")
 	ErrInvalidDraft     = errors.New("invalid managed draft")
+	ErrReleaseNotFound  = errors.New("managed release not found")
 )
 
 type DraftView struct {
@@ -40,6 +41,51 @@ type ReleaseView struct {
 	SnapshotHash      string
 	Status            string
 	CreatedAt         time.Time
+}
+
+type SnapshotView struct {
+	JSON []byte
+	Hash string
+}
+
+func (s *Service) ListReleases(ctx context.Context, limit int) ([]ReleaseView, error) {
+	if limit < 1 || limit > 200 {
+		limit = 50
+	}
+	rows, err := s.Client.ManagedRelease.Query().Order(ent.Desc(managedrelease.FieldManagedGeneration)).Limit(limit).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]ReleaseView, 0, len(rows))
+	for _, row := range rows {
+		views = append(views, ReleaseView{ReleaseID: row.ID, ManagedGeneration: int(row.ManagedGeneration), SnapshotHash: row.SnapshotHash, Status: row.Status, CreatedAt: row.CreatedAt})
+	}
+	return views, nil
+}
+
+func (s *Service) GetRelease(ctx context.Context, releaseID string) (ReleaseView, error) {
+	row, err := s.Client.ManagedRelease.Get(ctx, releaseID)
+	if ent.IsNotFound(err) {
+		return ReleaseView{}, ErrReleaseNotFound
+	}
+	if err != nil {
+		return ReleaseView{}, err
+	}
+	return ReleaseView{ReleaseID: row.ID, ManagedGeneration: int(row.ManagedGeneration), SnapshotHash: row.SnapshotHash, Status: row.Status, CreatedAt: row.CreatedAt}, nil
+}
+
+func (s *Service) GetSnapshot(ctx context.Context, generation int) (SnapshotView, error) {
+	row, err := s.Client.ManagedRelease.Query().Where(
+		managedrelease.ManagedGenerationEQ(int64(generation)),
+		managedrelease.StatusIn("ACTIVE", "SUPERSEDED"),
+	).Only(ctx)
+	if ent.IsNotFound(err) {
+		return SnapshotView{}, ErrReleaseNotFound
+	}
+	if err != nil {
+		return SnapshotView{}, err
+	}
+	return SnapshotView{JSON: append([]byte(nil), row.SnapshotJSON...), Hash: row.SnapshotHash}, nil
 }
 
 type Service struct {

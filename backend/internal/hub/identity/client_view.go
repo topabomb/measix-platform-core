@@ -39,8 +39,8 @@ func (s *Service) ManagedState(ctx context.Context) (ManagedStateView, error) {
 		return ManagedStateView{}, err
 	}
 	return ManagedStateView{
-		ActiveManagedGeneration: state.ActiveManagedGeneration,
-		ManagedStateRevision:    state.ManagedStateRevision,
+		ActiveManagedGeneration: int(state.ActiveManagedGeneration),
+		ManagedStateRevision:    int(state.ManagedStateRevision),
 		RuntimeStatus:           state.RuntimeStatus,
 	}, nil
 }

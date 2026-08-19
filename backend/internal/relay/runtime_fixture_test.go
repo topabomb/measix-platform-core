@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
 	relayruntime "github.com/topabomb/measix-platform-core/backend/internal/relay/runtime"
 	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
@@ -18,10 +19,59 @@ import (
 	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
 )
 
+type testAccessClaims struct {
+	DeploymentID string `json:"deploymentId"`
+	DeviceID     string `json:"deviceId"`
+	SessionID    string `json:"sessionId"`
+	jwt.RegisteredClaims
+}
+
+type testAccessSigner struct {
+	privateKey   ed25519.PrivateKey
+	deploymentID string
+	kid          string
+	now          time.Time
+}
+
+func (s *testAccessSigner) sign(t *testing.T, userID, deviceID, sessionID string) string {
+	t.Helper()
+	claims := testAccessClaims{
+		DeploymentID: s.deploymentID,
+		DeviceID:     deviceID,
+		SessionID:    sessionID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    s.deploymentID,
+			Subject:   userID,
+			Audience:  jwt.ClaimStrings{"client", "runtime"},
+			IssuedAt:  jwt.NewNumericDate(s.now),
+			ExpiresAt: jwt.NewNumericDate(s.now.Add(10 * time.Minute)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+	token.Header["kid"] = s.kid
+	value, err := token.SignedString(s.privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func (s *testAccessSigner) publicJWK() relaycontrolapi.PublicJwk {
+	publicKey := s.privateKey.Public().(ed25519.PublicKey)
+	return relaycontrolapi.PublicJwk{
+		Kty: relaycontrolapi.OKP,
+		Crv: relaycontrolapi.Ed25519,
+		Alg: relaycontrolapi.EdDSA,
+		Use: relaycontrolapi.Sig,
+		Kid: s.kid,
+		X:   base64.RawURLEncoding.EncodeToString(publicKey),
+	}
+}
+
 type runtimeFixture struct {
 	store         *control.Store
 	server        *httptest.Server
-	signer        *security.AccessSigner
+	signer        *testAccessSigner
 	userID        string
 	deviceID      string
 	sessionID     string
@@ -31,19 +81,8 @@ type runtimeFixture struct {
 func newRuntimeFixture(t *testing.T, state relaycontrolapi.RuntimeControlState, privateKey ed25519.PrivateKey) *runtimeFixture {
 	t.Helper()
 	now := time.Date(2026, 8, 19, 9, 0, 0, 0, time.UTC)
-	signer, err := security.NewAccessSigner(privateKey, state.DeploymentId, "i4-key", 10*time.Minute)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer.Now = func() time.Time { return now }
-	state.AuthKeys = []relaycontrolapi.PublicJwk{{
-		Kty: relaycontrolapi.OKP,
-		Crv: relaycontrolapi.Ed25519,
-		Alg: relaycontrolapi.EdDSA,
-		Use: relaycontrolapi.Sig,
-		Kid: "i4-key",
-		X:   signer.PublicJWK()["x"],
-	}}
+	signer := &testAccessSigner{privateKey: privateKey, deploymentID: state.DeploymentId, kid: "i4-key", now: now}
+	state.AuthKeys = []relaycontrolapi.PublicJwk{signer.publicJWK()}
 	hash, err := relaystate.HashDescriptor(state)
 	if err != nil {
 		t.Fatal(err)
@@ -71,15 +110,11 @@ func (f *runtimeFixture) request(t *testing.T, ctx context.Context, method, reso
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	token, _, err := f.signer.Sign(f.userID, f.deviceID, f.sessionID)
-	if err != nil {
-		t.Fatal(err)
-	}
 	request, err := http.NewRequestWithContext(ctx, method, f.server.URL+"/runtime/v1/resources/"+resourceID+path, body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Authorization", "Bearer "+f.signer.sign(t, f.userID, f.deviceID, f.sessionID))
 	request.Header.Set("X-Measix-Managed-Generation", "1")
 	request.Header.Set("X-Measix-Interaction-Id", f.interactionID)
 	if contentType != "" {

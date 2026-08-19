@@ -128,3 +128,25 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	snapshot.Metadata.PublishedByUserId = metadata.PublishedByUserID
 	return snapshot, hash, nil
 }
+
+// HashSnapshot recomputes the canonical hash of a decoded managed snapshot.
+// It is shared by contract tests and downstream verification tooling so the
+// canonical descriptor is not reimplemented outside the capability boundary.
+func HashSnapshot(snapshot clientapi.ManagedSnapshot) (string, error) {
+	metadata := snapshotMetadata{PublishedAt: snapshot.Metadata.PublishedAt}
+	if snapshot.Metadata.PublishedByUserId != nil {
+		value := string(*snapshot.Metadata.PublishedByUserId)
+		metadata.PublishedByUserID = &value
+	}
+	descriptor := snapshotDescriptor{
+		DeploymentID: string(snapshot.DeploymentId), SchemaVersion: int(snapshot.SchemaVersion), ManagedGeneration: snapshot.ManagedGeneration,
+		ReleaseID: string(snapshot.ReleaseId), Providers: snapshot.Providers, Models: snapshot.Models, TTS: snapshot.Tts, ASR: snapshot.Asr, MCP: snapshot.Mcp,
+		Policy: snapshot.Policy, Metadata: metadata,
+	}
+	payload, err := json.Marshal(descriptor)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(payload)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}

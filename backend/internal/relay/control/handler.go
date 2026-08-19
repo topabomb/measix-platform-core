@@ -1,6 +1,7 @@
 package control
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -12,15 +13,28 @@ import (
 	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
 )
 
+type SpoolStatus struct {
+	State            relaycontrolapi.ControlStatusSpoolState
+	PendingCount     int
+	OldestAgeSeconds *int
+}
+
+type SpoolStatusProvider func(context.Context) (SpoolStatus, error)
+
 type handler struct {
 	relaycontrolapi.Unimplemented
-	store        *Store
-	serviceToken string
+	store          *Store
+	serviceToken   string
+	spoolStatus    SpoolStatusProvider
 }
 
 func NewHandler(store *Store, serviceToken string) http.Handler {
+	return NewHandlerWithSpoolStatus(store, serviceToken, nil)
+}
+
+func NewHandlerWithSpoolStatus(store *Store, serviceToken string, statusProvider SpoolStatusProvider) http.Handler {
 	router := chi.NewRouter()
-	relaycontrolapi.HandlerFromMux(&handler{store: store, serviceToken: serviceToken}, router)
+	relaycontrolapi.HandlerFromMux(&handler{store: store, serviceToken: serviceToken, spoolStatus: statusProvider}, router)
 	return router
 }
 
@@ -54,7 +68,19 @@ func (h *handler) GetControlStatus(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusUnauthorized, "invalid_service_credential", "Unauthorized")
 		return
 	}
-	writeJSON(w, http.StatusOK, h.store.Status())
+	status := h.store.Status()
+	if h.spoolStatus != nil {
+		extra, err := h.spoolStatus(r.Context())
+		if err != nil {
+			degraded := relaycontrolapi.METERINGDEGRADED
+			status.SpoolState = &degraded
+		} else {
+			status.SpoolState = &extra.State
+			status.SpoolPendingCount = &extra.PendingCount
+			status.OldestPendingAgeSeconds = extra.OldestAgeSeconds
+		}
+	}
+	writeJSON(w, http.StatusOK, status)
 }
 
 func (h *handler) authorized(r *http.Request) bool {

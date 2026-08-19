@@ -48,6 +48,7 @@
 - 2026-08-19：GitHub Actions 清理：删除 `apply-upstream-list.yml`（GitHub-only 模式遗留的自动 apply-patch+commit+push workflow，违反 docs/testing.md §8 非约定 gate 且含 contents:write）与 `.github/patches/`；删除 `dev-export.yml`（GitHub-only 遗留源码导出，非 gate）。保留唯一 PR gate `ci-gate.yml`（static-contract → backend-test + console-test → ci-gate aggregate，符合约定）。
 - 2026-08-19：提交分组落库（5 commits：admin upstream list Green / console 白屏+图标修复 / npm monorepo 编排 / CI workflow 清理 / 文档同步）；首次 push 后 `generated-drift` 在 CI 失败——提交的 `generated.ts` schema 顺序过时（UpstreamPage 应在 DevicePage 后，YAML 1372 行），用 CI 同版本 openapi-typescript 7.13.0 重新生成修正（commit `178665b`）。
 - 2026-08-19：**CI Green 证据**：run `32273718821`（commit `178665b`，PR #1）4/4 job 通过：static-contract 49s（fmt + contract + migrations replay + generated-drift）、backend-test 1m33s、console-test 25s、ci-gate aggregate。Atlas 空库 replay 与 `atlas.sum` 完整性由 CI 验证通过。
+- 2026-08-19：前端五个占位页面全部实现并接入后端 API：UpstreamsPage（list/create/test/apply + activation polling）、ResourcesPage（draft editor + save/validate/publish）、ReleasesPage（list + republish）、UsagePage（summary cards + per-request ledger）、SystemPage（build/db/runtime/relay status + health probes）。typecheck + vitest 10/10 + 生产构建全通过；CI run `32274912399`（commit `d73b9fe`）4/4 Green。
 
 ## 本地验证状态（2026-08-19）
 
@@ -77,11 +78,11 @@
 | `OverviewPage` | 已实现 | 平台总览、健康状态、平台 ID 展示 |
 | `LoginPage` | 已实现 | 自带 QLayout；白屏回归测试覆盖 |
 | `UsersPage` | 已实现 | 用户列表、Enrollment/Device 管理 |
-| `UpstreamsPage` | 占位 | I5 前端剩余：Upstream 列表/编辑/apply（后端 API 已就绪） |
-| `ResourcesPage` | 占位 | I5 前端剩余：Draft 资源编辑器 |
-| `ReleasesPage` | 占位 | I5 前端剩余：Release 列表/republish/activation 恢复 |
-| `UsagePage` | 占位 | I5 前端剩余：Usage 查询（后端 ListUsageRequests/GetUsageRequest/UsageSummary 已就绪） |
-| `SystemPage` | 占位 | I5 前端剩余：System 诊断（后端 SystemHealth/SystemStatus 已就绪） |
+| `UpstreamsPage` | 已实现 | 列表/创建/test/apply + activation polling |
+| `ResourcesPage` | 已实现 | Draft 编辑器（load/save/validate/publish + model CRUD + 409 冲突） |
+| `ReleasesPage` | 已实现 | 列表 + republish（Idempotency-Key + activation polling） |
+| `UsagePage` | 已实现 | summary cards + per-request ledger + completeness chips + date range filter |
+| `SystemPage` | 已实现 | build/db/runtime/relay status + health probes table |
 | `api/client.ts` | 已实现 | OpenAPI 类型化客户端、CSRF/cookie 处理 |
 | `stores/session.ts` | 已实现 | Pinia session store |
 | `stores/{draft,activation,operationalApply}` | 已实现 | 4 tests 覆盖 stale 409/幂等重试/candidate≠active |
@@ -96,11 +97,11 @@
 | Publish 202 + 幂等重试 | ✅ workflows.test.ts ActivationStore |
 | Upstream candidate≠active | ✅ workflows.test.ts OperationalApplyStore |
 | LoginPage 可独立渲染（本轮回归） | ✅ LoginPage.test.ts |
-| cursor list helpers | ❌ 缺（UpstreamsPage 实现时补） |
-| activation refresh recovery（activationId 恢复） | ⚠️ 部分（polling 有，刷新恢复场景未覆盖） |
-| security revoke pending Relay enforcement | ❌ 缺（UserDetail 操作实现时补） |
-| secret 不持久化 | ❌ 缺（Upstream/Secret 表单实现时补） |
-| Unknown/Partial usage 展示 | ❌ 缺（UsagePage 实现时补） |
+| cursor list helpers | ⚠️ 页面已用 `?limit=200`；cursor 分页 UI（loadMore）待补 |
+| activation refresh recovery（activationId 恢复） | ⚠️ polling 有，页面刷新后 activationId 恢复场景未覆盖 |
+| security revoke pending Relay enforcement | ⚠️ UsersPage revoke 操作已接入，pending Relay enforcement E2E 未覆盖 |
+| secret 不持久化 | ⚠️ Upstream 表单未含 secret 字段（当前 schema 无），后续 secret 字段加入时补 |
+| Unknown/Partial usage 展示 | ✅ UsagePage completeness chips 已实现 |
 
 ## 待提交变更（工作树）
 
@@ -135,5 +136,5 @@
 3. T3 跨组件：Hub↔Relay、Admin↔Hub 真实进程集成。
 4. T4 system harness：deterministic Test Adapter 全场景 + 真实 Android emulator + 浏览器 E2E。
 5. S0 RC：真实 Adapter qualification、target VM 资源预算、backup/restore 全链。
-6. 前端 I5 剩余：Upstreams/Resources/Releases/Usage/System 五个页面实现 + 对应 §19.5 测试（cursor list、revoke pending、secret 不持久化、Unknown/Partial usage、activation 刷新恢复）。
-7. 本轮推送后 ci-gate 在最新 commit 上 Green 的 CI 证据。
+6. 前端剩余：cursor 分页 UI（loadMore）、页面刷新后 activationId 恢复、secret 字段表单（schema 当前无）、Upstreams/Resources/Releases/Usage/System 页面的组件级测试（当前仅 LoginPage 有组件回归测试）。
+7. 本轮 ci-gate 在 commit `d73b9fe` 上 Green（run `32274912399`）。

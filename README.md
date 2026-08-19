@@ -4,14 +4,33 @@
 
 ## Architecture authority
 
-Product semantics, platform terminology, S0 scope, cross-component behavior, component architecture, and required S0 test scenarios are **not redefined in this repository**.
+Product semantics, platform terminology, S0 scope, cross-component behavior, component architecture, delivery gates and required S0 test scenarios are **not redefined in this repository**.
 
 The authoritative architecture repository is:
 
 - `topabomb/measix-architecture`
-- S0: `docs/10-runtime-foundation/s0/`
+- S0 documents: `docs/10-runtime-foundation/s0/`
 
-Start with `ARCHITECTURE.md` and `docs/documentation-governance.md` before making implementation changes.
+Current S0 delivery order is governed by architecture as:
+
+```text
+S0 Core foundation
+  → S0.1 Managed Capability Delivery
+  → S0.2 Android Managed Runtime Integration
+  → S0 Exit
+```
+
+`S0.1` and `S0.2` are delivery sub-stages inside S0; S1 remains Agent Space.
+
+Start with `ARCHITECTURE.md`, `docs/documentation-governance.md` and `docs/s0-execution-progress.md` before making implementation changes.
+
+## Current implementation status
+
+The active implementation branch/PR contains most of the original S0 Core backend foundation, but **must not be described as S0-complete or Android-ready yet**.
+
+The current implementation target is **S0.1 Managed Capability Delivery**: complete the Admin → Hub → Relay → Adapter → Usage/Cost product loop, align and freeze the Client Snapshot/OpenAPI contract, pass the S0.1 pre-Android system gate, and produce the freeze manifest required before S0.2 Android work starts.
+
+See `docs/s0-execution-progress.md` for the authoritative implementation status and remaining gaps in this repository.
 
 ## Repository responsibilities
 
@@ -24,7 +43,8 @@ This repository owns implementation facts and executable artifacts, including:
 - Ent schema and Atlas versioned migrations;
 - component integration tests;
 - Upstream Adapter qualification harness;
-- S0 cross-component/system test harness and reports;
+- S0.1 pre-Android capability-delivery system harness;
+- final S0 cross-component/system test harness and reports;
 - CI workflows, build, local-development and operational procedures.
 
 ## Target structure
@@ -62,13 +82,14 @@ The structure above is the S0 implementation target. Concrete directories are cr
 | `AGENTS.md` | repository rules for AI/coding agents |
 | `CONTRIBUTING.md` | contribution, PR and change-classification workflow |
 | `docs/documentation-governance.md` | documentation authority and synchronization with `measix-architecture` |
+| `docs/s0-execution-progress.md` | current S0/S0.1 implementation plan, evidence and remaining gaps |
 | `docs/development.md` | local and GitHub-only development workflow |
-| `docs/api-contracts.md` | OpenAPI, fixtures and code-generation ownership |
-| `docs/testing.md` | executable testing conventions, CI layers and evidence |
+| `docs/api-contracts.md` | OpenAPI, fixtures, code generation and S0.1 client-contract freeze ownership |
+| `docs/testing.md` | executable testing conventions, S0.1/S0.2 gates, CI layers and evidence |
 | `docs/tdd.md` | mandatory TDD workflow, including GitHub-only Red/Green verification |
 | `docs/database-migrations.md` | Ent / Atlas / SQLite migration workflow |
 | `docs/operations.md` | runtime configuration, health, backup, restore and upgrade procedures |
-| `docs/release.md` | release-candidate composition and reproducible S0 verification |
+| `docs/release.md` | S0.1 freeze-candidate and final S0 release-candidate composition/evidence |
 
 ## Development principle
 

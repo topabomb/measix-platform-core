@@ -21,7 +21,13 @@ type transportKey struct {
 	idleMs           int
 }
 
-func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string) {
+type proxyResult struct {
+	UpstreamStatus *int
+	ErrorClass     string
+}
+
+func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string) proxyResult {
+	result := proxyResult{}
 	target := targetURL(upstream.BaseURL, runtimePath, r.URL.RawQuery)
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(request *httputil.ProxyRequest) {
@@ -34,6 +40,8 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 		Transport:     h.transportFor(route.TimeoutPolicy),
 		FlushInterval: -1,
 		ModifyResponse: func(response *http.Response) error {
+			status := response.StatusCode
+			result.UpstreamStatus = &status
 			if response.StatusCode >= 300 && response.StatusCode < 400 && response.Header.Get("Location") != "" {
 				return errUpstreamRedirect
 			}
@@ -41,12 +49,21 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 			response.Header.Set("X-Measix-Request-Id", requestID)
 			return nil
 		},
-		ErrorHandler: func(writer http.ResponseWriter, _ *http.Request, err error) {
-			if errors.Is(err, errUpstreamRedirect) {
+		ErrorHandler: func(writer http.ResponseWriter, request *http.Request, err error) {
+			switch {
+			case errors.Is(err, errUpstreamRedirect):
+				result.ErrorClass = "UPSTREAM_PROTOCOL_ERROR"
 				writeProblem(writer, http.StatusBadGateway, "upstream_protocol_error", "Upstream redirect is not allowed", requestID, nil, true)
-				return
+			case errors.Is(err, context.Canceled) || errors.Is(request.Context().Err(), context.Canceled):
+				result.ErrorClass = "CLIENT_CANCELLED"
+				writeProblem(writer, http.StatusBadGateway, "upstream_unavailable", "Upstream request cancelled", requestID, nil, true)
+			case errors.Is(err, context.DeadlineExceeded) || errors.Is(request.Context().Err(), context.DeadlineExceeded):
+				result.ErrorClass = "UPSTREAM_TIMEOUT"
+				writeProblem(writer, http.StatusGatewayTimeout, "upstream_timeout", "Upstream timeout", requestID, nil, true)
+			default:
+				result.ErrorClass = "UPSTREAM_UNAVAILABLE"
+				writeProblem(writer, http.StatusBadGateway, "upstream_unavailable", "Upstream unavailable", requestID, nil, true)
 			}
-			writeProblem(writer, http.StatusBadGateway, "upstream_unavailable", "Upstream unavailable", requestID, nil, true)
 		},
 	}
 
@@ -58,6 +75,7 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 		request = r.WithContext(ctx)
 	}
 	proxy.ServeHTTP(w, request)
+	return result
 }
 
 func (h *Handler) transportFor(policy relaycontrolapi.TimeoutPolicy) http.RoundTripper {

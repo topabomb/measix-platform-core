@@ -98,8 +98,8 @@ func TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck(t *testing.T) {
 	service.Now = func() time.Time { return now }
 	key := platformid.New(platformid.Idempotency)
 	result, err := service.Publish(ctx, runtimecontrol.PublishRequest{
-		AdminUserID:          boot.AdminUserID,
-		IdempotencyKey:       key,
+		AdminUserID:           boot.AdminUserID,
+		IdempotencyKey:        key,
 		ExpectedDraftRevision: updated.DraftRevision,
 	})
 	if err != nil {
@@ -133,8 +133,8 @@ func TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck(t *testing.T) {
 	}
 
 	replay, err := service.Publish(ctx, runtimecontrol.PublishRequest{
-		AdminUserID:          boot.AdminUserID,
-		IdempotencyKey:       key,
+		AdminUserID:           boot.AdminUserID,
+		IdempotencyKey:        key,
 		ExpectedDraftRevision: updated.DraftRevision,
 	})
 	if err != nil {
@@ -152,8 +152,8 @@ func TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck(t *testing.T) {
 	}
 
 	_, err = service.Publish(ctx, runtimecontrol.PublishRequest{
-		AdminUserID:          boot.AdminUserID,
-		IdempotencyKey:       key,
+		AdminUserID:           boot.AdminUserID,
+		IdempotencyKey:        key,
 		ExpectedDraftRevision: updated.DraftRevision + 1,
 	})
 	if !runtimecontrol.IsIdempotencyConflict(err) {

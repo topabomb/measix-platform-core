@@ -663,6 +663,10 @@ export interface components {
             items: components["schemas"]["Device"][];
             nextCursor?: string;
         };
+        UpstreamPage: {
+            items: components["schemas"]["Upstream"][];
+            nextCursor?: string;
+        };
         Activation: {
             activationId: components["schemas"]["ActivationId"];
             /** @enum {string} */
@@ -704,10 +708,6 @@ export interface components {
             /** @enum {string} */
             status: "INACTIVE" | "ACTIVE" | "APPLYING" | "DEGRADED" | "DISABLED";
             config?: components["schemas"]["UpstreamConfig"];
-        };
-        UpstreamPage: {
-            items: components["schemas"]["Upstream"][];
-            nextCursor?: string;
         };
         CreateUpstreamRequest: {
             config: components["schemas"]["UpstreamConfig"];

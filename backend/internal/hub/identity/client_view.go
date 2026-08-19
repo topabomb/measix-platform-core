@@ -3,8 +3,6 @@ package identity
 import (
 	"context"
 	"time"
-
-	"github.com/topabomb/measix-platform-core/backend/ent"
 )
 
 type DiscoveryView struct {
@@ -14,17 +12,17 @@ type DiscoveryView struct {
 
 type ManagedStateView struct {
 	ActiveManagedGeneration int
-	ManagedStateRevision     int
-	RuntimeStatus            string
+	ManagedStateRevision    int
+	RuntimeStatus           string
 }
 
 type BootstrapView struct {
-	Principal      AccessPrincipal
-	DeploymentName string
-	UserDisplayName string
-	DeviceStatus   string
+	Principal        AccessPrincipal
+	DeploymentName   string
+	UserDisplayName  string
+	DeviceStatus     string
 	SessionExpiresAt time.Time
-	ManagedState   ManagedStateView
+	ManagedState     ManagedStateView
 }
 
 func (s *Service) Discovery(ctx context.Context) (DiscoveryView, error) {
@@ -42,8 +40,8 @@ func (s *Service) ManagedState(ctx context.Context) (ManagedStateView, error) {
 	}
 	return ManagedStateView{
 		ActiveManagedGeneration: state.ActiveManagedGeneration,
-		ManagedStateRevision:     state.ManagedStateRevision,
-		RuntimeStatus:            state.RuntimeStatus,
+		ManagedStateRevision:    state.ManagedStateRevision,
+		RuntimeStatus:           state.RuntimeStatus,
 	}, nil
 }
 
@@ -80,11 +78,4 @@ func (s *Service) BootstrapView(ctx context.Context, accessToken string) (Bootst
 		SessionExpiresAt: se.ExpiresAt,
 		ManagedState:     state,
 	}, nil
-}
-
-func mapNotFound(err error) error {
-	if ent.IsNotFound(err) {
-		return ErrNotFound
-	}
-	return err
 }

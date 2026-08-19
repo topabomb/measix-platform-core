@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   GO_VERSION: '1.26.5'
@@ -14,10 +14,13 @@ env:
 
 jobs:
   export:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: 设置 Go
         uses: actions/setup-go@v6
@@ -43,16 +46,24 @@ jobs:
       - name: 在 CI 固定工具链下重新生成
         run: make generate
 
-      - name: 打包生成后的已跟踪源码
+      - name: 同步确定性生成物到当前 PR 分支
         run: |
-          git diff --binary > /tmp/generated.patch
-          git ls-files -z | xargs -0 zip -q /tmp/measix-platform-core-generated.zip
+          if git diff --quiet -- backend/go.mod backend/go.sum backend/ent backend/internal/wire backend/migrations/atlas.sum console/pnpm-lock.yaml console/src/api/generated.ts; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/go.mod backend/go.sum backend/ent backend/internal/wire backend/migrations/atlas.sum console/pnpm-lock.yaml console/src/api/generated.ts
+          git commit -m "同步确定性生成物"
+          git push origin HEAD:${{ github.head_ref }}
+
+      - name: 打包当前已跟踪源码
+        run: |
+          git ls-files -z | xargs -0 zip -q /tmp/measix-platform-core-source.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: measix-platform-core-generated
-          path: |
-            /tmp/measix-platform-core-generated.zip
-            /tmp/generated.patch
+          name: measix-platform-core-source
+          path: /tmp/measix-platform-core-source.zip
           if-no-files-found: error
           retention-days: 1

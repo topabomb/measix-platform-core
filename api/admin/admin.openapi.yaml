@@ -481,6 +481,22 @@ paths:
         schema:
           $ref: '#/components/schemas/ActivationId'
   /api/admin/v1/upstreams:
+    get:
+      operationId: listUpstreams
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters: &id009
+      - *id004
+      - *id005
     post:
       operationId: createUpstream
       responses:
@@ -1351,6 +1367,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Device'
+        nextCursor:
+          type: string
+    UpstreamPage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Upstream'
         nextCursor:
           type: string
     Activation:

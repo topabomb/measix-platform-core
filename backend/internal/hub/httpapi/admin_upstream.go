@@ -57,10 +57,17 @@ func (h *fullAdminHandler) ReplaceSecret(w http.ResponseWriter, r *http.Request,
 	writeJSON(w, http.StatusOK, adminapi.Secret{SecretId: view.SecretID, Name: view.Name, SecretVersion: view.SecretVersion})
 }
 
-func (h *fullAdminHandler) ListUpstreams(w http.ResponseWriter, r *http.Request) {
+func (h *fullAdminHandler) ListUpstreams(w http.ResponseWriter, r *http.Request, params adminapi.ListUpstreamsParams) {
 	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
+	}
+	limit := 50
+	if params.Limit != nil {
+		limit = *params.Limit
+	}
+	if limit < 1 || limit > 200 {
+		limit = 50
 	}
 	rows, err := h.services.Upstream.ListUpstreams(r.Context())
 	if err != nil {
@@ -71,7 +78,7 @@ func (h *fullAdminHandler) ListUpstreams(w http.ResponseWriter, r *http.Request)
 	for _, row := range rows {
 		items = append(items, upstreamWire(row))
 	}
-	writeJSON(w, http.StatusOK, items)
+	writeJSON(w, http.StatusOK, adminapi.UpstreamPage{Items: items})
 }
 
 func (h *fullAdminHandler) CreateUpstream(w http.ResponseWriter, r *http.Request, params adminapi.CreateUpstreamParams) {

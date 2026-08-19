@@ -283,7 +283,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["listUpstreams"];
         put?: never;
         post: operations["createUpstream"];
         delete?: never;
@@ -704,6 +704,10 @@ export interface components {
             /** @enum {string} */
             status: "INACTIVE" | "ACTIVE" | "APPLYING" | "DEGRADED" | "DISABLED";
             config?: components["schemas"]["UpstreamConfig"];
+        };
+        UpstreamPage: {
+            items: components["schemas"]["Upstream"][];
+            nextCursor?: string;
         };
         CreateUpstreamRequest: {
             config: components["schemas"]["UpstreamConfig"];
@@ -1452,6 +1456,31 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    listUpstreams: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpstreamPage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
         };
     };
     createUpstream: {

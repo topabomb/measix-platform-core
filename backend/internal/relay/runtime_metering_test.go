@@ -1,6 +1,7 @@
 package relay_test
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -51,9 +52,10 @@ func TestRLYI5RuntimeWritesCapturedRequestUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	responseBody, _ := io.ReadAll(response.Body)
 	_ = response.Body.Close()
 	if response.StatusCode != http.StatusCreated {
-		t.Fatalf("unexpected runtime status: %d", response.StatusCode)
+		t.Fatalf("unexpected runtime status: %d body=%s", response.StatusCode, responseBody)
 	}
 	events := recorder.snapshot()
 	if len(events) != 1 {
@@ -76,9 +78,10 @@ func TestRLYI5RuntimeWritesCapturedRequestUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	staleBody, _ := io.ReadAll(response.Body)
 	_ = response.Body.Close()
 	if response.StatusCode != http.StatusPreconditionRequired || upstreamCalls.Load() != 1 {
-		t.Fatalf("stale generation forwarded unexpectedly: status=%d calls=%d", response.StatusCode, upstreamCalls.Load())
+		t.Fatalf("stale generation forwarded unexpectedly: status=%d calls=%d body=%s", response.StatusCode, upstreamCalls.Load(), staleBody)
 	}
 	events = recorder.snapshot()
 	if len(events) != 2 || events[1].Forwarded || events[1].HttpStatus != http.StatusPreconditionRequired {

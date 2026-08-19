@@ -845,6 +845,12 @@ type UpstreamConfigUsageCapabilityLevel string
 // UpstreamId defines model for UpstreamId.
 type UpstreamId = string
 
+// UpstreamPage defines model for UpstreamPage.
+type UpstreamPage struct {
+	Items      []Upstream `json:"items"`
+	NextCursor *string    `json:"nextCursor,omitempty"`
+}
+
 // UpstreamTestResult defines model for UpstreamTestResult.
 type UpstreamTestResult struct {
 	LatencyMs            *int     `json:"latencyMs,omitempty"`
@@ -980,6 +986,12 @@ type ReplaceSecretParams struct {
 // LogoutAdminParams defines parameters for LogoutAdmin.
 type LogoutAdminParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ListUpstreamsParams defines parameters for ListUpstreams.
+type ListUpstreamsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // CreateUpstreamParams defines parameters for CreateUpstream.
@@ -1215,6 +1227,9 @@ type ServerInterface interface {
 	// (GET /api/admin/v1/system/status)
 	SystemStatus(w http.ResponseWriter, r *http.Request)
 
+	// (GET /api/admin/v1/upstreams)
+	ListUpstreams(w http.ResponseWriter, r *http.Request, params ListUpstreamsParams)
+
 	// (POST /api/admin/v1/upstreams)
 	CreateUpstream(w http.ResponseWriter, r *http.Request, params CreateUpstreamParams)
 
@@ -1358,6 +1373,11 @@ func (_ Unimplemented) SystemHealth(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/admin/v1/system/status)
 func (_ Unimplemented) SystemStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/upstreams)
+func (_ Unimplemented) ListUpstreams(w http.ResponseWriter, r *http.Request, params ListUpstreamsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2129,6 +2149,52 @@ func (siw *ServerInterfaceWrapper) SystemStatus(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SystemStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUpstreams operation middleware
+func (siw *ServerInterfaceWrapper) ListUpstreams(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUpstreamsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUpstreams(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3143,6 +3209,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/activations/{activationId}", wrapper.GetActivation)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/upstreams", wrapper.ListUpstreams)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/upstreams", wrapper.CreateUpstream)

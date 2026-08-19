@@ -25,7 +25,7 @@ func New(serviceToken string) *App {
 		h.SetReady(store.Current() != nil)
 		h.Ready(w, r)
 	})
-	pub.Mount("/runtime/v1/resources", relayruntime.NewHandler(store))
+	pub.Handle("/runtime/v1/resources/*", relayruntime.NewHandler(store))
 
 	internal := chi.NewRouter()
 	internal.Get("/live", h.Live)

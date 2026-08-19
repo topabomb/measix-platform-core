@@ -28,9 +28,9 @@ import (
 )
 
 var (
-	ErrIdempotencyConflict = errors.New("idempotency key reused with different request")
+	ErrIdempotencyConflict  = errors.New("idempotency key reused with different request")
 	ErrActivationInProgress = errors.New("another runtime activation is in progress")
-	ErrRelayAckMismatch      = errors.New("relay acknowledgement does not match desired state")
+	ErrRelayAckMismatch     = errors.New("relay acknowledgement does not match desired state")
 )
 
 const defaultMaxRequestBytes = 10 << 20
@@ -546,7 +546,7 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 			RuntimeRouteId: binding.RuntimeRouteId, UpstreamId: binding.UpstreamId,
 			AllowedMethods: append([]string(nil), binding.AllowedMethods...), AllowedPathPrefixes: append([]string(nil), binding.AllowedPathPrefixes...),
 			TransportPolicy: relaycontrolapi.RuntimeRouteSpecTransportPolicy(binding.TransportPolicy),
-			TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: timeout.ConnectMs, ResponseHeaderMs: timeout.ResponseHeaderMs, IdleMs: timeout.IdleMs},
+			TimeoutPolicy:   relaycontrolapi.TimeoutPolicy{ConnectMs: timeout.ConnectMs, ResponseHeaderMs: timeout.ResponseHeaderMs, IdleMs: timeout.IdleMs},
 		})
 	}
 	ids := make([]string, 0, len(upstreamSpecs))

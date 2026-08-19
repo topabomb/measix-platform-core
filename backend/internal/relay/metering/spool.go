@@ -148,7 +148,7 @@ func (s *Spool) Stats(ctx context.Context, now time.Time) (Stats, error) {
 	var oldest sql.NullString
 	var failed int
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*),MIN(created_at),SUM(CASE WHEN last_error_code IS NOT NULL THEN 1 ELSE 0 END) FROM request_usage_spool`,
+		`SELECT COUNT(*),MIN(created_at),COALESCE(SUM(CASE WHEN last_error_code IS NOT NULL THEN 1 ELSE 0 END),0) FROM request_usage_spool`,
 	).Scan(&count, &oldest, &failed); err != nil {
 		return Stats{}, err
 	}

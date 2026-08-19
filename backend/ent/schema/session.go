@@ -13,7 +13,7 @@ func (Session) Fields() []ent.Field {
 		field.String("user_id"),
 		field.String("device_id").Optional().Nillable(),
 		field.String("channel"),
-		field.Bytes("refresh_digest").Optional().Nillable(),
+		field.Bytes("refresh_digest").Optional().Nillable().Unique(),
 		field.Time("expires_at"),
 		field.String("status"),
 		field.Time("created_at"),

@@ -11,7 +11,7 @@ func (Enrollment) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("id").Immutable(),
 		field.String("user_id"),
-		field.Bytes("token_digest"),
+		field.Bytes("token_digest").Unique(),
 		field.Time("expires_at"),
 		field.Time("consumed_at").Optional().Nillable(),
 		field.String("created_by_user_id"),

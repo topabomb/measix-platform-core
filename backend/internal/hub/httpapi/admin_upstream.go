@@ -6,14 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	"measix/platform/ent"
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/hub/upstream"
 	"measix/platform/internal/wire/adminapi"
 )
 
 func (h *fullAdminHandler) CreateSecret(w http.ResponseWriter, r *http.Request, params adminapi.CreateSecretParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -23,7 +22,7 @@ func (h *fullAdminHandler) CreateSecret(w http.ResponseWriter, r *http.Request, 
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	view, err := h.services.Upstream.CreateSecret(r.Context(), admin.ID, request.Name, request.Value)
+	view, err := h.services.Upstream.CreateSecret(r.Context(), admin.UserID, request.Name, request.Value)
 	if err != nil {
 		writeProblem(w, http.StatusUnprocessableEntity, "invalid_secret", "Invalid secret")
 		return
@@ -32,7 +31,7 @@ func (h *fullAdminHandler) CreateSecret(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *fullAdminHandler) ReplaceSecret(w http.ResponseWriter, r *http.Request, secretID adminapi.SecretId, params adminapi.ReplaceSecretParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -42,7 +41,7 @@ func (h *fullAdminHandler) ReplaceSecret(w http.ResponseWriter, r *http.Request,
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	view, err := h.services.Upstream.ReplaceSecret(r.Context(), admin.ID, secretID, request.ExpectedSecretVersion, request.Value)
+	view, err := h.services.Upstream.ReplaceSecret(r.Context(), admin.UserID, secretID, request.ExpectedSecretVersion, request.Value)
 	if errors.Is(err, upstream.ErrRevisionConflict) {
 		writeProblem(w, http.StatusConflict, "secret_revision_conflict", "Secret revision conflict")
 		return
@@ -59,29 +58,24 @@ func (h *fullAdminHandler) ReplaceSecret(w http.ResponseWriter, r *http.Request,
 }
 
 func (h *fullAdminHandler) ListUpstreams(w http.ResponseWriter, r *http.Request) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	rows, err := h.services.Identity.Client.Upstream.Query().All(r.Context())
+	rows, err := h.services.Upstream.ListUpstreams(r.Context())
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
 	items := make([]adminapi.Upstream, 0, len(rows))
 	for _, row := range rows {
-		view, err := h.services.Upstream.GetUpstream(r.Context(), row.ID)
-		if err != nil {
-			writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
-			return
-		}
-		items = append(items, upstreamWire(view))
+		items = append(items, upstreamWire(row))
 	}
 	writeJSON(w, http.StatusOK, items)
 }
 
 func (h *fullAdminHandler) CreateUpstream(w http.ResponseWriter, r *http.Request, params adminapi.CreateUpstreamParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -91,7 +85,7 @@ func (h *fullAdminHandler) CreateUpstream(w http.ResponseWriter, r *http.Request
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	view, err := h.services.Upstream.CreateUpstream(r.Context(), admin.ID, request.Config)
+	view, err := h.services.Upstream.CreateUpstream(r.Context(), admin.UserID, request.Config)
 	if err != nil {
 		writeProblem(w, http.StatusUnprocessableEntity, "invalid_upstream", "Invalid upstream")
 		return
@@ -100,7 +94,7 @@ func (h *fullAdminHandler) CreateUpstream(w http.ResponseWriter, r *http.Request
 }
 
 func (h *fullAdminHandler) GetUpstream(w http.ResponseWriter, r *http.Request, upstreamID adminapi.UpstreamId) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -117,7 +111,7 @@ func (h *fullAdminHandler) GetUpstream(w http.ResponseWriter, r *http.Request, u
 }
 
 func (h *fullAdminHandler) UpdateUpstream(w http.ResponseWriter, r *http.Request, upstreamID adminapi.UpstreamId, params adminapi.UpdateUpstreamParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -127,7 +121,7 @@ func (h *fullAdminHandler) UpdateUpstream(w http.ResponseWriter, r *http.Request
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	view, err := h.services.Upstream.UpdateUpstream(r.Context(), admin.ID, upstreamID, request.ExpectedConfigRevision, request.Config)
+	view, err := h.services.Upstream.UpdateUpstream(r.Context(), admin.UserID, upstreamID, request.ExpectedConfigRevision, request.Config)
 	if errors.Is(err, upstream.ErrRevisionConflict) {
 		writeProblem(w, http.StatusConflict, "upstream_revision_conflict", "Upstream revision conflict")
 		return
@@ -144,7 +138,7 @@ func (h *fullAdminHandler) UpdateUpstream(w http.ResponseWriter, r *http.Request
 }
 
 func (h *fullAdminHandler) TestUpstream(w http.ResponseWriter, r *http.Request, upstreamID adminapi.UpstreamId, params adminapi.TestUpstreamParams) {
-	if _, _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -179,12 +173,12 @@ func (h *fullAdminHandler) TestUpstream(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *fullAdminHandler) ApplyUpstream(w http.ResponseWriter, r *http.Request, upstreamID adminapi.UpstreamId, params adminapi.ApplyUpstreamParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	result, err := h.services.RuntimeControl.ApplyUpstream(r.Context(), admin.ID, params.IdempotencyKey, upstreamID)
+	result, err := h.services.RuntimeControl.ApplyUpstream(r.Context(), admin.UserID, params.IdempotencyKey, upstreamID)
 	if err != nil {
 		writeRuntimeControlError(w, err)
 		return
@@ -199,5 +193,4 @@ func upstreamWire(view upstream.UpstreamView) adminapi.Upstream {
 	}
 }
 
-var _ *ent.Upstream
 var _ = runtimecontrol.ErrRelayAckMismatch

@@ -4,7 +4,11 @@ ci: fmt-check contract backend-test console-test migrations generated-drift
 
 fmt-check:
 	@files=$$(find backend -name '*.go' -type f -print0 | xargs -0 gofmt -l); \
-	if [ -n "$$files" ]; then echo "Go files need gofmt:"; echo "$$files"; exit 1; fi
+	if [ -n "$$files" ]; then \
+		echo "Go files need gofmt:"; echo "$$files"; \
+		for file in $$files; do gofmt -d "$$file"; done; \
+		exit 1; \
+	fi
 
 contract:
 	cd backend && go test ./internal/contract -count=1

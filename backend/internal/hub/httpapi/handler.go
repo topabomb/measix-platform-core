@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"measix/platform/ent"
 	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/wire/adminapi"
@@ -73,7 +72,7 @@ func (h *adminHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *adminHandler) GetSession(w http.ResponseWriter, r *http.Request) {
-	u, se, err := h.authenticateAdmin(r, "", false)
+	admin, err := h.authenticateAdmin(r, "", false)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -81,17 +80,17 @@ func (h *adminHandler) GetSession(w http.ResponseWriter, r *http.Request) {
 	cookie, _ := r.Cookie(adminSessionCookie)
 	writeJSON(w, http.StatusOK, adminapi.AdminSession{
 		CsrfToken: security.CSRFToken(cookie.Value, h.identity.CSRFKey),
-		ExpiresAt: se.ExpiresAt,
+		ExpiresAt: admin.ExpiresAt,
 		User: adminapi.AdminUserSummary{
-			UserId:      u.ID,
-			DisplayName: u.DisplayName,
-			Role:        adminapi.AdminUserSummaryRole(u.Role),
+			UserId:      admin.UserID,
+			DisplayName: admin.DisplayName,
+			Role:        adminapi.AdminUserSummaryRole(admin.Role),
 		},
 	})
 }
 
 func (h *adminHandler) LogoutAdmin(w http.ResponseWriter, r *http.Request, params adminapi.LogoutAdminParams) {
-	_, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	_, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -106,7 +105,7 @@ func (h *adminHandler) LogoutAdmin(w http.ResponseWriter, r *http.Request, param
 }
 
 func (h *adminHandler) ListUsers(w http.ResponseWriter, r *http.Request, params adminapi.ListUsersParams) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -114,7 +113,7 @@ func (h *adminHandler) ListUsers(w http.ResponseWriter, r *http.Request, params 
 	if params.Limit != nil {
 		limit = *params.Limit
 	}
-	users, err := h.identity.ListUsers(r.Context(), limit)
+	users, err := h.identity.ListUserViews(r.Context(), limit)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -127,7 +126,7 @@ func (h *adminHandler) ListUsers(w http.ResponseWriter, r *http.Request, params 
 }
 
 func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request, params adminapi.CreateUserParams) {
-	if _, _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -136,7 +135,7 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request, params
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	u, err := h.identity.CreateUser(r.Context(), request.Username, request.DisplayName, string(request.Role))
+	u, err := h.identity.CreateUserView(r.Context(), request.Username, request.DisplayName, string(request.Role))
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -145,11 +144,11 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request, params
 }
 
 func (h *adminHandler) GetUser(w http.ResponseWriter, r *http.Request, userID adminapi.UserId) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	u, err := h.identity.GetUser(r.Context(), userID)
+	u, err := h.identity.GetUserView(r.Context(), userID)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -158,7 +157,7 @@ func (h *adminHandler) GetUser(w http.ResponseWriter, r *http.Request, userID ad
 }
 
 func (h *adminHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.UpdateUserParams) {
-	if _, _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -167,7 +166,7 @@ func (h *adminHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userID
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	u, err := h.identity.UpdateUser(r.Context(), userID, request.Username, request.DisplayName, string(request.Role))
+	u, err := h.identity.UpdateUserView(r.Context(), userID, request.Username, request.DisplayName, string(request.Role))
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -176,7 +175,7 @@ func (h *adminHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userID
 }
 
 func (h *adminHandler) SetPassword(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.SetPasswordParams) {
-	if _, _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -193,7 +192,7 @@ func (h *adminHandler) SetPassword(w http.ResponseWriter, r *http.Request, userI
 }
 
 func (h *adminHandler) CreateEnrollment(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.CreateEnrollmentParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -207,7 +206,7 @@ func (h *adminHandler) CreateEnrollment(w http.ResponseWriter, r *http.Request, 
 	if request.ExpiresInSeconds != nil {
 		ttl = time.Duration(*request.ExpiresInSeconds) * time.Second
 	}
-	grant, err := h.identity.CreateEnrollment(r.Context(), userID, admin.ID, ttl)
+	grant, err := h.identity.CreateEnrollment(r.Context(), userID, admin.UserID, ttl)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -216,7 +215,7 @@ func (h *adminHandler) CreateEnrollment(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *adminHandler) ListDevices(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.ListDevicesParams) {
-	if _, _, err := h.authenticateAdmin(r, "", false); err != nil {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -224,7 +223,7 @@ func (h *adminHandler) ListDevices(w http.ResponseWriter, r *http.Request, userI
 	if params.Limit != nil {
 		limit = *params.Limit
 	}
-	devices, err := h.identity.ListDevices(r.Context(), userID, limit)
+	devices, err := h.identity.ListDeviceViews(r.Context(), userID, limit)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -243,12 +242,12 @@ func (h *adminHandler) ListDevices(w http.ResponseWriter, r *http.Request, userI
 	writeJSON(w, http.StatusOK, adminapi.DevicePage{Items: items})
 }
 
-func (h *adminHandler) authenticateAdmin(r *http.Request, csrf string, requireCSRF bool) (*ent.User, *ent.Session, error) {
+func (h *adminHandler) authenticateAdmin(r *http.Request, csrf string, requireCSRF bool) (identity.AdminPrincipalView, error) {
 	cookie, err := r.Cookie(adminSessionCookie)
 	if err != nil {
-		return nil, nil, identity.ErrNotAuthorized
+		return identity.AdminPrincipalView{}, identity.ErrNotAuthorized
 	}
-	return h.identity.AuthenticateAdmin(r.Context(), cookie.Value, csrf, requireCSRF)
+	return h.identity.AuthenticateAdminView(r.Context(), cookie.Value, csrf, requireCSRF)
 }
 
 func (h *clientHandler) Discover(w http.ResponseWriter, r *http.Request) {
@@ -384,7 +383,7 @@ func managedStateWire(state identity.ManagedStateView, applied *int) clientapi.M
 	}
 }
 
-func userWire(u *ent.User) adminapi.User {
+func userWire(u identity.UserView) adminapi.User {
 	return adminapi.User{
 		UserId:      u.ID,
 		Username:    u.Username,

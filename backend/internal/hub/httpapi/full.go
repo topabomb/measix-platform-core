@@ -4,13 +4,13 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/capability"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/identity"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/runtimecontrol"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/upstream"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/usage"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/clientapi"
+	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/hub/identity"
+	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/hub/upstream"
+	"measix/platform/internal/hub/usage"
+	"measix/platform/internal/wire/adminapi"
+	"measix/platform/internal/wire/clientapi"
 )
 
 type Services struct {
@@ -33,7 +33,8 @@ func NewFull(services Services, options Options) http.Handler {
 		adminHandler: &adminHandler{identity: services.Identity},
 		services:     services,
 	}
+	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity, options: options}}
 	adminapi.HandlerFromMux(admin, router)
-	clientapi.HandlerFromMux(&clientHandler{identity: services.Identity, options: options}, router)
+	clientapi.HandlerFromMux(client, router)
 	return router
 }

@@ -1,0 +1,73 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { useSessionStore } from './session'
+import { useDraftStore } from './draft'
+import { useActivationStore } from './activation'
+import { useOperationalApplyStore } from './operationalApply'
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  vi.unstubAllGlobals()
+})
+
+describe('SessionStore', () => {
+  it('restores session and clears it when the central API hook reports 401', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      user: { userId: 'usr_00000000-0000-4000-8000-000000000001', displayName: 'Admin', role: 'ADMIN' },
+      csrfToken: 'csrf-1', expiresAt: '2026-08-19T12:00:00Z',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const store = useSessionStore()
+    await store.restore()
+    expect(store.authenticated).toBe(true)
+    expect(store.csrfToken).toBe('csrf-1')
+    store.clear()
+    expect(store.authenticated).toBe(false)
+    expect(store.csrfToken).toBeUndefined()
+  })
+})
+
+describe('DraftStore', () => {
+  it('keeps local dirty content and stable candidate ids after stale revision conflict', async () => {
+    const initial = {
+      draftId: 'dft_00000000-0000-4000-8000-000000000001', draftRevision: 7,
+      content: { providers: [], models: [], tts: [], asr: [], mcp: [], bindings: [], policy: { policyId: 'pol_00000000-0000-4000-8000-000000000001', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true } },
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, code: 'stale_draft_revision', currentDraftRevision: 8 }), { status: 409, headers: { 'Content-Type': 'application/problem+json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = useDraftStore()
+    await store.load()
+    const modelId = store.addModel('prv_00000000-0000-4000-8000-000000000001')
+    expect(store.dirty).toBe(true)
+    await expect(store.save('csrf-1')).rejects.toMatchObject({ code: 'stale_draft_revision' })
+    expect(store.dirty).toBe(true)
+    expect(store.localContent?.models.some((model) => model.modelId === modelId)).toBe(true)
+    expect(store.conflictRevision).toBe(8)
+  })
+})
+
+describe('ActivationStore', () => {
+  it('reuses one idempotency key for retry and reports success only after COMPLETED', async () => {
+    const store = useActivationStore()
+    const key = store.beginCommand('PUBLISH')
+    expect(key).toMatch(/^idem_/)
+    expect(store.retryKey).toBe(key)
+    store.accept({ activationId: 'act_00000000-0000-4000-8000-000000000001', kind: 'PUBLISH', state: 'APPLYING', desiredControlRevision: 9, createdAt: '2026-08-19T10:00:00Z', updatedAt: '2026-08-19T10:00:00Z' })
+    expect(store.succeeded).toBe(false)
+    store.accept({ activationId: 'act_00000000-0000-4000-8000-000000000001', kind: 'PUBLISH', state: 'COMPLETED', desiredControlRevision: 9, createdAt: '2026-08-19T10:00:00Z', updatedAt: '2026-08-19T10:00:01Z' })
+    expect(store.succeeded).toBe(true)
+    expect(store.retryKey).toBe(key)
+  })
+})
+
+describe('OperationalApplyStore', () => {
+  it('keeps candidate and active revisions distinct while apply is pending', () => {
+    const store = useOperationalApplyStore()
+    store.observe({ upstreamId: 'ups_00000000-0000-4000-8000-000000000001', name: 'adapter', configRevision: 5, activeConfigRevision: 3, status: 'APPLYING' })
+    expect(store.candidateRevision).toBe(5)
+    expect(store.activeRevision).toBe(3)
+    expect(store.pending).toBe(true)
+  })
+})

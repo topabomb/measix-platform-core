@@ -1,0 +1,44 @@
+name: bootstrap-derived
+
+on:
+  push:
+    branches: [agent/s0-platform-core]
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore: regenerate derived artifacts') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/s0-platform-core
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: ariga/setup-atlas@v0
+        with:
+          version: 'v1.2.0'
+      - name: 安装 pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.0 --activate
+      - name: 生成派生产物
+        run: make generate
+      - name: 提交派生产物
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/go.mod backend/go.sum backend/ent backend/internal/wire backend/migrations/atlas.sum console/pnpm-lock.yaml console/src/api/generated.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore: regenerate derived artifacts"
+          git push origin HEAD:agent/s0-platform-core

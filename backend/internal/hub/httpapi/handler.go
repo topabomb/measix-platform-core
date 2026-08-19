@@ -167,7 +167,7 @@ func (h *adminHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userID
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	u, err := h.identity.UpdateUser(r.Context(), userID, request.DisplayName, string(request.Role))
+	u, err := h.identity.UpdateUser(r.Context(), userID, request.Username, request.DisplayName, string(request.Role))
 	if err != nil {
 		writeIdentityError(w, err)
 		return

@@ -376,11 +376,11 @@ func managedStateWire(state identity.ManagedStateView, applied *int) clientapi.M
 	}
 	return clientapi.ManagedState{
 		ActiveManagedGeneration: state.ActiveManagedGeneration,
-		ManagedStateRevision:     state.ManagedStateRevision,
-		RuntimeStatus:            clientapi.ManagedStateRuntimeStatus(state.RuntimeStatus),
-		RuntimeBlocked:           blocked,
-		SyncRequired:             syncRequired,
-		TargetManagedGeneration:  target,
+		ManagedStateRevision:    state.ManagedStateRevision,
+		RuntimeStatus:           clientapi.ManagedStateRuntimeStatus(state.RuntimeStatus),
+		RuntimeBlocked:          blocked,
+		SyncRequired:            syncRequired,
+		TargetManagedGeneration: target,
 	}
 }
 

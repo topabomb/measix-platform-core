@@ -6,6 +6,7 @@ on:
       - agent/s0-platform-core
     paths:
       - .github/patches/apply-upstream-list.patch
+      - .github/workflows/apply-upstream-list.yml
 
 permissions:
   contents: write

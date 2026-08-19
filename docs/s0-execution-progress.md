@@ -1,140 +1,236 @@
-# S0 Platform Core 开发计划与当前进展
+# S0 / S0.1 Platform Core 开发计划与当前进展
 
-> 架构权威：`topabomb/measix-architecture` 默认分支。  
-> 当前架构基线：`c2f517b52d84b1b4de5e5bab46a7a15d936a4e32`（2026-08-19）。  
-> 本轮范围：仅 `measix-platform-core`；不修改 `rikkahub_mcp` 与 `weero-agent-space`。
+> 架构权威：`topabomb/measix-architecture@main`。  
+> 当前架构基线：`e9d5ee4d011a07b438edf2e6f7708457fc6dc8d5`（S0.1/S0.2 delivery sub-stage 已合并）。  
+> 当前交付阶段：**S0.1 Managed Capability Delivery**。  
+> 本仓库范围：`measix-platform-core`（Control Hub + Runtime Relay + Admin Console + executable contracts/tests）；S0.2 Android 实现在 `rikkahub_mcp`，S1 Agent Space 不属于当前阶段。
 
-## 执行规则
+## 1. 当前结论
 
-实现只以当前 `measix-architecture` 默认分支为权威。当前 S0 基线采用 Control Hub / Runtime Relay、SQLite + Ent + Atlas，以及 `PUT /internal/v1/control/state` 的完整 desired-state apply；不实现旧 prepare/barrier/commit 协议。
+当前代码不能再描述为“platform-core I0–I5 已完成，只剩 Android/最终 RC”。新的架构权威把 S0 的实际交付顺序固定为：
 
-行为开发执行 Red → Green → Refactor。面向开发者、评审者和运维人员的说明文档优先使用中文；只有明确给 AI/Agent 使用的执行契约（例如 `AGENTS.md`）以及代码/机器配置按工程需要使用英文。
+```text
+S0 Core foundation
+  → S0.1 Managed Capability Delivery
+  → S0.2 Android Managed Runtime Integration
+  → S0 Exit
+```
 
-## 阶段计划与状态
+现有分支已经具备大量 S0 Core 后端基础，但 **S0.1 尚未完成，Client Snapshot/OpenAPI v1 仍是 pre-freeze，当前不能进入 Android S0.2 实现，也不能宣称 S0 Exit。**
 
-| 阶段 | 本仓库实施范围 | 状态 | 验收证据 |
-|---|---|---|---|
-| I0 工程与可执行契约 | 4 OpenAPI、fixtures、codegen、platformid、Hub/Relay health、SQLite/Ent/Atlas、Quasar shell、T0/T1/T2/CI | 已完成 | Red：commit `28504cef...` / run `32210208203`；生成链 run `32211905037` 已通过 Go module、4×OpenAPI、Ent、TS、Atlas hash；T0 contract tests `SYS-I0-001/002/003` + `TestS0OpenAPISurfacesValidate` + `TestSnapshotAndRuntimeControlGoldenHashes` 本地通过 |
-| I1 Identity & Enrollment | Hub 身份/Enrollment/Session/Admin auth、Admin User/Enrollment/Device | 已完成 | commit `5fe7591 feat: 完成 Users Enrollment 与安全变更流程`；`TestSYSI1001IdentityHTTPClosedLoop`、`TestI1IdentityEnrollmentRefreshAndRevoke`、`TestAdminSessionCookieAndCSRF`、`TestHUBID002/003/005` 本地通过 |
-| I2 Draft & Snapshot | Upstream/Secret、typed Draft aggregate、validation、deterministic Snapshot/ETag、Admin workflow | 已完成 | `TestHUBCAP001DraftOptimisticConcurrencyAndSaveDoesNotActivate`、`TestHUBUPS003SecretVersionsAreAppendOnlyEncryptedAndReferencedPrecisely`、`TestHUBCAP006SnapshotDeterministicAndClientSafe`、`TestHUBCAP008StagedReleaseIsImmutable` 本地通过；Admin Upstream 列表分页（`TestAdminContractExposesUpstreamList`）已 Green |
-| I3 Relay & Publish | full-state atomic apply/status、JWT/admission/route/proxy、Activation/reconcile/republish | 已完成 | `TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck`、`TestI3ControlApplyAndRuntimeAdmission`、`TestI3ControlRevisionConflictKeepsCurrentState`、`TestI3ReconcileFinalizesPublishWhenRelayAppliedButAckWasLost`、`TestI3ReconcileDoesNotBlindlyOverwriteUnexpectedNewerRelay`、`TestI3ActivationDescriptorDoesNotContainCredentialMaterial` 本地通过 |
-| I4 Relay transport completion | Model/SSE、TTS binary、ASR multipart、MCP Streamable HTTP、cancel/limits；Android 源码不在本轮 | Relay 侧已完成 | `TestRLYI4TransportsStreamWithoutProtocolTranslation`（TTS/ASR/MCP 子用例）、`TestRLYI4CancellationPropagatesToUpstream`、`TestRLYI4InFlightRequestKeepsCapturedControlState`、`TestRLYROUTE005*`、`TestRLYHDRCredentialHeaderCannotRestoreReservedHeaders` 本地通过；Android 源码属 `rikkahub_mcp` 仓库，不在本轮 |
-| I5 Metering/Admin/Hardening | Relay SQLite spool、Hub ingest/dedupe/pricing、Admin status/usage、migration/backup/restart/security/load harness | 核心已完成 | `TestRLYI5RuntimeWritesCapturedRequestUsage`、`TestRLYSPHubAckDeletesOnlyAcknowledgedBatch`、`TestRLYSPHubOutageKeepsRowsAndRecordsBackoff`、`TestRLYSPPoison422IsolatedWithoutDroppingGoodRows`、`TestHUBI5RequestUsageBatchIsIdempotent`、`TestHUBI5SemanticUsageDedupeAndCompleteness`、`TestHUBI5PricingUsesSpecificEffectiveRuleAndDecimalArithmetic`、`TestHUBI5UsageIngestHTTPContract`、`TestI5SecurityDisableIsDenyFirstAndEnableIsAllowLast`、`TestI5DeviceRevokeIsAppliedToRelay`、`TestHUBDBIntegrityAndBackupRestore` 本地通过；T4 真实 Adapter/Android emulator/浏览器 E2E 与 target VM 资源验证留待 RC |
+S0.1 的目标不是继续增加后端 CRUD，而是把现有基础收敛成真实可用的产品闭环：
 
-## 本轮边界与 S0 RC 关系
+```text
+Admin Console
+  → Upstream / Secret
+  → Managed Model / TTS / ASR / MCP / Policy
+  → Validate / Client Snapshot Preview
+  → Publish
+  → Runtime Relay
+  → deterministic / qualified Upstream Adapter
+  → Usage / Pricing / Cost / Diagnostics
+  → Client Contract Freeze Manifest
+```
 
-本轮实现所有不依赖 Android 源码修改或 Agent Space 修改的 platform-core 需求。以下跨仓库/外部输入不修改，也不会伪报通过：Android instrumentation/Emulator、`weero-agent-space`、真实外部 Adapter 凭据、最终固定 Android commit 的 T4。platform-core 保留对应接口、fixture、harness 和 manifest 字段。
+语义、required profile、字段和 Gate 以 `measix-architecture` 的 S0.1 文档为唯一权威；本文只记录本仓库的实现状态和证据。
 
-## 当前进展记录
+## 2. 执行规则
 
-- 2026-08-19：重新读取架构仓库当前 `main`，废弃旧 Control Server / Runtime Gateway / barrier-saga 假设。
-- 2026-08-19：确认技术栈为 Go 1.26.x、SQLite + Ent + Atlas、Vue 3 + Quasar、OpenAPI 3.0.3。
-- 2026-08-19：建立实施分支和 Draft PR #1。
-- 2026-08-19：完成真实 TDD Red：GitHub Actions 在 `platformid` 行为断言处失败，而非工具链/配置失败。
-- 2026-08-19：I0 executable source 已落库；4 份 OpenAPI 与 canonical fixtures 可解析。
-- 2026-08-19：GitHub Actions 已实际完成 `go mod tidy → 4×oapi-codegen → Ent → pnpm/openapi-typescript → Atlas hash`；Quasar 3 HTML 入口已修正。
-- 2026-08-19：T0 contract、`platformid`、health、Hub app、generated wire 已进入 Green；当前继续收敛 Ent 生成后依赖与完整 T0/T1/T2 Gate。
-- 2026-08-19：I1 完成（commit `5fe7591`），Identity/Enrollment/Session/Admin auth 全链 T2 通过。
-- 2026-08-19：I2 完成，Upstream/Secret（加密版本化）、Draft（乐观并发）、Snapshot（确定性 hash）、Staged Release（不可变）全部 T2 通过。
-- 2026-08-19：I3 完成，Publish intent 持久化 → Relay ACK → finalize、reconcile、republish、security change（deny-first/allow-last）全部 T2/T3 通过。
-- 2026-08-19：I4 Relay 侧完成，SSE/binary/multipart/MCP Streamable HTTP transport、cancellation、in-flight capture、routing security 全部 T2 通过。
-- 2026-08-19：I5 核心完成，Relay SQLite spool（at-least-once + Hub requestId 去重 + poison row 隔离）、Hub ingest、pricing、usage query、security revoke、DB backup/restore 全部 T2 通过。
-- 2026-08-19：Admin Upstream 列表分页 TDD 完成（Red `TestAdminContractExposesUpstreamList` → Green `GET /api/admin/v1/upstreams` + `UpstreamPage`），OpenAPI + 生成代码 + handler 一致。
-- 2026-08-19：Node 升级至 v24.19.0（满足架构 Node 24 LTS 要求），pnpm 11.0.0 安装；前端 `pnpm typecheck && pnpm test && pnpm build` 本地全通过（3 files / 8 tests）。
-- 2026-08-19：新增根级 `.gitignore`（Go/Node/OpenAPI/Atlas/编辑器）和 `package.json`（monorepo npm scripts 编排：`npm run dev/build/test/test:backend/test:console/contract/generate/drift/ci`）。
-- 2026-08-19：本地运行链路打通：`npm run setup`（密钥生成 + 迁移 + admin bootstrap）→ `npm start`（hub:8080 + relay:8090/8091 + console:9000）→ admin 登录 200 + cookie + CSRF 验证通过；`backend/cmd/devmigrate` 为本地 dev-only 迁移 applier（CI 仍用真实 atlas replay）。
-- 2026-08-19：修复前端白屏回归：`LoginPage` 在 layout 外使用裸 `QPage` → 改为自带 `QLayout→QPageContainer→QPage`；TDD Red→Green 补 `LoginPage.test.ts` 回归测试（Red：QLayout 缺失 + inputs 渲染 0；Green：2 tests passed）。
-- 2026-08-19：修复图标缺失：安装 `@quasar/extras` 并配置 `quasar.config.ts` `extras: ['material-icons']`；验证 build 产物 CSS 含 material-icons font-face + woff/woff2 字体。升级 `@quasar/app-vite` 3.3.0→3.7.0（Windows 路径分隔符 bug）。多语言切换：S0 架构技术栈（admin-console §2.1）未包含 i18n，验收清单亦无此要求，不私自引入 vue-i18n（需先经 measix-architecture Implementation Decision 批准）。
-- 2026-08-19：GitHub Actions 清理：删除 `apply-upstream-list.yml`（GitHub-only 模式遗留的自动 apply-patch+commit+push workflow，违反 docs/testing.md §8 非约定 gate 且含 contents:write）与 `.github/patches/`；删除 `dev-export.yml`（GitHub-only 遗留源码导出，非 gate）。保留唯一 PR gate `ci-gate.yml`（static-contract → backend-test + console-test → ci-gate aggregate，符合约定）。
-- 2026-08-19：提交分组落库（5 commits：admin upstream list Green / console 白屏+图标修复 / npm monorepo 编排 / CI workflow 清理 / 文档同步）；首次 push 后 `generated-drift` 在 CI 失败——提交的 `generated.ts` schema 顺序过时（UpstreamPage 应在 DevicePage 后，YAML 1372 行），用 CI 同版本 openapi-typescript 7.13.0 重新生成修正（commit `178665b`）。
-- 2026-08-19：**CI Green 证据**：run `32273718821`（commit `178665b`，PR #1）4/4 job 通过：static-contract 49s（fmt + contract + migrations replay + generated-drift）、backend-test 1m33s、console-test 25s、ci-gate aggregate。Atlas 空库 replay 与 `atlas.sum` 完整性由 CI 验证通过。
-- 2026-08-19：前端五个占位页面全部实现并接入后端 API：UpstreamsPage（list/create/test/apply + activation polling）、ResourcesPage（draft editor + save/validate/publish）、ReleasesPage（list + republish）、UsagePage（summary cards + per-request ledger）、SystemPage（build/db/runtime/relay status + health probes）。typecheck + vitest 10/10 + 生产构建全通过；CI run `32274912399`（commit `d73b9fe`）4/4 Green。
+- 行为修改继续严格执行 `Red → Green → Refactor`；
+- docs-only 同步不制造人工 Red，但最新提交仍必须经过仓库 CI；
+- OpenAPI/fixture/codegen 修改必须同提交保持 generated drift Green；
+- 任何 Android-visible semantic change 必须先有 architecture authority；
+- Runtime Relay 保持 provider-agnostic，不加入 OpenAI/Anthropic/Google body translation；
+- S0.1 Freeze Gate 之前，`client-control.openapi.yaml`/Snapshot v1 视为 pre-freeze；
+- S0.1 Freeze Gate 之后，不允许静默破坏已冻结 v1 后再要求 Android 跟随 latest。
 
-## 本地验证状态（2026-08-19）
+## 3. 已有 S0 Core 基础
 
-环境：Node v24.19.0、pnpm 11.0.0、Go 1.26.x。
+旧 I0–I5 仍用于追踪历史工作流和回归证据，但不再代表当前交付顺序。
 
-| 验证项 | 状态 | 说明 |
+| 旧工作流 | 当前实现判断 | 说明 |
 |---|---|---|
-| `go build ./...` | 通过 | 全部 Go 包可编译 |
-| `go vet ./...` | 通过 | 无静态问题 |
-| `go test ./... -count=1` | 通过 | 全部后端测试 Green，无 skip |
-| Go codegen drift（admin） | 通过 | `oapi-codegen` 重新生成 `admin.gen.go` 与工作树一致 |
-| TS codegen drift（generated.ts） | 通过 | `pnpm generate:api` 输出与工作树一致 |
-| Contract tests（T0） | 通过 | `SYS-I0-001/002/003` + OpenAPI validate + golden hashes + ListUpstreams |
-| 前端 `pnpm typecheck` | 通过 | `quasar prepare && tsc --noEmit` 退出码 0 |
-| 前端 `pnpm test` | 通过 | Vitest 4 files / 10 tests 全通过（client/workflow/stores/LoginPage 回归） |
-| 前端 `pnpm build` | 通过 | Quasar SPA 构建成功；产物含 material-icons font-face + woff/woff2 |
-| LoginPage 白屏回归测试 | Red→Green | Red（stash 修复后）：QLayout 缺失 + inputs=0；Green（恢复修复）：2 passed |
-| 本地运行链路 | 通过 | setup → hub+relay+console 启动 → admin login 200 + Set-Cookie + csrfToken |
-| Atlas migration replay | CI 通过 | run `32273718821` static-contract job：`atlas migrate apply` 空库 replay OK + `atlas.sum` hash 校验通过 |
-| Go race detector | 未执行 | 本地 `CGO_ENABLED=0`，CI backend-test job 亦不含 `-race`；Makefile 指定 race 测试包为 `platformid/health/sqliteutil/metering`，属遗留缺口 |
-| CI gate（PR #1） | 通过 | run `32273718821`（commit `178665b`）static-contract + backend-test + console-test + ci-gate 全 Green |
+| I0 Engineering & Executable Contracts | 基础已完成 | 四份 OpenAPI、fixtures、codegen、platformid、SQLite/Ent/Atlas、Hub/Relay health、Quasar/CI 基础已存在；但 Client OpenAPI 仍需按 S0.1 authority 完成 pre-freeze schema closure |
+| I1 Identity & Enrollment | 核心已完成 | User/Enrollment/Device/Session/Admin auth/revoke 等已有实现和测试；继续作为 S0.1 regression baseline |
+| I2 Draft & Snapshot | **核心 domain 已有，S0.1 产品契约未完成** | Draft/Snapshot compiler、reference validation、deterministic hash 已有；Android-visible resource fields/enums、Admin 完整资源编辑、Snapshot Preview 仍缺 |
+| I3 Relay & Publish | 核心已完成 | desired-state apply、ACK/finalize、reconcile、generation admission、routing/security 已有；继续作为 S0.1 runtime foundation |
+| I4 Relay Transport | Relay 侧基础已完成 | SSE/binary/multipart/MCP Streamable HTTP/cancel 等已有测试；这不等于四类 S0.1 required profile 已完成真实产品闭环，也不等于 Android I4/S0.2 |
+| I5 Metering/Admin/Hardening | **后端核心已有，产品闭环未完成** | spool/ingest/dedupe/pricing/DB/security 等已有；Admin Usage/Resources/Upstreams/Preview/filters 与 S0.1 browser/system gate 仍明显不足 |
 
-### 前端实现覆盖度
+历史 Green 证据仍有效作为回归基线，例如：
 
-| 页面/模块 | 状态 | 说明 |
-|---|---|---|
-| `OverviewPage` | 已实现 | 平台总览、健康状态、平台 ID 展示 |
-| `LoginPage` | 已实现 | 自带 QLayout；白屏回归测试覆盖 |
-| `UsersPage` | 已实现 | 用户列表、Enrollment/Device 管理 |
-| `UpstreamsPage` | 已实现 | 列表/创建/test/apply + activation polling |
-| `ResourcesPage` | 已实现 | Draft 编辑器（load/save/validate/publish + model CRUD + 409 冲突） |
-| `ReleasesPage` | 已实现 | 列表 + republish（Idempotency-Key + activation polling） |
-| `UsagePage` | 已实现 | summary cards + per-request ledger + completeness chips + date range filter |
-| `SystemPage` | 已实现 | build/db/runtime/relay status + health probes table |
-| `api/client.ts` | 已实现 | OpenAPI 类型化客户端、CSRF/cookie 处理 |
-| `stores/session.ts` | 已实现 | Pinia session store |
-| `stores/{draft,activation,operationalApply}` | 已实现 | 4 tests 覆盖 stale 409/幂等重试/candidate≠active |
-| 路由守卫 | 已实现 | 未登录重定向 `/login` |
+- Identity/Enrollment：`TestSYSI1001IdentityHTTPClosedLoop`、`TestI1IdentityEnrollmentRefreshAndRevoke`、Admin cookie/CSRF tests；
+- Draft/Snapshot：`TestHUBCAP001*`、`TestHUBCAP006SnapshotDeterministicAndClientSafe`、`TestHUBCAP008StagedReleaseIsImmutable`；
+- Publish/Relay：`TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck`、`TestI3ControlApplyAndRuntimeAdmission`、reconcile/conflict tests；
+- Relay transport：`TestRLYI4TransportsStreamWithoutProtocolTranslation`、cancellation/in-flight/routing/header tests；
+- Metering：Relay spool、Hub requestId dedupe、semantic completeness、pricing、security revoke、DB backup/restore tests。
 
-### 前端测试 vs 架构 admin-console §19.5 清单
+这些测试证明已有基础，不替代新的 S0.1 `CAP-*` Gate。
 
-| 架构要求 | 现状 |
-|---|---|
-| typed Problem mapping | ✅ client.test.ts + workflow.test.ts |
-| draft stale 409 | ✅ workflows.test.ts DraftStore |
-| Publish 202 + 幂等重试 | ✅ workflows.test.ts ActivationStore |
-| Upstream candidate≠active | ✅ workflows.test.ts OperationalApplyStore |
-| LoginPage 可独立渲染（本轮回归） | ✅ LoginPage.test.ts |
-| cursor list helpers | ⚠️ 页面已用 `?limit=200`；cursor 分页 UI（loadMore）待补 |
-| activation refresh recovery（activationId 恢复） | ⚠️ polling 有，页面刷新后 activationId 恢复场景未覆盖 |
-| security revoke pending Relay enforcement | ⚠️ UsersPage revoke 操作已接入，pending Relay enforcement E2E 未覆盖 |
-| secret 不持久化 | ⚠️ Upstream 表单未含 secret 字段（当前 schema 无），后续 secret 字段加入时补 |
-| Unknown/Partial usage 展示 | ✅ UsagePage completeness chips 已实现 |
+## 4. S0.1 当前差距审查
 
-## 待提交变更（工作树）
+### C0 — Contract Audit & Freeze Preparation — **未完成**
 
-当前分支 `agent/s0-platform-core` 工作树有以下未提交变更：
+当前 `api/client/client-control.openapi.yaml` 与新 architecture authority 仍有明确差距：
 
-| 文件 | 变更 | 验证 |
-|---|---|---|
-| `api/admin/admin.openapi.yaml` | 新增 `GET /api/admin/v1/upstreams`（`listUpstreams`）+ `UpstreamPage` schema | OpenAPI validate 通过 |
-| `backend/internal/wire/adminapi/admin.gen.go` | 由 OpenAPI 重新生成（`ListUpstreamsParams`、`UpstreamPage`） | codegen drift 校验通过 |
-| `console/src/api/generated.ts` | 由 OpenAPI 重新生成（`listUpstreams` operation、`UpstreamPage` interface） | `pnpm generate:api` drift 校验通过 |
-| `backend/internal/hub/httpapi/admin_upstream.go` | `ListUpstreams` 接受 `ListUpstreamsParams`、返回 `UpstreamPage` | `go test ./internal/hub/httpapi` 通过 |
-| `backend/internal/relay/runtime_metering_test.go` | 失败诊断增加 response body 输出 | `go test ./internal/relay` 通过 |
-| `.gitignore`（新增） | 根级忽略：Go 二进制/coverage、Node `node_modules`/`dist`/`.quasar`、Atlas 运行时、本地 DB/密钥（`.secrets/`、`.data/`）、编辑器缓存 | `git check-ignore` 验证 node_modules/dist/.quasar 被忽略，pnpm-lock.yaml/package.json 未被忽略 |
-| `package.json` + `package-lock.json`（新增） | 根级 monorepo 编排：`setup/start/start:hub/start:relay/start:console/test/contract/generate/drift/ci` 等统一命令 | `npm run test`（后端+前端）、`npm run contract` 验证通过 |
-| `scripts/dev-setup.mjs`（新增） | 一键 bootstrap：密钥生成、devmigrate、admin bootstrap | `npm run setup` 全链路验证 |
-| `backend/cmd/devmigrate`（新增） | dev-only 迁移 applier（本地 atlas CLI 不可用时的替代；CI 仍用真实 atlas replay） | `npm run setup` 验证 |
-| `console/quasar.config.ts` | dev server proxy（架构推荐 `/api`→Hub）+ `extras: ['material-icons']` | build 产物含图标字体验证 |
-| `console/src/pages/LoginPage.vue` | 白屏修复：自带 QLayout | TDD Red→Green |
-| `console/src/pages/LoginPage.test.ts`（新增） | 白屏回归测试（QPage 必须有 QLayout 父级） | Red→Green 双向验证 |
-| `console/vitest.config.ts`（新增） | Vitest 组件测试配置（plugin-vue + jsdom + quasar client build alias） | 10/10 tests 通过 |
-| `console/package.json` + `pnpm-lock.yaml` | +`@quasar/extras`、+`@vitejs/plugin-vue`/`jsdom`/`@types/node`（devDeps）、`@quasar/app-vite` 3.7.0 | typecheck/test/build 通过 |
-| `.github/workflows/apply-upstream-list.yml`（删除） | 移除 GitHub-only 遗留的自动 apply-patch+commit+push 机制 | 违反 docs/testing.md §8 约定 |
-| `.github/workflows/dev-export.yml`（删除） | 移除非 gate 的源码导出 workflow | GitHub-only 遗留工具 |
-| `.github/patches/`（删除） | 配套 patch 一并清理 | Green 产物已直接落库 |
-| `docs/development.md` | 新增 §11 本地运行命令（setup/start/devmigrate 说明） | 架构要求命令与实现同 PR 落档 |
-| `docs/s0-execution-progress.md` | 更新阶段状态、本地验证状态、前端覆盖度、测试缺口 | 文档同步 |
+- `ProviderDefinition.clientProtocol` 仍是自由字符串；
+- Model `inputModalities/outputModalities/capabilities` 仍是自由字符串数组，尚未形成冻结 vocabulary/schema；
+- `TtsDefinition` 尚未表达 architecture 已要求的完整 Android-visible TTS profile（包括 `voice`）；
+- `AsrDefinition` 尚未完成 S0.1 managed HTTP transcription 所需的冻结字段；
+- `McpDefinition` 尚未完成 S0.1 managed MCP auth ownership contract；
+- canonical Snapshot fixtures/hash golden 仍需随新 schema 同步；
+- Admin/OpenAPI usage query/preview contract 仍需按 S0.1 authority 完成。
 
-## 剩余验证缺口（需 GitHub Actions / RC）
+因此当前 `schemaVersion=1` **只能视为 pre-freeze**。
 
-1. `atlas migrate apply` 从空库 replay + `atlas.sum` 完整性检查。
-2. Go race tests（`platformid`、`health`、`sqliteutil`、`metering`）。
-3. T3 跨组件：Hub↔Relay、Admin↔Hub 真实进程集成。
-4. T4 system harness：deterministic Test Adapter 全场景 + 真实 Android emulator + 浏览器 E2E。
-5. S0 RC：真实 Adapter qualification、target VM 资源预算、backup/restore 全链。
-6. 前端剩余：cursor 分页 UI（loadMore）、页面刷新后 activationId 恢复、secret 字段表单（schema 当前无）、Upstreams/Resources/Releases/Usage/System 页面的组件级测试（当前仅 LoginPage 有组件回归测试）。
-7. 本轮 ci-gate 在 commit `d73b9fe` 上 Green（run `32274912399`）。
+### C1 — Upstream Operational Completion — **未完成**
+
+后端已有 Upstream/Secret/candidate-active revision/Apply 基础，但当前 `UpstreamsPage.vue` 仍存在明显产品缺口：
+
+- Create 表单只提交 `name/baseUrl/providerKind`；
+- `providerKind` 是旧 UI 概念，不是当前正式 Upstream executable config 的核心字段；
+- transport capabilities、auth/SecretRef、correlation mode、usage capability、timeouts 未形成完整可编辑 workflow；
+- Qualification/profile verification 没有形成 S0.1 真实操作与证据闭环。
+
+C1 必须让管理员不用 JSON/DB/内部 API 就能建立真正可运行的 Upstream。
+
+### C2 — Managed Resource Editor Completion — **未完成**
+
+当前 `ResourcesPage.vue` 实质仍是 Model-only Draft editor：
+
+- “Add model” 使用 `prv_placeholder`；
+- 没有完整 Provider editor/selector；
+- 没有正式 Models / TTS / ASR / MCP / Policy 五类编辑 workflow；
+- 没有完整 Upstream binding/transport/path/method 配置体验；
+- 不能通过 UI 组织 architecture 要求的四类受管能力。
+
+因此旧进度中“ResourcesPage 已实现”只能解释为页面骨架/基础 Draft workflow 已实现，不能解释为 S0.1 Resource product completion。
+
+### C3 — Snapshot Projection & Preview — **部分完成**
+
+已有 Hub Snapshot compiler、deterministic hash、Client-safe projection 基础，这是可复用的重要资产。
+
+仍缺：
+
+- S0.1 新字段/schema closure；
+- Admin “Client will receive” Snapshot Preview；
+- Preview 与 Release Snapshot 必须调用同一 canonical projection/compiler 的 executable proof；
+- 明确展示不会下发 Android 的 Upstream/Secret/RuntimeRoute/Pricing 等内部数据；
+- Client OpenAPI/fixture hash freeze evidence。
+
+### C4 — Runtime Reference Profile Completion — **部分完成**
+
+Relay generic transport 已具备较完整基础，但 S0.1 需要证明的不是“Relay 支持某 transport”，而是 required Managed Capability profile 的完整执行链。
+
+仍需：
+
+- deterministic Test Client 使用真实 Client Control/Runtime public API；
+- deterministic Test Adapter 覆盖 required profile、错误/no-forward/cancel/usage correlation；
+- Model streaming、TTS binary、ASR multipart、MCP Streamable HTTP 四类 profile 从 Published Snapshot 到 Runtime 的完整闭环；
+- required real Adapter/profile qualification；
+- qualification 证据按 adapter version + config revision + profile + transport + usage capability 记录，而不是模糊的“支持 S0”。
+
+### C5 — Usage / Pricing / Observability Completion — **部分完成**
+
+后端 Usage Ledger/spool/dedupe/pricing 已有基础，但当前 Admin 产品面仍不足：
+
+- `UsagePage.vue` 主要只有时间范围、Requests/Bytes/Cost/semantic meter chips；
+- request row 仍使用 `modelId` 语义，未正确围绕通用 `resourceId/resource kind` 组织；
+- 缺 architecture 要求的 User/Resource/Resource Kind/Upstream/Status/Completeness 等主要过滤；
+- Model/TTS/ASR/MCP 的 semantic meter/Unknown/Partial/Cost 观察不完整；
+- Pricing 编辑和 request detail/correlation 仍需形成管理员可用闭环。
+
+### C6 — Browser + Hub + Relay + Test Adapter/Test Client E2E — **未完成**
+
+已有本地 Hub/Relay/Console 启动链和组件测试，但没有证据证明 architecture S0.1 全套 `CAP-*` 场景已经通过真实浏览器 + real Hub/Relay + deterministic Test Client/Test Adapter 的完整拓扑。
+
+### C7 — S0.1 Client Contract Freeze Gate — **未开始**
+
+必须在 C0–C6 全部 Green 后才生成 freeze manifest。当前不存在可作为 S0.2 输入的有效 manifest，因此 Android 不应以当前 Client OpenAPI 作为“已经冻结的 v1”开始实现。
+
+## 5. S0.1 执行顺序
+
+严格按 architecture `measix-s0-capability-delivery-implementation-decision.md`：
+
+```text
+C0 Contract Audit & Freeze Preparation
+  ↓
+C1 Upstream Operational Completion
+  ↓
+C2 Managed Resource Editor Completion
+  ↓
+C3 Snapshot Projection & Preview
+  ↓
+C4 Runtime Reference Profile Completion
+  ↓
+C5 Usage / Pricing / Observability Completion
+  ↓
+C6 Browser + Hub + Relay + Test Adapter/Test Client E2E
+  ↓
+C7 S0.1 Client Contract Freeze Gate
+```
+
+允许在实现层做不破坏依赖关系的并行工作，但 Gate 不得倒置：尤其不能跳过 C0 的 Client contract closure，也不能在 C7 前把 Android integration 当作当前实现目标。
+
+## 6. S0.1 Exit 必须产出的本仓库证据
+
+至少包括：
+
+- 最新 architecture baseline commit；
+- `platformCoreCommit`；
+- Client Control OpenAPI hash；
+- canonical fixture hash；
+- frozen Snapshot schema version；
+- Admin production build identity/hash；
+- required real Adapter qualification reference；
+- S0.1 `CAP-*` scenario results；
+- deterministic four-profile runtime evidence；
+- no-forward/security/failure/usage evidence。
+
+只有这些证据齐全且 Gate Green，才能把 Client contract 标记为 frozen 并进入 S0.2。
+
+## 7. 当前不做
+
+S0.1 不修改：
+
+- `rikkahub_mcp` Android implementation；
+- `weero-agent-space`；
+- S1 Agent Space；
+- S2 Agent Runtime；
+- S3 Runtime Hook；
+- Phase 2 RBAC/Group/SSO/User Sync/Quota platform；
+- Runtime Relay WebSocket/realtime tunnel；
+- provider-specific body translation in Relay。
+
+S0.2 Android 接入只在 C7 freeze manifest 完成后启动。
+
+## 8. 已知工程验证缺口
+
+历史进度中已确认但尚不能伪报完成的项目继续保留：
+
+- Go race detector 尚未形成当前 required CI lane 的已观察 Green 证据；
+- S0.1 real browser full flow 未执行完整 Gate；
+- required real Adapter qualification 未完成；
+- S0.1 Client Contract Freeze manifest 未生成；
+- final Android emulator/device T4 属 S0.2/最终 S0，不在当前 S0.1 阶段执行。
+
+## 9. 历史 CI / 本地基础证据
+
+此前分支已出现过完整 PR aggregate Green，例如：
+
+- run `32273718821`：static-contract + backend-test + console-test + aggregate Green；
+- run `32274912399`：前端页面骨架/生产构建相关变更后 aggregate Green；
+- 本地曾验证 `go build ./...`、`go vet ./...`、`go test ./... -count=1`、Quasar typecheck/test/build、Hub+Relay+Console dev startup 与 Admin login。
+
+这些是已有基础的历史证据。**每次后续 S0.1 行为/contract 变更仍必须以最新 head 的实际 CI/测试结果为准，旧 Green 不能替代新 head。**
+
+## 10. 下一步
+
+当前唯一正确的开发入口是 **C0 Contract Audit & Freeze Preparation**：
+
+1. 按 architecture commit `e9d5ee4d011a07b438edf2e6f7708457fc6dc8d5` 对 Client/Admin executable contract 建立 failing contract tests；
+2. 修正 Client Snapshot/OpenAPI/fixtures/generated artifacts；
+3. 让新的 Android-visible contract 在 core 内部达到确定、可测试状态；
+4. 然后依次推进 C1–C7。
+
+在 C7 完成前，不再使用“platform-core S0 已完成”“可以直接开始 Android”之类表述。

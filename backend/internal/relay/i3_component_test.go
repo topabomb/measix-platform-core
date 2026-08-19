@@ -74,13 +74,13 @@ func TestI3ControlApplyAndRuntimeAdmission(t *testing.T) {
 			RuntimeRouteId: routeID, UpstreamId: upstreamID,
 			AllowedMethods: []string{http.MethodPost}, AllowedPathPrefixes: []string{"/v1/chat/completions"},
 			TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE,
-			TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000},
+			TimeoutPolicy:   relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000},
 		}},
 		Upstreams: []relaycontrolapi.RuntimeUpstreamSpec{{
 			UpstreamId: upstreamID, BaseUrl: upstream.URL, Enabled: true,
 			TransportCapabilities: []string{"HTTP_STREAMING_SSE"},
 			Auth: relaycontrolapi.RuntimeUpstreamAuth{
-				Type: relaycontrolapi.BEARER,
+				Type:                 relaycontrolapi.BEARER,
 				AdditionalProperties: map[string]interface{}{"token": "upstream-secret"},
 			},
 		}},
@@ -201,8 +201,8 @@ func minimalControlState(t *testing.T, revision, generation int) relaycontrolapi
 	t.Helper()
 	state := relaycontrolapi.RuntimeControlState{
 		ControlRevision: revision, ActiveManagedGeneration: generation,
-		DeploymentId: platformid.New(platformid.Deployment),
-		AuthKeys: []relaycontrolapi.PublicJwk{},
+		DeploymentId:   platformid.New(platformid.Deployment),
+		AuthKeys:       []relaycontrolapi.PublicJwk{},
 		PrincipalState: relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{}, Routes: []relaycontrolapi.RuntimeRouteSpec{}, Upstreams: []relaycontrolapi.RuntimeUpstreamSpec{},
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},

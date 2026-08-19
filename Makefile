@@ -1,6 +1,10 @@
-.PHONY: ci generate generated-drift backend-test console-test contract migrations migration-replay
+.PHONY: ci generate generated-drift fmt-check backend-test console-test contract migrations migration-replay
 
-ci: contract backend-test console-test migrations generated-drift
+ci: fmt-check contract backend-test console-test migrations generated-drift
+
+fmt-check:
+	@files=$$(find backend -name '*.go' -type f -print0 | xargs -0 gofmt -l); \
+	if [ -n "$$files" ]; then echo "Go files need gofmt:"; echo "$$files"; exit 1; fi
 
 contract:
 	cd backend && go test ./internal/contract -count=1

@@ -4,13 +4,12 @@ import (
 	"context"
 	"time"
 
-	"measix/platform/backend/ent"
-	"measix/platform/backend/ent/activation"
-	"measix/platform/backend/ent/requestusage"
-	"measix/platform/backend/internal/hub/maintenance"
-	"measix/platform/backend/internal/hub/runtimecontrol"
-	"measix/platform/backend/internal/hub/store"
-	"measix/platform/backend/internal/wire/relaycontrolapi"
+	"measix/platform/ent"
+	"measix/platform/ent/activation"
+	"measix/platform/ent/requestusage"
+	"measix/platform/internal/hub/maintenance"
+	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/hub/store"
 )
 
 type Service struct {
@@ -117,5 +116,3 @@ func semanticOrphanCount(ctx context.Context, client *ent.Client) (int, error) {
 	}
 	return orphan, nil
 }
-
-var _ relaycontrolapi.ControlStatus

@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	ErrInvalidControl       = errors.New("invalid runtime control")
-	ErrStaleRevision       = errors.New("stale control revision")
+	ErrInvalidControl        = errors.New("invalid runtime control")
+	ErrStaleRevision         = errors.New("stale control revision")
 	ErrRevisionHashConflict = errors.New("control revision hash conflict")
 )
 
@@ -127,37 +127,37 @@ func IsRevisionHashConflict(err error) bool { return errors.Is(err, ErrRevisionH
 
 func ack(state *State) relaycontrolapi.ControlAck {
 	return relaycontrolapi.ControlAck{
-		AppliedControlRevision: state.ControlRevision,
-		BundleHash:             state.BundleHash,
+		AppliedControlRevision:  state.ControlRevision,
+		BundleHash:              state.BundleHash,
 		ActiveManagedGeneration: state.ActiveManagedGeneration,
-		AppliedAt:              state.AppliedAt,
+		AppliedAt:               state.AppliedAt,
 	}
 }
 
 func HashDescriptor(input relaycontrolapi.RuntimeControlState) (relaycontrolapi.Sha256Hash, error) {
 	type authDescriptor struct {
 		Type       relaycontrolapi.RuntimeUpstreamAuthType `json:"type"`
-		HeaderName string                                `json:"headerName,omitempty"`
-		Username   string                                `json:"username,omitempty"`
+		HeaderName string                                  `json:"headerName,omitempty"`
+		Username   string                                  `json:"username,omitempty"`
 	}
 	type upstreamDescriptor struct {
-		UpstreamID            string                    `json:"upstreamId"`
-		BaseURL               string                    `json:"baseUrl"`
-		TransportCapabilities []string                  `json:"transportCapabilities"`
-		Enabled               bool                      `json:"enabled"`
+		UpstreamID            string                     `json:"upstreamId"`
+		BaseURL               string                     `json:"baseUrl"`
+		TransportCapabilities []string                   `json:"transportCapabilities"`
+		Enabled               bool                       `json:"enabled"`
 		SecretRef             *relaycontrolapi.SecretRef `json:"secretRef,omitempty"`
-		Auth                  authDescriptor            `json:"auth"`
+		Auth                  authDescriptor             `json:"auth"`
 	}
 	type descriptor struct {
-		ControlRevision         int                               `json:"controlRevision"`
-		ActiveManagedGeneration int                               `json:"activeManagedGeneration"`
-		DeploymentID            string                            `json:"deploymentId"`
-		AuthKeys                []relaycontrolapi.PublicJwk       `json:"authKeys"`
+		ControlRevision         int                                `json:"controlRevision"`
+		ActiveManagedGeneration int                                `json:"activeManagedGeneration"`
+		DeploymentID            string                             `json:"deploymentId"`
+		AuthKeys                []relaycontrolapi.PublicJwk        `json:"authKeys"`
 		PrincipalState          relaycontrolapi.PrincipalState     `json:"principalState"`
-		ResourceRoutes          []relaycontrolapi.ResourceRoute     `json:"resourceRoutes"`
-		Routes                  []relaycontrolapi.RuntimeRouteSpec   `json:"routes"`
+		ResourceRoutes          []relaycontrolapi.ResourceRoute    `json:"resourceRoutes"`
+		Routes                  []relaycontrolapi.RuntimeRouteSpec `json:"routes"`
 		Upstreams               []upstreamDescriptor               `json:"upstreams"`
-		OperationalLimits       relaycontrolapi.OperationalLimits   `json:"operationalLimits"`
+		OperationalLimits       relaycontrolapi.OperationalLimits  `json:"operationalLimits"`
 	}
 
 	authKeys := append([]relaycontrolapi.PublicJwk(nil), input.AuthKeys...)

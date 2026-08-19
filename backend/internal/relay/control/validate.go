@@ -163,10 +163,10 @@ func compileAuth(input relaycontrolapi.RuntimeUpstreamAuth) (UpstreamAuth, error
 	case relaycontrolapi.STATICHEADER:
 		header, okHeader := stringProperty(input, "headerName")
 		value, okValue := stringProperty(input, "value")
-		if !okHeader || !okValue || strings.TrimSpace(header) == "" || value == "" || strings.ContainsAny(header, "\r\n:") {
+		if !okHeader || !okValue || !safeCredentialHeaderName(header) || value == "" || strings.ContainsAny(value, "\r\n") {
 			return UpstreamAuth{}, ErrInvalidControl
 		}
-		result.HeaderName, result.Value = header, value
+		result.HeaderName, result.Value = strings.TrimSpace(header), value
 	case relaycontrolapi.BASIC:
 		username, okUser := stringProperty(input, "username")
 		password, okPassword := stringProperty(input, "password")
@@ -225,13 +225,51 @@ func validMethod(value string) bool {
 }
 
 func safePath(value string) bool {
-	if !strings.HasPrefix(value, "/") || strings.Contains(value, "//") || strings.Contains(value, "\\") {
+	decoded := value
+	for range 4 {
+		next, err := url.PathUnescape(decoded)
+		if err != nil {
+			return false
+		}
+		if next == decoded {
+			break
+		}
+		decoded = next
+	}
+	if strings.Contains(decoded, "%") || !strings.HasPrefix(decoded, "/") || strings.Contains(decoded, "//") || strings.Contains(decoded, "\\") {
 		return false
 	}
-	for _, segment := range strings.Split(value, "/") {
+	for _, segment := range strings.Split(decoded, "/") {
 		if segment == ".." || segment == "." {
 			return false
 		}
 	}
 	return true
+}
+
+func safeCredentialHeaderName(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	for _, ch := range value {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || strings.ContainsRune("!#$%&'*+-.^_`|~", ch) {
+			continue
+		}
+		return false
+	}
+	lower := strings.ToLower(value)
+	if lower == "host" || lower == "cookie" || strings.HasPrefix(lower, "x-forwarded-") || strings.HasPrefix(lower, "x-measix-") || hopByHopHeader(lower) {
+		return false
+	}
+	return true
+}
+
+func hopByHopHeader(lower string) bool {
+	switch lower {
+	case "connection", "proxy-connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade":
+		return true
+	default:
+		return false
+	}
 }

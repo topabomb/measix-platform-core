@@ -1,20 +1,22 @@
 name: bootstrap-derived
 
 on:
-  push:
-    branches: [agent/s0-platform-core]
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   generate:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore: regenerate derived artifacts') }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/s0-platform-core' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ github.repository }}
           ref: agent/s0-platform-core
       - uses: actions/setup-go@v6
         with:

@@ -7,12 +7,12 @@ import (
 )
 
 func (h *fullAdminHandler) DisableUser(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.DisableUserParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	result, err := h.services.RuntimeControl.DisableUser(r.Context(), admin.ID, params.IdempotencyKey, userID)
+	result, err := h.services.RuntimeControl.DisableUser(r.Context(), admin.UserID, params.IdempotencyKey, userID)
 	if err != nil {
 		writeRuntimeControlError(w, err)
 		return
@@ -21,12 +21,12 @@ func (h *fullAdminHandler) DisableUser(w http.ResponseWriter, r *http.Request, u
 }
 
 func (h *fullAdminHandler) EnableUser(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.EnableUserParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	result, err := h.services.RuntimeControl.EnableUser(r.Context(), admin.ID, params.IdempotencyKey, userID)
+	result, err := h.services.RuntimeControl.EnableUser(r.Context(), admin.UserID, params.IdempotencyKey, userID)
 	if err != nil {
 		writeRuntimeControlError(w, err)
 		return
@@ -35,12 +35,12 @@ func (h *fullAdminHandler) EnableUser(w http.ResponseWriter, r *http.Request, us
 }
 
 func (h *fullAdminHandler) RevokeDevice(w http.ResponseWriter, r *http.Request, deviceID adminapi.DeviceId, params adminapi.RevokeDeviceParams) {
-	admin, _, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	result, err := h.services.RuntimeControl.RevokeDevice(r.Context(), admin.ID, params.IdempotencyKey, deviceID)
+	result, err := h.services.RuntimeControl.RevokeDevice(r.Context(), admin.UserID, params.IdempotencyKey, deviceID)
 	if err != nil {
 		writeRuntimeControlError(w, err)
 		return

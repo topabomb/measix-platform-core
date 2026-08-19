@@ -203,6 +203,22 @@ func (s *Service) CreateUpstream(ctx context.Context, createdBy string, config a
 	return UpstreamView{UpstreamID: id, Name: config.Name, ConfigRevision: 1, Status: "INACTIVE", Config: config}, nil
 }
 
+func (s *Service) ListUpstreams(ctx context.Context) ([]UpstreamView, error) {
+	rows, err := s.Client.Upstream.Query().All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]UpstreamView, 0, len(rows))
+	for _, row := range rows {
+		config, err := LoadCandidateConfig(ctx, s.Client, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		views = append(views, upstreamView(row.ID, row.Name, row.ConfigRevision, row.ActiveConfigRevision, row.Status, config))
+	}
+	return views, nil
+}
+
 func (s *Service) GetUpstream(ctx context.Context, upstreamID string) (UpstreamView, error) {
 	row, err := s.Client.Upstream.Get(ctx, upstreamID)
 	if ent.IsNotFound(err) {

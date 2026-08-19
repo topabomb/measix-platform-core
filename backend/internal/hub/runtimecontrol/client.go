@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,29 @@ import (
 type RelayClient interface {
 	Apply(context.Context, relaycontrolapi.RuntimeControlState) (relaycontrolapi.ControlAck, error)
 	Status(context.Context) (relaycontrolapi.ControlStatus, error)
+}
+
+type RelayHTTPError struct {
+	StatusCode int
+	Code       string
+}
+
+func (e *RelayHTTPError) Error() string {
+	if e.Code != "" {
+		return fmt.Sprintf("relay returned status %d (%s)", e.StatusCode, e.Code)
+	}
+	return fmt.Sprintf("relay returned status %d", e.StatusCode)
+}
+
+func relayValidationRejected(err error) (string, bool) {
+	var relayErr *RelayHTTPError
+	if !errors.As(err, &relayErr) {
+		return "", false
+	}
+	if relayErr.StatusCode == http.StatusUnprocessableEntity && relayErr.Code == "invalid_runtime_control" {
+		return relayErr.Code, true
+	}
+	return "", false
 }
 
 type HTTPRelayClient struct {
@@ -48,7 +72,11 @@ func (c *HTTPRelayClient) Apply(ctx context.Context, state relaycontrolapi.Runti
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
-		return relaycontrolapi.ControlAck{}, fmt.Errorf("relay apply status %d: %s", response.StatusCode, body)
+		var problem struct {
+			Code string `json:"code"`
+		}
+		_ = json.Unmarshal(body, &problem)
+		return relaycontrolapi.ControlAck{}, &RelayHTTPError{StatusCode: response.StatusCode, Code: problem.Code}
 	}
 	var ack relaycontrolapi.ControlAck
 	if err := json.NewDecoder(response.Body).Decode(&ack); err != nil {
@@ -70,7 +98,11 @@ func (c *HTTPRelayClient) Status(ctx context.Context) (relaycontrolapi.ControlSt
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
-		return relaycontrolapi.ControlStatus{}, fmt.Errorf("relay status %d: %s", response.StatusCode, body)
+		var problem struct {
+			Code string `json:"code"`
+		}
+		_ = json.Unmarshal(body, &problem)
+		return relaycontrolapi.ControlStatus{}, &RelayHTTPError{StatusCode: response.StatusCode, Code: problem.Code}
 	}
 	var status relaycontrolapi.ControlStatus
 	if err := json.NewDecoder(response.Body).Decode(&status); err != nil {

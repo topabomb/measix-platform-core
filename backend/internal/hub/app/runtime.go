@@ -23,6 +23,7 @@ import (
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/hub/store"
+	"measix/platform/internal/hub/system"
 	"measix/platform/internal/hub/upstream"
 	"measix/platform/internal/hub/usage"
 	"measix/platform/internal/wire/usageingestapi"
@@ -99,9 +100,10 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	relayClient := runtimecontrol.NewHTTPRelayClient(cfg.RelayInternalURL, serviceCredential, client)
 	runtimeControl := runtimecontrol.NewService(st.Client, capabilityService, upstreamService, signer, relayClient)
 	usageService := usage.NewService(st.Client)
+	systemService := system.New(st, runtimeControl, options.BuildVersion)
 	services := httpapi.Services{
 		Identity: identityService, Capability: capabilityService, Upstream: upstreamService,
-		RuntimeControl: runtimeControl, Usage: usageService, BuildVersion: options.BuildVersion,
+		RuntimeControl: runtimeControl, Usage: usageService, System: systemService, BuildVersion: options.BuildVersion,
 	}
 
 	router := chi.NewRouter()

@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/enrollment"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/enrollment"
 )
 
 // EnrollmentCreate is the builder for creating a Enrollment entity.

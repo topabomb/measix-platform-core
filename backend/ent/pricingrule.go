@@ -4,12 +4,12 @@ package ent
 
 import (
 	"fmt"
+	"measix/platform/ent/pricingrule"
 	"strings"
 	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"measix/platform/ent/pricingrule"
 )
 
 // PricingRule is the model entity for the PricingRule schema.

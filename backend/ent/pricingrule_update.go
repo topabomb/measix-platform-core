@@ -6,13 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/predicate"
+	"measix/platform/ent/pricingrule"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/predicate"
-	"measix/platform/ent/pricingrule"
 )
 
 // PricingRuleUpdate is the builder for updating PricingRule entities.

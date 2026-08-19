@@ -4,12 +4,12 @@ package ent
 
 import (
 	"fmt"
+	"measix/platform/ent/secret"
 	"strings"
 	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"measix/platform/ent/secret"
 )
 
 // Secret is the model entity for the Secret schema.

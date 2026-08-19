@@ -4,12 +4,12 @@ package ent
 
 import (
 	"context"
+	"measix/platform/ent/device"
+	"measix/platform/ent/predicate"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/device"
-	"measix/platform/ent/predicate"
 )
 
 // DeviceDelete is the builder for deleting a Device entity.

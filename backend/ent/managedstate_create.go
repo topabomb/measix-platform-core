@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/managedstate"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/managedstate"
 )
 
 // ManagedStateCreate is the builder for creating a ManagedState entity.

@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/deployment"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/deployment"
 )
 
 // DeploymentCreate is the builder for creating a Deployment entity.

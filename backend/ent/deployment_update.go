@@ -6,13 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/deployment"
+	"measix/platform/ent/predicate"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/deployment"
-	"measix/platform/ent/predicate"
 )
 
 // DeploymentUpdate is the builder for updating Deployment entities.

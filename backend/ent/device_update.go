@@ -6,13 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/device"
+	"measix/platform/ent/predicate"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/device"
-	"measix/platform/ent/predicate"
 )
 
 // DeviceUpdate is the builder for updating Device entities.

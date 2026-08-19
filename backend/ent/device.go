@@ -4,12 +4,12 @@ package ent
 
 import (
 	"fmt"
+	"measix/platform/ent/device"
 	"strings"
 	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"measix/platform/ent/device"
 )
 
 // Device is the model entity for the Device schema.

@@ -6,13 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/managedrelease"
+	"measix/platform/ent/predicate"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/managedrelease"
-	"measix/platform/ent/predicate"
 )
 
 // ManagedReleaseUpdate is the builder for updating ManagedRelease entities.

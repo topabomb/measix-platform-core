@@ -4,12 +4,12 @@ package ent
 
 import (
 	"fmt"
+	"measix/platform/ent/enrollment"
 	"strings"
 	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"measix/platform/ent/enrollment"
 )
 
 // Enrollment is the model entity for the Enrollment schema.

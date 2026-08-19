@@ -4,12 +4,12 @@ package ent
 
 import (
 	"fmt"
+	"measix/platform/ent/deployment"
 	"strings"
 	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"measix/platform/ent/deployment"
 )
 
 // Deployment is the model entity for the Deployment schema.

@@ -6,11 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-	"time"
-
-	"entgo.io/ent"
-	"entgo.io/ent/dialect/sql"
 	"measix/platform/ent/activation"
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/device"
@@ -29,6 +24,11 @@ import (
 	"measix/platform/ent/upstream"
 	"measix/platform/ent/upstreamconfigrevision"
 	"measix/platform/ent/user"
+	"sync"
+	"time"
+
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/sql"
 )
 
 const (

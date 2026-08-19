@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/session"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/session"
 )
 
 // SessionCreate is the builder for creating a Session entity.

@@ -4,12 +4,12 @@ package ent
 
 import (
 	"fmt"
+	"measix/platform/ent/idempotencyrecord"
 	"strings"
 	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"measix/platform/ent/idempotencyrecord"
 )
 
 // IdempotencyRecord is the model entity for the IdempotencyRecord schema.

@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/upstream"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/upstream"
 )
 
 // UpstreamCreate is the builder for creating a Upstream entity.

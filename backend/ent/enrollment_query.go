@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"measix/platform/ent/enrollment"
+	"measix/platform/ent/predicate"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/enrollment"
-	"measix/platform/ent/predicate"
 )
 
 // EnrollmentQuery is the builder for querying Enrollment entities.

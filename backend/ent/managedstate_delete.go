@@ -4,12 +4,12 @@ package ent
 
 import (
 	"context"
+	"measix/platform/ent/managedstate"
+	"measix/platform/ent/predicate"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/managedstate"
-	"measix/platform/ent/predicate"
 )
 
 // ManagedStateDelete is the builder for deleting a ManagedState entity.

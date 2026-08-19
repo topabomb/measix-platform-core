@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"measix/platform/ent/predicate"
+	"measix/platform/ent/semanticusage"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/predicate"
-	"measix/platform/ent/semanticusage"
 )
 
 // SemanticUsageQuery is the builder for querying SemanticUsage entities.

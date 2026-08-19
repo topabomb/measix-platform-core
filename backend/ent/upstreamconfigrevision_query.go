@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"measix/platform/ent/predicate"
+	"measix/platform/ent/upstreamconfigrevision"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/predicate"
-	"measix/platform/ent/upstreamconfigrevision"
 )
 
 // UpstreamConfigRevisionQuery is the builder for querying UpstreamConfigRevision entities.

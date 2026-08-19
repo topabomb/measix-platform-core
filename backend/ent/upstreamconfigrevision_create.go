@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/upstreamconfigrevision"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/upstreamconfigrevision"
 )
 
 // UpstreamConfigRevisionCreate is the builder for creating a UpstreamConfigRevision entity.

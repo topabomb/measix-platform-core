@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"measix/platform/ent/managedrelease"
+	"measix/platform/ent/predicate"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/managedrelease"
-	"measix/platform/ent/predicate"
 )
 
 // ManagedReleaseQuery is the builder for querying ManagedRelease entities.

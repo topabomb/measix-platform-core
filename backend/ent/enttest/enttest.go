@@ -9,8 +9,9 @@ import (
 	// required by schema hooks.
 	_ "measix/platform/ent/runtime"
 
-	"entgo.io/ent/dialect/sql/schema"
 	"measix/platform/ent/migrate"
+
+	"entgo.io/ent/dialect/sql/schema"
 )
 
 type (

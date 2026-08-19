@@ -4,12 +4,12 @@ package ent
 
 import (
 	"context"
+	"measix/platform/ent/enrollment"
+	"measix/platform/ent/predicate"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/enrollment"
-	"measix/platform/ent/predicate"
 )
 
 // EnrollmentDelete is the builder for deleting a Enrollment entity.

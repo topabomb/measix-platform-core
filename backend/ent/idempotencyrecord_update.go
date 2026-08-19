@@ -6,13 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/idempotencyrecord"
+	"measix/platform/ent/predicate"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/idempotencyrecord"
-	"measix/platform/ent/predicate"
 )
 
 // IdempotencyRecordUpdate is the builder for updating IdempotencyRecord entities.

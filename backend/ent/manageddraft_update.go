@@ -6,13 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"measix/platform/ent/manageddraft"
+	"measix/platform/ent/predicate"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"measix/platform/ent/manageddraft"
-	"measix/platform/ent/predicate"
 )
 
 // ManagedDraftUpdate is the builder for updating ManagedDraft entities.

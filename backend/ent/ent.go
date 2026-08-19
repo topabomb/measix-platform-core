@@ -6,12 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
-	"sync"
-
-	"entgo.io/ent"
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqlgraph"
 	"measix/platform/ent/activation"
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/device"
@@ -29,6 +23,12 @@ import (
 	"measix/platform/ent/upstream"
 	"measix/platform/ent/upstreamconfigrevision"
 	"measix/platform/ent/user"
+	"reflect"
+	"sync"
+
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 // ent aliases to avoid import conflicts in user's code.

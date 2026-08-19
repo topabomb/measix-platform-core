@@ -11,9 +11,6 @@ import (
 
 	"measix/platform/ent/migrate"
 
-	"entgo.io/ent"
-	"entgo.io/ent/dialect"
-	"entgo.io/ent/dialect/sql"
 	"measix/platform/ent/activation"
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/device"
@@ -31,6 +28,10 @@ import (
 	"measix/platform/ent/upstream"
 	"measix/platform/ent/upstreamconfigrevision"
 	"measix/platform/ent/user"
+
+	"entgo.io/ent"
+	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/sql"
 )
 
 // Client is the client that holds all ent builders.

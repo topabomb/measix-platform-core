@@ -14,7 +14,7 @@
 
 | 阶段 | 本仓库实施范围 | 状态 | 验收证据 |
 |---|---|---|---|
-| I0 工程与可执行契约 | 4 OpenAPI、fixtures、codegen、platformid、Hub/Relay health、SQLite/Ent/Atlas、Quasar shell、T0/T1/T2/CI | 进行中 | Red：commit `28504cef...`，Actions `ci-gate` run 32210208203 按预期在 `New("dep") returned empty ID` 失败 |
+| I0 工程与可执行契约 | 4 OpenAPI、fixtures、codegen、platformid、Hub/Relay health、SQLite/Ent/Atlas、Quasar shell、T0/T1/T2/CI | 进行中 | Red：commit `28504cef...` / run `32210208203`；生成链 run `32211905037` 已通过 Go module、4×OpenAPI、Ent、TS、Atlas hash |
 | I1 Identity & Enrollment | Hub 身份/Enrollment/Session/Admin auth、Admin User/Enrollment/Device | 待执行 | |
 | I2 Draft & Snapshot | Upstream/Secret、typed Draft aggregate、validation、deterministic Snapshot/ETag、Admin workflow | 待执行 | |
 | I3 Relay & Publish | full-state atomic apply/status、JWT/admission/route/proxy、Activation/reconcile/republish | 待执行 | |
@@ -31,4 +31,6 @@
 - 2026-08-19：确认技术栈为 Go 1.26.x、SQLite + Ent + Atlas、Vue 3 + Quasar、OpenAPI 3.0.3。
 - 2026-08-19：建立实施分支和 Draft PR #1。
 - 2026-08-19：完成真实 TDD Red：GitHub Actions 在 `platformid` 行为断言处失败，而非工具链/配置失败。
-- 2026-08-19：开始 I0 Green：OpenAPI、fixtures、codegen、Ent/Atlas、Hub/Relay health 与 Quasar shell。
+- 2026-08-19：I0 executable source 已落库；4 份 OpenAPI 与 canonical fixtures 可解析。
+- 2026-08-19：GitHub Actions 已实际完成 `go mod tidy → 4×oapi-codegen → Ent → pnpm/openapi-typescript → Atlas hash`；Quasar 3 HTML 入口已修正。
+- 2026-08-19：T0 contract、`platformid`、health、Hub app、generated wire 已进入 Green；当前继续收敛 Ent 生成后依赖与完整 T0/T1/T2 Gate。

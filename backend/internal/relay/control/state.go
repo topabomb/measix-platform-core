@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	ErrInvalidControl        = errors.New("invalid runtime control")
-	ErrStaleRevision         = errors.New("stale control revision")
+	ErrInvalidControl       = errors.New("invalid runtime control")
+	ErrStaleRevision        = errors.New("stale control revision")
 	ErrRevisionHashConflict = errors.New("control revision hash conflict")
 )
 

@@ -50,7 +50,7 @@ var (
 	DevicesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
 		{Name: "user_id", Type: field.TypeString},
-		{Name: "installation_id", Type: field.TypeString, Nullable: true},
+		{Name: "installation_id", Type: field.TypeString, Unique: true, Nullable: true},
 		{Name: "status", Type: field.TypeString},
 		{Name: "app_version", Type: field.TypeString, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -67,7 +67,7 @@ var (
 	EnrollmentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
 		{Name: "user_id", Type: field.TypeString},
-		{Name: "token_digest", Type: field.TypeBytes},
+		{Name: "token_digest", Type: field.TypeBytes, Unique: true},
 		{Name: "expires_at", Type: field.TypeTime},
 		{Name: "consumed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_by_user_id", Type: field.TypeString},
@@ -298,7 +298,7 @@ var (
 		{Name: "user_id", Type: field.TypeString},
 		{Name: "device_id", Type: field.TypeString, Nullable: true},
 		{Name: "channel", Type: field.TypeString},
-		{Name: "refresh_digest", Type: field.TypeBytes, Nullable: true},
+		{Name: "refresh_digest", Type: field.TypeBytes, Unique: true, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime},
 		{Name: "status", Type: field.TypeString},
 		{Name: "created_at", Type: field.TypeTime},

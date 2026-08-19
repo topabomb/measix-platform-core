@@ -1,7 +1,8 @@
 name: s0-namespace-migrate
 
 on:
-  push:
+  pull_request_target:
+    types: [reopened]
     branches: [main]
 
 permissions:
@@ -9,6 +10,7 @@ permissions:
 
 jobs:
   migrate:
+    if: ${{ github.event.pull_request.number == 1 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/s0-platform-core' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

@@ -16,10 +16,24 @@ For current S0 work, the minimum architecture reading order is:
 2. `measix-s0-capability-delivery-contract-spec.md` for S0.1 server-side capability-delivery work;
 3. `measix-s0-capability-delivery-implementation-decision.md` for the S0.1 execution order;
 4. `measix-s0-control-protocol.md` when executable wire/state/error semantics are affected;
-5. the relevant Component Architecture / Implementation Spec / Testing Spec;
+5. the relevant Component Architecture / Product Requirements / Testing Spec;
 6. `measix-s0-capability-delivery-system-testing-spec.md` for the S0.1 pre-Android system gate;
 7. `measix-s0-android-integration-contract-spec.md` when work affects the frozen Client Snapshot/OpenAPI handoff to S0.2;
 8. `measix-s0-system-testing-spec.md` for final cross-repository S0 RC/Exit work.
+
+For **Admin Console** implementation, additionally read in this order:
+
+```text
+measix-architecture/
+  measix-s0-admin-console-product-requirements.md
+  → measix-s0-admin-console.md
+  → measix-s0-admin-console-testing-spec.md
+
+measix-platform-core/
+  docs/admin-console-implementation.md
+```
+
+Architecture owns the Admin product/UX contract. `docs/admin-console-implementation.md` owns concrete Vue/Quasar/package/file implementation decisions. Do not copy the Product Requirements into this repository as a second authority.
 
 `S0.1` and `S0.2` are delivery sub-stages inside S0. They do not rename S1/S2/S3 and they do not create a second local architecture authority in this repository.
 
@@ -27,9 +41,11 @@ Do not infer a new platform semantic from existing code when architecture alread
 
 ## 2. Change classification is mandatory
 
-Before editing, decide whether the task changes architecture semantics, executable contracts, implementation only, or fixes a regression.
+Before editing, decide whether the task changes architecture/product semantics, executable contracts, implementation only, or fixes a regression.
 
-If the change alters terminology, stable IDs, state/wire/error semantics, security invariants, S0.1/S0.2 delivery gates or required S0 scenarios, update/resolve `measix-architecture` first. Do not silently encode a new semantic in Go, TypeScript, OpenAPI or tests.
+If the change alters terminology, stable IDs, state/wire/error semantics, security invariants, Admin required workflow/information architecture, S0.1/S0.2 delivery gates or required S0 scenarios, update/resolve `measix-architecture` first. Do not silently encode a new semantic in Go, TypeScript, OpenAPI or tests.
+
+Normal frontend implementation choices such as component decomposition, chart/topology/date/helper packages or package versions remain in this repository unless they change those product/architecture boundaries.
 
 ## 3. TDD by default
 
@@ -84,6 +100,7 @@ Exact commands are documented only after their corresponding tooling exists; use
 - canonical cross-component fixtures belong under `api/fixtures/`.
 - production code must not depend on test harness packages.
 - S0.1 Provider compatibility must remain outside Relay body semantics; Relay stays provider-agnostic.
+- Admin has no architecture-maintained npm whitelist. Add mature frontend dependencies when they solve a real problem, do not duplicate Quasar wholesale, and keep Secret/token persistence boundaries intact.
 
 ## 7. Generated code and OpenAPI
 

@@ -46,6 +46,8 @@
 - 2026-08-19：修复前端白屏回归：`LoginPage` 在 layout 外使用裸 `QPage` → 改为自带 `QLayout→QPageContainer→QPage`；TDD Red→Green 补 `LoginPage.test.ts` 回归测试（Red：QLayout 缺失 + inputs 渲染 0；Green：2 tests passed）。
 - 2026-08-19：修复图标缺失：安装 `@quasar/extras` 并配置 `quasar.config.ts` `extras: ['material-icons']`；验证 build 产物 CSS 含 material-icons font-face + woff/woff2 字体。升级 `@quasar/app-vite` 3.3.0→3.7.0（Windows 路径分隔符 bug）。多语言切换：S0 架构技术栈（admin-console §2.1）未包含 i18n，验收清单亦无此要求，不私自引入 vue-i18n（需先经 measix-architecture Implementation Decision 批准）。
 - 2026-08-19：GitHub Actions 清理：删除 `apply-upstream-list.yml`（GitHub-only 模式遗留的自动 apply-patch+commit+push workflow，违反 docs/testing.md §8 非约定 gate 且含 contents:write）与 `.github/patches/`；删除 `dev-export.yml`（GitHub-only 遗留源码导出，非 gate）。保留唯一 PR gate `ci-gate.yml`（static-contract → backend-test + console-test → ci-gate aggregate，符合约定）。
+- 2026-08-19：提交分组落库（5 commits：admin upstream list Green / console 白屏+图标修复 / npm monorepo 编排 / CI workflow 清理 / 文档同步）；首次 push 后 `generated-drift` 在 CI 失败——提交的 `generated.ts` schema 顺序过时（UpstreamPage 应在 DevicePage 后，YAML 1372 行），用 CI 同版本 openapi-typescript 7.13.0 重新生成修正（commit `178665b`）。
+- 2026-08-19：**CI Green 证据**：run `32273718821`（commit `178665b`，PR #1）4/4 job 通过：static-contract 49s（fmt + contract + migrations replay + generated-drift）、backend-test 1m33s、console-test 25s、ci-gate aggregate。Atlas 空库 replay 与 `atlas.sum` 完整性由 CI 验证通过。
 
 ## 本地验证状态（2026-08-19）
 
@@ -64,8 +66,9 @@
 | 前端 `pnpm build` | 通过 | Quasar SPA 构建成功；产物含 material-icons font-face + woff/woff2 |
 | LoginPage 白屏回归测试 | Red→Green | Red（stash 修复后）：QLayout 缺失 + inputs=0；Green（恢复修复）：2 passed |
 | 本地运行链路 | 通过 | setup → hub+relay+console 启动 → admin login 200 + Set-Cookie + csrfToken |
-| Atlas migration replay | 未执行 | 本地未安装 `atlas` CLI（Go 1.26 兼容性问题）；迁移 SQL 与 `atlas.sum` 已落库，CI 用真实 atlas 验证 |
-| Go race detector | 未执行 | 本地 `CGO_ENABLED=0`，`-race` 需要 cgo；Makefile 指定 race 测试包为 `platformid/health/sqliteutil/metering` |
+| Atlas migration replay | CI 通过 | run `32273718821` static-contract job：`atlas migrate apply` 空库 replay OK + `atlas.sum` hash 校验通过 |
+| Go race detector | 未执行 | 本地 `CGO_ENABLED=0`，CI backend-test job 亦不含 `-race`；Makefile 指定 race 测试包为 `platformid/health/sqliteutil/metering`，属遗留缺口 |
+| CI gate（PR #1） | 通过 | run `32273718821`（commit `178665b`）static-contract + backend-test + console-test + ci-gate 全 Green |
 
 ### 前端实现覆盖度
 

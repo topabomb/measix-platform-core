@@ -129,7 +129,7 @@ func multiTransportFixture(t *testing.T, upstreamURL string) (*runtimeFixture, t
 		Upstreams: []relaycontrolapi.RuntimeUpstreamSpec{{
 			UpstreamId: upstreamID, BaseUrl: upstreamURL, Enabled: true,
 			TransportCapabilities: []string{"HTTP_BINARY_STREAM", "HTTP_MULTIPART", "MCP_STREAMABLE_HTTP"},
-			Auth: relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.BEARER, AdditionalProperties: map[string]interface{}{"token": "runtime-secret"}},
+			Auth:                  relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.BEARER, AdditionalProperties: map[string]interface{}{"token": "runtime-secret"}},
 		}},
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 	}

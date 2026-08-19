@@ -1,0 +1,25 @@
+name: dev-export
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: 打包当前源码
+        run: |
+          git archive --format=zip --output=/tmp/measix-platform-core.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: measix-platform-core-source
+          path: /tmp/measix-platform-core.zip
+          if-no-files-found: error
+          retention-days: 1

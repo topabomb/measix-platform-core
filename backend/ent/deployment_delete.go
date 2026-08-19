@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/deployment"
-	"github.com/topabomb/measix-platform-core/backend/ent/predicate"
+	"measix/platform/ent/deployment"
+	"measix/platform/ent/predicate"
 )
 
 // DeploymentDelete is the builder for deleting a Deployment entity.

@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/testutil"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent"
+	"measix/platform/internal/hub/testutil"
+	"measix/platform/internal/wire/usageingestapi"
+	"measix/platform/pkg/platformid"
 )
 
 func TestHUBI5RequestUsageBatchIsIdempotent(t *testing.T) {

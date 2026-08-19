@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
+	"measix/platform/internal/relay/control"
+	"measix/platform/internal/wire/relaycontrolapi"
 )
 
 var errUpstreamRedirect = errors.New("upstream redirect is not allowed")

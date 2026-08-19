@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/pkg/platformid"
 )
 
 const runtimePrefix = "/runtime/v1/resources/"

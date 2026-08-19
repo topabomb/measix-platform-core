@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/requestusage"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent"
+	"measix/platform/ent/requestusage"
+	"measix/platform/internal/wire/usageingestapi"
+	"measix/platform/pkg/platformid"
 )
 
 var ErrInvalidBatch = errors.New("invalid request usage batch")

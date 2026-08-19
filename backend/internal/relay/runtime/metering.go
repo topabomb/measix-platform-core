@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
+	"measix/platform/internal/relay/control"
+	"measix/platform/internal/wire/usageingestapi"
 )
 
 type UsageRecorder interface {

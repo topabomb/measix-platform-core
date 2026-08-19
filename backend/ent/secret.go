@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/secret"
+	"measix/platform/ent/secret"
 )
 
 // Secret is the model entity for the Secret schema.

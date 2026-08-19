@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/managedrelease"
+	"measix/platform/ent/managedrelease"
 )
 
 // ManagedRelease is the model entity for the ManagedRelease schema.

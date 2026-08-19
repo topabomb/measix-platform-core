@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/managedrelease"
+	"measix/platform/ent/managedrelease"
 )
 
 // ManagedReleaseCreate is the builder for creating a ManagedRelease entity.

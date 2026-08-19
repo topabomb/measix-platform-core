@@ -7,7 +7,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/adminstatic"
+	"measix/platform/internal/hub/adminstatic"
 )
 
 func testFS() fs.FS {

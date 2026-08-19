@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaycontrolapi"
 )
 
 var (

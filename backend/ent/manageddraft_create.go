@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/manageddraft"
+	"measix/platform/ent/manageddraft"
 )
 
 // ManagedDraftCreate is the builder for creating a ManagedDraft entity.

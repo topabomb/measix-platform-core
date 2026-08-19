@@ -10,16 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent/activation"
-	"github.com/topabomb/measix-platform-core/backend/ent/managedrelease"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/capability"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/runtimecontrol"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/testutil"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/upstream"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent/activation"
+	"measix/platform/ent/managedrelease"
+	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/hub/security"
+	"measix/platform/internal/hub/testutil"
+	"measix/platform/internal/hub/upstream"
+	"measix/platform/internal/relay/control"
+	"measix/platform/internal/wire/adminapi"
+	"measix/platform/pkg/platformid"
 )
 
 func TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck(t *testing.T) {

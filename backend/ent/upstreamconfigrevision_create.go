@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/upstreamconfigrevision"
+	"measix/platform/ent/upstreamconfigrevision"
 )
 
 // UpstreamConfigRevisionCreate is the builder for creating a UpstreamConfigRevision entity.

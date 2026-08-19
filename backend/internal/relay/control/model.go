@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaycontrolapi"
 )
 
 type Route struct {

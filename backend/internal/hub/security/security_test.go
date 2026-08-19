@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
+	"measix/platform/internal/hub/security"
 )
 
 func TestPasswordArgon2idRoundTrip(t *testing.T) {

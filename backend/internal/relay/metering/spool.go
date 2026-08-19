@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/common/sqliteutil"
+	"measix/platform/internal/common/sqliteutil"
 )
 
 //go:embed migrations/001_spool.sql

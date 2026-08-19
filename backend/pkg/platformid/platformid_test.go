@@ -1,7 +1,7 @@
 package platformid_test
 
 import (
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/pkg/platformid"
 	"testing"
 )
 

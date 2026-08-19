@@ -10,17 +10,17 @@ import (
 	"sort"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/activation"
-	"github.com/topabomb/measix-platform-core/backend/ent/device"
-	"github.com/topabomb/measix-platform-core/backend/ent/idempotencyrecord"
-	"github.com/topabomb/measix-platform-core/backend/ent/session"
-	"github.com/topabomb/measix-platform-core/backend/ent/user"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/upstream"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaystate"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent"
+	"measix/platform/ent/activation"
+	"measix/platform/ent/device"
+	"measix/platform/ent/idempotencyrecord"
+	"measix/platform/ent/session"
+	"measix/platform/ent/user"
+	"measix/platform/internal/hub/upstream"
+	"measix/platform/internal/wire/adminapi"
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaystate"
+	"measix/platform/pkg/platformid"
 )
 
 func (s *Service) GetActivation(ctx context.Context, activationID string) (ActivationResult, error) {

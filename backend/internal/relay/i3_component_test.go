@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
-	relayruntime "github.com/topabomb/measix-platform-core/backend/internal/relay/runtime"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/hub/security"
+	"measix/platform/internal/relay/control"
+	relayruntime "measix/platform/internal/relay/runtime"
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/pkg/platformid"
 )
 
 func TestI3ControlApplyAndRuntimeAdmission(t *testing.T) {

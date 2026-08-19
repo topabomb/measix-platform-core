@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/managedstate"
+	"measix/platform/ent/managedstate"
 )
 
 // ManagedState is the model entity for the ManagedState schema.

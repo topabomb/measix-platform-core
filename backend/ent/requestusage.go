@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/requestusage"
+	"measix/platform/ent/requestusage"
 )
 
 // RequestUsage is the model entity for the RequestUsage schema.

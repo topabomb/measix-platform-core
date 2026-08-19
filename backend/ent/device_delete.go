@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/device"
-	"github.com/topabomb/measix-platform-core/backend/ent/predicate"
+	"measix/platform/ent/device"
+	"measix/platform/ent/predicate"
 )
 
 // DeviceDelete is the builder for deleting a Device entity.

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/metering"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/relay/metering"
+	"measix/platform/internal/wire/usageingestapi"
+	"measix/platform/pkg/platformid"
 )
 
 func TestRLYSPHubAckDeletesOnlyAcknowledgedBatch(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/clientapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/wire/adminapi"
+	"measix/platform/internal/wire/clientapi"
+	"measix/platform/pkg/platformid"
 )
 
 type SnapshotInput struct {

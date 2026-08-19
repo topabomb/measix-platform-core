@@ -5,11 +5,11 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/managedrelease"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/capability"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/runtimecontrol"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
+	"measix/platform/ent"
+	"measix/platform/ent/managedrelease"
+	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/wire/adminapi"
 )
 
 func (h *fullAdminHandler) GetDraft(w http.ResponseWriter, r *http.Request) {

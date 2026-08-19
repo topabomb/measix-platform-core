@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/pricingrule"
-	"github.com/topabomb/measix-platform-core/backend/ent/semanticusage"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent"
+	"measix/platform/ent/pricingrule"
+	"measix/platform/ent/semanticusage"
+	"measix/platform/pkg/platformid"
 )
 
 type Completeness string

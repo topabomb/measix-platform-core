@@ -1,8 +1,8 @@
 package app_test
 
 import (
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/app"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/config"
+	"measix/platform/internal/hub/app"
+	"measix/platform/internal/hub/config"
 	"net/http"
 	"net/http/httptest"
 	"testing"

@@ -5,8 +5,8 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/internal/common/sqliteutil"
+	"measix/platform/ent"
+	"measix/platform/internal/common/sqliteutil"
 )
 
 type Store struct {

@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/semanticusage"
+	"measix/platform/ent/semanticusage"
 )
 
 // SemanticUsageCreate is the builder for creating a SemanticUsage entity.

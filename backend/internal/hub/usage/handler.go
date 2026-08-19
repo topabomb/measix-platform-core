@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
+	"measix/platform/internal/wire/usageingestapi"
 )
 
 const maxUsageBatchBody = 2 << 20

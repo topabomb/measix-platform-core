@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/identity"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/clientapi"
+	"measix/platform/ent"
+	"measix/platform/internal/hub/identity"
+	"measix/platform/internal/hub/security"
+	"measix/platform/internal/wire/adminapi"
+	"measix/platform/internal/wire/clientapi"
 )
 
 const adminSessionCookie = "measix_admin_session"

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/hub/security"
+	"measix/platform/pkg/platformid"
 )
 
 func (s *Service) Bootstrap(ctx context.Context, deploymentName, adminUsername, adminDisplayName, password string) (BootstrapResult, error) {

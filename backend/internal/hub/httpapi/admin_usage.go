@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/usage"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
+	"measix/platform/ent"
+	"measix/platform/internal/hub/usage"
+	"measix/platform/internal/wire/adminapi"
 )
 
 func (h *fullAdminHandler) ListUsageRequests(w http.ResponseWriter, r *http.Request, params adminapi.ListUsageRequestsParams) {

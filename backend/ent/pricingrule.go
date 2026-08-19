@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/pricingrule"
+	"measix/platform/ent/pricingrule"
 )
 
 // PricingRule is the model entity for the PricingRule schema.

@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	relayruntime "github.com/topabomb/measix-platform-core/backend/internal/relay/runtime"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
+	relayruntime "measix/platform/internal/relay/runtime"
+	"measix/platform/internal/wire/usageingestapi"
 )
 
 type captureUsageRecorder struct {

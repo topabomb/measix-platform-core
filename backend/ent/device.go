@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/device"
+	"measix/platform/ent/device"
 )
 
 // Device is the model entity for the Device schema.

@@ -7,9 +7,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/requestusage"
-	"github.com/topabomb/measix-platform-core/backend/ent/semanticusage"
+	"measix/platform/ent"
+	"measix/platform/ent/requestusage"
+	"measix/platform/ent/semanticusage"
 )
 
 type Summary struct {

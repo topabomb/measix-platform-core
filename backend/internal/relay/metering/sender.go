@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
+	"measix/platform/internal/wire/usageingestapi"
 )
 
 type Sender struct {

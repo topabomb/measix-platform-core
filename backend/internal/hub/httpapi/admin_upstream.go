@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/runtimecontrol"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/upstream"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
+	"measix/platform/ent"
+	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/hub/upstream"
+	"measix/platform/internal/wire/adminapi"
 )
 
 func (h *fullAdminHandler) CreateSecret(w http.ResponseWriter, r *http.Request, params adminapi.CreateSecretParams) {

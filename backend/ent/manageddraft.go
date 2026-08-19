@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/manageddraft"
+	"measix/platform/ent/manageddraft"
 )
 
 // ManagedDraft is the model entity for the ManagedDraft schema.

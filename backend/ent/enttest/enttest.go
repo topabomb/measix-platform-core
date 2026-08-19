@@ -5,12 +5,12 @@ package enttest
 import (
 	"context"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
+	"measix/platform/ent"
 	// required by schema hooks.
-	_ "github.com/topabomb/measix-platform-core/backend/ent/runtime"
+	_ "measix/platform/ent/runtime"
 
 	"entgo.io/ent/dialect/sql/schema"
-	"github.com/topabomb/measix-platform-core/backend/ent/migrate"
+	"measix/platform/ent/migrate"
 )
 
 type (

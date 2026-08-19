@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/capability"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/runtimecontrol"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/testutil"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/upstream"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/hub/security"
+	"measix/platform/internal/hub/testutil"
+	"measix/platform/internal/hub/upstream"
+	"measix/platform/internal/relay/control"
+	"measix/platform/pkg/platformid"
 )
 
 func TestI5SecurityDisableIsDenyFirstAndEnableIsAllowLast(t *testing.T) {

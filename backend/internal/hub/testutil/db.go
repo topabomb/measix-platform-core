@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/common/sqliteutil"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/store"
+	"measix/platform/internal/common/sqliteutil"
+	"measix/platform/internal/hub/store"
 )
 
 func OpenStore(t *testing.T) *store.Store {

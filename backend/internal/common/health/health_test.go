@@ -1,7 +1,7 @@
 package health_test
 
 import (
-	"github.com/topabomb/measix-platform-core/backend/internal/common/health"
+	"measix/platform/internal/common/health"
 	"net/http"
 	"net/http/httptest"
 	"testing"

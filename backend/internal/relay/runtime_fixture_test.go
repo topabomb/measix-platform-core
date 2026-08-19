@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
-	relayruntime "github.com/topabomb/measix-platform-core/backend/internal/relay/runtime"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaystate"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/relay/control"
+	relayruntime "measix/platform/internal/relay/runtime"
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaystate"
+	"measix/platform/pkg/platformid"
 )
 
 type testAccessClaims struct {

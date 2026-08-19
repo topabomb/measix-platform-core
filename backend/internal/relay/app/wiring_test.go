@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/app"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaystate"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/relay/app"
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaystate"
+	"measix/platform/pkg/platformid"
 )
 
 func TestRelayAppFailsClosedUntilControlApply(t *testing.T) {

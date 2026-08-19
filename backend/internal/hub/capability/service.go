@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/manageddraft"
-	"github.com/topabomb/measix-platform-core/backend/ent/managedrelease"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/upstream"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent"
+	"measix/platform/ent/manageddraft"
+	"measix/platform/ent/managedrelease"
+	"measix/platform/internal/hub/upstream"
+	"measix/platform/internal/wire/adminapi"
+	"measix/platform/pkg/platformid"
 )
 
 var (

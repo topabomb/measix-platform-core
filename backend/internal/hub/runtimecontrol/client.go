@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaycontrolapi"
 )
 
 type RelayClient interface {

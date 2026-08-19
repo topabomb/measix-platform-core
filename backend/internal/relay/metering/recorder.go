@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/wire/usageingestapi"
+	"measix/platform/pkg/platformid"
 )
 
 type Recorder struct {

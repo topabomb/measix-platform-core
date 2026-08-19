@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/predicate"
-	"github.com/topabomb/measix-platform-core/backend/ent/session"
+	"measix/platform/ent/predicate"
+	"measix/platform/ent/session"
 )
 
 // SessionDelete is the builder for deleting a Session entity.

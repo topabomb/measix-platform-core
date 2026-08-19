@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/pkg/platformid"
 )
 
 func TestRLYI4TransportsStreamWithoutProtocolTranslation(t *testing.T) {

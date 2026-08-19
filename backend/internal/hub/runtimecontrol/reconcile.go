@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/activation"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaystate"
+	"measix/platform/ent"
+	"measix/platform/ent/activation"
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaystate"
 )
 
 var ErrRelayDiverged = errors.New("relay applied state is unexpectedly newer or different")

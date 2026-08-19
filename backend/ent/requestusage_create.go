@@ -10,7 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/requestusage"
+	"measix/platform/ent/requestusage"
 )
 
 // RequestUsageCreate is the builder for creating a RequestUsage entity.

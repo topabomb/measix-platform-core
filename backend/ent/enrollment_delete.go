@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/topabomb/measix-platform-core/backend/ent/enrollment"
-	"github.com/topabomb/measix-platform-core/backend/ent/predicate"
+	"measix/platform/ent/enrollment"
+	"measix/platform/ent/predicate"
 )
 
 // EnrollmentDelete is the builder for deleting a Enrollment entity.

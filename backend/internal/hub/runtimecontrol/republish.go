@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/activation"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/capability"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaystate"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent"
+	"measix/platform/ent/activation"
+	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/wire/adminapi"
+	"measix/platform/internal/wire/relaystate"
+	"measix/platform/pkg/platformid"
 )
 
 func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, sourceReleaseID string) (ActivationResult, error) {

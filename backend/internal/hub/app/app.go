@@ -3,8 +3,8 @@ package app
 import (
 	"encoding/json"
 	"github.com/go-chi/chi/v5"
-	"github.com/topabomb/measix-platform-core/backend/internal/common/health"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/config"
+	"measix/platform/internal/common/health"
+	"measix/platform/internal/hub/config"
 	"net/http"
 )
 

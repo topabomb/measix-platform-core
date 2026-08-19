@@ -5,11 +5,11 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/topabomb/measix-platform-core/backend/internal/common/health"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/metering"
-	relayruntime "github.com/topabomb/measix-platform-core/backend/internal/relay/runtime"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
+	"measix/platform/internal/common/health"
+	"measix/platform/internal/relay/control"
+	"measix/platform/internal/relay/metering"
+	relayruntime "measix/platform/internal/relay/runtime"
+	"measix/platform/internal/wire/relaycontrolapi"
 )
 
 type App struct {

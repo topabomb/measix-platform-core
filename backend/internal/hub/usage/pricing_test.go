@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/testutil"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/hub/testutil"
+	"measix/platform/pkg/platformid"
 )
 
 func TestHUBI5SemanticUsageDedupeAndCompleteness(t *testing.T) {

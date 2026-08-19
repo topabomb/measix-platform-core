@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/activation"
+	"measix/platform/ent/activation"
 )
 
 // Activation is the model entity for the Activation schema.

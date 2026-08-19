@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/common/sqliteutil"
+	"measix/platform/internal/common/sqliteutil"
 )
 
 func TestOpenAppliesProductionPragmas(t *testing.T) {

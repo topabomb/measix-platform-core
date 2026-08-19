@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/capability"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/identity"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/testutil"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/upstream"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/hub/identity"
+	"measix/platform/internal/hub/security"
+	"measix/platform/internal/hub/testutil"
+	"measix/platform/internal/hub/upstream"
+	"measix/platform/internal/wire/adminapi"
+	"measix/platform/pkg/platformid"
 )
 
 func TestHUBCAP001DraftOptimisticConcurrencyAndSaveDoesNotActivate(t *testing.T) {

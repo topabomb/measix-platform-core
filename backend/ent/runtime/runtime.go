@@ -2,7 +2,7 @@
 
 package runtime
 
-// The schema-stitching logic is generated in github.com/topabomb/measix-platform-core/backend/ent/runtime.go
+// The schema-stitching logic is generated in measix/platform/ent/runtime.go
 
 const (
 	Version = "v0.14.6"                                         // Version of ent codegen.

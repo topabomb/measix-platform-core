@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/upstreamconfigrevision"
+	"measix/platform/ent/upstreamconfigrevision"
 )
 
 // UpstreamConfigRevision is the model entity for the UpstreamConfigRevision schema.

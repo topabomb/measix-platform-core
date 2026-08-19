@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/semanticusage"
+	"measix/platform/ent/semanticusage"
 )
 
 // SemanticUsage is the model entity for the SemanticUsage schema.

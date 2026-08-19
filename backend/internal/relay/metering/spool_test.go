@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/metering"
+	"measix/platform/internal/relay/metering"
 )
 
 func TestSpoolPersistsAcrossRestartAndDeletesOnlyAckedRows(t *testing.T) {

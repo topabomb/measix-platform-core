@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/deployment"
+	"measix/platform/ent/deployment"
 )
 
 // Deployment is the model entity for the Deployment schema.

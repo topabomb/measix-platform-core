@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/common/sqliteutil"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/maintenance"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/testutil"
+	"measix/platform/internal/common/sqliteutil"
+	"measix/platform/internal/hub/maintenance"
+	"measix/platform/internal/hub/testutil"
 )
 
 func TestHUBDBIntegrityAndBackupRestore(t *testing.T) {

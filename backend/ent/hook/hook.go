@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
+	"measix/platform/ent"
 )
 
 // The ActivationFunc type is an adapter to allow the use of ordinary

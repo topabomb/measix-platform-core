@@ -3,7 +3,7 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
+	"measix/platform/internal/wire/adminapi"
 )
 
 func (h *fullAdminHandler) DisableUser(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.DisableUserParams) {

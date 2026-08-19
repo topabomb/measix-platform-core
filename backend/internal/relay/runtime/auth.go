@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/control"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/internal/relay/control"
+	"measix/platform/pkg/platformid"
 )
 
 type accessClaims struct {

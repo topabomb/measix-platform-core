@@ -9,7 +9,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/enrollment"
+	"measix/platform/ent/enrollment"
 )
 
 // Enrollment is the model entity for the Enrollment schema.

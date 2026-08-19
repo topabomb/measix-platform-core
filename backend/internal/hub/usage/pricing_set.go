@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/pkg/platformid"
 )
 
 type PricingRuleRecord struct {

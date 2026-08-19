@@ -7,18 +7,18 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/activation"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaystate"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent"
+	"measix/platform/ent/activation"
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaystate"
+	"measix/platform/pkg/platformid"
 )
 
 type securitySubject string
 
 const (
-	securityUserDisable securitySubject = "USER_DISABLE"
-	securityUserEnable  securitySubject = "USER_ENABLE"
+	securityUserDisable  securitySubject = "USER_DISABLE"
+	securityUserEnable   securitySubject = "USER_ENABLE"
 	securityDeviceRevoke securitySubject = "DEVICE_REVOKE"
 )
 

@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/common/server"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/app"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/config"
-	"github.com/topabomb/measix-platform-core/backend/internal/relay/metering"
 	"golang.org/x/sync/errgroup"
+	"measix/platform/internal/common/server"
+	"measix/platform/internal/relay/app"
+	"measix/platform/internal/relay/config"
+	"measix/platform/internal/relay/metering"
 )
 
 func main() {

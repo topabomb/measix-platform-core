@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
-	"github.com/topabomb/measix-platform-core/backend/ent/predicate"
+	"measix/platform/ent/predicate"
 )
 
 // ID filters vertices based on their ID field.

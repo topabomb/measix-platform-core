@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/testutil"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
+	"measix/platform/internal/hub/testutil"
+	"measix/platform/internal/wire/usageingestapi"
 )
 
 func TestHUBI5UsageIngestHTTPContract(t *testing.T) {

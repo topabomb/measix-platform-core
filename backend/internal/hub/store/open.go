@@ -3,7 +3,7 @@ package store
 import (
 	"database/sql"
 
-	"github.com/topabomb/measix-platform-core/backend/internal/common/sqliteutil"
+	"measix/platform/internal/common/sqliteutil"
 )
 
 // Open opens hub.db using the S0 SQLite runtime policy. It does not auto-migrate.

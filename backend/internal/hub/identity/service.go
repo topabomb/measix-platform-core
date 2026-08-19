@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/topabomb/measix-platform-core/backend/ent"
-	"github.com/topabomb/measix-platform-core/backend/ent/device"
-	"github.com/topabomb/measix-platform-core/backend/ent/enrollment"
-	"github.com/topabomb/measix-platform-core/backend/ent/session"
-	"github.com/topabomb/measix-platform-core/backend/ent/user"
-	"github.com/topabomb/measix-platform-core/backend/internal/hub/security"
-	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
+	"measix/platform/ent"
+	"measix/platform/ent/device"
+	"measix/platform/ent/enrollment"
+	"measix/platform/ent/session"
+	"measix/platform/ent/user"
+	"measix/platform/internal/hub/security"
+	"measix/platform/pkg/platformid"
 )
 
 var (

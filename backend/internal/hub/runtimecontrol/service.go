@@ -113,6 +113,13 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 	if err != nil {
 		return ActivationResult{}, err
 	}
+	previousDesiredRevision := managed.DesiredControlRevision
+	previousRuntimeStatus := managed.RuntimeStatus
+	var previousDesiredHash *string
+	if managed.DesiredBundleHash != nil {
+		value := *managed.DesiredBundleHash
+		previousDesiredHash = &value
+	}
 	generation, err := s.nextGeneration(ctx)
 	if err != nil {
 		return ActivationResult{}, err
@@ -167,6 +174,12 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 
 	ack, err := s.Relay.Apply(ctx, state)
 	if err != nil {
+		if code, rejected := relayValidationRejected(err); rejected {
+			if rejectErr := s.rejectPublish(ctx, activationID, releaseID, code, previousDesiredRevision, previousDesiredHash, previousRuntimeStatus); rejectErr != nil {
+				return ActivationResult{}, rejectErr
+			}
+			return s.loadActivation(ctx, activationID)
+		}
 		_ = s.markUnknown(ctx, activationID, "relay_apply_unknown")
 		return s.loadActivation(ctx, activationID)
 	}
@@ -276,20 +289,7 @@ func (s *Service) persistPublishIntent(ctx context.Context, intent publishIntent
 	if _, err := tx.IdempotencyRecord.Create().
 		SetAdminUserID(intent.Request.AdminUserID).
 		SetMethod(httpMethodPublish).
-		SetNormalizedPath(publishPath).
-		SetIdempotencyKey(intent.Request.IdempotencyKey).
-		SetRequestHash(intent.RequestHash).
-		SetActivationID(intent.ActivationID).
-		SetCreatedAt(intent.Now).
-		Save(ctx); err != nil {
-		return rollback(err)
-	}
-	if _, err := tx.ManagedState.UpdateOneID("current").
-		SetDesiredControlRevision(int64(intent.ControlRevision)).
-		SetDesiredBundleHash(intent.BundleHash).
-		SetRuntimeStatus("ACTIVATING").
-		SetManagedStateRevision(managed.ManagedStateRevision + 1).
-		SetUpdatedAt(intent.Now).
+		SetNormalizedPathEQ(intent.Request.IdempotencyKey).
 		Save(ctx); err != nil {
 		return rollback(err)
 	}
@@ -344,6 +344,42 @@ func (s *Service) finalizePublish(ctx context.Context, activationID, releaseID s
 		return rollback(err)
 	}
 	if _, err := tx.Activation.UpdateOneID(activationID).SetState("COMPLETED").SetCompletedAt(now).Save(ctx); err != nil {
+		return rollback(err)
+	}
+	return tx.Commit()
+}
+
+func (s *Service) rejectPublish(ctx context.Context, activationID, releaseID, code string, previousRevision int64, previousHash *string, previousRuntimeStatus string) error {
+	now := s.Now().UTC()
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	rollback := func(cause error) error {
+		_ = tx.Rollback()
+		return cause
+	}
+	if _, err := tx.Activation.UpdateOneID(activationID).SetState("FAILED").SetErrorCode(code).SetCompletedAt(now).Save(ctx); err != nil {
+		return rollback(err)
+	}
+	if _, err := tx.ManagedRelease.UpdateOneID(releaseID).SetStatus("ACTIVATION_FAILED").Save(ctx); err != nil {
+		return rollback(err)
+	}
+	managed, err := tx.ManagedState.Get(ctx, "current")
+	if err != nil {
+		return rollback(err)
+	}
+	update := tx.ManagedState.UpdateOneID("current").
+		SetDesiredControlRevision(previousRevision).
+		SetRuntimeStatus(previousRuntimeStatus).
+		SetManagedStateRevision(managed.ManagedStateRevision + 1).
+		SetUpdatedAt(now)
+	if previousHash == nil {
+		update.ClearDesiredBundleHash()
+	} else {
+		update.SetDesiredBundleHash(*previousHash)
+	}
+	if _, err := update.Save(ctx); err != nil {
 		return rollback(err)
 	}
 	return tx.Commit()

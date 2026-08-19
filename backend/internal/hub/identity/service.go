@@ -54,7 +54,6 @@ func (s *Service) CreateUser(ctx context.Context, username, displayName, role st
 	if username == "" || displayName == "" || (role != "ADMIN" && role != "MEMBER") {
 		return nil, fmt.Errorf("invalid user")
 	}
-
 	now := s.Now().UTC()
 	u, err := s.Client.User.Create().
 		SetID(platformid.New(platformid.User)).
@@ -133,7 +132,6 @@ func (s *Service) CreateEnrollment(ctx context.Context, userID, createdBy string
 	if _, err := s.GetUser(ctx, userID); err != nil {
 		return EnrollmentGrant{}, err
 	}
-
 	code, err := s.Random(16)
 	if err != nil {
 		return EnrollmentGrant{}, err
@@ -159,7 +157,6 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 	if err := platformid.Validate(platformid.Installation, installationID); err != nil {
 		return ExchangeResult{}, fmt.Errorf("invalid installation id")
 	}
-
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
 		return ExchangeResult{}, err
@@ -168,7 +165,6 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 		_ = tx.Rollback()
 		return ExchangeResult{}, cause
 	}
-
 	e, err := tx.Enrollment.Query().Where(enrollment.TokenDigestEQ(security.DigestToken(code))).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -176,7 +172,6 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 		}
 		return rollback(err)
 	}
-
 	now := s.Now().UTC()
 	if e.ConsumedAt != nil {
 		return rollback(ErrAlreadyUsed)
@@ -184,7 +179,6 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 	if !now.Before(e.ExpiresAt) {
 		return rollback(ErrExpired)
 	}
-
 	u, err := tx.User.Get(ctx, e.UserID)
 	if err != nil {
 		return rollback(err)
@@ -192,13 +186,11 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 	if u.Status != "ACTIVE" {
 		return rollback(ErrRevoked)
 	}
-
 	if existing, queryErr := tx.Device.Query().Where(device.InstallationIDEQ(installationID)).Only(ctx); queryErr == nil && existing.ID != "" {
 		return rollback(ErrConflict)
 	} else if queryErr != nil && !ent.IsNotFound(queryErr) {
 		return rollback(queryErr)
 	}
-
 	refreshToken, err := s.Random(32)
 	if err != nil {
 		return rollback(err)
@@ -206,7 +198,6 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 	deviceID := platformid.New(platformid.Device)
 	sessionID := platformid.New(platformid.Session)
 	refreshExpiresAt := now.Add(30 * 24 * time.Hour)
-
 	if _, err := tx.Device.Create().
 		SetID(deviceID).
 		SetUserID(e.UserID).
@@ -235,7 +226,6 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 	if err := tx.Commit(); err != nil {
 		return ExchangeResult{}, err
 	}
-
 	accessToken, accessExpiresAt, err := s.Signer.Sign(e.UserID, deviceID, sessionID)
 	if err != nil {
 		return ExchangeResult{}, err
@@ -249,6 +239,34 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 		AccessTokenExpiresAt: accessExpiresAt,
 		RefreshToken:         refreshToken,
 		RefreshExpiresAt:     refreshExpiresAt,
+	}, nil
+}
+
+func (s *Service) AuthenticateAccess(ctx context.Context, token string) (AccessPrincipal, error) {
+	claims, err := s.Signer.Verify(token)
+	if err != nil {
+		return AccessPrincipal{}, ErrCredential
+	}
+	se, err := s.Client.Session.Get(ctx, claims.SessionID)
+	if err != nil || se.Status != "ACTIVE" || se.Channel != "ANDROID" || !s.Now().UTC().Before(se.ExpiresAt) {
+		return AccessPrincipal{}, ErrRevoked
+	}
+	if se.UserID != claims.Subject || se.DeviceID == nil || *se.DeviceID != claims.DeviceID {
+		return AccessPrincipal{}, ErrCredential
+	}
+	u, err := s.Client.User.Get(ctx, claims.Subject)
+	if err != nil || u.Status != "ACTIVE" {
+		return AccessPrincipal{}, ErrRevoked
+	}
+	d, err := s.Client.Device.Get(ctx, claims.DeviceID)
+	if err != nil || d.Status != "ACTIVE" || d.UserID != u.ID {
+		return AccessPrincipal{}, ErrRevoked
+	}
+	return AccessPrincipal{
+		DeploymentID: claims.DeploymentID,
+		UserID:       u.ID,
+		DeviceID:     d.ID,
+		SessionID:    se.ID,
 	}, nil
 }
 
@@ -266,7 +284,6 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (string, tim
 	if !s.Now().UTC().Before(se.ExpiresAt) {
 		return "", time.Time{}, ErrExpired
 	}
-
 	u, err := s.Client.User.Get(ctx, se.UserID)
 	if err != nil || u.Status != "ACTIVE" {
 		return "", time.Time{}, ErrRevoked
@@ -278,7 +295,6 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (string, tim
 	if err != nil || d.Status != "ACTIVE" {
 		return "", time.Time{}, ErrRevoked
 	}
-
 	_, _ = s.Client.Session.UpdateOneID(se.ID).SetLastUsedAt(s.Now().UTC()).Save(ctx)
 	return s.Signer.Sign(se.UserID, d.ID, se.ID)
 }
@@ -365,7 +381,6 @@ func (s *Service) LoginAdmin(ctx context.Context, username, password string) (Ad
 	if err != nil || u.Role != "ADMIN" || u.Status != "ACTIVE" || u.PasswordHash == nil || !security.VerifyPassword(*u.PasswordHash, password) {
 		return AdminSessionResult{}, ErrCredential
 	}
-
 	cookieSecret, err := s.Random(32)
 	if err != nil {
 		return AdminSessionResult{}, err

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/topabomb/measix-platform-core/backend/ent"
 	"github.com/topabomb/measix-platform-core/backend/internal/hub/testutil"
 	"github.com/topabomb/measix-platform-core/backend/internal/wire/usageingestapi"
 	"github.com/topabomb/measix-platform-core/backend/pkg/platformid"
@@ -13,9 +14,10 @@ import (
 func TestHUBI5RequestUsageBatchIsIdempotent(t *testing.T) {
 	store := testutil.OpenStore(t)
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
+	userID, upstreamID := seedUsageParents(t, store.Client, now)
 	service := NewService(store.Client)
 	service.Now = func() time.Time { return now }
-	event := validRequestUsageEvent(now)
+	event := validRequestUsageEvent(now, userID, upstreamID)
 
 	ack, err := service.Ingest(context.Background(), usageingestapi.UsageBatch{Events: []usageingestapi.RequestUsageEvent{event, event}})
 	if err != nil {
@@ -42,8 +44,10 @@ func TestHUBI5RequestUsageBatchIsIdempotent(t *testing.T) {
 
 func TestHUBI5RequestUsageRejectsInvalidIdentity(t *testing.T) {
 	store := testutil.OpenStore(t)
+	now := time.Now().UTC()
+	userID, upstreamID := seedUsageParents(t, store.Client, now)
 	service := NewService(store.Client)
-	event := validRequestUsageEvent(time.Now().UTC())
+	event := validRequestUsageEvent(now, userID, upstreamID)
 	event.RequestId = "req_invalid"
 	if _, err := service.Ingest(context.Background(), usageingestapi.UsageBatch{Events: []usageingestapi.RequestUsageEvent{event}}); err == nil {
 		t.Fatal("invalid requestId was accepted")
@@ -54,19 +58,46 @@ func TestHUBI5RequestUsageRejectsInvalidIdentity(t *testing.T) {
 	}
 }
 
-func validRequestUsageEvent(now time.Time) usageingestapi.RequestUsageEvent {
-	device := platformid.New(platformid.Device)
+func seedUsageParents(t *testing.T, client *ent.Client, now time.Time) (string, string) {
+	t.Helper()
+	ctx := context.Background()
+	userID := platformid.New(platformid.User)
+	if _, err := client.User.Create().
+		SetID(userID).
+		SetUsername("usage-test-" + userID).
+		SetDisplayName("Usage Test").
+		SetRole("MEMBER").
+		SetStatus("ACTIVE").
+		SetCreatedAt(now).
+		SetUpdatedAt(now).
+		Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	upstreamID := platformid.New(platformid.Upstream)
+	if _, err := client.Upstream.Create().
+		SetID(upstreamID).
+		SetName("usage-test-upstream").
+		SetConfigRevision(1).
+		SetStatus("ACTIVE").
+		SetCreatedAt(now).
+		SetUpdatedAt(now).
+		Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return userID, upstreamID
+}
+
+func validRequestUsageEvent(now time.Time, userID, upstreamID string) usageingestapi.RequestUsageEvent {
 	interaction := platformid.New(platformid.Interaction)
 	upstreamStatus := 200
 	return usageingestapi.RequestUsageEvent{
 		RequestId:          platformid.New(platformid.Request),
 		InteractionId:      &interaction,
 		DeploymentId:       platformid.New(platformid.Deployment),
-		UserId:             platformid.New(platformid.User),
-		DeviceId:           &device,
+		UserId:             userID,
 		ResourceId:         platformid.New(platformid.Model),
 		RuntimeRouteId:     platformid.New(platformid.Route),
-		UpstreamId:         platformid.New(platformid.Upstream),
+		UpstreamId:         upstreamID,
 		ManagedGeneration:  3,
 		ControlRevision:    7,
 		StartedAt:          now.Add(-250 * time.Millisecond),

@@ -23,11 +23,16 @@ jobs:
         run: |
           set -euo pipefail
           old='github.com/topabomb/measix-platform-core/backend'
-          if grep -RIl --include='*.go' "$old" backend | grep -q .; then
-            grep -RIl --include='*.go' "$old" backend | while read -r file; do
+          mapfile -t files < <(grep -RIl --include='*.go' "$old" backend || true)
+          if (( ${#files[@]} > 0 )); then
+            for file in "${files[@]}"; do
               sed -i "s#${old}#measix/platform#g" "$file"
             done
             find backend -name '*.go' -type f -print0 | xargs -0 gofmt -w
+            if grep -RIl --include='*.go' "$old" backend | head -n 1 | grep -q .; then
+              echo 'namespace migration incomplete' >&2
+              exit 1
+            fi
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add backend

@@ -1,4 +1,4 @@
-module github.com/topabomb/measix-platform-core/backend
+module measix/platform
 
 go 1.26.0
 

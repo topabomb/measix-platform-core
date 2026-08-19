@@ -1,0 +1,22 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 1,
+  "managedGeneration": 42,
+  "releaseId": "rel_550e8400-e29b-41d4-a716-446655440000",
+  "providers": [],
+  "models": [],
+  "tts": [],
+  "asr": [],
+  "mcp": [],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": true,
+    "allowLocalTts": true,
+    "allowLocalAsr": true,
+    "allowLocalMcp": true
+  },
+  "metadata": {
+    "publishedAt": "2026-08-19T03:00:00Z"
+  },
+  "snapshotHash": "sha256:7059c747e5d0bb3a092df5dbabf882236e7e3a39a2216e4fb056bc52e2c48071"
+}

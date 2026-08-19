@@ -1,0 +1,1934 @@
+openapi: 3.0.3
+info:
+  title: MEASIX Admin API
+  version: 1.0.0
+paths:
+  /api/admin/v1/session/login:
+    post:
+      operationId: login
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSession'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+  /api/admin/v1/session:
+    get:
+      operationId: getSession
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSession'
+        '401':
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: logoutAdmin
+      responses:
+        '204':
+          description: Logged out
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - &id001
+        name: X-CSRF-Token
+        in: header
+        required: true
+        schema:
+          type: string
+  /api/admin/v1/users:
+    get:
+      operationId: listUsers
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters: &id006
+      - &id004
+        name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      - &id005
+        name: cursor
+        in: query
+        schema:
+          type: string
+    post:
+      operationId: createUser
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/users/{userId}:
+    get:
+      operationId: getUser
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - &id002
+        name: userId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UserId'
+    put:
+      operationId: updateUser
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      parameters:
+      - *id002
+      - *id001
+  /api/admin/v1/users/{userId}:disable:
+    post:
+      operationId: disableUser
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id002
+      - *id001
+      - &id003
+        name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          $ref: '#/components/schemas/IdempotencyKey'
+  /api/admin/v1/users/{userId}:enable:
+    post:
+      operationId: enableUser
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id002
+      - *id001
+      - *id003
+  /api/admin/v1/users/{userId}:set-password:
+    post:
+      operationId: setPassword
+      responses:
+        '204':
+          description: Updated
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPasswordRequest'
+      parameters:
+      - *id002
+      - *id001
+  /api/admin/v1/users/{userId}/enrollments:
+    post:
+      operationId: createEnrollment
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateEnrollmentResponse'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEnrollmentRequest'
+      parameters:
+      - *id002
+      - *id001
+  /api/admin/v1/users/{userId}/devices:
+    get:
+      operationId: listDevices
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevicePage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id002
+      - *id004
+      - *id005
+  /api/admin/v1/devices/{deviceId}:revoke:
+    post:
+      operationId: revokeDevice
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - name: deviceId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/DeviceId'
+      - *id001
+      - *id003
+  /api/admin/v1/draft:
+    get:
+      operationId: getDraft
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draft'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: putDraft
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draft'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutDraftRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/draft:validate:
+    post:
+      operationId: validateDraft
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateDraftResponse'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateDraftRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/draft:publish:
+    post:
+      operationId: publishDraft
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishDraftRequest'
+      parameters:
+      - *id001
+      - *id003
+  /api/admin/v1/releases:
+    get:
+      operationId: listReleases
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleasePage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters: *id006
+  /api/admin/v1/releases/{releaseId}:
+    get:
+      operationId: getRelease
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - &id007
+        name: releaseId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ReleaseId'
+  /api/admin/v1/releases/{releaseId}:republish:
+    post:
+      operationId: republishRelease
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id007
+      - *id001
+      - *id003
+  /api/admin/v1/activations/{activationId}:
+    get:
+      operationId: getActivation
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - name: activationId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ActivationId'
+  /api/admin/v1/upstreams:
+    post:
+      operationId: createUpstream
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upstream'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUpstreamRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/upstreams/{upstreamId}:
+    get:
+      operationId: getUpstream
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upstream'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - &id008
+        name: upstreamId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UpstreamId'
+    put:
+      operationId: updateUpstream
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Upstream'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUpstreamRequest'
+      parameters:
+      - *id008
+      - *id001
+  /api/admin/v1/upstreams/{upstreamId}:test:
+    post:
+      operationId: testUpstream
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamTestResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '504':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id008
+      - *id001
+  /api/admin/v1/upstreams/{upstreamId}:apply:
+    post:
+      operationId: applyUpstream
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id008
+      - *id001
+      - *id003
+  /api/admin/v1/secrets:
+    post:
+      operationId: createSecret
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Secret'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSecretRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/secrets/{secretId}:replace:
+    post:
+      operationId: replaceSecret
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Secret'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceSecretRequest'
+      parameters:
+      - name: secretId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/SecretId'
+      - *id001
+  /api/admin/v1/usage/summary:
+    get:
+      operationId: usageSummary
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageSummary'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/usage/requests:
+    get:
+      operationId: listUsageRequests
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestUsagePage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters: *id006
+  /api/admin/v1/usage/requests/{requestId}:
+    get:
+      operationId: getUsageRequest
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestUsageView'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/RequestId'
+  /api/admin/v1/pricing:
+    get:
+      operationId: getPricing
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingSet'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: putPricing
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingSet'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutPricingRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/system/status:
+    get:
+      operationId: systemStatus
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatus'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/system/health:
+    get:
+      operationId: systemHealth
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+components:
+  schemas:
+    DeploymentId:
+      type: string
+      pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    UserId:
+      type: string
+      pattern: ^usr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DeviceId:
+      type: string
+      pattern: ^dev_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    EnrollmentId:
+      type: string
+      pattern: ^enr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    SessionId:
+      type: string
+      pattern: ^ses_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    InstallationId:
+      type: string
+      pattern: ^ins_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ProviderId:
+      type: string
+      pattern: ^prv_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ModelId:
+      type: string
+      pattern: ^mdl_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    TtsId:
+      type: string
+      pattern: ^tts_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AsrId:
+      type: string
+      pattern: ^asr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    McpServerId:
+      type: string
+      pattern: ^mcp_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    PolicyId:
+      type: string
+      pattern: ^pol_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DraftId:
+      type: string
+      pattern: ^drf_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ReleaseId:
+      type: string
+      pattern: ^rel_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    UpstreamId:
+      type: string
+      pattern: ^ups_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    SecretId:
+      type: string
+      pattern: ^sec_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    RuntimeRouteId:
+      type: string
+      pattern: ^rte_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ActivationId:
+      type: string
+      pattern: ^act_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    RequestId:
+      type: string
+      pattern: ^req_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    InteractionId:
+      type: string
+      pattern: ^int_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    PricingRuleId:
+      type: string
+      pattern: ^prc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    IdempotencyKey:
+      type: string
+      pattern: ^idem_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    Sha256Hash:
+      type: string
+      pattern: ^sha256:[0-9a-f]{64}$
+    Problem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+        detail:
+          type: string
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        activationId:
+          $ref: '#/components/schemas/ActivationId'
+        targetManagedGeneration:
+          type: integer
+          minimum: 0
+        currentDraftRevision:
+          type: integer
+          minimum: 0
+        forwarded:
+          type: boolean
+    ValidationIssue:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - severity
+      - path
+      - message
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+          enum:
+          - ERROR
+          - WARNING
+        path:
+          type: string
+        message:
+          type: string
+    ProviderDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - providerId
+      - displayName
+      - clientProtocol
+      - enabled
+      properties:
+        providerId:
+          $ref: '#/components/schemas/ProviderId'
+        displayName:
+          type: string
+          minLength: 1
+        clientProtocol:
+          type: string
+          minLength: 1
+        enabled:
+          type: boolean
+    ModelDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - modelId
+      - providerId
+      - displayName
+      - upstreamModelKey
+      - runtimePath
+      - inputModalities
+      - outputModalities
+      - capabilities
+      - enabled
+      properties:
+        modelId:
+          $ref: '#/components/schemas/ModelId'
+        providerId:
+          $ref: '#/components/schemas/ProviderId'
+        displayName:
+          type: string
+        upstreamModelKey:
+          type: string
+        runtimePath:
+          type: string
+          pattern: ^/[^?#]*$
+        inputModalities:
+          type: array
+          items:
+            type: string
+        outputModalities:
+          type: array
+          items:
+            type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+    TtsDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - ttsId
+      - displayName
+      - clientProtocol
+      - runtimePath
+      - enabled
+      properties:
+        ttsId:
+          $ref: '#/components/schemas/TtsId'
+        displayName:
+          type: string
+        clientProtocol:
+          type: string
+        upstreamModelKey:
+          type: string
+        runtimePath:
+          type: string
+          pattern: ^/[^?#]*$
+        enabled:
+          type: boolean
+    AsrDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - asrId
+      - displayName
+      - clientProtocol
+      - runtimePath
+      - enabled
+      properties:
+        asrId:
+          $ref: '#/components/schemas/AsrId'
+        displayName:
+          type: string
+        clientProtocol:
+          type: string
+        upstreamModelKey:
+          type: string
+        runtimePath:
+          type: string
+          pattern: ^/[^?#]*$
+        enabled:
+          type: boolean
+    McpDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - mcpServerId
+      - displayName
+      - clientProtocol
+      - runtimePath
+      - enabled
+      properties:
+        mcpServerId:
+          $ref: '#/components/schemas/McpServerId'
+        displayName:
+          type: string
+        clientProtocol:
+          type: string
+          enum:
+          - MCP_STREAMABLE_HTTP
+        runtimePath:
+          type: string
+          pattern: ^/[^?#]*$
+        enabled:
+          type: boolean
+    TimeoutPolicy:
+      type: object
+      additionalProperties: false
+      required:
+      - connectMs
+      - responseHeaderMs
+      - idleMs
+      properties:
+        connectMs:
+          type: integer
+          minimum: 1
+        responseHeaderMs:
+          type: integer
+          minimum: 1
+        idleMs:
+          type: integer
+          minimum: 1
+        overallMs:
+          type: integer
+          minimum: 1
+    RuntimeBindingDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - runtimeRouteId
+      - resourceId
+      - upstreamId
+      - allowedMethods
+      - allowedPathPrefixes
+      - transportPolicy
+      properties:
+        runtimeRouteId:
+          $ref: '#/components/schemas/RuntimeRouteId'
+        resourceId:
+          type: string
+        upstreamId:
+          $ref: '#/components/schemas/UpstreamId'
+        allowedMethods:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        allowedPathPrefixes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            pattern: ^/
+        transportPolicy:
+          type: string
+          enum:
+          - HTTP_REQUEST_RESPONSE
+          - HTTP_STREAMING_SSE
+          - HTTP_BINARY_STREAM
+          - HTTP_MULTIPART
+        timeoutPolicy:
+          $ref: '#/components/schemas/TimeoutPolicy'
+    ManagedPolicy:
+      type: object
+      additionalProperties: false
+      required:
+      - policyId
+      - allowLocalProviders
+      - allowLocalTts
+      - allowLocalAsr
+      - allowLocalMcp
+      properties:
+        policyId:
+          $ref: '#/components/schemas/PolicyId'
+        allowLocalProviders:
+          type: boolean
+        allowLocalTts:
+          type: boolean
+        allowLocalAsr:
+          type: boolean
+        allowLocalMcp:
+          type: boolean
+        defaultModelId:
+          $ref: '#/components/schemas/ModelId'
+        defaultTtsId:
+          $ref: '#/components/schemas/TtsId'
+        defaultAsrId:
+          $ref: '#/components/schemas/AsrId'
+    ManagedDraftContent:
+      type: object
+      additionalProperties: false
+      required:
+      - providers
+      - models
+      - tts
+      - asr
+      - mcp
+      - bindings
+      - policy
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderDefinition'
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelDefinition'
+        tts:
+          type: array
+          items:
+            $ref: '#/components/schemas/TtsDefinition'
+        asr:
+          type: array
+          items:
+            $ref: '#/components/schemas/AsrDefinition'
+        mcp:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpDefinition'
+        bindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuntimeBindingDefinition'
+        policy:
+          $ref: '#/components/schemas/ManagedPolicy'
+    AdminUserSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - displayName
+      - role
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        displayName:
+          type: string
+        role:
+          type: string
+          enum:
+          - ADMIN
+          - MEMBER
+    AdminSession:
+      type: object
+      additionalProperties: false
+      required:
+      - user
+      - csrfToken
+      - expiresAt
+      properties:
+        user:
+          $ref: '#/components/schemas/AdminUserSummary'
+        csrfToken:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+    User:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - username
+      - displayName
+      - role
+      - status
+      - createdAt
+      - updatedAt
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        username:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+          enum:
+          - ADMIN
+          - MEMBER
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - DISABLED
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - username
+      - displayName
+      - role
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+          enum:
+          - ADMIN
+          - MEMBER
+    UpdateUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - username
+      - displayName
+      - role
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+          enum:
+          - ADMIN
+          - MEMBER
+    SetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - newPassword
+      properties:
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+    CreateEnrollmentRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        expiresInSeconds:
+          type: integer
+          minimum: 60
+          maximum: 3600
+          default: 600
+    CreateEnrollmentResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - enrollmentId
+      - code
+      - expiresAt
+      properties:
+        enrollmentId:
+          $ref: '#/components/schemas/EnrollmentId'
+        code:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    Device:
+      type: object
+      additionalProperties: false
+      required:
+      - deviceId
+      - userId
+      - status
+      properties:
+        deviceId:
+          $ref: '#/components/schemas/DeviceId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        installationId:
+          $ref: '#/components/schemas/InstallationId'
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - REVOKED
+        appVersion:
+          type: string
+        lastSeenAt:
+          type: string
+          format: date-time
+    UserPage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        nextCursor:
+          type: string
+    DevicePage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+        nextCursor:
+          type: string
+    Activation:
+      type: object
+      additionalProperties: false
+      required:
+      - activationId
+      - kind
+      - state
+      - desiredControlRevision
+      - createdAt
+      - updatedAt
+      properties:
+        activationId:
+          $ref: '#/components/schemas/ActivationId'
+        kind:
+          type: string
+          enum:
+          - PUBLISH
+          - RUNTIME_CONFIG
+          - SECURITY_CHANGE
+        state:
+          type: string
+          enum:
+          - APPLYING
+          - COMPLETED
+          - FAILED
+          - UNKNOWN
+        releaseId:
+          $ref: '#/components/schemas/ReleaseId'
+        subjectId:
+          type: string
+        targetManagedGeneration:
+          type: integer
+          minimum: 0
+        desiredControlRevision:
+          type: integer
+          minimum: 0
+        bundleHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        errorCode:
+          type: string
+    UpstreamConfig:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - baseUrl
+      - transportCapabilities
+      - auth
+      - correlationMode
+      - usageCapabilityLevel
+      - timeoutDefaults
+      properties:
+        name:
+          type: string
+        baseUrl:
+          type: string
+          format: uri
+        transportCapabilities:
+          type: array
+          items:
+            type: string
+        auth:
+          type: object
+          additionalProperties: true
+          required:
+          - type
+          properties:
+            type:
+              type: string
+              enum:
+              - NONE
+              - BEARER
+              - STATIC_HEADER
+              - BASIC
+        correlationMode:
+          type: string
+        usageCapabilityLevel:
+          type: string
+          enum:
+          - LEVEL_0
+          - LEVEL_1
+          - LEVEL_2
+        timeoutDefaults:
+          $ref: '#/components/schemas/TimeoutPolicy'
+    Upstream:
+      type: object
+      additionalProperties: false
+      required:
+      - upstreamId
+      - name
+      - configRevision
+      - status
+      properties:
+        upstreamId:
+          $ref: '#/components/schemas/UpstreamId'
+        name:
+          type: string
+        configRevision:
+          type: integer
+          minimum: 1
+        activeConfigRevision:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+          - INACTIVE
+          - ACTIVE
+          - APPLYING
+          - DEGRADED
+          - DISABLED
+        config:
+          $ref: '#/components/schemas/UpstreamConfig'
+    CreateUpstreamRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - config
+      properties:
+        config:
+          $ref: '#/components/schemas/UpstreamConfig'
+    UpdateUpstreamRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedConfigRevision
+      - config
+      properties:
+        expectedConfigRevision:
+          type: integer
+          minimum: 1
+        config:
+          $ref: '#/components/schemas/UpstreamConfig'
+    UpstreamTestResult:
+      type: object
+      additionalProperties: false
+      required:
+      - reachable
+      - verifiedCapabilities
+      - warnings
+      properties:
+        reachable:
+          type: boolean
+        latencyMs:
+          type: integer
+          minimum: 0
+        verifiedCapabilities:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+    Secret:
+      type: object
+      additionalProperties: false
+      required:
+      - secretId
+      - name
+      - secretVersion
+      properties:
+        secretId:
+          $ref: '#/components/schemas/SecretId'
+        name:
+          type: string
+        secretVersion:
+          type: integer
+          minimum: 1
+    CreateSecretRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - value
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+          minLength: 1
+    ReplaceSecretRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedSecretVersion
+      - value
+      properties:
+        expectedSecretVersion:
+          type: integer
+          minimum: 1
+        value:
+          type: string
+          minLength: 1
+    Draft:
+      type: object
+      additionalProperties: false
+      required:
+      - draftId
+      - draftRevision
+      - content
+      properties:
+        draftId:
+          $ref: '#/components/schemas/DraftId'
+        draftRevision:
+          type: integer
+          minimum: 0
+        content:
+          $ref: '#/components/schemas/ManagedDraftContent'
+    PutDraftRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedDraftRevision
+      - content
+      properties:
+        expectedDraftRevision:
+          type: integer
+          minimum: 0
+        content:
+          $ref: '#/components/schemas/ManagedDraftContent'
+    ValidateDraftRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedDraftRevision
+      properties:
+        expectedDraftRevision:
+          type: integer
+          minimum: 0
+    ValidateDraftResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - valid
+      - errors
+      - warnings
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+    PublishDraftRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedDraftRevision
+      - acknowledgedWarningCodes
+      properties:
+        expectedDraftRevision:
+          type: integer
+          minimum: 0
+        acknowledgedWarningCodes:
+          type: array
+          items:
+            type: string
+    Release:
+      type: object
+      additionalProperties: false
+      required:
+      - releaseId
+      - managedGeneration
+      - status
+      - snapshotHash
+      - createdAt
+      properties:
+        releaseId:
+          $ref: '#/components/schemas/ReleaseId'
+        managedGeneration:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+          - STAGED
+          - ACTIVE
+          - ACTIVATION_FAILED
+          - SUPERSEDED
+        snapshotHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        createdAt:
+          type: string
+          format: date-time
+    ReleasePage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Release'
+        nextCursor:
+          type: string
+    UsageSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - from
+      - to
+      - requestCount
+      - forwardedRequestCount
+      - requestBytes
+      - responseBytes
+      - semanticMeters
+      - cost
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        requestCount:
+          type: integer
+          minimum: 0
+        forwardedRequestCount:
+          type: integer
+          minimum: 0
+        requestBytes:
+          type: integer
+          minimum: 0
+        responseBytes:
+          type: integer
+          minimum: 0
+        semanticMeters:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - meter
+            - quantity
+            - confidence
+            properties:
+              meter:
+                type: string
+              quantity:
+                type: string
+              confidence:
+                type: string
+                enum:
+                - EXACT
+                - PARTIAL
+                - UNKNOWN
+        cost:
+          type: object
+          additionalProperties: false
+          required:
+          - status
+          properties:
+            status:
+              type: string
+              enum:
+              - KNOWN
+              - PARTIAL
+              - UNKNOWN
+            amount:
+              type: string
+            currency:
+              type: string
+    RequestUsageView:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - deploymentId
+      - userId
+      - resourceId
+      - runtimeRouteId
+      - upstreamId
+      - managedGeneration
+      - controlRevision
+      - startedAt
+      - completedAt
+      - forwarded
+      - httpStatus
+      - requestBytes
+      - responseBytes
+      - durationMs
+      properties:
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        interactionId:
+          $ref: '#/components/schemas/InteractionId'
+        deploymentId:
+          $ref: '#/components/schemas/DeploymentId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        deviceId:
+          $ref: '#/components/schemas/DeviceId'
+        resourceId:
+          type: string
+        runtimeRouteId:
+          $ref: '#/components/schemas/RuntimeRouteId'
+        upstreamId:
+          $ref: '#/components/schemas/UpstreamId'
+        managedGeneration:
+          type: integer
+          minimum: 0
+        controlRevision:
+          type: integer
+          minimum: 0
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        forwarded:
+          type: boolean
+        httpStatus:
+          type: integer
+        upstreamHttpStatus:
+          type: integer
+        requestBytes:
+          type: integer
+          minimum: 0
+        responseBytes:
+          type: integer
+          minimum: 0
+        durationMs:
+          type: integer
+          minimum: 0
+        errorClass:
+          type: string
+    RequestUsagePage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RequestUsageView'
+        nextCursor:
+          type: string
+    PricingRule:
+      type: object
+      additionalProperties: false
+      required:
+      - pricingRuleId
+      - meter
+      - unitSize
+      - unitPrice
+      - currency
+      - effectiveFrom
+      properties:
+        pricingRuleId:
+          $ref: '#/components/schemas/PricingRuleId'
+        resourceId:
+          type: string
+        upstreamId:
+          $ref: '#/components/schemas/UpstreamId'
+        meter:
+          type: string
+        unitSize:
+          type: string
+        unitPrice:
+          type: string
+        currency:
+          type: string
+        effectiveFrom:
+          type: string
+          format: date-time
+    PricingSet:
+      type: object
+      additionalProperties: false
+      required:
+      - pricingRevision
+      - rules
+      properties:
+        pricingRevision:
+          type: integer
+          minimum: 0
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricingRule'
+    PutPricingRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedPricingRevision
+      - rules
+      properties:
+        expectedPricingRevision:
+          type: integer
+          minimum: 0
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricingRule'
+    SystemStatus:
+      type: object
+      additionalProperties: false
+      required:
+      - buildVersion
+      - dbHealth
+      - migrationRevision
+      - runtimeStatus
+      - activeManagedGeneration
+      - managedStateRevision
+      - desiredControlRevision
+      - relayReady
+      properties:
+        buildVersion:
+          type: string
+        dbHealth:
+          type: string
+        migrationRevision:
+          type: string
+        runtimeStatus:
+          type: string
+          enum:
+          - READY
+          - ACTIVATING
+          - DEGRADED
+        activeManagedGeneration:
+          type: integer
+          minimum: 0
+        managedStateRevision:
+          type: integer
+          minimum: 0
+        desiredControlRevision:
+          type: integer
+          minimum: 0
+        desiredBundleHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        relayReady:
+          type: boolean
+        appliedControlRevision:
+          type: integer
+          minimum: 0
+        appliedBundleHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        lastRelaySeenAt:
+          type: string
+          format: date-time
+        latestActivation:
+          $ref: '#/components/schemas/Activation'
+        requestUsageIngestLagSeconds:
+          type: integer
+          minimum: 0
+        semanticOrphanCount:
+          type: integer
+          minimum: 0
+    Health:
+      type: object
+      additionalProperties: false
+      required:
+      - live
+      - ready
+      properties:
+        live:
+          type: boolean
+        ready:
+          type: boolean
+  responses:
+    Problem:
+      description: Problem response
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

@@ -1,0 +1,6 @@
+package: adminapi
+output: backend/internal/wire/adminapi/admin.gen.go
+generate:
+  models: true
+output-options:
+  skip-prune: true

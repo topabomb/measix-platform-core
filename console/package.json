@@ -1,0 +1,28 @@
+{
+  "name": "measix-admin-console",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@11.0.0",
+  "scripts": {
+    "dev": "quasar dev",
+    "prepare": "quasar prepare",
+    "generate:api": "openapi-typescript ../api/admin/admin.openapi.yaml -o src/api/generated.ts",
+    "typecheck": "quasar prepare && tsc --noEmit",
+    "test": "vitest run",
+    "build": "quasar build"
+  },
+  "dependencies": {
+    "pinia": "4.0.2",
+    "quasar": "2.23.3",
+    "vue": "3.5.40",
+    "vue-router": "5.2.0"
+  },
+  "devDependencies": {
+    "@quasar/app-vite": "3.3.0",
+    "@vue/test-utils": "2.4.6",
+    "openapi-typescript": "7.13.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.0"
+  }
+}

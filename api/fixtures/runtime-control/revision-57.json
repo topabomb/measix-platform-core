@@ -1,0 +1,27 @@
+{
+  "controlRevision": 57,
+  "activeManagedGeneration": 42,
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "authKeys": [
+    {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "alg": "EdDSA",
+      "use": "sig",
+      "kid": "test-key",
+      "x": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  ],
+  "principalState": {
+    "disabledUserIds": [],
+    "revokedDeviceIds": [],
+    "revokedSessionIds": []
+  },
+  "resourceRoutes": [],
+  "routes": [],
+  "upstreams": [],
+  "operationalLimits": {
+    "maxRequestBytes": 10485760
+  },
+  "bundleHash": "sha256:5653470ac22afb96aa9f63641487ab6d6d125fddd8086643629b37329d1e559f"
+}

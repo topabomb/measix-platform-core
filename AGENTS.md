@@ -8,14 +8,20 @@ Before changing behavior, read:
 
 1. `docs/documentation-governance.md`;
 2. `ARCHITECTURE.md`;
-3. relevant documents in `topabomb/measix-architecture`:
-   - S0 Foundation Contract;
-   - Implementation Decision;
-   - Control Protocol when cross-component;
-   - relevant Component Architecture;
-   - relevant Component Implementation Spec;
-   - relevant Component Testing Spec;
-   - S0 System Testing Spec for cross-component/system work.
+3. relevant documents in `topabomb/measix-architecture`.
+
+For current S0 work, the minimum architecture reading order is:
+
+1. `measix-s0-foundation-contract-spec.md`;
+2. `measix-s0-capability-delivery-contract-spec.md` for S0.1 server-side capability-delivery work;
+3. `measix-s0-capability-delivery-implementation-decision.md` for the S0.1 execution order;
+4. `measix-s0-control-protocol.md` when executable wire/state/error semantics are affected;
+5. the relevant Component Architecture / Implementation Spec / Testing Spec;
+6. `measix-s0-capability-delivery-system-testing-spec.md` for the S0.1 pre-Android system gate;
+7. `measix-s0-android-integration-contract-spec.md` when work affects the frozen Client Snapshot/OpenAPI handoff to S0.2;
+8. `measix-s0-system-testing-spec.md` for final cross-repository S0 RC/Exit work.
+
+`S0.1` and `S0.2` are delivery sub-stages inside S0. They do not rename S1/S2/S3 and they do not create a second local architecture authority in this repository.
 
 Do not infer a new platform semantic from existing code when architecture already owns the meaning.
 
@@ -23,7 +29,7 @@ Do not infer a new platform semantic from existing code when architecture alread
 
 Before editing, decide whether the task changes architecture semantics, executable contracts, implementation only, or fixes a regression.
 
-If the change alters terminology, stable IDs, state/wire/error semantics, security invariants or required S0 scenarios, update/resolve `measix-architecture` first. Do not silently encode a new semantic in Go, TypeScript, OpenAPI or tests.
+If the change alters terminology, stable IDs, state/wire/error semantics, security invariants, S0.1/S0.2 delivery gates or required S0 scenarios, update/resolve `measix-architecture` first. Do not silently encode a new semantic in Go, TypeScript, OpenAPI or tests.
 
 ## 3. TDD by default
 
@@ -77,12 +83,15 @@ Exact commands are documented only after their corresponding tooling exists; use
 - generated wire types come from OpenAPI; do not hand-maintain duplicate DTOs.
 - canonical cross-component fixtures belong under `api/fixtures/`.
 - production code must not depend on test harness packages.
+- S0.1 Provider compatibility must remain outside Relay body semantics; Relay stays provider-agnostic.
 
 ## 7. Generated code and OpenAPI
 
 Never hand-edit generated outputs. Change OpenAPI/generator source, regenerate, then verify drift.
 
 A semantic wire change requires architecture approval first. A schema completion that preserves existing meaning may land here, but ambiguity must be escalated rather than guessed.
+
+The Client Control OpenAPI is **pre-freeze until the S0.1 Client Contract Freeze Gate succeeds**. Before S0.2 Android implementation starts, the S0.1 freeze manifest must pin the architecture commit, platform-core commit, Client OpenAPI hash, canonical fixture hash and Snapshot schema version. After that freeze, incompatible changes require the architecture-defined compatibility/versioning path rather than silently mutating Snapshot v1.
 
 ## 8. Persistence and migrations
 
@@ -93,7 +102,9 @@ A semantic wire change requires architecture approval first. A schema completion
 
 ## 9. Testing expectations
 
-Architecture scenario IDs are requirements, not test implementation names. Reference `HUB-*`, `RLY-*`, `ADM-*` and `SYS-*` where the test proves a critical scenario; ordinary unit tests do not need artificial IDs.
+Architecture scenario IDs are requirements, not test implementation names. Reference `HUB-*`, `RLY-*`, `ADM-*`, `CAP-*` and `SYS-*` where the test proves a critical scenario; ordinary unit tests do not need artificial IDs.
+
+S0.1 `CAP-*` scenarios prove the pre-Android server-side product closure using real Admin/Hub/Relay plus deterministic Test Client/Test Adapter and required real Adapter qualification. Final `SYS-*` S0 Exit still requires the pinned Android repository and Android emulator/device evidence defined by architecture.
 
 Tests must be deterministic, isolated, bounded by deadlines, use synthetic credentials/content, and avoid public-network dependencies in normal PR CI.
 
@@ -106,7 +117,8 @@ For implementation work, report:
 - Red evidence;
 - Green evidence;
 - exact test layers/checks executed;
+- current delivery sub-stage (`S0.1`, `S0.2` or final S0 RC) when relevant;
 - remaining verification gaps;
 - migrations/generated artifacts/operational impact when applicable.
 
-Never state that a test passed unless it actually executed locally or in CI and the result was observed.
+Never state that S0.1, S0.2 or S0 Exit is complete unless the corresponding architecture gate has actually executed and its required evidence exists. Never state that a test passed unless it actually executed locally or in CI and the result was observed.

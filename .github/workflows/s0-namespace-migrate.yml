@@ -2,7 +2,7 @@ name: s0-namespace-migrate
 
 on:
   pull_request_target:
-    types: [reopened]
+    types: [reopened, synchronize]
     branches: [main]
 
 permissions:

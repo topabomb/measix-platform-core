@@ -16,14 +16,21 @@ type EnrollmentGrant struct {
 }
 
 type ExchangeResult struct {
-	DeploymentID        string
-	UserID              string
-	DeviceID            string
-	SessionID           string
-	AccessToken         string
+	DeploymentID         string
+	UserID               string
+	DeviceID             string
+	SessionID            string
+	AccessToken          string
 	AccessTokenExpiresAt time.Time
-	RefreshToken        string
-	RefreshExpiresAt    time.Time
+	RefreshToken         string
+	RefreshExpiresAt     time.Time
+}
+
+type AccessPrincipal struct {
+	DeploymentID string
+	UserID       string
+	DeviceID     string
+	SessionID    string
 }
 
 type AdminSessionResult struct {

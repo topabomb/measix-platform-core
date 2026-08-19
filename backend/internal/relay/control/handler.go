@@ -23,9 +23,9 @@ type SpoolStatusProvider func(context.Context) (SpoolStatus, error)
 
 type handler struct {
 	relaycontrolapi.Unimplemented
-	store          *Store
-	serviceToken   string
-	spoolStatus    SpoolStatusProvider
+	store        *Store
+	serviceToken string
+	spoolStatus  SpoolStatusProvider
 }
 
 func NewHandler(store *Store, serviceToken string) http.Handler {

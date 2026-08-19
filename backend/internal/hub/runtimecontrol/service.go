@@ -289,7 +289,20 @@ func (s *Service) persistPublishIntent(ctx context.Context, intent publishIntent
 	if _, err := tx.IdempotencyRecord.Create().
 		SetAdminUserID(intent.Request.AdminUserID).
 		SetMethod(httpMethodPublish).
-		SetNormalizedPathEQ(intent.Request.IdempotencyKey).
+		SetNormalizedPath(publishPath).
+		SetIdempotencyKey(intent.Request.IdempotencyKey).
+		SetRequestHash(intent.RequestHash).
+		SetActivationID(intent.ActivationID).
+		SetCreatedAt(intent.Now).
+		Save(ctx); err != nil {
+		return rollback(err)
+	}
+	if _, err := tx.ManagedState.UpdateOneID("current").
+		SetDesiredControlRevision(int64(intent.ControlRevision)).
+		SetDesiredBundleHash(intent.BundleHash).
+		SetRuntimeStatus("ACTIVATING").
+		SetManagedStateRevision(managed.ManagedStateRevision + 1).
+		SetUpdatedAt(intent.Now).
 		Save(ctx); err != nil {
 		return rollback(err)
 	}
@@ -298,7 +311,7 @@ func (s *Service) persistPublishIntent(ctx context.Context, intent publishIntent
 
 const (
 	httpMethodPublish = "POST"
-	publishPath       = "/api/admin/v1/managed/publish"
+	publishPath       = "/api/admin/v1/draft:publish"
 )
 
 func (s *Service) finalizePublish(ctx context.Context, activationID, releaseID string, generation, controlRevision int, bundleHash string) error {

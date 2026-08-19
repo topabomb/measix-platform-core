@@ -19,29 +19,11 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           service = Path('backend/internal/hub/identity/service.go')
           text = service.read_text()
-          old = '''func (s *Service) UpdateUser(ctx context.Context, userID, displayName, role string) (*ent.User, error) {
-          \tdisplayName = strings.TrimSpace(displayName)
-          \tif displayName == "" || (role != "ADMIN" && role != "MEMBER") {
-          \t\treturn nil, fmt.Errorf("invalid user")
-          \t}
-          \tn, err := s.Client.User.Update().Where(user.IDEQ(userID)).
-          \t\tSetDisplayName(displayName).
-          \t\tSetRole(role).
-          \t\tSetUpdatedAt(s.Now().UTC()).
-          \t\tSave(ctx)
-          \tif err != nil {
-          \t\treturn nil, err
-          \t}
-          \tif n != 1 {
-          \t\treturn nil, ErrNotFound
-          \t}
-          \treturn s.GetUser(ctx, userID)
-          }
-          '''
-          new = '''func (s *Service) UpdateUser(ctx context.Context, userID, username, displayName, role string) (*ent.User, error) {
+          replacement = '''func (s *Service) UpdateUser(ctx context.Context, userID, username, displayName, role string) (*ent.User, error) {
           \tusername = NormalizeUsername(username)
           \tdisplayName = strings.TrimSpace(displayName)
           \tif username == "" || displayName == "" || (role != "ADMIN" && role != "MEMBER") {
@@ -64,10 +46,18 @@ jobs:
           \t}
           \treturn s.GetUser(ctx, userID)
           }
-          '''
-          if text.count(old) != 1:
+
+          func (s *Service) SetPassword'''
+          text, count = re.subn(
+              r'func \(s \*Service\) UpdateUser\(.*?\n}\n\nfunc \(s \*Service\) SetPassword',
+              replacement,
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
               raise SystemExit('service UpdateUser patch anchor mismatch')
-          service.write_text(text.replace(old, new))
+          service.write_text(text)
 
           handler = Path('backend/internal/hub/httpapi/handler.go')
           text = handler.read_text()

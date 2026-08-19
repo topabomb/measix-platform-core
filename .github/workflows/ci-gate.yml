@@ -27,22 +27,29 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
 
-      - name: 启用 Corepack
-        run: corepack enable
-
-      - name: 设置 Node.js 与 pnpm store cache
+      - name: 设置 Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: pnpm
-          cache-dependency-path: console/pnpm-lock.yaml
+          package-manager-cache: false
+
+      - name: 固定 pnpm 版本
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.0 --activate
+          echo "PNPM_STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: 恢复 pnpm store cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-node24-${{ hashFiles('console/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-node24-
 
       - uses: ariga/setup-atlas@v0
         with:
           version: 'v1.2.0'
-
-      - name: 固定 pnpm 版本
-        run: corepack prepare pnpm@11.0.0 --activate
 
       - name: 验证确定性生成链
         run: make generate

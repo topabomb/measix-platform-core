@@ -12,7 +12,7 @@ import (
 
 func testFS() fs.FS {
 	return fstest.MapFS{
-		"index.html":              {Data: []byte("<html>admin</html>")},
+		"index.html":             {Data: []byte("<html>admin</html>")},
 		"assets/app.abcdef01.js": {Data: []byte("console.log('ok')")},
 	}
 }

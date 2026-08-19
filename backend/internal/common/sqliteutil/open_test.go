@@ -18,7 +18,7 @@ func TestOpenAppliesProductionPragmas(t *testing.T) {
 		"journal_mode": "wal",
 		"foreign_keys": "1",
 		"busy_timeout": "5000",
-		"synchronous": "2",
+		"synchronous":  "2",
 	}
 	for pragma, want := range checks {
 		var got string

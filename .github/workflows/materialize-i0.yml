@@ -49,6 +49,10 @@ jobs:
         run: |
           corepack enable
           corepack prepare pnpm@11.0.0 --activate
+      - name: 预解析 Go 依赖
+        if: steps.source.outputs.present == 'true'
+        shell: bash
+        run: cd backend && go mod tidy
       - name: 生成派生产物
         if: steps.source.outputs.present == 'true'
         shell: bash

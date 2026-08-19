@@ -1,141 +1,58 @@
 # Repository Guidelines for Coding Agents
 
-This file is the execution contract for AI/coding agents working in `measix-platform-core`.
+This repository implements MEASIX Control Hub, Runtime Relay and Admin Console.
 
-## 1. Read before implementation
+## Before changing behavior
 
-Before changing behavior, read:
+1. Read `docs/documentation-governance.md` and `ARCHITECTURE.md`.
+2. Use `topabomb/measix-architecture/docs/measix-stage-document-index.md` to identify the architecture documents for the current stage/workstream.
+3. Read the relevant local implementation document (`docs/api-contracts.md`, `docs/admin-console-implementation.md`, `docs/testing.md`, etc.).
 
-1. `docs/documentation-governance.md`;
-2. `ARCHITECTURE.md`;
-3. relevant documents in `topabomb/measix-architecture`.
+Architecture owns product/wire/state/security meaning. Do not infer a different semantic from existing code.
 
-For current S0 work, the minimum architecture reading order is:
+## TDD
 
-1. `measix-s0-foundation-contract-spec.md`;
-2. `measix-s0-capability-delivery-contract-spec.md` for S0.1 server-side capability-delivery work;
-3. `measix-s0-capability-delivery-implementation-decision.md` for the S0.1 execution order;
-4. `measix-s0-control-protocol.md` when executable wire/state/error semantics are affected;
-5. the relevant Component Architecture / Product Requirements / Testing Spec;
-6. `measix-s0-capability-delivery-system-testing-spec.md` for the S0.1 pre-Android system gate;
-7. `measix-s0-android-integration-contract-spec.md` when work affects the frozen Client Snapshot/OpenAPI handoff to S0.2;
-8. `measix-s0-system-testing-spec.md` for final cross-repository S0 RC/Exit work.
-
-For **Admin Console** implementation, additionally read in this order:
-
-```text
-measix-architecture/
-  measix-s0-admin-console-product-requirements.md
-  → measix-s0-admin-console.md
-  → measix-s0-admin-console-testing-spec.md
-
-measix-platform-core/
-  docs/admin-console-implementation.md
-```
-
-Architecture owns the Admin product/UX contract. `docs/admin-console-implementation.md` owns concrete Vue/Quasar/package/file implementation decisions. Do not copy the Product Requirements into this repository as a second authority.
-
-`S0.1` and `S0.2` are delivery sub-stages inside S0. They do not rename S1/S2/S3 and they do not create a second local architecture authority in this repository.
-
-Do not infer a new platform semantic from existing code when architecture already owns the meaning.
-
-## 2. Change classification is mandatory
-
-Before editing, decide whether the task changes architecture/product semantics, executable contracts, implementation only, or fixes a regression.
-
-If the change alters terminology, stable IDs, state/wire/error semantics, security invariants, Admin required workflow/information architecture, S0.1/S0.2 delivery gates or required S0 scenarios, update/resolve `measix-architecture` first. Do not silently encode a new semantic in Go, TypeScript, OpenAPI or tests.
-
-Normal frontend implementation choices such as component decomposition, chart/topology/date/helper packages or package versions remain in this repository unless they change those product/architecture boundaries.
-
-## 3. TDD by default
-
-For new behavior and bug fixes:
+Behavior changes and bug fixes use:
 
 ```text
 Red → Green → Refactor
 ```
 
 - add the smallest meaningful failing test first;
-- confirm it fails for the intended reason;
-- implement only enough to pass;
-- refactor while preserving Green;
-- run the complete affected gate before declaring completion.
+- verify the intended failure;
+- implement the minimum change;
+- keep generated artifacts/migrations synchronized;
+- run the affected gate and observe the latest result before reporting Green.
 
-Do not delete, skip, relax or retry-away the failing requirement.
+Docs-only changes do not require artificial Red tests.
 
-Docs-only changes and pure generated-output regeneration do not require an artificial Red test, but generated drift/validation still must pass.
+## Boundaries
 
-## 4. GitHub-only execution mode
+- Runtime Relay must not import Hub domain/Ent packages or access `hub.db`.
+- Admin Console calls only the Control Hub Admin API; never Relay internal APIs.
+- generated wire types come from OpenAPI; do not maintain duplicate DTOs.
+- canonical cross-component fixtures live under `api/fixtures/`.
+- Relay remains provider-agnostic; provider-specific body translation does not belong there.
+- Secret plaintext must not enter persistent browser state or logs.
 
-When no local shell/runtime is available, do not pretend tests were run locally.
+## Contract changes
 
-Use a branch + Draft PR and GitHub Actions as the test executor:
+A semantic wire/state/ID/security change requires architecture authority first. Then update, as applicable:
 
-1. commit/push the Red test;
-2. inspect the PR workflow run/check and verify the expected failure;
-3. commit the minimum implementation;
-4. inspect the latest commit's workflow run/check and verify Green;
-5. inspect logs/artifacts for the affected test lane;
-6. refactor and re-run;
-7. only claim tests passed when GitHub reports the relevant checks successful on the latest commit SHA.
+```text
+OpenAPI → fixtures → generated artifacts → tests → implementation
+```
 
-If CI cannot execute the required test, report that as a verification gap; do not substitute static inspection for an executed test.
+Client Control/Snapshot v1 remains pre-freeze until the S0.1 C7 gate produces the required manifest. After freeze, incompatible changes require an explicit compatibility/versioning decision.
 
-## 5. Local execution mode
+## Frontend dependencies
 
-When a local checkout/runtime is available:
+Normal Vue/browser package selection belongs to this repository. `console/package.json` and `pnpm-lock.yaml` are the concrete dependency authority. Do not require an architecture whitelist for ordinary helpers, visualization, date/time, accessibility or server-state packages.
 
-- run the narrow failing test continuously during Red/Green;
-- run the affected package/component suite before push;
-- let GitHub CI independently repeat the required gate;
-- never treat a local pass as a reason to ignore a CI failure.
+New dependencies must have a real feature use, avoid duplicating Quasar or business/wire authority, and pass typecheck/test/build. See `docs/admin-console-implementation.md`.
 
-Exact commands are documented only after their corresponding tooling exists; use `docs/development.md` and `docs/testing.md` rather than inventing commands.
+## Completion claims
 
-## 6. Dependency boundaries
+Do not claim S0.1, S0.2 or S0 Exit unless the corresponding architecture gate has executed and the required evidence exists. Historical Green runs are regression evidence only; they do not satisfy a newer head commit.
 
-- Runtime Relay must not import Hub domain/service/Ent packages.
-- Admin Console must not call Relay internal APIs.
-- generated wire types come from OpenAPI; do not hand-maintain duplicate DTOs.
-- canonical cross-component fixtures belong under `api/fixtures/`.
-- production code must not depend on test harness packages.
-- S0.1 Provider compatibility must remain outside Relay body semantics; Relay stays provider-agnostic.
-- Admin has no architecture-maintained npm whitelist. Add mature frontend dependencies when they solve a real problem, do not duplicate Quasar wholesale, and keep Secret/token persistence boundaries intact.
-
-## 7. Generated code and OpenAPI
-
-Never hand-edit generated outputs. Change OpenAPI/generator source, regenerate, then verify drift.
-
-A semantic wire change requires architecture approval first. A schema completion that preserves existing meaning may land here, but ambiguity must be escalated rather than guessed.
-
-The Client Control OpenAPI is **pre-freeze until the S0.1 Client Contract Freeze Gate succeeds**. Before S0.2 Android implementation starts, the S0.1 freeze manifest must pin the architecture commit, platform-core commit, Client OpenAPI hash, canonical fixture hash and Snapshot schema version. After that freeze, incompatible changes require the architecture-defined compatibility/versioning path rather than silently mutating Snapshot v1.
-
-## 8. Persistence and migrations
-
-- no ORM AutoMigrate in production;
-- published Atlas migrations are immutable;
-- schema changes require migration generation/review and replay/upgrade tests;
-- Relay never reads or writes `hub.db`.
-
-## 9. Testing expectations
-
-Architecture scenario IDs are requirements, not test implementation names. Reference `HUB-*`, `RLY-*`, `ADM-*`, `CAP-*` and `SYS-*` where the test proves a critical scenario; ordinary unit tests do not need artificial IDs.
-
-S0.1 `CAP-*` scenarios prove the pre-Android server-side product closure using real Admin/Hub/Relay plus deterministic Test Client/Test Adapter and required real Adapter qualification. Final `SYS-*` S0 Exit still requires the pinned Android repository and Android emulator/device evidence defined by architecture.
-
-Tests must be deterministic, isolated, bounded by deadlines, use synthetic credentials/content, and avoid public-network dependencies in normal PR CI.
-
-## 10. Completion report
-
-For implementation work, report:
-
-- files/areas changed;
-- architecture reference or `Architecture impact: none`;
-- Red evidence;
-- Green evidence;
-- exact test layers/checks executed;
-- current delivery sub-stage (`S0.1`, `S0.2` or final S0 RC) when relevant;
-- remaining verification gaps;
-- migrations/generated artifacts/operational impact when applicable.
-
-Never state that S0.1, S0.2 or S0 Exit is complete unless the corresponding architecture gate has actually executed and its required evidence exists. Never state that a test passed unless it actually executed locally or in CI and the result was observed.
+Implementation reports should state changed areas, architecture impact, Red/Green evidence, executed checks and remaining gaps.

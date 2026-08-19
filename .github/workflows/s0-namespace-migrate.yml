@@ -1,8 +1,7 @@
 name: s0-namespace-migrate
 
 on:
-  pull_request_target:
-    types: [reopened, synchronize]
+  push:
     branches: [main]
 
 permissions:
@@ -10,7 +9,6 @@ permissions:
 
 jobs:
   migrate:
-    if: ${{ github.event.pull_request.number == 1 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/s0-platform-core' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -23,9 +21,10 @@ jobs:
         run: |
           set -euo pipefail
           old='github.com/topabomb/measix-platform-core/backend'
-          sed -i "s#^module ${old}$#module measix/platform#" backend/go.mod
+          new='measix/platform'
+          sed -i "s#^module ${old}$#module ${new}#" backend/go.mod
           grep -RIl --include='*.go' "$old" backend | while read -r file; do
-            sed -i "s#${old}#measix/platform#g" "$file"
+            sed -i "s#${old}#${new}#g" "$file"
           done
           find backend -name '*.go' -type f -print0 | xargs -0 gofmt -w
           if grep -R --include='*.go' -n "$old" backend; then

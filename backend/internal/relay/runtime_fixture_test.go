@@ -102,8 +102,8 @@ func singleRouteFixture(t *testing.T, upstreamURL, token string) (*runtimeFixtur
 		ActiveManagedGeneration: 1,
 		DeploymentId:            platformid.New(platformid.Deployment),
 		PrincipalState: relaycontrolapi.PrincipalState{
-			DisabledUserIds: []string{},
-			RevokedDeviceIds: []string{},
+			DisabledUserIds:   []string{},
+			RevokedDeviceIds:  []string{},
 			RevokedSessionIds: []string{},
 		},
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},

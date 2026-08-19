@@ -16,29 +16,37 @@ jobs:
           repository: ${{ github.repository }}
           ref: agent/s0-platform-core
           fetch-depth: 0
-      - name: 迁移项目内部 Go namespace
+      - name: 迁移并提交项目内部 Go namespace
         shell: bash
         run: |
           set -euo pipefail
           old='github.com/topabomb/measix-platform-core/backend'
           new='measix/platform'
-          sed -i "s#^module ${old}$#module ${new}#" backend/go.mod
-          grep -RIl --include='*.go' "$old" backend | while read -r file; do
-            sed -i "s#${old}#${new}#g" "$file"
-          done
-          find backend -name '*.go' -type f -print0 | xargs -0 gofmt -w
-          if grep -R --include='*.go' -n "$old" backend; then
-            echo '仍存在绑定仓库托管地址的项目内部 import' >&2
-            exit 1
-          fi
-          grep -q '^module measix/platform$' backend/go.mod
-      - name: 提交 namespace 迁移
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "refactor: use stable Go module namespace"
-          git push origin HEAD:agent/s0-platform-core
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin agent/s0-platform-core
+            git reset --hard origin/agent/s0-platform-core
+            sed -i "s#^module ${old}$#module ${new}#" backend/go.mod
+            while IFS= read -r file; do
+              sed -i "s#${old}#${new}#g" "$file"
+            done < <(grep -RIl --include='*.go' "$old" backend || true)
+            find backend -name '*.go' -type f -print0 | xargs -0 gofmt -w
+            if grep -R --include='*.go' -n "$old" backend; then
+              echo '仍存在绑定仓库托管地址的项目内部 import' >&2
+              exit 1
+            fi
+            grep -q '^module measix/platform$' backend/go.mod
+            git add backend
+            if git diff --cached --quiet; then
+              exit 0
+            fi
+            git commit -m "refactor: use stable Go module namespace"
+            if git push origin HEAD:agent/s0-platform-core; then
+              exit 0
+            fi
+            echo "namespace push race, retry ${attempt}/5"
+          done
+          echo 'namespace migration could not converge on latest branch head' >&2
+          exit 1

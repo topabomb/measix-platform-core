@@ -12,27 +12,12 @@ jobs:
   migrate:
     if: ${{ github.event.pull_request.number == 1 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/s0-platform-core' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
         with:
           repository: ${{ github.repository }}
           ref: agent/s0-platform-core
           fetch-depth: 0
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.26.5'
-          cache: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-      - uses: ariga/setup-atlas@v0
-        with:
-          version: 'v1.2.0'
-      - name: 固定 pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.0.0 --activate
       - name: 迁移项目内部 Go namespace
         shell: bash
         run: |
@@ -43,16 +28,18 @@ jobs:
             sed -i "s#${old}#measix/platform#g" "$file"
           done
           find backend -name '*.go' -type f -print0 | xargs -0 gofmt -w
-          make generate
           if grep -R --include='*.go' -n "$old" backend; then
-            echo '仍存在托管地址绑定的内部 import' >&2
+            echo '仍存在绑定仓库托管地址的项目内部 import' >&2
             exit 1
           fi
           grep -q '^module measix/platform$' backend/go.mod
-      - name: 提交 namespace 与生成物
+      - name: 提交 namespace 迁移
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend console/pnpm-lock.yaml console/src/api/generated.ts
+          git add backend
+          if git diff --cached --quiet; then
+            exit 0
+          fi
           git commit -m "refactor: use stable Go module namespace"
           git push origin HEAD:agent/s0-platform-core

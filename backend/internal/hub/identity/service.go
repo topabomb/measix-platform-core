@@ -451,3 +451,67 @@ func optionalString(value string) *string {
 	}
 	return &value
 }
+
+func userView(row *ent.User) UserView {
+	return UserView{ID: row.ID, Username: row.Username, DisplayName: row.DisplayName, Role: row.Role, Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+}
+
+func deviceView(row *ent.Device) DeviceView {
+	return DeviceView{ID: row.ID, UserID: row.UserID, InstallationID: row.InstallationID, AppVersion: row.AppVersion, LastSeenAt: row.LastSeenAt, Status: row.Status}
+}
+
+func (s *Service) CreateUserView(ctx context.Context, username, displayName, role string) (UserView, error) {
+	row, err := s.CreateUser(ctx, username, displayName, role)
+	if err != nil {
+		return UserView{}, err
+	}
+	return userView(row), nil
+}
+
+func (s *Service) GetUserView(ctx context.Context, userID string) (UserView, error) {
+	row, err := s.GetUser(ctx, userID)
+	if err != nil {
+		return UserView{}, err
+	}
+	return userView(row), nil
+}
+
+func (s *Service) ListUserViews(ctx context.Context, limit int) ([]UserView, error) {
+	rows, err := s.ListUsers(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]UserView, 0, len(rows))
+	for _, row := range rows {
+		views = append(views, userView(row))
+	}
+	return views, nil
+}
+
+func (s *Service) UpdateUserView(ctx context.Context, userID, username, displayName, role string) (UserView, error) {
+	row, err := s.UpdateUser(ctx, userID, username, displayName, role)
+	if err != nil {
+		return UserView{}, err
+	}
+	return userView(row), nil
+}
+
+func (s *Service) ListDeviceViews(ctx context.Context, userID string, limit int) ([]DeviceView, error) {
+	rows, err := s.ListDevices(ctx, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]DeviceView, 0, len(rows))
+	for _, row := range rows {
+		views = append(views, deviceView(row))
+	}
+	return views, nil
+}
+
+func (s *Service) AuthenticateAdminView(ctx context.Context, cookieSecret, csrfToken string, requireCSRF bool) (AdminPrincipalView, error) {
+	u, se, err := s.AuthenticateAdmin(ctx, cookieSecret, csrfToken, requireCSRF)
+	if err != nil {
+		return AdminPrincipalView{}, err
+	}
+	return AdminPrincipalView{UserID: u.ID, DisplayName: u.DisplayName, Role: u.Role, SessionID: se.ID, ExpiresAt: se.ExpiresAt}, nil
+}

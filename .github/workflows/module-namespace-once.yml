@@ -1,0 +1,38 @@
+name: module-namespace-once
+
+on:
+  push:
+    branches:
+      - agent/s0-platform-core
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/s0-platform-core
+          fetch-depth: 0
+      - name: Migrate host-independent module namespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          old='github.com/topabomb/measix-platform-core/backend'
+          new='measix-platform-core/backend'
+          sed -i "s#^module ${old}$#module ${new}#" backend/go.mod
+          grep -RIl --include='*.go' "$old" backend | while read -r file; do
+            sed -i "s#${old}#${new}#g" "$file"
+          done
+          find backend -name '*.go' -type f -print0 | xargs -0 gofmt -w
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add backend/go.mod backend
+          git commit -m 'refactor: decouple Go module namespace from GitHub'
+          git push origin HEAD:agent/s0-platform-core

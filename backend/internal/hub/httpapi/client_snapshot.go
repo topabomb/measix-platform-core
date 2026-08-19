@@ -1,15 +1,16 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 
-	"measix/platform/ent"
-	"measix/platform/ent/managedrelease"
+	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/wire/clientapi"
 )
 
 type fullClientHandler struct {
 	*clientHandler
+	capability *capability.Service
 }
 
 func (h *fullClientHandler) GetManagedSnapshot(w http.ResponseWriter, r *http.Request, generation int, params clientapi.GetManagedSnapshotParams) {
@@ -22,11 +23,8 @@ func (h *fullClientHandler) GetManagedSnapshot(w http.ResponseWriter, r *http.Re
 		writeIdentityError(w, err)
 		return
 	}
-	row, err := h.identity.Client.ManagedRelease.Query().Where(
-		managedrelease.ManagedGenerationEQ(int64(generation)),
-		managedrelease.StatusIn("ACTIVE", "SUPERSEDED"),
-	).Only(r.Context())
-	if ent.IsNotFound(err) {
+	snapshot, err := h.capability.GetSnapshot(r.Context(), generation)
+	if errors.Is(err, capability.ErrReleaseNotFound) {
 		writeProblem(w, http.StatusNotFound, "snapshot_not_found", "Managed snapshot not found")
 		return
 	}
@@ -34,7 +32,7 @@ func (h *fullClientHandler) GetManagedSnapshot(w http.ResponseWriter, r *http.Re
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
-	etag := `"` + row.SnapshotHash + `"`
+	etag := `"` + snapshot.Hash + `"`
 	if params.IfNoneMatch != nil && *params.IfNoneMatch == etag {
 		w.Header().Set("ETag", etag)
 		w.WriteHeader(http.StatusNotModified)
@@ -43,5 +41,5 @@ func (h *fullClientHandler) GetManagedSnapshot(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("ETag", etag)
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(row.SnapshotJSON)
+	_, _ = w.Write(snapshot.JSON)
 }

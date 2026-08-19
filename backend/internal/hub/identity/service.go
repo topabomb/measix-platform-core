@@ -85,16 +85,21 @@ func (s *Service) ListUsers(ctx context.Context, limit int) ([]*ent.User, error)
 	return s.Client.User.Query().Order(ent.Asc(user.FieldUsername)).Limit(limit).All(ctx)
 }
 
-func (s *Service) UpdateUser(ctx context.Context, userID, displayName, role string) (*ent.User, error) {
+func (s *Service) UpdateUser(ctx context.Context, userID, username, displayName, role string) (*ent.User, error) {
+	username = NormalizeUsername(username)
 	displayName = strings.TrimSpace(displayName)
-	if displayName == "" || (role != "ADMIN" && role != "MEMBER") {
+	if username == "" || displayName == "" || (role != "ADMIN" && role != "MEMBER") {
 		return nil, fmt.Errorf("invalid user")
 	}
 	n, err := s.Client.User.Update().Where(user.IDEQ(userID)).
+		SetUsername(username).
 		SetDisplayName(displayName).
 		SetRole(role).
 		SetUpdatedAt(s.Now().UTC()).
 		Save(ctx)
+	if ent.IsConstraintError(err) {
+		return nil, ErrConflict
+	}
 	if err != nil {
 		return nil, err
 	}

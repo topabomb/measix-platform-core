@@ -5,40 +5,13 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   export:
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-      - name: 一次性收敛项目内部 Go namespace
-        if: ${{ github.actor != 'github-actions[bot]' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          old='github.com/topabomb/measix-platform-core/backend'
-          mapfile -t files < <(grep -RIl --include='*.go' "$old" backend || true)
-          if (( ${#files[@]} > 0 )); then
-            for file in "${files[@]}"; do
-              sed -i "s#${old}#measix/platform#g" "$file"
-            done
-            find backend -name '*.go' -type f -print0 | xargs -0 gofmt -w
-            if grep -RIl --include='*.go' "$old" backend | head -n 1 | grep -q .; then
-              echo 'namespace migration incomplete' >&2
-              exit 1
-            fi
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add backend
-            git commit -m 'refactor: complete stable Go module namespace migration'
-            git push origin HEAD:${{ github.event.pull_request.head.ref }}
-          fi
       - name: 打包当前源码
         run: |
           git archive --format=zip --output=/tmp/measix-platform-core.zip HEAD

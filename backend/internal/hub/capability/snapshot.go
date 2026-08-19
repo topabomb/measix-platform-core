@@ -22,17 +22,17 @@ type SnapshotInput struct {
 }
 
 type snapshotDescriptor struct {
-	DeploymentID      string                           `json:"deploymentId"`
-	SchemaVersion     int                              `json:"schemaVersion"`
-	ManagedGeneration int                              `json:"managedGeneration"`
-	ReleaseID         string                           `json:"releaseId"`
-	Providers         []clientapi.ProviderDefinition   `json:"providers"`
-	Models            []clientapi.ModelDefinition      `json:"models"`
-	TTS               []clientapi.TtsDefinition        `json:"tts"`
-	ASR               []clientapi.AsrDefinition        `json:"asr"`
-	MCP               []clientapi.McpDefinition        `json:"mcp"`
-	Policy            clientapi.ManagedPolicy          `json:"policy"`
-	Metadata          snapshotMetadata                 `json:"metadata"`
+	DeploymentID      string                         `json:"deploymentId"`
+	SchemaVersion     int                            `json:"schemaVersion"`
+	ManagedGeneration int                            `json:"managedGeneration"`
+	ReleaseID         string                         `json:"releaseId"`
+	Providers         []clientapi.ProviderDefinition `json:"providers"`
+	Models            []clientapi.ModelDefinition    `json:"models"`
+	TTS               []clientapi.TtsDefinition      `json:"tts"`
+	ASR               []clientapi.AsrDefinition      `json:"asr"`
+	MCP               []clientapi.McpDefinition      `json:"mcp"`
+	Policy            clientapi.ManagedPolicy        `json:"policy"`
+	Metadata          snapshotMetadata               `json:"metadata"`
 }
 
 type snapshotMetadata struct {
@@ -87,14 +87,14 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	sort.Slice(mcp, func(i, j int) bool { return mcp[i].McpServerId < mcp[j].McpServerId })
 
 	policy := clientapi.ManagedPolicy{
-		PolicyId: input.Content.Policy.PolicyId,
+		PolicyId:            input.Content.Policy.PolicyId,
 		AllowLocalProviders: input.Content.Policy.AllowLocalProviders,
-		AllowLocalTts: input.Content.Policy.AllowLocalTts,
-		AllowLocalAsr: input.Content.Policy.AllowLocalAsr,
-		AllowLocalMcp: input.Content.Policy.AllowLocalMcp,
-		DefaultModelId: input.Content.Policy.DefaultModelId,
-		DefaultTtsId: input.Content.Policy.DefaultTtsId,
-		DefaultAsrId: input.Content.Policy.DefaultAsrId,
+		AllowLocalTts:       input.Content.Policy.AllowLocalTts,
+		AllowLocalAsr:       input.Content.Policy.AllowLocalAsr,
+		AllowLocalMcp:       input.Content.Policy.AllowLocalMcp,
+		DefaultModelId:      input.Content.Policy.DefaultModelId,
+		DefaultTtsId:        input.Content.Policy.DefaultTtsId,
+		DefaultAsrId:        input.Content.Policy.DefaultAsrId,
 	}
 	var publishedBy *string
 	if input.PublishedByUserID != "" {

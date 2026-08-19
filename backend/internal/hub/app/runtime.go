@@ -110,7 +110,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	h := &health.State{}
 	router.Get("/live", h.Live)
 	router.Get("/ready", h.Ready)
-	httpapi.RegisterFull(router, services, httpapi.Options{ControlAPIBase: cfg.PublicBaseURL, RuntimeAPIBase: cfg.RuntimeAPIBase})
+	httpapi.RegisterFull(router, services, httpapi.Options{PublicBaseURL: cfg.PublicBaseURL, RuntimeAPIBase: cfg.RuntimeAPIBase})
 	usageingestapi.HandlerFromMux(usage.NewHandler(usageService, serviceCredential), router)
 	if options.AdminAssets != nil {
 		static := adminstatic.New(options.AdminAssets)

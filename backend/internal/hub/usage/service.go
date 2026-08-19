@@ -53,7 +53,7 @@ func (s *Service) Ingest(ctx context.Context, batch usageingestapi.UsageBatch) (
 			ack.DuplicateCount++
 			continue
 		}
-		builder := tx.RequestUsage.Create().
+		_, err = tx.RequestUsage.Create().
 			SetRequestID(event.RequestId).
 			SetNillableInteractionID(event.InteractionId).
 			SetDeploymentID(event.DeploymentId).
@@ -73,12 +73,9 @@ func (s *Service) Ingest(ctx context.Context, batch usageingestapi.UsageBatch) (
 			SetResponseBytes(int64(event.ResponseBytes)).
 			SetDurationMs(int64(event.DurationMs)).
 			SetNillableErrorClass(event.ErrorClass).
-			SetIngestedAt(ingestedAt)
-		if _, err := builder.Save(ctx); err != nil {
-			if ent.IsConstraintError(err) {
-				ack.DuplicateCount++
-				continue
-			}
+			SetIngestedAt(ingestedAt).
+			Save(ctx)
+		if err != nil {
 			return rollback(err)
 		}
 		ack.AcceptedCount++

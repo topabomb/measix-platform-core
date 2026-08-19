@@ -8,7 +8,6 @@ import (
 
 	"github.com/topabomb/measix-platform-core/backend/ent"
 	"github.com/topabomb/measix-platform-core/backend/ent/activation"
-	"github.com/topabomb/measix-platform-core/backend/internal/wire/adminapi"
 	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaycontrolapi"
 	"github.com/topabomb/measix-platform-core/backend/internal/wire/relaystate"
 )
@@ -41,7 +40,13 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 			_ = s.setRuntimeStatus(ctx, "DEGRADED")
 			return nil, ErrRelayDiverged
 		}
-		if relayMatches(status, pending.ControlRevision, pending.BundleHash, pending.TargetGeneration) {
+		state, err := s.stateFromActivationDescriptor(ctx, pending)
+		if err != nil {
+			_ = s.setRuntimeStatus(ctx, "DEGRADED")
+			return nil, err
+		}
+		generation := int64(state.ActiveManagedGeneration)
+		if relayMatches(status, pending.ControlRevision, pending.BundleHash, &generation) {
 			return s.finalizePending(ctx, pending.ID)
 		}
 		if !status.Ready || status.AppliedControlRevision < int(pending.ControlRevision) {
@@ -70,7 +75,7 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 		return nil, nil
 	}
 	if !status.Ready || status.AppliedControlRevision < int(managed.DesiredControlRevision) {
-		if err := s.rehydrateActive(ctx, managed.ActiveReleaseID, int(managed.ActiveManagedGeneration), int(managed.DesiredControlRevision), stringPointer(managed.DesiredBundleHash)); err != nil {
+		if err := s.rehydrateActive(ctx, int(managed.ActiveManagedGeneration), int(managed.DesiredControlRevision), stringPointer(managed.DesiredBundleHash)); err != nil {
 			_ = s.setRuntimeStatus(ctx, "DEGRADED")
 			return nil, err
 		}
@@ -108,11 +113,43 @@ func (s *Service) finalizePending(ctx context.Context, activationID string) (*Ac
 	if err != nil {
 		return nil, err
 	}
-	if row.Kind != "PUBLISH" || row.SubjectID == nil || row.TargetGeneration == nil {
+	switch row.Kind {
+	case "PUBLISH":
+		if row.SubjectID == nil || row.TargetGeneration == nil {
+			return nil, fmt.Errorf("publish activation missing target")
+		}
+		if err := s.finalizePublish(ctx, row.ID, *row.SubjectID, int(*row.TargetGeneration), int(row.ControlRevision), row.BundleHash); err != nil {
+			return nil, err
+		}
+	case "RUNTIME_CONFIG":
+		if row.SubjectID == nil {
+			return nil, fmt.Errorf("runtime config activation missing target")
+		}
+		var pending struct {
+			TargetRevision int `json:"targetRevision"`
+		}
+		if len(row.PendingOperationJSON) == 0 || json.Unmarshal(row.PendingOperationJSON, &pending) != nil || pending.TargetRevision < 1 {
+			return nil, fmt.Errorf("runtime config activation missing persisted revision")
+		}
+		if err := s.finalizeUpstreamApply(ctx, row.ID, *row.SubjectID, pending.TargetRevision, int(row.ControlRevision), row.BundleHash); err != nil {
+			return nil, err
+		}
+	case "SECURITY_CHANGE":
+		if row.SubjectID == nil {
+			return nil, fmt.Errorf("security activation missing subject")
+		}
+		var pending struct {
+			Operation string `json:"operation"`
+			SubjectID string `json:"subjectId"`
+		}
+		if len(row.PendingOperationJSON) == 0 || json.Unmarshal(row.PendingOperationJSON, &pending) != nil || pending.SubjectID != *row.SubjectID {
+			return nil, fmt.Errorf("security activation missing persisted operation")
+		}
+		if err := s.finalizeSecurityChange(ctx, row.ID, securitySubject(pending.Operation), pending.SubjectID, int(row.ControlRevision), row.BundleHash); err != nil {
+			return nil, err
+		}
+	default:
 		return nil, fmt.Errorf("unsupported pending activation kind %q", row.Kind)
-	}
-	if err := s.finalizePublish(ctx, row.ID, *row.SubjectID, int(*row.TargetGeneration), int(row.ControlRevision), row.BundleHash); err != nil {
-		return nil, err
 	}
 	result, err := s.loadActivation(ctx, row.ID)
 	if err != nil {
@@ -126,26 +163,12 @@ func (s *Service) reapplyPending(ctx context.Context, activationID string) error
 	if err != nil {
 		return err
 	}
-	if row.Kind != "PUBLISH" || row.SubjectID == nil || row.TargetGeneration == nil {
-		return fmt.Errorf("unsupported pending activation kind %q", row.Kind)
-	}
-	release, err := s.Client.ManagedRelease.Get(ctx, *row.SubjectID)
-	if err != nil {
-		return err
-	}
-	var content adminapi.ManagedDraftContent
-	if err := json.Unmarshal(release.ReleaseContentJSON, &content); err != nil {
-		return err
-	}
-	state, err := s.compileState(ctx, content, int(*row.TargetGeneration), int(row.ControlRevision))
+	state, err := s.stateFromActivationDescriptor(ctx, row)
 	if err != nil {
 		return err
 	}
 	hash, err := relaystate.HashDescriptor(state)
-	if err != nil {
-		return err
-	}
-	if string(hash) != row.BundleHash {
+	if err != nil || string(hash) != row.BundleHash {
 		_ = s.setRuntimeStatus(ctx, "DEGRADED")
 		return ErrRelayDiverged
 	}
@@ -155,34 +178,64 @@ func (s *Service) reapplyPending(ctx context.Context, activationID string) error
 		_ = s.markUnknown(ctx, row.ID, "relay_reapply_unknown")
 		return err
 	}
-	if ack.AppliedControlRevision != int(row.ControlRevision) || string(ack.BundleHash) != row.BundleHash || ack.ActiveManagedGeneration != int(*row.TargetGeneration) {
+	if ack.AppliedControlRevision != int(row.ControlRevision) || string(ack.BundleHash) != row.BundleHash || ack.ActiveManagedGeneration != state.ActiveManagedGeneration {
 		_ = s.markFailed(ctx, row.ID, "relay_ack_mismatch")
 		return ErrRelayAckMismatch
 	}
 	return nil
 }
 
-func (s *Service) rehydrateActive(ctx context.Context, releaseID *string, generation, revision int, expectedHash string) error {
-	if releaseID == nil || expectedHash == "" {
+func (s *Service) stateFromActivationDescriptor(ctx context.Context, row *ent.Activation) (relaycontrolapi.RuntimeControlState, error) {
+	var state relaycontrolapi.RuntimeControlState
+	if len(row.TargetDescriptorJSON) == 0 || json.Unmarshal(row.TargetDescriptorJSON, &state) != nil {
+		return state, fmt.Errorf("invalid persisted activation descriptor")
+	}
+	if state.ControlRevision != int(row.ControlRevision) {
+		return state, ErrRelayDiverged
+	}
+	for i := range state.Upstreams {
+		value := &state.Upstreams[i]
+		if value.Auth.AdditionalProperties == nil {
+			value.Auth.AdditionalProperties = map[string]interface{}{}
+		}
+		if value.Auth.Type == relaycontrolapi.NONE {
+			continue
+		}
+		if value.SecretRef == nil {
+			return state, fmt.Errorf("persisted upstream %s lacks secret reference", value.UpstreamId)
+		}
+		secret, err := s.Upstream.ResolveSecret(ctx, value.SecretRef.SecretId, value.SecretRef.SecretVersion)
+		if err != nil {
+			return state, err
+		}
+		switch value.Auth.Type {
+		case relaycontrolapi.BEARER:
+			value.Auth.AdditionalProperties["token"] = string(secret)
+		case relaycontrolapi.STATICHEADER:
+			value.Auth.AdditionalProperties["value"] = string(secret)
+		case relaycontrolapi.BASIC:
+			value.Auth.AdditionalProperties["password"] = string(secret)
+		default:
+			return state, fmt.Errorf("unsupported persisted auth type %s", value.Auth.Type)
+		}
+	}
+	return state, nil
+}
+
+func (s *Service) rehydrateActive(ctx context.Context, generation, revision int, expectedHash string) error {
+	if expectedHash == "" {
 		return fmt.Errorf("desired runtime state cannot be reconstructed")
 	}
-	release, err := s.Client.ManagedRelease.Get(ctx, *releaseID)
+	content, err := s.activeReleaseContent(ctx)
 	if err != nil {
 		return err
 	}
-	var content adminapi.ManagedDraftContent
-	if err := json.Unmarshal(release.ReleaseContentJSON, &content); err != nil {
-		return err
-	}
-	state, err := s.compileState(ctx, content, generation, revision)
+	state, err := s.compileOperationalState(ctx, content, generation, revision, nil)
 	if err != nil {
 		return err
 	}
 	hash, err := relaystate.HashDescriptor(state)
-	if err != nil {
-		return err
-	}
-	if string(hash) != expectedHash {
+	if err != nil || string(hash) != expectedHash {
 		return ErrRelayDiverged
 	}
 	state.BundleHash = hash

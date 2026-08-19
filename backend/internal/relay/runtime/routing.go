@@ -35,11 +35,8 @@ func isRuntimeResourceID(value string) bool {
 }
 
 func safeRuntimePath(value string) bool {
-	if !strings.HasPrefix(value, "/") || strings.Contains(value, "//") || strings.Contains(value, "\\") {
-		return false
-	}
-	decoded, err := url.PathUnescape(value)
-	if err != nil {
+	decoded, ok := fullyUnescapePath(value)
+	if !ok || !strings.HasPrefix(decoded, "/") || strings.Contains(decoded, "//") || strings.Contains(decoded, "\\") {
 		return false
 	}
 	for _, segment := range strings.Split(decoded, "/") {
@@ -48,6 +45,28 @@ func safeRuntimePath(value string) bool {
 		}
 	}
 	return true
+}
+
+// fullyUnescapePath closes encoded and repeatedly encoded traversal variants without
+// changing the path that is ultimately forwarded. net/http has already decoded one
+// layer into URL.Path, so a bounded fixed-point decode is required for %252e-style
+// inputs while also preventing pathological expansion.
+func fullyUnescapePath(value string) (string, bool) {
+	decoded := value
+	for range 4 {
+		next, err := url.PathUnescape(decoded)
+		if err != nil {
+			return "", false
+		}
+		if next == decoded {
+			return decoded, true
+		}
+		decoded = next
+	}
+	if strings.Contains(decoded, "%") {
+		return "", false
+	}
+	return decoded, true
 }
 
 func allowedPath(path string, prefixes []string) bool {

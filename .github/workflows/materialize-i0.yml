@@ -21,7 +21,7 @@ jobs:
         id: source
         shell: bash
         run: |
-          if [ -f tools/i0-source.tar.gz.b64 ]; then
+          if ls tools/i0-source.part-* >/dev/null 2>&1; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
@@ -29,7 +29,7 @@ jobs:
       - name: 展开 I0 源码
         if: steps.source.outputs.present == 'true'
         shell: bash
-        run: base64 -d tools/i0-source.tar.gz.b64 | tar -xzf -
+        run: cat tools/i0-source.part-* | base64 -d | tar -xzf -
       - uses: actions/setup-go@v6
         if: steps.source.outputs.present == 'true'
         with:
@@ -57,7 +57,7 @@ jobs:
         if: steps.source.outputs.present == 'true'
         shell: bash
         run: |
-          rm -f tools/i0-source.tar.gz.b64
+          rm -f tools/i0-source*
           rm -f .github/workflows/materialize-i0.yml
           rm -f .github/workflows/red-platformid.yml
           git config user.name "github-actions[bot]"

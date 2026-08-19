@@ -7,17 +7,52 @@ on:
 permissions:
   contents: read
 
+env:
+  GO_VERSION: '1.26.5'
+  NODE_VERSION: '24'
+  PNPM_VERSION: '11.0.0'
+
 jobs:
   export:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
-      - name: 打包当前源码
+
+      - name: 设置 Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: 固定 pnpm 版本
         run: |
-          git archive --format=zip --output=/tmp/measix-platform-core.zip HEAD
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - uses: ariga/setup-atlas@v0
+        with:
+          version: 'v1.2.0'
+
+      - name: 在 CI 固定工具链下重新生成
+        run: make generate
+
+      - name: 打包生成后的已跟踪源码
+        run: |
+          git diff --binary > /tmp/generated.patch
+          git ls-files -z | xargs -0 zip -q /tmp/measix-platform-core-generated.zip
+
       - uses: actions/upload-artifact@v4
         with:
-          name: measix-platform-core-source
-          path: /tmp/measix-platform-core.zip
+          name: measix-platform-core-generated
+          path: |
+            /tmp/measix-platform-core-generated.zip
+            /tmp/generated.patch
           if-no-files-found: error
           retention-days: 1

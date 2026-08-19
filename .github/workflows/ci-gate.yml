@@ -9,28 +9,43 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-gate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v6
+
+      - name: 设置 Go
+        uses: actions/setup-go@v6
         with:
           go-version: '1.26.5'
-          cache: false
-      - uses: actions/setup-node@v5
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: 启用 Corepack
+        run: corepack enable
+
+      - name: 设置 Node.js 与 pnpm store cache
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
+          cache: pnpm
+          cache-dependency-path: console/pnpm-lock.yaml
+
       - uses: ariga/setup-atlas@v0
         with:
           version: 'v1.2.0'
-      - name: 安装 pnpm
-        shell: bash
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.0.0 --activate
+
+      - name: 固定 pnpm 版本
+        run: corepack prepare pnpm@11.0.0 --activate
+
       - name: 验证确定性生成链
         run: make generate
+
       - name: 执行 T0/T1/T2 聚合门禁
         run: make ci

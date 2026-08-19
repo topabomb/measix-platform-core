@@ -10,9 +10,6 @@ on:
       - .github/patches/apply-upstream-list.patch
       - .github/workflows/apply-upstream-list.yml
 
-permissions:
-  contents: write
-
 env:
   GO_VERSION: '1.26.5'
   NODE_VERSION: '24'
@@ -43,7 +40,7 @@ jobs:
         with:
           version: v1.2.0
       - name: Apply source patch
-        run: git apply --index .github/patches/apply-upstream-list.patch
+        run: git apply .github/patches/apply-upstream-list.patch
       - name: Run canonical generators
         run: make generate
       - name: Verify focused Green
@@ -52,11 +49,13 @@ jobs:
           go test ./internal/contract ./internal/hub/upstream -count=1
           cd ../console
           pnpm test --run
-      - name: Commit generated Green
+      - name: Export exact verified changes
         run: |
-          git config user.name 'measix-ci'
-          git config user.email 'actions@users.noreply.github.com'
-          git add api backend console
-          git diff --cached --check
-          git commit -m 'feat: 补齐 Admin Upstream 分页列表契约'
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          git diff --binary HEAD -- api backend console > /tmp/upstream-list-generated.patch
+          test -s /tmp/upstream-list-generated.patch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upstream-list-generated
+          path: /tmp/upstream-list-generated.patch
+          if-no-files-found: error
+          retention-days: 1

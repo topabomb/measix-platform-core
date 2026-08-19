@@ -128,7 +128,7 @@ func (s *Service) finalizePending(ctx context.Context, activationID string) (*Ac
 		var pending struct {
 			TargetRevision int `json:"targetRevision"`
 		}
-		if len(row.PendingOperationJSON) == 0 || json.Unmarshal(row.PendingOperationJSON, &pending) != nil || pending.TargetRevision < 1 {
+		if row.PendingOperationJSON == nil || len(*row.PendingOperationJSON) == 0 || json.Unmarshal(*row.PendingOperationJSON, &pending) != nil || pending.TargetRevision < 1 {
 			return nil, fmt.Errorf("runtime config activation missing persisted revision")
 		}
 		if err := s.finalizeUpstreamApply(ctx, row.ID, *row.SubjectID, pending.TargetRevision, int(row.ControlRevision), row.BundleHash); err != nil {
@@ -142,7 +142,7 @@ func (s *Service) finalizePending(ctx context.Context, activationID string) (*Ac
 			Operation string `json:"operation"`
 			SubjectID string `json:"subjectId"`
 		}
-		if len(row.PendingOperationJSON) == 0 || json.Unmarshal(row.PendingOperationJSON, &pending) != nil || pending.SubjectID != *row.SubjectID {
+		if row.PendingOperationJSON == nil || len(*row.PendingOperationJSON) == 0 || json.Unmarshal(*row.PendingOperationJSON, &pending) != nil || pending.SubjectID != *row.SubjectID {
 			return nil, fmt.Errorf("security activation missing persisted operation")
 		}
 		if err := s.finalizeSecurityChange(ctx, row.ID, securitySubject(pending.Operation), pending.SubjectID, int(row.ControlRevision), row.BundleHash); err != nil {

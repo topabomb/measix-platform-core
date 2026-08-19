@@ -1,6 +1,6 @@
 # Testing and CI
 
-This document defines how `measix-platform-core` executes and records tests. Required behavior and critical scenarios remain authoritative in the S0 Component/System Testing Specs in `topabomb/measix-architecture`.
+This document defines how `measix-platform-core` executes and records tests. Required behavior and critical scenarios remain authoritative in the S0.1/S0.2/Component/System Testing Specs in `topabomb/measix-architecture`.
 
 ## 1. Test layers
 
@@ -12,11 +12,43 @@ The repository implements the S0 five-layer model:
 | T1 Unit / Domain | pure validation/state/mapping | Go unit tests, Vitest unit/store helpers |
 | T2 Component Integration | one real component + local real boundaries | real SQLite, real HTTP server, component/static-host tests |
 | T3 Cross-component Integration | multiple real MEASIX components | real Hub↔Relay, Admin↔Hub, deterministic Adapter |
-| T4 S0 System / E2E | client-facing topology and full S0 flows | system harness + fixed Android repository commit |
+| T4 System / E2E | client-facing topology and full product flows | S0.1 pre-Android system gate, then final S0.2 Android/system RC |
 
-Normal PR CI is dominated by T0/T1/T2. Main/integration adds required T3. RC adds complete T4 and real Adapter/Android/browser requirements from the architecture System Testing Spec.
+Normal PR CI is dominated by T0/T1/T2. Integration candidates add required T3. S0.1 adds a deterministic pre-Android system gate. Final S0 RC adds Android emulator/device and the remaining cross-repository requirements from the architecture System Testing Spec.
 
-## 2. Test locations
+## 2. Delivery-gate mapping
+
+### S0 Core evidence
+
+Existing I0–I5 tests remain valuable regression evidence for identity, Draft/Snapshot foundations, Relay admission/transport, metering, persistence and Admin infrastructure. They do **not** by themselves prove S0.1 or final S0 Exit.
+
+### S0.1 Managed Capability Delivery
+
+S0.1 is a pre-Android product/system gate owned semantically by `measix-s0-capability-delivery-system-testing-spec.md`.
+
+Its executable topology is:
+
+```text
+real Admin browser
+  → real Control Hub
+  → real Runtime Relay
+  → deterministic Test Adapter / qualified real Adapter
+
+Snapshot/Runtime Test Client
+  → real Client Control API + Runtime API
+```
+
+S0.1 must prove the architecture `CAP-*` scenarios, including the required Managed Capability profiles, Snapshot preview/release equivalence, publish/runtime enforcement, usage/pricing/diagnostics, no-forward security behavior and the Client Contract Freeze evidence.
+
+No Android commit or emulator is required for the S0.1 gate.
+
+### S0.2 / final S0 Exit
+
+S0.2 consumes the pinned S0.1 freeze manifest. Final S0 RC adds the real `rikkahub_mcp` Android implementation and proves the architecture `AND-*`/`SYS-*` scenarios with fixed cross-repository source commits.
+
+A passing S0.1 gate must never be reported as final S0 Exit.
+
+## 3. Test locations
 
 Target conventions:
 
@@ -26,24 +58,24 @@ console/**/*.spec.ts            frontend unit/component tests
 api/fixtures/                   canonical contract fixtures
 test/qualification/             Adapter qualification harness
 test/system/harness/            real-process system harness
-test/system/scenarios/          SYS scenario orchestration
+test/system/scenarios/          CAP/SYS scenario orchestration
 test/system/reports/            generated local output; CI publishes artifacts
 ```
 
 Tests should live near the code they prove unless they are explicitly cross-component/system infrastructure.
 
-## 3. Mapping architecture requirements
+## 4. Mapping architecture requirements
 
-Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`, `SYS-*`.
+Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`, `CAP-*`, `AND-*` and `SYS-*`.
 
 Rules:
 
 - a test proving a critical scenario must expose the ID in its test name, metadata or nearby comment so reports can map it;
 - ordinary unit tests do not need artificial IDs;
-- this repository must not invent a new `SYS-*` semantic; add it to the architecture Testing Spec first;
+- this repository must not invent a new `CAP-*`/`SYS-*` semantic; add it to the architecture Testing Spec first;
 - one critical scenario may require several executable tests, and one well-structured system test may prove several explicitly listed IDs.
 
-## 4. Determinism and isolation
+## 5. Determinism and isolation
 
 Every automated test must:
 
@@ -55,9 +87,9 @@ Every automated test must:
 - use bounded eventually assertions rather than fixed long sleeps;
 - clean up processes/files or preserve them only as explicit failure artifacts.
 
-Critical tests cannot depend on a flaky external Provider. Real Adapter qualification is a separate RC lane.
+Critical deterministic tests cannot depend on a flaky external Provider. Real Adapter qualification is a separate S0.1/RC lane.
 
-## 5. Real-boundary rules
+## 6. Real-boundary rules
 
 Do not mock away the behavior under test:
 
@@ -67,11 +99,13 @@ Do not mock away the behavior under test:
 - migration tests execute versioned SQL;
 - Admin static-host tests use real production build output;
 - T3 Hub/Relay tests run real processes/binaries;
-- T4 uses the client-facing URL topology, not internal shortcuts.
+- S0.1 browser/system tests use real Admin→Hub→Relay paths;
+- S0.1 Test Client uses the public Client Control and Runtime paths, not internal shortcuts;
+- final S0 T4 uses the real Android client-facing URL topology.
 
 Mocks/fakes are appropriate for uncontrollable third-party services, clocks/randomness, and targeted failure injection.
 
-## 6. Coverage policy
+## 7. Coverage policy
 
 There is no global percentage that substitutes for the architecture Testing Specs.
 
@@ -79,7 +113,7 @@ Coverage reports may be generated as diagnostics and trend signals. A PR fails f
 
 Do not add a repository-wide percentage gate without a specific engineering reason and review; if introduced, it remains secondary to required scenarios.
 
-## 7. Failure, retry and flakiness
+## 8. Failure, retry and flakiness
 
 A product/test assertion failure must remain a failure. Tests do not retry until green.
 
@@ -87,9 +121,11 @@ A whole CI job may be rerun once for a clearly identified runner/infrastructure 
 
 Flaky critical tests are defects. Fix them; do not permanently quarantine/skip them.
 
-## 8. PR CI design
+## 9. PR CI design
 
-Once I0 CI is implemented, GitHub Actions should expose stable, understandable checks. Recommended logical jobs are:
+GitHub Actions should expose stable, understandable checks. Current logical gates may be coarser than the target decomposition, but the required aggregate result remains explicit.
+
+Recommended logical jobs are:
 
 ```text
 static-contract
@@ -104,7 +140,7 @@ ci-gate
 
 The required gate evaluates the latest PR commit. Older Green checks do not satisfy a new head commit.
 
-## 9. Main/integration CI
+## 10. Main/integration CI
 
 After merge or on an integration candidate, run at least:
 
@@ -116,13 +152,33 @@ After merge or on an integration candidate, run at least:
 - deterministic Adapter transport suite;
 - core backend/system-harness scenarios.
 
-A failure blocks promotion to RC even if `main` itself is not technically reverted automatically.
+During S0.1, promotion to the Client Contract Freeze candidate additionally requires the complete architecture-defined `CAP-*` gate. A failure blocks freeze even if the lower-level CI aggregate is Green.
 
-## 10. System/RC evidence
+## 11. S0.1 freeze evidence
 
-T3/T4 and RC runs publish machine-readable evidence and useful diagnostics as GitHub Actions artifacts. At minimum, retain the manifest required by architecture plus test reports/log summaries that contain no secrets.
+The S0.1 system run publishes machine-readable evidence and diagnostics containing no secrets.
 
-The manifest includes fixed source identities such as:
+The freeze manifest pins at least:
+
+```text
+architectureCommit
+platformCoreCommit
+clientControlOpenApiHash
+canonicalFixtureHash
+snapshotSchemaVersion
+adminBuildHash
+adapterQualificationRef
+scenarioResults
+startedAt/completedAt
+```
+
+The exact serialized schema is implemented by the harness and follows the architecture contract; this document does not create a second wire schema.
+
+The manifest exists only after all required S0.1 scenarios are Green. A document or commit message saying “frozen” is not a substitute.
+
+## 12. Final S0 RC evidence
+
+Final T4/RC extends the frozen S0.1 composition with fixed Android identity and the additional architecture-required evidence, for example:
 
 ```text
 platformCoreCommit
@@ -132,25 +188,25 @@ adminBuildHash
 openApiFixtureHash
 hubBuild
 relayBuild
-adapterName/version/configRevision
+adapter qualification identity
 androidAppVersion
 scenarioResults
 startedAt/completedAt
 ```
 
-The `architectureCommit` is implementation-governance metadata; it complements, not replaces, the System Testing Spec's required fixed source commits.
+The final architecture System Testing Spec is authoritative for the exact required fields/scenarios.
 
-## 11. Local test loop
+## 13. Local test loop
 
 Local development uses the narrowest test that demonstrates Red/Green, then expands to the affected component suite before push. CI repeats the required gate independently.
 
 Exact commands are documented here only when their actual scripts/package targets exist. Do not invent documentation-only commands that CI cannot execute.
 
-## 12. GitHub-only test loop
+## 14. GitHub-only test loop
 
 When no local runtime is available:
 
-1. open a Draft PR;
+1. open/use a Draft PR;
 2. push the Red test commit;
 3. wait for/inspect the Actions check;
 4. confirm the intended test failed for the expected reason;
@@ -161,12 +217,12 @@ When no local runtime is available:
 
 This is a valid TDD loop because execution is delegated to CI rather than skipped. See `docs/tdd.md`.
 
-## 13. Secrets and test data
+## 15. Secrets and test data
 
 No production token, secret, enrollment code, refresh credential, real conversation or sensitive prompt is allowed in fixtures, logs or artifacts.
 
 Security scenarios additionally assert that protected material does not appear in responses, logs, reports, Admin storage/DOM, managed Snapshot or usage events.
 
-## 14. Test-change review
+## 16. Test-change review
 
 Deleting or weakening a test requires a reason. A critical test may be removed only when the architecture capability/scenario is removed or another test demonstrably covers the same requirement. “Hard to test” is not sufficient.

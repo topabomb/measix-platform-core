@@ -65,7 +65,7 @@ The implementation is organized around executable ownership, not around duplicat
 api/          executable wire contracts + canonical fixtures
 backend/      Go binaries, packages, Ent, migrations
 console/      Admin Console source/build
- test/        qualification + S0 system harness
+test/         qualification + S0 system harness
 .github/      CI/PR automation
 ```
 

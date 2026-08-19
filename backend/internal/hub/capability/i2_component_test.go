@@ -142,11 +142,11 @@ func TestHUBCAP006SnapshotDeterministicAndClientSafe(t *testing.T) {
 	cap.Now = func() time.Time { return now }
 	releaseID := platformid.New(platformid.Release)
 	input := capability.SnapshotInput{
-		DeploymentID:     boot.DeploymentID,
-		ReleaseID:        releaseID,
+		DeploymentID:      boot.DeploymentID,
+		ReleaseID:         releaseID,
 		ManagedGeneration: 1,
-		Content:          content,
-		PublishedAt:      now,
+		Content:           content,
+		PublishedAt:       now,
 		PublishedByUserID: boot.AdminUserID,
 	}
 	first, firstHash, err := cap.CompileSnapshot(input)
@@ -239,7 +239,7 @@ func testUpstreamConfig(secretID string, secretVersion int) adminapi.UpstreamCon
 		},
 		CorrelationMode:      "HEADER",
 		UsageCapabilityLevel: adminapi.LEVEL0,
-		TimeoutDefaults: adminapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000},
+		TimeoutDefaults:      adminapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000},
 	}
 }
 

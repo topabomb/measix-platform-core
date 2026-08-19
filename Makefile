@@ -1,6 +1,6 @@
-.PHONY: ci generate backend-test console-test contract migrations
+.PHONY: ci generate generated-drift backend-test console-test contract migrations migration-replay
 
-ci: contract backend-test console-test migrations
+ci: contract backend-test console-test migrations generated-drift
 
 contract:
 	cd backend && go test ./internal/contract -count=1
@@ -8,14 +8,22 @@ contract:
 backend-test:
 	cd backend && go test ./... -count=1
 	cd backend && go vet ./...
-	cd backend && go test -race ./pkg/platformid ./internal/common/health -count=1
+	cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/sqliteutil ./internal/relay/metering -count=1
 
 console-test:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build
 
-migrations:
+migrations: migration-replay
 	atlas migrate hash --dir file://backend/migrations
 	git diff --exit-code -- backend/migrations/atlas.sum
+
+migration-replay:
+	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	atlas migrate apply --dir file://backend/migrations --url "sqlite://$$tmp/hub.db"; \
+	atlas migrate status --dir file://backend/migrations --url "sqlite://$$tmp/hub.db"
+
+generated-drift:
+	git diff --exit-code -- backend/go.mod backend/go.sum backend/ent backend/internal/wire backend/migrations/atlas.sum console/pnpm-lock.yaml console/src/api/generated.ts
 
 generate:
 	cd backend && go mod tidy

@@ -57,7 +57,7 @@ type UserView struct {
 type DeviceView struct {
 	ID             string
 	UserID         string
-	InstallationID string
+	InstallationID *string
 	AppVersion     *string
 	LastSeenAt     *time.Time
 	Status         string

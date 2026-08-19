@@ -1,0 +1,29 @@
+name: ci-gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.5'
+      - name: Run repository gate
+        shell: bash
+        run: |
+          if [ -f Makefile ]; then
+            make ci
+          else
+            cd backend
+            go test ./pkg/platformid -run TestCanonicalKindsGenerateAndValidateUUIDv4 -count=1
+          fi

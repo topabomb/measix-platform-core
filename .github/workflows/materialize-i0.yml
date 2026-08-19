@@ -29,16 +29,16 @@ jobs:
       - name: 展开 I0 源码
         if: steps.source.outputs.present == 'true'
         shell: bash
-        run: cat tools/i0-source.part-* | base64 -d | tar -xzf -
+        run: |
+          cat tools/i0-source.part-* | base64 -d | tar -xzf -
+          git checkout HEAD -- .github
       - name: 提交 I0 源码基础
         if: steps.source.outputs.present == 'true'
         shell: bash
         run: |
           rm -f tools/i0-source*
-          rm -f .github/workflows/materialize-i0.yml
-          rm -f .github/workflows/red-platformid.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add -A -- ':!.github'
           git commit -m "feat: establish I0 engineering and contract source"
           git push origin HEAD:agent/s0-platform-core

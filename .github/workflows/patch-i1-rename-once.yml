@@ -1,0 +1,87 @@
+name: patch-i1-rename-once
+
+on:
+  push:
+    branches: [agent/s0-platform-core]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !startsWith(github.event.head_commit.message, 'fix: implement stable user rename') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/s0-platform-core
+      - name: Apply exact I1 rename patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          service = Path('backend/internal/hub/identity/service.go')
+          text = service.read_text()
+          old = '''func (s *Service) UpdateUser(ctx context.Context, userID, displayName, role string) (*ent.User, error) {
+          \tdisplayName = strings.TrimSpace(displayName)
+          \tif displayName == "" || (role != "ADMIN" && role != "MEMBER") {
+          \t\treturn nil, fmt.Errorf("invalid user")
+          \t}
+          \tn, err := s.Client.User.Update().Where(user.IDEQ(userID)).
+          \t\tSetDisplayName(displayName).
+          \t\tSetRole(role).
+          \t\tSetUpdatedAt(s.Now().UTC()).
+          \t\tSave(ctx)
+          \tif err != nil {
+          \t\treturn nil, err
+          \t}
+          \tif n != 1 {
+          \t\treturn nil, ErrNotFound
+          \t}
+          \treturn s.GetUser(ctx, userID)
+          }
+          '''
+          new = '''func (s *Service) UpdateUser(ctx context.Context, userID, username, displayName, role string) (*ent.User, error) {
+          \tusername = NormalizeUsername(username)
+          \tdisplayName = strings.TrimSpace(displayName)
+          \tif username == "" || displayName == "" || (role != "ADMIN" && role != "MEMBER") {
+          \t\treturn nil, fmt.Errorf("invalid user")
+          \t}
+          \tn, err := s.Client.User.Update().Where(user.IDEQ(userID)).
+          \t\tSetUsername(username).
+          \t\tSetDisplayName(displayName).
+          \t\tSetRole(role).
+          \t\tSetUpdatedAt(s.Now().UTC()).
+          \t\tSave(ctx)
+          \tif ent.IsConstraintError(err) {
+          \t\treturn nil, ErrConflict
+          \t}
+          \tif err != nil {
+          \t\treturn nil, err
+          \t}
+          \tif n != 1 {
+          \t\treturn nil, ErrNotFound
+          \t}
+          \treturn s.GetUser(ctx, userID)
+          }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('service UpdateUser patch anchor mismatch')
+          service.write_text(text.replace(old, new))
+
+          handler = Path('backend/internal/hub/httpapi/handler.go')
+          text = handler.read_text()
+          old = 'h.identity.UpdateUser(r.Context(), userID, request.DisplayName, string(request.Role))'
+          new = 'h.identity.UpdateUser(r.Context(), userID, request.Username, request.DisplayName, string(request.Role))'
+          if text.count(old) != 1:
+              raise SystemExit('handler UpdateUser patch anchor mismatch')
+          handler.write_text(text.replace(old, new))
+          PY
+          gofmt -w backend/internal/hub/identity/service.go backend/internal/hub/httpapi/handler.go
+      - name: Commit source patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/internal/hub/identity/service.go backend/internal/hub/httpapi/handler.go
+          git commit -m "fix: implement stable user rename"
+          git push origin HEAD:agent/s0-platform-core

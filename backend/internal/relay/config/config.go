@@ -7,9 +7,9 @@ import (
 )
 
 type Config struct {
-	PublicListenAddr   string
-	InternalListenAddr string
-	SpoolPath          string
+	PublicListenAddr    string
+	InternalListenAddr  string
+	SpoolPath           string
 	HubServiceTokenFile string
 }
 

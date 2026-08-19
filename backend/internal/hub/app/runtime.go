@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -75,12 +77,14 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 		return closeOnError(fmt.Errorf("normal Hub startup requires exactly one ACTIVE Deployment; run bootstrap-admin first"))
 	}
 	deployment := deployments[0]
-	kid := keyID(privateKey.Public().([]byte))
+	publicKey := privateKey.Public().(ed25519.PublicKey)
+	kid := keyID(publicKey)
 	signer, err := security.NewAccessSigner(privateKey, deployment.ID, kid, cfg.AccessTokenTTL)
 	if err != nil {
 		return closeOnError(err)
 	}
-	csrfDigest := sha256.Sum256(append([]byte("measix:admin-csrf:"), masterKey...))
+	csrfMaterial := append([]byte("measix:admin-csrf:"), masterKey...)
+	csrfDigest := sha256.Sum256(csrfMaterial)
 	identityService := identity.New(st.Client, signer, csrfDigest[:])
 	box, err := security.NewSecretBox(masterKey, 1)
 	if err != nil {
@@ -112,8 +116,8 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 		router.Handle("/admin/*", static)
 	}
 
-	// Relay connectivity is an operational state, not a reason to expose a half-initialized Hub.
-	// Reconcile once before readiness; failure is persisted as DEGRADED and Admin/diagnostics remain available.
+	// Relay connectivity is operational state. A failed startup reconcile leaves Runtime DEGRADED,
+	// while the fully initialized Admin/diagnostics surface remains available for recovery.
 	_, _ = runtimeControl.Reconcile(ctx)
 	h.SetReady(true)
 	return &Runtime{
@@ -146,7 +150,7 @@ func (r *Runtime) RunReconciler(ctx context.Context) error {
 }
 
 func readCredentialFile(path string) (string, error) {
-	value, err := osReadFile(path)
+	value, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
@@ -160,8 +164,4 @@ func readCredentialFile(path string) (string, error) {
 func keyID(publicKey []byte) string {
 	sum := sha256.Sum256(publicKey)
 	return "hub-ed25519-" + hex.EncodeToString(sum[:6])
-}
-
-var osReadFile = func(path string) ([]byte, error) {
-	return os.ReadFile(path)
 }

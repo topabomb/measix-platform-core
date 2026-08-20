@@ -237,17 +237,19 @@ focus / selected / interactive state
 保留 Quasar 的自然工程结构，只增加真正有价值的 feature 层，不引入 Clean Architecture 式前端目录爆炸：
 
 ```text
-console/src/
-├── api/          generated types + transport/problem
-├── boot/         Quasar boot integration only
-├── components/   跨 feature UI primitives/pattern pieces
-├── composables/  跨 feature browser/workflow helpers
-├── css/          Quasar variables + thin semantic tokens
-├── layouts/      App Shell / responsive layout orchestration
-├── features/     有真实复杂度的业务域实现
-├── pages/        route composition; 不承载大型业务 workflow
-├── router/       routes + route metadata/navigation registry
-└── stores/       session / cross-route operation/workflow state
+console/
+├── src/
+│   ├── api/          generated types + transport/problem
+│   ├── boot/         Quasar boot integration only
+│   ├── components/   跨 feature UI primitives/pattern pieces
+│   ├── composables/  跨 feature browser/workflow helpers
+│   ├── css/          Quasar variables + thin semantic tokens
+│   ├── layouts/      App Shell / responsive layout orchestration
+│   ├── features/     有真实复杂度的业务域实现
+│   ├── pages/        route composition; 不承载大型业务 workflow
+│   ├── router/       routes + route metadata/navigation registry
+│   └── stores/       session / cross-route operation/workflow state
+└── e2e/              Playwright browser specs/fixtures；只负责 Admin UI 角色
 ```
 
 `features/` 按业务能力而不是按技术层拆分。S0.1 随实际实现逐步出现：
@@ -383,11 +385,13 @@ Overview 保持少量关键状态和 attention list；System 是诊断详情。�
 - mobile 不存在 hover-only 信息；
 - long-running operation refresh 后可重新发现。
 
-## 13. 测试基线
+## 13. 测试与 Browser E2E 基线
 
-Unit/component 不复制 Hub business validator，重点验证 payload、state projection、error、recovery 和 layout behavior。
+Architecture 的 Admin Testing Spec 与 S0.1 System Testing Spec 决定必须证明的行为和 CAP 场景；本文只固定前端怎么实现这些测试，不复制场景矩阵。
 
-除现有 S0.1 feature tests 外，前端基础设施至少增加以下长期稳定测试：
+### 13.1 Unit / Component / Contract
+
+Unit/component 不复制 Hub business validator，重点验证 payload、state projection、error、recovery 和 layout behavior。前端基础设施至少覆盖：
 
 ```text
 navigation registry → correct route/active state
@@ -400,23 +404,81 @@ no Secret persistence
 no browser → Relay/internal API
 ```
 
-Feature component tests 继续覆盖 Upstream、Resources、Review/Preview、Pricing、Usage 等 architecture Testing Spec 场景。
+Feature component tests 继续覆盖 Upstream、Resources、Review/Preview、Pricing、Usage 等 architecture Testing Spec 行为。Contract 测试以 generated Admin OpenAPI types/fixtures 为边界，不维护第二份手写 request/response schema。
 
-Real-browser E2E 使用 production `dist/spa` + real Hub/Relay system harness。代表性 viewport 至少覆盖 desktop 与 mobile smoke；关键路径测试关注可操作性和语义，不建立脆弱的大规模 pixel-perfect screenshot suite。视觉回归只用于少量 Shell/高风险 layout。
+### 13.2 Browser E2E 的角色
+
+Browser E2E 使用 `@playwright/test`，运行 **production `dist/spa` + real Control Hub + real Runtime Relay + system harness**。浏览器只扮演管理员：登录、填写、点击、导航、刷新并读取 UI；它不通过 `page.route('/api/**')` mock Hub，也不直接写 SQLite、调用 `/internal/*` 或用测试代码替代正常 Admin 操作完成 Golden Path。
+
+系统环境、Deterministic Adapter 和 Test Client 由 repository-wide `test/system/` harness 提供，生命周期与 CI 约定见 `docs/development.md`。这样 `console/e2e/` 不再自己维护另一套 backend fixture/runtime。
+
+### 13.3 Playwright 代码约定
+
+```text
+console/e2e/
+├── fixtures/    browser/session/layout 等少量共享 fixture
+└── specs/       按真实用户 workflow 组织，不按 Vue component 镜像目录
+```
+
+保持测试贴近可访问 UI：
+
+1. selector 优先 `getByRole` / `getByLabel` / `getByText`；
+2. 只有语义 locator 无法稳定表达时才增加少量 `data-testid`；
+3. 不依赖 Quasar 内部 class、DOM 层级、`nth-child` 或生成实现细节；
+4. 等待权威状态使用 bounded polling/Playwright assertion，不使用大段固定 `sleep`；
+5. critical path 不用自动 retry 把偶发失败混成 Green；
+6. 失败保留 browser trace/screenshot 与 system process logs，但产物不得包含 Secret、credential、prompt/body；
+7. 不建立大规模 pixel-perfect screenshot suite；视觉回归只用于少量 Shell/高风险 responsive layout。
+
+CI 的 product gate 以 Chromium 为确定性基线；desktop Golden Path 为主，mobile viewport 至少覆盖 Shell、导航、核心编辑/提交与 inspector fallback smoke。其他浏览器矩阵只有在正式 browser support 要求出现后再扩展，避免现在把兼容性矩阵做成维护负担。
+
+### 13.4 E2E 增量策略
+
+现在就建立 E2E 基础设施，但不在 C0/C1 尚变化时一次写死完整 C6。实施顺序：
+
+```text
+Phase 0 / now
+  production SPA
+  + real Hub/Relay
+  + clean SQLite/migrations
+  + Playwright login
+  + Overview/System smoke
+
+C1
+  Secret + Upstream + Test + Apply + refresh recovery
+
+C2
+  Model/TTS/ASR/MCP + Policy authoring/reload
+
+C3
+  Validate + Review + canonical Preview + Publish
+
+C4
+  Test Client + Deterministic Adapter prove four runtime profiles
+
+C5
+  Usage/Pricing/System diagnostics
+
+C6
+  compose already-green slices into clean-environment Golden Path
+  + failure/restart/recovery scenarios
+```
+
+详细字段行为仍先在最窄 Unit/Component/Contract 层完成 Red → Green；E2E 负责逐步锁定真实跨边界的用户闭环，而不是把每个 field assertion 都重复一遍。新的关键 workflow 不应等到 C6 才第一次进入 real-browser/system test。
 
 ## 14. 实施顺序
 
-当前不先做“完整设计系统”，而是随 S0.1 产品闭环把长期骨架落地：
+当前不先做“完整设计系统”，而是随 S0.1 产品闭环把长期骨架和可测试性一起落地：
 
 ```text
 1. App Shell / navigation registry / semantic styling / responsive modes
 2. shared page header + collection/detail/inspector patterns
-3. Upstreams
-4. Resources + Policy + relationship view
-5. Review / Preview / Publish / Releases
-6. Pricing + Usage
-7. Overview / System
-8. production browser E2E + responsive/accessibility hardening
+3. E2E Phase 0：production SPA + real-system browser smoke
+4. Upstreams + C1 browser slice
+5. Resources + Policy + relationship view + C2 browser slice
+6. Review / Preview / Publish / Releases + C3 browser slice
+7. Pricing + Usage + Overview / System + C5 browser slice
+8. Test Client / Adapter runtime proof 与 C6 Golden Path/recovery hardening
 ```
 
-每一步都只抽取已经出现真实复用的 primitive。完成 S0.1 后，S1/S2 新页面优先复用这三个页面模型和同一个 Shell，而不是建立新的前端架构。
+每一步都只抽取已经出现真实复用的 primitive。完成 S0.1 后，S1/S2 新页面优先复用这三个页面模型、同一个 Shell 和相同 real-system browser testing pattern，而不是建立新的前端架构。

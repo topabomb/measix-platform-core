@@ -10,16 +10,16 @@
  *   "Admin T4.1 使用 production dist/spa"
  *
  * This script:
- *   1. Creates a clean temp directory
- *   2. Applies migrations to a fresh SQLite DB
- *   3. Bootstraps an admin
- *   4. Starts the Control Hub process
- *   5. Starts the Runtime Relay process
- *   6. Starts the deterministic Adapter
- *   7. Serves the production Admin SPA
- *   8. Runs Playwright E2E tests
- *   9. Collects evidence/artifacts
- *  10. Tears down all processes
+ *   1. Creates a clean temp directory with unique ports and identity
+ *   2. Generates crypto material (master key, Ed25519 seed, relay service token)
+ *   3. Applies migrations to a fresh SQLite DB via devmigrate
+ *   4. Bootstraps an admin user via control-hub bootstrap-admin
+ *   5. Builds and starts the Control Hub process
+ *   6. Builds and starts the Runtime Relay process
+ *   7. Starts a deterministic upstream Adapter (Node implementation)
+ *   8. Starts a same-origin SPA proxy (serves dist/spa + proxies API to Hub)
+ *   9. Runs Playwright E2E tests
+ *  10. Collects evidence/artifacts and tears down
  *
  * Usage:
  *   node scripts/e2e-harness.mjs [--keep] [--timeout=600000]
@@ -28,29 +28,54 @@
  *   MEASIX_E2E_TIMEOUT  — max time for the harness (default 600000ms = 10min)
  */
 import { spawn, execSync } from 'node:child_process'
-import { existsSync, mkdirSync, rmSync, writeFileSync, copyFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import {
+  existsSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+  readFileSync,
+  statSync,
+} from 'node:fs'
+import { join, resolve, extname } from 'node:path'
 import { tmpdir } from 'node:os'
+import { createServer } from 'node:http'
+import { randomFillSync } from 'node:crypto'
+import { createRequire } from 'node:module'
+import { request as httpRequest } from 'node:http'
+
+const require = createRequire(import.meta.url)
+const net = require('node:net')
 
 const ROOT = resolve(import.meta.dirname, '..')
 const KEEP = process.argv.includes('--keep')
 const TIMEOUT = parseInt(process.env.MEASIX_E2E_TIMEOUT || '600000', 10)
 
 const processes = []
+const servers = []
+let envRoot = ''
+
+function log(msg) {
+  console.log(`[harness] ${msg}`)
+}
 
 function cleanup() {
   if (KEEP) {
-    console.log(`Keeping temp dir: ${envRoot}`)
+    log(`Keeping temp dir: ${envRoot}`)
     return
   }
   for (const p of processes) {
     try { p.kill('SIGTERM') } catch {}
   }
+  for (const s of servers) {
+    try { s.close() } catch {}
+  }
   setTimeout(() => {
     for (const p of processes) {
       try { p.kill('SIGKILL') } catch {}
     }
-    try { rmSync(envRoot, { recursive: true, force: true }) } catch {}
+    if (envRoot) {
+      try { rmSync(envRoot, { recursive: true, force: true }) } catch {}
+    }
   }, 3000)
 }
 
@@ -58,150 +83,205 @@ process.on('SIGINT', () => { cleanup(); process.exit(1) })
 process.on('SIGTERM', () => { cleanup(); process.exit(1) })
 process.on('exit', () => { cleanup() })
 
+// --- Allocate free ports ---
+
+function freePort() {
+  return new Promise((resolveP, rejectP) => {
+    const srv = net.createServer()
+    srv.listen(0, '127.0.0.1', () => {
+      const port = srv.address().port
+      srv.close(() => resolveP(port))
+    })
+    srv.on('error', rejectP)
+  })
+}
+
+// --- Generate random bytes ---
+
+function randomBytes(n) {
+  const buf = Buffer.alloc(n)
+  randomFillSync(buf)
+  return buf
+}
+
 // --- Setup ---
 
-const envRoot = join(tmpdir(), `measix-e2e-${Date.now()}`)
+envRoot = join(tmpdir(), `measix-e2e-${Date.now()}`)
 mkdirSync(envRoot, { recursive: true })
 
 const hubDB = join(envRoot, 'hub.db')
-const relayDB = join(envRoot, 'relay.db')
-const hubPort = 18080 + Math.floor(Math.random() * 1000)
-const relayPort = 19080 + Math.floor(Math.random() * 1000)
-const adapterPort = 18099 + Math.floor(Math.random() * 100)
-const spaPort = 17080 + Math.floor(Math.random() * 100)
+const masterKeyFile = join(envRoot, 'master.key')
+const jwtKeyFile = join(envRoot, 'jwt-ed25519.seed')
+const relayTokenFile = join(envRoot, 'relay-service.token')
+const spoolPath = join(envRoot, 'relay-spool.db')
+const pwFile = join(envRoot, 'admin-password.txt')
+
+const hubPort = await freePort()
+const relayPubPort = await freePort()
+const relayIntPort = await freePort()
+const adapterPort = await freePort()
+const spaPort = await freePort()
 
 const hubBaseURL = `http://127.0.0.1:${hubPort}`
-const relayBaseURL = `http://127.0.0.1:${relayPort}`
+const relayPubBaseURL = `http://127.0.0.1:${relayPubPort}`
+const relayIntBaseURL = `http://127.0.0.1:${relayIntPort}`
+const adapterBaseURL = `http://127.0.0.1:${adapterPort}`
 const spaBaseURL = `http://127.0.0.1:${spaPort}`
 
-console.log(`[harness] temp dir: ${envRoot}`)
-console.log(`[harness] hub: ${hubBaseURL}`)
-console.log(`[harness] relay: ${relayBaseURL}`)
-console.log(`[harness] spa: ${spaBaseURL}`)
+log(`temp dir: ${envRoot}`)
+log(`hub: ${hubBaseURL}`)
+log(`relay public: ${relayPubBaseURL}`)
+log(`relay internal: ${relayIntBaseURL}`)
+log(`adapter: ${adapterBaseURL}`)
+log(`spa (same-origin proxy): ${spaBaseURL}`)
 
-// --- 1. Build binaries ---
+// --- 1. Generate crypto material ---
 
-console.log('[harness] building control-hub and runtime-relay binaries...')
+log('generating crypto material...')
+writeFileSync(masterKeyFile, randomBytes(32), { mode: 0o600 })
+writeFileSync(jwtKeyFile, randomBytes(32), { mode: 0o600 })
+const tokenBytes = randomBytes(32)
+writeFileSync(relayTokenFile, Buffer.from(tokenBytes.toString('hex') + '\n'), { mode: 0o600 })
+
+// --- 2. Generate admin password ---
+
+const adminPassword = 'e2e-admin-' + tokenBytes.toString('hex').slice(0, 8)
+writeFileSync(pwFile, adminPassword + '\n', { mode: 0o600 })
+
+// --- 3. Build binaries ---
+
+log('building control-hub and runtime-relay binaries...')
+const backendDir = join(ROOT, 'backend')
+const hubBin = join(envRoot, process.platform === 'win32' ? 'control-hub.exe' : 'control-hub')
+const relayBin = join(envRoot, process.platform === 'win32' ? 'runtime-relay.exe' : 'runtime-relay')
+
 try {
-  execSync('go build -o control-hub.exe ./cmd/control-hub', { cwd: join(ROOT, 'backend'), stdio: 'inherit' })
-  execSync('go build -o runtime-relay.exe ./cmd/runtime-relay', { cwd: join(ROOT, 'backend'), stdio: 'inherit' })
+  execSync(`go build -o "${hubBin}" ./cmd/control-hub`, { cwd: backendDir, stdio: 'inherit' })
+  execSync(`go build -o "${relayBin}" ./cmd/runtime-relay`, { cwd: backendDir, stdio: 'inherit' })
 } catch (e) {
-  console.error('[harness] build failed:', e.message)
+  log(`build failed: ${e.message}`)
   process.exit(1)
 }
 
-// --- 2. Apply migrations ---
+// --- 4. Apply migrations ---
 
-console.log('[harness] applying migrations...')
+log('applying migrations...')
 try {
-  execSync(`go run ./cmd/devmigrate --db ${hubDB}`, { cwd: join(ROOT, 'backend'), stdio: 'inherit' })
+  execSync(`go run ./cmd/devmigrate --db "${hubDB}"`, { cwd: backendDir, stdio: 'inherit' })
 } catch (e) {
-  console.error('[harness] migration failed:', e.message)
+  log(`migration failed: ${e.message}`)
   process.exit(1)
 }
 
-// --- 3. Bootstrap admin ---
+// --- 5. Bootstrap admin ---
 
-const adminPassword = 'e2e-admin-' + Date.now()
-console.log('[harness] bootstrapping admin...')
+log('bootstrapping admin...')
 try {
-  execSync(`go run ./cmd/control-hub --bootstrap-admin --db ${hubDB} --password "${adminPassword}"`, {
-    cwd: join(ROOT, 'backend'), stdio: 'inherit',
-  })
+  execSync(
+    `go run ./cmd/control-hub bootstrap-admin` +
+    ` --db "${hubDB}"` +
+    ` --master-key-file "${masterKeyFile}"` +
+    ` --jwt-private-key-file "${jwtKeyFile}"` +
+    ` --deployment-name "E2E-TEST"` +
+    ` --username "admin"` +
+    ` --display-name "E2E Test Admin"` +
+    ` --password-file "${pwFile}"`,
+    { cwd: backendDir, stdio: 'inherit' },
+  )
 } catch (e) {
-  // If bootstrap-admin flag doesn't exist, try alternative
-  console.log('[harness] bootstrap-admin flag not available, trying alternative...')
+  log(`bootstrap-admin failed: ${e.message}`)
+  process.exit(1)
 }
 
-// --- 4. Start Control Hub ---
+// --- 6. Start Control Hub ---
 
-console.log('[harness] starting Control Hub...')
-const hubProc = spawn(join(ROOT, 'backend', 'control-hub.exe'), [
+log('starting Control Hub...')
+const hubProc = spawn(hubBin, [
+  'run',
+  '--listen', `127.0.0.1:${hubPort}`,
+  '--public-base-url', hubBaseURL,
+  '--runtime-api-base', relayPubBaseURL,
   '--db', hubDB,
-  '--port', String(hubPort),
-  '--relay-url', relayBaseURL,
+  '--master-key-file', masterKeyFile,
+  '--jwt-private-key-file', jwtKeyFile,
+  '--relay-internal-url', relayIntBaseURL,
+  '--relay-service-token-file', relayTokenFile,
+  '--reconcile-interval', '2s',
 ], {
-  cwd: ROOT,
+  cwd: envRoot,
   stdio: ['ignore', 'pipe', 'pipe'],
-  env: {
-    ...process.env,
-    MEASIX_HUB_DB: hubDB,
-    MEASIX_HUB_PORT: String(hubPort),
-    MEASIX_RELAY_URL: relayBaseURL,
-    MEASIX_ADMIN_PASSWORD: adminPassword,
-  },
 })
 processes.push(hubProc)
 hubProc.stdout.on('data', (d) => process.stdout.write(`[hub] ${d}`))
 hubProc.stderr.on('data', (d) => process.stderr.write(`[hub] ${d}`))
 
-// --- 5. Start Runtime Relay ---
+// --- 7. Start Runtime Relay ---
 
-console.log('[harness] starting Runtime Relay...')
-const relayProc = spawn(join(ROOT, 'backend', 'runtime-relay.exe'), [
-  '--db', relayDB,
-  '--port', String(relayPort),
-  '--hub-url', hubBaseURL,
+log('starting Runtime Relay...')
+const relayProc = spawn(relayBin, [
+  '--public-listen', `127.0.0.1:${relayPubPort}`,
+  '--internal-listen', `127.0.0.1:${relayIntPort}`,
+  '--spool', spoolPath,
+  '--hub-usage-url', `${hubBaseURL}/internal/v1/usage/request-events:batch`,
+  '--hub-service-token-file', relayTokenFile,
 ], {
-  cwd: ROOT,
+  cwd: envRoot,
   stdio: ['ignore', 'pipe', 'pipe'],
-  env: {
-    ...process.env,
-    MEASIX_RELAY_DB: relayDB,
-    MEASIX_RELAY_PORT: String(relayPort),
-    MEASIX_HUB_URL: hubBaseURL,
-  },
 })
 processes.push(relayProc)
 relayProc.stdout.on('data', (d) => process.stdout.write(`[relay] ${d}`))
 relayProc.stderr.on('data', (d) => process.stderr.write(`[relay] ${d}`))
 
-// --- 6. Wait for Hub and Relay to be ready ---
+// --- 8. Start deterministic Adapter ---
 
-console.log('[harness] waiting for Hub and Relay to be ready...')
+log('starting deterministic Adapter...')
+const adapterServer = startAdapter(adapterPort)
+servers.push(adapterServer)
+
+// --- 9. Wait for Hub and Relay to be ready ---
+
 async function waitFor(url, label, maxWait = 30000) {
   const start = Date.now()
+  let last = ''
   while (Date.now() - start < maxWait) {
     try {
       const resp = await fetch(url)
       if (resp.ok || resp.status === 401 || resp.status === 404) {
-        console.log(`[harness] ${label} ready`)
+        log(`${label} ready`)
         return
       }
-    } catch {}
+      last = `status=${resp.status}`
+    } catch (e) {
+      last = e.message
+    }
     await new Promise(r => setTimeout(r, 500))
   }
-  throw new Error(`${label} not ready after ${maxWait}ms`)
+  throw new Error(`${label} not ready after ${maxWait}ms (${last})`)
 }
 
-await waitFor(`${hubBaseURL}/api/admin/v1/session/login`, 'Hub')
-await waitFor(`${relayBaseURL}/healthz`, 'Relay')
+await waitFor(`${hubBaseURL}/live`, 'Hub')
+await waitFor(`${relayIntBaseURL}/live`, 'Relay')
 
-// --- 7. Serve production SPA ---
+// --- 10. Start same-origin SPA proxy ---
 
-console.log('[harness] serving production SPA...')
+log('starting same-origin SPA proxy...')
 const spaDir = join(ROOT, 'console', 'dist', 'spa')
 if (!existsSync(spaDir)) {
-  console.error('[harness] SPA build not found. Run "make console-build" first.')
+  log('SPA build not found. Run "make console-build" first.')
   process.exit(1)
 }
 
-// Use a simple Node HTTP server for the SPA
-const spaServer = spawn('npx', ['http-server', spaDir, '-p', String(spaPort), '--silent'], {
-  cwd: join(ROOT, 'console'),
-  stdio: ['ignore', 'pipe', 'pipe'],
-  shell: true,
-})
-processes.push(spaServer)
+const spaServer = startSpaProxy(spaPort, spaDir, hubPort)
+servers.push(spaServer)
 
 await waitFor(spaBaseURL, 'SPA')
 
-// --- 8. Run Playwright E2E ---
+// --- 11. Run Playwright E2E ---
 
-console.log('[harness] running Playwright E2E tests...')
+log('running Playwright E2E tests...')
 const e2eEnv = {
   ...process.env,
-  MEASIX_E2E_BASE_URL: hubBaseURL,
+  MEASIX_E2E_BASE_URL: spaBaseURL,
   MEASIX_E2E_ADMIN_PASSWORD: adminPassword,
   PLAYWRIGHT_BASE_URL: spaBaseURL,
 }
@@ -213,14 +293,215 @@ try {
     env: e2eEnv,
     timeout: TIMEOUT,
   })
-  console.log('[harness] E2E tests PASSED')
+  log('E2E tests PASSED')
 } catch (e) {
-  console.error('[harness] E2E tests FAILED:', e.message)
+  log(`E2E tests FAILED: ${e.message}`)
   process.exit(1)
 }
 
-// --- 9. Done ---
+// --- 12. Done ---
 
-console.log('[harness] all steps completed successfully')
-console.log(`[harness] evidence dir: ${envRoot}`)
+log('all steps completed successfully')
+log(`evidence dir: ${envRoot}`)
 cleanup()
+
+// ---------------------------------------------------------------------------
+// Deterministic Adapter (Node implementation of backend/test/system/adapter)
+// ---------------------------------------------------------------------------
+
+function startAdapter(port) {
+  const ttsBytes = Buffer.from([
+    0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ])
+
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, `http://127.0.0.1:${port}`)
+
+    // Gather body for JSON parsing
+    const bodyChunks = []
+    req.on('data', (chunk) => bodyChunks.push(chunk))
+    req.on('end', () => {
+      const body = Buffer.concat(bodyChunks)
+      let bodyJSON = null
+      try {
+        if (req.headers['content-type']?.includes('application/json') && body.length > 0) {
+          bodyJSON = JSON.parse(body.toString())
+        }
+      } catch {}
+
+      const path = url.pathname
+
+      if (path === '/v1/chat/completions') {
+        const streaming = bodyJSON?.stream === true
+        if (streaming) {
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+          })
+          const chunks = [
+            `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}`,
+            `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"hel"}}]}`,
+            `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"lo"}}]}`,
+            `data: [DONE]`,
+          ]
+          for (const c of chunks) {
+            res.write(c + '\n\n')
+          }
+          res.end()
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({
+            id: '1',
+            object: 'chat.completion',
+            choices: [{
+              index: 0,
+              message: { role: 'assistant', content: 'hello' },
+              finish_reason: 'stop',
+            }],
+          }))
+        }
+        return
+      }
+
+      if (path === '/v1/audio/speech') {
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg' })
+        res.end(ttsBytes)
+        return
+      }
+
+      if (path === '/v1/audio/transcriptions') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ text: 'transcribed' }))
+        return
+      }
+
+      if (path === '/mcp') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          result: { tools: [{ name: 'tool-a' }] },
+        }))
+        return
+      }
+
+      if (path.startsWith('/v1/errors/')) {
+        const code = parseInt(path.split('/').pop(), 10) || 400
+        res.writeHead(code, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: { code } }))
+        return
+      }
+
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'not found' }))
+    })
+  })
+
+  server.listen(port, '127.0.0.1')
+  return server
+}
+
+// ---------------------------------------------------------------------------
+// Same-origin SPA proxy
+// Serves production dist/spa at /admin/* and proxies /api/*, /internal/*,
+// /live, /ready to Hub. This ensures browser fetch('/api/...') hits the
+// same origin, satisfying credentials: 'same-origin'.
+// ---------------------------------------------------------------------------
+
+function startSpaProxy(port, spaDir, hubPort) {
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, `http://127.0.0.1:${port}`)
+    const path = url.pathname
+
+    // Proxy API and internal requests to Hub via raw HTTP pipeline
+    if (path.startsWith('/api/') || path.startsWith('/internal/') ||
+        path === '/live' || path === '/ready') {
+      const proxyReq = httpRequest({
+        hostname: '127.0.0.1',
+        port: hubPort,
+        path: req.url,
+        method: req.method,
+        headers: req.headers,
+      }, (proxyResp) => {
+        res.writeHead(proxyResp.statusCode, proxyResp.headers)
+        proxyResp.pipe(res)
+      })
+      proxyReq.on('error', (e) => {
+        if (!res.headersSent) {
+          res.writeHead(502, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'proxy error', detail: e.message }))
+        }
+      })
+      req.pipe(proxyReq)
+      return
+    }
+
+    // Serve SPA static files under /admin
+    if (path === '/admin' || path.startsWith('/admin/')) {
+      let filePath = path.replace(/^\/admin\/?/, '')
+      if (!filePath) filePath = 'index.html'
+
+      const full = join(spaDir, filePath)
+      if (existsSync(full) && statSync(full).isFile()) {
+        serveStaticFile(res, full, filePath)
+        return
+      }
+
+      // SPA fallback: serve index.html for client-side routing (non-asset, no extension)
+      if (!filePath.startsWith('assets/') && !extname(filePath)) {
+        const index = join(spaDir, 'index.html')
+        if (existsSync(index)) {
+          serveStaticFile(res, index, 'index.html')
+          return
+        }
+      }
+
+      res.writeHead(404)
+      res.end('not found')
+      return
+    }
+
+    // Root redirect to /admin
+    if (path === '/' || path === '') {
+      res.writeHead(302, { Location: '/admin' })
+      res.end()
+      return
+    }
+
+    res.writeHead(404, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'not found' }))
+  })
+
+  server.listen(port, '127.0.0.1')
+  return server
+}
+
+function serveStaticFile(res, fullPath, name) {
+  const data = readFileSync(fullPath)
+
+  if (name === 'index.html') {
+    res.setHeader('Cache-Control', 'no-cache')
+  } else if (name.startsWith('assets/')) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  }
+
+  const ext = extname(name)
+  const mimeTypes = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+  }
+  const ct = mimeTypes[ext] || 'application/octet-stream'
+  res.setHeader('Content-Type', ct)
+  res.writeHead(200)
+  res.end(data)
+}

@@ -1,3 +1,5 @@
+//go:build candidate
+
 package scenarios
 
 import (

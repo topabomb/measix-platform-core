@@ -33,11 +33,13 @@ type Adapter struct {
 	URL      string
 	ttsBytes []byte
 
-	mu        sync.Mutex
-	facts     []*RequestFact
-	cancelled bool
-	timeout   time.Duration
-	server    *httptest.Server
+	mu            sync.Mutex
+	facts         []*RequestFact
+	cancelled     bool
+	timeout       time.Duration
+	server        *httptest.Server
+	injectHeaders map[string]string
+	injectStatus  int
 }
 
 // New starts a deterministic adapter on a random loopback port.
@@ -55,6 +57,17 @@ func (a *Adapter) Close() { a.server.Close() }
 
 // Bytes returns the deterministic TTS binary payload.
 func (a *Adapter) Bytes() []byte { return a.ttsBytes }
+
+// InjectHeaders sets headers that the adapter will include in its next
+// chat completion response. This is used to test Relay's header-stripping
+// behavior by having the upstream actually return Set-Cookie/Location.
+// Pass nil and status 0 to clear injection.
+func (a *Adapter) InjectHeaders(headers map[string]string, status int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.injectHeaders = headers
+	a.injectStatus = status
+}
 
 // LastRequest returns the most recent captured fact for a path, or nil.
 func (a *Adapter) LastRequest(path string) *RequestFact {
@@ -205,6 +218,29 @@ func (a *Adapter) record(fact *RequestFact) {
 }
 
 func (a *Adapter) handleChat(w http.ResponseWriter, r *http.Request, fact *RequestFact) {
+	// Check if header injection is active (for SEC-020 strip tests).
+	a.mu.Lock()
+	injectHeaders := a.injectHeaders
+	injectStatus := a.injectStatus
+	// Clear injection after first use so subsequent requests are normal.
+	a.injectHeaders = nil
+	a.injectStatus = 0
+	a.mu.Unlock()
+
+	if injectHeaders != nil {
+		for k, v := range injectHeaders {
+			w.Header().Set(k, v)
+		}
+		status := injectStatus
+		if status == 0 {
+			status = http.StatusOK
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, `{"id":"1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}]}`)
+		return
+	}
+
 	streaming := false
 	if fact != nil && fact.BodyJSON != nil {
 		if v, ok := fact.BodyJSON["stream"].(bool); ok {

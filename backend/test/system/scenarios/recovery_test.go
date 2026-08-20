@@ -1,3 +1,5 @@
+//go:build candidate
+
 package scenarios
 
 import (
@@ -6,6 +8,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	_ "modernc.org/sqlite"
 
 	"measix/platform/pkg/platformid"
 	"measix/platform/test/system/adapter"

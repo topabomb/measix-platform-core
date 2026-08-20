@@ -4,23 +4,39 @@ import { useSessionStore } from './session'
 import { useDraftStore } from './draft'
 import { useActivationStore } from './activation'
 import { useOperationalApplyStore } from './operationalApply'
+import { setUnauthorizedHandler } from '../api/client'
 
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.unstubAllGlobals()
+  setUnauthorizedHandler(undefined)
 })
 
 describe('SessionStore', () => {
-  it('restores session and clears it when the central API hook reports 401', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      user: { userId: 'usr_00000000-0000-4000-8000-000000000001', displayName: 'Admin', role: 'ADMIN' },
-      csrfToken: 'csrf-1', expiresAt: '2026-08-19T12:00:00Z',
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+  it('clears session when the central API hook reports 401', async () => {
+    // First call: successful session restore.
+    // Second call: 401 Unauthorized.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        user: { userId: 'usr_00000000-0000-4000-8000-000000000001', displayName: 'Admin', role: 'ADMIN' },
+        csrfToken: 'csrf-1', expiresAt: '2026-08-19T12:00:00Z',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ type: 'about:blank', title: 'Unauthorized', status: 401, code: 'invalid_admin_session' }),
+        { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
+      ))
+    vi.stubGlobal('fetch', fetchMock)
+
     const store = useSessionStore()
     await store.restore()
     expect(store.authenticated).toBe(true)
     expect(store.csrfToken).toBe('csrf-1')
-    store.clear()
+
+    // Register the central 401 handler that clears the session.
+    setUnauthorizedHandler(() => { store.clear() })
+
+    // The next API call gets 401 — the central hook must clear the session.
+    await expect(store.restore()).rejects.toMatchObject({ status: 401 })
     expect(store.authenticated).toBe(false)
     expect(store.csrfToken).toBeUndefined()
   })

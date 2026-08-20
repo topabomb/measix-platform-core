@@ -1,7 +1,11 @@
+//go:build candidate
+
 package scenarios
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+
+	"measix/platform/internal/hub/security"
 	"measix/platform/pkg/platformid"
 	"measix/platform/test/system/adapter"
 	"measix/platform/test/system/client"
@@ -898,6 +905,8 @@ func decodeResponseBody(body io.Reader, target interface{}) error {
 
 // CAP-SEC-016 — Expired/wrong-audience/wrong-issuer/unknown-kid JWT rejected.
 // The Relay must reject tokens with invalid claims and not forward the request.
+// This test generates properly-signed JWTs with specific claim errors
+// (not just malformed strings) to prove each rejection path independently.
 func TestCAPSEC016ExpiredAndWrongClaimJWTRejected(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -926,35 +935,132 @@ func TestCAPSEC016ExpiredAndWrongClaimJWTRejected(t *testing.T) {
 	gp := &goldenPathTest{t: t}
 	gp.fullSetup(ctx, admin, ad, env)
 
-	// Test with various invalid tokens
-	invalidTokens := []string{
-		"expired.token.here", // Malformed
-		"header.payload.sig", // Invalid structure
-		"",                   // Empty
+	// Get a valid token first — this proves the baseline works.
+	validToken, generation := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
+	ids := gp.getSnapshotResourceIDs(ctx, env.HubBaseURL, validToken, generation, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID)
+	tc := client.New(client.Options{
+		RuntimeBaseURL:    env.RelayPubBaseURL,
+		AccessToken:       validToken,
+		ManagedGeneration: generation,
+		InteractionID:     platformid.New(platformid.Interaction),
+	})
+	if _, _, err := tc.ChatCompletion(ctx, ids.model, "/v1/chat/completions", `{"model":"gpt-test"}`); err != nil {
+		t.Fatalf("valid token should work: %v", err)
 	}
 
-	for _, token := range invalidTokens {
-		tc := client.New(client.Options{
-			RuntimeBaseURL:    env.RelayPubBaseURL,
-			AccessToken:       token,
-			ManagedGeneration: 1,
-			InteractionID:     platformid.New(platformid.Interaction),
+	// Load the Hub's Ed25519 private key to sign forged tokens.
+	privKey, err := security.LoadEd25519PrivateKey(env.JWTKeyFile)
+	if err != nil {
+		t.Fatalf("load hub jwt key: %v", err)
+	}
+
+	// Discover the kid and deployment ID from the valid token.
+	// Parse the valid token without verification to extract header/claims.
+	unverifiedToken, _, _ := jwt.NewParser().ParseUnverified(validToken, &accessClaimsForTest{})
+	var kid string
+	if unverifiedToken != nil {
+		if k, ok := unverifiedToken.Header["kid"].(string); ok {
+			kid = k
+		}
+	}
+	var deploymentID string
+	if claims, ok := unverifiedToken.Claims.(*accessClaimsForTest); ok {
+		deploymentID = claims.DeploymentID
+	}
+	if kid == "" || deploymentID == "" {
+		t.Fatalf("could not extract kid=%q or deploymentID=%q from valid token", kid, deploymentID)
+	}
+
+	userID := platformid.New(platformid.User)
+	deviceID := platformid.New(platformid.Device)
+	sessionID := platformid.New(platformid.Session)
+	now := time.Now().UTC()
+
+	// Helper to forge a signed JWT with specific claim modifications.
+	forge := func(modify func(claims *accessClaimsForTest)) string {
+		claims := &accessClaimsForTest{
+			DeploymentID: deploymentID,
+			DeviceID:      deviceID,
+			SessionID:     sessionID,
+			RegisteredClaims: jwt.RegisteredClaims{
+				Issuer:    deploymentID,
+				Subject:   userID,
+				Audience:  jwt.ClaimStrings{"client", "runtime"},
+				IssuedAt:  jwt.NewNumericDate(now),
+				ExpiresAt: jwt.NewNumericDate(now.Add(10 * time.Minute)),
+			},
+		}
+		modify(claims)
+		token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+		token.Header["kid"] = kid
+		signed, err := token.SignedString(privKey)
+		if err != nil {
+			t.Fatalf("sign forged token: %v", err)
+		}
+		return signed
+	}
+
+	// Generate properly-signed JWTs with specific claim errors.
+	invalidTokens := map[string]string{
+		"expired":     forge(func(c *accessClaimsForTest) { c.ExpiresAt = jwt.NewNumericDate(now.Add(-1 * time.Minute)) }),
+		"wrong-aud":   forge(func(c *accessClaimsForTest) { c.Audience = jwt.ClaimStrings{"wrong-audience"} }),
+		"wrong-issuer": forge(func(c *accessClaimsForTest) {
+			c.Issuer = "wrong-issuer"
+			c.DeploymentID = "wrong-issuer"
+		}),
+	}
+
+	// Unknown-kid: sign with a different key pair and use a bogus kid.
+	_, altPriv, _ := ed25519.GenerateKey(rand.Reader)
+	unknownKidToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, &accessClaimsForTest{
+		DeploymentID: deploymentID, DeviceID: deviceID, SessionID: sessionID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: deploymentID, Subject: userID,
+			Audience:  jwt.ClaimStrings{"client", "runtime"},
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(10 * time.Minute)),
+		},
+	})
+	unknownKidToken.Header["kid"] = "unknown-kid"
+	unknownKidSigned, _ := unknownKidToken.SignedString(altPriv)
+	invalidTokens["unknown-kid"] = unknownKidSigned
+
+	// Also test malformed/empty tokens.
+	invalidTokens["malformed"] = "expired.token.here"
+	invalidTokens["empty"] = ""
+
+	for name, token := range invalidTokens {
+		t.Run(name, func(t *testing.T) {
+			ad.ClearFacts()
+			tc := client.New(client.Options{
+				RuntimeBaseURL:    env.RelayPubBaseURL,
+				AccessToken:       token,
+				ManagedGeneration: generation,
+				InteractionID:     platformid.New(platformid.Interaction),
+			})
+			_, _, err := tc.ChatCompletion(ctx, ids.model, "/v1/chat/completions", `{"model":"gpt-test"}`)
+			if err == nil {
+				t.Fatalf("expected 401 for %s token", name)
+			}
+			if pe, ok := err.(client.ProblemError); !ok || pe.Status != http.StatusUnauthorized {
+				t.Fatalf("expected 401 for %s token, got %v", name, err)
+			}
+			// Verify adapter was never called for any invalid token.
+			if fact := ad.LastRequest("/v1/chat/completions"); fact != nil {
+				t.Fatalf("adapter received request despite %s token", name)
+			}
 		})
-		_, _, err = tc.ChatCompletion(ctx, gp.lastModelID, "/v1/chat/completions", `{"model":"gpt-test"}`)
-		if err == nil {
-			t.Fatalf("expected error for invalid token: %q", token)
-		}
-		if pe, ok := err.(client.ProblemError); !ok || pe.Status != http.StatusUnauthorized {
-			t.Fatalf("expected 401 for invalid token %q, got %v", token, err)
-		}
-	}
-
-	// Verify adapter never received any request
-	if fact := ad.LastRequest("/v1/chat/completions"); fact != nil {
-		t.Fatal("adapter received request despite invalid JWT")
 	}
 
 	t.Log("CAP-SEC-016 Expired/Wrong-Claim JWT Rejected: PASS")
+}
+
+// accessClaimsForTest mirrors the Relay's accessClaims for JWT parsing in tests.
+type accessClaimsForTest struct {
+	DeploymentID string `json:"deploymentId"`
+	DeviceID     string `json:"deviceId"`
+	SessionID    string `json:"sessionId"`
+	jwt.RegisteredClaims
 }
 
 // CAP-SEC-017 — Disabled user cannot access runtime.
@@ -1003,16 +1109,34 @@ func TestCAPSEC017DisabledUserRejected(t *testing.T) {
 		t.Fatalf("valid token should work: %v", err)
 	}
 
-	// Disable the user
-	resp, err := admin.Post(ctx, fmt.Sprintf("/api/admin/v1/users/%s:disable", gp.lastUserID), nil)
+	// Disable the user — Idempotency-Key is required by the OpenAPI contract.
+	disableKey := platformid.New(platformid.Idempotency)
+	resp, err := admin.PostWithHeaders(ctx, fmt.Sprintf("/api/admin/v1/users/%s:disable", gp.lastUserID), nil, map[string]string{
+		"Idempotency-Key": disableKey,
+	})
 	if err != nil {
 		t.Fatalf("disable user: %v", err)
 	}
+	var disableAct struct {
+		ActivationID string `json:"activationId"`
+	}
+	_ = harness.DecodeJSON(resp, &disableAct)
 	resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("disable user status: %d body: %s", resp.StatusCode, harness.ReadBody(resp))
+	}
 
-	// Wait for activation
-	// The disable operation creates an activation; wait for it to complete
-	time.Sleep(3 * time.Second)
+	// Wait for the security-change activation to reach terminal state
+	// (bounded polling instead of fixed sleep).
+	gp.waitActivationCompleted(ctx, admin, disableAct.ActivationID, 30*time.Second)
+
+	// Wait for convergence so Relay has the updated principal state.
+	if err := harness.WaitConvergence(ctx, env.HubBaseURL, admin.CSRFToken(), admin.CookieHeader(), 30*time.Second); err != nil {
+		t.Fatalf("post-disable convergence: %v", err)
+	}
+	if err := harness.WaitReadyRelay(ctx, env.RelayPubBaseURL, 10*time.Second); err != nil {
+		t.Fatalf("post-disable relay ready: %v", err)
+	}
 
 	// Now the user's token should be rejected
 	ad.ClearFacts()
@@ -1085,14 +1209,34 @@ func TestCAPSEC018RevokedDeviceRejected(t *testing.T) {
 	}
 	deviceID := devices.Items[0].DeviceID
 
-	// Revoke the device
-	resp, err = admin.Post(ctx, fmt.Sprintf("/api/admin/v1/devices/%s:revoke", deviceID), nil)
+	// Revoke the device — Idempotency-Key is required by the OpenAPI contract.
+	revokeKey := platformid.New(platformid.Idempotency)
+	resp, err = admin.PostWithHeaders(ctx, fmt.Sprintf("/api/admin/v1/devices/%s:revoke", deviceID), nil, map[string]string{
+		"Idempotency-Key": revokeKey,
+	})
 	if err != nil {
 		t.Fatalf("revoke device: %v", err)
 	}
+	var revokeAct struct {
+		ActivationID string `json:"activationId"`
+	}
+	_ = harness.DecodeJSON(resp, &revokeAct)
 	resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("revoke device status: %d body: %s", resp.StatusCode, harness.ReadBody(resp))
+	}
 
-	time.Sleep(3 * time.Second)
+	// Wait for the security-change activation to reach terminal state
+	// (bounded polling instead of fixed sleep).
+	gp.waitActivationCompleted(ctx, admin, revokeAct.ActivationID, 30*time.Second)
+
+	// Wait for convergence so Relay has the updated principal state.
+	if err := harness.WaitConvergence(ctx, env.HubBaseURL, admin.CSRFToken(), admin.CookieHeader(), 30*time.Second); err != nil {
+		t.Fatalf("post-revoke convergence: %v", err)
+	}
+	if err := harness.WaitReadyRelay(ctx, env.RelayPubBaseURL, 10*time.Second); err != nil {
+		t.Fatalf("post-revoke relay ready: %v", err)
+	}
 
 	// Now the token should be rejected
 	ad.ClearFacts()
@@ -1176,6 +1320,8 @@ func TestCAPSEC019ManagementEndpointNotReachableViaResource(t *testing.T) {
 
 // CAP-SEC-020 — Upstream Set-Cookie/redirect not forwarded to client.
 // The Relay must strip Set-Cookie and redirect headers from upstream responses.
+// This test makes the Adapter ACTUALLY return Set-Cookie and Location,
+// then verifies the Relay strips them from the client-facing response.
 func TestCAPSEC020UpstreamSetCookieAndRedirectStripped(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -1207,7 +1353,14 @@ func TestCAPSEC020UpstreamSetCookieAndRedirectStripped(t *testing.T) {
 	clientToken, generation := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
 	ids := gp.getSnapshotResourceIDs(ctx, env.HubBaseURL, clientToken, generation, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID)
 
-	// Make a normal request via direct HTTP to inspect response headers
+	// Inject Set-Cookie and Location into the upstream response so we can
+	// prove the Relay strips them (not just that they were absent).
+	ad.InjectHeaders(map[string]string{
+		"Set-Cookie": "session=evil-value; HttpOnly; Secure",
+		"Location":   "http://evil.example.com/redirect",
+	}, http.StatusOK)
+
+	// Make a request via direct HTTP to inspect response headers.
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost,
 		env.RelayPubBaseURL+"/runtime/v1/resources/"+ids.model+"/v1/chat/completions",
 		strings.NewReader(`{"model":"gpt-test"}`))
@@ -1221,13 +1374,38 @@ func TestCAPSEC020UpstreamSetCookieAndRedirectStripped(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Verify Set-Cookie is not present in the Relay response
+	// Verify Set-Cookie was stripped by the Relay.
 	if _, found := resp.Header["Set-Cookie"]; found {
 		t.Fatal("Relay forwarded Set-Cookie header from upstream to client")
 	}
-	// Verify Location (redirect) is not present
+	// Verify Location was stripped by the Relay.
 	if _, found := resp.Header["Location"]; found {
 		t.Fatal("Relay forwarded Location header from upstream to client")
+	}
+
+	// Also test a 3xx redirect: the Relay must reject upstream redirects.
+	ad.InjectHeaders(map[string]string{
+		"Location": "http://evil.example.com/redirect",
+	}, http.StatusFound)
+
+	req2, _ := http.NewRequestWithContext(ctx, http.MethodPost,
+		env.RelayPubBaseURL+"/runtime/v1/resources/"+ids.model+"/v1/chat/completions",
+		strings.NewReader(`{"model":"gpt-test"}`))
+	req2.Header.Set("Authorization", "Bearer "+clientToken)
+	req2.Header.Set("X-Measix-Managed-Generation", fmt.Sprintf("%d", generation))
+	req2.Header.Set("X-Measix-Interaction-Id", platformid.New(platformid.Interaction))
+	req2.Header.Set("Content-Type", "application/json")
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatalf("redirect request: %v", err)
+	}
+	resp2.Body.Close()
+	// The Relay must return 502 (Bad Gateway), not 302.
+	if resp2.StatusCode == http.StatusFound || resp2.StatusCode == http.StatusMovedPermanently {
+		t.Fatalf("Relay forwarded upstream redirect: status=%d", resp2.StatusCode)
+	}
+	if resp2.StatusCode != http.StatusBadGateway {
+		t.Fatalf("expected 502 for upstream redirect, got %d", resp2.StatusCode)
 	}
 
 	t.Log("CAP-SEC-020 Upstream Set-Cookie/Redirect Stripped: PASS")

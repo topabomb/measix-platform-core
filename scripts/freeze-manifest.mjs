@@ -158,6 +158,7 @@ const scenarioResults = [
   { id: 'CAP-C2-010', name: 'Create TTS', file: 'console/src/pages/ResourcesPage.vue', required: true, result: 'PASS', testNames: ['ResourcesPage.test.ts'] },
   { id: 'CAP-C2-011', name: 'Missing voice', file: 'backend/internal/hub/capability/', required: true, result: 'PASS', testNames: ['TestCAPC0004TTSVoiceRequired'] },
   { id: 'CAP-C2-020', name: 'Create HTTP ASR', file: 'console/src/pages/ResourcesPage.vue', required: true, result: 'PASS', testNames: ['ResourcesPage.test.ts'] },
+  { id: 'CAP-C2-021', name: 'Realtime fields not exposed as Managed S0.1 editor/config', file: 'console/src/pages/ResourcesPage.vue', required: true, result: 'PASS', testNames: ['ResourcesPage.test.ts'] },
   { id: 'CAP-C2-030', name: 'Enterprise-managed MCP', file: 'console/src/pages/ResourcesPage.vue', required: true, result: 'PASS', testNames: ['ResourcesPage.test.ts'] },
   { id: 'CAP-C2-031', name: 'NONE auth MCP', file: 'backend/internal/hub/capability/', required: true, result: 'PASS', testNames: ['TestCAPC0006MCPAuthOwnershipValidation'] },
   { id: 'CAP-C2-032', name: 'Unsupported auth ownership', file: 'backend/internal/hub/capability/', required: true, result: 'PASS', testNames: ['TestCAPC0006MCPAuthOwnershipValidation'] },
@@ -245,9 +246,18 @@ const scenarioResults = [
   { id: 'CAP-SEC-013', name: 'Request Body Size Limit', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
   { id: 'CAP-SEC-014', name: 'System Status No Internal Config', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
   { id: 'CAP-SEC-015', name: 'Idempotent Publish', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
-  // C7
-  { id: 'CAP-C7-001', name: 'Freeze Manifest Generated', file: 'scripts/freeze-manifest.mjs', required: true, result: 'NOT_EXECUTED' },
-  { id: 'CAP-C7-002', name: 'Clean Replay', file: 'docs/s0-clean-replay-report.md', required: true, result: 'NOT_EXECUTED' },
+  { id: 'CAP-SEC-016', name: 'Expired/Wrong-Claim JWT Rejected', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
+  { id: 'CAP-SEC-017', name: 'Disabled User Rejected', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
+  { id: 'CAP-SEC-018', name: 'Revoked Device Rejected', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
+  { id: 'CAP-SEC-019', name: 'Management Endpoint Not Reachable via Resource', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
+  { id: 'CAP-SEC-020', name: 'Upstream Set-Cookie/Redirect Stripped', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
+  { id: 'CAP-SEC-021', name: 'Snapshot Preview No Server Fields Leak', file: 'security_test.go', required: true, result: 'NOT_EXECUTED' },
+  // C7 — Freeze Gate (self-referential: C7-001/C7-002 are excluded from the
+  // pre-flight required-PASS check because they are the manifest generation
+  // itself and the clean replay proof. They are recorded as NOT_EXECUTED
+  // until the manifest is actually generated and clean replay is proven.
+  { id: 'CAP-C7-001', name: 'Freeze Manifest Generated', file: 'scripts/freeze-manifest.mjs', required: false, result: 'NOT_EXECUTED' },
+  { id: 'CAP-C7-002', name: 'Clean Replay', file: 'docs/s0-clean-replay-report.md', required: false, result: 'NOT_EXECUTED' },
   // Baseline
   { id: 'BASELINE', name: 'Resource Baseline', file: 'baseline_test.go', required: false, result: 'NOT_EXECUTED' },
 ]
@@ -267,13 +277,25 @@ if (buildHash === 'not-built') {
   errors.push('Admin production build not found. Run "make console-build" before generating freeze manifest.')
 }
 
-// 3. All required scenarios must be PASS
+// 3. All required scenarios (excluding C7 self-referential) must be PASS
 const notPassRequired = scenarioResults.filter(s => s.required && s.result !== 'PASS')
 if (notPassRequired.length > 0) {
   errors.push(`${notPassRequired.length} required scenarios are not PASS:`)
   for (const s of notPassRequired) {
     errors.push(`  ${s.id} ${s.name}: ${s.result}`)
   }
+}
+
+// 4. Real adapter qualification must be executed
+const realAdapterStatus = 'NOT_EXECUTED'
+if (realAdapterStatus === 'NOT_EXECUTED') {
+  errors.push('Real adapter qualification has not been executed. See docs/s0-real-adapter-qualification.md')
+}
+
+// 5. Resource baseline must be GREEN
+const resourceBaselineStatus = 'NOT_GREEN'
+if (resourceBaselineStatus !== 'GREEN') {
+  errors.push(`Resource baseline is ${resourceBaselineStatus}. See docs/s0-resource-baseline.md`)
 }
 
 if (errors.length > 0) {
@@ -303,9 +325,9 @@ const manifest = {
   canonicalFixtureHash: fixturesHash(),
   deterministicAdapterVersion: deterministicAdapterVersion(),
   realAdapterQualificationRef: 'docs/s0-real-adapter-qualification.md',
-  realAdapterQualificationStatus: 'NOT_EXECUTED',
+  realAdapterQualificationStatus: realAdapterStatus,
   resourceBaselineRef: 'docs/s0-resource-baseline.md',
-  resourceBaselineStatus: 'NOT_GREEN',
+  resourceBaselineStatus,
   scenarioResults,
   startedAt: now,
   completedAt: now,

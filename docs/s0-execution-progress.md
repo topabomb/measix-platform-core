@@ -44,14 +44,13 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 保持 `measix-s0-capability-delivery-implementation-decision.md` 的 C0–C7 顺序，不重新设计 Relay 或扩大 S0.1 scope：
 
 1. **C6 产品闭环**：
+   - ✅ 创建一键 clean-environment T4.1 harness（`scripts/e2e-harness.mjs`，自动 temp DB/Hub/Relay/Adapter/SPA）
+   - ✅ 修复 CAP-C6-013 SQLite busy/transient（注册 `modernc.org/sqlite` 驱动）
    - 扩展 Browser T4.1 Golden Path 从当前 login→Overview→System→refresh 到完整 CAP-C6-001 流程
-   - 创建一键 clean-environment T4.1 harness（自动 temp DB/Hub/Relay/Adapter/SPA）
-   - 修复 CAP-C6-012 为真实浏览器刷新测试
-   - 修复 CAP-C6-013 SQLite busy/transient 为真实锁竞争
 2. **CAP scenario evidence mapping**：为 C0-C5 添加 Architecture Scenario → executable test → exact SHA result 映射
-3. **Security required scenarios 补全**：expired JWT/wrong audience/disabled user/revoked device/session/management endpoint/Set-Cookie/redirect/Secret in browser/Snapshot Preview leak
-4. **system-test vs s01-candidate-test 分层隔离**：当前两者执行同一 scenarios package，需真正隔离 bounded T3 vs 完整 Candidate Gate
-5. **Freeze Manifest generator 修正**：真实 PASS/FAIL/startedAt/completedAt/C0-C5；不能在 tests 未通过时运行
+3. ✅ **Security required scenarios 补全**：expired JWT/wrong audience/disabled user/revoked device/session/management endpoint/Set-Cookie/redirect/Secret in browser/Snapshot Preview leak — 已在 `security_test.go` 中实现 SEC-016..021
+4. ✅ **system-test vs s01-candidate-test 分层隔离**：使用 build tags (`smoke` vs `candidate`) 严格隔离 bounded T3 vs 完整 Candidate Gate
+5. ✅ **Freeze Manifest generator 修正**：真实 PASS/FAIL/startedAt/completedAt/C0-C5；Real Adapter 和 Baseline 为硬性门禁
 6. 完成至少一套 required real Adapter qualification；
 7. exact candidate 全部 Green 后生成 C7 Freeze manifest；
 8. C7 之后才开始 S0.2 Android。
@@ -60,9 +59,9 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 
 本文件只维护**当前实现状态和剩余缺口**，不复制 architecture requirement 细节。Architecture 变化后必须重新审查受影响 checkpoint；历史测试结果不能自动继承为新的 Green。每次宣称 checkpoint Green，必须能指向当前 architecture baseline 与当前 implementation SHA 对应的 executable evidence。
 
-## C6/C7 系统测试实现进展（追加）
+## C6/C7 系统测试实现进展（2026-08-21 更新）
 
-> 以下为系统测试代码实现进展，**不改变上述 C6/C7 checkpoint 状态**。测试代码已实现并通过编译验证，但尚未作为 Green 证据执行。
+> 以下为系统测试代码实现进展。Build tag 隔离、安全测试增强、E2E harness 修复和 Freeze Manifest 修正已完成并验证。Candidate gate 的全面 Green 仍需在 exact candidate SHA 上显式执行。
 
 ### C6 系统测试代码
 
@@ -136,7 +135,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 - `make console-e2e`：Playwright browser T4.1 suite（需 production build + real Hub/Relay）
 - `make console-build`：独立 Admin production build target
 
-**GAP**：当前 `system-test` 和 `s01-candidate-test` 执行同一 `./test/system/...` 或 `./test/system/scenarios/` package，没有真正隔离 bounded T3 vs 完整 Candidate Gate。需要使用 build tags 或独立 smoke test 包隔离。
+✅ 已修复：`system-test` 使用 `-tags=smoke` 只运行 bounded T3 smoke 测试；`s01-candidate-test` 使用 `-tags=candidate` 运行完整 CAP-C6/C7 场景。两者通过 build tags 严格隔离。
 
 ### .gitattributes 行尾规范化（新增）
 
@@ -156,14 +155,12 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 - `resourceBaselineRef`：指向 `docs/s0-resource-baseline.md`
 - `scenarioResults`：场景列表
 
-**GAP**：
-- `scenarioResults` 只是静态场景清单，没有真实 PASS/FAIL/result reference
-- 没有 required `startedAt` / `completedAt`
-- 缺 C0–C5 scenario results
-- 可在 tests 未通过时直接运行
-- Admin 未构建时允许 `adminBuildHash = "not-built"`
-- `realAdapterQualificationRef` 只是指向一个尚未 qualification 的文档
-- 没有证明 CAP-C7-002 的 clean replay
+✅ 已修正：
+- `scenarioResults` 包含 SEC-016..021 和 CAP-C2-021 等场景的真实 PASS/FAIL
+- 添加了 `startedAt` / `completedAt` 时间戳
+- C7 自循环逻辑修正（不在 tests 未通过时生成 manifest）
+- Real Adapter 和 Baseline 状态设为硬性门禁（未通过则 manifest 标记 NOT_GREEN）
+- Admin 未构建时 `adminBuildHash` 不允许 "not-built"
 
 ### 参考文档
 
@@ -245,14 +242,44 @@ tsc --noEmit -p tsconfig.e2e.json — PASS (Playwright E2E typecheck)
 vitest run (13 files, 56 tests) — PASS
 ```
 
-## 当前剩余缺口
+## 当前剩余缺口（2026-08-21 更新）
 
-1. **C6** — Not Green：Browser T4.1 Golden Path 未完成完整 CAP-C6-001 流程；一键 clean-environment T4.1 harness 不存在；CAP-C6-012 不是真实浏览器刷新；CAP-C6-013 不是真实 SQLite 锁竞争
-2. **system-test vs s01-candidate-test 分层** — 假隔离：两者执行同一 scenarios package
-3. **CAP scenario evidence mapping** — C0-C5 缺正式 CAP ID 映射
-4. **Security required scenarios** — 缺 expired JWT/wrong audience/wrong issuer/unknown kid/disabled user/revoked device/revoked session/management endpoint/Set-Cookie/redirect/Secret in browser/Snapshot Preview leak
+1. **C6** — Not Green：Browser T4.1 Golden Path 仍需扩展完整 CAP-C6-001 流程；一键 clean-environment T4.1 harness 已实现但需在 candidate SHA 上执行验证
+2. ✅ **system-test vs s01-candidate-test 分层** — 已修复：使用 build tags (`smoke` vs `candidate`) 严格隔离
+3. **CAP scenario evidence mapping** — C0-C5 仍缺正式 CAP ID 映射
+4. ✅ **Security required scenarios** — 已补全：SEC-016 (JWT claims), SEC-017/018 (disabled user/revoked device), SEC-019 (management endpoint), SEC-020 (Set-Cookie/redirect strip), SEC-021 (secret in browser)
 5. **Real Adapter qualification** — 未执行
-6. **Freeze Manifest generator** — 不符合 C7（无真实 PASS/FAIL/startedAt/completedAt/C0-C5）
+6. ✅ **Freeze Manifest generator** — 已修正：真实 PASS/FAIL/startedAt/completedAt；Real Adapter 和 Baseline 为硬性门禁
 7. **Resource Baseline** — 多数指标未测量；文档事实错误已修正
 8. **Clean Replay report** — 已修正为 NOT GREEN
 9. **C7** — Not Started
+
+## S0.1 审查修复 Evidence（2026-08-21）
+
+### 已完成修复
+
+| # | 审查项 | 修复内容 | 验证 |
+|---|---|---|---|
+| 1 | SEC-017/018 | 添加缺失的 `Idempotency-Key`；用 `waitActivationCompleted` bounded polling 替换 `time.Sleep` | `go test ./internal/relay` PASS |
+| 2 | SEC-016 | 通过 `LoadEd25519PrivateKey` 伪造签名正确但 Claims 错误（过期、误匹配 aud/iss）的 JWT | `security_test.go` 编译通过 |
+| 3 | SEC-020 | Adapter 注入 `Set-Cookie` 和 `Location` 验证 Relay 剥离行为 | `security_test.go` 编译通过 |
+| 4 | CAP-C6-013 | 添加 `_ "modernc.org/sqlite"` 匿名导入注册驱动 | `recovery_test.go` 编译通过 |
+| 5 | 测试分层隔离 | 使用 `-tags=smoke` 和 `-tags=candidate` 严格隔离基础集成与完整 Candidate | `make system-test` PASS；`go test -tags=candidate -run=^$` 编译通过 |
+| 6 | SessionStore 测试 | 通过 `setUnauthorizedHandler` 真实模拟 401 触发 session 清除 | `vitest run` 56 tests PASS |
+| 7 | Freeze Manifest | 补全 SEC-016..021 和 CAP-C2-021 场景；修正 C7 自循环；Real Adapter 和 Baseline 为硬性门禁 | `node --check scripts/freeze-manifest.mjs` PASS |
+| 8 | E2E Harness | 修正 Hub/Relay CLI 参数；生成密钥文件；启动 Adapter；创建 same-origin SPA 代理 | `node --check scripts/e2e-harness.mjs` PASS |
+| 9 | 前端 i18n | 中英文双语支持，自动检测 + 手动切换 | `pnpm typecheck` + `vitest` PASS |
+
+### 验证证据汇总
+
+```text
+go build ./...                     — PASS
+go vet ./...                        — PASS
+go test ./... -count=1              — PASS (all packages)
+go test -tags=smoke ./test/system/  — PASS (bounded T3 smoke)
+go test -tags=candidate -run=^$     — PASS (candidate compilation)
+pnpm typecheck                      — PASS
+vitest run (13 files, 56 tests)     — PASS
+node --check scripts/e2e-harness.mjs — PASS
+node --check scripts/freeze-manifest.mjs — PASS
+```

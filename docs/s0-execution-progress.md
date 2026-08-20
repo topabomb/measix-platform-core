@@ -55,3 +55,86 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 ## 状态维护规则
 
 本文件只维护**当前实现状态和剩余缺口**，不复制 architecture requirement 细节。Architecture 变化后必须重新审查受影响 checkpoint；历史测试结果不能自动继承为新的 Green。每次宣称 checkpoint Green，必须能指向当前 architecture baseline 与当前 implementation SHA 对应的 executable evidence。
+
+## C6/C7 系统测试实现进展（追加）
+
+> 以下为系统测试代码实现进展，**不改变上述 C6/C7 checkpoint 状态**。测试代码已实现并通过编译验证，但尚未作为 Green 证据执行。
+
+### C6 系统测试代码
+
+1. **HubEnv 测试环境**（`backend/test/system/harness/hub_env.go`）：
+   - 创建隔离的 Hub+Relay 环境（独立 SQLite、Ed25519 密钥、relay service token）
+   - 通过 `devmigrate` 应用迁移，`bootstrap-admin` 创建初始管理员
+   - 构建 `control-hub` 和 `runtime-relay` 二进制
+   - 管理进程生命周期（Start/Stop/Restart）
+   - `WaitConvergence` 轮询直到 desired==applied controlRevision
+
+2. **AdminClient**（`backend/test/system/harness/admin_client.go`）：
+   - 管理 session cookie + CSRF token
+   - 封装 GET/POST/PUT/DELETE
+
+3. **Golden Path 测试**（`golden_path_test.go` + `golden_helpers.go`）：
+   - `TestCAPC6001GoldenPath`：完整 Login→User→Secret→Upstream→Test→Apply→Resources→Validate→Preview→Publish→Activation→Relay→Usage 闭环
+   - `TestCAPC6002TestClientFourCapabilities`：Test Client 通过 Client Control API 获取 Managed State/Snapshot，调用四种 runtime profiles
+   - `TestCAPC6003UsageClosure`：四 resource kinds、filters、request detail、usage/cost completeness
+   - `TestCAPC6004PublishNewGeneration`：N request→428/no-forward，client refresh snapshot，N+1 succeeds
+   - `TestCAPC6011RelayRestart`：Relay 重启后 Hub rehydrate，fail-closed → READY
+   - `TestCAPC6012RefreshDuringActivation`：浏览器刷新场景，同一 activation 恢复
+   - `TestCAPC6014FullRestart`：Hub+Relay 全部重启，preserves active release/route/usage spool
+   - `TestCAPC6015BackupRestore`：SQLite backup/restore preserves IDs/release/generation
+
+4. **Security Suite**（`security_test.go`，15 场景）：
+   - SEC-001：未认证 admin API 访问拒绝（401）
+   - SEC-002：CSRF token 强制校验
+   - SEC-003：Session cookie HttpOnly + Secure + SameSite=Strict
+   - SEC-004：Snapshot 不泄漏 server-only 字段
+   - SEC-005：Usage request detail 不含 prompt/body/secret
+   - SEC-006：无效 enrollment code 拒绝
+   - SEC-007：无效 access token Relay 拒绝且不 forward
+   - SEC-008：严格 JSON body 校验（unknown fields/malformed）
+   - SEC-009：Client header spoof 被 Relay 剥离
+   - SEC-010：Secret value 创建后永不返回
+   - SEC-011：Logout 失效 session
+   - SEC-012：Client Control API 认证强制
+   - SEC-013：Request body 大小限制
+   - SEC-014：System status 不泄漏内部配置
+   - SEC-015：幂等 Publish
+
+5. **Resource Baseline**（`baseline_test.go`）：
+   - 测量 Admin login/CRUD/Publish/convergence/runtime 延迟
+   - 报告：`docs/s0-resource-baseline.md`
+
+### C7 Freeze Manifest 脚本增强
+
+`scripts/freeze-manifest.mjs` 已增强，支持以下字段（在 C7 Gate 正式执行时生成）：
+- `architectureCommit`：pinned architecture 仓库 commit
+- `platformCoreCommit`：pinned platform-core commit
+- `adminBuildHash`：Admin Console production build SHA-256
+- `clientControlOpenApiHash` / `adminOpenApiHash`：OpenAPI SHA-256
+- `canonicalFixtureHash`：canonical fixtures tree SHA-256
+- `deterministicAdapterVersion`：Test Adapter + Test Client 源码 hash
+- `realAdapterQualificationRef`：指向 `docs/s0-real-adapter-qualification.md`
+- `resourceBaselineRef`：指向 `docs/s0-resource-baseline.md`
+- `scenarioResults`：24 个场景的 ID/name/file/required 列表
+
+### 参考文档
+
+- `docs/s0-real-adapter-qualification.md`：Real Adapter Qualification 报告与操作流程
+- `docs/s0-resource-baseline.md`：Resource Baseline 基准指标
+- `docs/s0-clean-replay-report.md`：Clean Replay 验证报告
+
+### 编译验证
+
+```text
+go build ./...              — PASS
+go vet ./...                — PASS
+go test -c ./test/system/... — PASS (编译通过)
+tsc --noEmit                — PASS
+```
+
+### 剩余缺口
+
+- C1/C2/C3 需按最新 architecture 要求补齐（见上方"下一步顺序"）
+- C6 系统测试需在 CI 或本地执行产出 Green 证据
+- Real Adapter qualification 需在安全环境执行
+- C7 Freeze manifest 需在全部 Gate Green 后正式生成

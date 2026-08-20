@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { components } from '../api/generated'
 import { apiFetch, ApiProblem } from '../api/client'
+import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
@@ -14,6 +15,7 @@ type Activation = components['schemas']['Activation']
 type UpstreamConfig = components['schemas']['UpstreamConfig']
 type UpstreamTestResult = components['schemas']['UpstreamTestResult']
 type TimeoutPolicy = components['schemas']['TimeoutPolicy']
+type Secret = components['schemas']['Secret']
 
 const session = useSessionStore()
 const activation = useActivationStore()
@@ -27,6 +29,13 @@ const detailOpen = ref(false)
 const testing = ref(false)
 const testResult = ref<UpstreamTestResult>()
 const canMutate = computed(() => Boolean(session.csrfToken))
+
+// Inline Secret creation so admins can satisfy C1 (Secret + Upstream) without
+// leaving the UI or using JSON/API directly.
+const secretOpen = ref(false)
+const secretName = ref('')
+const secretValue = ref('')
+const creatingSecret = ref(false)
 
 const AUTH_TYPES = ['NONE', 'BEARER', 'STATIC_HEADER', 'BASIC'] as const
 const USAGE_LEVELS = ['LEVEL_0', 'LEVEL_1', 'LEVEL_2'] as const
@@ -119,6 +128,30 @@ async function createUpstream() {
   }
 }
 
+async function createSecret() {
+  if (!session.csrfToken) return
+  if (!secretName.value.trim() || !secretValue.value) return
+  creatingSecret.value = true
+  error.value = undefined
+  try {
+    const created = await apiFetch<Secret>('/api/admin/v1/secrets', {
+      method: 'POST',
+      body: JSON.stringify({ name: secretName.value.trim(), value: secretValue.value }),
+    }, session.csrfToken)
+    // Auto-fill the create-upstream auth section with the new secret ref.
+    secretId.value = created.secretId
+    secretVersion.value = created.secretVersion
+    authSecret.value = String(created.secretVersion)
+    secretOpen.value = false
+    secretName.value = ''
+    secretValue.value = ''
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    creatingSecret.value = false
+  }
+}
+
 async function openUpstream(upstream: Upstream) {
   selected.value = upstream
   testResult.value = undefined
@@ -173,16 +206,13 @@ onMounted(refresh)
 
 <template>
   <q-page padding>
-    <div class="row items-center justify-between q-mb-lg">
-      <div>
-        <div class="text-h5 text-weight-bold">Upstreams</div>
-        <div class="text-body2 text-grey-7">Model provider upstreams, configuration revisions and runtime activation.</div>
-      </div>
-      <div class="q-gutter-sm">
-        <q-btn flat icon="refresh" @click="refresh" />
+    <PageHeader title="Upstreams" subtitle="Model provider upstreams, secrets, configuration revisions and runtime activation.">
+      <template #actions>
+        <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
+        <q-btn outline color="secondary" icon="key" label="Create secret" :disable="!canMutate" @click="secretOpen = true" />
         <q-btn color="primary" icon="cloud_queue" label="Create upstream" :disable="!canMutate" @click="createOpen = true" />
-      </div>
-    </div>
+      </template>
+    </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
     <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-md rounded-borders">
       <div class="row items-center justify-between">
@@ -290,6 +320,24 @@ onMounted(refresh)
           </div>
         </q-card-section>
         <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /></q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="secretOpen">
+      <q-card style="min-width: 480px; max-width: 95vw">
+        <q-card-section class="text-h6">Create secret</q-card-section>
+        <q-card-section class="q-gutter-md">
+          <p class="text-body2 text-grey-7 q-mt-none q-mb-sm">
+            Store an opaque credential in the Hub. Secret values are write-only and are never
+            returned by the Admin API.
+          </p>
+          <q-input v-model="secretName" outlined label="Secret name" placeholder="OpenAI key" />
+          <q-input v-model="secretValue" outlined label="Secret value" type="password" autocomplete="new-password" placeholder="sk-..." />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" v-close-popup />
+          <q-btn color="primary" label="Create secret" :disable="!secretName.trim() || !secretValue || creatingSecret" :loading="creatingSecret" @click="createSecret" />
+        </q-card-actions>
       </q-card>
     </q-dialog>
   </q-page>

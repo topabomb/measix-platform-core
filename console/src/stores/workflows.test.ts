@@ -27,6 +27,50 @@ describe('SessionStore', () => {
 })
 
 describe('DraftStore', () => {
+  it('upserts a runtime binding for a resource and reuses its stable runtimeRouteId', async () => {
+    const initial = {
+      draftId: 'dft_00000000-0000-4000-8000-000000000001', draftRevision: 1,
+      content: { providers: [], models: [], tts: [], asr: [], mcp: [], bindings: [], policy: { policyId: 'pol_00000000-0000-4000-8000-000000000001', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true } },
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+
+    const store = useDraftStore()
+    await store.load()
+    const modelId = store.addModel('prv_00000000-0000-4000-8000-000000000001')
+
+    store.setBinding(modelId, 'ups_00000000-0000-4000-8000-000000000001', 'HTTP_STREAMING_SSE')
+    const first = store.bindingFor(modelId)
+    expect(first).toBeDefined()
+    expect(first!.upstreamId).toBe('ups_00000000-0000-4000-8000-000000000001')
+    expect(first!.transportPolicy).toBe('HTTP_STREAMING_SSE')
+    expect(first!.allowedMethods).toContain('POST')
+    expect(first!.allowedPathPrefixes).toContain('/')
+
+    // Editing keeps the same runtimeRouteId so candidate IDs are stable.
+    store.setBinding(modelId, 'ups_00000000-0000-4000-8000-000000000002', 'HTTP_REQUEST_RESPONSE')
+    const second = store.bindingFor(modelId)
+    expect(second!.runtimeRouteId).toBe(first!.runtimeRouteId)
+    expect(second!.upstreamId).toBe('ups_00000000-0000-4000-8000-000000000002')
+    expect(second!.transportPolicy).toBe('HTTP_REQUEST_RESPONSE')
+  })
+
+  it('removes a binding when the resource is unbound (empty upstream)', async () => {
+    const initial = {
+      draftId: 'dft_00000000-0000-4000-8000-000000000001', draftRevision: 1,
+      content: { providers: [], models: [], tts: [], asr: [], mcp: [], bindings: [], policy: { policyId: 'pol_00000000-0000-4000-8000-000000000001', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true } },
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+
+    const store = useDraftStore()
+    await store.load()
+    const modelId = store.addModel('prv_00000000-0000-4000-8000-000000000001')
+    store.setBinding(modelId, 'ups_00000000-0000-4000-8000-000000000001', 'HTTP_STREAMING_SSE')
+    expect(store.bindingFor(modelId)).toBeDefined()
+
+    store.setBinding(modelId, '', 'HTTP_STREAMING_SSE')
+    expect(store.bindingFor(modelId)).toBeUndefined()
+  })
+
   it('keeps local dirty content and stable candidate ids after stale revision conflict', async () => {
     const initial = {
       draftId: 'dft_00000000-0000-4000-8000-000000000001', draftRevision: 7,

@@ -18,11 +18,11 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
 |---|---|---|
 | C0 Contract Audit & Freeze Prep | ✅ Green | Provider/Model/TTS/ASR/MCP 枚举闭合完成；Snapshot fixtures 完成；codegen drift Green |
 | C1 Upstream Operational | ✅ Green | UpstreamConfig 完整表单（auth/timeout/correlation/usage level）+ component TDD 2 tests Green |
-| C2 Managed Resource Editor | ✅ Green | Models/TTS/ASR/MCP/Policy 五类 editor + relationship count + TDD 7 tests Green |
+| C2 Managed Resource Editor | ✅ Green | 五类 editor 改为 Tab 结构 + Runtime Binding（upstream select/transport policy）+ relationship view；Models/TTS/ASR/MCP/Policy 均可绑定真实 upstream |
 | C3 Snapshot Projection & Preview | ✅ Green | `POST /api/admin/v1/draft:preview` 端点 + PreviewDraftRequest/Response schema + handler + service + UI dialog + TDD 1 test Green |
-| C4 Runtime Reference Profile | ⏳ 未完成 | 缺 Test Client/Test Adapter 四 profile (SSE/Binary/Multipart/MCP) 完整闭环 |
-| C5 Usage / Pricing / Observability | ⏳ 未完成 | Admin 缺 resource-kind 视角、完整 filters、UNKNOWN/PARTIAL/cost semantics 与趋势可视化 |
-| C6 Browser + Hub + Relay System E2E | ⏳ 未完成 | 缺 real browser + real Hub/Relay + deterministic Test Client/Test Adapter 的 S0.1 Gate 证据 |
+| C4 Runtime Reference Profile | ✅ Green | Test Adapter + Test Client 四 profile 完整闭环（Chat req/resp+SSE、TTS binary、ASR multipart、MCP Streamable HTTP、timeout/cancel/4xx/5xx）+ real relay system-smoke + CAP-C4-040..045 admission（stale gen/invalid JWT/revoked session/disabled user/unknown resource/internal header spoof）|
+| C5 Usage / Pricing / Observability | ✅ Green（Admin） | Summary 完整指标（Requests/Blocked/semantic meters/Usage completeness EXACT/PARTIAL/UNKNOWN）；完整 filters（time range + userId/resourceId/resourceKind/upstreamId/status/completeness，live watch）；Request detail 对话框（identity/generation/status/duration/bytes，不含 prompt/body/Secret）；Pricing editor（GET/PUT /api/admin/v1/pricing，乐观并发）；Overview 新增 last Activation / control-not-converged / Upstream 汇总；SystemPage applied controlRevision+bundle hash+convergence |
+| C6 Browser + Hub + Relay System E2E | ⏳ 部分 | real relay system-smoke（CAP-C4 四 transport + admission）已 Green；缺 Hub 全链路 + real browser 的 S0.1 Gate 证据 |
 | C7 Client Contract Freeze Gate | ⏳ 未开始 | C4–C6 未全部 Green；freeze manifest 不存在 |
 
 ## 已完成的变更清单
@@ -148,6 +148,29 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
    - 前端 1 test Green（验证 API 调用 + 对话框内容）
    - 后端全部测试 Green（包括新增 handler）
 
+### Admin Console UI 布局与工作流收敛（frontend-first）
+
+1. **响应式 App Shell 修正**（`AdminLayout.vue`）：
+   - 修复 Compact(md) 抽屉 mini 状态逻辑，`mini` 仅在未展开时生效，`mini-to-overlay` 保证展开回填
+   - Mobile(<md) 导航点击后自动关闭 overlay drawer（route 变化 watch 驱动，实施 §5/§12）
+   - Wide 页面内容容器居中并限制 max-width 1280px，兼顾极宽屏可读性（实施 §5 Desktop/Wide）
+   - 新增登录身份菜单（Sign out）与 Mobile 独立退出按钮
+
+2. **ResourcesPage 重构为 Tab 结构**（product §8）：
+   - 一级 Tab：Overview | Models | TTS | ASR | MCP | Policy
+   - Overview 含 Providers 管理与 **Resource→Upstream relationship view** 表格（kind/resource/upstream/status/启用态）
+   - 每个 resource editor 新增 **Runtime Binding**：Upstream select（active 优先）+ transport policy（model=SSE、tts=Binary、asr=Multipart、mcp=Request-Response），复用稳定 runtimeRouteId
+   - `draft.ts` 新增 `bindingFor/setBinding/removeBinding`，binding 引用空 upstream 即删除，候选 `rte_*` id 跨编辑稳定
+   - 保留 Validate/Preview/Publish 工作流与 warning acknowledgement
+
+3. **Upstreams 增加 inline Secret 创建**（C1 闭环）：
+   - 新增 "Create secret" 对话框（name+value，write-only），调用 `POST /api/admin/v1/secrets`
+   - 创建成功后自动回填 create-upstream 的 auth SecretRef（secretId/version），满足"无需 JSON/API 完成 Secret+Upstream"
+
+4. **页面标题一致化**：Users/Releases/Usage/Upstreams 改用 `PageHeader`（breadcrumbs/title/subtitle/actions），与 Overview/System 对齐
+5. **网格响应式修正**：System/Usage 的 `col-3` 硬编码改为 `col-xs-12 col-sm-6 col-md-3`，避免移动端挤压
+6. 新增/更新测试：AdminLayout 3 tests、ResourcesPage 9 tests、UpstreamsPage 3 tests（含 secret 创建），console 32 tests Green；`tsc --noEmit`、production build 均 Green
+
 ### P0 依赖降级
 
 1. `@quasar/app-vite` 3.x → 2.3.0（兼容 Node 22.17.0）
@@ -186,16 +209,22 @@ pkg/platformid           — ok
 ### 前端 Vitest（全部 Green）
 
 ```text
-6 test files, 19 tests, all passed
-  src/api/client.test.ts         → 1 test
-  src/api/workflow.test.ts       → 3 tests
-  src/stores/workflows.test.ts   → 4 tests
-  src/pages/LoginPage.test.ts    → 2 tests
-  src/pages/UpstreamsPage.test.ts → 2 tests
-  src/pages/ResourcesPage.test.ts → 7 tests
+12 test files, 51 tests, all passed
+  src/api/client.test.ts          → 1 test
+  src/api/workflow.test.ts        → 3 tests
+  src/router/navigation.test.ts   → 3 tests
+  src/stores/workflows.test.ts    → 6 tests
+  src/layouts/AdminLayout.test.ts → 3 tests
+  src/pages/LoginPage.test.ts     → 2 tests
+  src/pages/UpstreamsPage.test.ts → 3 tests
+  src/pages/ResourcesPage.test.ts → 10 tests
+  src/pages/UsagePage.test.ts     → 12 tests
+  src/pages/PricingPanel.test.ts  → 3 tests
+  src/pages/OverviewPage.test.ts  → 3 tests
+  src/pages/SystemPage.test.ts    → 2 tests
 ```
 
-`tsc --noEmit` — 无类型错误
+`tsc --noEmit` — 无类型错误；`quasar build` production dist/spa 构建成功
 
 ## 契约与管理
 
@@ -213,6 +242,51 @@ pkg/platformid           — ok
 - provider-specific body translation in Relay
 - S1+/enterprise 空导航或通用 workflow/dashboard builder
 
+## 已完成的变更清单（追加：CAP-C4 admission/cancel system-level 覆盖）
+
+1. `test/system/client`：Test Client 新增 `SpoofHeaders` 注入（用于验证 inbound sanitization），并新增：
+   - `TestCAPC4042RevokedSessionRejectedNoForward`（401 invalid_session，无 forward）
+   - `TestCAPC4042DisabledUserRejectedNoForward`（403 user_disabled，无 forward）
+   - `TestCAPC4043UnknownResourceRejectedNoForward`（403 resource_not_allowed，无 forward）
+   - `TestCAPC4045ClientInternalHeaderSpoofStripped`（伪造 X-Measix-Request-Id / X-Measix-Internal / X-Forwarded-For 被 Relay 剥离，且不 reach upstream）
+   - `TestCAPC4022ClientStreamCancelPropagates`（client cancel 传播到 upstream）
+2. `test/system/adapter`：`RequestFact` 新增 `Headers`（`safeHeaders` 只记录非敏感 header，排除 Authorization/Cookie），`XMeasixRequestId` 已有。
+3. `env` helper 支持 `revokeSession()`/`disableUser()`（重放 control state，ControlRevision 递增避免 hash conflict）。
+
+### Admin Console C5 增强（frontend-first）
+
+1. **UsagePage**：
+   - 新增 `kindOf()` 从稳定 resourceId 前缀（mdl_/tts_/asr_/mcp_）把 request 分类为 MODEL/TTS/ASR/MCP，并在 ledger 行显示彩色 kind chip
+   - ledger 行新增 errorClass（negative chip）、durationMs、upstreamHttpStatus
+   - Cost 卡片新增语义状态 chip（cost KNOWN/PARTIAL/UNKNOWN，颜色区分）
+   - 改为 Summary | Pricing 双 Tab 结构
+2. **PricingPanel（新组件，product §C5 Pricing editor）**：
+   - 读取 `GET /api/admin/v1/pricing` → `PricingSet`（revision + rules）
+   - 可增删定价规则（meter 下拉枚举标准 meter、unitSize/unitPrice/currency/effectiveFrom）
+   - `PUT /api/admin/v1/pricing` 提交，携带 `expectedPricingRevision` 实现乐观并发，成功后以服务端返回的 revision/rules 为准
+   - 对 `rules` 空数组做防御处理（`?? []`），避免渲染崩溃
+3. 新增/更新测试：UsagePage 6 tests、PricingPanel 3 tests；console 共 **10 files / 40 tests** 全 Green；`tsc --noEmit`、production build 全 Green
+
+### Admin Console C5 第二轮完成（§14/§15，frontend-first，TDD）
+
+1. **UsagePage Summary 完整指标（§14 Summary）**：
+   - Blocked 计数卡（requestCount - forwardedRequestCount）
+   - Semantic meters 卡展示 meter+quantity+confidence，按类别着色（token/characters/audio）
+   - Usage completeness 卡：EXACT/PARTIAL/UNKNOWN 计数
+2. **Filters 完整（§14 Filter）**：
+   - 新增 `completeness` 筛选器（EXACT/PARTIAL/UNKNOWN），query 携带
+   - Range 快捷下拉（Last 24h/7d/30d）+ Reset 清空
+   - 筛选变更 watch 自动 live refresh
+3. **Request Detail 对话框（§14 Request Detail）**：
+   - 点击 ledger 行打开，展示 requestId/interactionId/User/Device/Resource/Upstream/RuntimeRoute/Generation/ControlRevision/status/duration/bytes/errorClass
+   - 明确不显示 prompt/body/Secret
+4. **Overview/System 可观测性（§15）**：
+   - Overview 新增 last Activation（state chip）、control-not-converged 告警、Upstream active/degraded/disabled 汇总、Relay last seen
+   - SystemPage Relay 卡新增 applied controlRevision + bundle hash + convergence 标记
+5. 测试：新增 OverviewPage 3 tests、SystemPage 2 tests、UsagePage 扩展至 12 tests；console 共 **12 files / 51 tests** 全 Green；`tsc --noEmit`、production build 全通过。任务清单见 docs/c5-task-tracking.md
+
 ## 下一步
 
-**C4 Runtime Reference Profile**：建立 Test Client + Test Adapter，证明四个 runtime profile（SSE/Binary/Multipart/MCP）的完整执行链。
+**C6 Browser + Hub + Relay System E2E（Golden Path）**：建立真实 Admin build（dist/spa）+ Control Hub + Runtime Relay + SQLite/migrations + deterministic Adapter/Test Client 的 Golden Path 全链路系统 E2E，覆盖 Login→User→Secret/Upstream→Resources（五 tab + binding）→Pricing→Validate/Review→Publish→Activation→Relay runtime traffic→Usage/Cost/System。其中 real-relay system-smoke 与 hub→relay control 交接已分别 Green，缺统一双进程全链路 + real-browser Playwright E2E。
+
+**C7 S0.1 Freeze**：仅当 C0–C6 全 Green 后执行，记录 architecture commit / platform-core commit / Client OpenAPI hash / fixture hash / schemaVersion / Admin build identity / system scenario / real Adapter qualification。

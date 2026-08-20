@@ -6,6 +6,8 @@ import { ApiProblem, apiFetch, createCandidateId } from '../api/client'
 type Draft = components['schemas']['Draft']
 type ManagedDraftContent = components['schemas']['ManagedDraftContent']
 type ValidateDraftResponse = components['schemas']['ValidateDraftResponse']
+type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
+type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
 
 export const useDraftStore = defineStore('draft', () => {
   const baselineContent = ref<ManagedDraftContent>()
@@ -109,6 +111,49 @@ export const useDraftStore = defineStore('draft', () => {
     return mcpServerId
   }
 
+  /** Existing binding for a resource, if any. */
+  function bindingFor(resourceId: string): RuntimeBindingDefinition | undefined {
+    return requireContent().bindings.find((b) => b.resourceId === resourceId)
+  }
+
+  /**
+   * Upsert a runtime binding for an enabled resource. Reuses an existing
+   * runtimeRouteId so candidate IDs stay stable across edits; a binding that
+   * references no upstream is removed (a resource without an upstream has no
+   * valid binding).
+   */
+  function setBinding(resourceId: string, upstreamId: string, transportPolicy: TransportPolicy) {
+    if (!upstreamId) {
+      removeBinding(resourceId)
+      return
+    }
+    const content = requireContent()
+    const existing = content.bindings.find((b) => b.resourceId === resourceId)
+    const runtimeRouteId = existing?.runtimeRouteId ?? createCandidateId('rte')
+    const next: RuntimeBindingDefinition = {
+      runtimeRouteId,
+      resourceId,
+      upstreamId,
+      allowedMethods: existing?.allowedMethods?.length ? existing.allowedMethods : ['POST'],
+      allowedPathPrefixes: existing?.allowedPathPrefixes?.length ? existing.allowedPathPrefixes : ['/'],
+      transportPolicy,
+    }
+    if (existing) {
+      Object.assign(existing, next)
+    } else {
+      content.bindings.push(next)
+    }
+    markDirty()
+  }
+
+  /** Remove the runtime binding for a resource (e.g. when it is deleted or unbound). */
+  function removeBinding(resourceId: string) {
+    const content = requireContent()
+    const before = content.bindings.length
+    content.bindings = content.bindings.filter((b) => b.resourceId !== resourceId)
+    if (content.bindings.length !== before) markDirty()
+  }
+
   async function save(csrfToken: string) {
     if (baselineRevision.value === undefined) throw new Error('draft is not loaded')
     saving.value = true
@@ -139,5 +184,6 @@ export const useDraftStore = defineStore('draft', () => {
   return {
     baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
     load, save, validate, addModel, addTts, addAsr, addMcp, markDirty,
+    bindingFor, setBinding, removeBinding,
   }
 })

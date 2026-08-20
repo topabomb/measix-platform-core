@@ -25,6 +25,7 @@ type RequestFact struct {
 	MultipartFiles   map[string][]byte
 	ContentType      string
 	XMeasixRequestId string
+	Headers          map[string]string
 }
 
 // Adapter is a deterministic upstream Test Adapter.
@@ -125,6 +126,7 @@ func (a *Adapter) capture(r *http.Request) *RequestFact {
 		MultipartFiles:   map[string][]byte{},
 		ContentType:      r.Header.Get("Content-Type"),
 		XMeasixRequestId: r.Header.Get("X-Measix-Request-Id"),
+		Headers:          safeHeaders(r.Header),
 	}
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		if err := r.ParseMultipartForm(8 << 20); err == nil {
@@ -160,6 +162,23 @@ func (a *Adapter) capture(r *http.Request) *RequestFact {
 		r.Body = io.NopCloser(strings.NewReader(string(body)))
 	}
 	return fact
+}
+
+// safeHeaders records only non-sensitive header keys (lowercased) so the tests
+// can assert on sanitization without persisting credentials. Authorization and
+// cookies are excluded.
+func safeHeaders(h http.Header) map[string]string {
+	out := map[string]string{}
+	for k, v := range h {
+		lower := strings.ToLower(k)
+		if lower == "authorization" || lower == "cookie" || lower == "set-cookie" {
+			continue
+		}
+		if len(v) > 0 {
+			out[lower] = v[0]
+		}
+	}
+	return out
 }
 
 func (a *Adapter) record(fact *RequestFact) {

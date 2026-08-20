@@ -113,6 +113,43 @@ func TestCAPC4030ClientMCP(t *testing.T) {
 	}
 }
 
+// CAP-C4-022: a client cancel mid-stream must be propagated by the Relay to the
+// upstream, so the upstream observes cancellation (no orphaned upstream work).
+func TestCAPC4022ClientStreamCancelPropagates(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	ctx, cancel := context.WithCancel(context.Background())
+	var observedErr error
+	var errCh = make(chan error, 1)
+	go func() {
+		errCh <- c.ChatCompletionStream(ctx, env.resourceIDs.model, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, func([]byte) {})
+	}()
+	// Wait for at least one chunk to flow, then cancel the client.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if env.adapter.Cancelled() {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case observedErr = <-errCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("client stream did not return after cancel")
+	}
+	// The adapter must observe cancellation of the upstream request.
+	deadline = time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if env.adapter.Cancelled() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("adapter did not observe cancellation: err=%v", observedErr)
+}
+
 // CAP-C4-040: old generation must be rejected before any upstream body forward.
 func TestCAPC4040OldGenerationNoForward(t *testing.T) {
 	env := newEnv(t)
@@ -152,6 +189,97 @@ func TestCAPC4041InvalidJWTReturns401NoForward(t *testing.T) {
 	}
 }
 
+// CAP-C4-042: a revoked session must be rejected (401) before any upstream forward.
+func TestCAPC4042RevokedSessionRejectedNoForward(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	env.revokeSession()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	_, _, err := c.ChatCompletion(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{}`)
+	if err == nil {
+		t.Fatal("expected 401 for revoked session")
+	}
+	problem, ok := err.(client.ProblemError)
+	if !ok || problem.Status != 401 || problem.Code != "invalid_session" {
+		t.Fatalf("expected 401 invalid_session, got %v", err)
+	}
+	if fact := env.adapter.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatalf("adapter received body despite revoked session: %+v", fact)
+	}
+}
+
+// CAP-C4-042: a disabled user must be rejected (403) before any upstream forward.
+func TestCAPC4042DisabledUserRejectedNoForward(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	env.disableUser()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	_, _, err := c.ChatCompletion(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{}`)
+	if err == nil {
+		t.Fatal("expected 403 for disabled user")
+	}
+	problem, ok := err.(client.ProblemError)
+	if !ok || problem.Status != 403 || problem.Code != "user_disabled" {
+		t.Fatalf("expected 403 user_disabled, got %v", err)
+	}
+	if fact := env.adapter.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatalf("adapter received body despite disabled user: %+v", fact)
+	}
+}
+
+// CAP-C4-043: an unknown resource id must be rejected (403 resource_not_allowed)
+// before any upstream forward.
+func TestCAPC4043UnknownResourceRejectedNoForward(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	unknown := platformid.New(platformid.Model) // a different, unbound model id
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	_, _, err := c.ChatCompletion(context.Background(), unknown, "/v1/chat/completions", `{}`)
+	if err == nil {
+		t.Fatal("expected 403 for unknown resource")
+	}
+	problem, ok := err.(client.ProblemError)
+	if !ok || problem.Status != 403 || problem.Code != "resource_not_allowed" {
+		t.Fatalf("expected 403 resource_not_allowed, got %v", err)
+	}
+	if fact := env.adapter.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatalf("adapter received body despite unknown resource: %+v", fact)
+	}
+}
+
+// CAP-C4-045: client-supplied internal X-Measix-* headers must not reach the
+// upstream; the relay replaces them with its own request correlation.
+func TestCAPC4045ClientInternalHeaderSpoofStripped(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{
+		RuntimeBaseURL: env.relayURL, AccessToken: env.token,
+		ManagedGeneration: env.generation, InteractionID: env.interactionID,
+		SpoofHeaders: map[string]string{
+			"X-Measix-Request-Id": "forged-request",
+			"X-Measix-Internal":   "secret-bypass",
+			"X-Forwarded-For":     "203.0.113.7",
+		},
+	})
+	if _, _, err := c.ChatCompletion(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{}`); err != nil {
+		t.Fatal(err)
+	}
+	fact := env.adapter.LastRequest("/v1/chat/completions")
+	if fact == nil {
+		t.Fatal("request not captured")
+	}
+	// The relay must strip the forged headers and set its own correlation id.
+	if fact.XMeasixRequestId == "" || fact.XMeasixRequestId == "forged-request" {
+		t.Fatalf("relay did not replace spoofed request-id: %q", fact.XMeasixRequestId)
+	}
+	if fact.Headers["X-Measix-Internal"] != "" {
+		t.Fatalf("internal header leaked upstream: %q", fact.Headers["X-Measix-Internal"])
+	}
+	if fact.Headers["X-Forwarded-For"] != "" {
+		t.Fatalf("client-controlled x-forwarded-for reached upstream: %q", fact.Headers["X-Forwarded-For"])
+	}
+}
+
 type resourceIDs struct{ model, tts, asr, mcp string }
 
 type env struct {
@@ -162,6 +290,35 @@ type env struct {
 	interactionID string
 	resourceIDs   resourceIDs
 	srv           *httptest.Server
+	store         *control.Store
+	state         relaycontrolapi.RuntimeControlState
+	userID        string
+	sessionID     string
+	deviceID      string
+}
+
+// revokeSession marks the signed session revoked and re-applies control state.
+func (e *env) revokeSession() {
+	e.state.PrincipalState.RevokedSessionIds = append(e.state.PrincipalState.RevokedSessionIds, e.sessionID)
+	e.applyState()
+}
+
+// disableUser marks the signed user disabled and re-applies control state.
+func (e *env) disableUser() {
+	e.state.PrincipalState.DisabledUserIds = append(e.state.PrincipalState.DisabledUserIds, e.userID)
+	e.applyState()
+}
+
+func (e *env) applyState() {
+	e.state.ControlRevision++
+	hash, err := relaystate.HashDescriptor(e.state)
+	if err != nil {
+		panic(err)
+	}
+	e.state.BundleHash = hash
+	if _, err := e.store.Apply(e.state); err != nil {
+		panic(err)
+	}
 }
 
 func newEnv(t *testing.T) *env {
@@ -230,7 +387,8 @@ func newEnv(t *testing.T) *env {
 	srv := httptest.NewServer(relayruntime.NewHandler(store))
 	return &env{
 		adapter: ad, relayURL: srv.URL, token: token, generation: 1, interactionID: interactionID,
-		resourceIDs: ids, srv: srv,
+		resourceIDs: ids, srv: srv, store: store, state: state,
+		userID: userID, sessionID: sessionID, deviceID: deviceID,
 	}
 }
 

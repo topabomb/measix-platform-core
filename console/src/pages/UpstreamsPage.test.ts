@@ -5,12 +5,14 @@ import {
   QCard, QCardSection, QCardActions, QInput, QBtn, QBanner,
   QSelect, QToggle, QDialog, QSeparator,
   QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip, QSpinner,
+  QIcon, QToolbarTitle, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown,
   ClosePopup,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { h } from 'vue'
 import UpstreamsPage from './UpstreamsPage.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { useSessionStore } from '../stores/session'
 import * as client from '../api/client'
 
@@ -45,7 +47,7 @@ function mountUpstreamsPage() {
             QLayout, QPage, QPageContainer, QCard, QCardSection, QCardActions,
             QInput, QBtn, QBanner, QSelect, QToggle, QDialog, QSeparator,
             QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip,
-            QSpinner,
+            QSpinner, QIcon, QToolbarTitle, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, PageHeader,
           },
           directives: { ClosePopup },
         }], pinia, router],
@@ -91,6 +93,66 @@ describe('UpstreamsPage', () => {
       return label.includes('Provider kind') || label.includes('providerKind')
     })
     expect(providerKindSelect).toBeUndefined()
+  })
+
+  it('can create a secret inline and auto-fills the auth secret reference', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/api/admin/v1/secrets' && init?.method === 'POST') {
+        return { secretId: 'sec_created', name: 'My Key', secretVersion: 1 }
+      }
+      return { items: [], nextCursor: undefined }
+    })
+
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    // Open the create-secret helper dialog.
+    const btns = wrapper.findAllComponents(QBtn)
+    const secretBtn = btns.find((b) => String(b.props('label') ?? '').includes('Create secret'))
+    expect(secretBtn).toBeTruthy()
+    await secretBtn!.trigger('click')
+    await flushPromises()
+
+    const inputs = wrapper.findAllComponents(QInput)
+    const nameInput = inputs.find((i) => (i.props('label') ?? '') === 'Secret name')
+    const valueInput = inputs.find((i) => (i.props('label') ?? '') === 'Secret value')
+    expect(nameInput).toBeTruthy()
+    expect(valueInput).toBeTruthy()
+    await nameInput!.setValue('My Key')
+    await valueInput!.setValue('sk-super-secret')
+    await flushPromises()
+
+    const dialogBtns = wrapper.findAllComponents(QBtn)
+    // The dialog's submit button is rendered after the header button with the
+    // same label; pick the last match to target the dialog action.
+    const createSecretBtns = dialogBtns.filter((b) => String(b.props('label') ?? '') === 'Create secret')
+    expect(createSecretBtns.length).toBeGreaterThanOrEqual(2)
+    await createSecretBtns[createSecretBtns.length - 1]!.trigger('click')
+    await flushPromises()
+
+    const secretCall = fetchSpy.mock.calls.find((c) => c[0] === '/api/admin/v1/secrets' && c[1]?.method === 'POST')
+    expect(secretCall).toBeDefined()
+    const secretBody = JSON.parse((secretCall![1] as RequestInit).body as string)
+    expect(secretBody).toEqual({ name: 'My Key', value: 'sk-super-secret' })
+
+    // The created secret reference is applied to the create-upstream auth
+    // section: open create-upstream, switch auth to BEARER, and the Secret ID
+    // field is pre-filled.
+    const allBtns = wrapper.findAllComponents(QBtn)
+    const createUpstreamBtn = allBtns.find((b) => String(b.props('label') ?? '').includes('Create upstream'))
+    await createUpstreamBtn!.trigger('click')
+    await flushPromises()
+
+    const authSelect = wrapper.findAllComponents(QSelect).find((s) => (s.props('label') ?? '') === 'Auth type')
+    expect(authSelect).toBeTruthy()
+    await authSelect!.setValue('BEARER')
+    await flushPromises()
+
+    const secretIdInput = wrapper.findAllComponents(QInput).find((i) => (i.props('label') ?? '') === 'Secret ID')
+    expect(secretIdInput).toBeTruthy()
+    expect(secretIdInput!.props('modelValue')).toBe('sec_created')
   })
 
   it('create upstream submits UpstreamConfig with all required fields, not providerKind', async () => {

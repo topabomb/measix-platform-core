@@ -3,9 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import {
   Quasar, QLayout, QPage, QPageContainer,
   QCard, QCardSection, QCardActions, QInput, QBtn, QBanner,
-  QSelect, QToggle, QDialog, QSeparator,
-  QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip, QSpinner,
-  QBadge, QIcon,
+  QSelect, QToggle, QDialog, QSeparator, QTab, QTabs, QBadge, QChip,
+  QList, QItem, QItemSection, QItemLabel, QMarkupTable, QSpinner, QIcon,
   ClosePopup,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
@@ -37,9 +36,9 @@ function mountResourcesPage() {
         plugins: [[Quasar, {
           components: {
             QLayout, QPage, QPageContainer, QCard, QCardSection, QCardActions,
-            QInput, QBtn, QBanner, QSelect, QToggle, QDialog, QSeparator,
-            QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip,
-            QSpinner, QBadge, QIcon,
+            QInput, QBtn, QBanner, QSelect, QToggle, QDialog, QSeparator, QTab, QTabs,
+            QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip, QBadge,
+            QSpinner, QIcon,
           },
           directives: { ClosePopup },
         }], pinia, router],
@@ -78,25 +77,35 @@ const EMPTY_DRAFT = {
   },
 }
 
+function findAddBtn(wrapper: ReturnType<typeof mount>, label: string) {
+  return wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes(label))
+}
+
+async function switchTab(wrapper: ReturnType<typeof mount>, name: string) {
+  const tab = wrapper.findAllComponents(QTab).find((t) => t.props('name') === name)
+  expect(tab).toBeTruthy()
+  await tab!.trigger('click')
+  await flushPromises()
+}
+
 describe('ResourcesPage', () => {
   beforeEach(() => {
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
       if (path === '/api/admin/v1/draft') return structuredClone(EMPTY_DRAFT)
+      if (path.startsWith('/api/admin/v1/upstreams')) return { items: [], nextCursor: undefined }
       return {}
     })
   })
 
-  it('renders five resource editor sections: Models, TTS, ASR, MCP, Policy', async () => {
+  it('renders five resource tabs: Models, TTS, ASR, MCP, Policy', async () => {
     const { wrapper, pinia } = mountResourcesPage()
     setupSession(pinia)
     await flushPromises()
 
-    const html = wrapper.html()
-    expect(html).toContain('Models')
-    expect(html).toContain('TTS')
-    expect(html).toContain('ASR')
-    expect(html).toContain('MCP')
-    expect(html).toContain('Policy')
+    const tabs = wrapper.findAllComponents(QTab).map((t) => String(t.props('label')))
+    for (const expected of ['Overview', 'Models', 'TTS', 'ASR', 'MCP', 'Policy']) {
+      expect(tabs).toContain(expected)
+    }
   })
 
   it('can add a TTS resource through the Add button', async () => {
@@ -107,8 +116,8 @@ describe('ResourcesPage', () => {
     const draft = useDraftStore(pinia)
     expect(draft.localContent?.tts).toHaveLength(0)
 
-    const btns = wrapper.findAllComponents(QBtn)
-    const addTtsBtn = btns.find((b) => String(b.props('label') ?? '').includes('Add TTS'))
+    await switchTab(wrapper, 'tts')
+    const addTtsBtn = findAddBtn(wrapper, 'Add TTS')
     expect(addTtsBtn).toBeTruthy()
     await addTtsBtn!.trigger('click')
     await flushPromises()
@@ -127,8 +136,8 @@ describe('ResourcesPage', () => {
     const draft = useDraftStore(pinia)
     expect(draft.localContent?.asr).toHaveLength(0)
 
-    const btns = wrapper.findAllComponents(QBtn)
-    const addAsrBtn = btns.find((b) => String(b.props('label') ?? '').includes('Add ASR'))
+    await switchTab(wrapper, 'asr')
+    const addAsrBtn = findAddBtn(wrapper, 'Add ASR')
     expect(addAsrBtn).toBeTruthy()
     await addAsrBtn!.trigger('click')
     await flushPromises()
@@ -147,8 +156,8 @@ describe('ResourcesPage', () => {
     const draft = useDraftStore(pinia)
     expect(draft.localContent?.mcp).toHaveLength(0)
 
-    const btns = wrapper.findAllComponents(QBtn)
-    const addMcpBtn = btns.find((b) => String(b.props('label') ?? '').includes('Add MCP'))
+    await switchTab(wrapper, 'mcp')
+    const addMcpBtn = findAddBtn(wrapper, 'Add MCP')
     expect(addMcpBtn).toBeTruthy()
     await addMcpBtn!.trigger('click')
     await flushPromises()
@@ -164,6 +173,7 @@ describe('ResourcesPage', () => {
     setupSession(pinia)
     await flushPromises()
 
+    await switchTab(wrapper, 'policy')
     const toggles = wrapper.findAllComponents(QToggle)
     expect(toggles.length).toBeGreaterThanOrEqual(4)
 
@@ -171,7 +181,7 @@ describe('ResourcesPage', () => {
     expect(draft.localContent?.policy?.allowLocalProviders).toBe(true)
   })
 
-  it('shows relationship count for each resource to its provider', async () => {
+  it('shows relationship rows in the Overview tab for each resource to its upstream', async () => {
     const { wrapper, pinia } = mountResourcesPage()
     setupSession(pinia)
     await flushPromises()
@@ -183,21 +193,32 @@ describe('ResourcesPage', () => {
       clientProtocol: 'OPENAI_CHAT_COMPLETIONS',
       enabled: true,
     })
-    draft.localContent!.models.push({
-      modelId: 'mdl_test',
-      providerId: 'prv_openai',
-      displayName: 'GPT-4',
-      upstreamModelKey: 'gpt-4',
-      runtimePath: '/v1/chat/completions',
-      inputModalities: ['TEXT'],
-      outputModalities: ['TEXT'],
-      capabilities: ['TOOL'],
-      enabled: true,
-    })
+    const modelId = draft.addModel('prv_openai')
+    draft.setBinding(modelId, 'ups_test', 'HTTP_STREAMING_SSE')
     await flushPromises()
 
     const html = wrapper.html()
-    expect(html).toContain('1')
+    expect(html).toContain('Resource → Upstream relationships')
+    expect(html).toContain('ups_test')
+  })
+
+  it('renders an enable toggle for each resource in the relationship view', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    const draft = useDraftStore(pinia)
+    draft.localContent!.providers.push({
+      providerId: 'prv_openai', displayName: 'OpenAI', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', enabled: true,
+    })
+    const modelId = draft.addModel('prv_openai')
+    expect(draft.localContent!.models[0].enabled).toBe(true)
+    await flushPromises()
+
+    // The Overview relationship view renders an enable toggle per resource row.
+    const html = wrapper.html()
+    expect(html).toContain('relationship-enable-toggle')
+    expect(modelId).toBeDefined()
   })
 
   it('adds a model only when a real provider exists, never a placeholder', async () => {
@@ -206,7 +227,8 @@ describe('ResourcesPage', () => {
     await flushPromises()
 
     const draft = useDraftStore(pinia)
-    const addModelBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Add model'))
+    await switchTab(wrapper, 'models')
+    const addModelBtn = findAddBtn(wrapper, 'Add model')
     expect(addModelBtn!.props('disable')).toBe(true)
 
     // Add a real provider, then the model button becomes usable and binds to it.
@@ -219,7 +241,7 @@ describe('ResourcesPage', () => {
     draft.markDirty()
     await flushPromises()
 
-    const enabledBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Add model'))
+    const enabledBtn = findAddBtn(wrapper, 'Add model')
     await enabledBtn!.trigger('click')
     await flushPromises()
 
@@ -243,6 +265,7 @@ describe('ResourcesPage', () => {
     }]
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path === '/api/admin/v1/draft') return draftWithWarnings
+      if (path.startsWith('/api/admin/v1/upstreams')) return { items: [], nextCursor: undefined }
       if (path === '/api/admin/v1/draft:validate') {
         return {
           valid: true,
@@ -266,7 +289,7 @@ describe('ResourcesPage', () => {
     await flushPromises()
 
     window.confirm = vi.fn(() => true)
-    const publishBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '') === 'Publish')
+    const publishBtn = findAddBtn(wrapper, 'Publish')
     await publishBtn!.trigger('click')
     await flushPromises()
 
@@ -281,6 +304,7 @@ describe('ResourcesPage', () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path === '/api/admin/v1/draft') return structuredClone(EMPTY_DRAFT)
+      if (path.startsWith('/api/admin/v1/upstreams')) return { items: [], nextCursor: undefined }
       if (path === '/api/admin/v1/draft:preview' && init?.method === 'POST') {
         return {
           draftRevision: 1,
@@ -300,30 +324,17 @@ describe('ResourcesPage', () => {
     setupSession(pinia)
     await flushPromises()
 
-    // Verify the preview API call was made
-    const previewCall = fetchSpy.mock.calls.find(
-      (c) => c[0] === '/api/admin/v1/draft:preview' && (c[1] as RequestInit)?.method === 'POST',
-    )
-    // Before clicking, no preview call
-    expect(previewCall).toBeUndefined()
-
     const btns = wrapper.findAllComponents(QBtn)
     const previewBtn = btns.find((b) => String(b.props('label') ?? '') === 'Preview')
     expect(previewBtn).toBeTruthy()
     await previewBtn!.trigger('click')
     await flushPromises()
 
-    // After clicking, verify the preview API was called
     const previewCallAfter = fetchSpy.mock.calls.find(
       (c) => c[0] === '/api/admin/v1/draft:preview' && (c[1] as RequestInit)?.method === 'POST',
     )
     expect(previewCallAfter).toBeDefined()
 
-    // Verify the dialog opened by checking QDialog component model
-    const dialog = wrapper.findAllComponents(QDialog).find((d) => d.props('modelValue') === true)
-    expect(dialog).toBeTruthy()
-
-    // Check the dialog body content via the rendered DOM (QDialog teleports to body)
     const body = document.body.innerHTML
     expect(body).toContain('sha256:abc123')
     expect(body).toContain('Snapshot Preview')

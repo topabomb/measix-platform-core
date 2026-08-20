@@ -43,34 +43,44 @@ onMounted(refresh)
     <ProblemBanner :error="error" class="q-mb-md" />
     <LoadingState v-if="loading && !status" />
     <template v-else-if="status">
-      <div class="row q-gutter-md q-mb-md">
-        <q-card flat bordered class="col-3">
-          <q-card-section>
-            <div class="text-caption text-grey-7">Build</div>
-            <div class="text-h6">{{ status.buildVersion }}</div>
-          </q-card-section>
-        </q-card>
-        <q-card flat bordered class="col-3">
-          <q-card-section>
-            <div class="text-caption text-grey-7">Database</div>
-            <div class="text-h6">{{ status.dbHealth }}</div>
-            <div class="text-caption">migration {{ status.migrationRevision }}</div>
-          </q-card-section>
-        </q-card>
-        <q-card flat bordered class="col-3">
-          <q-card-section>
-            <div class="text-caption text-grey-7">Runtime</div>
-            <StatusChip :value="status.runtimeStatus" />
-            <div class="text-caption q-mt-sm">generation {{ status.activeManagedGeneration }} · revision {{ status.managedStateRevision }}</div>
-          </q-card-section>
-        </q-card>
-        <q-card flat bordered class="col-3">
-          <q-card-section>
-            <div class="text-caption text-grey-7">Relay</div>
-            <q-badge :color="status.relayReady ? 'green' : 'red'" :label="status.relayReady ? 'Ready' : 'Not ready'" />
-            <div class="text-caption q-mt-sm">desired revision {{ status.desiredControlRevision }}</div>
-          </q-card-section>
-        </q-card>
+      <div class="row q-col-gutter-md q-mb-md">
+        <div class="col-xs-12 col-sm-6 col-md-3">
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="text-caption text-grey-7">Build</div>
+              <div class="text-h6">{{ status.buildVersion }}</div>
+            </q-card-section>
+          </q-card>
+        </div>
+        <div class="col-xs-12 col-sm-6 col-md-3">
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="text-caption text-grey-7">Database</div>
+              <div class="text-h6">{{ status.dbHealth }}</div>
+              <div class="text-caption">migration {{ status.migrationRevision }}</div>
+            </q-card-section>
+          </q-card>
+        </div>
+        <div class="col-xs-12 col-sm-6 col-md-3">
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="text-caption text-grey-7">Runtime</div>
+              <StatusChip :value="status.runtimeStatus" />
+              <div class="text-caption q-mt-sm">generation {{ status.activeManagedGeneration }} · revision {{ status.managedStateRevision }}</div>
+            </q-card-section>
+          </q-card>
+        </div>
+        <div class="col-xs-12 col-sm-6 col-md-3">
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="text-caption text-grey-7">Relay</div>
+              <q-badge :color="status.relayReady ? 'green' : 'red'" :label="status.relayReady ? 'Ready' : 'Not ready'" />
+              <div class="text-caption q-mt-sm">desired {{ status.desiredControlRevision }} · applied {{ status.appliedControlRevision ?? '—' }}</div>
+              <div class="text-caption">bundle {{ status.appliedBundleHash ? status.appliedBundleHash.slice(7, 19) : '—' }}</div>
+              <div v-if="status.appliedControlRevision !== undefined && status.appliedControlRevision !== status.desiredControlRevision" class="text-caption text-warning q-mt-xs">control not converged</div>
+            </q-card-section>
+          </q-card>
+        </div>
       </div>
     </template>
 

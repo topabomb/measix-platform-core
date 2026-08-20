@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import LoadingState from '../components/LoadingState.vue'
@@ -9,22 +9,40 @@ import PageHeader from '../components/PageHeader.vue'
 
 type SystemStatus = components['schemas']['SystemStatus']
 type UsageSummary = components['schemas']['UsageSummary']
+type Upstream = components['schemas']['Upstream']
+type UpstreamPage = components['schemas']['UpstreamPage']
 
 const system = ref<SystemStatus>()
 const usage = ref<UsageSummary>()
+const upstreams = ref<Upstream[]>([])
 const loading = ref(false)
 const error = ref<unknown>()
+
+const converged = computed(() => {
+  if (!system.value) return false
+  if (system.value.appliedControlRevision !== undefined && system.value.appliedControlRevision !== system.value.desiredControlRevision) return false
+  if (system.value.appliedBundleHash && system.value.desiredBundleHash && system.value.appliedBundleHash !== system.value.desiredBundleHash) return false
+  return true
+})
+
+const upstreamCounts = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const u of upstreams.value) counts[u.status] = (counts[u.status] ?? 0) + 1
+  return counts
+})
 
 async function refresh() {
   loading.value = true
   error.value = undefined
   try {
-    const [systemStatus, usageSummary] = await Promise.all([
+    const [systemStatus, usageSummary, upstreamPage] = await Promise.all([
       apiFetch<SystemStatus>('/api/admin/v1/system/status'),
       apiFetch<UsageSummary>('/api/admin/v1/usage/summary'),
+      apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=200'),
     ])
     system.value = systemStatus
     usage.value = usageSummary
+    upstreams.value = upstreamPage.items
   } catch (cause) {
     error.value = cause
   } finally {
@@ -43,8 +61,9 @@ onMounted(refresh)
     <ProblemBanner :error="error" class="q-mb-md" />
     <LoadingState v-if="loading && !system" />
     <template v-else-if="system">
-      <q-banner v-if="system.runtimeStatus !== 'READY' || !system.relayReady" class="bg-orange-1 text-warning q-mb-md rounded-borders">
+      <q-banner v-if="system.runtimeStatus !== 'READY' || !system.relayReady || !converged" class="bg-orange-1 text-warning q-mb-md rounded-borders">
         Managed runtime is not fully ready. New managed interactions may be blocked until Hub and Relay converge.
+        <template v-if="!converged"> <span class="text-weight-medium">Control not converged</span> (desired {{ system.desiredControlRevision }} / applied {{ system.appliedControlRevision ?? '—' }}).</template>
       </q-banner>
       <div class="row q-col-gutter-md">
         <div class="col-12 col-sm-6 col-lg-3">
@@ -54,10 +73,35 @@ onMounted(refresh)
           <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">Managed generation</div><div class="text-h4">{{ system.activeManagedGeneration }}</div><div class="text-caption">state rev {{ system.managedStateRevision }}</div></q-card-section></q-card>
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">Control revision</div><div class="text-h4">{{ system.desiredControlRevision }}</div><div class="text-caption">Relay {{ system.appliedControlRevision ?? '—' }}</div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">Control revision</div><div class="text-h4">{{ system.desiredControlRevision }}</div><div class="text-caption">Relay {{ system.appliedControlRevision ?? '—' }} · <span class="text-caption">bundle {{ system.desiredBundleHash ? system.desiredBundleHash.slice(7, 19) : '—' }}</span></div></q-card-section></q-card>
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
           <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">Requests</div><div class="text-h4">{{ usage?.requestCount ?? 0 }}</div><div class="text-caption">{{ usage?.forwardedRequestCount ?? 0 }} forwarded</div></q-card-section></q-card>
+        </div>
+      </div>
+      <div class="row q-col-gutter-md q-mt-xs">
+        <div class="col-12 col-md-6">
+          <q-card flat bordered>
+            <q-card-section class="text-subtitle1 text-weight-medium">Last activation</q-card-section>
+            <q-list separator>
+              <template v-if="system.latestActivation">
+                <q-item><q-item-section><q-item-label>{{ system.latestActivation.activationId }}</q-item-label><q-item-label caption>{{ system.latestActivation.kind }} · rev {{ system.latestActivation.desiredControlRevision }}</q-item-label></q-item-section><q-item-section side><StatusChip :value="system.latestActivation.state" /></q-item-section></q-item>
+              </template>
+              <q-item v-else><q-item-section class="text-grey-7">No activation yet.</q-item-section></q-item>
+              <q-item><q-item-section>Relay last seen</q-item-section><q-item-section side>{{ system.lastRelaySeenAt ?? '—' }}</q-item-section></q-item>
+            </q-list>
+          </q-card>
+        </div>
+        <div class="col-12 col-md-6">
+          <q-card flat bordered>
+            <q-card-section class="text-subtitle1 text-weight-medium">Upstreams</q-card-section>
+            <q-list separator>
+              <q-item><q-item-section>Active</q-item-section><q-item-section side>{{ upstreamCounts.ACTIVE ?? 0 }} active</q-item-section></q-item>
+              <q-item><q-item-section>Degraded</q-item-section><q-item-section side>{{ upstreamCounts.DEGRADED ?? 0 }} degraded</q-item-section></q-item>
+              <q-item><q-item-section>Disabled / inactive</q-item-section><q-item-section side>{{ (upstreamCounts.DISABLED ?? 0) + (upstreamCounts.INACTIVE ?? 0) }} disabled</q-item-section></q-item>
+              <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">No upstreams configured.</q-item-section></q-item>
+            </q-list>
+          </q-card>
         </div>
       </div>
       <div class="row q-col-gutter-md q-mt-xs">

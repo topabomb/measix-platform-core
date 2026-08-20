@@ -23,7 +23,12 @@ type Options struct {
 	AccessToken       string
 	ManagedGeneration int
 	InteractionID     string
-	HTTPClient        *http.Client
+	// SpoofHeaders are extra headers sent by the client. They exist to exercise
+	// the Relay's inbound sanitization (a malicious/compromised client attempting
+	// to forge internal X-Measix-* or forwarding headers); the Relay must strip
+	// them and never forward them to the upstream.
+	SpoofHeaders map[string]string
+	HTTPClient   *http.Client
 }
 
 // Client is a client-facing Test Client for the S0.1 runtime contract.
@@ -32,6 +37,7 @@ type Client struct {
 	token       string
 	generation  int
 	interaction string
+	spoof       map[string]string
 	http        *http.Client
 }
 
@@ -46,6 +52,7 @@ func New(opts Options) *Client {
 		token:       opts.AccessToken,
 		generation:  opts.ManagedGeneration,
 		interaction: opts.InteractionID,
+		spoof:       opts.SpoofHeaders,
 		http:        c,
 	}
 }
@@ -158,6 +165,9 @@ func (c *Client) newRequest(ctx context.Context, resourceID, runtimePath string,
 	req.Header.Set("X-Measix-Managed-Generation", fmt.Sprintf("%d", c.generation))
 	if c.interaction != "" {
 		req.Header.Set("X-Measix-Interaction-Id", c.interaction)
+	}
+	for k, v := range c.spoof {
+		req.Header.Set(k, v)
 	}
 	return req, nil
 }

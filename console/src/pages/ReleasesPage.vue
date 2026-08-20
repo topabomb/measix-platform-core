@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
@@ -74,13 +75,11 @@ onMounted(refresh)
 
 <template>
   <q-page padding>
-    <div class="row items-center justify-between q-mb-lg">
-      <div>
-        <div class="text-h5 text-weight-bold">Releases</div>
-        <div class="text-body2 text-grey-7">Immutable staged releases and republish history.</div>
-      </div>
-      <q-btn flat icon="refresh" @click="refresh" />
-    </div>
+    <PageHeader title="Releases" subtitle="Immutable staged releases and republish history.">
+      <template #actions>
+        <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
+      </template>
+    </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
     <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-md rounded-borders">
       <div class="row items-center justify-between">

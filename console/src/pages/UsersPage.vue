@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
@@ -119,10 +120,12 @@ onMounted(refresh)
 
 <template>
   <q-page padding>
-    <div class="row items-center justify-between q-mb-lg">
-      <div><div class="text-h5 text-weight-bold">Users</div><div class="text-body2 text-grey-7">Enterprise users, enrollment and device enforcement.</div></div>
-      <div class="q-gutter-sm"><q-btn flat icon="refresh" @click="refresh" /><q-btn color="primary" icon="person_add" label="Create user" :disable="!canMutate" @click="createOpen = true" /></div>
-    </div>
+    <PageHeader title="Users" subtitle="Enterprise users, enrollment and device enforcement.">
+      <template #actions>
+        <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
+        <q-btn color="primary" icon="person_add" label="Create user" :disable="!canMutate" @click="createOpen = true" />
+      </template>
+    </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
     <q-banner v-if="activation.activation && !activation.succeeded" class="bg-orange-1 q-mb-md rounded-borders">
       <div class="row items-center justify-between"><span>Security activation {{ activation.activation.activationId }}</span><StatusChip :value="activation.activation.state" /></div>

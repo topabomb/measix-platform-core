@@ -1,9 +1,10 @@
 # S0.1 Real Adapter Qualification Report
 
 > **Checkpoint**: C6 / C7  
+> **Status**: NOT EXECUTED — Real endpoint qualification has not been performed.  
 > **Date**: 2026-08-20  
 > **Architecture baseline**: `topabomb/measix-architecture@6eda9eb9bb842b4cbd3fa36f78e6c481ed35c55b`  
-> **Platform-core commit**: see `docs/s0-freeze-manifest.json` → `platformCoreCommit`
+> **Platform-core commit**: see `docs/s0-freeze-manifest.json` → `platformCoreCommit` (if generated)
 
 ## 1. Scope
 
@@ -14,15 +15,13 @@ deterministic Test Adapter is a faithful stand-in for a real upstream.
 This report covers:
 
 1. **Deterministic Adapter Qualification** — the in-repo `test/system/adapter`
-   is qualified against all four required transport profiles.
+   implements all four required transport profiles. System tests using the
+   deterministic adapter compile and pass at the component level.
 2. **Real Endpoint Qualification Procedure** — the documented procedure for
-   qualifying a real OpenAI-compatible endpoint (e.g. OpenAI API, Azure OpenAI,
-   Ollama with OpenAI compatibility layer).
-3. **Qualification Results** — the deterministic adapter passes all profiles.
+   qualifying a real OpenAI-compatible endpoint.
+3. **Qualification Results** — NOT EXECUTED.
 
-## 2. Deterministic Adapter Qualification
-
-### 2.1 Adapter Description
+## 2. Deterministic Adapter Description
 
 The deterministic Test Adapter (`backend/test/system/adapter/adapter.go`) is a
 real HTTP service backed by `httptest.Server`. It is NOT a mock — it uses real
@@ -37,37 +36,10 @@ responses.
 | ASR (multipart) | `POST /v1/audio/transcriptions` | HTTP_MULTIPART | JSON `{text:...}` |
 | MCP (Streamable HTTP) | `POST /mcp` | HTTP_REQUEST_RESPONSE | JSON `{jsonrpc:2.0,...}` |
 
-### 2.2 Qualification Scenarios
-
-The following scenarios are qualified through the full Hub→Relay→Adapter path
-in the system test suite:
-
-| Scenario ID | Description | Test | Status |
-|---|---|---|---|
-| QLF-001 | Model request/response roundtrip | `TestCAPC6001GoldenPath` | PASS |
-| QLF-002 | Model streaming SSE (≥2 chunks) | `runAllFourProfiles` | PASS |
-| QLF-003 | TTS binary stream (audio/mpeg) | `runAllFourProfiles` | PASS |
-| QLF-004 | ASR multipart upload | `runAllFourProfiles` | PASS |
-| QLF-005 | MCP Streamable HTTP | `runAllFourProfiles` | PASS |
-| QLF-006 | Stale generation 428 no-forward | `TestCAPC6004PublishNewGeneration` + `TestCAPC6004EnhancedNoForwardAndUsageGeneration` | PASS |
-| QLF-007 | Relay restart recovery | `TestCAPC6011RelayRestart` | PASS |
-| QLF-008 | Full restart preserves state | `TestCAPC6014FullRestart` | PASS |
-| QLF-009 | Backup/restore preserves generation | `TestCAPC6015BackupRestore` | PASS |
-| QLF-010 | Usage closure (all 4 kinds) | `TestCAPC6003UsageClosure` | PASS |
-| QLF-011 | Hub crash around Publish recovery | `TestCAPC6010HubCrashAroundPublish` | PASS |
-| QLF-012 | SQLite busy/transient recovery | `TestCAPC6013SQLiteBusyTransient` | PASS |
-| QLF-013 | Enhanced no-forward + Usage generation | `TestCAPC6004EnhancedNoForwardAndUsageGeneration` | PASS |
-
-### 2.3 Adapter Safety Properties
-
-The adapter captures request facts for assertion purposes but NEVER persists:
-
-- Authorization headers (excluded by `safeHeaders`)
-- Cookie headers (excluded by `safeHeaders`)
-- Set-Cookie headers (excluded by `safeHeaders`)
-- Raw prompt body content (not persisted in usage records)
-
-This is verified by `TestCAPSEC005UsageDetailNoContentLeak`.
+The deterministic adapter faithfully implements the OpenAI Chat Completions,
+Audio Speech, Audio Transcriptions, and MCP Streamable HTTP protocols. Its
+response shapes (JSON structure, SSE event format, binary content type,
+multipart parsing) match the OpenAI API specification.
 
 ## 3. Real Endpoint Qualification Procedure
 
@@ -139,26 +111,23 @@ The real endpoint is qualified when:
 - [ ] Usage records show correct resource kind, generation, and status
 - [ ] No prompt body or secret is leaked in usage detail
 - [ ] Stale generation requests return 428 with `forwarded: false`
-- [ ] Adapter receives NO request body for denied old-generation calls (enhanced assertion)
+- [ ] Adapter receives NO request body for denied old-generation calls
 
-## 4. Qualification Reference
+## 4. Qualification Results — NOT EXECUTED
 
-**Deterministic Adapter Qualification**: PASS  
-**Real Endpoint Qualification**: Procedure documented; execution requires
-an environment with a real OpenAI-compatible endpoint and API key. The
-deterministic adapter is validated as a faithful stand-in through the full
-Hub→Relay→Adapter path in all C6 system scenarios.
+**Deterministic Adapter**: Implemented; system tests using it compile and pass
+at the component level. These are deterministic T2/T3 evidence, NOT equivalent
+to real adapter qualification.
 
-The deterministic adapter faithfully implements the OpenAI Chat Completions,
-Audio Speech, Audio Transcriptions, and MCP Streamable HTTP protocols. Its
-response shapes (JSON structure, SSE event format, binary content type,
-multipart parsing) match the OpenAI API specification. Therefore, the C6
-system test results using the deterministic adapter are valid evidence that
-the Hub→Relay→Adapter path correctly handles real OpenAI-compatible endpoints.
+**Real Endpoint Qualification**: NOT EXECUTED. The procedure in §3.2 is the
+authoritative guide for operators to execute real endpoint qualification in a
+secure environment. No real OpenAI-compatible endpoint has been qualified.
 
 ## 5. Gap
 
-- Real OpenAI API qualification has not been executed in CI (requires an API
-  key secret that must not enter persistent state or logs per AGENTS.md).
-- The procedure in §3.2 is the authoritative guide for operators to execute
-  real endpoint qualification in a secure environment.
+- Real OpenAI API qualification has not been executed (requires an API key
+  secret that must not enter persistent state or logs per AGENTS.md).
+- Deterministic adapter tests are NOT a substitute for real adapter
+  qualification per `measix-s0-capability-delivery-system-testing-spec.md` §16.
+- The deterministic adapter cannot be used to claim real Adapter qualification
+  for C7 Freeze.

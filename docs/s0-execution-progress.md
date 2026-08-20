@@ -2,7 +2,6 @@
 
 > Architecture authority：`topabomb/measix-architecture@6eda9eb9bb842b4cbd3fa36f78e6c481ed35c55b`  
 > Implementation branch：`agent/s0-platform-core`  
-> 本轮重新审查前的实现 head：`846781f86473db44d4c0a87e2379a8298efbb956`  
 > 当前阶段：**S0.1 Managed Capability Delivery**  
 > 阶段阅读清单：`topabomb/measix-architecture/docs/measix-stage-document-index.md`
 
@@ -44,13 +43,18 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 
 保持 `measix-s0-capability-delivery-implementation-decision.md` 的 C0–C7 顺序，不重新设计 Relay 或扩大 S0.1 scope：
 
-1. 以最新 Admin Product Requirements + Admin Testing Spec 为准补齐 C1；
-2. 补齐 C2 visual authoring、Policy defaults、validation navigation 与 relationship state；
-3. 补齐 C3 Review → Snapshot Preview → Publish 产品闭环；
-4. 建立/完成 Playwright real-browser T4.1 slices，组合 C6 clean-environment Golden Path；
-5. 完成至少一套 required real Adapter qualification；
-6. exact candidate 全部 Green 后生成 C7 Freeze manifest；
-7. C7 之后才开始 S0.2 Android。
+1. **C6 产品闭环**：
+   - 扩展 Browser T4.1 Golden Path 从当前 login→Overview→System→refresh 到完整 CAP-C6-001 流程
+   - 创建一键 clean-environment T4.1 harness（自动 temp DB/Hub/Relay/Adapter/SPA）
+   - 修复 CAP-C6-012 为真实浏览器刷新测试
+   - 修复 CAP-C6-013 SQLite busy/transient 为真实锁竞争
+2. **CAP scenario evidence mapping**：为 C0-C5 添加 Architecture Scenario → executable test → exact SHA result 映射
+3. **Security required scenarios 补全**：expired JWT/wrong audience/disabled user/revoked device/session/management endpoint/Set-Cookie/redirect/Secret in browser/Snapshot Preview leak
+4. **system-test vs s01-candidate-test 分层隔离**：当前两者执行同一 scenarios package，需真正隔离 bounded T3 vs 完整 Candidate Gate
+5. **Freeze Manifest generator 修正**：真实 PASS/FAIL/startedAt/completedAt/C0-C5；不能在 tests 未通过时运行
+6. 完成至少一套 required real Adapter qualification；
+7. exact candidate 全部 Green 后生成 C7 Freeze manifest；
+8. C7 之后才开始 S0.2 Android。
 
 ## 状态维护规则
 
@@ -85,7 +89,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 
 4. **Recovery 场景测试**（`recovery_test.go`，新增）：
    - `TestCAPC6010HubCrashAroundPublish`：Hub 在 Publish activation 创建后崩溃，重启后同一 activation 完成且不产生重复 generation
-   - `TestCAPC6013SQLiteBusyTransient`：SQLite busy/transient 错误恢复，验证 bounded retry semantics 和无数据损坏
+   - `TestCAPC6013SQLiteBusyTransient`：SQLite busy/transient 错误恢复，验证 bounded retry 语义和无数据损坏
    - `TestCAPC6004EnhancedNoForwardAndUsageGeneration`：强化 CAP-C6-004，明确断言 428 forwarded=false、Adapter 无 request body、Usage 记录正确的 generation
 
 6. **Security Suite**（`security_test.go`，15 场景）：
@@ -119,7 +123,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 2. **Browser E2E 测试**（`console/e2e/golden-path.spec.ts`）：
    - CAP-C6-001 browser slice：login → Overview → System → refresh
    - CAP-C6-001 browser slice：create user → user visible in list
-   - 使用 `data-cy` 属性定位元素
+   - **GAP**：当前 Browser E2E 只覆盖 Golden Path 的很小一段，缺完整 CAP-C6-001 流程
 
 3. **@playwright/test 依赖**：
    - `console/package.json` 已添加 `@playwright/test@1.55.0`
@@ -132,11 +136,12 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 - `make console-e2e`：Playwright browser T4.1 suite（需 production build + real Hub/Relay）
 - `make console-build`：独立 Admin production build target
 
+**GAP**：当前 `system-test` 和 `s01-candidate-test` 执行同一 `./test/system/...` 或 `./test/system/scenarios/` package，没有真正隔离 bounded T3 vs 完整 Candidate Gate。需要使用 build tags 或独立 smoke test 包隔离。
+
 ### .gitattributes 行尾规范化（新增）
 
 - 新增 `.gitattributes` 确保 `*.go` 文件在所有平台 checkout 时保持 LF
 - 解决 Windows `autocrlf=true` 导致 gofmt 全量报错的问题
-- CI (Linux) 不受影响；本地 Windows 开发者不再需要手动 `gofmt -w`
 
 ### C7 Freeze Manifest 脚本增强
 
@@ -149,13 +154,22 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 - `deterministicAdapterVersion`：Test Adapter + Test Client 源码 hash
 - `realAdapterQualificationRef`：指向 `docs/s0-real-adapter-qualification.md`
 - `resourceBaselineRef`：指向 `docs/s0-resource-baseline.md`
-- `scenarioResults`：27 个场景的 ID/name/file/required 列表（含 CAP-C6-010、CAP-C6-013、CAP-C6-004-ENH）
+- `scenarioResults`：场景列表
+
+**GAP**：
+- `scenarioResults` 只是静态场景清单，没有真实 PASS/FAIL/result reference
+- 没有 required `startedAt` / `completedAt`
+- 缺 C0–C5 scenario results
+- 可在 tests 未通过时直接运行
+- Admin 未构建时允许 `adminBuildHash = "not-built"`
+- `realAdapterQualificationRef` 只是指向一个尚未 qualification 的文档
+- 没有证明 CAP-C7-002 的 clean replay
 
 ### 参考文档
 
-- `docs/s0-real-adapter-qualification.md`：Real Adapter Qualification 报告与操作流程
-- `docs/s0-resource-baseline.md`：Resource Baseline 基准指标
-- `docs/s0-clean-replay-report.md`：Clean Replay 验证报告
+- `docs/s0-real-adapter-qualification.md`：Real Adapter Qualification 报告（NOT EXECUTED）
+- `docs/s0-resource-baseline.md`：Resource Baseline 基准指标（NOT GREEN — 多数指标未测量）
+- `docs/s0-clean-replay-report.md`：Clean Replay 验证报告（NOT GREEN）
 
 ### 编译验证
 
@@ -164,25 +178,11 @@ gofmt -l backend/           — PASS (零文件需格式化)
 go build ./...              — PASS
 go vet ./...                — PASS
 go test -c ./test/system/... — PASS (编译通过)
-tsc --noEmit                — PASS
+pnpm build                  — PASS (production build)
+pnpm typecheck              — PASS
 tsc --noEmit -p tsconfig.e2e.json — PASS (Playwright E2E typecheck)
 vitest run (13 files, 56 tests) — PASS
 ```
-
-### gofmt 行尾修复
-
-- 在 Windows `autocrlf=true` 环境下，所有 Go 文件之前以 CRLF 检出，导致 `gofmt -l` 标记全量文件需格式化
-- `.gitattributes` 已配置 `*.go text eol=lf`，但工作树中文件在规则生效前已检出
-- 执行 `gofmt -w backend/` 修复全部 CRLF→LF + 实际格式修正（struct 字段对齐、单行 struct 声明展开）
-- 当前 `gofmt -l backend/` 返回零结果
-
-### Browser E2E data-cy 属性补齐
-
-- LoginPage.vue：`data-cy="login-username"`、`data-cy="login-password"`、`data-cy="login-submit"`
-- OverviewPage.vue：`data-cy="overview-page"`
-- SystemPage.vue：`data-cy="system-page"`、`data-cy="system-runtime-status"`
-- UsersPage.vue：`data-cy="users-page"`、`data-cy="create-user-btn"`、`data-cy="user-row"`、`data-cy="user-form-username"`、`data-cy="user-form-display-name"`、`data-cy="user-form-submit"`
-- Playwright E2E 测试中引用的定位器现在有对应的生产代码实现
 
 ### C1–C3 前端产品闭环完成状态（2026-08-20 更新）
 
@@ -239,14 +239,20 @@ vitest run (13 files, 56 tests) — PASS
 gofmt -l backend/           — PASS (零文件需格式化)
 go build ./...              — PASS
 go vet ./...                — PASS
-tsc --noEmit                — PASS
+pnpm build                  — PASS (production build)
+pnpm typecheck              — PASS
 tsc --noEmit -p tsconfig.e2e.json — PASS (Playwright E2E typecheck)
 vitest run (13 files, 56 tests) — PASS
 ```
 
 ## 当前剩余缺口
 
-- C6 deterministic system tests 需在 CI 或本地执行产出 Green 证据
-- Browser T4.1 Playwright 测试已落地但需在 candidate 环境执行产出 Green 证据
-- Real Adapter qualification 需在安全环境执行
-- C7 Freeze manifest 需在全部 Gate Green 后正式生成
+1. **C6** — Not Green：Browser T4.1 Golden Path 未完成完整 CAP-C6-001 流程；一键 clean-environment T4.1 harness 不存在；CAP-C6-012 不是真实浏览器刷新；CAP-C6-013 不是真实 SQLite 锁竞争
+2. **system-test vs s01-candidate-test 分层** — 假隔离：两者执行同一 scenarios package
+3. **CAP scenario evidence mapping** — C0-C5 缺正式 CAP ID 映射
+4. **Security required scenarios** — 缺 expired JWT/wrong audience/wrong issuer/unknown kid/disabled user/revoked device/revoked session/management endpoint/Set-Cookie/redirect/Secret in browser/Snapshot Preview leak
+5. **Real Adapter qualification** — 未执行
+6. **Freeze Manifest generator** — 不符合 C7（无真实 PASS/FAIL/startedAt/completedAt/C0-C5）
+7. **Resource Baseline** — 多数指标未测量；文档事实错误已修正
+8. **Clean Replay report** — 已修正为 NOT GREEN
+9. **C7** — Not Started

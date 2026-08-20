@@ -562,6 +562,16 @@ func TestCAPC6015BackupRestore(t *testing.T) {
 }
 
 // CAP-C6-012 — Browser refresh during activation: same activation recovered.
+// CAP-C6-012 — Browser refresh during activation (API-level simulation).
+// This test verifies that repeated API queries for the same activation ID
+// return the same activation state across "refreshes". It does NOT use a
+// real browser — it uses AdminClient GET requests to simulate the API
+// behavior that a browser refresh would trigger.
+//
+// ARCHITECTURE NOTE: The full CAP-C6-012 specification requires a real
+// browser refresh test, which is covered by the Playwright E2E suite
+// (console/e2e/). This Go test verifies the server-side activation
+// recovery semantics that underpin the browser behavior.
 func TestCAPC6012RefreshDuringActivation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()

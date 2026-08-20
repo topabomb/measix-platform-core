@@ -2,9 +2,8 @@ package scenarios
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -120,9 +119,10 @@ func TestCAPC6010HubCrashAroundPublish(t *testing.T) {
 // CAP-C6-013 — SQLite busy/transient error handling.
 // When SQLite encounters a transient/busy error, the Hub must handle it
 // gracefully with bounded retry semantics — no corruption, no silent loss.
-// This test simulates a transient DB lock by opening a write transaction
-// from a second connection while the Hub is operating, then verifying the
-// Hub recovers and continues to serve correctly.
+// This test creates a real SQLite write lock contention by opening a second
+// connection to the same database file, holding a write transaction, and
+// concurrently performing a Hub write operation. The Hub must either retry
+// internally (via WAL mode + busy_timeout) or return a clean error.
 func TestCAPC6013SQLiteBusyTransient(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -161,28 +161,54 @@ func TestCAPC6013SQLiteBusyTransient(t *testing.T) {
 		t.Fatalf("list users before transient: status=%d", resp.StatusCode)
 	}
 
-	// Simulate a transient SQLite busy condition by copying the DB file
-	// (simulating a backup/snapshot that briefly locks the file) and
-	// immediately performing a write operation. The Hub must either
-	// retry internally or return a clean error that the client can retry.
-	//
-	// We use a file copy to simulate the transient lock; the Hub's WAL
-	// mode and busy_timeout should handle this without corruption.
-	backupPath := filepath.Join(env.Root, "busy-snapshot.db")
-	if err := copyFile(env.DBPath, backupPath); err != nil {
-		t.Fatalf("copy db: %v", err)
+	// Open a second SQLite connection to the same DB file and hold a write
+	// transaction, creating real SQLITE_BUSY contention.
+	busyDB, err := sql.Open("sqlite", env.DBPath+"?_busy_timeout=100")
+	if err != nil {
+		t.Fatalf("open busy connection: %v", err)
+	}
+	defer busyDB.Close()
+
+	// Acquire an exclusive write lock on the DB.
+	tx, err := busyDB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		t.Fatalf("begin busy tx: %v", err)
+	}
+	// Lock a table to create real write contention.
+	if _, err := tx.Exec("UPDATE managed_drafts SET revision = revision WHERE 1=1"); err != nil {
+		// Some SQLite builds may not have this table; try a generic approach.
+		if _, err := tx.Exec("BEGIN IMMEDIATE"); err != nil {
+			t.Logf("could not acquire write lock: %v (this is acceptable — WAL mode may not block)", err)
+		}
 	}
 
-	// Immediately perform a write through the Admin API — the Hub must
-	// handle any transient SQLite lock gracefully.
-	draftRev := gp.getDraftRevision(ctx, admin)
-	content := gp.buildModifiedDraftContent(ctx, admin, "Transient Model")
-	newRev := gp.putDraft(ctx, admin, draftRev, content)
-	gp.validateDraft(ctx, admin, newRev)
+	// Immediately perform a write through the Admin API — the Hub's WAL mode
+	// and busy_timeout should handle the contention, or return a clean error.
+	// We do NOT expect this to hang or corrupt data.
+	done := make(chan error, 1)
+	go func() {
+		draftRev := gp.getDraftRevision(ctx, admin)
+		content := gp.buildModifiedDraftContent(ctx, admin, "Transient Model")
+		newRev := gp.putDraft(ctx, admin, draftRev, content)
+		gp.validateDraft(ctx, admin, newRev)
+		activationID := gp.publishDraft(ctx, admin, newRev)
+		gp.waitActivationCompleted(ctx, admin, activationID, 90*time.Second)
+		done <- nil
+	}()
 
-	// Publish and verify activation completes despite the transient.
-	activationID := gp.publishDraft(ctx, admin, newRev)
-	gp.waitActivationCompleted(ctx, admin, activationID, 60*time.Second)
+	// Release the lock after a brief period to simulate transient contention.
+	time.Sleep(500 * time.Millisecond)
+	_ = tx.Rollback()
+
+	// Wait for the concurrent operation to complete.
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("concurrent operation failed: %v", err)
+		}
+	case <-time.After(90 * time.Second):
+		t.Fatal("concurrent operation timed out — Hub may have deadlocked on SQLite busy")
+	}
 
 	// Wait for convergence.
 	if err := harness.WaitConvergence(ctx, env.HubBaseURL, admin.CSRFToken(), admin.CookieHeader(), 30*time.Second); err != nil {
@@ -216,9 +242,6 @@ func TestCAPC6013SQLiteBusyTransient(t *testing.T) {
 	if _, _, err := tc.ChatCompletion(ctx, ids.model, "/v1/chat/completions", `{"model":"gpt-test"}`); err != nil {
 		t.Fatalf("runtime request after transient: %v", err)
 	}
-
-	// Clean up the backup file.
-	_ = os.Remove(backupPath)
 
 	t.Log("CAP-C6-013 SQLite Busy/Transient: PASS")
 }

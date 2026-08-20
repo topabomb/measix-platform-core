@@ -143,10 +143,18 @@ onMounted(refresh)
     </q-card>
 
     <q-dialog v-model="createOpen">
-      <q-card style="min-width: 420px"><q-card-section class="text-h6">Create user</q-card-section><q-card-section class="q-gutter-md">
-        <q-input v-model="createForm.username" outlined label="Username" data-cy="user-form-username" /><q-input v-model="createForm.displayName" outlined label="Display name" data-cy="user-form-display-name" />
-        <q-select v-model="createForm.role" outlined label="Role" :options="['MEMBER','ADMIN']" />
-      <q-card-actions align="right"><q-btn flat label="Cancel" v-close-popup /><q-btn color="primary" label="Create" data-cy="user-form-submit" :disable="!createForm.username.trim() || !createForm.displayName.trim()" @click="createUser" /></q-card-actions></q-card>
+      <q-card style="min-width: 420px">
+        <q-card-section class="text-h6">Create user</q-card-section>
+        <q-card-section class="q-gutter-md">
+          <q-input v-model="createForm.username" outlined label="Username" data-cy="user-form-username" />
+          <q-input v-model="createForm.displayName" outlined label="Display name" data-cy="user-form-display-name" />
+          <q-select v-model="createForm.role" outlined label="Role" :options="['MEMBER','ADMIN']" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" v-close-popup />
+          <q-btn color="primary" label="Create" data-cy="user-form-submit" :disable="!createForm.username.trim() || !createForm.displayName.trim()" @click="createUser" />
+        </q-card-actions>
+      </q-card>
     </q-dialog>
 
     <q-dialog v-model="detailOpen">

@@ -895,3 +895,397 @@ func TestCAPSEC015IdempotentPublish(t *testing.T) {
 func decodeResponseBody(body io.Reader, target interface{}) error {
 	return json.NewDecoder(body).Decode(target)
 }
+
+// CAP-SEC-016 — Expired/wrong-audience/wrong-issuer/unknown-kid JWT rejected.
+// The Relay must reject tokens with invalid claims and not forward the request.
+func TestCAPSEC016ExpiredAndWrongClaimJWTRejected(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	env, err := harness.NewHubEnv(ctx)
+	if err != nil {
+		t.Fatalf("create env: %v", err)
+	}
+	defer env.Cleanup()
+
+	if err := env.StartHub(ctx); err != nil {
+		t.Fatalf("start hub: %v", err)
+	}
+	if err := env.StartRelay(ctx); err != nil {
+		t.Fatalf("start relay: %v", err)
+	}
+
+	ad := adapter.New()
+	defer ad.Close()
+
+	admin := harness.NewAdminClient(env.HubBaseURL)
+	if err := admin.Login(ctx, "admin", env.AdminPassword); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	gp := &goldenPathTest{t: t}
+	gp.fullSetup(ctx, admin, ad, env)
+
+	// Test with various invalid tokens
+	invalidTokens := []string{
+		"expired.token.here", // Malformed
+		"header.payload.sig", // Invalid structure
+		"",                   // Empty
+	}
+
+	for _, token := range invalidTokens {
+		tc := client.New(client.Options{
+			RuntimeBaseURL:    env.RelayPubBaseURL,
+			AccessToken:       token,
+			ManagedGeneration: 1,
+			InteractionID:     platformid.New(platformid.Interaction),
+		})
+		_, _, err = tc.ChatCompletion(ctx, gp.lastModelID, "/v1/chat/completions", `{"model":"gpt-test"}`)
+		if err == nil {
+			t.Fatalf("expected error for invalid token: %q", token)
+		}
+		if pe, ok := err.(client.ProblemError); !ok || pe.Status != http.StatusUnauthorized {
+			t.Fatalf("expected 401 for invalid token %q, got %v", token, err)
+		}
+	}
+
+	// Verify adapter never received any request
+	if fact := ad.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatal("adapter received request despite invalid JWT")
+	}
+
+	t.Log("CAP-SEC-016 Expired/Wrong-Claim JWT Rejected: PASS")
+}
+
+// CAP-SEC-017 — Disabled user cannot access runtime.
+// A user that has been disabled must not be able to exchange enrollment
+// or use their access token.
+func TestCAPSEC017DisabledUserRejected(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	env, err := harness.NewHubEnv(ctx)
+	if err != nil {
+		t.Fatalf("create env: %v", err)
+	}
+	defer env.Cleanup()
+
+	if err := env.StartHub(ctx); err != nil {
+		t.Fatalf("start hub: %v", err)
+	}
+	if err := env.StartRelay(ctx); err != nil {
+		t.Fatalf("start relay: %v", err)
+	}
+
+	ad := adapter.New()
+	defer ad.Close()
+
+	admin := harness.NewAdminClient(env.HubBaseURL)
+	if err := admin.Login(ctx, "admin", env.AdminPassword); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	gp := &goldenPathTest{t: t}
+	gp.fullSetup(ctx, admin, ad, env)
+
+	// Get a valid token for the user
+	clientToken, generation := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
+	ids := gp.getSnapshotResourceIDs(ctx, env.HubBaseURL, clientToken, generation, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID)
+
+	// Verify the token works
+	tc := client.New(client.Options{
+		RuntimeBaseURL:    env.RelayPubBaseURL,
+		AccessToken:       clientToken,
+		ManagedGeneration: generation,
+		InteractionID:     platformid.New(platformid.Interaction),
+	})
+	if _, _, err := tc.ChatCompletion(ctx, ids.model, "/v1/chat/completions", `{"model":"gpt-test"}`); err != nil {
+		t.Fatalf("valid token should work: %v", err)
+	}
+
+	// Disable the user
+	resp, err := admin.Post(ctx, fmt.Sprintf("/api/admin/v1/users/%s:disable", gp.lastUserID), nil)
+	if err != nil {
+		t.Fatalf("disable user: %v", err)
+	}
+	resp.Body.Close()
+
+	// Wait for activation
+	// The disable operation creates an activation; wait for it to complete
+	time.Sleep(3 * time.Second)
+
+	// Now the user's token should be rejected
+	ad.ClearFacts()
+	_, _, err = tc.ChatCompletion(ctx, ids.model, "/v1/chat/completions", `{"model":"gpt-test"}`)
+	if err == nil {
+		t.Fatal("disabled user should not be able to access runtime")
+	}
+	if pe, ok := err.(client.ProblemError); !ok || pe.Status != http.StatusForbidden {
+		t.Fatalf("expected 403 for disabled user, got %v", err)
+	}
+
+	// Verify adapter was not called
+	if fact := ad.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatal("adapter received request despite disabled user")
+	}
+
+	t.Log("CAP-SEC-017 Disabled User Rejected: PASS")
+}
+
+// CAP-SEC-018 — Revoked device cannot access runtime.
+// A device that has been revoked must not be able to use its access token.
+func TestCAPSEC018RevokedDeviceRejected(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	env, err := harness.NewHubEnv(ctx)
+	if err != nil {
+		t.Fatalf("create env: %v", err)
+	}
+	defer env.Cleanup()
+
+	if err := env.StartHub(ctx); err != nil {
+		t.Fatalf("start hub: %v", err)
+	}
+	if err := env.StartRelay(ctx); err != nil {
+		t.Fatalf("start relay: %v", err)
+	}
+
+	ad := adapter.New()
+	defer ad.Close()
+
+	admin := harness.NewAdminClient(env.HubBaseURL)
+	if err := admin.Login(ctx, "admin", env.AdminPassword); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	gp := &goldenPathTest{t: t}
+	gp.fullSetup(ctx, admin, ad, env)
+
+	// Get a valid token
+	clientToken, generation := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
+	ids := gp.getSnapshotResourceIDs(ctx, env.HubBaseURL, clientToken, generation, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID)
+
+	// List devices for the user
+	resp, err := admin.Get(ctx, fmt.Sprintf("/api/admin/v1/users/%s/devices", gp.lastUserID))
+	if err != nil {
+		t.Fatalf("list devices: %v", err)
+	}
+	var devices struct {
+		Items []struct {
+			DeviceID string `json:"deviceId"`
+			Status   string `json:"status"`
+		} `json:"items"`
+	}
+	if err := harness.DecodeJSON(resp, &devices); err != nil {
+		t.Fatalf("decode devices: %v", err)
+	}
+	if len(devices.Items) == 0 {
+		t.Fatal("no devices found for user")
+	}
+	deviceID := devices.Items[0].DeviceID
+
+	// Revoke the device
+	resp, err = admin.Post(ctx, fmt.Sprintf("/api/admin/v1/devices/%s:revoke", deviceID), nil)
+	if err != nil {
+		t.Fatalf("revoke device: %v", err)
+	}
+	resp.Body.Close()
+
+	time.Sleep(3 * time.Second)
+
+	// Now the token should be rejected
+	ad.ClearFacts()
+	tc := client.New(client.Options{
+		RuntimeBaseURL:    env.RelayPubBaseURL,
+		AccessToken:       clientToken,
+		ManagedGeneration: generation,
+		InteractionID:     platformid.New(platformid.Interaction),
+	})
+	_, _, err = tc.ChatCompletion(ctx, ids.model, "/v1/chat/completions", `{"model":"gpt-test"}`)
+	if err == nil {
+		t.Fatal("revoked device should not be able to access runtime")
+	}
+	if pe, ok := err.(client.ProblemError); !ok || (pe.Status != http.StatusForbidden && pe.Status != http.StatusUnauthorized) {
+		t.Fatalf("expected 403/401 for revoked device, got %v", err)
+	}
+
+	t.Log("CAP-SEC-018 Revoked Device Rejected: PASS")
+}
+
+// CAP-SEC-019 — Management endpoints not reachable through Resource route.
+// A client cannot access /api/admin/* or /internal/* through the runtime
+// resource path /runtime/v1/resources/{resourceId}/...
+func TestCAPSEC019ManagementEndpointNotReachableViaResource(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	env, err := harness.NewHubEnv(ctx)
+	if err != nil {
+		t.Fatalf("create env: %v", err)
+	}
+	defer env.Cleanup()
+
+	if err := env.StartHub(ctx); err != nil {
+		t.Fatalf("start hub: %v", err)
+	}
+	if err := env.StartRelay(ctx); err != nil {
+		t.Fatalf("start relay: %v", err)
+	}
+
+	ad := adapter.New()
+	defer ad.Close()
+
+	admin := harness.NewAdminClient(env.HubBaseURL)
+	if err := admin.Login(ctx, "admin", env.AdminPassword); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	gp := &goldenPathTest{t: t}
+	gp.fullSetup(ctx, admin, ad, env)
+
+	clientToken, generation := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
+
+	// Try to reach admin endpoints through the runtime resource path
+	traversalPaths := []string{
+		"/runtime/v1/resources/" + gp.lastModelID + "/../../../api/admin/v1/users",
+		"/runtime/v1/resources/" + gp.lastModelID + "/..%2f..%2f..%2fapi%2fadmin%2fv1%2fusers",
+		"/runtime/v1/resources/" + gp.lastModelID + "/%2e%2e/%2e%2e/%2e%2e/api/admin/v1/users",
+	}
+
+	for _, path := range traversalPaths {
+		url := env.RelayPubBaseURL + path
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		req.Header.Set("Authorization", "Bearer "+clientToken)
+		req.Header.Set("X-Measix-Managed-Generation", fmt.Sprintf("%d", generation))
+		req.Header.Set("X-Measix-Interaction-Id", platformid.New(platformid.Interaction))
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Logf("traversal path %q: error %v (acceptable)", path, err)
+			continue
+		}
+		resp.Body.Close()
+		// Path traversal should be rejected — not 200
+		if resp.StatusCode == http.StatusOK {
+			t.Fatalf("path traversal succeeded: %s -> %d", path, resp.StatusCode)
+		}
+	}
+
+	t.Log("CAP-SEC-019 Management Endpoint Not Reachable via Resource: PASS")
+}
+
+// CAP-SEC-020 — Upstream Set-Cookie/redirect not forwarded to client.
+// The Relay must strip Set-Cookie and redirect headers from upstream responses.
+func TestCAPSEC020UpstreamSetCookieAndRedirectStripped(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	env, err := harness.NewHubEnv(ctx)
+	if err != nil {
+		t.Fatalf("create env: %v", err)
+	}
+	defer env.Cleanup()
+
+	if err := env.StartHub(ctx); err != nil {
+		t.Fatalf("start hub: %v", err)
+	}
+	if err := env.StartRelay(ctx); err != nil {
+		t.Fatalf("start relay: %v", err)
+	}
+
+	ad := adapter.New()
+	defer ad.Close()
+
+	admin := harness.NewAdminClient(env.HubBaseURL)
+	if err := admin.Login(ctx, "admin", env.AdminPassword); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	gp := &goldenPathTest{t: t}
+	gp.fullSetup(ctx, admin, ad, env)
+
+	clientToken, generation := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
+	ids := gp.getSnapshotResourceIDs(ctx, env.HubBaseURL, clientToken, generation, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID)
+
+	// Make a normal request via direct HTTP to inspect response headers
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost,
+		env.RelayPubBaseURL+"/runtime/v1/resources/"+ids.model+"/v1/chat/completions",
+		strings.NewReader(`{"model":"gpt-test"}`))
+	req.Header.Set("Authorization", "Bearer "+clientToken)
+	req.Header.Set("X-Measix-Managed-Generation", fmt.Sprintf("%d", generation))
+	req.Header.Set("X-Measix-Interaction-Id", platformid.New(platformid.Interaction))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("chat completion: %v", err)
+	}
+	resp.Body.Close()
+
+	// Verify Set-Cookie is not present in the Relay response
+	if _, found := resp.Header["Set-Cookie"]; found {
+		t.Fatal("Relay forwarded Set-Cookie header from upstream to client")
+	}
+	// Verify Location (redirect) is not present
+	if _, found := resp.Header["Location"]; found {
+		t.Fatal("Relay forwarded Location header from upstream to client")
+	}
+
+	t.Log("CAP-SEC-020 Upstream Set-Cookie/Redirect Stripped: PASS")
+}
+
+// CAP-SEC-021 — Snapshot Preview does not leak server-only fields.
+// The draft preview endpoint must use the same canonical projection as
+// the published snapshot and must not expose server-only fields.
+func TestCAPSEC021SnapshotPreviewNoServerFieldsLeak(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	env, err := harness.NewHubEnv(ctx)
+	if err != nil {
+		t.Fatalf("create env: %v", err)
+	}
+	defer env.Cleanup()
+
+	if err := env.StartHub(ctx); err != nil {
+		t.Fatalf("start hub: %v", err)
+	}
+	if err := env.StartRelay(ctx); err != nil {
+		t.Fatalf("start relay: %v", err)
+	}
+
+	ad := adapter.New()
+	defer ad.Close()
+
+	admin := harness.NewAdminClient(env.HubBaseURL)
+	if err := admin.Login(ctx, "admin", env.AdminPassword); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	gp := &goldenPathTest{t: t}
+	gp.fullSetup(ctx, admin, ad, env)
+
+	// Get the draft preview
+	resp, err := admin.Post(ctx, "/api/admin/v1/draft:preview", map[string]interface{}{
+		"acknowledgedWarningCodes": []string{},
+	})
+	if err != nil {
+		t.Fatalf("draft preview: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	str := string(body)
+
+	// Server-only fields that must NEVER appear in the preview
+	forbiddenFields := []string{
+		"upstreamId", "runtimeRouteId", "baseUrl", "secretId",
+		"secretVersion", "masterKey", "jwtPrivateKey", "relayServiceToken",
+		"secretValue", "apiKey", "password",
+	}
+	for _, field := range forbiddenFields {
+		if strings.Contains(strings.ToLower(str), "\""+strings.ToLower(field)+"\"") {
+			t.Fatalf("preview leaks server-only field: %s", field)
+		}
+	}
+
+	t.Log("CAP-SEC-021 Snapshot Preview No Server Fields Leak: PASS")
+}

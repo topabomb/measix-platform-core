@@ -7,6 +7,7 @@ This document defines how engineers work on `measix-platform-core` locally or en
 S0 architecture fixes the major implementation stack:
 
 - Go 1.26.x;
+- Node.js >= 22.17.0;
 - OpenAPI 3.0.3;
 - `oapi-codegen/v2` / `kin-openapi`;
 - SQLite with `modernc.org/sqlite`;
@@ -14,9 +15,9 @@ S0 architecture fixes the major implementation stack:
 - Vue 3 + TypeScript + Quasar;
 - Pinia + Vue Router;
 - `openapi-typescript`;
-- pnpm.
+- pnpm 11.
 
-Exact patch/tool versions become authoritative in repository-controlled toolchain files and lockfiles when I0 initializes them. Do not duplicate floating version tables across multiple Markdown files.
+Concrete minimum/runtime versions are enforced by repository-controlled toolchain files and CI. Do not duplicate floating version tables across multiple Markdown files.
 
 ## 2. Development modes
 
@@ -149,7 +150,7 @@ Relay data-path changes must be tested against real HTTP/TCP boundaries for stre
 
 ## 11. Local runtime and dev commands
 
-The repository root is npm-orchestrated (`package.json`); the Admin Console itself uses pnpm (`console/pnpm-lock.yaml`). Required local toolchain: Go 1.26.x, Node 24 LTS, pnpm 11.
+The repository root is npm-orchestrated (`package.json`); the Admin Console itself uses pnpm (`console/pnpm-lock.yaml`). Required local toolchain: Go 1.26.x, Node.js >= 22.17.0, pnpm 11. CI runs Node.js 22.17.0 to verify the minimum supported Node baseline.
 
 ```bash
 npm run setup             # one-shot bootstrap: keys (.secrets/), migration (.data/hub.db), admin user

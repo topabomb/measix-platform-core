@@ -65,7 +65,7 @@ func TestHUBCAP002CandidateIDValidation(t *testing.T) {
 		content := validDraft(up.UpstreamID)
 		providerID := content.Providers[0].ProviderId
 		content.Providers = append(content.Providers, adminapi.ProviderDefinition{
-			ProviderId: providerID, // duplicate
+			ProviderId:  providerID, // duplicate
 			DisplayName: "Duplicate", ClientProtocol: adminapi.OPENAICHATCOMPLETIONS, Enabled: true,
 		})
 		_, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
@@ -84,7 +84,7 @@ func TestHUBCAP002CandidateIDValidation(t *testing.T) {
 		// TTS with a different prefix but using the same UUID is still not a duplicate
 		// because the prefix differs. But a model ID used twice is a duplicate.
 		content.Models = append(content.Models, adminapi.ModelDefinition{
-			ModelId: sharedID, // same ID = duplicate
+			ModelId:    sharedID, // same ID = duplicate
 			ProviderId: content.Providers[0].ProviderId, DisplayName: "Dup Model",
 			UpstreamModelKey: "model-dup", RuntimePath: "/v1/chat/completions", Enabled: false,
 			Capabilities: []adminapi.ModelDefinitionCapabilities{adminapi.TOOL}, InputModalities: []adminapi.ModelDefinitionInputModalities{adminapi.ModelDefinitionInputModalitiesTEXT}, OutputModalities: []adminapi.ModelDefinitionOutputModalities{adminapi.ModelDefinitionOutputModalitiesTEXT},

@@ -163,7 +163,7 @@ func TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck(t *testing.T) {
 
 func publishUpstreamConfig(secretID string, secretVersion int) adminapi.UpstreamConfig {
 	return adminapi.UpstreamConfig{
-		Name: "Adapter",
+		Name:    "Adapter",
 		BaseUrl: "https://adapter.example",
 		TransportCapabilities: []adminapi.UpstreamConfigTransportCapabilities{
 			adminapi.UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE,

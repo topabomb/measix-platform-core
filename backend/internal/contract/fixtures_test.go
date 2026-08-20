@@ -88,7 +88,7 @@ func TestNegativeSnapshotFixturesRejectedByEnumValidation(t *testing.T) {
 	// Go JSON unmarshal does not reject unknown enum values for string-based types,
 	// so we use the generated Valid() methods to verify they are not valid enum members.
 	type check struct {
-		path string
+		path  string
 		valid func() bool
 	}
 

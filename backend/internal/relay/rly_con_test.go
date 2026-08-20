@@ -90,9 +90,9 @@ func TestRLYCON004OldCredentialNotUsedInNewRequest(t *testing.T) {
 
 	stateA := relaycontrolapi.RuntimeControlState{
 		ControlRevision: 1, ActiveManagedGeneration: 1, DeploymentId: deploymentID,
-		PrincipalState: relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
-		ResourceRoutes: []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
-		Routes: []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
+		PrincipalState:    relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
+		ResourceRoutes:    []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
+		Routes:            []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
 		Upstreams:         []relaycontrolapi.RuntimeUpstreamSpec{{UpstreamId: upstreamID, BaseUrl: upstreamA.URL, Enabled: true, TransportCapabilities: []string{"HTTP_STREAMING_SSE"}, Auth: relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.BEARER, AdditionalProperties: map[string]interface{}{"token": "old-credential"}}}},
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 	}
@@ -118,9 +118,9 @@ func TestRLYCON004OldCredentialNotUsedInNewRequest(t *testing.T) {
 	// Apply new state with different upstream and credential.
 	stateB := relaycontrolapi.RuntimeControlState{
 		ControlRevision: 2, ActiveManagedGeneration: 2, DeploymentId: deploymentID,
-		PrincipalState: relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
-		ResourceRoutes: []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
-		Routes: []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
+		PrincipalState:    relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
+		ResourceRoutes:    []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
+		Routes:            []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
 		Upstreams:         []relaycontrolapi.RuntimeUpstreamSpec{{UpstreamId: upstreamID, BaseUrl: upstreamB.URL, Enabled: true, TransportCapabilities: []string{"HTTP_STREAMING_SSE"}, Auth: relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.BEARER, AdditionalProperties: map[string]interface{}{"token": "new-credential"}}}},
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 	}
@@ -294,9 +294,9 @@ func TestRLYCON002NewRequestUsesNewState(t *testing.T) {
 	upstreamID2 := platformid.New(platformid.Upstream)
 	state2 := relaycontrolapi.RuntimeControlState{
 		ControlRevision: 2, ActiveManagedGeneration: 2, DeploymentId: fixture.signer.deploymentID,
-		PrincipalState: relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
-		ResourceRoutes: []relaycontrolapi.ResourceRoute{{ResourceId: resourceID2, RuntimeRouteId: routeID2}},
-		Routes: []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID2, UpstreamId: upstreamID2, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
+		PrincipalState:    relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
+		ResourceRoutes:    []relaycontrolapi.ResourceRoute{{ResourceId: resourceID2, RuntimeRouteId: routeID2}},
+		Routes:            []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID2, UpstreamId: upstreamID2, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
 		Upstreams:         []relaycontrolapi.RuntimeUpstreamSpec{{UpstreamId: upstreamID2, BaseUrl: upstream.URL, Enabled: true, TransportCapabilities: []string{"HTTP_STREAMING_SSE"}, Auth: relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.BEARER, AdditionalProperties: map[string]interface{}{"token": "runtime-secret"}}}},
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 	}

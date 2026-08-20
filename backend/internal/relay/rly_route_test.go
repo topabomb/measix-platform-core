@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"measix/platform/internal/wire/relaycontrolapi"
-	"measix/platform/pkg/platformid"
-	relayruntime "measix/platform/internal/relay/runtime"
-	"measix/platform/internal/relay/control"
-	relaystate "measix/platform/internal/wire/relaystate"
 	"crypto/ed25519"
 	"crypto/rand"
+	"measix/platform/internal/relay/control"
+	relayruntime "measix/platform/internal/relay/runtime"
+	"measix/platform/internal/wire/relaycontrolapi"
+	relaystate "measix/platform/internal/wire/relaystate"
+	"measix/platform/pkg/platformid"
 	"time"
 )
 

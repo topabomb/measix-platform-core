@@ -48,11 +48,11 @@ type ValidationResult struct {
 }
 
 type ReleaseView struct {
-	ReleaseID         string
-	ManagedGeneration int
-	SnapshotHash      string
-	Status            string
-	CreatedAt         time.Time
+	ReleaseID           string
+	ManagedGeneration   int
+	SnapshotHash        string
+	Status              string
+	CreatedAt           time.Time
 	SourceDraftRevision int
 	PublishedBy         string
 	DiffSummary         adminapi.DiffSummary

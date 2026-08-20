@@ -93,7 +93,7 @@ func TestRLYAUTH002WrongAlgSignatureKidRejected(t *testing.T) {
 	t.Run("wrong alg (HS256)", func(t *testing.T) {
 		claims := testAccessClaims{
 			DeploymentID: fixture.signer.deploymentID,
-			DeviceID:      fixture.deviceID, SessionID: fixture.sessionID,
+			DeviceID:     fixture.deviceID, SessionID: fixture.sessionID,
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer: fixture.signer.deploymentID, Subject: fixture.userID,
 				Audience: jwt.ClaimStrings{"client", "runtime"},
@@ -121,7 +121,7 @@ func TestRLYAUTH002WrongAlgSignatureKidRejected(t *testing.T) {
 	t.Run("wrong kid", func(t *testing.T) {
 		token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, testAccessClaims{
 			DeploymentID: fixture.signer.deploymentID,
-			DeviceID:      fixture.deviceID, SessionID: fixture.sessionID,
+			DeviceID:     fixture.deviceID, SessionID: fixture.sessionID,
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer: fixture.signer.deploymentID, Subject: fixture.userID,
 				Audience: jwt.ClaimStrings{"client", "runtime"},
@@ -217,8 +217,8 @@ func TestRLYAUTH004ExpiredTokenRejected(t *testing.T) {
 			DeviceID:     fixture.deviceID, SessionID: fixture.sessionID,
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer: fixture.signer.deploymentID, Subject: fixture.userID,
-				Audience: jwt.ClaimStrings{"client", "runtime"},
-				IssuedAt: jwt.NewNumericDate(fixture.signer.now.Add(-20 * time.Minute)),
+				Audience:  jwt.ClaimStrings{"client", "runtime"},
+				IssuedAt:  jwt.NewNumericDate(fixture.signer.now.Add(-20 * time.Minute)),
 				ExpiresAt: jwt.NewNumericDate(fixture.signer.now.Add(-10 * time.Minute)),
 			},
 		}
@@ -326,10 +326,10 @@ func TestRLYAUTH006DisabledUserRejected(t *testing.T) {
 	defer upstream.Close()
 	state := relaycontrolapi.RuntimeControlState{
 		ControlRevision: 1, ActiveManagedGeneration: 1,
-		DeploymentId:   deploymentID,
-		PrincipalState:  relaycontrolapi.PrincipalState{DisabledUserIds: []string{userID}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
-		ResourceRoutes:  []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
-		Routes: []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
+		DeploymentId:      deploymentID,
+		PrincipalState:    relaycontrolapi.PrincipalState{DisabledUserIds: []string{userID}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
+		ResourceRoutes:    []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
+		Routes:            []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
 		Upstreams:         []relaycontrolapi.RuntimeUpstreamSpec{{UpstreamId: upstreamID, BaseUrl: upstream.URL, Enabled: true, TransportCapabilities: []string{"HTTP_STREAMING_SSE"}, Auth: relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.NONE, AdditionalProperties: map[string]interface{}{}}}},
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 	}
@@ -370,10 +370,10 @@ func TestRLYAUTH007RevokedDeviceSessionRejected(t *testing.T) {
 	t.Run("revoked device", func(t *testing.T) {
 		state := relaycontrolapi.RuntimeControlState{
 			ControlRevision: 1, ActiveManagedGeneration: 1,
-			DeploymentId:   deploymentID,
-			PrincipalState:  relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{deviceID}, RevokedSessionIds: []string{}},
-			ResourceRoutes:  []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
-			Routes: []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
+			DeploymentId:      deploymentID,
+			PrincipalState:    relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{deviceID}, RevokedSessionIds: []string{}},
+			ResourceRoutes:    []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
+			Routes:            []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
 			Upstreams:         []relaycontrolapi.RuntimeUpstreamSpec{{UpstreamId: upstreamID, BaseUrl: upstream.URL, Enabled: true, TransportCapabilities: []string{"HTTP_STREAMING_SSE"}, Auth: relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.NONE, AdditionalProperties: map[string]interface{}{}}}},
 			OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 		}
@@ -395,10 +395,10 @@ func TestRLYAUTH007RevokedDeviceSessionRejected(t *testing.T) {
 	t.Run("revoked session", func(t *testing.T) {
 		state := relaycontrolapi.RuntimeControlState{
 			ControlRevision: 1, ActiveManagedGeneration: 1,
-			DeploymentId:   deploymentID,
-			PrincipalState:  relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{sessionID}},
-			ResourceRoutes:  []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
-			Routes: []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
+			DeploymentId:      deploymentID,
+			PrincipalState:    relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{sessionID}},
+			ResourceRoutes:    []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
+			Routes:            []relaycontrolapi.RuntimeRouteSpec{{RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}}},
 			Upstreams:         []relaycontrolapi.RuntimeUpstreamSpec{{UpstreamId: upstreamID, BaseUrl: upstream.URL, Enabled: true, TransportCapabilities: []string{"HTTP_STREAMING_SSE"}, Auth: relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.NONE, AdditionalProperties: map[string]interface{}{}}}},
 			OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 		}

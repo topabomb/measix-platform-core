@@ -228,7 +228,7 @@ func bootstrapI2(t *testing.T) (*testutil.StoreHandle, identity.BootstrapResult,
 
 func testUpstreamConfig(secretID string, secretVersion int) adminapi.UpstreamConfig {
 	return adminapi.UpstreamConfig{
-		Name: "Adapter",
+		Name:    "Adapter",
 		BaseUrl: "https://adapter.example",
 		TransportCapabilities: []adminapi.UpstreamConfigTransportCapabilities{
 			adminapi.UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE,

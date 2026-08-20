@@ -102,6 +102,13 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
 5. Overview/System 页面接入 PageHeader
 6. 新增 navigation registry 单元测试（3 tests），console 22 tests Green
 
+### C2/C3 Resources 契约修正（head `7419df0`）
+
+1. **Publish 契约闭环**：`publish()` 现在发送 `expectedDraftRevision` + `acknowledgedWarningCodes`（对 validate warnings 显式确认），不再发送空 body
+2. **移除 `prv_placeholder`**：新增 provider 创建/编辑/删除（候选 id，绝不用占位 provider）；`Add model` 在无 provider 时禁用，有 provider 时绑定第一个真实 provider
+3. provider 删除有引用保护（被 model 引用时拒绝）
+4. 新增 2 个 ResourcesPage 测试（real-provider model 添加、publish body 契约），console 24 tests Green
+
 ### C2 Managed Resource Editor
 
 1. **ResourcesPage.vue 重写**：

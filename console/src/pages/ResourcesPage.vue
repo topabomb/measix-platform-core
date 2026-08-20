@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { components } from '../api/generated'
-import { apiFetch } from '../api/client'
+import { apiFetch, createCandidateId } from '../api/client'
 import { useDraftStore } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
 import { useActivationStore } from '../stores/activation'
@@ -52,6 +52,16 @@ async function validate() {
 
 async function publish() {
   if (!session.csrfToken) return
+  if (draft.baselineRevision === undefined) return
+  // The executable contract requires expectedDraftRevision and an explicit
+  // acknowledgement of any outstanding warning codes before publishing.
+  const warnings = draft.validationResult?.warnings ?? []
+  if (warnings.length) {
+    const ok = window.confirm(
+      `Publish with ${warnings.length} acknowledged warning(s)?\n${warnings.map((w) => `${w.code} (${w.path})`).join('\n')}`,
+    )
+    if (!ok) return
+  }
   if (!window.confirm('Publish current draft as a new Release? This creates an immutable staged release.')) return
   publishing.value = true
   activation.resetCommand()
@@ -61,6 +71,10 @@ async function publish() {
     const result = await apiFetch<Activation>('/api/admin/v1/draft:publish', {
       method: 'POST',
       headers: { 'Idempotency-Key': key },
+      body: JSON.stringify({
+        expectedDraftRevision: draft.baselineRevision,
+        acknowledgedWarningCodes: warnings.map((w) => w.code),
+      }),
     }, session.csrfToken)
     activation.accept(result)
     if (result.state === 'APPLYING' || result.state === 'UNKNOWN') {
@@ -77,6 +91,47 @@ async function publish() {
 /** Count models referencing a given providerId */
 function modelCountForProvider(providerId: string): number {
   return draft.localContent?.models.filter((m) => m.providerId === providerId).length ?? 0
+}
+
+/** Add a model bound to the first real provider. Never fabricate a placeholder
+ * provider (architecture testing spec forbids prv_placeholder bindings). */
+function addModel() {
+  const content = draft.localContent
+  if (!content) return
+  if (!content.providers.length) {
+    error.value = new Error('Add a provider before adding models — every model must bind to a real provider.')
+    return
+  }
+  draft.addModel(content.providers[0].providerId)
+  draft.markDirty()
+}
+
+/** Add a real provider (candidate id) — never a placeholder binding. */
+function addProvider() {
+  const content = draft.localContent
+  if (!content) return
+  const providerId = createCandidateId('prv')
+  content.providers.push({
+    providerId,
+    displayName: 'New provider',
+    clientProtocol: 'OPENAI_CHAT_COMPLETIONS',
+    enabled: true,
+  })
+  draft.markDirty()
+  return providerId
+}
+
+/** Delete a provider only when no models reference it. */
+function removeProvider(providerId: string) {
+  const content = draft.localContent
+  if (!content) return
+  const referenced = content.models.some((m) => m.providerId === providerId)
+  if (referenced) {
+    error.value = new Error(`Provider ${providerId} is referenced by models and cannot be removed.`)
+    return
+  }
+  content.providers = content.providers.filter((p) => p.providerId !== providerId)
+  draft.markDirty()
 }
 
 async function previewSnapshot() {
@@ -144,16 +199,20 @@ onMounted(refresh)
         <q-card-section>
           <div class="row items-center justify-between">
             <div class="text-subtitle2">Providers</div>
+            <q-btn flat dense icon="add" label="Add provider" size="sm" @click="addProvider()" />
           </div>
           <q-list dense class="q-mt-sm">
             <q-item v-for="provider in draft.localContent.providers" :key="provider.providerId">
               <q-item-section>
-                <q-item-label>{{ provider.displayName }}</q-item-label>
-                <q-item-label caption>{{ provider.providerId }} · {{ provider.clientProtocol }} · {{ modelCountForProvider(provider.providerId) }} model(s)</q-item-label>
+                <q-input v-model="provider.displayName" dense outlined label="Display name" @update:model-value="draft.markDirty()" />
+                <div class="text-caption text-grey-7">{{ provider.providerId }} · {{ provider.clientProtocol }} · {{ modelCountForProvider(provider.providerId) }} model(s)</div>
               </q-item-section>
-              <q-item-section side><q-toggle v-model="provider.enabled" @update:model-value="draft.markDirty()" /></q-item-section>
+              <q-item-section side>
+                <q-toggle v-model="provider.enabled" @update:model-value="draft.markDirty()" />
+                <q-btn flat dense color="negative" icon="delete" size="sm" :disable="modelCountForProvider(provider.providerId) > 0" @click="removeProvider(provider.providerId)" />
+              </q-item-section>
             </q-item>
-            <q-item v-if="!draft.localContent.providers.length"><q-item-section class="text-grey-7">No providers.</q-item-section></q-item>
+            <q-item v-if="!draft.localContent.providers.length"><q-item-section class="text-grey-7">No providers. Add one before creating models.</q-item-section></q-item>
           </q-list>
         </q-card-section>
       </q-card>
@@ -164,7 +223,7 @@ onMounted(refresh)
           <q-card-section>
             <div class="row items-center justify-between">
               <div class="text-subtitle2">Models</div>
-              <q-btn flat dense icon="add" label="Add model" size="sm" @click="draft.addModel('prv_placeholder'); draft.markDirty()" />
+              <q-btn flat dense icon="add" label="Add model" size="sm" :disable="!draft.localContent.providers.length" @click="addModel()" />
             </div>
             <q-list dense class="q-mt-sm">
               <q-item v-for="(model, idx) in draft.localContent.models" :key="model.modelId">

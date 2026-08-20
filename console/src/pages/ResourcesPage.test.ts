@@ -200,6 +200,83 @@ describe('ResourcesPage', () => {
     expect(html).toContain('1')
   })
 
+  it('adds a model only when a real provider exists, never a placeholder', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    const draft = useDraftStore(pinia)
+    const addModelBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Add model'))
+    expect(addModelBtn!.props('disable')).toBe(true)
+
+    // Add a real provider, then the model button becomes usable and binds to it.
+    draft.localContent!.providers.push({
+      providerId: 'prv_openai',
+      displayName: 'OpenAI',
+      clientProtocol: 'OPENAI_CHAT_COMPLETIONS',
+      enabled: true,
+    })
+    draft.markDirty()
+    await flushPromises()
+
+    const enabledBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Add model'))
+    await enabledBtn!.trigger('click')
+    await flushPromises()
+
+    expect(draft.localContent!.models).toHaveLength(1)
+    expect(draft.localContent!.models[0].providerId).toBe('prv_openai')
+    expect(draft.localContent!.models[0].providerId).not.toMatch(/placeholder/)
+  })
+
+  it('publishes with expectedDraftRevision and acknowledged warning codes', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    const draftWithWarnings = structuredClone(EMPTY_DRAFT) as {
+      draftRevision: number
+      content: {
+        providers: { providerId: string; displayName: string; clientProtocol: string; enabled: boolean }[]
+        models: unknown[]; tts: unknown[]; asr: unknown[]; mcp: unknown[]; bindings: unknown[]
+        policy: Record<string, unknown>
+      }
+    }
+    draftWithWarnings.content.providers = [{
+      providerId: 'prv_openai', displayName: 'OpenAI', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', enabled: true,
+    }]
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/api/admin/v1/draft') return draftWithWarnings
+      if (path === '/api/admin/v1/draft:validate') {
+        return {
+          valid: true,
+          errors: [],
+          warnings: [{ code: 'WARN_UNKNOWN_COST', path: '$', message: 'cost unknown', severity: 'WARNING' }],
+        }
+      }
+      return { activationId: 'act_001', kind: 'PUBLISH', state: 'APPLYING' }
+    })
+
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    const draft = useDraftStore(pinia)
+    draft.validationResult = {
+      valid: true,
+      errors: [],
+      warnings: [{ code: 'WARN_UNKNOWN_COST', path: '$', message: 'cost unknown', severity: 'WARNING' }],
+    }
+    await flushPromises()
+
+    window.confirm = vi.fn(() => true)
+    const publishBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '') === 'Publish')
+    await publishBtn!.trigger('click')
+    await flushPromises()
+
+    const publishCall = fetchSpy.mock.calls.find((c) => c[0] === '/api/admin/v1/draft:publish')
+    expect(publishCall).toBeDefined()
+    const body = JSON.parse((publishCall![1] as RequestInit).body as string)
+    expect(body.expectedDraftRevision).toBe(1)
+    expect(body.acknowledgedWarningCodes).toEqual(['WARN_UNKNOWN_COST'])
+  })
+
   it('can preview snapshot and shows hash and resource counts', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {

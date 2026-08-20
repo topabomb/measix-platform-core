@@ -52,15 +52,12 @@ func TestBaseline(t *testing.T) {
 	// Measure user creation latency
 	gp := &goldenPathTest{t: t}
 	userStart := time.Now()
-	gp.createUser(ctx, admin)
+	userID := gp.createUser(ctx, admin)
 	userLatency := time.Since(userStart)
 	t.Logf("BASELINE create user latency: %v", userLatency)
 
 	// Measure enrollment creation
 	enrollStart := time.Now()
-	gp.lastEnrollmentCode = gp.createEnrollment(ctx, admin, "usr_"+platformid.New(platformid.User)[:8])
-	// Re-create with proper user ID
-	userID := gp.createUser(ctx, admin)
 	gp.lastEnrollmentCode = gp.createEnrollment(ctx, admin, userID)
 	enrollLatency := time.Since(enrollStart)
 	t.Logf("BASELINE create enrollment latency: %v", enrollLatency)
@@ -91,7 +88,7 @@ func TestBaseline(t *testing.T) {
 
 	// Build and save draft
 	draftRev := gp.getDraftRevision(ctx, admin)
-	gp.lastProviderID = "prv_" + platformid.New(platformid.Deployment)[:8]
+	gp.lastProviderID = platformid.New(platformid.Provider)
 	gp.lastModelID = platformid.New(platformid.Model)
 	gp.lastTtsID = platformid.New(platformid.TTS)
 	gp.lastAsrID = platformid.New(platformid.ASR)
@@ -100,7 +97,7 @@ func TestBaseline(t *testing.T) {
 	routeTTS := platformid.New(platformid.Route)
 	routeASR := platformid.New(platformid.Route)
 	routeMCP := platformid.New(platformid.Route)
-	policyID := "pol_" + platformid.New(platformid.Deployment)[:8]
+	policyID := platformid.New(platformid.Policy)
 	gp.lastDraftContent = gp.buildDraftContent(
 		gp.lastProviderID, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID,
 		gp.lastUpstreamID, routeModel, routeTTS, routeASR, routeMCP, policyID,

@@ -298,8 +298,9 @@ func TestCAPC6004PublishNewGeneration(t *testing.T) {
 		t.Fatalf("expected 428, got %v", err)
 	}
 
-	// Fetch new snapshot with new generation
-	_, generationN1 := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
+	// Fetch new snapshot with new generation — need a fresh enrollment since the first was consumed
+	newEnrollmentCode := gp.createEnrollment(ctx, admin, gp.lastUserID)
+	_, generationN1 := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, newEnrollmentCode)
 	if generationN1 <= generationN {
 		t.Fatalf("generation should increment: %d -> %d", generationN, generationN1)
 	}
@@ -535,8 +536,9 @@ func TestCAPC6015BackupRestore(t *testing.T) {
 		t.Fatalf("re-login: %v", err)
 	}
 
-	// Verify generation is preserved
-	_, generationAfter := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
+	// Verify generation is preserved — need a fresh enrollment since the first was consumed
+	newEnrollmentCode := gp.createEnrollment(ctx, admin, gp.lastUserID)
+	_, generationAfter := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, newEnrollmentCode)
 	if generationAfter != generation {
 		t.Fatalf("generation not preserved: %d -> %d", generation, generationAfter)
 	}
@@ -595,7 +597,7 @@ func TestCAPC6012RefreshDuringActivation(t *testing.T) {
 	gp.applyUpstream(ctx, admin, gp.lastUpstreamID)
 
 	draftRev := gp.getDraftRevision(ctx, admin)
-	gp.lastProviderID = "prv_" + platformid.New(platformid.Deployment)[:8]
+	gp.lastProviderID = platformid.New(platformid.Provider)
 	gp.lastModelID = platformid.New(platformid.Model)
 	gp.lastTtsID = platformid.New(platformid.TTS)
 	gp.lastAsrID = platformid.New(platformid.ASR)
@@ -604,7 +606,7 @@ func TestCAPC6012RefreshDuringActivation(t *testing.T) {
 	routeTTS := platformid.New(platformid.Route)
 	routeASR := platformid.New(platformid.Route)
 	routeMCP := platformid.New(platformid.Route)
-	policyID := "pol_" + platformid.New(platformid.Deployment)[:8]
+	policyID := platformid.New(platformid.Policy)
 
 	gp.lastDraftContent = gp.buildDraftContent(
 		gp.lastProviderID, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID,

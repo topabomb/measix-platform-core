@@ -93,8 +93,11 @@ func TestCAPSEC002CSRFEnforced(t *testing.T) {
 		t.Fatalf("create user without CSRF: %v", err)
 	}
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401 without CSRF, got %d", resp.StatusCode)
+	// OpenAPI-generated server treats X-CSRF-Token as a required header parameter,
+	// so missing CSRF returns 400 (Bad Request) before the handler is invoked.
+	// Wrong CSRF reaches the handler and returns 401 (Unauthorized).
+	if resp.StatusCode != http.StatusUnauthorized && resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 401 or 400 without CSRF, got %d", resp.StatusCode)
 	}
 
 	// Create with wrong CSRF token
@@ -328,8 +331,9 @@ func TestCAPSEC006InvalidEnrollmentRejected(t *testing.T) {
 		t.Fatalf("start hub: %v", err)
 	}
 
-	// Attempt to exchange a bogus enrollment code
-	body := `{"code":"bogus-code-12345","installationId":"inst-1","platform":"ANDROID","appVersion":"1.0"}`
+	// Attempt to exchange a bogus enrollment code (with valid installationId format)
+	validInstallationID := platformid.New(platformid.Installation)
+	body := fmt.Sprintf(`{"code":"bogus-code-12345","installationId":%q,"platform":"ANDROID","appVersion":"1.0"}`, validInstallationID)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, env.HubBaseURL+"/api/client/v1/enrollments/exchange",
 		strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -338,6 +342,7 @@ func TestCAPSEC006InvalidEnrollmentRejected(t *testing.T) {
 		t.Fatalf("exchange bogus enrollment: %v", err)
 	}
 	defer resp.Body.Close()
+	// The enrollment code is invalid, so the service should reject with 401 (credential error).
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for bogus enrollment code, got %d", resp.StatusCode)
 	}
@@ -636,8 +641,8 @@ func TestCAPSEC011LogoutInvalidatesSession(t *testing.T) {
 		t.Fatalf("session should work before logout, got %d", resp.StatusCode)
 	}
 
-	// Logout
-	resp, err = admin.Post(ctx, "/api/admin/v1/session/logout", nil)
+	// Logout (DELETE /api/admin/v1/session)
+	resp, err = admin.Delete(ctx, "/api/admin/v1/session")
 	if err != nil {
 		t.Fatalf("logout: %v", err)
 	}
@@ -672,8 +677,8 @@ func TestCAPSEC012ClientAPIAuthEnforced(t *testing.T) {
 		t.Fatalf("start hub: %v", err)
 	}
 
-	// Discovery is public (no auth required)
-	resp, err := http.Get(env.HubBaseURL + "/api/client/v1/discovery")
+	// Discovery is public (no auth required) at /.well-known/measix
+	resp, err := http.Get(env.HubBaseURL + "/.well-known/measix")
 	if err != nil {
 		t.Fatalf("discovery: %v", err)
 	}
@@ -851,11 +856,12 @@ func TestCAPSEC015IdempotentPublish(t *testing.T) {
 	newRev := gp.putDraft(ctx, admin, draftRev, content)
 	gp.validateDraft(ctx, admin, newRev)
 
-	idempotencyKey := "idempotent-publish-" + fmt.Sprintf("%d", time.Now().UnixNano())
-	resp1, err := admin.Post(ctx, "/api/admin/v1/draft:publish?Idempotency-Key="+idempotencyKey, map[string]interface{}{
+	idempotencyKey := platformid.New(platformid.Idempotency)
+	publishHeaders := map[string]string{"Idempotency-Key": idempotencyKey}
+	resp1, err := admin.PostWithHeaders(ctx, "/api/admin/v1/draft:publish", map[string]interface{}{
 		"expectedDraftRevision":    newRev,
 		"acknowledgedWarningCodes": []string{},
-	})
+	}, publishHeaders)
 	if err != nil {
 		t.Fatalf("first publish: %v", err)
 	}
@@ -863,10 +869,10 @@ func TestCAPSEC015IdempotentPublish(t *testing.T) {
 	_ = harness.DecodeJSON(resp1, &act1)
 
 	// Second publish with same idempotency key should return the same activation
-	resp2, err := admin.Post(ctx, "/api/admin/v1/draft:publish?Idempotency-Key="+idempotencyKey, map[string]interface{}{
+	resp2, err := admin.PostWithHeaders(ctx, "/api/admin/v1/draft:publish", map[string]interface{}{
 		"expectedDraftRevision":    newRev,
 		"acknowledgedWarningCodes": []string{},
-	})
+	}, publishHeaders)
 	if err != nil {
 		t.Fatalf("second publish: %v", err)
 	}

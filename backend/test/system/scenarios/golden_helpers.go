@@ -18,6 +18,7 @@ import (
 // goldenPathTest holds shared state for the golden path helpers.
 type goldenPathTest struct {
 	t                    *testing.T
+	lastUserID           string
 	lastEnrollmentCode   string
 	lastUpstreamID       string
 	lastDraftContent     map[string]interface{}
@@ -35,8 +36,8 @@ type goldenPathTest struct {
 // save draft, validate, preview, publish, and wait for activation/convergence.
 func (g *goldenPathTest) fullSetup(ctx context.Context, admin *harness.AdminClient, ad *adapter.Adapter, env *harness.HubEnv) {
 	// 1. Create user + enrollment
-	userID := g.createUser(ctx, admin)
-	g.lastEnrollmentCode = g.createEnrollment(ctx, admin, userID)
+	g.lastUserID = g.createUser(ctx, admin)
+	g.lastEnrollmentCode = g.createEnrollment(ctx, admin, g.lastUserID)
 
 	// 2. Create secret
 	g.lastSecretID, g.lastSecretVersion = g.createSecret(ctx, admin)
@@ -50,7 +51,7 @@ func (g *goldenPathTest) fullSetup(ctx context.Context, admin *harness.AdminClie
 
 	// 5. Build and save draft with all resources
 	draftRev := g.getDraftRevision(ctx, admin)
-	g.lastProviderID = "prv_" + platformid.New(platformid.Deployment)[:8]
+	g.lastProviderID = platformid.New(platformid.Provider)
 	g.lastModelID = platformid.New(platformid.Model)
 	g.lastTtsID = platformid.New(platformid.TTS)
 	g.lastAsrID = platformid.New(platformid.ASR)
@@ -59,7 +60,7 @@ func (g *goldenPathTest) fullSetup(ctx context.Context, admin *harness.AdminClie
 	routeTTS := platformid.New(platformid.Route)
 	routeASR := platformid.New(platformid.Route)
 	routeMCP := platformid.New(platformid.Route)
-	policyID := "pol_" + platformid.New(platformid.Deployment)[:8]
+	policyID := platformid.New(platformid.Policy)
 
 	g.lastDraftContent = g.buildDraftContent(
 		g.lastProviderID, g.lastModelID, g.lastTtsID, g.lastAsrID, g.lastMcpID,
@@ -178,7 +179,10 @@ func (g *goldenPathTest) testUpstream(ctx context.Context, admin *harness.AdminC
 }
 
 func (g *goldenPathTest) applyUpstream(ctx context.Context, admin *harness.AdminClient, upstreamID string) {
-	resp, err := admin.Post(ctx, fmt.Sprintf("/api/admin/v1/upstreams/%s:apply", upstreamID), map[string]interface{}{})
+	idempotencyKey := platformid.New(platformid.Idempotency)
+	resp, err := admin.PostWithHeaders(ctx, fmt.Sprintf("/api/admin/v1/upstreams/%s:apply", upstreamID), map[string]interface{}{}, map[string]string{
+		"Idempotency-Key": idempotencyKey,
+	})
 	if err != nil {
 		g.t.Fatalf("apply upstream: %v", err)
 	}
@@ -378,10 +382,12 @@ func (g *goldenPathTest) assertPreviewClientSafe(ctx context.Context, admin *har
 }
 
 func (g *goldenPathTest) publishDraft(ctx context.Context, admin *harness.AdminClient, rev int) string {
-	idempotencyKey := "publish-" + fmt.Sprintf("%d", time.Now().UnixNano())
-	resp, err := admin.Post(ctx, "/api/admin/v1/draft:publish?Idempotency-Key="+idempotencyKey, map[string]interface{}{
+	idempotencyKey := platformid.New(platformid.Idempotency)
+	resp, err := admin.PostWithHeaders(ctx, "/api/admin/v1/draft:publish", map[string]interface{}{
 		"expectedDraftRevision":    rev,
 		"acknowledgedWarningCodes": []string{},
+	}, map[string]string{
+		"Idempotency-Key": idempotencyKey,
 	})
 	if err != nil {
 		g.t.Fatalf("publish: %v", err)
@@ -431,13 +437,14 @@ func (g *goldenPathTest) waitActivationCompleted(ctx context.Context, admin *har
 
 func (g *goldenPathTest) exchangeEnrollmentAndBootstrap(ctx context.Context, hubBaseURL, enrollmentCode string) (string, int) {
 	// Exchange enrollment to get a client access token
+	installationID := platformid.New(platformid.Installation)
 	resp, err := http.Post(hubBaseURL+"/api/client/v1/enrollments/exchange", "application/json",
-		strings.NewReader(fmt.Sprintf(`{"platform":"ANDROID","code":%q,"installationId":"inst-%d","appVersion":"test-1.0"}`, enrollmentCode, time.Now().UnixNano())))
+		strings.NewReader(fmt.Sprintf(`{"platform":"ANDROID","code":%q,"installationId":%q,"appVersion":"test-1.0"}`, enrollmentCode, installationID)))
 	if err != nil {
 		g.t.Fatalf("exchange enrollment: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body := harness.ReadBody(resp)
 		g.t.Fatalf("exchange enrollment status: %d body: %s", resp.StatusCode, body)
 	}

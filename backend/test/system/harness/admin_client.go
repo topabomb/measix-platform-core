@@ -76,6 +76,26 @@ func (c *AdminClient) Post(ctx context.Context, path string, body interface{}) (
 	return c.doJSON(ctx, http.MethodPost, path, c.csrfToken, body)
 }
 
+// PostWithHeaders performs a POST request with a JSON body and extra headers
+// (e.g. Idempotency-Key) and returns the raw response.
+func (c *AdminClient) PostWithHeaders(ctx context.Context, path string, body interface{}, headers map[string]string) (*http.Response, error) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Cookie", c.CookieHeader())
+	req.Header.Set("X-CSRF-Token", c.csrfToken)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	return c.HTTPClient.Do(req)
+}
+
 // Put performs a PUT request with a JSON body and returns the raw response.
 func (c *AdminClient) Put(ctx context.Context, path string, body interface{}) (*http.Response, error) {
 	return c.doJSON(ctx, http.MethodPut, path, c.csrfToken, body)

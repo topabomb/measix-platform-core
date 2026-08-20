@@ -406,7 +406,7 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	}
 	_, hash, err := s.CompileSnapshot(SnapshotInput{
 		DeploymentID:      deployment.ID,
-		ReleaseID:         "preview",
+		ReleaseID:         platformid.New(platformid.Release),
 		ManagedGeneration: 1,
 		Content:           draft.Content,
 		PublishedAt:       s.Now().UTC(),

@@ -86,6 +86,22 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
    - 新增 4 个契约测试 + 1 个 `ListRequests` filter 单元测试，全部 Green
    - 注：新增共享枚举值导致 oapi-codegen 对 `PROVIDER/ERROR/WARNING` 等重命名带类型前缀（`ReleaseDiffKindPROVIDER` 等），相关代码已同步更新
 
+### Frontend-first 长期骨架（实施顺序第 1 步，head `f4f7b1e`）
+
+1. **Navigation registry**（`src/router/navigation.ts`）：
+   - 由 route metadata 驱动，不再硬编码在 `AdminLayout.vue`
+   - 7 项 S0.1 IA：Overview/Users/Resources/Upstreams/Releases/Usage/System（stable id/label/icon/order/visibility）
+2. **响应式 App Shell**（`AdminLayout.vue`）：
+   - Wide（>md）常驻 drawer；Compact（md）可折叠 mini；Mobile（<md）overlay drawer
+   - 单一 QLayout，Global Header + Primary Nav + PageContainer
+3. **PageHeader** 组件：breadcrumbs、title+context、semantic status、primary+secondary actions（窄屏 secondary 进 overflow）
+4. **Semantic status/style**：
+   - `StatusChip` 收敛为 healthy/pending/degraded/failed/neutral 语义色调，始终带文本
+   - `HealthIndicator`：Global Header 常驻 runtime degraded/Relay not ready 高优先级指示
+   - `useSystemHealth` composable：模块级共享轮询 system/status
+5. Overview/System 页面接入 PageHeader
+6. 新增 navigation registry 单元测试（3 tests），console 22 tests Green
+
 ### C2 Managed Resource Editor
 
 1. **ResourcesPage.vue 重写**：

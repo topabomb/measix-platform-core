@@ -5,6 +5,7 @@ import { apiFetch } from '../api/client'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 type SystemStatus = components['schemas']['SystemStatus']
 type SystemHealth = components['schemas']['SystemHealth']
@@ -36,13 +37,9 @@ onMounted(refresh)
 
 <template>
   <q-page padding>
-    <div class="row items-center justify-between q-mb-lg">
-      <div>
-        <div class="text-h5 text-weight-bold">System</div>
-        <div class="text-body2 text-grey-7">Build, runtime, database and Relay health.</div>
-      </div>
-      <q-btn flat icon="refresh" @click="refresh" />
-    </div>
+    <PageHeader title="System" subtitle="Build, runtime, database and Relay health.">
+      <template #primary><q-btn flat icon="refresh" @click="refresh" /></template>
+    </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
     <LoadingState v-if="loading && !status" />
     <template v-else-if="status">

@@ -5,6 +5,7 @@ import { apiFetch } from '../api/client'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 type SystemStatus = components['schemas']['SystemStatus']
 type UsageSummary = components['schemas']['UsageSummary']
@@ -36,13 +37,9 @@ onMounted(refresh)
 
 <template>
   <q-page padding>
-    <div class="row items-center justify-between q-mb-lg">
-      <div>
-        <div class="text-h5 text-weight-bold">Overview</div>
-        <div class="text-body2 text-grey-7">Current Control Hub, Relay and usage state.</div>
-      </div>
-      <q-btn flat icon="refresh" label="Refresh" :loading="loading" @click="refresh" />
-    </div>
+    <PageHeader title="Overview" subtitle="Current Control Hub, Relay and usage state.">
+      <template #primary><q-btn flat icon="refresh" label="Refresh" :loading="loading" @click="refresh" /></template>
+    </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
     <LoadingState v-if="loading && !system" />
     <template v-else-if="system">

@@ -276,28 +276,28 @@ func (e ReleaseStatus) Valid() bool {
 
 // Defines values for ReleaseDiffKind.
 const (
-	ASR      ReleaseDiffKind = "ASR"
-	MCP      ReleaseDiffKind = "MCP"
-	MODEL    ReleaseDiffKind = "MODEL"
-	POLICY   ReleaseDiffKind = "POLICY"
-	PROVIDER ReleaseDiffKind = "PROVIDER"
-	TTS      ReleaseDiffKind = "TTS"
+	ReleaseDiffKindASR      ReleaseDiffKind = "ASR"
+	ReleaseDiffKindMCP      ReleaseDiffKind = "MCP"
+	ReleaseDiffKindMODEL    ReleaseDiffKind = "MODEL"
+	ReleaseDiffKindPOLICY   ReleaseDiffKind = "POLICY"
+	ReleaseDiffKindPROVIDER ReleaseDiffKind = "PROVIDER"
+	ReleaseDiffKindTTS      ReleaseDiffKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ReleaseDiffKind enum.
 func (e ReleaseDiffKind) Valid() bool {
 	switch e {
-	case ASR:
+	case ReleaseDiffKindASR:
 		return true
-	case MCP:
+	case ReleaseDiffKindMCP:
 		return true
-	case MODEL:
+	case ReleaseDiffKindMODEL:
 		return true
-	case POLICY:
+	case ReleaseDiffKindPOLICY:
 		return true
-	case PROVIDER:
+	case ReleaseDiffKindPROVIDER:
 		return true
-	case TTS:
+	case ReleaseDiffKindTTS:
 		return true
 	default:
 		return false
@@ -588,16 +588,154 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for ValidationIssueSeverity.
 const (
-	ERROR   ValidationIssueSeverity = "ERROR"
-	WARNING ValidationIssueSeverity = "WARNING"
+	ValidationIssueSeverityERROR   ValidationIssueSeverity = "ERROR"
+	ValidationIssueSeverityWARNING ValidationIssueSeverity = "WARNING"
 )
 
 // Valid indicates whether the value is a known member of the ValidationIssueSeverity enum.
 func (e ValidationIssueSeverity) Valid() bool {
 	switch e {
-	case ERROR:
+	case ValidationIssueSeverityERROR:
 		return true
-	case WARNING:
+	case ValidationIssueSeverityWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUsageRequestsParamsResourceKind.
+const (
+	ListUsageRequestsParamsResourceKindASR      ListUsageRequestsParamsResourceKind = "ASR"
+	ListUsageRequestsParamsResourceKindMCP      ListUsageRequestsParamsResourceKind = "MCP"
+	ListUsageRequestsParamsResourceKindMODEL    ListUsageRequestsParamsResourceKind = "MODEL"
+	ListUsageRequestsParamsResourceKindPROVIDER ListUsageRequestsParamsResourceKind = "PROVIDER"
+	ListUsageRequestsParamsResourceKindTTS      ListUsageRequestsParamsResourceKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageRequestsParamsResourceKind enum.
+func (e ListUsageRequestsParamsResourceKind) Valid() bool {
+	switch e {
+	case ListUsageRequestsParamsResourceKindASR:
+		return true
+	case ListUsageRequestsParamsResourceKindMCP:
+		return true
+	case ListUsageRequestsParamsResourceKindMODEL:
+		return true
+	case ListUsageRequestsParamsResourceKindPROVIDER:
+		return true
+	case ListUsageRequestsParamsResourceKindTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUsageRequestsParamsStatus.
+const (
+	ListUsageRequestsParamsStatusBLOCKED ListUsageRequestsParamsStatus = "BLOCKED"
+	ListUsageRequestsParamsStatusERROR   ListUsageRequestsParamsStatus = "ERROR"
+	ListUsageRequestsParamsStatusSUCCESS ListUsageRequestsParamsStatus = "SUCCESS"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageRequestsParamsStatus enum.
+func (e ListUsageRequestsParamsStatus) Valid() bool {
+	switch e {
+	case ListUsageRequestsParamsStatusBLOCKED:
+		return true
+	case ListUsageRequestsParamsStatusERROR:
+		return true
+	case ListUsageRequestsParamsStatusSUCCESS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUsageRequestsParamsCompleteness.
+const (
+	ListUsageRequestsParamsCompletenessKNOWN   ListUsageRequestsParamsCompleteness = "KNOWN"
+	ListUsageRequestsParamsCompletenessPARTIAL ListUsageRequestsParamsCompleteness = "PARTIAL"
+	ListUsageRequestsParamsCompletenessUNKNOWN ListUsageRequestsParamsCompleteness = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageRequestsParamsCompleteness enum.
+func (e ListUsageRequestsParamsCompleteness) Valid() bool {
+	switch e {
+	case ListUsageRequestsParamsCompletenessKNOWN:
+		return true
+	case ListUsageRequestsParamsCompletenessPARTIAL:
+		return true
+	case ListUsageRequestsParamsCompletenessUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageSummaryParamsResourceKind.
+const (
+	UsageSummaryParamsResourceKindASR      UsageSummaryParamsResourceKind = "ASR"
+	UsageSummaryParamsResourceKindMCP      UsageSummaryParamsResourceKind = "MCP"
+	UsageSummaryParamsResourceKindMODEL    UsageSummaryParamsResourceKind = "MODEL"
+	UsageSummaryParamsResourceKindPROVIDER UsageSummaryParamsResourceKind = "PROVIDER"
+	UsageSummaryParamsResourceKindTTS      UsageSummaryParamsResourceKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the UsageSummaryParamsResourceKind enum.
+func (e UsageSummaryParamsResourceKind) Valid() bool {
+	switch e {
+	case UsageSummaryParamsResourceKindASR:
+		return true
+	case UsageSummaryParamsResourceKindMCP:
+		return true
+	case UsageSummaryParamsResourceKindMODEL:
+		return true
+	case UsageSummaryParamsResourceKindPROVIDER:
+		return true
+	case UsageSummaryParamsResourceKindTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageSummaryParamsStatus.
+const (
+	UsageSummaryParamsStatusBLOCKED UsageSummaryParamsStatus = "BLOCKED"
+	UsageSummaryParamsStatusERROR   UsageSummaryParamsStatus = "ERROR"
+	UsageSummaryParamsStatusSUCCESS UsageSummaryParamsStatus = "SUCCESS"
+)
+
+// Valid indicates whether the value is a known member of the UsageSummaryParamsStatus enum.
+func (e UsageSummaryParamsStatus) Valid() bool {
+	switch e {
+	case UsageSummaryParamsStatusBLOCKED:
+		return true
+	case UsageSummaryParamsStatusERROR:
+		return true
+	case UsageSummaryParamsStatusSUCCESS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageSummaryParamsCompleteness.
+const (
+	UsageSummaryParamsCompletenessKNOWN   UsageSummaryParamsCompleteness = "KNOWN"
+	UsageSummaryParamsCompletenessPARTIAL UsageSummaryParamsCompleteness = "PARTIAL"
+	UsageSummaryParamsCompletenessUNKNOWN UsageSummaryParamsCompleteness = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the UsageSummaryParamsCompleteness enum.
+func (e UsageSummaryParamsCompleteness) Valid() bool {
+	switch e {
+	case UsageSummaryParamsCompletenessKNOWN:
+		return true
+	case UsageSummaryParamsCompletenessPARTIAL:
+		return true
+	case UsageSummaryParamsCompletenessUNKNOWN:
 		return true
 	default:
 		return false
@@ -1335,9 +1473,47 @@ type TestUpstreamParams struct {
 
 // ListUsageRequestsParams defines parameters for ListUsageRequests.
 type ListUsageRequestsParams struct {
-	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit        *int                                 `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor       *string                              `form:"cursor,omitempty" json:"cursor,omitempty"`
+	From         *time.Time                           `form:"from,omitempty" json:"from,omitempty"`
+	To           *time.Time                           `form:"to,omitempty" json:"to,omitempty"`
+	UserId       *string                              `form:"userId,omitempty" json:"userId,omitempty"`
+	ResourceId   *string                              `form:"resourceId,omitempty" json:"resourceId,omitempty"`
+	ResourceKind *ListUsageRequestsParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
+	UpstreamId   *string                              `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
+	Status       *ListUsageRequestsParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
+	Completeness *ListUsageRequestsParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
 }
+
+// ListUsageRequestsParamsResourceKind defines parameters for ListUsageRequests.
+type ListUsageRequestsParamsResourceKind string
+
+// ListUsageRequestsParamsStatus defines parameters for ListUsageRequests.
+type ListUsageRequestsParamsStatus string
+
+// ListUsageRequestsParamsCompleteness defines parameters for ListUsageRequests.
+type ListUsageRequestsParamsCompleteness string
+
+// UsageSummaryParams defines parameters for UsageSummary.
+type UsageSummaryParams struct {
+	From         *time.Time                      `form:"from,omitempty" json:"from,omitempty"`
+	To           *time.Time                      `form:"to,omitempty" json:"to,omitempty"`
+	UserId       *string                         `form:"userId,omitempty" json:"userId,omitempty"`
+	ResourceId   *string                         `form:"resourceId,omitempty" json:"resourceId,omitempty"`
+	ResourceKind *UsageSummaryParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
+	UpstreamId   *string                         `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
+	Status       *UsageSummaryParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
+	Completeness *UsageSummaryParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
+}
+
+// UsageSummaryParamsResourceKind defines parameters for UsageSummary.
+type UsageSummaryParamsResourceKind string
+
+// UsageSummaryParamsStatus defines parameters for UsageSummary.
+type UsageSummaryParamsStatus string
+
+// UsageSummaryParamsCompleteness defines parameters for UsageSummary.
+type UsageSummaryParamsCompleteness string
 
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
@@ -1510,7 +1686,7 @@ type ServerInterface interface {
 	GetUsageRequest(w http.ResponseWriter, r *http.Request, requestId RequestId)
 
 	// (GET /api/admin/v1/usage/summary)
-	UsageSummary(w http.ResponseWriter, r *http.Request)
+	UsageSummary(w http.ResponseWriter, r *http.Request, params UsageSummaryParams)
 
 	// (GET /api/admin/v1/users)
 	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
@@ -1680,7 +1856,7 @@ func (_ Unimplemented) GetUsageRequest(w http.ResponseWriter, r *http.Request, r
 }
 
 // (GET /api/admin/v1/usage/summary)
-func (_ Unimplemented) UsageSummary(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) UsageSummary(w http.ResponseWriter, r *http.Request, params UsageSummaryParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2803,6 +2979,110 @@ func (siw *ServerInterfaceWrapper) ListUsageRequests(w http.ResponseWriter, r *h
 		return
 	}
 
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "userId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceId", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceKind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceKind", r.URL.Query(), &params.ResourceKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceKind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceKind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "upstreamId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "upstreamId", r.URL.Query(), &params.UpstreamId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "upstreamId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "upstreamId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "completeness" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "completeness", r.URL.Query(), &params.Completeness, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "completeness"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "completeness", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListUsageRequests(w, r, params)
 	}))
@@ -2843,8 +3123,118 @@ func (siw *ServerInterfaceWrapper) GetUsageRequest(w http.ResponseWriter, r *htt
 // UsageSummary operation middleware
 func (siw *ServerInterfaceWrapper) UsageSummary(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UsageSummaryParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "userId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceId", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceKind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceKind", r.URL.Query(), &params.ResourceKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceKind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceKind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "upstreamId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "upstreamId", r.URL.Query(), &params.UpstreamId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "upstreamId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "upstreamId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "completeness" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "completeness", r.URL.Query(), &params.Completeness, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "completeness"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "completeness", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UsageSummary(w, r)
+		siw.Handler.UsageSummary(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

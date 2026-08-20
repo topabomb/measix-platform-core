@@ -18,7 +18,12 @@ func (h *fullAdminHandler) ListUsageRequests(w http.ResponseWriter, r *http.Requ
 	if params.Limit != nil {
 		limit = *params.Limit
 	}
-	rows, err := h.services.Usage.ListRequests(r.Context(), limit)
+	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status))
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
+		return
+	}
+	rows, err := h.services.Usage.ListRequests(r.Context(), filter, limit)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
@@ -43,14 +48,27 @@ func (h *fullAdminHandler) GetUsageRequest(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, requestUsageWire(row))
 }
 
-func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request) {
+func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, params adminapi.UsageSummaryParams) {
 	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	to := time.Now().UTC().Add(time.Nanosecond)
-	from := time.Unix(0, 0).UTC()
-	summary, err := h.services.Usage.Summary(r.Context(), from, to)
+	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status))
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
+		return
+	}
+	if params.Completeness != nil {
+		switch *params.Completeness {
+		case adminapi.UsageSummaryParamsCompletenessKNOWN:
+			filter.Completeness = usage.CompletenessComplete
+		case adminapi.UsageSummaryParamsCompletenessPARTIAL:
+			filter.Completeness = usage.CompletenessPartial
+		case adminapi.UsageSummaryParamsCompletenessUNKNOWN:
+			filter.Completeness = usage.CompletenessUnknown
+		}
+	}
+	summary, err := h.services.Usage.Summary(r.Context(), filter)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
@@ -143,6 +161,34 @@ func (h *fullAdminHandler) PutPricing(w http.ResponseWriter, r *http.Request, pa
 		return
 	}
 	writeJSON(w, http.StatusOK, pricingSetWire(revision, rows))
+}
+
+func usageFilterFromParams(from, to *time.Time, userID, resourceID, resourceKind, upstreamID, status *string) (usage.Filter, error) {
+	filter := usage.Filter{From: from, To: to}
+	if userID != nil {
+		filter.UserID = *userID
+	}
+	if resourceID != nil {
+		filter.ResourceID = *resourceID
+	}
+	if upstreamID != nil {
+		filter.UpstreamID = *upstreamID
+	}
+	if resourceKind != nil {
+		filter.ResourceKind = usage.ResourceKind(*resourceKind)
+	}
+	if status != nil {
+		filter.Status = usage.RequestStatus(*status)
+	}
+	return filter, nil
+}
+
+func strPtr[T ~string](v *T) *string {
+	if v == nil {
+		return nil
+	}
+	s := string(*v)
+	return &s
 }
 
 func requestUsageWire(row usage.RequestView) adminapi.RequestUsageView {

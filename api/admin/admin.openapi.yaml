@@ -724,6 +724,63 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
+      parameters: &usageFilters
+      - &uf_from
+        name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - &uf_to
+        name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - &uf_userId
+        name: userId
+        in: query
+        schema:
+          type: string
+      - &uf_resourceId
+        name: resourceId
+        in: query
+        schema:
+          type: string
+      - &uf_resourceKind
+        name: resourceKind
+        in: query
+        schema:
+          type: string
+          enum:
+          - PROVIDER
+          - MODEL
+          - TTS
+          - ASR
+          - MCP
+      - &uf_upstreamId
+        name: upstreamId
+        in: query
+        schema:
+          type: string
+      - &uf_status
+        name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - SUCCESS
+          - ERROR
+          - BLOCKED
+      - &uf_completeness
+        name: completeness
+        in: query
+        schema:
+          type: string
+          enum:
+          - KNOWN
+          - PARTIAL
+          - UNKNOWN
   /api/admin/v1/usage/requests:
     get:
       operationId: listUsageRequests
@@ -740,7 +797,17 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
-      parameters: *id006
+      parameters:
+      - *id004
+      - *id005
+      - *uf_from
+      - *uf_to
+      - *uf_userId
+      - *uf_resourceId
+      - *uf_resourceKind
+      - *uf_upstreamId
+      - *uf_status
+      - *uf_completeness
   /api/admin/v1/usage/requests/{requestId}:
     get:
       operationId: getUsageRequest

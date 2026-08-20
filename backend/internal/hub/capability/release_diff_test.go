@@ -34,9 +34,9 @@ func TestReleaseContentDiffCountsAddedChangedRemovedByKind(t *testing.T) {
 	var providerDiff, modelDiff *adminapi.ResourceDiff
 	for _, d := range *diff.Details {
 		switch d.Kind {
-		case adminapi.PROVIDER:
+		case adminapi.ReleaseDiffKindPROVIDER:
 			providerDiff = &d
-		case adminapi.MODEL:
+		case adminapi.ReleaseDiffKindMODEL:
 			modelDiff = &d
 		}
 	}

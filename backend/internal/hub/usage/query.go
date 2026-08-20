@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"measix/platform/ent"
+	"measix/platform/ent/predicate"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/semanticusage"
 )
@@ -33,6 +34,37 @@ type CostSummary struct {
 	State    CostState
 	Amount   string
 	Currency string
+}
+
+type ResourceKind string
+
+const (
+	ResourceKindProvider ResourceKind = "PROVIDER"
+	ResourceKindModel    ResourceKind = "MODEL"
+	ResourceKindTTS      ResourceKind = "TTS"
+	ResourceKindASR      ResourceKind = "ASR"
+	ResourceKindMCP      ResourceKind = "MCP"
+)
+
+type RequestStatus string
+
+const (
+	RequestStatusSuccess RequestStatus = "SUCCESS"
+	RequestStatusError   RequestStatus = "ERROR"
+	RequestStatusBlocked RequestStatus = "BLOCKED"
+)
+
+// Filter captures the combinable usage read-model filters (Time / User /
+// Resource / Resource Kind / Upstream / Status / Completeness).
+type Filter struct {
+	From         *time.Time
+	To           *time.Time
+	UserID       string
+	ResourceID   string
+	ResourceKind ResourceKind
+	UpstreamID   string
+	Status       RequestStatus
+	Completeness Completeness
 }
 
 type RequestView struct {
@@ -71,11 +103,15 @@ func requestView(row *ent.RequestUsage) RequestView {
 	}
 }
 
-func (s *Service) ListRequests(ctx context.Context, limit int) ([]RequestView, error) {
+func (s *Service) ListRequests(ctx context.Context, filter Filter, limit int) ([]RequestView, error) {
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
-	rows, err := s.Client.RequestUsage.Query().Order(ent.Desc(requestusage.FieldCompletedAt)).Limit(limit).All(ctx)
+	q := s.Client.RequestUsage.Query()
+	if preds := requestFilterPreds(filter); len(preds) > 0 {
+		q = q.Where(requestusage.And(preds...))
+	}
+	rows, err := q.Order(ent.Desc(requestusage.FieldCompletedAt)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +120,62 @@ func (s *Service) ListRequests(ctx context.Context, limit int) ([]RequestView, e
 		views = append(views, requestView(row))
 	}
 	return views, nil
+}
+
+// requestFilterPreds returns the combinable predicates for a Filter over the
+// RequestUsage entity (excluding time which is applied separately by callers).
+func requestFilterPreds(filter Filter) []predicate.RequestUsage {
+	preds := []predicate.RequestUsage{}
+	if filter.UserID != "" {
+		preds = append(preds, requestusage.UserIDEQ(filter.UserID))
+	}
+	if filter.ResourceID != "" {
+		preds = append(preds, requestusage.ResourceIDEQ(filter.ResourceID))
+	}
+	if filter.ResourceKind != "" {
+		preds = append(preds, requestusage.ResourceIDHasPrefix(resourceKindPrefix(filter.ResourceKind)))
+	}
+	if filter.UpstreamID != "" {
+		preds = append(preds, requestusage.UpstreamIDEQ(filter.UpstreamID))
+	}
+	if filter.Status != "" {
+		preds = append(preds, requestStatusPred(filter.Status))
+	}
+	return preds
+}
+
+func resourceKindPrefix(kind ResourceKind) string {
+	switch kind {
+	case ResourceKindProvider:
+		return "prv_"
+	case ResourceKindModel:
+		return "mdl_"
+	case ResourceKindTTS:
+		return "tts_"
+	case ResourceKindASR:
+		return "asr_"
+	case ResourceKindMCP:
+		return "mcp_"
+	default:
+		return ""
+	}
+}
+
+func requestStatusPred(status RequestStatus) predicate.RequestUsage {
+	switch status {
+	case RequestStatusError:
+		return requestusage.And(
+			requestusage.ForwardedEQ(true),
+			requestusage.HTTPStatusGTE(400),
+		)
+	case RequestStatusBlocked:
+		return requestusage.ForwardedEQ(false)
+	default: // SUCCESS
+		return requestusage.And(
+			requestusage.ForwardedEQ(true),
+			requestusage.HTTPStatusLT(400),
+		)
+	}
 }
 
 func (s *Service) GetRequest(ctx context.Context, requestID string) (RequestView, error) {
@@ -97,18 +189,27 @@ func (s *Service) GetRequest(ctx context.Context, requestID string) (RequestView
 	return requestView(row), nil
 }
 
-func (s *Service) Summary(ctx context.Context, from, to time.Time) (Summary, error) {
-	if from.IsZero() || to.IsZero() || !from.Before(to) {
+func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
+	from, to := time.Unix(0, 0).UTC(), time.Now().UTC().Add(time.Nanosecond)
+	if filter.From != nil {
+		from = filter.From.UTC()
+	}
+	if filter.To != nil {
+		to = filter.To.UTC()
+	}
+	if !from.Before(to) {
 		return Summary{}, ErrInvalidBatch
 	}
-	requests, err := s.Client.RequestUsage.Query().Where(
-		requestusage.CompletedAtGTE(from.UTC()),
-		requestusage.CompletedAtLT(to.UTC()),
-	).All(ctx)
+	preds := append(
+		requestFilterPreds(filter),
+		requestusage.CompletedAtGTE(from),
+		requestusage.CompletedAtLT(to),
+	)
+	requests, err := s.Client.RequestUsage.Query().Where(requestusage.And(preds...)).All(ctx)
 	if err != nil {
 		return Summary{}, err
 	}
-	result := Summary{From: from.UTC(), To: to.UTC(), Cost: CostSummary{State: CostUnknown}}
+	result := Summary{From: from, To: to, Cost: CostSummary{State: CostUnknown}}
 	for _, row := range requests {
 		result.RequestCount++
 		if row.Forwarded {
@@ -118,10 +219,14 @@ func (s *Service) Summary(ctx context.Context, from, to time.Time) (Summary, err
 		result.ResponseBytes += row.ResponseBytes
 	}
 
-	semantic, err := s.Client.SemanticUsage.Query().Where(
-		semanticusage.OccurredAtGTE(from.UTC()),
-		semanticusage.OccurredAtLT(to.UTC()),
-	).All(ctx)
+	semanticQ := s.Client.SemanticUsage.Query().Where(
+		semanticusage.OccurredAtGTE(from),
+		semanticusage.OccurredAtLT(to),
+	)
+	if filter.Completeness != "" {
+		semanticQ = semanticQ.Where(semanticusage.CompletenessEQ(string(filter.Completeness)))
+	}
+	semantic, err := semanticQ.All(ctx)
 	if err != nil {
 		return Summary{}, err
 	}

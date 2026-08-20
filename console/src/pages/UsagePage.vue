@@ -15,6 +15,24 @@ const loading = ref(false)
 const error = ref<unknown>()
 const fromISO = ref<string>()
 const toISO = ref<string>()
+const userId = ref<string>()
+const resourceId = ref<string>()
+const resourceKind = ref<string>()
+const upstreamId = ref<string>()
+const status = ref<string>()
+const resourceKinds = ['PROVIDER', 'MODEL', 'TTS', 'ASR', 'MCP']
+const statuses = ['SUCCESS', 'ERROR', 'BLOCKED']
+const activeFilters = computed(() => {
+  const parts: string[] = []
+  if (fromISO.value) parts.push(`from ${fromISO.value}`)
+  if (toISO.value) parts.push(`to ${toISO.value}`)
+  if (userId.value) parts.push(`user ${userId.value}`)
+  if (resourceId.value) parts.push(`resource ${resourceId.value}`)
+  if (resourceKind.value) parts.push(`kind ${resourceKind.value}`)
+  if (upstreamId.value) parts.push(`upstream ${upstreamId.value}`)
+  if (status.value) parts.push(status.value)
+  return parts
+})
 const semanticMeterKeys = computed(() => {
   if (!summary.value) return []
   return Object.keys(summary.value.semanticMeters ?? {})
@@ -26,6 +44,11 @@ async function refresh() {
   const query = new URLSearchParams()
   if (fromISO.value) query.set('from', fromISO.value)
   if (toISO.value) query.set('to', toISO.value)
+  if (userId.value) query.set('userId', userId.value)
+  if (resourceId.value) query.set('resourceId', resourceId.value)
+  if (resourceKind.value) query.set('resourceKind', resourceKind.value)
+  if (upstreamId.value) query.set('upstreamId', upstreamId.value)
+  if (status.value) query.set('status', status.value)
   const qs = query.toString()
   try {
     const [s, r] = await Promise.all([
@@ -58,12 +81,23 @@ onMounted(refresh)
         <div class="text-h5 text-weight-bold">Usage</div>
         <div class="text-body2 text-grey-7">Aggregate usage summary and per-request ledger.</div>
       </div>
-      <div class="row items-center q-gutter-sm">
-        <q-input v-model="fromISO" outlined dense label="From (ISO)" style="width: 200px" />
-        <q-input v-model="toISO" outlined dense label="To (ISO)" style="width: 200px" />
-        <q-btn flat icon="refresh" @click="refresh" />
-      </div>
+      <q-btn flat icon="refresh" @click="refresh" />
     </div>
+    <div class="row items-center q-gutter-sm q-mb-md flex-wrap">
+      <q-input v-model="fromISO" outlined dense label="From" placeholder="2026-08-01T00:00:00Z" style="width: 190px" />
+      <q-input v-model="toISO" outlined dense label="To" placeholder="2026-08-31T23:59:59Z" style="width: 190px" />
+      <q-input v-model="userId" outlined dense label="User ID" placeholder="usr_..." style="width: 180px" />
+      <q-input v-model="resourceId" outlined dense label="Resource ID" placeholder="mdl_..." style="width: 180px" />
+      <q-select v-model="resourceKind" outlined dense label="Kind" :options="resourceKinds" clearable style="width: 150px" />
+      <q-input v-model="upstreamId" outlined dense label="Upstream ID" placeholder="ups_..." style="width: 180px" />
+      <q-select v-model="status" outlined dense label="Status" :options="statuses" clearable style="width: 140px" />
+    </div>
+    <q-banner v-if="activeFilters.length" class="q-mb-md bg-grey-2 rounded-borders">
+      <div class="row items-center q-gutter-sm">
+        <span class="text-caption text-grey-7">Active filters:</span>
+        <q-chip v-for="f in activeFilters" :key="f" dense>{{ f }}</q-chip>
+      </div>
+    </q-banner>
     <ProblemBanner :error="error" class="q-mb-md" />
 
     <LoadingState v-if="loading && !summary" />
@@ -105,10 +139,13 @@ onMounted(refresh)
         <q-item v-for="req in requests" :key="req.requestId">
           <q-item-section>
             <q-item-label>{{ req.requestId }}</q-item-label>
-            <q-item-label caption>{{ req.startedAt }} · {{ req.modelId ?? 'unknown model' }}</q-item-label>
+            <q-item-label caption>{{ req.startedAt }} · {{ req.resourceId }} · {{ req.upstreamId }}</q-item-label>
           </q-item-section>
           <q-item-section side>
-            <q-chip dense :color="req.completeness === 'COMPLETE' ? 'green-2' : 'orange-2'">{{ req.completeness }}</q-chip>
+            <div class="row items-center q-gutter-sm">
+              <q-chip dense :color="req.forwarded ? 'green-2' : 'orange-2'">{{ req.forwarded ? 'forwarded' : 'blocked' }}</q-chip>
+              <q-chip dense :class="req.httpStatus >= 400 ? 'text-negative' : 'text-grey-8'">{{ req.httpStatus }}</q-chip>
+            </div>
           </q-item-section>
         </q-item>
         <q-item v-if="!requests.length"><q-item-section class="text-grey-7">No usage requests recorded.</q-item-section></q-item>

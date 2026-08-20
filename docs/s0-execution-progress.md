@@ -78,6 +78,14 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
    - ReleasesPage 显示 diff summary、published by/at、detail 弹窗含 per-kind 表格与 activation timeline
    - 新增 3 个契约测试 + 2 个 `releaseContentDiff` 单元测试，全部 Green
 
+5. **Admin Usage filter/read model 补齐（P1-C，head `d5a6dfa`）**：
+   - `/usage/summary` 与 `/usage/requests` 新增可组合 query filters：from/to、userId、resourceId、resourceKind、upstreamId、status、completeness
+   - `resourceKind`（PROVIDER/MODEL/TTS/ASR/MCP）与 `status`（SUCCESS/ERROR/BLOCKED）为 frozen enum
+   - backend `ListRequests`/`Summary` 改为接受 `usage.Filter`，ent 谓词组合过滤（status 语义：SUCCESS=forwarded&<400，ERROR=forwarded&>=400，BLOCKED=!forwarded）
+   - UsagePage 增加 user/resource/kind/upstream/status 过滤器与 active filters 展示，修正 request 列表字段
+   - 新增 4 个契约测试 + 1 个 `ListRequests` filter 单元测试，全部 Green
+   - 注：新增共享枚举值导致 oapi-codegen 对 `PROVIDER/ERROR/WARNING` 等重命名带类型前缀（`ReleaseDiffKindPROVIDER` 等），相关代码已同步更新
+
 ### C2 Managed Resource Editor
 
 1. **ResourcesPage.vue 重写**：

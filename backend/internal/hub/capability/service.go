@@ -75,23 +75,23 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 	if previous != nil {
 		for _, p := range previous.Providers {
 			prev[p.ProviderId] = defHash(p)
-			prevKinds[p.ProviderId] = adminapi.PROVIDER
+			prevKinds[p.ProviderId] = adminapi.ReleaseDiffKindPROVIDER
 		}
 		for _, m := range previous.Models {
 			prev[m.ModelId] = defHash(m)
-			prevKinds[m.ModelId] = adminapi.MODEL
+			prevKinds[m.ModelId] = adminapi.ReleaseDiffKindMODEL
 		}
 		for _, t := range previous.Tts {
 			prev[t.TtsId] = defHash(t)
-			prevKinds[t.TtsId] = adminapi.TTS
+			prevKinds[t.TtsId] = adminapi.ReleaseDiffKindTTS
 		}
 		for _, a := range previous.Asr {
 			prev[a.AsrId] = defHash(a)
-			prevKinds[a.AsrId] = adminapi.ASR
+			prevKinds[a.AsrId] = adminapi.ReleaseDiffKindASR
 		}
 		for _, m := range previous.Mcp {
 			prev[m.McpServerId] = defHash(m)
-			prevKinds[m.McpServerId] = adminapi.MCP
+			prevKinds[m.McpServerId] = adminapi.ReleaseDiffKindMCP
 		}
 	}
 
@@ -116,31 +116,31 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 		delete(prevKinds, id)
 	}
 	for _, p := range current.Providers {
-		process(adminapi.PROVIDER, p.ProviderId)
+		process(adminapi.ReleaseDiffKindPROVIDER, p.ProviderId)
 	}
 	for _, m := range current.Models {
-		process(adminapi.MODEL, m.ModelId)
+		process(adminapi.ReleaseDiffKindMODEL, m.ModelId)
 	}
 	for _, t := range current.Tts {
-		process(adminapi.TTS, t.TtsId)
+		process(adminapi.ReleaseDiffKindTTS, t.TtsId)
 	}
 	for _, a := range current.Asr {
-		process(adminapi.ASR, a.AsrId)
+		process(adminapi.ReleaseDiffKindASR, a.AsrId)
 	}
 	for _, m := range current.Mcp {
-		process(adminapi.MCP, m.McpServerId)
+		process(adminapi.ReleaseDiffKindMCP, m.McpServerId)
 	}
 	for _, kind := range prevKinds {
 		ensure(kind).Removed++
 	}
 
 	kinds := []adminapi.ReleaseDiffKind{
-		adminapi.PROVIDER,
-		adminapi.MODEL,
-		adminapi.TTS,
-		adminapi.ASR,
-		adminapi.MCP,
-		adminapi.POLICY,
+		adminapi.ReleaseDiffKindPROVIDER,
+		adminapi.ReleaseDiffKindMODEL,
+		adminapi.ReleaseDiffKindTTS,
+		adminapi.ReleaseDiffKindASR,
+		adminapi.ReleaseDiffKindMCP,
+		adminapi.ReleaseDiffKindPOLICY,
 	}
 	var details []adminapi.ResourceDiff
 	for _, kind := range kinds {
@@ -499,10 +499,10 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedDraftContent) ValidationResult {
 	result := ValidationResult{Errors: []adminapi.ValidationIssue{}, Warnings: []adminapi.ValidationIssue{}}
 	addError := func(code, path, message string) {
-		result.Errors = append(result.Errors, adminapi.ValidationIssue{Code: code, Path: path, Message: message, Severity: adminapi.ERROR})
+		result.Errors = append(result.Errors, adminapi.ValidationIssue{Code: code, Path: path, Message: message, Severity: adminapi.ValidationIssueSeverityERROR})
 	}
 	addWarning := func(code, path, message string) {
-		result.Warnings = append(result.Warnings, adminapi.ValidationIssue{Code: code, Path: path, Message: message, Severity: adminapi.WARNING})
+		result.Warnings = append(result.Warnings, adminapi.ValidationIssue{Code: code, Path: path, Message: message, Severity: adminapi.ValidationIssueSeverityWARNING})
 	}
 	if err := validateCandidateIDs(content); err != nil {
 		addError("invalid_candidate_id", "$", err.Error())

@@ -1801,7 +1801,16 @@ export interface operations {
     };
     usageSummary: {
         parameters: {
-            query?: never;
+            query?: {
+                from?: string;
+                to?: string;
+                userId?: string;
+                resourceId?: string;
+                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                upstreamId?: string;
+                status?: "SUCCESS" | "ERROR" | "BLOCKED";
+                completeness?: "KNOWN" | "PARTIAL" | "UNKNOWN";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1827,6 +1836,14 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string;
+                from?: string;
+                to?: string;
+                userId?: string;
+                resourceId?: string;
+                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                upstreamId?: string;
+                status?: "SUCCESS" | "ERROR" | "BLOCKED";
+                completeness?: "KNOWN" | "PARTIAL" | "UNKNOWN";
             };
             header?: never;
             path?: never;

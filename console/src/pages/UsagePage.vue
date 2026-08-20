@@ -71,6 +71,15 @@ function fmtBytes(n: number | undefined): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
+const costLabel = computed(() => {
+  if (!summary.value) return '—'
+  const cost = summary.value.cost
+  if (cost.status === 'KNOWN' || cost.status === 'PARTIAL') {
+    return `${cost.amount ?? '0'} ${cost.currency ?? ''}`.trim()
+  }
+  return 'unknown'
+})
+
 onMounted(refresh)
 </script>
 
@@ -120,7 +129,7 @@ onMounted(refresh)
         <q-card flat bordered class="col-3">
           <q-card-section>
             <div class="text-caption text-grey-7">Cost</div>
-            <div class="text-h5">{{ summary.cost }}</div>
+            <div class="text-h5">{{ costLabel }}</div>
           </q-card-section>
         </q-card>
         <q-card flat bordered class="col">

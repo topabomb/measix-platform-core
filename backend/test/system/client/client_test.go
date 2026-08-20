@@ -1,0 +1,279 @@
+package client_test
+
+import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+
+	"measix/platform/internal/relay/control"
+	relayruntime "measix/platform/internal/relay/runtime"
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaystate"
+	"measix/platform/pkg/platformid"
+	"measix/platform/test/system/adapter"
+	"measix/platform/test/system/client"
+)
+
+// TestClient must only use the client-facing runtime topology
+// (/runtime/v1/resources/{resourceId}{runtimePath} + generation + interaction headers)
+// and must not need upstreamId/runtimeRouteId/base URL/Secret.
+
+func TestCAPC4001ClientChatNonStream(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	body, ct, err := c.ChatCompletion(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{"model":"gpt-test","messages":[]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("content-type=%q", ct)
+	}
+	if !bytes.Contains(body, []byte(`"role":"assistant"`)) {
+		t.Fatalf("bad body: %s", body)
+	}
+	fact := env.adapter.LastRequest("/v1/chat/completions")
+	if fact == nil || fact.XMeasixRequestId == "" {
+		t.Fatalf("relay did not inject request correlation: %+v", fact)
+	}
+}
+
+func TestCAPC4002ClientChatStream(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	var chunks int
+	var done bool
+	err := c.ChatCompletionStream(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, func(data []byte) {
+		if bytes.Contains(data, []byte("[DONE]")) {
+			done = true
+		} else {
+			chunks++
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chunks < 2 || !done {
+		t.Fatalf("chunks=%d done=%v", chunks, done)
+	}
+}
+
+func TestCAPC4010ClientTTSBinary(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	body, ct, err := c.Speech(context.Background(), env.resourceIDs.tts, "/v1/audio/speech", `{"input":"hello","voice":"alloy"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(ct, "audio/mpeg") {
+		t.Fatalf("content-type=%q", ct)
+	}
+	if !bytes.Equal(body, env.adapter.Bytes()) {
+		t.Fatalf("binary corrupted: len=%d", len(body))
+	}
+}
+
+func TestCAPC4020ClientASRMultipart(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	body, _, err := c.Transcription(context.Background(), env.resourceIDs.asr, "/v1/audio/transcriptions", "whisper-test", "sample.wav", []byte("RIFF-test-bytes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(body, []byte(`"text":"transcribed"`)) {
+		t.Fatalf("bad transcription: %s", body)
+	}
+	fact := env.adapter.LastRequest("/v1/audio/transcriptions")
+	if fact == nil || fact.MultipartFields["model"] != "whisper-test" || !bytes.Contains(fact.MultipartFiles["file"], []byte("RIFF-test-bytes")) {
+		t.Fatalf("multipart not preserved: %+v", fact)
+	}
+}
+
+func TestCAPC4030ClientMCP(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	body, _, err := c.MCP(context.Background(), env.resourceIDs.mcp, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(body, []byte(`"tools"`)) {
+		t.Fatalf("bad MCP body: %s", body)
+	}
+}
+
+// CAP-C4-040: old generation must be rejected before any upstream body forward.
+func TestCAPC4040OldGenerationNoForward(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: 0, InteractionID: env.interactionID})
+	_, _, err := c.ChatCompletion(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{"model":"gpt-test"}`)
+	if err == nil {
+		t.Fatal("expected 428 for stale generation")
+	}
+	problem, ok := err.(client.ProblemError)
+	if !ok {
+		t.Fatalf("expected ProblemError, got %T", err)
+	}
+	if problem.Status != 428 || problem.Forwarded == nil || *problem.Forwarded {
+		t.Fatalf("unexpected problem: status=%d code=%s forwarded=%v", problem.Status, problem.Code, problem.Forwarded)
+	}
+	if fact := env.adapter.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatalf("adapter received body despite stale generation: %+v", fact)
+	}
+}
+
+// CAP-C4-041: invalid JWT must be rejected without forward.
+func TestCAPC4041InvalidJWTReturns401NoForward(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: "not-a-token", ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	_, _, err := c.ChatCompletion(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{}`)
+	if err == nil {
+		t.Fatal("expected 401")
+	}
+	problem, ok := err.(client.ProblemError)
+	if !ok || problem.Status != 401 {
+		t.Fatalf("expected 401 problem, got %v", err)
+	}
+	if fact := env.adapter.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatalf("adapter received body despite invalid JWT")
+	}
+}
+
+type resourceIDs struct{ model, tts, asr, mcp string }
+
+type env struct {
+	adapter       *adapter.Adapter
+	relayURL      string
+	token         string
+	generation    int
+	interactionID string
+	resourceIDs   resourceIDs
+	srv           *httptest.Server
+}
+
+func newEnv(t *testing.T) *env {
+	t.Helper()
+	now := time.Date(2026, 8, 19, 9, 0, 0, 0, time.UTC)
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deploymentID := platformid.New(platformid.Deployment)
+	userID := platformid.New(platformid.User)
+	deviceID := platformid.New(platformid.Device)
+	sessionID := platformid.New(platformid.Session)
+	interactionID := platformid.New(platformid.Interaction)
+
+	signer := &accessSigner{privateKey: privateKey, deploymentID: deploymentID, kid: "i4-key", now: now}
+	token := signer.sign(t, userID, deviceID, sessionID)
+
+	ad := adapter.New()
+	ids := resourceIDs{
+		model: platformid.New(platformid.Model),
+		tts:   platformid.New(platformid.TTS),
+		asr:   platformid.New(platformid.ASR),
+		mcp:   platformid.New(platformid.MCP),
+	}
+	upstreamID := platformid.New(platformid.Upstream)
+	modelRoute := platformid.New(platformid.Route)
+	ttsRoute := platformid.New(platformid.Route)
+	asrRoute := platformid.New(platformid.Route)
+	mcpRoute := platformid.New(platformid.Route)
+
+	state := relaycontrolapi.RuntimeControlState{
+		ControlRevision:         1,
+		ActiveManagedGeneration: 1,
+		DeploymentId:            deploymentID,
+		AuthKeys:                []relaycontrolapi.PublicJwk{signer.publicJWK()},
+		PrincipalState:          relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
+		ResourceRoutes: []relaycontrolapi.ResourceRoute{
+			{ResourceId: ids.model, RuntimeRouteId: modelRoute},
+			{ResourceId: ids.tts, RuntimeRouteId: ttsRoute},
+			{ResourceId: ids.asr, RuntimeRouteId: asrRoute},
+			{ResourceId: ids.mcp, RuntimeRouteId: mcpRoute},
+		},
+		Routes: []relaycontrolapi.RuntimeRouteSpec{
+			{RuntimeRouteId: modelRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
+			{RuntimeRouteId: ttsRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/audio/speech"}, TransportPolicy: relaycontrolapi.HTTPBINARYSTREAM, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
+			{RuntimeRouteId: asrRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/audio/transcriptions"}, TransportPolicy: relaycontrolapi.HTTPMULTIPART, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
+			{RuntimeRouteId: mcpRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/mcp"}, TransportPolicy: relaycontrolapi.HTTPREQUESTRESPONSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
+		},
+		Upstreams: []relaycontrolapi.RuntimeUpstreamSpec{{
+			UpstreamId: upstreamID, BaseUrl: ad.URL, Enabled: true,
+			TransportCapabilities: []string{"HTTP_STREAMING_SSE", "HTTP_BINARY_STREAM", "HTTP_MULTIPART", "MCP_STREAMABLE_HTTP"},
+			Auth:                  relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.BEARER, AdditionalProperties: map[string]interface{}{"token": "server-side-secret"}},
+		}},
+		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
+	}
+	hash, err := relaystate.HashDescriptor(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.BundleHash = hash
+	store := control.NewStore(func() time.Time { return now })
+	if _, err := store.Apply(state); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(relayruntime.NewHandler(store))
+	return &env{
+		adapter: ad, relayURL: srv.URL, token: token, generation: 1, interactionID: interactionID,
+		resourceIDs: ids, srv: srv,
+	}
+}
+
+func (e *env) close() {
+	e.srv.Close()
+	e.adapter.Close()
+}
+
+type accessSigner struct {
+	privateKey   ed25519.PrivateKey
+	deploymentID string
+	kid          string
+	now          time.Time
+}
+
+func (s *accessSigner) sign(t *testing.T, userID, deviceID, sessionID string) string {
+	t.Helper()
+	claims := struct {
+		DeploymentID string `json:"deploymentId"`
+		DeviceID     string `json:"deviceId"`
+		SessionID    string `json:"sessionId"`
+		jwt.RegisteredClaims
+	}{
+		DeploymentID: s.deploymentID, DeviceID: deviceID, SessionID: sessionID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: s.deploymentID, Subject: userID,
+			Audience: jwt.ClaimStrings{"client", "runtime"},
+			IssuedAt: jwt.NewNumericDate(s.now), ExpiresAt: jwt.NewNumericDate(s.now.Add(10 * time.Minute)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+	token.Header["kid"] = s.kid
+	value, err := token.SignedString(s.privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func (s *accessSigner) publicJWK() relaycontrolapi.PublicJwk {
+	publicKey := s.privateKey.Public().(ed25519.PublicKey)
+	return relaycontrolapi.PublicJwk{
+		Kty: relaycontrolapi.OKP, Crv: relaycontrolapi.Ed25519, Alg: relaycontrolapi.EdDSA, Use: relaycontrolapi.Sig,
+		Kid: s.kid, X: base64.RawURLEncoding.EncodeToString(publicKey),
+	}
+}

@@ -112,6 +112,28 @@ jobs:
       - name: 执行 Backend T1/T2 门禁
         run: make backend-test
 
+  system-test:
+    needs: static-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: 恢复 Go dependency/build cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ env.GO_VERSION }}-
+      - name: 执行 S0.1 T3 系统 harness 门禁
+        run: make system-test
+
   console-test:
     needs: static-contract
     runs-on: ubuntu-24.04
@@ -139,11 +161,12 @@ jobs:
 
   ci-gate:
     if: ${{ always() }}
-    needs: [static-contract, backend-test, console-test]
+    needs: [static-contract, backend-test, system-test, console-test]
     runs-on: ubuntu-24.04
     steps:
       - name: 汇总 required gate
         run: |
           test "${{ needs.static-contract.result }}" = "success"
           test "${{ needs.backend-test.result }}" = "success"
+          test "${{ needs.system-test.result }}" = "success"
           test "${{ needs.console-test.result }}" = "success"

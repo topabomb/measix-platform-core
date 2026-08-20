@@ -155,15 +155,17 @@ S0.1 的 T3/T4.1 使用一套 repository-wide harness；Admin、Relay、Test Cli
 
 ### 10.1 Target structure
 
-保持结构浅而清楚：
+保持结构浅而清楚。Repository-wide harness 放在 Go module 内以便复用 `internal/` 包，落地为 `backend/test/system/`（路径结构沿用 `test/system/`，source-tree 权威见 §3）：
 
 ```text
-test/system/
+backend/test/system/
 ├── harness/       environment/process/readiness/polling/log/cleanup
 ├── adapter/       deterministic upstream adapter
 ├── client/        client-facing Test Client
 └── scenarios/     cross-component/system scenarios
 ```
+
+执行入口：`make system-test`（等价 `cd backend && go test ./test/system/...`）。`ci-gate` 通过独立的 `system-test` job 承载该 T3 门禁。
 
 只有目录内文件数量或职责真正分化后才继续拆子目录；不要为每个 CAP ID、capability 或 process 创建一层目录。
 
@@ -324,6 +326,7 @@ Notes:
 - The Quasar dev server proxies `/api`, `/live`, `/ready`, `/.well-known` to the Hub (port 8080) and `/runtime` to the Relay (8090). Dev proxy is dev-only; production serves the SPA from the same origin as the Hub.
 - `backend/cmd/devmigrate` applies the published Atlas migration SQL verbatim for local development only because the Atlas CLI cannot currently be installed alongside the local Go 1.26 toolchain. CI keeps executing the real `atlas migrate apply` replay (`make migration-replay`); `devmigrate` is not a replacement and never runs in CI.
 - Other orchestration scripts: `npm run test` (backend + console), `npm run contract`, `npm run generate`, `npm run drift`, `npm run build`, `npm run ci` (delegates to the Makefile targets that CI executes).
+- System harness: `make system-test` runs `backend/test/system/` (T3 real-process + component scenarios). `make freeze-manifest` regenerates `docs/s0-freeze-manifest.json` (S0.1 Client Contract Freeze inputs: commit, OpenAPI hash, fixture hash, snapshot schema version).
 
 ## 12. Keeping docs accurate
 

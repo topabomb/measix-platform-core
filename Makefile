@@ -1,6 +1,6 @@
-.PHONY: ci generate generated-drift fmt-check backend-test console-test contract migrations migration-replay
+.PHONY: ci generate generated-drift fmt-check backend-test system-test console-test contract migrations migration-replay freeze-manifest
 
-ci: fmt-check contract backend-test console-test migrations generated-drift
+ci: fmt-check contract backend-test system-test console-test migrations generated-drift
 
 fmt-check:
 	@files=$$(find backend -name '*.go' -type f -print0 | xargs -0 gofmt -l); \
@@ -17,6 +17,12 @@ backend-test:
 	cd backend && go test ./... -count=1
 	cd backend && go vet ./...
 	cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/sqliteutil ./internal/relay/metering -count=1
+
+system-test:
+	cd backend && go test ./test/system/... -count=1 -timeout 5m
+
+freeze-manifest:
+	node scripts/freeze-manifest.mjs
 
 console-test:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build

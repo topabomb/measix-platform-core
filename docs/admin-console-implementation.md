@@ -406,11 +406,15 @@ no browser → Relay/internal API
 
 Feature component tests 继续覆盖 Upstream、Resources、Review/Preview、Pricing、Usage 等 architecture Testing Spec 行为。Contract 测试以 generated Admin OpenAPI types/fixtures 为边界，不维护第二份手写 request/response schema。
 
+这些快速测试和 production build 属于默认 GitHub Actions CI；它们负责每次提交的快速反馈。
+
 ### 13.2 Browser E2E 的角色
 
 Browser E2E 使用 `@playwright/test`，运行 **production `dist/spa` + real Control Hub + real Runtime Relay + system harness**。浏览器只扮演管理员：登录、填写、点击、导航、刷新并读取 UI；它不通过 `page.route('/api/**')` mock Hub，也不直接写 SQLite、调用 `/internal/*` 或用测试代码替代正常 Admin 操作完成 Golden Path。
 
-系统环境、Deterministic Adapter 和 Test Client 由 repository-wide `test/system/` harness 提供，生命周期与 CI 约定见 `docs/development.md`。这样 `console/e2e/` 不再自己维护另一套 backend fixture/runtime。
+系统环境、Deterministic Adapter 和 Test Client 由 repository-wide `test/system/` harness 提供，生命周期与候选验证约定见 `docs/development.md`。这样 `console/e2e/` 不再自己维护另一套 backend fixture/runtime。
+
+Browser E2E 是 S0.1 C6/C7 的硬验收证据，但**不运行在默认 GitHub Actions CI/CD 中**。它在开发时按需显式运行受影响 slice，并在 S0.1 freeze candidate 上完整运行。
 
 ### 13.3 Playwright 代码约定
 
@@ -430,11 +434,13 @@ console/e2e/
 6. 失败保留 browser trace/screenshot 与 system process logs，但产物不得包含 Secret、credential、prompt/body；
 7. 不建立大规模 pixel-perfect screenshot suite；视觉回归只用于少量 Shell/高风险 responsive layout。
 
-CI 的 product gate 以 Chromium 为确定性基线；desktop Golden Path 为主，mobile viewport 至少覆盖 Shell、导航、核心编辑/提交与 inspector fallback smoke。其他浏览器矩阵只有在正式 browser support 要求出现后再扩展，避免现在把兼容性矩阵做成维护负担。
+S0.1 candidate E2E gate 以 Chromium 为确定性基线；desktop Golden Path 为主，mobile viewport 至少覆盖 Shell、导航、核心编辑/提交与 inspector fallback smoke。其他浏览器矩阵只有在正式 browser support 要求出现后再扩展，避免现在把兼容性矩阵做成维护负担。
+
+GitHub Actions CI/CD 不启动 Playwright T4.1。候选 E2E 必须固定 exact candidate SHA/build，并由受控本地或专用候选环境显式执行；Actions 的 frontend unit/component/build Green 不能替代它。
 
 ### 13.4 E2E 增量策略
 
-现在就建立 E2E 基础设施，但不在 C0/C1 尚变化时一次写死完整 C6。实施顺序：
+现在就建立 E2E 基础设施，但不把完整 E2E 挂到每次 CI。实施顺序：
 
 ```text
 Phase 0 / now
@@ -464,7 +470,7 @@ C6
   + failure/restart/recovery scenarios
 ```
 
-详细字段行为仍先在最窄 Unit/Component/Contract 层完成 Red → Green；E2E 负责逐步锁定真实跨边界的用户闭环，而不是把每个 field assertion 都重复一遍。新的关键 workflow 不应等到 C6 才第一次进入 real-browser/system test。
+详细字段行为仍先在最窄 Unit/Component/Contract 层完成 Red → Green；E2E 负责逐步锁定真实跨边界的用户闭环，而不是把每个 field assertion 都重复一遍。新的关键 workflow 不应等到 C6 才第一次具备可执行 browser/system test，但这些 slice 只需按需显式运行，不要求每次 GitHub Actions 自动执行。
 
 ## 14. 实施顺序
 
@@ -473,7 +479,7 @@ C6
 ```text
 1. App Shell / navigation registry / semantic styling / responsive modes
 2. shared page header + collection/detail/inspector patterns
-3. E2E Phase 0：production SPA + real-system browser smoke
+3. E2E Phase 0：production SPA + real-system browser smoke（显式运行，不进默认 Actions）
 4. Upstreams + C1 browser slice
 5. Resources + Policy + relationship view + C2 browser slice
 6. Review / Preview / Publish / Releases + C3 browser slice

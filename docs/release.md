@@ -18,6 +18,8 @@ Final S0 Release Candidate
 
 Do not collapse these into one status.
 
+GitHub Actions CI/CD is intentionally not the full release verifier. It provides the fast deterministic T0–T3 baseline. Browser/system E2E and real external qualification are explicit promotion gates executed separately on a pinned candidate SHA.
+
 ## 2. S0.1 freeze candidate
 
 S0.1 is intentionally pre-Android. A freeze candidate fixes the server-side implementation and Android-facing executable contract after the architecture-defined S0.1 gate is Green.
@@ -59,15 +61,15 @@ The final system/RC manifest additionally records the build/qualification/scenar
 
 ### Pull request
 
-T0/T1/T2 for the affected repository surface, with Red/Green evidence for behavior changes.
+T0/T1/T2 for the affected repository surface, with Red/Green evidence for behavior changes. Bounded deterministic T3 runs where the repository CI requires them. No browser E2E is executed by GitHub Actions PR CI.
 
 ### Main / integration candidate
 
-Adds required T3 lanes, migration/static-host checks and deterministic system-harness backend scenarios.
+Adds required T3 lanes, migration/static-host checks and deterministic system-harness backend scenarios. GitHub Actions still stops before T4.1 browser/system E2E.
 
 ### S0.1 freeze candidate
 
-Runs all requirements in `measix-s0-capability-delivery-system-testing-spec.md`, including:
+This is an explicit candidate-verification stage outside normal GitHub Actions CI/CD. Pin the exact platform-core commit/build, then run all requirements in `measix-s0-capability-delivery-system-testing-spec.md`, including:
 
 - real Admin browser through real Hub;
 - real Hub↔Relay control/runtime paths;
@@ -80,11 +82,13 @@ Runs all requirements in `measix-s0-capability-delivery-system-testing-spec.md`,
 - Client OpenAPI/fixture/schema freeze evidence;
 - no unexplained critical `CAP-*` skip.
 
+The run may execute on a developer-controlled/local or dedicated controlled candidate environment, but it must use the exact pinned SHA and produce reproducible machine-readable evidence. A GitHub Actions `ci-gate` success is necessary baseline evidence but never substitutes for this candidate gate.
+
 Only after this candidate passes can S0.2 Android work treat the Client contract as frozen input.
 
 ### Final S0 release candidate
 
-Runs all required current-release S0 gates, including:
+Likewise, the final S0 E2E/RC verification is an explicit release-candidate run rather than part of every GitHub Actions CI/CD execution. It runs all required current-release S0 gates, including:
 
 - valid pinned S0.1 freeze input;
 - applicable Component Testing Spec MUST scenarios;
@@ -134,20 +138,26 @@ After freeze, an incompatible Android-visible change creates a new architecture-
 
 Every freeze/RC binary/static build must be traceable to its source commit and build configuration. Release evidence must make it possible to determine which Hub, Relay and Admin build was tested.
 
-## 8. GitHub Actions evidence
+## 8. Verification evidence
 
-Freeze/RC workflows publish as applicable:
+GitHub Actions publishes its normal T0–T3 check results. It does not execute or claim the browser/system E2E gate.
+
+Explicit Freeze/RC verification preserves as applicable:
 
 - machine-readable manifest;
+- exact source/build identity;
 - test result files;
 - bounded diagnostic logs;
 - browser/emulator failure artifacts when useful;
 - qualification reports;
-- resource/load summaries.
+- resource/load summaries;
+- started/completed timestamps and scenario result mapping.
+
+Evidence may be retained by the controlled candidate runner and referenced from the freeze/RC manifest or release record. It does not need to be produced by GitHub Actions, but it must be durable enough to audit and reproduce the candidate.
 
 Artifacts must not contain production credentials, real user conversations or secret plaintext.
 
-A successful workflow status without the required scenario/report evidence is not sufficient for S0.1 freeze or final S0 RC.
+A successful GitHub Actions workflow status without the required candidate scenario/report evidence is not sufficient for S0.1 freeze or final S0 RC.
 
 ## 9. Reproduction
 

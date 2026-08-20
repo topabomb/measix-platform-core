@@ -12,9 +12,9 @@ The repository implements the S0 five-layer model:
 | T1 Unit / Domain | pure validation/state/mapping | Go unit tests, Vitest unit/store helpers |
 | T2 Component Integration | one real component + local real boundaries | real SQLite, real HTTP server, component/static-host tests |
 | T3 Cross-component Integration | multiple real MEASIX components | real Hub↔Relay, Admin↔Hub, deterministic Adapter |
-| T4 System / E2E | client-facing topology and full product flows | S0.1 pre-Android system gate, then final S0.2 Android/system RC |
+| T4 System / E2E | client-facing topology and full product flows | S0.1 pre-Android explicit candidate gate, then final S0.2 Android/system RC |
 
-Normal PR CI is dominated by T0/T1/T2. Integration candidates add required T3. S0.1 adds a deterministic pre-Android system gate. Final S0 RC adds Android emulator/device and the remaining cross-repository requirements from the architecture System Testing Spec.
+Normal GitHub Actions CI is deliberately limited to deterministic T0–T3 plus required builds. Browser/System E2E is not executed by GitHub Actions CI/CD because it is materially slower and is a promotion/freeze proof rather than a per-commit feedback loop. S0.1 still requires the complete deterministic pre-Android T4.1 gate before C6/C7 completion. Final S0 RC still requires Android emulator/device and the remaining cross-repository requirements from the architecture System Testing Spec.
 
 ## 2. Delivery-gate mapping
 
@@ -59,7 +59,7 @@ api/fixtures/                   canonical contract fixtures
 test/qualification/             Adapter qualification harness
 test/system/harness/            real-process system harness
 test/system/scenarios/          CAP/SYS scenario orchestration
-test/system/reports/            generated local output; CI publishes artifacts
+test/system/reports/            generated candidate output/evidence; not a normal CI artifact lane
 ```
 
 Tests should live near the code they prove unless they are explicitly cross-component/system infrastructure.
@@ -123,7 +123,7 @@ Flaky critical tests are defects. Fix them; do not permanently quarantine/skip t
 
 ## 9. PR CI design
 
-GitHub Actions should expose stable, understandable checks. Current logical gates may be coarser than the target decomposition, but the required aggregate result remains explicit.
+GitHub Actions should expose stable, understandable checks and stay fast enough to remain useful on every push. The default PR gate therefore stops at T3 and does **not** execute Playwright/browser T4.1 E2E.
 
 Recommended logical jobs are:
 
@@ -133,30 +133,37 @@ unit
 component-hub
 component-relay
 component-admin
+system-test       # bounded deterministic T3 only
 ci-gate
 ```
 
 `ci-gate` is the merge-facing aggregate check and **must always be reported for pull requests**. Do not put workflow-level path filters on a required check: a required workflow that never runs can leave a PR waiting for a status indefinitely. Component jobs may skip work internally when unaffected, but the aggregate result remains explicit.
 
-The required gate evaluates the latest PR commit. Older Green checks do not satisfy a new head commit.
+The required gate evaluates the latest PR commit. Older Green checks do not satisfy a new head commit. A Green `ci-gate` means the repository's normal T0–T3 CI baseline is Green; it does **not** mean C6, C7, S0.1 Freeze or final S0 Exit is complete.
 
-## 10. Main/integration CI
+## 10. Main/integration CI and explicit E2E promotion
 
-After merge or on an integration candidate, run at least:
+After merge or on an integration candidate, GitHub Actions runs at least:
 
 - all PR gates;
 - Hub↔Relay T3;
-- Admin↔Hub T3;
+- Admin↔Hub T3 where implemented as bounded integration tests;
 - migration replay/upgrade;
-- Admin production static host;
+- Admin production static host/build;
 - deterministic Adapter transport suite;
-- core backend/system-harness scenarios.
+- core backend/system-harness T3 scenarios.
 
-During S0.1, promotion to the Client Contract Freeze candidate additionally requires the complete architecture-defined `CAP-*` gate. A failure blocks freeze even if the lower-level CI aggregate is Green.
+GitHub Actions CI/CD intentionally does **not** run T4.1 browser/system E2E, even on `main`. This keeps continuous feedback deterministic and bounded.
+
+Promotion to an S0.1 C6/C7 freeze candidate adds a separate explicit candidate verification outside GitHub Actions CI/CD. It must run on the exact candidate commit and execute the complete architecture-defined `CAP-*` T4.1 gate with production Admin, real Hub/Relay, deterministic Adapter/Test Client, and the required recovery/security scenarios. The candidate is blocked if this run is missing or not Green, even when GitHub Actions `ci-gate` is Green.
+
+The candidate E2E runner may be a developer-controlled/local or dedicated controlled environment, but it must be reproducible and record at least the exact source SHA, command/config identity, started/completed timestamps, scenario results and safe diagnostics. Historical E2E evidence cannot be reused after the candidate SHA changes unless the architecture gate explicitly allows an unaffected artifact, which S0.1 Freeze currently does not.
+
+Real external Adapter qualification remains a separate explicit qualification lane and is also not part of normal GitHub Actions CI/CD.
 
 ## 11. S0.1 freeze evidence
 
-The S0.1 system run publishes machine-readable evidence and diagnostics containing no secrets.
+The explicit S0.1 candidate system run generates machine-readable evidence and diagnostics containing no secrets.
 
 The freeze manifest pins at least:
 
@@ -198,7 +205,9 @@ The final architecture System Testing Spec is authoritative for the exact requir
 
 ## 13. Local test loop
 
-Local development uses the narrowest test that demonstrates Red/Green, then expands to the affected component suite before push. CI repeats the required gate independently.
+Local development uses the narrowest test that demonstrates Red/Green, then expands to the affected component suite before push. CI repeats the required T0–T3 gate independently.
+
+When a change affects an existing browser/system workflow, run the smallest affected E2E slice explicitly during development where practical; this is development evidence, not a reason to move the full T4.1 suite into Actions. Before C6/C7 promotion, always rerun the complete candidate gate on the exact candidate SHA.
 
 Exact commands are documented here only when their actual scripts/package targets exist. Do not invent documentation-only commands that CI cannot execute.
 
@@ -209,13 +218,13 @@ When no local runtime is available:
 1. open/use a Draft PR;
 2. push the Red test commit;
 3. wait for/inspect the Actions check;
-4. confirm the intended test failed for the expected reason;
+4. confirm the intended T0–T3 test failed for the expected reason;
 5. push the Green implementation commit;
 6. inspect checks on the **latest commit SHA**;
-7. inspect job logs/artifacts for the affected lane;
+7. inspect job logs/artifacts for the affected CI lane;
 8. refactor and repeat if needed.
 
-This is a valid TDD loop because execution is delegated to CI rather than skipped. See `docs/tdd.md`.
+This is a valid TDD loop for T0–T3 because execution is delegated to CI rather than skipped. A T4.1/browser requirement cannot be declared Green from GitHub-only CI; it requires the separate explicit candidate E2E run. See `docs/tdd.md`.
 
 ## 15. Secrets and test data
 

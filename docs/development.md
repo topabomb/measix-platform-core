@@ -33,10 +33,12 @@ branch
 → rerun narrow test
 → affected component suite
 → push / PR
-→ GitHub CI independently verifies
+→ GitHub CI independently verifies T0–T3
 ```
 
 Local configuration uses synthetic/test credentials only. Development must not require production configuration or public Provider access for normal T0–T3 work.
+
+When a change affects an existing browser/system workflow, run the smallest relevant E2E slice explicitly where practical. Full T4.1 remains a candidate/freeze gate rather than a per-commit loop.
 
 ### GitHub-only
 
@@ -46,7 +48,7 @@ When development is performed through GitHub/API/coding-agent access without a l
 branch
 → Draft PR
 → commit Red test
-→ GitHub Actions executes and fails as expected
+→ GitHub Actions executes affected T0–T3 gate and fails as expected
 → inspect failing check/log
 → commit implementation
 → GitHub Actions executes latest SHA and passes
@@ -54,9 +56,9 @@ branch
 → refactor / rerun
 ```
 
-GitHub Actions is the executor in this mode. Static code review alone is not test execution.
+GitHub Actions is the executor in this mode for the repository's normal T0–T3/build gates. T4.1 browser/system E2E is deliberately excluded from GitHub Actions CI/CD; C6/C7 completion requires a separate explicit candidate run on the exact candidate SHA.
 
-See `docs/tdd.md` for the evidence contract.
+Static code review alone is not test execution. See `docs/tdd.md` for the evidence contract.
 
 ## 3. I0 target repository structure
 
@@ -145,6 +147,8 @@ Admin Console development separates:
 
 Frontend tests may stub Hub for component-level T1/T2, but system/browser lanes use the repository-wide real system harness. Browser E2E implementation rules live in `docs/admin-console-implementation.md`; architecture Admin/System Testing Specs remain the authority for required behavior and CAP scenarios.
 
+Browser E2E is maintained as executable product evidence but is not part of the default GitHub Actions CI/CD path. During feature work, run affected slices explicitly when needed; before C6/C7/Freeze, run the complete T4.1 candidate suite on the pinned SHA.
+
 ## 9. Runtime Relay workflow
 
 Relay data-path changes must be tested against real HTTP/TCP boundaries for streaming, cancellation, header handling and forwarding behavior. In-memory mocks do not replace required Relay T2/T3 scenarios.
@@ -165,7 +169,7 @@ backend/test/system/
 └── scenarios/     cross-component/system scenarios
 ```
 
-执行入口：`make system-test`（等价 `cd backend && go test ./test/system/...`）。`ci-gate` 通过独立的 `system-test` job 承载该 T3 门禁。
+执行入口：`make system-test`（等价 `cd backend && go test ./test/system/...`）。`ci-gate` 通过独立的 `system-test` job 承载当前 bounded T3 门禁；它不是 T4.1/browser E2E。
 
 只有目录内文件数量或职责真正分化后才继续拆子目录；不要为每个 CAP ID、capability 或 process 创建一层目录。
 
@@ -272,23 +276,37 @@ clean environment
 
 之后随 C1–C5 增量增加 browser/system slice，C6 只把已经分别 Green 的能力组合成 clean-environment Golden Path 与恢复场景，而不是届时才首次建设 E2E。
 
-### 10.6 CI layering
+这些 browser/system slices 可以在开发机或受控候选环境中显式执行，但不进入默认 GitHub Actions CI/CD。维护 E2E 与每次 push 自动执行 E2E 是两件不同的事。
 
-Repository CI 保持分层，不把所有测试塞入一个 job：
+### 10.6 CI layering and E2E execution policy
+
+Repository verification 明确分成两条执行路径：
 
 ```text
-T0      static / contract / generated drift
-T1/T2   backend unit/component + frontend unit/component/build
-T3      cross-component system integration
-T4.1    production browser + Hub + Relay + Adapter + Test Client product/system gate
+GitHub Actions CI/CD
+  T0      static / contract / generated drift
+  T1/T2   backend unit/component + frontend unit/component/build
+  T3      bounded cross-component system integration
+  no T4.1 browser E2E
+
+Explicit S0.1 candidate verification
+  T4.1    production browser + Hub + Relay + Adapter + Test Client
+  recovery/security/generation Golden Path
+  real Adapter qualification as a separate explicit lane
 ```
 
-当 system harness 落地后，至少提供：
+GitHub Actions `ci-gate` 只聚合正常 T0–T3 required checks。它必须快速、确定、每个最新 PR SHA 都能可靠运行；不得因为没有执行 T4.1 就把 `ci-gate` 描述为 S0.1 complete。
 
-- 一个快速 `system-smoke`，用于持续验证 clean start、migration、Hub/Relay、production SPA 基础闭环；
-- 一个完整 `system-e2e`/T4.1 gate，承载 architecture required CAP-C6/failure/recovery 场景。
+完整 browser/system E2E 不运行在 GitHub Actions CI/CD 中。它在以下时点显式执行：
 
-具体命令名以 Makefile/package scripts/CI workflow 为实现权威，新增命令时同步本文。S0.1 checkpoint/Freeze completion 必须引用最新 commit 上实际执行的 Green evidence；历史 Green、component mock Green 或人工页面检查不能替代 T4.1。
+- C6 开始组合完整 Golden Path 时；
+- 修复会影响现有 T4.1 主链/恢复语义的缺陷后；
+- 生成 C7/Freeze candidate 前；
+- candidate SHA 变化后重新做最终 candidate verification。
+
+候选 E2E 必须固定 exact commit/build，使用生产 `dist/spa`、真实 Hub/Relay/SQLite/migrations、Deterministic Adapter/Test Client，并生成可追溯的 safe evidence。没有该证据，即使 GitHub Actions 全 Green，也不得宣称 C6/C7/S0.1 Freeze Green。
+
+可以在 Actions 中保留快速 `make system-test`/system smoke，但它必须是 bounded T3，不启动完整 Playwright Golden Path。完整 E2E 的具体执行命令只有在实现真正落地时才加入 Makefile/package scripts；不要为了文档先发明不存在的命令。
 
 ### 10.7 TDD placement
 
@@ -298,15 +316,15 @@ E2E 不取代最窄层 Red → Green：
 field/payload/state bug
 → Unit/Component/Contract Red
 → implementation Green
-→ affected system/browser slice Green
+→ affected system/browser slice explicit Green when relevant
 
 cross-process/recovery bug
 → smallest reproducible T2/T3 scenario Red
 → implementation Green
-→ related CAP/T4.1 scenario Green
+→ related CAP/T4.1 explicit candidate scenario Green
 ```
 
-关键 workflow 在其 C1–C5 实现阶段就加入对应 real-system slice；不要等 C6 才补一整套事后验收测试。
+关键 workflow 在其 C1–C5 实现阶段就维护对应 real-system/browser slice；不要等 C6 才补一整套事后验收测试。它们不必在每次 GitHub Actions run 自动执行。
 
 ## 11. Local runtime and dev commands
 
@@ -325,8 +343,8 @@ Notes:
 - `npm run setup` is idempotent; generated secrets/passwords live under gitignored `.secrets/`, local databases under `.data/`.
 - The Quasar dev server proxies `/api`, `/live`, `/ready`, `/.well-known` to the Hub (port 8080) and `/runtime` to the Relay (8090). Dev proxy is dev-only; production serves the SPA from the same origin as the Hub.
 - `backend/cmd/devmigrate` applies the published Atlas migration SQL verbatim for local development only because the Atlas CLI cannot currently be installed alongside the local Go 1.26 toolchain. CI keeps executing the real `atlas migrate apply` replay (`make migration-replay`); `devmigrate` is not a replacement and never runs in CI.
-- Other orchestration scripts: `npm run test` (backend + console), `npm run contract`, `npm run generate`, `npm run drift`, `npm run build`, `npm run ci` (delegates to the Makefile targets that CI executes).
-- System harness: `make system-test` runs `backend/test/system/` (T3 real-process + component scenarios). `make freeze-manifest` regenerates `docs/s0-freeze-manifest.json` (S0.1 Client Contract Freeze inputs: commit, OpenAPI hash, fixture hash, snapshot schema version).
+- Other orchestration scripts: `npm run test` (backend + console), `npm run contract`, `npm run generate`, `npm run drift`, `npm run build`, `npm run ci` (delegates to the Makefile targets that GitHub Actions CI executes). These commands do not imply T4.1 browser E2E.
+- System harness: `make system-test` runs `backend/test/system/` as the current bounded T3 lane. `make freeze-manifest` regenerates `docs/s0-freeze-manifest.json`; it is valid C7 evidence only after the explicit S0.1 T4.1 candidate gate and real Adapter qualification are Green for the pinned candidate.
 
 ## 12. Keeping docs accurate
 

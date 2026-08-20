@@ -232,7 +232,7 @@ func testUpstreamConfig(secretID string, secretVersion int) adminapi.UpstreamCon
 		BaseUrl:               "https://adapter.example",
 		TransportCapabilities: []string{"HTTP", "SSE", "BINARY", "MULTIPART", "MCP_STREAMABLE_HTTP"},
 		Auth: adminapi.UpstreamConfig_Auth{
-			Type: adminapi.BEARER,
+			Type: adminapi.UpstreamConfigAuthTypeBEARER,
 			AdditionalProperties: map[string]interface{}{
 				"secretRef": map[string]interface{}{"secretId": secretID, "secretVersion": secretVersion},
 			},

@@ -71,6 +71,8 @@ func (s *Store) Status() relaycontrolapi.ControlStatus {
 
 func IsRevisionHashConflict(err error) bool { return errors.Is(err, ErrRevisionHashConflict) }
 
+func IsRevisionStale(err error) bool { return errors.Is(err, ErrStaleRevision) }
+
 func ack(state *State) relaycontrolapi.ControlAck {
 	return relaycontrolapi.ControlAck{
 		AppliedControlRevision:  state.ControlRevision,

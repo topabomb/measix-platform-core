@@ -351,15 +351,15 @@ type SecretRef struct {
 
 func SecretRefs(auth adminapi.UpstreamConfig_Auth) ([]SecretRef, error) {
 	switch auth.Type {
-	case adminapi.NONE:
+	case adminapi.UpstreamConfigAuthTypeNONE:
 		return nil, nil
-	case adminapi.BEARER:
+	case adminapi.UpstreamConfigAuthTypeBEARER:
 		ref, err := parseSecretRef(auth.AdditionalProperties["secretRef"])
 		if err != nil {
 			return nil, ErrInvalidConfig
 		}
 		return []SecretRef{ref}, nil
-	case adminapi.STATICHEADER:
+	case adminapi.UpstreamConfigAuthTypeSTATICHEADER:
 		if header, _ := auth.AdditionalProperties["headerName"].(string); strings.TrimSpace(header) == "" {
 			return nil, ErrInvalidConfig
 		}
@@ -368,7 +368,7 @@ func SecretRefs(auth adminapi.UpstreamConfig_Auth) ([]SecretRef, error) {
 			return nil, ErrInvalidConfig
 		}
 		return []SecretRef{ref}, nil
-	case adminapi.BASIC:
+	case adminapi.UpstreamConfigAuthTypeBASIC:
 		if username, _ := auth.AdditionalProperties["username"].(string); strings.TrimSpace(username) == "" {
 			return nil, ErrInvalidConfig
 		}

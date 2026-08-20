@@ -113,6 +113,24 @@ func (e DeviceStatus) Valid() bool {
 	}
 }
 
+// Defines values for McpDefinitionAuthOwnership.
+const (
+	McpDefinitionAuthOwnershipENTERPRISEMANAGED McpDefinitionAuthOwnership = "ENTERPRISE_MANAGED"
+	McpDefinitionAuthOwnershipNONE              McpDefinitionAuthOwnership = "NONE"
+)
+
+// Valid indicates whether the value is a known member of the McpDefinitionAuthOwnership enum.
+func (e McpDefinitionAuthOwnership) Valid() bool {
+	switch e {
+	case McpDefinitionAuthOwnershipENTERPRISEMANAGED:
+		return true
+	case McpDefinitionAuthOwnershipNONE:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for McpDefinitionClientProtocol.
 const (
 	MCPSTREAMABLEHTTP McpDefinitionClientProtocol = "MCP_STREAMABLE_HTTP"
@@ -197,6 +215,21 @@ func (e SystemStatusRuntimeStatus) Valid() bool {
 	}
 }
 
+// Defines values for TtsDefinitionClientProtocol.
+const (
+	OPENAIAUDIOSPEECH TtsDefinitionClientProtocol = "OPENAI_AUDIO_SPEECH"
+)
+
+// Valid indicates whether the value is a known member of the TtsDefinitionClientProtocol enum.
+func (e TtsDefinitionClientProtocol) Valid() bool {
+	switch e {
+	case OPENAIAUDIOSPEECH:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateUserRequestRole.
 const (
 	UpdateUserRequestRoleADMIN  UpdateUserRequestRole = "ADMIN"
@@ -244,22 +277,22 @@ func (e UpstreamStatus) Valid() bool {
 
 // Defines values for UpstreamConfigAuthType.
 const (
-	BASIC        UpstreamConfigAuthType = "BASIC"
-	BEARER       UpstreamConfigAuthType = "BEARER"
-	NONE         UpstreamConfigAuthType = "NONE"
-	STATICHEADER UpstreamConfigAuthType = "STATIC_HEADER"
+	UpstreamConfigAuthTypeBASIC        UpstreamConfigAuthType = "BASIC"
+	UpstreamConfigAuthTypeBEARER       UpstreamConfigAuthType = "BEARER"
+	UpstreamConfigAuthTypeNONE         UpstreamConfigAuthType = "NONE"
+	UpstreamConfigAuthTypeSTATICHEADER UpstreamConfigAuthType = "STATIC_HEADER"
 )
 
 // Valid indicates whether the value is a known member of the UpstreamConfigAuthType enum.
 func (e UpstreamConfigAuthType) Valid() bool {
 	switch e {
-	case BASIC:
+	case UpstreamConfigAuthTypeBASIC:
 		return true
-	case BEARER:
+	case UpstreamConfigAuthTypeBEARER:
 		return true
-	case NONE:
+	case UpstreamConfigAuthTypeNONE:
 		return true
-	case STATICHEADER:
+	case UpstreamConfigAuthTypeSTATICHEADER:
 		return true
 	default:
 		return false
@@ -554,12 +587,16 @@ type ManagedPolicy struct {
 
 // McpDefinition defines model for McpDefinition.
 type McpDefinition struct {
+	AuthOwnership  McpDefinitionAuthOwnership  `json:"authOwnership"`
 	ClientProtocol McpDefinitionClientProtocol `json:"clientProtocol"`
 	DisplayName    string                      `json:"displayName"`
 	Enabled        bool                        `json:"enabled"`
 	McpServerId    McpServerId                 `json:"mcpServerId"`
 	RuntimePath    string                      `json:"runtimePath"`
 }
+
+// McpDefinitionAuthOwnership defines model for McpDefinition.AuthOwnership.
+type McpDefinitionAuthOwnership string
 
 // McpDefinitionClientProtocol defines model for McpDefinition.ClientProtocol.
 type McpDefinitionClientProtocol string
@@ -779,13 +816,17 @@ type TimeoutPolicy struct {
 
 // TtsDefinition defines model for TtsDefinition.
 type TtsDefinition struct {
-	ClientProtocol   string  `json:"clientProtocol"`
-	DisplayName      string  `json:"displayName"`
-	Enabled          bool    `json:"enabled"`
-	RuntimePath      string  `json:"runtimePath"`
-	TtsId            TtsId   `json:"ttsId"`
-	UpstreamModelKey *string `json:"upstreamModelKey,omitempty"`
+	ClientProtocol   TtsDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName      string                      `json:"displayName"`
+	Enabled          bool                        `json:"enabled"`
+	RuntimePath      string                      `json:"runtimePath"`
+	TtsId            TtsId                       `json:"ttsId"`
+	UpstreamModelKey *string                     `json:"upstreamModelKey,omitempty"`
+	Voice            string                      `json:"voice"`
 }
+
+// TtsDefinitionClientProtocol defines model for TtsDefinition.ClientProtocol.
+type TtsDefinitionClientProtocol string
 
 // TtsId defines model for TtsId.
 type TtsId = string

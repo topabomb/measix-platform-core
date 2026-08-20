@@ -306,10 +306,10 @@ func exactDecimal(value *big.Rat) (string, error) {
 	}
 	numerator := new(big.Int).Set(value.Num())
 	if scale > count2 {
-		numerator.Mul(numerator, new(big.Int).Exp(five, big.NewInt(int64(scale-count2)), nil))
+		numerator.Mul(numerator, new(big.Int).Exp(two, big.NewInt(int64(scale-count2)), nil))
 	}
 	if scale > count5 {
-		numerator.Mul(numerator, new(big.Int).Exp(two, big.NewInt(int64(scale-count5)), nil))
+		numerator.Mul(numerator, new(big.Int).Exp(five, big.NewInt(int64(scale-count5)), nil))
 	}
 	negative := numerator.Sign() < 0
 	if negative {

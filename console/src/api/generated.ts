@@ -535,8 +535,10 @@ export interface components {
         TtsDefinition: {
             ttsId: components["schemas"]["TtsId"];
             displayName: string;
-            clientProtocol: string;
+            /** @enum {string} */
+            clientProtocol: "OPENAI_AUDIO_SPEECH";
             upstreamModelKey?: string;
+            voice: string;
             runtimePath: string;
             enabled: boolean;
         };
@@ -554,6 +556,8 @@ export interface components {
             /** @enum {string} */
             clientProtocol: "MCP_STREAMABLE_HTTP";
             runtimePath: string;
+            /** @enum {string} */
+            authOwnership: "ENTERPRISE_MANAGED" | "NONE";
             enabled: boolean;
         };
         TimeoutPolicy: {

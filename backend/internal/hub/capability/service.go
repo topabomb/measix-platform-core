@@ -243,6 +243,9 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for i, value := range content.Tts {
 		resources[value.TtsId] = value.Enabled
+		if value.Enabled && strings.TrimSpace(value.Voice) == "" {
+			addError("missing_tts_voice", fmt.Sprintf("tts[%d].voice", i), "enabled TTS requires a non-empty voice")
+		}
 		if !validRuntimePath(value.RuntimePath) {
 			addError("invalid_runtime_path", fmt.Sprintf("tts[%d].runtimePath", i), "runtimePath must be an absolute normalized path")
 		}
@@ -257,6 +260,9 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		resources[value.McpServerId] = value.Enabled
 		if !value.ClientProtocol.Valid() {
 			addError("invalid_client_protocol", fmt.Sprintf("mcp[%d].clientProtocol", i), "unsupported MCP client protocol")
+		}
+		if !value.AuthOwnership.Valid() {
+			addError("invalid_mcp_auth_ownership", fmt.Sprintf("mcp[%d].authOwnership", i), "MCP authOwnership must be ENTERPRISE_MANAGED or NONE")
 		}
 		if !validRuntimePath(value.RuntimePath) {
 			addError("invalid_runtime_path", fmt.Sprintf("mcp[%d].runtimePath", i), "runtimePath must be an absolute normalized path")

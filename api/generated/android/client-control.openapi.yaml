@@ -343,6 +343,7 @@ components:
       - displayName
       - clientProtocol
       - runtimePath
+      - voice
       - enabled
       properties:
         ttsId:
@@ -351,8 +352,13 @@ components:
           type: string
         clientProtocol:
           type: string
+          enum:
+          - OPENAI_AUDIO_SPEECH
         upstreamModelKey:
           type: string
+        voice:
+          type: string
+          minLength: 1
         runtimePath:
           type: string
           pattern: ^/[^?#]*$
@@ -389,6 +395,7 @@ components:
       - displayName
       - clientProtocol
       - runtimePath
+      - authOwnership
       - enabled
       properties:
         mcpServerId:
@@ -402,6 +409,11 @@ components:
         runtimePath:
           type: string
           pattern: ^/[^?#]*$
+        authOwnership:
+          type: string
+          enum:
+          - ENTERPRISE_MANAGED
+          - NONE
         enabled:
           type: boolean
     TimeoutPolicy:

@@ -70,7 +70,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	}
 	tts := make([]clientapi.TtsDefinition, 0, len(input.Content.Tts))
 	for _, value := range input.Content.Tts {
-		tts = append(tts, clientapi.TtsDefinition{TtsId: value.TtsId, DisplayName: value.DisplayName, ClientProtocol: value.ClientProtocol, UpstreamModelKey: value.UpstreamModelKey, RuntimePath: value.RuntimePath, Enabled: value.Enabled})
+		tts = append(tts, clientapi.TtsDefinition{TtsId: value.TtsId, DisplayName: value.DisplayName, ClientProtocol: clientapi.TtsDefinitionClientProtocol(value.ClientProtocol), UpstreamModelKey: value.UpstreamModelKey, Voice: value.Voice, RuntimePath: value.RuntimePath, Enabled: value.Enabled})
 	}
 	asr := make([]clientapi.AsrDefinition, 0, len(input.Content.Asr))
 	for _, value := range input.Content.Asr {
@@ -78,7 +78,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	}
 	mcp := make([]clientapi.McpDefinition, 0, len(input.Content.Mcp))
 	for _, value := range input.Content.Mcp {
-		mcp = append(mcp, clientapi.McpDefinition{McpServerId: value.McpServerId, DisplayName: value.DisplayName, ClientProtocol: clientapi.McpDefinitionClientProtocol(value.ClientProtocol), RuntimePath: value.RuntimePath, Enabled: value.Enabled})
+		mcp = append(mcp, clientapi.McpDefinition{McpServerId: value.McpServerId, DisplayName: value.DisplayName, ClientProtocol: clientapi.McpDefinitionClientProtocol(value.ClientProtocol), AuthOwnership: clientapi.McpDefinitionAuthOwnership(value.AuthOwnership), RuntimePath: value.RuntimePath, Enabled: value.Enabled})
 	}
 	sort.Slice(providers, func(i, j int) bool { return providers[i].ProviderId < providers[j].ProviderId })
 	sort.Slice(models, func(i, j int) bool { return models[i].ModelId < models[j].ModelId })

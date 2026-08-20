@@ -167,7 +167,7 @@ func publishUpstreamConfig(secretID string, secretVersion int) adminapi.Upstream
 		BaseUrl:               "https://adapter.example",
 		TransportCapabilities: []string{"HTTP_REQUEST_RESPONSE", "HTTP_STREAMING_SSE"},
 		Auth: adminapi.UpstreamConfig_Auth{
-			Type: adminapi.BEARER,
+			Type: adminapi.UpstreamConfigAuthTypeBEARER,
 			AdditionalProperties: map[string]interface{}{
 				"secretRef": map[string]interface{}{"secretId": secretID, "secretVersion": secretVersion},
 			},

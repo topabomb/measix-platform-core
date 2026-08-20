@@ -624,22 +624,22 @@ func (s *Service) compileUpstream(ctx context.Context, upstreamID string, config
 		spec.SecretRef = &relaycontrolapi.SecretRef{SecretId: ref.SecretID, SecretVersion: ref.Version}
 	}
 	switch config.Auth.Type {
-	case adminapi.NONE:
+	case adminapi.UpstreamConfigAuthTypeNONE:
 		spec.Auth = relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.NONE, AdditionalProperties: map[string]interface{}{}}
-	case adminapi.BEARER:
+	case adminapi.UpstreamConfigAuthTypeBEARER:
 		secret, err := s.Upstream.ResolveSecret(ctx, ref.SecretID, ref.Version)
 		if err != nil {
 			return relaycontrolapi.RuntimeUpstreamSpec{}, err
 		}
 		spec.Auth = relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.BEARER, AdditionalProperties: map[string]interface{}{"token": string(secret)}}
-	case adminapi.STATICHEADER:
+	case adminapi.UpstreamConfigAuthTypeSTATICHEADER:
 		secret, err := s.Upstream.ResolveSecret(ctx, ref.SecretID, ref.Version)
 		if err != nil {
 			return relaycontrolapi.RuntimeUpstreamSpec{}, err
 		}
 		header, _ := config.Auth.AdditionalProperties["headerName"].(string)
 		spec.Auth = relaycontrolapi.RuntimeUpstreamAuth{Type: relaycontrolapi.STATICHEADER, AdditionalProperties: map[string]interface{}{"headerName": header, "value": string(secret)}}
-	case adminapi.BASIC:
+	case adminapi.UpstreamConfigAuthTypeBASIC:
 		secret, err := s.Upstream.ResolveSecret(ctx, ref.SecretID, ref.Version)
 		if err != nil {
 			return relaycontrolapi.RuntimeUpstreamSpec{}, err

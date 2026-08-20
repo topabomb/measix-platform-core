@@ -515,10 +515,10 @@ func TestCAPSEC009ClientHeaderSpoofStripped(t *testing.T) {
 		InteractionID:     platformid.New(platformid.Interaction),
 		SpoofHeaders: map[string]string{
 			"X-Measix-Request-Id": "spoof-request-id",
-			"X-Measix-Internal":    "true",
-			"X-Forwarded-For":      "10.0.0.1",
-			"X-Forwarded-Host":     "evil.example.com",
-			"X-Real-Ip":            "10.0.0.1",
+			"X-Measix-Internal":   "true",
+			"X-Forwarded-For":     "10.0.0.1",
+			"X-Forwarded-Host":    "evil.example.com",
+			"X-Real-Ip":           "10.0.0.1",
 		},
 	})
 
@@ -865,7 +865,9 @@ func TestCAPSEC015IdempotentPublish(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first publish: %v", err)
 	}
-	var act1 struct{ ActivationID string `json:"activationId"` }
+	var act1 struct {
+		ActivationID string `json:"activationId"`
+	}
 	_ = harness.DecodeJSON(resp1, &act1)
 
 	// Second publish with same idempotency key should return the same activation
@@ -876,7 +878,9 @@ func TestCAPSEC015IdempotentPublish(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second publish: %v", err)
 	}
-	var act2 struct{ ActivationID string `json:"activationId"` }
+	var act2 struct {
+		ActivationID string `json:"activationId"`
+	}
 	_ = harness.DecodeJSON(resp2, &act2)
 
 	if act1.ActivationID != act2.ActivationID {

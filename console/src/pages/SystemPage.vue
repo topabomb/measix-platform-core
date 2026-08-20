@@ -36,7 +36,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding>
+  <q-page padding data-cy="system-page">
     <PageHeader title="System" subtitle="Build, runtime, database and Relay health.">
       <template #primary><q-btn flat icon="refresh" @click="refresh" /></template>
     </PageHeader>
@@ -65,7 +65,7 @@ onMounted(refresh)
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">Runtime</div>
-              <StatusChip :value="status.runtimeStatus" />
+              <div data-cy="system-runtime-status"><StatusChip :value="status.runtimeStatus" /></div>
               <div class="text-caption q-mt-sm">generation {{ status.activeManagedGeneration }} · revision {{ status.managedStateRevision }}</div>
             </q-card-section>
           </q-card>

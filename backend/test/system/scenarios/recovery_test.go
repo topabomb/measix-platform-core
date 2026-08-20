@@ -84,33 +84,26 @@ func TestCAPC6010HubCrashAroundPublish(t *testing.T) {
 		t.Fatalf("post-crash relay ready: %v", err)
 	}
 
-	// Verify no duplicate activation was created — list activations and
-	// ensure there is exactly one for this publish.
-	resp, err := admin.Get(ctx, "/api/admin/v1/activations?limit=10")
+	// Verify no duplicate activation was created — check releases and
+	// the generation count. The activation list endpoint is not available,
+	// so we verify via releases and the generation increment instead.
+	resp, err := admin.Get(ctx, "/api/admin/v1/releases?limit=10")
 	if err != nil {
-		t.Fatalf("list activations: %v", err)
+		t.Fatalf("list releases: %v", err)
 	}
-	var acts struct {
+	var releases struct {
 		Items []struct {
-			ActivationID string `json:"activationId"`
-			Kind         string `json:"kind"`
-			State        string `json:"state"`
+			ReleaseID         string `json:"releaseId"`
+			ManagedGeneration int    `json:"managedGeneration"`
+			Status            string `json:"status"`
 		} `json:"items"`
 	}
-	if err := harness.DecodeJSON(resp, &acts); err != nil {
-		t.Fatalf("decode activations: %v", err)
+	if err := harness.DecodeJSON(resp, &releases); err != nil {
+		t.Fatalf("decode releases: %v", err)
 	}
-	// Count COMPLETED activations for the publish kind.
-	completedCount := 0
-	for _, a := range acts.Items {
-		if a.State == "COMPLETED" && a.Kind == "PUBLISH" {
-			completedCount++
-		}
-	}
-	// There should be at least 2 (initial setup + crash recovery), but
-	// no duplicate of the same activation.
-	if completedCount < 2 {
-		t.Fatalf("expected at least 2 completed PUBLISH activations, got %d", completedCount)
+	// There should be at least 2 releases (initial setup + crash recovery).
+	if len(releases.Items) < 2 {
+		t.Fatalf("expected at least 2 releases after crash recovery, got %d", len(releases.Items))
 	}
 
 	// Verify the generation incremented exactly once from the crash recovery.

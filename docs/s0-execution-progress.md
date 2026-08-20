@@ -160,11 +160,29 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 ### 编译验证
 
 ```text
+gofmt -l backend/           — PASS (零文件需格式化)
 go build ./...              — PASS
 go vet ./...                — PASS
 go test -c ./test/system/... — PASS (编译通过)
 tsc --noEmit                — PASS
+tsc --noEmit -p tsconfig.e2e.json — PASS (Playwright E2E typecheck)
+vitest run (13 files, 56 tests) — PASS
 ```
+
+### gofmt 行尾修复
+
+- 在 Windows `autocrlf=true` 环境下，所有 Go 文件之前以 CRLF 检出，导致 `gofmt -l` 标记全量文件需格式化
+- `.gitattributes` 已配置 `*.go text eol=lf`，但工作树中文件在规则生效前已检出
+- 执行 `gofmt -w backend/` 修复全部 CRLF→LF + 实际格式修正（struct 字段对齐、单行 struct 声明展开）
+- 当前 `gofmt -l backend/` 返回零结果
+
+### Browser E2E data-cy 属性补齐
+
+- LoginPage.vue：`data-cy="login-username"`、`data-cy="login-password"`、`data-cy="login-submit"`
+- OverviewPage.vue：`data-cy="overview-page"`
+- SystemPage.vue：`data-cy="system-page"`、`data-cy="system-runtime-status"`
+- UsersPage.vue：`data-cy="users-page"`、`data-cy="create-user-btn"`、`data-cy="user-row"`、`data-cy="user-form-username"`、`data-cy="user-form-display-name"`、`data-cy="user-form-submit"`
+- Playwright E2E 测试中引用的定位器现在有对应的生产代码实现
 
 ### C1–C3 前端产品闭环完成状态（2026-08-20 更新）
 
@@ -218,9 +236,12 @@ tsc --noEmit                — PASS
 ### 验证证据
 
 ```text
-tsc --noEmit                — PASS
-vitest run (13 files, 56 tests) — PASS
+gofmt -l backend/           — PASS (零文件需格式化)
 go build ./...              — PASS
+go vet ./...                — PASS
+tsc --noEmit                — PASS
+tsc --noEmit -p tsconfig.e2e.json — PASS (Playwright E2E typecheck)
+vitest run (13 files, 56 tests) — PASS
 ```
 
 ## 当前剩余缺口

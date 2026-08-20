@@ -367,10 +367,10 @@ func WaitConvergence(ctx context.Context, hubBaseURL, csrfToken, sessionCookie s
 
 // SystemStatusSummary is a lightweight summary of system status for convergence checks.
 type SystemStatusSummary struct {
-	Converged                bool
-	DesiredControlRevision  int
-	AppliedControlRevision  int
-	RuntimeStatus           string
+	Converged              bool
+	DesiredControlRevision int
+	AppliedControlRevision int
+	RuntimeStatus          string
 }
 
 func doSystemStatus(ctx context.Context, baseURL, csrfToken, sessionCookie string) (*SystemStatusSummary, error) {
@@ -396,10 +396,10 @@ func doSystemStatus(ctx context.Context, baseURL, csrfToken, sessionCookie strin
 		return nil, err
 	}
 	return &SystemStatusSummary{
-		Converged:               raw.ControlDesired == raw.ControlApplied && raw.ControlApplied > 0,
-		DesiredControlRevision:  raw.ControlDesired,
-		AppliedControlRevision:  raw.ControlApplied,
-		RuntimeStatus:           raw.RuntimeStatus,
+		Converged:              raw.ControlDesired == raw.ControlApplied && raw.ControlApplied > 0,
+		DesiredControlRevision: raw.ControlDesired,
+		AppliedControlRevision: raw.ControlApplied,
+		RuntimeStatus:          raw.RuntimeStatus,
 	}, nil
 }
 

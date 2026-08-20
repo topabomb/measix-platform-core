@@ -36,11 +36,11 @@ async function submit() {
           </q-card-section>
           <q-card-section class="q-gutter-md">
             <ProblemBanner :error="error" />
-            <q-input v-model="username" outlined label="Username" autocomplete="username" @keyup.enter="submit" />
-            <q-input v-model="password" outlined type="password" label="Password" autocomplete="current-password" @keyup.enter="submit" />
+            <q-input v-model="username" outlined label="Username" autocomplete="username" data-cy="login-username" @keyup.enter="submit" />
+            <q-input v-model="password" outlined type="password" label="Password" autocomplete="current-password" data-cy="login-password" @keyup.enter="submit" />
           </q-card-section>
           <q-card-actions align="right" class="q-pa-md">
-            <q-btn color="primary" label="Sign in" :loading="session.loading" :disable="!username.trim() || !password" @click="submit" />
+            <q-btn color="primary" label="Sign in" data-cy="login-submit" :loading="session.loading" :disable="!username.trim() || !password" @click="submit" />
           </q-card-actions>
         </q-card>
       </q-page>

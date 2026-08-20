@@ -99,7 +99,10 @@ func sanitizeOutboundHeaders(header http.Header) {
 	}
 	for key := range header {
 		lower := strings.ToLower(key)
-		if lower == "authorization" || lower == "cookie" || lower == "host" || strings.HasPrefix(lower, "x-forwarded-") || strings.HasPrefix(lower, "x-measix-") || hopByHop(lower) {
+		if lower == "authorization" || lower == "cookie" || lower == "host" ||
+			strings.HasPrefix(lower, "x-forwarded-") || strings.HasPrefix(lower, "x-measix-") ||
+			lower == "x-real-ip" || lower == "x-request-id" || lower == "x-requested-with" ||
+			hopByHop(lower) {
 			header.Del(key)
 		}
 	}

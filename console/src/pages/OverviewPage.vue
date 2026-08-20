@@ -82,7 +82,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding>
+  <q-page padding data-cy="overview-page">
     <PageHeader title="Overview" subtitle="Current Control Hub, Relay and usage state.">
       <template #primary><q-btn flat icon="refresh" label="Refresh" :loading="loading" @click="refresh" /></template>
     </PageHeader>

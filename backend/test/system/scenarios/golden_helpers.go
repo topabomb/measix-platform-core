@@ -17,18 +17,18 @@ import (
 
 // goldenPathTest holds shared state for the golden path helpers.
 type goldenPathTest struct {
-	t                    *testing.T
-	lastUserID           string
-	lastEnrollmentCode   string
-	lastUpstreamID       string
-	lastDraftContent     map[string]interface{}
-	lastModelID          string
-	lastTtsID            string
-	lastAsrID            string
-	lastMcpID            string
-	lastProviderID       string
-	lastSecretID         string
-	lastSecretVersion    int
+	t                  *testing.T
+	lastUserID         string
+	lastEnrollmentCode string
+	lastUpstreamID     string
+	lastDraftContent   map[string]interface{}
+	lastModelID        string
+	lastTtsID          string
+	lastAsrID          string
+	lastMcpID          string
+	lastProviderID     string
+	lastSecretID       string
+	lastSecretVersion  int
 }
 
 // fullSetup performs the complete golden path setup: user, enrollment, secret,
@@ -96,7 +96,9 @@ func (g *goldenPathTest) createUser(ctx context.Context, admin *harness.AdminCli
 	if err != nil {
 		g.t.Fatalf("create user: %v", err)
 	}
-	var user struct{ UserID string `json:"userId"` }
+	var user struct {
+		UserID string `json:"userId"`
+	}
 	if err := harness.DecodeJSON(resp, &user); err != nil {
 		g.t.Fatalf("decode user: %v", err)
 	}
@@ -110,7 +112,9 @@ func (g *goldenPathTest) createEnrollment(ctx context.Context, admin *harness.Ad
 	if err != nil {
 		g.t.Fatalf("create enrollment: %v", err)
 	}
-	var result struct{ Code string `json:"code"` }
+	var result struct {
+		Code string `json:"code"`
+	}
 	if err := harness.DecodeJSON(resp, &result); err != nil {
 		g.t.Fatalf("decode enrollment: %v", err)
 	}
@@ -160,7 +164,9 @@ func (g *goldenPathTest) createUpstream(ctx context.Context, admin *harness.Admi
 	if err != nil {
 		g.t.Fatalf("create upstream: %v", err)
 	}
-	var upstream struct{ UpstreamID string `json:"upstreamId"` }
+	var upstream struct {
+		UpstreamID string `json:"upstreamId"`
+	}
 	if err := harness.DecodeJSON(resp, &upstream); err != nil {
 		g.t.Fatalf("decode upstream: %v body: %s", err, harness.ReadBody(resp))
 	}
@@ -197,7 +203,9 @@ func (g *goldenPathTest) applyUpstream(ctx context.Context, admin *harness.Admin
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
-		var up struct{ Status string `json:"status"` }
+		var up struct {
+			Status string `json:"status"`
+		}
 		_ = harness.DecodeJSON(r, &up)
 		if up.Status == "ACTIVE" {
 			return
@@ -213,7 +221,9 @@ func (g *goldenPathTest) getDraftRevision(ctx context.Context, admin *harness.Ad
 	if err != nil {
 		g.t.Fatalf("get draft: %v", err)
 	}
-	var draft struct{ DraftRevision int `json:"draftRevision"` }
+	var draft struct {
+		DraftRevision int `json:"draftRevision"`
+	}
 	if err := harness.DecodeJSON(resp, &draft); err != nil {
 		g.t.Fatalf("decode draft: %v", err)
 	}
@@ -326,7 +336,9 @@ func (g *goldenPathTest) putDraft(ctx context.Context, admin *harness.AdminClien
 	if resp.StatusCode != http.StatusOK {
 		g.t.Fatalf("put draft status: %d body: %s", resp.StatusCode, harness.ReadBody(resp))
 	}
-	var draft struct{ DraftRevision int `json:"draftRevision"` }
+	var draft struct {
+		DraftRevision int `json:"draftRevision"`
+	}
 	if err := harness.DecodeJSON(resp, &draft); err != nil {
 		g.t.Fatalf("decode put draft: %v", err)
 	}
@@ -341,8 +353,8 @@ func (g *goldenPathTest) validateDraft(ctx context.Context, admin *harness.Admin
 		g.t.Fatalf("validate draft: %v", err)
 	}
 	var result struct {
-		Valid   bool                     `json:"valid"`
-		Errors  []map[string]interface{} `json:"errors"`
+		Valid  bool                     `json:"valid"`
+		Errors []map[string]interface{} `json:"errors"`
 	}
 	if err := harness.DecodeJSON(resp, &result); err != nil {
 		g.t.Fatalf("decode validate: %v", err)
@@ -395,7 +407,9 @@ func (g *goldenPathTest) publishDraft(ctx context.Context, admin *harness.AdminC
 	if resp.StatusCode != http.StatusAccepted {
 		g.t.Fatalf("publish status: %d body: %s", resp.StatusCode, harness.ReadBody(resp))
 	}
-	var act struct{ ActivationID string `json:"activationId"` }
+	var act struct {
+		ActivationID string `json:"activationId"`
+	}
 	if err := harness.DecodeJSON(resp, &act); err != nil {
 		g.t.Fatalf("decode publish: %v", err)
 	}

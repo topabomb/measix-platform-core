@@ -1,0 +1,25 @@
+# Normalize line endings: Go source files must always use LF.
+# This prevents gofmt failures on Windows (autocrlf=true) where
+# CRLF checkout causes every Go file to be flagged as needing formatting.
+
+*.go text eol=lf
+
+# Go module files also require LF
+go.mod text eol=lf
+go.sum text eol=lf
+
+# Scripts and Makefile use LF
+Makefile text eol=lf
+*.mjs text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Markdown may use platform default
+*.md text=auto
+
+# Binary files
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -83,7 +83,12 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
    - `TestCAPC6014FullRestart`：Hub+Relay 全部重启，preserves active release/route/usage spool
    - `TestCAPC6015BackupRestore`：SQLite backup/restore preserves IDs/release/generation
 
-4. **Security Suite**（`security_test.go`，15 场景）：
+4. **Recovery 场景测试**（`recovery_test.go`，新增）：
+   - `TestCAPC6010HubCrashAroundPublish`：Hub 在 Publish activation 创建后崩溃，重启后同一 activation 完成且不产生重复 generation
+   - `TestCAPC6013SQLiteBusyTransient`：SQLite busy/transient 错误恢复，验证 bounded retry semantics 和无数据损坏
+   - `TestCAPC6004EnhancedNoForwardAndUsageGeneration`：强化 CAP-C6-004，明确断言 428 forwarded=false、Adapter 无 request body、Usage 记录正确的 generation
+
+6. **Security Suite**（`security_test.go`，15 场景）：
    - SEC-001：未认证 admin API 访问拒绝（401）
    - SEC-002：CSRF token 强制校验
    - SEC-003：Session cookie HttpOnly + Secure + SameSite=Strict
@@ -100,9 +105,38 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
    - SEC-014：System status 不泄漏内部配置
    - SEC-015：幂等 Publish
 
-5. **Resource Baseline**（`baseline_test.go`）：
+7. **Resource Baseline**（`baseline_test.go`）：
    - 测量 Admin login/CRUD/Publish/convergence/runtime 延迟
    - 报告：`docs/s0-resource-baseline.md`
+
+### Browser E2E 基础设施（新增）
+
+1. **Playwright 配置**（`console/playwright.config.ts`）：
+   - 使用 Chromium、单 worker、无 retry
+   - 使用 production `dist/spa` + real Hub/Relay
+   - 禁止 `page.route()` mock Admin API
+
+2. **Browser E2E 测试**（`console/e2e/golden-path.spec.ts`）：
+   - CAP-C6-001 browser slice：login → Overview → System → refresh
+   - CAP-C6-001 browser slice：create user → user visible in list
+   - 使用 `data-cy` 属性定位元素
+
+3. **@playwright/test 依赖**：
+   - `console/package.json` 已添加 `@playwright/test@1.55.0`
+   - `console/pnpm-lock.yaml` 已更新
+
+### Makefile 测试入口分离（新增）
+
+- `make system-test`：保持 bounded T3（默认 CI）
+- `make s01-candidate-test`：完整 CAP-C6/C7 deterministic system scenarios（含 recovery/security）
+- `make console-e2e`：Playwright browser T4.1 suite（需 production build + real Hub/Relay）
+- `make console-build`：独立 Admin production build target
+
+### .gitattributes 行尾规范化（新增）
+
+- 新增 `.gitattributes` 确保 `*.go` 文件在所有平台 checkout 时保持 LF
+- 解决 Windows `autocrlf=true` 导致 gofmt 全量报错的问题
+- CI (Linux) 不受影响；本地 Windows 开发者不再需要手动 `gofmt -w`
 
 ### C7 Freeze Manifest 脚本增强
 
@@ -115,7 +149,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 - `deterministicAdapterVersion`：Test Adapter + Test Client 源码 hash
 - `realAdapterQualificationRef`：指向 `docs/s0-real-adapter-qualification.md`
 - `resourceBaselineRef`：指向 `docs/s0-resource-baseline.md`
-- `scenarioResults`：24 个场景的 ID/name/file/required 列表
+- `scenarioResults`：27 个场景的 ID/name/file/required 列表（含 CAP-C6-010、CAP-C6-013、CAP-C6-004-ENH）
 
 ### 参考文档
 
@@ -191,6 +225,7 @@ go build ./...              — PASS
 
 ## 当前剩余缺口
 
-- C6 系统测试需在 CI 或本地执行产出 Green 证据
+- C6 deterministic system tests 需在 CI 或本地执行产出 Green 证据
+- Browser T4.1 Playwright 测试已落地但需在 candidate 环境执行产出 Green 证据
 - Real Adapter qualification 需在安全环境执行
 - C7 Freeze manifest 需在全部 Gate Green 后正式生成

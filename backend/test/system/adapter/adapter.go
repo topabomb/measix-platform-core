@@ -68,6 +68,23 @@ func (a *Adapter) LastRequest(path string) *RequestFact {
 	return nil
 }
 
+// ClearFacts removes all captured request facts. Useful for asserting that
+// subsequent denied requests are not forwarded to the upstream.
+func (a *Adapter) ClearFacts() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.facts = nil
+}
+
+// AllFacts returns a snapshot of all captured request facts.
+func (a *Adapter) AllFacts() []*RequestFact {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := make([]*RequestFact, len(a.facts))
+	copy(out, a.facts)
+	return out
+}
+
 // Cancelled reports whether the adapter has observed any client cancellation.
 func (a *Adapter) Cancelled() bool {
 	a.mu.Lock()

@@ -1,4 +1,4 @@
-.PHONY: ci generate generated-drift fmt-check backend-test system-test console-test contract migrations migration-replay freeze-manifest
+.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test console-test console-e2e contract migrations migration-replay freeze-manifest
 
 ci: fmt-check contract backend-test system-test console-test migrations generated-drift
 
@@ -18,8 +18,28 @@ backend-test:
 	cd backend && go vet ./...
 	cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/sqliteutil ./internal/relay/metering -count=1
 
+# system-test is the bounded T3 lane for default CI. It does NOT execute
+# the full S0.1 candidate T4.1 browser/product gate.
 system-test:
 	cd backend && go test ./test/system/... -count=1 -timeout 5m
+
+# s01-candidate-test is the explicit S0.1 candidate verification lane.
+# It runs the full CAP-C6/C7 deterministic system scenarios including
+# recovery, security, and generation tests. This target is not part of
+# default GitHub Actions CI/CD; it must be executed explicitly on the
+# exact candidate SHA before C6/C7/Freeze claims.
+s01-candidate-test: console-build
+	cd backend && go test ./test/system/scenarios/ -count=1 -timeout 15m -v
+
+# console-e2e runs the Playwright browser T4.1 suite. Requires a
+# production Admin build and real Hub/Relay processes. This target is
+# not part of default GitHub Actions CI/CD; it is the explicit S0.1
+# candidate browser gate.
+console-e2e: console-build
+	cd console && npx playwright test --reporter=list
+
+console-build:
+	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm build
 
 freeze-manifest:
 	node scripts/freeze-manifest.mjs

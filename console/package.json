@@ -14,7 +14,10 @@
     "generate:api": "openapi-typescript ../api/admin/admin.openapi.yaml -o src/api/generated.ts",
     "typecheck": "quasar prepare && tsc --noEmit",
     "test": "vitest run",
-    "build": "quasar build"
+    "build": "quasar build",
+    "e2e:typecheck": "tsc --noEmit -p tsconfig.e2e.json",
+    "e2e:install": "playwright install chromium",
+    "e2e": "playwright test --reporter=list"
   },
   "dependencies": {
     "@quasar/extras": "^2.0.4",
@@ -31,6 +34,7 @@
     "jsdom": "^30.0.1",
     "openapi-typescript": "7.13.0",
     "typescript": "6.0.3",
-    "vitest": "4.1.0"
+    "vitest": "4.1.0",
+    "@playwright/test": "1.55.0"
   }
 }

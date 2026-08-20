@@ -2,7 +2,7 @@
 
 > **Checkpoint**: C6 / C7  
 > **Date**: 2026-08-20  
-> **Architecture baseline**: `topabomb/measix-architecture@02ba0add27cddce3bcebe63433495df6ea39b9ad`
+> **Architecture baseline**: `topabomb/measix-architecture@6eda9eb9bb842b4cbd3fa36f78e6c481ed35c55b`
 
 ## 1. Purpose
 

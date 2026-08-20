@@ -708,18 +708,26 @@ export interface components {
             updatedAt: string;
             errorCode?: string;
         };
+        SecretRef: {
+            secretId: components["schemas"]["SecretId"];
+            secretVersion: number;
+        };
+        UpstreamAuth: {
+            /** @enum {string} */
+            type: "NONE" | "BEARER" | "STATIC_HEADER" | "BASIC";
+            secretRef?: components["schemas"]["SecretRef"];
+            headerName?: string;
+            username?: string;
+            passwordSecretRef?: components["schemas"]["SecretRef"];
+        };
         UpstreamConfig: {
             name: string;
             /** Format: uri */
             baseUrl: string;
-            transportCapabilities: string[];
-            auth: {
-                /** @enum {string} */
-                type: "NONE" | "BEARER" | "STATIC_HEADER" | "BASIC";
-            } & {
-                [key: string]: unknown;
-            };
-            correlationMode: string;
+            transportCapabilities: ("HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART")[];
+            auth: components["schemas"]["UpstreamAuth"];
+            /** @enum {string} */
+            correlationMode: "HEADER_ECHO" | "VIRTUAL_KEY" | "REQUEST_LOG_ID" | "USAGE_API" | "WEBHOOK" | "NONE";
             /** @enum {string} */
             usageCapabilityLevel: "LEVEL_0" | "LEVEL_1" | "LEVEL_2";
             timeoutDefaults: components["schemas"]["TimeoutPolicy"];

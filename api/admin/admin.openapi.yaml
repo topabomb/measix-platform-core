@@ -1479,6 +1479,39 @@ components:
           format: date-time
         errorCode:
           type: string
+    SecretRef:
+      type: object
+      additionalProperties: false
+      required:
+      - secretId
+      - secretVersion
+      properties:
+        secretId:
+          $ref: '#/components/schemas/SecretId'
+        secretVersion:
+          type: integer
+          minimum: 1
+    UpstreamAuth:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - NONE
+          - BEARER
+          - STATIC_HEADER
+          - BASIC
+        secretRef:
+          $ref: '#/components/schemas/SecretRef'
+        headerName:
+          type: string
+        username:
+          type: string
+        passwordSecretRef:
+          $ref: '#/components/schemas/SecretRef'
     UpstreamConfig:
       type: object
       additionalProperties: false
@@ -1498,23 +1531,25 @@ components:
           format: uri
         transportCapabilities:
           type: array
+          minItems: 1
           items:
             type: string
+            enum:
+            - HTTP_REQUEST_RESPONSE
+            - HTTP_STREAMING_SSE
+            - HTTP_BINARY_STREAM
+            - HTTP_MULTIPART
         auth:
-          type: object
-          additionalProperties: true
-          required:
-          - type
-          properties:
-            type:
-              type: string
-              enum:
-              - NONE
-              - BEARER
-              - STATIC_HEADER
-              - BASIC
+          $ref: '#/components/schemas/UpstreamAuth'
         correlationMode:
           type: string
+          enum:
+          - HEADER_ECHO
+          - VIRTUAL_KEY
+          - REQUEST_LOG_ID
+          - USAGE_API
+          - WEBHOOK
+          - NONE
         usageCapabilityLevel:
           type: string
           enum:

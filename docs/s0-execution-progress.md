@@ -55,13 +55,21 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
    - 替换简化 `providerKind` 表单为完整 `UpstreamConfig`
    - Auth section: NONE/BEARER/STATIC_HEADER/BASIC + SecretRef
    - Timeouts: connectMs/responseHeaderMs/idleMs
-   - CorrelationMode: HEADER/QUERY_PARAM/NONE
+   - CorrelationMode（typed enum）: HEADER_ECHO/VIRTUAL_KEY/REQUEST_LOG_ID/USAGE_API/WEBHOOK/NONE
    - UsageCapabilityLevel: LEVEL_0/LEVEL_1/LEVEL_2
-   - TransportCapabilities: HTTP/SSE/BINARY/MULTIPART/MCP_STREAMABLE_HTTP
+   - TransportCapabilities（typed enum）: HTTP_REQUEST_RESPONSE/HTTP_STREAMING_SSE/HTTP_BINARY_STREAM/HTTP_MULTIPART
 
 2. **UpstreamsPage.test.ts**（2 tests Green）：
    - 不渲染 Provider kind select
    - 提交包含所有必需字段且不含 `providerKind`
+
+3. **Admin executable contract closure（P1-A，head `4db0d67`）**：
+   - `UpstreamConfig.transportCapabilities` items 改为 frozen enum（4 值），`correlationMode` 改为 frozen enum（6 值）
+   - `auth` 从 `additionalProperties: true` 松散 map 改为 closed 类型化 `UpstreamAuth`（type/secretRef/headerName/username/passwordSecretRef）
+   - 新增 `SecretRef`（secretId+secretVersion）closed schema
+   - 重新生成 `admin.gen.go` / `generated.ts`；后端 handler、runtimecontrol、测试全部改用 typed 字段
+   - UpstreamsPage 使用正确枚举值，STATIC_HEADER 绑定 headerName、BASIC 绑定 username+passwordSecretRef，Test 结果结构化渲染
+   - 新增 5 个契约测试（frozen enum、closed auth、SecretRef、typed ref）全部 Green
 
 ### C2 Managed Resource Editor
 

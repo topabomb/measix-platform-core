@@ -4,7 +4,6 @@
 package adminapi
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -253,22 +252,22 @@ func (e ReleaseStatus) Valid() bool {
 
 // Defines values for RuntimeBindingDefinitionTransportPolicy.
 const (
-	HTTPBINARYSTREAM    RuntimeBindingDefinitionTransportPolicy = "HTTP_BINARY_STREAM"
-	HTTPMULTIPART       RuntimeBindingDefinitionTransportPolicy = "HTTP_MULTIPART"
-	HTTPREQUESTRESPONSE RuntimeBindingDefinitionTransportPolicy = "HTTP_REQUEST_RESPONSE"
-	HTTPSTREAMINGSSE    RuntimeBindingDefinitionTransportPolicy = "HTTP_STREAMING_SSE"
+	RuntimeBindingDefinitionTransportPolicyHTTPBINARYSTREAM    RuntimeBindingDefinitionTransportPolicy = "HTTP_BINARY_STREAM"
+	RuntimeBindingDefinitionTransportPolicyHTTPMULTIPART       RuntimeBindingDefinitionTransportPolicy = "HTTP_MULTIPART"
+	RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE RuntimeBindingDefinitionTransportPolicy = "HTTP_REQUEST_RESPONSE"
+	RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE    RuntimeBindingDefinitionTransportPolicy = "HTTP_STREAMING_SSE"
 )
 
 // Valid indicates whether the value is a known member of the RuntimeBindingDefinitionTransportPolicy enum.
 func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 	switch e {
-	case HTTPBINARYSTREAM:
+	case RuntimeBindingDefinitionTransportPolicyHTTPBINARYSTREAM:
 		return true
-	case HTTPMULTIPART:
+	case RuntimeBindingDefinitionTransportPolicyHTTPMULTIPART:
 		return true
-	case HTTPREQUESTRESPONSE:
+	case RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE:
 		return true
-	case HTTPSTREAMINGSSE:
+	case RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE:
 		return true
 	default:
 		return false
@@ -356,24 +355,78 @@ func (e UpstreamStatus) Valid() bool {
 	}
 }
 
-// Defines values for UpstreamConfigAuthType.
+// Defines values for UpstreamAuthType.
 const (
-	UpstreamConfigAuthTypeBASIC        UpstreamConfigAuthType = "BASIC"
-	UpstreamConfigAuthTypeBEARER       UpstreamConfigAuthType = "BEARER"
-	UpstreamConfigAuthTypeNONE         UpstreamConfigAuthType = "NONE"
-	UpstreamConfigAuthTypeSTATICHEADER UpstreamConfigAuthType = "STATIC_HEADER"
+	UpstreamAuthTypeBASIC        UpstreamAuthType = "BASIC"
+	UpstreamAuthTypeBEARER       UpstreamAuthType = "BEARER"
+	UpstreamAuthTypeNONE         UpstreamAuthType = "NONE"
+	UpstreamAuthTypeSTATICHEADER UpstreamAuthType = "STATIC_HEADER"
 )
 
-// Valid indicates whether the value is a known member of the UpstreamConfigAuthType enum.
-func (e UpstreamConfigAuthType) Valid() bool {
+// Valid indicates whether the value is a known member of the UpstreamAuthType enum.
+func (e UpstreamAuthType) Valid() bool {
 	switch e {
-	case UpstreamConfigAuthTypeBASIC:
+	case UpstreamAuthTypeBASIC:
 		return true
-	case UpstreamConfigAuthTypeBEARER:
+	case UpstreamAuthTypeBEARER:
 		return true
-	case UpstreamConfigAuthTypeNONE:
+	case UpstreamAuthTypeNONE:
 		return true
-	case UpstreamConfigAuthTypeSTATICHEADER:
+	case UpstreamAuthTypeSTATICHEADER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpstreamConfigCorrelationMode.
+const (
+	UpstreamConfigCorrelationModeHEADERECHO   UpstreamConfigCorrelationMode = "HEADER_ECHO"
+	UpstreamConfigCorrelationModeNONE         UpstreamConfigCorrelationMode = "NONE"
+	UpstreamConfigCorrelationModeREQUESTLOGID UpstreamConfigCorrelationMode = "REQUEST_LOG_ID"
+	UpstreamConfigCorrelationModeUSAGEAPI     UpstreamConfigCorrelationMode = "USAGE_API"
+	UpstreamConfigCorrelationModeVIRTUALKEY   UpstreamConfigCorrelationMode = "VIRTUAL_KEY"
+	UpstreamConfigCorrelationModeWEBHOOK      UpstreamConfigCorrelationMode = "WEBHOOK"
+)
+
+// Valid indicates whether the value is a known member of the UpstreamConfigCorrelationMode enum.
+func (e UpstreamConfigCorrelationMode) Valid() bool {
+	switch e {
+	case UpstreamConfigCorrelationModeHEADERECHO:
+		return true
+	case UpstreamConfigCorrelationModeNONE:
+		return true
+	case UpstreamConfigCorrelationModeREQUESTLOGID:
+		return true
+	case UpstreamConfigCorrelationModeUSAGEAPI:
+		return true
+	case UpstreamConfigCorrelationModeVIRTUALKEY:
+		return true
+	case UpstreamConfigCorrelationModeWEBHOOK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpstreamConfigTransportCapabilities.
+const (
+	UpstreamConfigTransportCapabilitiesHTTPBINARYSTREAM    UpstreamConfigTransportCapabilities = "HTTP_BINARY_STREAM"
+	UpstreamConfigTransportCapabilitiesHTTPMULTIPART       UpstreamConfigTransportCapabilities = "HTTP_MULTIPART"
+	UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE UpstreamConfigTransportCapabilities = "HTTP_REQUEST_RESPONSE"
+	UpstreamConfigTransportCapabilitiesHTTPSTREAMINGSSE    UpstreamConfigTransportCapabilities = "HTTP_STREAMING_SSE"
+)
+
+// Valid indicates whether the value is a known member of the UpstreamConfigTransportCapabilities enum.
+func (e UpstreamConfigTransportCapabilities) Valid() bool {
+	switch e {
+	case UpstreamConfigTransportCapabilitiesHTTPBINARYSTREAM:
+		return true
+	case UpstreamConfigTransportCapabilitiesHTTPMULTIPART:
+		return true
+	case UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE:
+		return true
+	case UpstreamConfigTransportCapabilitiesHTTPSTREAMINGSSE:
 		return true
 	default:
 		return false
@@ -887,6 +940,12 @@ type Secret struct {
 // SecretId defines model for SecretId.
 type SecretId = string
 
+// SecretRef defines model for SecretRef.
+type SecretRef struct {
+	SecretId      SecretId `json:"secretId"`
+	SecretVersion int      `json:"secretVersion"`
+}
+
 // SessionId defines model for SessionId.
 type SessionId = string
 
@@ -974,25 +1033,34 @@ type Upstream struct {
 // UpstreamStatus defines model for Upstream.Status.
 type UpstreamStatus string
 
+// UpstreamAuth defines model for UpstreamAuth.
+type UpstreamAuth struct {
+	HeaderName        *string          `json:"headerName,omitempty"`
+	PasswordSecretRef *SecretRef       `json:"passwordSecretRef,omitempty"`
+	SecretRef         *SecretRef       `json:"secretRef,omitempty"`
+	Type              UpstreamAuthType `json:"type"`
+	Username          *string          `json:"username,omitempty"`
+}
+
+// UpstreamAuthType defines model for UpstreamAuth.Type.
+type UpstreamAuthType string
+
 // UpstreamConfig defines model for UpstreamConfig.
 type UpstreamConfig struct {
-	Auth                  UpstreamConfig_Auth                `json:"auth"`
-	BaseUrl               string                             `json:"baseUrl"`
-	CorrelationMode       string                             `json:"correlationMode"`
-	Name                  string                             `json:"name"`
-	TimeoutDefaults       TimeoutPolicy                      `json:"timeoutDefaults"`
-	TransportCapabilities []string                           `json:"transportCapabilities"`
-	UsageCapabilityLevel  UpstreamConfigUsageCapabilityLevel `json:"usageCapabilityLevel"`
+	Auth                  UpstreamAuth                          `json:"auth"`
+	BaseUrl               string                                `json:"baseUrl"`
+	CorrelationMode       UpstreamConfigCorrelationMode         `json:"correlationMode"`
+	Name                  string                                `json:"name"`
+	TimeoutDefaults       TimeoutPolicy                         `json:"timeoutDefaults"`
+	TransportCapabilities []UpstreamConfigTransportCapabilities `json:"transportCapabilities"`
+	UsageCapabilityLevel  UpstreamConfigUsageCapabilityLevel    `json:"usageCapabilityLevel"`
 }
 
-// UpstreamConfigAuthType defines model for UpstreamConfig.Auth.Type.
-type UpstreamConfigAuthType string
+// UpstreamConfigCorrelationMode defines model for UpstreamConfig.CorrelationMode.
+type UpstreamConfigCorrelationMode string
 
-// UpstreamConfig_Auth defines model for UpstreamConfig.Auth.
-type UpstreamConfig_Auth struct {
-	Type                 UpstreamConfigAuthType `json:"type"`
-	AdditionalProperties map[string]interface{} `json:"-"`
-}
+// UpstreamConfigTransportCapabilities defines model for UpstreamConfig.TransportCapabilities.
+type UpstreamConfigTransportCapabilities string
 
 // UpstreamConfigUsageCapabilityLevel defines model for UpstreamConfig.UsageCapabilityLevel.
 type UpstreamConfigUsageCapabilityLevel string
@@ -1266,72 +1334,6 @@ type CreateEnrollmentJSONRequestBody = CreateEnrollmentRequest
 
 // SetPasswordJSONRequestBody defines body for SetPassword for application/json ContentType.
 type SetPasswordJSONRequestBody = SetPasswordRequest
-
-// Getter for additional properties for UpstreamConfig_Auth. Returns the specified
-// element and whether it was found
-func (a UpstreamConfig_Auth) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for UpstreamConfig_Auth
-func (a *UpstreamConfig_Auth) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for UpstreamConfig_Auth to handle AdditionalProperties
-func (a *UpstreamConfig_Auth) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["type"]; found {
-		err = json.Unmarshal(raw, &a.Type)
-		if err != nil {
-			return fmt.Errorf("error reading 'type': %w", err)
-		}
-		delete(object, "type")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for UpstreamConfig_Auth to handle AdditionalProperties
-func (a UpstreamConfig_Auth) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	object["type"], err = json.Marshal(a.Type)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'type': %w", err)
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {

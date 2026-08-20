@@ -309,8 +309,13 @@ func LoadCandidateConfig(ctx context.Context, client *ent.Client, upstreamID str
 }
 
 func ValidateConfig(ctx context.Context, client *ent.Client, config adminapi.UpstreamConfig) error {
-	if strings.TrimSpace(config.Name) == "" || len(config.TransportCapabilities) == 0 || strings.TrimSpace(config.CorrelationMode) == "" {
+	if strings.TrimSpace(config.Name) == "" || len(config.TransportCapabilities) == 0 || !config.CorrelationMode.Valid() {
 		return ErrInvalidConfig
+	}
+	for _, tc := range config.TransportCapabilities {
+		if !tc.Valid() {
+			return ErrInvalidConfig
+		}
 	}
 	parsed, err := url.Parse(config.BaseUrl)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
@@ -349,30 +354,30 @@ type SecretRef struct {
 	Version  int
 }
 
-func SecretRefs(auth adminapi.UpstreamConfig_Auth) ([]SecretRef, error) {
+func SecretRefs(auth adminapi.UpstreamAuth) ([]SecretRef, error) {
 	switch auth.Type {
-	case adminapi.UpstreamConfigAuthTypeNONE:
+	case adminapi.UpstreamAuthTypeNONE:
 		return nil, nil
-	case adminapi.UpstreamConfigAuthTypeBEARER:
-		ref, err := parseSecretRef(auth.AdditionalProperties["secretRef"])
+	case adminapi.UpstreamAuthTypeBEARER:
+		ref, err := typedSecretRef(auth.SecretRef)
 		if err != nil {
 			return nil, ErrInvalidConfig
 		}
 		return []SecretRef{ref}, nil
-	case adminapi.UpstreamConfigAuthTypeSTATICHEADER:
-		if header, _ := auth.AdditionalProperties["headerName"].(string); strings.TrimSpace(header) == "" {
+	case adminapi.UpstreamAuthTypeSTATICHEADER:
+		if strings.TrimSpace(derefString(auth.HeaderName)) == "" {
 			return nil, ErrInvalidConfig
 		}
-		ref, err := parseSecretRef(auth.AdditionalProperties["secretRef"])
+		ref, err := typedSecretRef(auth.SecretRef)
 		if err != nil {
 			return nil, ErrInvalidConfig
 		}
 		return []SecretRef{ref}, nil
-	case adminapi.UpstreamConfigAuthTypeBASIC:
-		if username, _ := auth.AdditionalProperties["username"].(string); strings.TrimSpace(username) == "" {
+	case adminapi.UpstreamAuthTypeBASIC:
+		if strings.TrimSpace(derefString(auth.Username)) == "" {
 			return nil, ErrInvalidConfig
 		}
-		ref, err := parseSecretRef(auth.AdditionalProperties["passwordSecretRef"])
+		ref, err := typedSecretRef(auth.PasswordSecretRef)
 		if err != nil {
 			return nil, ErrInvalidConfig
 		}
@@ -382,41 +387,24 @@ func SecretRefs(auth adminapi.UpstreamConfig_Auth) ([]SecretRef, error) {
 	}
 }
 
-func parseSecretRef(value any) (SecretRef, error) {
-	object, ok := value.(map[string]interface{})
-	if !ok {
+func typedSecretRef(ref *adminapi.SecretRef) (SecretRef, error) {
+	if ref == nil {
 		return SecretRef{}, ErrInvalidConfig
 	}
-	id, ok := object["secretId"].(string)
-	if !ok {
+	if err := platformid.Validate(platformid.Secret, ref.SecretId); err != nil {
 		return SecretRef{}, ErrInvalidConfig
 	}
-	version, ok := numericInt(object["secretVersion"])
-	if !ok {
+	if ref.SecretVersion <= 0 {
 		return SecretRef{}, ErrInvalidConfig
 	}
-	return SecretRef{SecretID: id, Version: version}, nil
+	return SecretRef{SecretID: ref.SecretId, Version: ref.SecretVersion}, nil
 }
 
-func numericInt(value any) (int, bool) {
-	switch v := value.(type) {
-	case int:
-		return v, true
-	case int32:
-		return int(v), true
-	case int64:
-		return int(v), true
-	case float64:
-		if v < 1 || v != float64(int(v)) {
-			return 0, false
-		}
-		return int(v), true
-	case json.Number:
-		n, err := v.Int64()
-		return int(n), err == nil
-	default:
-		return 0, false
+func derefString(v *string) string {
+	if v == nil {
+		return ""
 	}
+	return *v
 }
 
 func upstreamView(id, name string, revision int64, active *int64, status string, config adminapi.UpstreamConfig) UpstreamView {

@@ -33,16 +33,17 @@ func newUpstreamService(t *testing.T) (*Service, *testutil.StoreHandle, string, 
 
 func testConfig(secretID string, secretVersion int) adminapi.UpstreamConfig {
 	return adminapi.UpstreamConfig{
-		Name:                  "Adapter",
-		BaseUrl:               "https://adapter.example",
-		TransportCapabilities: []string{"HTTP", "SSE", "BINARY", "MULTIPART", "MCP_STREAMABLE_HTTP"},
-		Auth: adminapi.UpstreamConfig_Auth{
-			Type: adminapi.UpstreamConfigAuthTypeBEARER,
-			AdditionalProperties: map[string]interface{}{
-				"secretRef": map[string]interface{}{"secretId": secretID, "secretVersion": secretVersion},
-			},
+		Name: "Adapter",
+		BaseUrl: "https://adapter.example",
+		TransportCapabilities: []adminapi.UpstreamConfigTransportCapabilities{
+			adminapi.UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE,
+			adminapi.UpstreamConfigTransportCapabilitiesHTTPSTREAMINGSSE,
 		},
-		CorrelationMode:      "HEADER",
+		Auth: adminapi.UpstreamAuth{
+			Type:      adminapi.UpstreamAuthTypeBEARER,
+			SecretRef: &adminapi.SecretRef{SecretId: secretID, SecretVersion: secretVersion},
+		},
+		CorrelationMode:      adminapi.UpstreamConfigCorrelationModeHEADERECHO,
 		UsageCapabilityLevel: adminapi.LEVEL0,
 		TimeoutDefaults:      adminapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000},
 	}
@@ -151,9 +152,7 @@ func TestHUBUPS004PreciseSecretReference(t *testing.T) {
 	})
 	t.Run("nonexistent secretId is rejected", func(t *testing.T) {
 		bad := testConfig(secret.SecretID, secret.SecretVersion)
-		bad.Auth.AdditionalProperties["secretRef"] = map[string]interface{}{
-			"secretId": "sec_nonexistent", "secretVersion": 1,
-		}
+		bad.Auth.SecretRef = &adminapi.SecretRef{SecretId: "sec_nonexistent", SecretVersion: 1}
 		_, err := svc.CreateUpstream(ctx, adminID, bad)
 		if !errors.Is(err, ErrInvalidConfig) {
 			t.Fatalf("expected ErrInvalidConfig for nonexistent secret, got: %v", err)

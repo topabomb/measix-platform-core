@@ -163,16 +163,17 @@ func TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck(t *testing.T) {
 
 func publishUpstreamConfig(secretID string, secretVersion int) adminapi.UpstreamConfig {
 	return adminapi.UpstreamConfig{
-		Name:                  "Adapter",
-		BaseUrl:               "https://adapter.example",
-		TransportCapabilities: []string{"HTTP_REQUEST_RESPONSE", "HTTP_STREAMING_SSE"},
-		Auth: adminapi.UpstreamConfig_Auth{
-			Type: adminapi.UpstreamConfigAuthTypeBEARER,
-			AdditionalProperties: map[string]interface{}{
-				"secretRef": map[string]interface{}{"secretId": secretID, "secretVersion": secretVersion},
-			},
+		Name: "Adapter",
+		BaseUrl: "https://adapter.example",
+		TransportCapabilities: []adminapi.UpstreamConfigTransportCapabilities{
+			adminapi.UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE,
+			adminapi.UpstreamConfigTransportCapabilitiesHTTPSTREAMINGSSE,
 		},
-		CorrelationMode:      "HEADER_ECHO",
+		Auth: adminapi.UpstreamAuth{
+			Type:      adminapi.UpstreamAuthTypeBEARER,
+			SecretRef: &adminapi.SecretRef{SecretId: secretID, SecretVersion: secretVersion},
+		},
+		CorrelationMode:      adminapi.UpstreamConfigCorrelationModeHEADERECHO,
 		UsageCapabilityLevel: adminapi.LEVEL0,
 		TimeoutDefaults:      adminapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000},
 	}
@@ -192,7 +193,7 @@ func publishDraft(upstreamID string) adminapi.ManagedDraftContent {
 		Tts: []adminapi.TtsDefinition{}, Asr: []adminapi.AsrDefinition{}, Mcp: []adminapi.McpDefinition{},
 		Bindings: []adminapi.RuntimeBindingDefinition{{
 			RuntimeRouteId: routeID, ResourceId: modelID, UpstreamId: upstreamID,
-			AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: adminapi.HTTPSTREAMINGSSE,
+			AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE,
 		}},
 		Policy: adminapi.ManagedPolicy{PolicyId: policyID, AllowLocalProviders: true, AllowLocalTts: true, AllowLocalAsr: true, AllowLocalMcp: true, DefaultModelId: &modelID},
 	}

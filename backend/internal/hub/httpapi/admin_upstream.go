@@ -172,7 +172,9 @@ func (h *fullAdminHandler) TestUpstream(w http.ResponseWriter, r *http.Request, 
 		}
 	}
 	if err == nil {
-		result.VerifiedCapabilities = append(result.VerifiedCapabilities, view.Config.TransportCapabilities...)
+		for _, tc := range view.Config.TransportCapabilities {
+			result.VerifiedCapabilities = append(result.VerifiedCapabilities, string(tc))
+		}
 	} else {
 		result.Warnings = append(result.Warnings, "upstream_unreachable")
 	}

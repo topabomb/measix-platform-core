@@ -12,6 +12,7 @@ type Upstream = components['schemas']['Upstream']
 type UpstreamPage = components['schemas']['UpstreamPage']
 type Activation = components['schemas']['Activation']
 type UpstreamConfig = components['schemas']['UpstreamConfig']
+type UpstreamTestResult = components['schemas']['UpstreamTestResult']
 type TimeoutPolicy = components['schemas']['TimeoutPolicy']
 
 const session = useSessionStore()
@@ -24,20 +25,21 @@ const error = ref<unknown>()
 const createOpen = ref(false)
 const detailOpen = ref(false)
 const testing = ref(false)
+const testResult = ref<UpstreamTestResult>()
 const canMutate = computed(() => Boolean(session.csrfToken))
 
 const AUTH_TYPES = ['NONE', 'BEARER', 'STATIC_HEADER', 'BASIC'] as const
 const USAGE_LEVELS = ['LEVEL_0', 'LEVEL_1', 'LEVEL_2'] as const
-const CORRELATION_MODES = ['HEADER', 'QUERY_PARAM', 'NONE'] as const
-const TRANSPORT_CAPS = ['HTTP', 'SSE', 'BINARY', 'MULTIPART', 'MCP_STREAMABLE_HTTP'] as const
+const CORRELATION_MODES = ['HEADER_ECHO', 'VIRTUAL_KEY', 'REQUEST_LOG_ID', 'USAGE_API', 'WEBHOOK', 'NONE'] as const
+const TRANSPORT_CAPS = ['HTTP_REQUEST_RESPONSE', 'HTTP_STREAMING_SSE', 'HTTP_BINARY_STREAM', 'HTTP_MULTIPART'] as const
 
 function emptyConfig(): UpstreamConfig {
   return {
     name: '',
     baseUrl: '',
-    transportCapabilities: ['HTTP', 'SSE', 'BINARY', 'MULTIPART', 'MCP_STREAMABLE_HTTP'],
+    transportCapabilities: ['HTTP_STREAMING_SSE'],
     auth: { type: 'NONE' },
-    correlationMode: 'HEADER',
+    correlationMode: 'NONE',
     usageCapabilityLevel: 'LEVEL_0',
     timeoutDefaults: { connectMs: 1000, responseHeaderMs: 5000, idleMs: 30000 },
   }
@@ -46,6 +48,9 @@ function emptyConfig(): UpstreamConfig {
 const createForm = ref<UpstreamConfig>(emptyConfig())
 const secretId = ref('')
 const secretVersion = ref<number | undefined>(undefined)
+const headerName = ref('')
+const username = ref('')
+const authSecret = ref('')
 
 async function refresh() {
   loading.value = true
@@ -61,19 +66,30 @@ async function refresh() {
   }
 }
 
+function secretRefFor(value: string): { secretId: string; secretVersion: number } | undefined {
+  const v = Number(value)
+  if (!secretId.value || !Number.isInteger(v) || v < 1) return undefined
+  return { secretId: secretId.value, secretVersion: v }
+}
+
 function buildAuth(): UpstreamConfig['auth'] {
   const authType = createForm.value.auth.type
-  if (authType === 'NONE') {
-    return { type: 'NONE' }
+  if (authType === 'NONE') return { type: 'NONE' }
+  if (authType === 'BEARER') {
+    const ref = secretRefFor(authSecret.value)
+    return ref ? { type: 'BEARER', secretRef: ref } : { type: 'BEARER' }
   }
-  if (authType === 'BEARER' && secretId.value && secretVersion.value) {
-    return { type: 'BEARER', secretRef: { secretId: secretId.value, secretVersion: secretVersion.value } }
+  if (authType === 'STATIC_HEADER') {
+    const ref = secretRefFor(authSecret.value)
+    return headerName.value.trim()
+      ? { type: 'STATIC_HEADER', headerName: headerName.value.trim(), ...(ref ? { secretRef: ref } : {}) }
+      : { type: 'STATIC_HEADER', ...(ref ? { secretRef: ref } : {}) }
   }
-  if (authType === 'STATIC_HEADER' && secretId.value && secretVersion.value) {
-    return { type: 'STATIC_HEADER', secretRef: { secretId: secretId.value, secretVersion: secretVersion.value } }
-  }
-  if (authType === 'BASIC' && secretId.value && secretVersion.value) {
-    return { type: 'BASIC', secretRef: { secretId: secretId.value, secretVersion: secretVersion.value } }
+  if (authType === 'BASIC') {
+    const ref = secretRefFor(authSecret.value)
+    return username.value.trim()
+      ? { type: 'BASIC', username: username.value.trim(), ...(ref ? { passwordSecretRef: ref } : {}) }
+      : { type: 'BASIC', ...(ref ? { passwordSecretRef: ref } : {}) }
   }
   return { type: authType }
 }
@@ -94,6 +110,9 @@ async function createUpstream() {
     createForm.value = emptyConfig()
     secretId.value = ''
     secretVersion.value = undefined
+    authSecret.value = ''
+    headerName.value = ''
+    username.value = ''
     await refresh()
   } catch (cause) {
     error.value = cause
@@ -102,6 +121,7 @@ async function createUpstream() {
 
 async function openUpstream(upstream: Upstream) {
   selected.value = upstream
+  testResult.value = undefined
   detailOpen.value = true
 }
 
@@ -109,10 +129,12 @@ async function testUpstream() {
   if (!selected.value || !session.csrfToken) return
   testing.value = true
   error.value = undefined
+  testResult.value = undefined
   try {
-    await apiFetch(`/api/admin/v1/upstreams/${encodeURIComponent(selected.value.upstreamId)}:test`, {
+    const result = await apiFetch<UpstreamTestResult>(`/api/admin/v1/upstreams/${encodeURIComponent(selected.value.upstreamId)}:test`, {
       method: 'POST',
     }, session.csrfToken)
+    testResult.value = result
   } catch (cause) {
     error.value = cause
   } finally {
@@ -190,11 +212,15 @@ onMounted(refresh)
           <q-input v-model="createForm.name" outlined label="Name" />
           <q-input v-model="createForm.baseUrl" outlined label="Base URL" placeholder="https://api.example.com" />
 
+          <q-select v-model="createForm.transportCapabilities" outlined label="Transport capabilities" multiple :options="[...TRANSPORT_CAPS]" />
+
           <div class="text-subtitle2">Authentication</div>
           <q-select v-model="createForm.auth.type" outlined label="Auth type" :options="[...AUTH_TYPES]" />
           <template v-if="createForm.auth.type !== 'NONE'">
             <q-input v-model="secretId" outlined label="Secret ID" placeholder="sec_..." />
-            <q-input v-model.number="secretVersion" type="number" outlined label="Secret version" />
+            <q-input v-model="authSecret" outlined label="Secret version" placeholder="1" />
+            <q-input v-if="createForm.auth.type === 'STATIC_HEADER'" v-model="headerName" outlined label="Header name" placeholder="X-Api-Key" />
+            <q-input v-if="createForm.auth.type === 'BASIC'" v-model="username" outlined label="Username" />
           </template>
 
           <q-select v-model="createForm.correlationMode" outlined label="Correlation mode" :options="[...CORRELATION_MODES]" />
@@ -237,8 +263,31 @@ onMounted(refresh)
               <tr v-if="selected.config"><td class="text-grey-7">Auth type</td><td>{{ selected.config.auth?.type ?? '—' }}</td></tr>
               <tr v-if="selected.config"><td class="text-grey-7">Correlation mode</td><td>{{ selected.config.correlationMode ?? '—' }}</td></tr>
               <tr v-if="selected.config"><td class="text-grey-7">Usage level</td><td>{{ selected.config.usageCapabilityLevel ?? '—' }}</td></tr>
+              <tr v-if="selected.config"><td class="text-grey-7">Transport</td><td>{{ selected.config.transportCapabilities.join(', ') }}</td></tr>
             </tbody>
           </q-markup-table>
+
+          <div v-if="testResult" class="q-mt-md">
+            <div class="text-subtitle2">Test connection</div>
+            <q-banner :class="testResult.reachable ? 'bg-green-1' : 'bg-red-1'" class="rounded-borders q-my-sm">
+              <div class="row items-center justify-between">
+                <span>{{ testResult.reachable ? 'Reachable' : 'Unreachable' }}</span>
+                <span v-if="testResult.latencyMs != null" class="text-caption">{{ testResult.latencyMs }} ms</span>
+              </div>
+            </q-banner>
+            <q-markup-table flat dense v-if="testResult.verifiedCapabilities?.length || testResult.warnings?.length">
+              <tbody>
+                <tr v-if="testResult.verifiedCapabilities?.length">
+                  <td class="text-grey-7">Verified capabilities</td>
+                  <td>{{ testResult.verifiedCapabilities.join(', ') }}</td>
+                </tr>
+                <tr v-if="testResult.warnings?.length">
+                  <td class="text-grey-7">Warnings</td>
+                  <td>{{ testResult.warnings.join('; ') }}</td>
+                </tr>
+              </tbody>
+            </q-markup-table>
+          </div>
         </q-card-section>
         <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /></q-card-actions>
       </q-card>

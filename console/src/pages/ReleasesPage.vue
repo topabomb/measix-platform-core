@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
@@ -8,6 +9,8 @@ import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { useActivationStore } from '../stores/activation'
 import { useSessionStore } from '../stores/session'
+
+const { t: $t } = useI18n()
 
 type ReleasePage = components['schemas']['ReleasePage']
 type Release = components['schemas']['Release']
@@ -37,7 +40,7 @@ async function refresh() {
 
 async function republish(release: Release) {
   if (!session.csrfToken) return
-  if (!window.confirm(`Republish release ${release.releaseId} (generation ${release.managedGeneration}) as a new runtime generation?`)) return
+  if (!window.confirm($t('releases.republishConfirm', { id: release.releaseId, gen: release.managedGeneration }))) return
   activation.resetCommand()
   const key = activation.beginCommand('PUBLISH')
   error.value = undefined
@@ -64,10 +67,10 @@ function showDetail(release: Release) {
 
 function diffText(diff: Release['diffSummary']): string {
   const parts: string[] = []
-  if (diff.added) parts.push(`+${diff.added} added`)
-  if (diff.changed) parts.push(`~${diff.changed} changed`)
-  if (diff.removed) parts.push(`-${diff.removed} removed`)
-  return parts.length ? parts.join(' · ') : 'no changes'
+  if (diff.added) parts.push(`+${diff.added} ${$t('resources.review.added').toLowerCase()}`)
+  if (diff.changed) parts.push(`~${diff.changed} ${$t('resources.review.changed').toLowerCase()}`)
+  if (diff.removed) parts.push(`-${diff.removed} ${$t('resources.review.removed').toLowerCase()}`)
+  return parts.length ? parts.join(' · ') : $t('common.noData')
 }
 
 onMounted(refresh)
@@ -75,7 +78,7 @@ onMounted(refresh)
 
 <template>
   <q-page padding>
-    <PageHeader title="Releases" subtitle="Immutable staged releases and republish history.">
+    <PageHeader :title="$t('releases.title')" :subtitle="$t('releases.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
       </template>
@@ -83,7 +86,7 @@ onMounted(refresh)
     <ProblemBanner :error="error" class="q-mb-md" />
     <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-md rounded-borders">
       <div class="row items-center justify-between">
-        <span>Activation {{ activation.activation.activationId }} ({{ activation.activation.kind }})</span>
+        <span>{{ $t('system.currentActivation') }} {{ activation.activation.activationId }} ({{ activation.activation.kind }})</span>
         <StatusChip :value="activation.activation.state" />
       </div>
     </q-banner>
@@ -92,19 +95,19 @@ onMounted(refresh)
       <q-list separator>
         <q-item v-for="release in releases" :key="release.releaseId" clickable @click="showDetail(release)">
           <q-item-section>
-            <q-item-label>Generation {{ release.managedGeneration }} <span class="text-grey-7 text-caption">· draft r{{ release.sourceDraftRevision }}</span></q-item-label>
+            <q-item-label>{{ $t('releases.generation') }} {{ release.managedGeneration }} <span class="text-grey-7 text-caption">· {{ $t('releases.sourceDraft') }} r{{ release.sourceDraftRevision }}</span></q-item-label>
             <q-item-label caption>
-              {{ diffText(release.diffSummary) }} · published {{ release.publishedAt }} by {{ release.publishedBy || '—' }}
+              {{ diffText(release.diffSummary) }} · {{ $t('releases.publishedAt') }} {{ release.publishedAt }} {{ $t('releases.publishedBy') }} {{ release.publishedBy || '—' }}
             </q-item-label>
           </q-item-section>
           <q-item-section side>
             <div class="row items-center q-gutter-sm">
               <StatusChip :value="release.status" />
-              <q-btn outline color="primary" label="Republish" size="sm" stop @click.stop="republish(release)" />
+              <q-btn outline color="primary" :label="$t('releases.republish')" size="sm" stop @click.stop="republish(release)" />
             </div>
           </q-item-section>
         </q-item>
-        <q-item v-if="!releases.length"><q-item-section class="text-grey-7">No releases published.</q-item-section></q-item>
+        <q-item v-if="!releases.length"><q-item-section class="text-grey-7">{{ $t('releases.noReleases') }}</q-item-section></q-item>
       </q-list>
     </q-card>
 
@@ -112,7 +115,7 @@ onMounted(refresh)
       <q-card v-if="detailRelease" style="min-width: 480px; max-width: 640px">
         <q-card-section class="row items-center justify-between">
           <div>
-            <div class="text-h6">Generation {{ detailRelease.managedGeneration }}</div>
+            <div class="text-h6">{{ $t('releases.generation') }} {{ detailRelease.managedGeneration }}</div>
             <div class="text-caption text-grey-7">{{ detailRelease.releaseId }} · {{ detailRelease.snapshotHash }}</div>
           </div>
           <StatusChip :value="detailRelease.status" />
@@ -121,13 +124,13 @@ onMounted(refresh)
         <q-card-section>
           <q-markup-table flat dense>
             <tbody>
-              <tr><td class="text-grey-7">Source draft revision</td><td>r{{ detailRelease.sourceDraftRevision }}</td></tr>
-              <tr><td class="text-grey-7">Published</td><td>{{ detailRelease.publishedAt }} by {{ detailRelease.publishedBy || '—' }}</td></tr>
+              <tr><td class="text-grey-7">{{ $t('releases.sourceDraft') }}</td><td>r{{ detailRelease.sourceDraftRevision }}</td></tr>
+              <tr><td class="text-grey-7">{{ $t('releases.publishedAt') }}</td><td>{{ detailRelease.publishedAt }} {{ $t('releases.publishedBy') }} {{ detailRelease.publishedBy || '—' }}</td></tr>
             </tbody>
           </q-markup-table>
-          <div class="text-subtitle2 q-mt-md">Diff summary</div>
+          <div class="text-subtitle2 q-mt-md">{{ $t('releases.diff') }}</div>
           <q-markup-table flat dense v-if="detailRelease.diffSummary.details?.length">
-            <thead><tr><th>Kind</th><th class="text-right">Added</th><th class="text-right">Changed</th><th class="text-right">Removed</th></tr></thead>
+            <thead><tr><th>{{ $t('resources.relationship.kind') }}</th><th class="text-right">{{ $t('resources.review.added') }}</th><th class="text-right">{{ $t('resources.review.changed') }}</th><th class="text-right">{{ $t('resources.review.removed') }}</th></tr></thead>
             <tbody>
               <tr v-for="d in (detailRelease.diffSummary.details as ResourceDiff[])" :key="d.kind">
                 <td>{{ d.kind }}</td>
@@ -137,9 +140,9 @@ onMounted(refresh)
               </tr>
             </tbody>
           </q-markup-table>
-          <div v-else class="text-grey-7">No resource changes.</div>
+          <div v-else class="text-grey-7">{{ $t('common.noData') }}</div>
 
-          <div class="text-subtitle2 q-mt-md">Activation history</div>
+          <div class="text-subtitle2 q-mt-md">{{ $t('releases.activationHistory') }}</div>
           <div v-if="detailRelease.activationHistory.length">
             <q-timeline dense>
               <q-timeline-entry v-for="attempt in detailRelease.activationHistory" :key="attempt.activationId"
@@ -151,11 +154,11 @@ onMounted(refresh)
               </q-timeline-entry>
             </q-timeline>
           </div>
-          <div v-else class="text-grey-7">No activation attempts recorded.</div>
+          <div v-else class="text-grey-7">{{ $t('common.noData') }}</div>
         </q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <q-btn flat :label="$t('common.close')" color="primary" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>

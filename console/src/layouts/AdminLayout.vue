@@ -1,28 +1,68 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useSessionStore } from '../stores/session'
 import { visibleNavItems } from '../router/navigation'
 import HealthIndicator from '../components/HealthIndicator.vue'
+import { switchLocale, currentLocale, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 
+const $t = useI18n().t
+const $q = useQuasar()
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 const drawerOpen = ref(false)
 const navItems = visibleNavItems()
 
+// On wide screens the drawer is persistent; ensure it starts open.
+if ($q.screen.gt.sm) {
+  drawerOpen.value = true
+}
+
+// On wide screens the drawer stays persistent; on compact/mobile it closes.
+function onNavigate() {
+  if (!$q.screen.gt.sm) {
+    drawerOpen.value = false
+  }
+}
+
 // On mobile the drawer is an overlay; close it after navigating so the user
 // returns to the chosen page (implementation §5 Mobile, §12).
+// On wide screens the drawer is persistent; do NOT close it.
 watch(
   () => route.fullPath,
   () => {
-    drawerOpen.value = false
+    if (!$q.screen.gt.sm) {
+      drawerOpen.value = false
+    }
   },
 )
 
 async function logout() {
   await session.logout()
   await router.replace('/login')
+}
+
+/** Map nav item id to i18n key. */
+function navLabel(id: string): string {
+  const key = `nav.${id.toLowerCase()}`
+  const translated = $t(key)
+  return typeof translated === 'string' ? translated : id
+}
+
+/** Language switcher: cycles through supported locales. */
+function onSwitchLocale() {
+  const current = currentLocale()
+  const idx = SUPPORTED_LOCALES.indexOf(current)
+  const next = SUPPORTED_LOCALES[(idx + 1) % SUPPORTED_LOCALES.length] as LocaleCode
+  switchLocale(next)
+}
+
+const LOCALE_LABELS: Record<LocaleCode, string> = {
+  en: 'English',
+  zh: '中文',
 }
 </script>
 
@@ -33,10 +73,22 @@ async function logout() {
         <q-btn
           flat round dense icon="menu"
           class="lt-md"
-          aria-label="Menu"
+          :aria-label="$t('nav.system')"
           @click="drawerOpen = !drawerOpen"
         />
         <q-toolbar-title class="text-weight-bold" style="min-width: 0">MEASIX Admin</q-toolbar-title>
+
+        <!-- Language switcher -->
+        <q-btn
+          flat dense
+          no-caps
+          class="q-mr-xs"
+          :aria-label="$t('common.switchLanguage')"
+          @click="onSwitchLocale"
+        >
+          <q-icon name="language" class="q-mr-xs" />
+          <span class="gt-sm">{{ LOCALE_LABELS[currentLocale()] }}</span>
+        </q-btn>
 
         <!-- Global high-priority runtime indicator (product §4.1). -->
         <HealthIndicator v-if="session.authenticated" class="q-mr-sm" />
@@ -54,7 +106,7 @@ async function logout() {
             <q-list>
               <q-item clickable v-close-popup @click="logout">
                 <q-item-section avatar><q-icon name="logout" /></q-item-section>
-                <q-item-section>Sign out</q-item-section>
+                <q-item-section>{{ $t('login.signOut') }}</q-item-section>
               </q-item>
             </q-list>
           </q-menu>
@@ -63,7 +115,7 @@ async function logout() {
           v-if="session.authenticated"
           flat dense round icon="logout"
           class="lt-md"
-          aria-label="Sign out"
+          :aria-label="$t('login.signOut')"
           @click="logout"
         />
       </q-toolbar>
@@ -80,7 +132,7 @@ async function logout() {
       :mini-to-overlay="true"
     >
       <q-list padding>
-        <q-item-label header class="gt-sm">Runtime Foundation</q-item-label>
+        <q-item-label header class="gt-sm">{{ $t('nav.runtimeFoundation') }}</q-item-label>
         <q-item
           v-for="item in navItems"
           :key="item.id"
@@ -88,10 +140,10 @@ async function logout() {
           :to="item.path"
           exact
           active-class="bg-grey-2 text-primary"
-          @click="drawerOpen = false"
+          @click="onNavigate"
         >
           <q-item-section avatar><q-icon :name="item.icon" /></q-item-section>
-          <q-item-section>{{ item.label }}</q-item-section>
+          <q-item-section>{{ navLabel(item.id) }}</q-item-section>
         </q-item>
       </q-list>
     </q-drawer>

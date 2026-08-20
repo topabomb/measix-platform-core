@@ -102,8 +102,8 @@ describe('ResourcesPage', () => {
     setupSession(pinia)
     await flushPromises()
 
-    const tabs = wrapper.findAllComponents(QTab).map((t) => String(t.props('label')))
-    for (const expected of ['Overview', 'Models', 'TTS', 'ASR', 'MCP', 'Policy']) {
+    const tabs = wrapper.findAllComponents(QTab).map((t) => String(t.props('name')))
+    for (const expected of ['overview', 'models', 'tts', 'asr', 'mcp', 'policy']) {
       expect(tabs).toContain(expected)
     }
   })
@@ -352,7 +352,7 @@ describe('ResourcesPage', () => {
     await flushPromises()
 
     const btns = wrapper.findAllComponents(QBtn)
-    const previewBtn = btns.find((b) => String(b.props('label') ?? '') === 'Preview')
+    const previewBtn = btns.find((b) => String(b.props('label') ?? '').includes('Snapshot Preview'))
     expect(previewBtn).toBeTruthy()
     await previewBtn!.trigger('click')
     await flushPromises()

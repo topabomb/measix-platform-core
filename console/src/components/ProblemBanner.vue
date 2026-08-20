@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ApiProblem } from '../api/client'
 
+const { t, te } = useI18n()
 const props = defineProps<{ error?: unknown }>()
 const visible = computed(() => props.error !== undefined && props.error !== null)
-const title = computed(() => props.error instanceof ApiProblem ? props.error.code : 'request_failed')
+const title = computed(() => {
+  if (props.error instanceof ApiProblem) {
+    const key = `problem.${props.error.code}`
+    return te(key) ? t(key) : props.error.code
+  }
+  return t('problem.default')
+})
 const detail = computed(() => props.error instanceof Error ? props.error.message : String(props.error ?? ''))
 </script>
 

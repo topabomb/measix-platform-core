@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 // Semantic status chip (implementation §6): maps the product status vocabulary
 // to stable semantic tones — healthy / pending / degraded / failed / neutral.
 // Status is always rendered with text (never color alone).
 
 const props = defineProps<{ value: string }>()
+const { t, te } = useI18n()
 
 type Tone = 'healthy' | 'pending' | 'degraded' | 'failed' | 'neutral'
 
@@ -30,8 +32,14 @@ const classes: Record<Tone, string> = {
   failed: 'bg-negative text-white',
   neutral: 'bg-grey-7 text-white',
 }
+
+/** Translate the status value via the status.* i18n namespace; fall back to raw. */
+const label = computed(() => {
+  const key = `status.${props.value}`
+  return te(key) ? t(key) : props.value
+})
 </script>
 
 <template>
-  <q-chip :class="classes[tone]" dense square>{{ value }}</q-chip>
+  <q-chip :class="classes[tone]" dense square>{{ label }}</q-chip>
 </template>

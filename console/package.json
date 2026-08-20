@@ -24,9 +24,11 @@
     "pinia": "3.0.4",
     "quasar": "2.23.3",
     "vue": "3.5.40",
+    "vue-i18n": "^11.4.8",
     "vue-router": "4.5.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "@quasar/app-vite": "2.3.0",
     "@types/node": "^26.2.0",
     "@vitejs/plugin-vue": "^6.0.8",
@@ -34,7 +36,6 @@
     "jsdom": "^30.0.1",
     "openapi-typescript": "7.13.0",
     "typescript": "6.0.3",
-    "vitest": "4.1.0",
-    "@playwright/test": "1.55.0"
+    "vitest": "4.1.0"
   }
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, createCandidateId } from '../api/client'
 import { useDraftStore } from '../stores/draft'
@@ -24,6 +25,7 @@ type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition'
 type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
 type DraftPreviewResponse = components['schemas']['DraftPreviewResponse']
 
+const { t: $t } = useI18n()
 const draft = useDraftStore()
 const session = useSessionStore()
 const activation = useActivationStore()
@@ -264,7 +266,7 @@ function addModel() {
   const content = draft.localContent
   if (!content) return
   if (!content.providers.length) {
-    error.value = new Error('Add a provider before adding models — every model must bind to a real provider.')
+    error.value = new Error($t('resources.addProviderBeforeModels'))
     return
   }
   const id = draft.addModel(content.providers[0].providerId)
@@ -278,7 +280,7 @@ function addProvider() {
   const providerId = createCandidateId('prv')
   content.providers.push({
     providerId,
-    displayName: 'New provider',
+    displayName: $t('resources.newProvider'),
     clientProtocol: 'OPENAI_CHAT_COMPLETIONS',
     enabled: true,
   })
@@ -291,7 +293,7 @@ function removeProvider(providerId: string) {
   if (!content) return
   const referenced = content.models.some((m) => m.providerId === providerId)
   if (referenced) {
-    error.value = new Error(`Provider ${providerId} is referenced by models and cannot be removed.`)
+    error.value = new Error($t('resources.providerReferenced', { id: providerId }))
     return
   }
   content.providers = content.providers.filter((p) => p.providerId !== providerId)
@@ -411,27 +413,27 @@ onMounted(refresh)
 
 <template>
   <q-page padding>
-    <PageHeader title="Resources" subtitle="Edit the managed capability draft: models, TTS, ASR, MCP, policy and upstream bindings.">
+    <PageHeader :title="$t('nav.resources')" :subtitle="$t('resources.subtitle')">
       <template #primary>
-        <q-btn color="positive" icon="rocket_launch" label="Review & Publish" :disable="!canMutate || draft.dirty" :loading="reviewing" @click="openReview" />
+        <q-btn color="positive" icon="rocket_launch" :label="$t('resources.draft.review')" :disable="!canMutate || draft.dirty" :loading="reviewing" @click="openReview" />
       </template>
       <template #actions>
         <q-btn flat icon="refresh" :loading="draft.loading" @click="refresh" />
-        <q-btn outline color="secondary" label="Preview" :disable="!canMutate" :loading="previewing" @click="previewSnapshot" />
-        <q-btn outline color="primary" label="Validate" :disable="!canMutate || draft.loading" @click="validate" />
-        <q-btn outline color="primary" label="Save" :disable="!canMutate || !draft.dirty" :loading="draft.saving" @click="save" />
+        <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate" :loading="previewing" @click="previewSnapshot" />
+        <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || draft.loading" @click="validate" />
+        <q-btn outline color="primary" :label="$t('common.save')" :disable="!canMutate || !draft.dirty" :loading="draft.saving" @click="save" />
       </template>
     </PageHeader>
 
     <ProblemBanner :error="error" class="q-mb-md" />
     <q-banner v-if="draft.conflictRevision !== undefined" class="bg-orange-1 q-mb-md rounded-borders">
-      <div class="text-weight-medium">Stale draft (revision {{ draft.baselineRevision }})</div>
-      <div class="text-body2">Server is at revision {{ draft.conflictRevision }}. Reload to pick up the latest changes.</div>
-      <template #action><q-btn flat label="Reload" @click="refresh" /></template>
+      <div class="text-weight-medium">{{ $t('resources.staleDraft', { rev: draft.baselineRevision }) }}</div>
+      <div class="text-body2">{{ $t('resources.staleHint', { rev: draft.conflictRevision }) }}</div>
+      <template #action><q-btn flat :label="$t('resources.reload')" @click="refresh" /></template>
     </q-banner>
     <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-md rounded-borders">
       <div class="row items-center justify-between">
-        <span>Activation {{ activation.activation.activationId }} ({{ activation.activation.kind }})</span>
+        <span>{{ $t('system.currentActivation') }} {{ activation.activation.activationId }} ({{ activation.activation.kind }})</span>
         <StatusChip :value="activation.activation.state" />
       </div>
       <div v-if="activation.activation.errorCode" class="text-caption text-negative">{{ activation.activation.errorCode }}</div>
@@ -449,7 +451,7 @@ onMounted(refresh)
           <q-separator v-if="stage !== activation.publishStages[activation.publishStages.length - 1]" vertical class="q-mx-sm" style="height: 20px" />
         </template>
       </div>
-      <div class="text-caption text-grey-7 q-mt-xs">Recovery: refresh the page to recover this activation — no duplicate command will be sent.</div>
+      <div class="text-caption text-grey-7 q-mt-xs">{{ $t('upstreams.activationRecoveryHint') }}</div>
     </q-banner>
 
     <LoadingState v-if="draft.loading" />
@@ -458,18 +460,18 @@ onMounted(refresh)
       <q-card flat bordered class="q-mb-md">
         <q-card-section class="row items-center justify-between">
           <div class="text-subtitle1">
-            Revision {{ draft.baselineRevision }}
-            <q-badge v-if="draft.dirty" color="orange" label="unsaved" class="q-ml-sm" />
+            {{ $t('resources.draft.revision') }} {{ draft.baselineRevision }}
+            <q-badge v-if="draft.dirty" color="orange" :label="$t('common.dirty').toLowerCase()" class="q-ml-sm" />
           </div>
           <div class="row items-center q-gutter-sm">
             <q-chip v-if="draft.validationResult?.errors.length" color="negative" outline dense icon="error">
-              {{ draft.validationResult.errors.length }} error(s)
+              {{ draft.validationResult.errors.length }} {{ $t('common.error') }}(s)
             </q-chip>
             <q-chip v-else-if="draft.validationResult?.warnings.length" color="amber" outline dense icon="warning">
-              {{ draft.validationResult.warnings.length }} warning(s)
+              {{ draft.validationResult.warnings.length }} {{ $t('common.warning') }}(s)
             </q-chip>
             <q-chip v-else-if="draft.validationResult" color="positive" outline dense icon="check_circle">
-              valid
+              {{ $t('resources.valid').toLowerCase() }}
             </q-chip>
           </div>
         </q-card-section>
@@ -477,20 +479,20 @@ onMounted(refresh)
 
       <!-- Tabbed resource editors -->
       <q-tabs v-model="activeTab" class="q-mb-md" dense align="left">
-        <q-tab name="overview" label="Overview" icon="account_tree" />
-        <q-tab name="models" label="Models" icon="smart_toy">
+        <q-tab name="overview" :label="$t('resources.overview.providers')" icon="account_tree" />
+        <q-tab name="models" :label="$t('resources.tabs.models')" icon="smart_toy">
           <q-badge v-if="draft.localContent.models.length" color="primary" rounded floating :label="draft.localContent.models.length" />
         </q-tab>
-        <q-tab name="tts" label="TTS" icon="record_voice_over">
+        <q-tab name="tts" :label="$t('resources.tabs.tts')" icon="record_voice_over">
           <q-badge v-if="draft.localContent.tts.length" color="teal" rounded floating :label="draft.localContent.tts.length" />
         </q-tab>
-        <q-tab name="asr" label="ASR" icon="hearing">
+        <q-tab name="asr" :label="$t('resources.tabs.asr')" icon="hearing">
           <q-badge v-if="draft.localContent.asr.length" color="indigo" rounded floating :label="draft.localContent.asr.length" />
         </q-tab>
-        <q-tab name="mcp" label="MCP" icon="link">
+        <q-tab name="mcp" :label="$t('resources.tabs.mcp')" icon="link">
           <q-badge v-if="draft.localContent.mcp.length" color="deep-purple" rounded floating :label="draft.localContent.mcp.length" />
         </q-tab>
-        <q-tab name="policy" label="Policy" icon="policy" />
+        <q-tab name="policy" :label="$t('resources.tabs.policy')" icon="policy" />
       </q-tabs>
 
       <!-- ===== Overview: relationship view + providers ===== -->
@@ -499,21 +501,21 @@ onMounted(refresh)
         <q-card flat bordered class="q-mb-md">
           <q-card-section>
             <div class="row items-center justify-between">
-              <div class="text-subtitle2">Providers</div>
-              <q-btn flat dense icon="add" label="Add provider" size="sm" @click="addProvider()" />
+              <div class="text-subtitle2">{{ $t('resources.overview.providers') }}</div>
+              <q-btn flat dense icon="add" :label="$t('resources.overview.addProvider')" size="sm" @click="addProvider()" />
             </div>
             <q-list dense class="q-mt-sm">
               <q-item v-for="provider in draft.localContent.providers" :key="provider.providerId">
                 <q-item-section>
-                  <q-input v-model="provider.displayName" dense outlined label="Display name" @update:model-value="draft.markDirty()" />
-                  <div class="text-caption text-grey-7">{{ provider.providerId }} · {{ provider.clientProtocol }} · {{ modelCountForProvider(provider.providerId) }} model(s)</div>
+                  <q-input v-model="provider.displayName" dense outlined :label="$t('users.displayName')" @update:model-value="draft.markDirty()" />
+                  <div class="text-caption text-grey-7">{{ provider.providerId }} · {{ provider.clientProtocol }} · {{ $t('resources.overview.modelCount', { count: modelCountForProvider(provider.providerId) }) }}</div>
                 </q-item-section>
                 <q-item-section side>
                   <q-toggle v-model="provider.enabled" @update:model-value="draft.markDirty()" />
                   <q-btn flat dense color="negative" icon="delete" size="sm" :disable="modelCountForProvider(provider.providerId) > 0" @click="removeProvider(provider.providerId)" />
                 </q-item-section>
               </q-item>
-              <q-item v-if="!draft.localContent.providers.length"><q-item-section class="text-grey-7">No providers. Add one before creating models.</q-item-section></q-item>
+              <q-item v-if="!draft.localContent.providers.length"><q-item-section class="text-grey-7">{{ $t('resources.overview.noProviders') }}</q-item-section></q-item>
             </q-list>
           </q-card-section>
         </q-card>
@@ -522,28 +524,28 @@ onMounted(refresh)
         <q-card flat bordered>
           <q-card-section>
             <div class="row items-center justify-between q-mb-sm">
-              <div class="text-subtitle2">Resource → Upstream relationships</div>
+              <div class="text-subtitle2">{{ $t('resources.overview.relationships') }}</div>
               <q-btn-toggle
                 v-model="relationshipKindFilter"
                 dense flat
                 :options="[
-                  { label: 'All', value: 'all' },
-                  { label: 'Model', value: 'Model' },
-                  { label: 'TTS', value: 'TTS' },
-                  { label: 'ASR', value: 'ASR' },
-                  { label: 'MCP', value: 'MCP' },
+                  { label: $t('common.all'), value: 'all' },
+                  { label: $t('resources.tabs.models'), value: 'Model' },
+                  { label: $t('resources.tabs.tts'), value: 'TTS' },
+                  { label: $t('resources.tabs.asr'), value: 'ASR' },
+                  { label: $t('resources.tabs.mcp'), value: 'MCP' },
                 ]"
               />
             </div>
             <q-markup-table flat dense>
               <thead>
                 <tr>
-                  <th>Kind</th>
-                  <th>Resource</th>
-                  <th>Upstream</th>
-                  <th>Runtime Path</th>
-                  <th>Transport</th>
-                  <th class="text-right">Status</th>
+                  <th>{{ $t('resources.overview.kind') }}</th>
+                  <th>{{ $t('resources.overview.resource') }}</th>
+                  <th>{{ $t('resources.overview.upstream') }}</th>
+                  <th>{{ $t('resources.overview.runtimePath') }}</th>
+                  <th>{{ $t('resources.overview.transport') }}</th>
+                  <th class="text-right">{{ $t('common.status') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -560,23 +562,23 @@ onMounted(refresh)
                       <q-badge v-if="row.upstreamStatus" :color="row.upstreamStatus === 'ACTIVE' ? 'green' : row.upstreamStatus === 'DEGRADED' ? 'orange' : 'grey'" :label="row.upstreamStatus.toLowerCase()" class="q-mt-xs" />
                     </template>
                     <template v-else>
-                      <q-badge color="red" label="missing binding" />
-                      <div class="text-caption text-grey-7 q-mt-xs">Click to bind upstream</div>
+                      <q-badge color="red" :label="$t('resources.overview.missingBinding')" />
+                      <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.overview.clickToBind') }}</div>
                     </template>
                   </td>
                   <td><code class="text-caption">{{ row.runtimePath || '—' }}</code></td>
                   <td><span class="text-caption">{{ row.transport || '—' }}</span></td>
                   <td class="text-right">
                     <div class="row items-center justify-end q-gutter-xs">
-                      <q-badge v-if="!row.enabled" color="grey" label="disabled" />
-                      <q-badge v-else-if="row.bindingState === 'missing'" color="red" label="no binding" />
-                      <q-badge v-else-if="row.upstreamStatus && row.upstreamStatus !== 'ACTIVE'" color="orange" label="degraded upstream" />
-                      <q-badge v-else color="green" label="bound" />
-                      <q-toggle data-testid="relationship-enable-toggle" :model-value="row.enabled" :label="row.enabled ? 'on' : 'off'" @update:model-value="(v: boolean) => toggleEnabled(row.kind, row.resourceId, v)" @click.stop />
+                      <q-badge v-if="!row.enabled" color="grey" :label="$t('common.disabled').toLowerCase()" />
+                      <q-badge v-else-if="row.bindingState === 'missing'" color="red" :label="$t('resources.overview.noBinding')" />
+                      <q-badge v-else-if="row.upstreamStatus && row.upstreamStatus !== 'ACTIVE'" color="orange" :label="$t('resources.overview.degradedUpstream')" />
+                      <q-badge v-else color="green" :label="$t('resources.overview.bound')" />
+                      <q-toggle data-testid="relationship-enable-toggle" :model-value="row.enabled" :label="row.enabled ? $t('resources.overview.on') : $t('resources.overview.off')" @update:model-value="(v: boolean) => toggleEnabled(row.kind, row.resourceId, v)" @click.stop />
                     </div>
                   </td>
                 </tr>
-                <tr v-if="!filteredRelationshipRows.length"><td colspan="6" class="text-grey-7">No managed resources of this kind yet.</td></tr>
+                <tr v-if="!filteredRelationshipRows.length"><td colspan="6" class="text-grey-7">{{ $t('resources.overview.noResources') }}</td></tr>
               </tbody>
             </q-markup-table>
           </q-card-section>
@@ -590,8 +592,8 @@ onMounted(refresh)
           <div class="col-12 col-md-4">
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
-                <div class="text-subtitle2">Models</div>
-                <q-btn flat dense icon="add" label="Add" size="sm" :disable="!draft.localContent.providers.length" @click="addModel()" />
+                <div class="text-subtitle2">{{ $t('resources.tabs.models') }}</div>
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" :disable="!draft.localContent.providers.length" @click="addModel()" />
               </q-card-section>
               <q-list separator>
                 <q-item v-for="(model, idx) in draft.localContent.models" :key="model.modelId"
@@ -601,18 +603,18 @@ onMounted(refresh)
                     <q-item-label caption>
                       {{ model.modelId }}
                       · <q-badge v-for="m in model.inputModalities" :key="m" dense color="primary" :label="m" class="q-mr-xs" />
-                      · {{ model.upstreamModelKey || 'no key' }}
+                      · {{ model.upstreamModelKey || $t('resources.model.noKey') }}
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
-                      <q-badge v-if="!draft.bindingFor(model.modelId)?.upstreamId" color="red" label="no binding" />
-                      <q-badge v-if="!model.enabled" color="grey" label="off" />
+                      <q-badge v-if="!draft.bindingFor(model.modelId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
+                      <q-badge v-if="!model.enabled" color="grey" :label="$t('resources.overview.off')" />
                       <q-btn flat dense color="negative" icon="delete" size="sm" @click.stop="removeResource('models', idx, model.modelId)" />
                     </div>
                   </q-item-section>
                 </q-item>
-                <q-item v-if="!draft.localContent.models.length"><q-item-section class="text-grey-7">No models. Add one to get started.</q-item-section></q-item>
+                <q-item v-if="!draft.localContent.models.length"><q-item-section class="text-grey-7">{{ $t('resources.model.noModels') }}</q-item-section></q-item>
               </q-list>
             </q-card>
           </div>
@@ -624,67 +626,67 @@ onMounted(refresh)
               <q-card-section class="row items-start justify-between">
                 <div>
                   <div class="text-h6">{{ selectedModel.displayName }}</div>
-                  <div class="text-caption text-grey-7">{{ selectedModel.modelId }} (read-only system identity)</div>
+                  <div class="text-caption text-grey-7">{{ selectedModel.modelId }} ({{ $t('resources.model.systemIdentity') }})</div>
                 </div>
                 <div class="row items-center q-gutter-sm">
-                  <q-badge v-if="draft.dirty" color="orange" label="unsaved" />
-                  <q-toggle v-model="selectedModel.enabled" label="Enabled" @update:model-value="draft.markDirty()" />
+                  <q-badge v-if="draft.dirty" color="orange" :label="$t('common.dirty').toLowerCase()" />
+                  <q-toggle v-model="selectedModel.enabled" :label="$t('common.enabled')" @update:model-value="draft.markDirty()" />
                 </div>
               </q-card-section>
               <q-separator />
 
               <!-- Identity -->
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Identity</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.model.identity') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-input v-model="selectedModel.displayName" dense outlined label="Display Name" class="col" @update:model-value="draft.markDirty()" />
-                  <q-select v-model="selectedModel.providerId" dense outlined label="Provider" :options="draft.localContent.providers.map((p) => ({ label: p.displayName, value: p.providerId }))" emit-value map-options class="col" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedModel.displayName" dense outlined :label="$t('resources.model.displayName')" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.providerId" dense outlined :label="$t('resources.model.provider')" :options="draft.localContent.providers.map((p) => ({ label: p.displayName, value: p.providerId }))" emit-value map-options class="col" @update:model-value="draft.markDirty()" />
                 </div>
-                <div class="text-caption text-grey-7 q-mt-xs">{{ selectedModel.modelId }} (logical mdl_* identity — created automatically)</div>
+                <div class="text-caption text-grey-7 q-mt-xs">{{ selectedModel.modelId }} ({{ $t('resources.model.logicalIdentity') }})</div>
               </q-card-section>
               <q-separator />
 
               <!-- Capability -->
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Capability</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.model.capability') }}</div>
                 <div class="row q-gutter-sm q-mb-sm">
                   <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">Protocol</div>
-                    <q-badge color="primary" label="OPENAI_CHAT_COMPLETIONS" />
+                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.model.protocol') }}</div>
+                    <q-badge color="primary" :label="$t('resources.model.protocol')" />
                   </div>
                   <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">Upstream Model Key</div>
-                    <q-input v-model="selectedModel.upstreamModelKey" dense outlined label="Upstream model key" hint="The upstream provider's model identifier" @update:model-value="draft.markDirty()" />
+                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.model.upstreamModelKey') }}</div>
+                    <q-input v-model="selectedModel.upstreamModelKey" dense outlined :label="$t('resources.model.upstreamModelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" @update:model-value="draft.markDirty()" />
                   </div>
                 </div>
                 <div class="row q-gutter-sm">
-                  <q-select v-model="selectedModel.inputModalities" dense outlined label="Input Modalities" multiple :options="[...INPUT_MODS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
-                  <q-select v-model="selectedModel.outputModalities" dense outlined label="Output Modalities" multiple :options="[...OUTPUT_MODS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
-                  <q-select v-model="selectedModel.capabilities" dense outlined label="Capabilities" multiple :options="[...MODEL_CAPS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.inputModalities" dense outlined :label="$t('resources.model.inputModalities')" multiple :options="[...INPUT_MODS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.outputModalities" dense outlined :label="$t('resources.model.outputModalities')" multiple :options="[...OUTPUT_MODS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.capabilities" dense outlined :label="$t('resources.model.capabilities')" multiple :options="[...MODEL_CAPS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
                 </div>
-                <div class="text-caption text-grey-7 q-mt-xs">Use checkbox/chip controls for capabilities — no comma-separated strings.</div>
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.model.capabilityHint') }}</div>
               </q-card-section>
               <q-separator />
 
               <!-- Execution -->
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Execution / Binding</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.model.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId ?? ''" dense outlined label="Upstream" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
-                  <q-input v-model="selectedModel.runtimePath" dense outlined label="Runtime Path" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
+                  <q-input v-model="selectedModel.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">
-                  Transport summary: HTTP + SSE (streaming chat completions)
+                  {{ $t('resources.model.transportSummary') }}
                 </div>
                 <q-banner v-if="!draft.bindingFor(selectedModel.modelId)?.upstreamId" class="bg-red-1 q-mt-sm rounded-borders">
-                  <div class="text-body2 text-negative">Missing upstream binding — this resource cannot be published when enabled.</div>
+                  <div class="text-body2 text-negative">{{ $t('resources.model.missingUpstream') }}</div>
                 </q-banner>
               </q-card-section>
               <q-separator />
 
               <!-- Validation -->
               <q-card-section v-if="draft.validationResult">
-                <div class="text-subtitle2 q-mb-sm">Validation</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.model.validation') }}</div>
                 <q-list dense>
                   <q-item v-for="e in validationIssuesFor(selectedModel.modelId).errors" :key="e.path + e.code">
                     <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
@@ -695,7 +697,7 @@ onMounted(refresh)
                     <q-item-section><span class="text-amber-8">{{ w.code }} — {{ w.message }}</span> <span class="text-caption text-grey-7">{{ w.path }}</span></q-item-section>
                   </q-item>
                   <q-item v-if="!validationIssuesFor(selectedModel.modelId).errors.length && !validationIssuesFor(selectedModel.modelId).warnings.length">
-                    <q-item-section class="text-positive">No issues for this resource.</q-item-section>
+                    <q-item-section class="text-positive">{{ $t('resources.model.noIssues') }}</q-item-section>
                   </q-item>
                 </q-list>
               </q-card-section>
@@ -703,7 +705,7 @@ onMounted(refresh)
             <q-card v-else flat bordered>
               <q-card-section class="text-grey-7 text-center">
                 <q-icon name="smart_toy" size="3rem" />
-                <div class="text-body2 q-mt-sm">Select a model from the list or add a new one.</div>
+                <div class="text-body2 q-mt-sm">{{ $t('resources.model.selectOrAdd') }}</div>
               </q-card-section>
             </q-card>
           </div>
@@ -716,25 +718,25 @@ onMounted(refresh)
           <div class="col-12 col-md-4">
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
-                <div class="text-subtitle2">TTS <span class="text-caption text-grey-7">· OpenAI Audio Speech</span></div>
-                <q-btn flat dense icon="add" label="Add" size="sm" @click="draft.addTts(); selectedResourceId = draft.localContent?.tts[draft.localContent.tts.length - 1]?.ttsId" />
+                <div class="text-subtitle2">{{ $t('resources.tabs.tts') }} <span class="text-caption text-grey-7">· {{ $t('resources.tts.protocolBadge') }}</span></div>
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" @click="draft.addTts(); selectedResourceId = draft.localContent?.tts[draft.localContent.tts.length - 1]?.ttsId" />
               </q-card-section>
               <q-list separator>
                 <q-item v-for="(tts, idx) in draft.localContent.tts" :key="tts.ttsId"
                   :active="selectedResourceId === tts.ttsId" clickable @click="selectTts(tts.ttsId)">
                   <q-item-section>
                     <q-item-label>{{ tts.displayName }}</q-item-label>
-                    <q-item-label caption>{{ tts.ttsId }} · {{ tts.voice || 'no voice' }}</q-item-label>
+                    <q-item-label caption>{{ tts.ttsId }} · {{ tts.voice || $t('resources.tts.noVoice') }}</q-item-label>
                   </q-item-section>
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
-                      <q-badge v-if="!draft.bindingFor(tts.ttsId)?.upstreamId" color="red" label="no binding" />
-                      <q-badge v-if="!tts.voice" color="red" label="no voice" />
+                      <q-badge v-if="!draft.bindingFor(tts.ttsId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
+                      <q-badge v-if="!tts.voice" color="red" :label="$t('resources.tts.noVoice')" />
                       <q-btn flat dense color="negative" icon="delete" size="sm" @click.stop="removeResource('tts', idx, tts.ttsId)" />
                     </div>
                   </q-item-section>
                 </q-item>
-                <q-item v-if="!draft.localContent.tts.length"><q-item-section class="text-grey-7">No TTS. Add one to get started.</q-item-section></q-item>
+                <q-item v-if="!draft.localContent.tts.length"><q-item-section class="text-grey-7">{{ $t('resources.tts.noTts') }}</q-item-section></q-item>
               </q-list>
             </q-card>
           </div>
@@ -746,52 +748,52 @@ onMounted(refresh)
                   <div class="text-h6">{{ selectedTts.displayName }}</div>
                   <div class="text-caption text-grey-7">{{ selectedTts.ttsId }}</div>
                 </div>
-                <q-toggle v-model="selectedTts.enabled" label="Enabled" @update:model-value="draft.markDirty()" />
+                <q-toggle v-model="selectedTts.enabled" :label="$t('common.enabled')" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Identity</div>
-                <q-input v-model="selectedTts.displayName" dense outlined label="Display Name" @update:model-value="draft.markDirty()" />
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.identity') }}</div>
+                <q-input v-model="selectedTts.displayName" dense outlined :label="$t('resources.tts.displayName')" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Speech Profile</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.speechProfile') }}</div>
                 <div class="row q-gutter-sm q-mb-sm">
-                  <q-input v-model="selectedTts.upstreamModelKey" dense outlined label="Model Key" hint="Upstream TTS model identifier" class="col" @update:model-value="draft.markDirty()" />
-                  <q-input v-model="selectedTts.voice" dense outlined label="Voice" hint="Required field — e.g. alloy, echo, nova" class="col"
-                    :rules="[(v: string) => !!v || 'Voice is required']"
+                  <q-input v-model="selectedTts.upstreamModelKey" dense outlined :label="$t('resources.tts.modelKey')" :hint="$t('resources.tts.transport')" class="col" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedTts.voice" dense outlined :label="$t('resources.tts.voice')" :hint="$t('resources.tts.voiceHint')" class="col"
+                    :rules="[(v: string) => !!v || $t('resources.tts.voiceRequired')]"
                     @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="row q-gutter-sm items-center">
                   <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">Protocol</div>
-                    <q-badge color="teal" label="OPENAI_AUDIO_SPEECH" />
+                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.tts.protocol') }}</div>
+                    <q-badge color="teal" :label="$t('resources.tts.protocolBadge')" />
                   </div>
                   <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">Output baseline</div>
-                    <q-badge color="grey" label="MP3 (binary response)" />
+                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.tts.outputBaseline') }}</div>
+                    <q-badge color="grey" :label="$t('resources.tts.mp3BaselineBadge')" />
                   </div>
                 </div>
                 <q-banner v-if="!selectedTts.voice" class="bg-red-1 q-mt-sm rounded-borders">
-                  <div class="text-body2 text-negative">Voice is required for enabled TTS.</div>
+                  <div class="text-body2 text-negative">{{ $t('resources.tts.voiceRequired') }}</div>
                 </q-banner>
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Execution / Binding</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId ?? ''" dense outlined label="Upstream" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedTts!.ttsId, v, 'HTTP_BINARY_STREAM')" />
-                  <q-input v-model="selectedTts.runtimePath" dense outlined label="Runtime Path" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId ?? ''" dense outlined :label="$t('resources.tts.transport')" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedTts!.ttsId, v, 'HTTP_BINARY_STREAM')" />
+                  <q-input v-model="selectedTts.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" @update:model-value="draft.markDirty()" />
                 </div>
-                <div class="text-caption text-grey-7 q-mt-xs">Transport summary: HTTP request → binary audio response</div>
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.tts.transportSummary') }}</div>
               </q-card-section>
               <q-separator />
 
               <q-card-section v-if="draft.validationResult">
-                <div class="text-subtitle2 q-mb-sm">Validation</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.validation') }}</div>
                 <q-list dense>
                   <q-item v-for="e in validationIssuesFor(selectedTts.ttsId).errors" :key="e.path + e.code">
                     <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
@@ -802,7 +804,7 @@ onMounted(refresh)
                     <q-item-section><span class="text-amber-8">{{ w.code }} — {{ w.message }}</span> <span class="text-caption text-grey-7">{{ w.path }}</span></q-item-section>
                   </q-item>
                   <q-item v-if="!validationIssuesFor(selectedTts.ttsId).errors.length && !validationIssuesFor(selectedTts.ttsId).warnings.length">
-                    <q-item-section class="text-positive">No issues for this resource.</q-item-section>
+                    <q-item-section class="text-positive">{{ $t('resources.tts.noIssues') }}</q-item-section>
                   </q-item>
                 </q-list>
               </q-card-section>
@@ -810,7 +812,7 @@ onMounted(refresh)
             <q-card v-else flat bordered>
               <q-card-section class="text-grey-7 text-center">
                 <q-icon name="record_voice_over" size="3rem" />
-                <div class="text-body2 q-mt-sm">Select a TTS from the list or add a new one.</div>
+                <div class="text-body2 q-mt-sm">{{ $t('resources.tts.selectOrAdd') }}</div>
               </q-card-section>
             </q-card>
           </div>
@@ -823,24 +825,24 @@ onMounted(refresh)
           <div class="col-12 col-md-4">
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
-                <div class="text-subtitle2">ASR <span class="text-caption text-grey-7">· OpenAI Audio Transcriptions (HTTP)</span></div>
-                <q-btn flat dense icon="add" label="Add" size="sm" @click="draft.addAsr(); selectedResourceId = draft.localContent?.asr[draft.localContent.asr.length - 1]?.asrId" />
+                <div class="text-subtitle2">{{ $t('resources.tabs.asr') }} <span class="text-caption text-grey-7">· {{ $t('resources.asr.protocolBadge') }} (HTTP)</span></div>
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" @click="draft.addAsr(); selectedResourceId = draft.localContent?.asr[draft.localContent.asr.length - 1]?.asrId" />
               </q-card-section>
               <q-list separator>
                 <q-item v-for="(asr, idx) in draft.localContent.asr" :key="asr.asrId"
                   :active="selectedResourceId === asr.asrId" clickable @click="selectAsr(asr.asrId)">
                   <q-item-section>
                     <q-item-label>{{ asr.displayName }}</q-item-label>
-                    <q-item-label caption>{{ asr.asrId }} · {{ asr.language || 'any language' }}</q-item-label>
+                    <q-item-label caption>{{ asr.asrId }} · {{ asr.language || $t('resources.asr.anyLanguage') }}</q-item-label>
                   </q-item-section>
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
-                      <q-badge v-if="!draft.bindingFor(asr.asrId)?.upstreamId" color="red" label="no binding" />
+                      <q-badge v-if="!draft.bindingFor(asr.asrId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
                       <q-btn flat dense color="negative" icon="delete" size="sm" @click.stop="removeResource('asr', idx, asr.asrId)" />
                     </div>
                   </q-item-section>
                 </q-item>
-                <q-item v-if="!draft.localContent.asr.length"><q-item-section class="text-grey-7">No ASR. Add one to get started.</q-item-section></q-item>
+                <q-item v-if="!draft.localContent.asr.length"><q-item-section class="text-grey-7">{{ $t('resources.asr.noAsr') }}</q-item-section></q-item>
               </q-list>
             </q-card>
           </div>
@@ -852,48 +854,48 @@ onMounted(refresh)
                   <div class="text-h6">{{ selectedAsr.displayName }}</div>
                   <div class="text-caption text-grey-7">{{ selectedAsr.asrId }}</div>
                 </div>
-                <q-toggle v-model="selectedAsr.enabled" label="Enabled" @update:model-value="draft.markDirty()" />
+                <q-toggle v-model="selectedAsr.enabled" :label="$t('common.enabled')" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Identity</div>
-                <q-input v-model="selectedAsr.displayName" dense outlined label="Display Name" @update:model-value="draft.markDirty()" />
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.identity') }}</div>
+                <q-input v-model="selectedAsr.displayName" dense outlined :label="$t('resources.asr.displayName')" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Transcription Profile</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.transcriptionProfile') }}</div>
                 <div class="row q-gutter-sm q-mb-sm">
-                  <q-input v-model="selectedAsr.upstreamModelKey" dense outlined label="Model Key" hint="Upstream ASR model identifier" class="col" @update:model-value="draft.markDirty()" />
-                  <q-input v-model="selectedAsr.language" dense outlined label="Optional Language" hint="Leave empty for auto-detect" class="col" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedAsr.upstreamModelKey" dense outlined :label="$t('resources.asr.modelKey')" :hint="$t('resources.asr.transport')" class="col" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedAsr.language" dense outlined :label="$t('resources.asr.optionalLanguage')" :hint="$t('resources.asr.optionalLanguageHint')" class="col" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="row q-gutter-sm items-center">
                   <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">Protocol</div>
-                    <q-badge color="indigo" label="OPENAI_AUDIO_TRANSCRIPTIONS" />
+                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.asr.protocol') }}</div>
+                    <q-badge color="indigo" :label="$t('resources.asr.protocolBadge')" />
                   </div>
                   <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">Transport</div>
-                    <q-badge color="grey" label="HTTP multipart transcription" />
+                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('upstreams.transport') }}</div>
+                    <q-badge color="grey" :label="$t('resources.asr.transportBadge')" />
                   </div>
                 </div>
-                <div class="text-caption text-grey-7 q-mt-xs">No realtime/WebSocket/VAD/streaming ASR fields — not supported in S0.1.</div>
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.asr.notRealtimeHint') }}</div>
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Execution / Binding</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId ?? ''" dense outlined label="Upstream" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedAsr!.asrId, v, 'HTTP_MULTIPART')" />
-                  <q-input v-model="selectedAsr.runtimePath" dense outlined label="Runtime Path" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedAsr!.asrId, v, 'HTTP_MULTIPART')" />
+                  <q-input v-model="selectedAsr.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" @update:model-value="draft.markDirty()" />
                 </div>
-                <div class="text-caption text-grey-7 q-mt-xs">Transport summary: multipart HTTP transcription</div>
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.asr.transportSummary') }}</div>
               </q-card-section>
               <q-separator />
 
               <q-card-section v-if="draft.validationResult">
-                <div class="text-subtitle2 q-mb-sm">Validation</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.validation') }}</div>
                 <q-list dense>
                   <q-item v-for="e in validationIssuesFor(selectedAsr.asrId).errors" :key="e.path + e.code">
                     <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
@@ -904,7 +906,7 @@ onMounted(refresh)
                     <q-item-section><span class="text-amber-8">{{ w.code }} — {{ w.message }}</span> <span class="text-caption text-grey-7">{{ w.path }}</span></q-item-section>
                   </q-item>
                   <q-item v-if="!validationIssuesFor(selectedAsr.asrId).errors.length && !validationIssuesFor(selectedAsr.asrId).warnings.length">
-                    <q-item-section class="text-positive">No issues for this resource.</q-item-section>
+                    <q-item-section class="text-positive">{{ $t('resources.asr.noIssues') }}</q-item-section>
                   </q-item>
                 </q-list>
               </q-card-section>
@@ -912,7 +914,7 @@ onMounted(refresh)
             <q-card v-else flat bordered>
               <q-card-section class="text-grey-7 text-center">
                 <q-icon name="hearing" size="3rem" />
-                <div class="text-body2 q-mt-sm">Select an ASR from the list or add a new one.</div>
+                <div class="text-body2 q-mt-sm">{{ $t('resources.asr.selectOrAdd') }}</div>
               </q-card-section>
             </q-card>
           </div>
@@ -925,8 +927,8 @@ onMounted(refresh)
           <div class="col-12 col-md-4">
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
-                <div class="text-subtitle2">MCP <span class="text-caption text-grey-7">· MCP Streamable HTTP</span></div>
-                <q-btn flat dense icon="add" label="Add" size="sm" @click="draft.addMcp(); selectedResourceId = draft.localContent?.mcp[draft.localContent.mcp.length - 1]?.mcpServerId" />
+                <div class="text-subtitle2">{{ $t('resources.tabs.mcp') }} <span class="text-caption text-grey-7">· {{ $t('resources.mcp.transport') }}</span></div>
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" @click="draft.addMcp(); selectedResourceId = draft.localContent?.mcp[draft.localContent.mcp.length - 1]?.mcpServerId" />
               </q-card-section>
               <q-list separator>
                 <q-item v-for="(mcp, idx) in draft.localContent.mcp" :key="mcp.mcpServerId"
@@ -937,12 +939,12 @@ onMounted(refresh)
                   </q-item-section>
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
-                      <q-badge v-if="!draft.bindingFor(mcp.mcpServerId)?.upstreamId" color="red" label="no binding" />
+                      <q-badge v-if="!draft.bindingFor(mcp.mcpServerId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
                       <q-btn flat dense color="negative" icon="delete" size="sm" @click.stop="removeResource('mcp', idx, mcp.mcpServerId)" />
                     </div>
                   </q-item-section>
                 </q-item>
-                <q-item v-if="!draft.localContent.mcp.length"><q-item-section class="text-grey-7">No MCP. Add one to get started.</q-item-section></q-item>
+                <q-item v-if="!draft.localContent.mcp.length"><q-item-section class="text-grey-7">{{ $t('resources.mcp.noMcp') }}</q-item-section></q-item>
               </q-list>
             </q-card>
           </div>
@@ -954,49 +956,49 @@ onMounted(refresh)
                   <div class="text-h6">{{ selectedMcp.displayName }}</div>
                   <div class="text-caption text-grey-7">{{ selectedMcp.mcpServerId }}</div>
                 </div>
-                <q-toggle v-model="selectedMcp.enabled" label="Enabled" @update:model-value="draft.markDirty()" />
+                <q-toggle v-model="selectedMcp.enabled" :label="$t('common.enabled')" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Identity</div>
-                <q-input v-model="selectedMcp.displayName" dense outlined label="Display Name" @update:model-value="draft.markDirty()" />
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.mcp.identity') }}</div>
+                <q-input v-model="selectedMcp.displayName" dense outlined :label="$t('resources.mcp.displayName')" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">MCP Profile</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.mcp.mcpProfile') }}</div>
                 <div class="row q-gutter-sm items-center q-mb-sm">
                   <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">Protocol</div>
-                    <q-badge color="deep-purple" label="MCP_STREAMABLE_HTTP" />
+                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.mcp.protocol') }}</div>
+                    <q-badge color="deep-purple" :label="$t('resources.mcp.protocolBadge')" />
                   </div>
                   <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">Auth Ownership</div>
-                    <q-select v-model="selectedMcp.authOwnership" dense outlined label="Auth ownership" :options="[...AUTH_OWNERSHIPS]" @update:model-value="draft.markDirty()" />
+                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.mcp.authOwnership') }}</div>
+                    <q-select v-model="selectedMcp.authOwnership" dense outlined :label="$t('resources.mcp.authOwnership')" :options="[...AUTH_OWNERSHIPS]" @update:model-value="draft.markDirty()" />
                   </div>
                 </div>
                 <q-banner v-if="selectedMcp.authOwnership === 'ENTERPRISE_MANAGED'" class="bg-blue-1 q-mt-sm rounded-borders">
-                  <div class="text-body2 text-info">Credentials are managed server-side via the Upstream/Secret binding. The client never receives the Secret.</div>
+                  <div class="text-body2 text-info">{{ $t('resources.mcp.enterpriseManagedHint') }}</div>
                 </q-banner>
                 <q-banner v-else class="bg-grey-1 q-mt-sm rounded-borders">
-                  <div class="text-body2 text-grey-7">No authentication required for this MCP server.</div>
+                  <div class="text-body2 text-grey-7">{{ $t('resources.mcp.noneHint') }}</div>
                 </q-banner>
               </q-card-section>
               <q-separator />
 
               <q-card-section>
-                <div class="text-subtitle2 q-mb-sm">Execution / Binding</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.mcp.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId ?? ''" dense outlined label="Upstream" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
-                  <q-input v-model="selectedMcp.runtimePath" dense outlined label="Runtime Path" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
+                  <q-input v-model="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" @update:model-value="draft.markDirty()" />
                 </div>
-                <div class="text-caption text-grey-7 q-mt-xs">Transport summary: Streamable HTTP</div>
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.mcp.transportSummary') }}</div>
               </q-card-section>
               <q-separator />
 
               <q-card-section v-if="draft.validationResult">
-                <div class="text-subtitle2 q-mb-sm">Validation</div>
+                <div class="text-subtitle2 q-mb-sm">{{ $t('resources.mcp.validation') }}</div>
                 <q-list dense>
                   <q-item v-for="e in validationIssuesFor(selectedMcp.mcpServerId).errors" :key="e.path + e.code">
                     <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
@@ -1007,7 +1009,7 @@ onMounted(refresh)
                     <q-item-section><span class="text-amber-8">{{ w.code }} — {{ w.message }}</span> <span class="text-caption text-grey-7">{{ w.path }}</span></q-item-section>
                   </q-item>
                   <q-item v-if="!validationIssuesFor(selectedMcp.mcpServerId).errors.length && !validationIssuesFor(selectedMcp.mcpServerId).warnings.length">
-                    <q-item-section class="text-positive">No issues for this resource.</q-item-section>
+                    <q-item-section class="text-positive">{{ $t('resources.mcp.noIssues') }}</q-item-section>
                   </q-item>
                 </q-list>
               </q-card-section>
@@ -1015,7 +1017,7 @@ onMounted(refresh)
             <q-card v-else flat bordered>
               <q-card-section class="text-grey-7 text-center">
                 <q-icon name="link" size="3rem" />
-                <div class="text-body2 q-mt-sm">Select an MCP from the list or add a new one.</div>
+                <div class="text-body2 q-mt-sm">{{ $t('resources.mcp.selectOrAdd') }}</div>
               </q-card-section>
             </q-card>
           </div>
@@ -1027,40 +1029,40 @@ onMounted(refresh)
         <q-card flat bordered>
           <q-card-section class="row items-center justify-between">
             <div>
-              <div class="text-subtitle2">Policy</div>
-              <div class="text-caption text-grey-7">Policy ID: {{ draft.localContent.policy.policyId }}</div>
+              <div class="text-subtitle2">{{ $t('resources.tabs.policy') }}</div>
+              <div class="text-caption text-grey-7">{{ $t('resources.policy.policyId') }}: {{ draft.localContent.policy.policyId }}</div>
             </div>
-            <q-badge v-if="draft.dirty" color="orange" label="unsaved" />
+            <q-badge v-if="draft.dirty" color="orange" :label="$t('common.dirty').toLowerCase()" />
           </q-card-section>
           <q-separator />
 
           <q-card-section>
-            <div class="text-subtitle2 q-mb-sm">Local Coexistence</div>
-            <div class="text-body2 text-grey-7 q-mb-md">Controls whether client local capabilities can coexist with managed capabilities.</div>
+            <div class="text-subtitle2 q-mb-sm">{{ $t('resources.policy.localCoexistence') }}</div>
+            <div class="text-body2 text-grey-7 q-mb-md">{{ $t('resources.policy.coexistenceHint') }}</div>
             <div class="row q-gutter-md">
-              <q-toggle v-model="draft.localContent.policy.allowLocalProviders" label="Allow Local Models" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalTts" label="Allow Local TTS" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalAsr" label="Allow Local ASR" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalMcp" label="Allow Local MCP" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalProviders" :label="$t('resources.policy.allowLocalModels')" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalTts" :label="$t('resources.policy.allowLocalTts')" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalAsr" :label="$t('resources.policy.allowLocalAsr')" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalMcp" :label="$t('resources.policy.allowLocalMcp')" @update:model-value="draft.markDirty()" />
             </div>
           </q-card-section>
           <q-separator />
 
           <q-card-section>
-            <div class="text-subtitle2 q-mb-sm">Defaults</div>
-            <div class="text-body2 text-grey-7 q-mb-md">Only enabled and valid resources can be set as defaults.</div>
+            <div class="text-subtitle2 q-mb-sm">{{ $t('resources.policy.defaults') }}</div>
+            <div class="text-body2 text-grey-7 q-mb-md">{{ $t('resources.policy.defaultsHint') }}</div>
             <div class="row q-col-gutter-md">
               <div class="col-12 col-md-4">
-                <q-select v-model="draft.localContent.policy.defaultModelId" dense outlined label="Default Model" :options="enabledModels" emit-value map-options clearable @update:model-value="draft.markDirty()" />
-                <div class="text-caption text-grey-7 q-mt-xs">Only enabled models appear here.</div>
+                <q-select v-model="draft.localContent.policy.defaultModelId" dense outlined :label="$t('resources.policy.defaultModel')" :options="enabledModels" emit-value map-options clearable @update:model-value="draft.markDirty()" />
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledModelsHint') }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <q-select v-model="draft.localContent.policy.defaultTtsId" dense outlined label="Default TTS" :options="enabledTts" emit-value map-options clearable @update:model-value="draft.markDirty()" />
-                <div class="text-caption text-grey-7 q-mt-xs">Only enabled TTS appear here.</div>
+                <q-select v-model="draft.localContent.policy.defaultTtsId" dense outlined :label="$t('resources.policy.defaultTts')" :options="enabledTts" emit-value map-options clearable @update:model-value="draft.markDirty()" />
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledTtsHint') }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <q-select v-model="draft.localContent.policy.defaultAsrId" dense outlined label="Default ASR" :options="enabledAsr" emit-value map-options clearable @update:model-value="draft.markDirty()" />
-                <div class="text-caption text-grey-7 q-mt-xs">Only enabled ASR appear here.</div>
+                <q-select v-model="draft.localContent.policy.defaultAsrId" dense outlined :label="$t('resources.policy.defaultAsr')" :options="enabledAsr" emit-value map-options clearable @update:model-value="draft.markDirty()" />
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledAsrHint') }}</div>
               </div>
             </div>
           </q-card-section>
@@ -1070,14 +1072,14 @@ onMounted(refresh)
       <!-- Shared validation summary (below all tabs) -->
       <q-card flat bordered class="q-mt-md">
         <q-card-section>
-          <div class="text-subtitle2">Validation</div>
-          <div v-if="!draft.validationResult" class="text-body2 text-grey-7 q-mt-sm">Click Validate to check the draft.</div>
+          <div class="text-subtitle2">{{ $t('resources.model.validation') }}</div>
+          <div v-if="!draft.validationResult" class="text-body2 text-grey-7 q-mt-sm">{{ $t('resources.dirtyHint') }}</div>
           <div v-else>
             <q-banner v-if="draft.validationResult.errors.length === 0 && draft.validationResult.warnings.length === 0" class="bg-green-1 q-mt-sm rounded-borders">
-              Draft is valid.
+              {{ $t('resources.valid') }}
             </q-banner>
             <q-banner v-else class="bg-orange-1 q-mt-sm rounded-borders">
-              <div>{{ draft.validationResult.errors.length }} errors · {{ draft.validationResult.warnings.length }} warnings</div>
+              <div>{{ $t('resources.errorsWarnings', { errors: draft.validationResult.errors.length, warnings: draft.validationResult.warnings.length }) }}</div>
             </q-banner>
             <q-list dense class="q-mt-sm">
               <q-item v-for="e in draft.validationResult.errors" :key="e.path + e.code">
@@ -1098,18 +1100,18 @@ onMounted(refresh)
         <q-card style="min-width: 800px; max-width: 95vw">
           <q-card-section class="row items-center justify-between">
             <div>
-              <div class="text-h6">Review & Publish</div>
-              <div class="text-caption text-grey-7">Revision {{ draft.baselineRevision }} → new immutable release</div>
+              <div class="text-h6">{{ $t('resources.review.title') }}</div>
+              <div class="text-caption text-grey-7">{{ $t('resources.draft.revision') }} {{ draft.baselineRevision }} → {{ $t('releases.subtitle') }}</div>
             </div>
-            <q-badge v-if="reviewTotalChanges === 0" color="grey" label="no changes" />
-            <q-badge v-else color="primary" :label="`${reviewTotalChanges} change(s)`" />
+            <q-badge v-if="reviewTotalChanges === 0" color="grey" :label="$t('resources.review.noChanges')" />
+            <q-badge v-else color="primary" :label="$t('resources.review.changes', { count: reviewTotalChanges })" />
           </q-card-section>
           <q-separator />
 
           <q-card-section v-if="reviewDiff" style="max-height: 60vh; overflow-y: auto">
             <!-- Blocking errors -->
             <q-banner v-if="hasBlockingErrors" class="bg-red-1 q-mb-md rounded-borders">
-              <div class="text-weight-medium text-negative">{{ draft.validationResult!.errors.length }} blocking error(s) — cannot publish.</div>
+              <div class="text-weight-medium text-negative">{{ $t('resources.review.blockingErrors', { count: draft.validationResult!.errors.length }) }}</div>
               <q-list dense class="q-mt-sm">
                 <q-item v-for="e in draft.validationResult!.errors" :key="e.path + e.code">
                   <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
@@ -1122,14 +1124,14 @@ onMounted(refresh)
             </q-banner>
 
             <!-- Resource changes: Added / Changed / Removed -->
-            <div class="text-subtitle2 q-mb-sm">Resource changes</div>
+            <div class="text-subtitle2 q-mb-sm">{{ $t('resources.review.resourceChanges') }}</div>
             <q-markup-table flat dense class="q-mb-md">
               <thead>
                 <tr>
-                  <th>Kind</th>
-                  <th class="text-right text-positive">Added</th>
-                  <th class="text-right text-warning">Changed</th>
-                  <th class="text-right text-negative">Removed</th>
+                  <th>{{ $t('resources.relationship.kind') }}</th>
+                  <th class="text-right text-positive">{{ $t('resources.review.added') }}</th>
+                  <th class="text-right text-warning">{{ $t('resources.review.changed') }}</th>
+                  <th class="text-right text-negative">{{ $t('resources.review.removed') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1146,7 +1148,7 @@ onMounted(refresh)
                   <td class="text-right text-negative">{{ row.d.removed.length > 0 ? '-' + row.d.removed.length : '—' }}</td>
                 </tr>
                 <tr v-if="reviewDiff.policyChanged">
-                  <td>Policy</td>
+                  <td>{{ $t('resources.tabs.policy') }}</td>
                   <td class="text-right">—</td>
                   <td class="text-right text-warning">~1</td>
                   <td class="text-right">—</td>
@@ -1156,76 +1158,76 @@ onMounted(refresh)
 
             <!-- Added resource details -->
             <template v-if="reviewDiff.providers.added.length || reviewDiff.models.added.length || reviewDiff.tts.added.length || reviewDiff.asr.added.length || reviewDiff.mcp.added.length">
-              <div class="text-subtitle2 q-mb-sm text-positive">Added resources</div>
+              <div class="text-subtitle2 q-mb-sm text-positive">{{ $t('resources.review.addedResources') }}</div>
               <q-list dense class="q-mb-md">
                 <q-item v-for="p in reviewDiff.providers.added" :key="p.providerId">
                   <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>Provider: {{ p.displayName }} ({{ p.providerId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.preview.providers') }}: {{ p.displayName }} ({{ p.providerId }})</q-item-section>
                 </q-item>
                 <q-item v-for="m in reviewDiff.models.added" :key="m.modelId">
                   <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>Model: {{ m.displayName }} ({{ m.modelId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.tabs.models') }}: {{ m.displayName }} ({{ m.modelId }})</q-item-section>
                 </q-item>
                 <q-item v-for="t in reviewDiff.tts.added" :key="t.ttsId">
                   <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>TTS: {{ t.displayName }} ({{ t.ttsId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.tabs.tts') }}: {{ t.displayName }} ({{ t.ttsId }})</q-item-section>
                 </q-item>
                 <q-item v-for="a in reviewDiff.asr.added" :key="a.asrId">
                   <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>ASR: {{ a.displayName }} ({{ a.asrId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.tabs.asr') }}: {{ a.displayName }} ({{ a.asrId }})</q-item-section>
                 </q-item>
                 <q-item v-for="m in reviewDiff.mcp.added" :key="m.mcpServerId">
                   <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>MCP: {{ m.displayName }} ({{ m.mcpServerId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.tabs.mcp') }}: {{ m.displayName }} ({{ m.mcpServerId }})</q-item-section>
                 </q-item>
               </q-list>
             </template>
 
             <!-- Removed resource details -->
             <template v-if="reviewDiff.providers.removed.length || reviewDiff.models.removed.length || reviewDiff.tts.removed.length || reviewDiff.asr.removed.length || reviewDiff.mcp.removed.length">
-              <div class="text-subtitle2 q-mb-sm text-negative">Removed resources</div>
+              <div class="text-subtitle2 q-mb-sm text-negative">{{ $t('resources.review.removedResources') }}</div>
               <q-list dense class="q-mb-md">
                 <q-item v-for="p in reviewDiff.providers.removed" :key="p.providerId">
                   <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>Provider: {{ p.displayName }} ({{ p.providerId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.preview.providers') }}: {{ p.displayName }} ({{ p.providerId }})</q-item-section>
                 </q-item>
                 <q-item v-for="m in reviewDiff.models.removed" :key="m.modelId">
                   <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>Model: {{ m.displayName }} ({{ m.modelId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.tabs.models') }}: {{ m.displayName }} ({{ m.modelId }})</q-item-section>
                 </q-item>
                 <q-item v-for="t in reviewDiff.tts.removed" :key="t.ttsId">
                   <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>TTS: {{ t.displayName }} ({{ t.ttsId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.tabs.tts') }}: {{ t.displayName }} ({{ t.ttsId }})</q-item-section>
                 </q-item>
                 <q-item v-for="a in reviewDiff.asr.removed" :key="a.asrId">
                   <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>ASR: {{ a.displayName }} ({{ a.asrId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.tabs.asr') }}: {{ a.displayName }} ({{ a.asrId }})</q-item-section>
                 </q-item>
                 <q-item v-for="m in reviewDiff.mcp.removed" :key="m.mcpServerId">
                   <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>MCP: {{ m.displayName }} ({{ m.mcpServerId }})</q-item-section>
+                  <q-item-section>{{ $t('resources.tabs.mcp') }}: {{ m.displayName }} ({{ m.mcpServerId }})</q-item-section>
                 </q-item>
               </q-list>
             </template>
 
             <!-- Policy changes -->
-            <div v-if="reviewDiff.policyChanged" class="text-subtitle2 q-mb-sm">Policy changes</div>
+            <div v-if="reviewDiff.policyChanged" class="text-subtitle2 q-mb-sm">{{ $t('resources.review.policyChanges') }}</div>
             <q-banner v-if="reviewDiff.policyChanged" class="bg-blue-1 q-mb-md rounded-borders">
-              <div class="text-body2">Policy has been modified. Review local coexistence toggles and default resource selections.</div>
+              <div class="text-body2">{{ $t('resources.review.policyChangedHint') }}</div>
             </q-banner>
 
             <!-- Runtime routing impact -->
-            <div class="text-subtitle2 q-mb-sm">Runtime routing impact</div>
+            <div class="text-subtitle2 q-mb-sm">{{ $t('resources.review.runtimeImpact') }}</div>
             <q-markup-table flat dense class="q-mb-md">
               <tbody>
-                <tr><td class="text-grey-7">Bindings added</td><td class="text-positive">{{ routingImpact.added > 0 ? '+' + routingImpact.added : '—' }}</td></tr>
-                <tr><td class="text-grey-7">Bindings changed</td><td class="text-warning">{{ routingImpact.changed > 0 ? '~' + routingImpact.changed : '—' }}</td></tr>
-                <tr><td class="text-grey-7">Bindings removed</td><td class="text-negative">{{ routingImpact.removed > 0 ? '-' + routingImpact.removed : '—' }}</td></tr>
+                <tr><td class="text-grey-7">{{ $t('resources.review.bindingsAdded') }}</td><td class="text-positive">{{ routingImpact.added > 0 ? '+' + routingImpact.added : '—' }}</td></tr>
+                <tr><td class="text-grey-7">{{ $t('resources.review.bindingsChanged') }}</td><td class="text-warning">{{ routingImpact.changed > 0 ? '~' + routingImpact.changed : '—' }}</td></tr>
+                <tr><td class="text-grey-7">{{ $t('resources.review.bindingsRemoved') }}</td><td class="text-negative">{{ routingImpact.removed > 0 ? '-' + routingImpact.removed : '—' }}</td></tr>
               </tbody>
             </q-markup-table>
 
             <!-- Warnings -->
-            <div v-if="reviewWarnings.length" class="text-subtitle2 q-mb-sm">Warnings (acknowledged on publish)</div>
+            <div v-if="reviewWarnings.length" class="text-subtitle2 q-mb-sm">{{ $t('resources.review.warningsAck') }}</div>
             <q-list v-if="reviewWarnings.length" dense class="q-mb-md">
               <q-item v-for="w in reviewWarnings" :key="w.path + w.code">
                 <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
@@ -1238,17 +1240,17 @@ onMounted(refresh)
 
             <!-- Snapshot hash -->
             <div v-if="preview" class="text-caption text-grey-7">
-              Snapshot hash: <code>{{ preview.snapshotHash }}</code>
+              {{ $t('resources.review.snapshotHash') }}: <code>{{ preview.snapshotHash }}</code>
             </div>
           </q-card-section>
 
           <q-separator />
           <q-card-actions align="right">
-            <q-btn flat label="Cancel" v-close-popup :disable="publishing" />
+            <q-btn flat :label="$t('common.cancel')" v-close-popup :disable="publishing" />
             <q-btn
               color="positive"
               icon="rocket_launch"
-              :label="reviewWarnings.length ? `Publish with ${reviewWarnings.length} warning(s)` : 'Publish'"
+              :label="reviewWarnings.length ? $t('resources.review.publishWithWarnings', { count: reviewWarnings.length }) : $t('resources.draft.publish')"
               :disable="hasBlockingErrors || publishing"
               :loading="publishing"
               @click="publish"
@@ -1260,19 +1262,19 @@ onMounted(refresh)
       <!-- Snapshot Preview Dialog -->
       <q-dialog v-model="previewOpen">
         <q-card style="min-width: 700px; max-width: 95vw">
-          <q-card-section class="text-h6">Client Snapshot Preview</q-card-section>
+          <q-card-section class="text-h6">{{ $t('resources.preview.title') }}</q-card-section>
           <q-card-section v-if="preview">
-            <div class="text-subtitle2 q-mb-sm">Hash: {{ preview.snapshotHash }}</div>
-            <div class="text-caption text-grey-7 q-mb-md">Revision {{ preview.draftRevision }}</div>
+            <div class="text-subtitle2 q-mb-sm">{{ $t('resources.preview.hash') }}: {{ preview.snapshotHash }}</div>
+            <div class="text-caption text-grey-7 q-mb-md">{{ $t('resources.draft.revision') }} {{ preview.draftRevision }}</div>
 
             <q-banner class="bg-blue-1 q-mb-md rounded-borders">
-              <div class="text-body2"><b>Client receives:</b> Providers, Models, TTS, ASR, MCP, Policy</div>
-              <div class="text-body2 text-negative"><b>Client never receives:</b> Upstream/base URL, Secret, runtimeRouteId, Runtime Binding, Pricing</div>
+              <div class="text-body2"><b>{{ $t('resources.preview.clientReceives') }}:</b> {{ $t('resources.preview.clientReceivesList') }}</div>
+              <div class="text-body2 text-negative"><b>{{ $t('resources.preview.clientNeverReceives') }}:</b> {{ $t('resources.preview.clientNeverReceivesList') }}</div>
             </q-banner>
 
-            <q-expansion-item dense group="preview" label="Providers ({{ preview.providers.length }})" icon="domain">
+            <q-expansion-item dense group="preview" :label="`${$t('resources.preview.providers')} (${preview.providers.length})`" icon="domain">
               <q-markup-table flat dense>
-                <thead><tr><th>Display Name</th><th>Protocol</th><th>Enabled</th></tr></thead>
+                <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.preview.protocol') }}</th><th>{{ $t('resources.preview.enabled') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="p in preview.providers" :key="p.providerId">
                     <td>{{ p.displayName }}</td><td>{{ p.clientProtocol }}</td><td>{{ p.enabled }}</td>
@@ -1281,9 +1283,9 @@ onMounted(refresh)
               </q-markup-table>
             </q-expansion-item>
 
-            <q-expansion-item dense group="preview" label="Models ({{ preview.models.length }})" icon="smart_toy">
+            <q-expansion-item dense group="preview" :label="`${$t('resources.preview.models')} (${preview.models.length})`" icon="smart_toy">
               <q-markup-table flat dense>
-                <thead><tr><th>Display Name</th><th>Model ID</th><th>Provider</th><th>Key</th><th>Input</th><th>Caps</th></tr></thead>
+                <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.preview.modelId') }}</th><th>{{ $t('resources.preview.provider') }}</th><th>{{ $t('resources.preview.key') }}</th><th>{{ $t('resources.preview.input') }}</th><th>{{ $t('resources.preview.caps') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="m in preview.models" :key="m.modelId">
                     <td>{{ m.displayName }}</td><td>{{ m.modelId }}</td><td>{{ m.providerId }}</td>
@@ -1294,9 +1296,9 @@ onMounted(refresh)
               </q-markup-table>
             </q-expansion-item>
 
-            <q-expansion-item dense group="preview" label="TTS ({{ preview.tts.length }})" icon="record_voice_over">
+            <q-expansion-item dense group="preview" :label="`${$t('resources.preview.tts')} (${preview.tts.length})`" icon="record_voice_over">
               <q-markup-table flat dense>
-                <thead><tr><th>Display Name</th><th>TTS ID</th><th>Voice</th><th>Key</th></tr></thead>
+                <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.preview.ttsId') }}</th><th>{{ $t('resources.preview.voice') }}</th><th>{{ $t('resources.preview.key') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="t in preview.tts" :key="t.ttsId">
                     <td>{{ t.displayName }}</td><td>{{ t.ttsId }}</td><td>{{ t.voice }}</td><td>{{ t.upstreamModelKey }}</td>
@@ -1305,20 +1307,20 @@ onMounted(refresh)
               </q-markup-table>
             </q-expansion-item>
 
-            <q-expansion-item dense group="preview" label="ASR ({{ preview.asr.length }})" icon="hearing">
+            <q-expansion-item dense group="preview" :label="`${$t('resources.preview.asr')} (${preview.asr.length})`" icon="hearing">
               <q-markup-table flat dense>
-                <thead><tr><th>Display Name</th><th>ASR ID</th><th>Language</th><th>Key</th></tr></thead>
+                <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.preview.asrId') }}</th><th>{{ $t('resources.preview.language') }}</th><th>{{ $t('resources.preview.key') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="a in preview.asr" :key="a.asrId">
-                    <td>{{ a.displayName }}</td><td>{{ a.asrId }}</td><td>{{ a.language || 'auto' }}</td><td>{{ a.upstreamModelKey }}</td>
+                    <td>{{ a.displayName }}</td><td>{{ a.asrId }}</td><td>{{ a.language || $t('resources.preview.auto') }}</td><td>{{ a.upstreamModelKey }}</td>
                   </tr>
                 </tbody>
               </q-markup-table>
             </q-expansion-item>
 
-            <q-expansion-item dense group="preview" label="MCP ({{ preview.mcp.length }})" icon="link">
+            <q-expansion-item dense group="preview" :label="`${$t('resources.preview.mcp')} (${preview.mcp.length})`" icon="link">
               <q-markup-table flat dense>
-                <thead><tr><th>Display Name</th><th>MCP ID</th><th>Auth</th></tr></thead>
+                <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.preview.mcpId') }}</th><th>{{ $t('resources.preview.auth') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="m in preview.mcp" :key="m.mcpServerId">
                     <td>{{ m.displayName }}</td><td>{{ m.mcpServerId }}</td><td>{{ m.authOwnership }}</td>
@@ -1327,27 +1329,27 @@ onMounted(refresh)
               </q-markup-table>
             </q-expansion-item>
 
-            <q-expansion-item dense group="preview" label="Policy" icon="policy">
+            <q-expansion-item dense group="preview" :label="$t('resources.preview.policy')" icon="policy">
               <q-markup-table flat dense>
                 <tbody>
-                  <tr><td class="text-grey-7">Policy ID</td><td>{{ preview.policy.policyId }}</td></tr>
-                  <tr><td class="text-grey-7">Allow local providers</td><td>{{ preview.policy.allowLocalProviders }}</td></tr>
-                  <tr><td class="text-grey-7">Allow local TTS</td><td>{{ preview.policy.allowLocalTts }}</td></tr>
-                  <tr><td class="text-grey-7">Allow local ASR</td><td>{{ preview.policy.allowLocalAsr }}</td></tr>
-                  <tr><td class="text-grey-7">Allow local MCP</td><td>{{ preview.policy.allowLocalMcp }}</td></tr>
-                  <tr><td class="text-grey-7">Default Model</td><td>{{ preview.policy.defaultModelId ?? '—' }}</td></tr>
-                  <tr><td class="text-grey-7">Default TTS</td><td>{{ preview.policy.defaultTtsId ?? '—' }}</td></tr>
-                  <tr><td class="text-grey-7">Default ASR</td><td>{{ preview.policy.defaultAsrId ?? '—' }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.policy.policyId') }}</td><td>{{ preview.policy.policyId }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalProviders') }}</td><td>{{ preview.policy.allowLocalProviders }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalTts') }}</td><td>{{ preview.policy.allowLocalTts }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalAsr') }}</td><td>{{ preview.policy.allowLocalAsr }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalMcp') }}</td><td>{{ preview.policy.allowLocalMcp }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultModel') }}</td><td>{{ preview.policy.defaultModelId ?? '—' }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultTts') }}</td><td>{{ preview.policy.defaultTtsId ?? '—' }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultAsr') }}</td><td>{{ preview.policy.defaultAsrId ?? '—' }}</td></tr>
                 </tbody>
               </q-markup-table>
             </q-expansion-item>
           </q-card-section>
           <q-card-actions align="right">
-            <q-btn flat label="Close" v-close-popup />
+            <q-btn flat :label="$t('common.close')" v-close-popup />
           </q-card-actions>
         </q-card>
       </q-dialog>
     </template>
-    <div v-else class="text-body2 text-grey-7">No draft loaded.</div>
+    <div v-else class="text-body2 text-grey-7">{{ $t('resources.noDraft') }}</div>
   </q-page>
 </template>

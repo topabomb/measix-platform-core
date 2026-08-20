@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import PricingPanel from './PricingPanel.vue'
+
+const { t: $t } = useI18n()
 
 type UsageSummary = components['schemas']['UsageSummary']
 type RequestUsagePage = components['schemas']['RequestUsagePage']
@@ -31,14 +34,14 @@ const statuses = ['SUCCESS', 'ERROR', 'BLOCKED']
 const completenesses = ['EXACT', 'PARTIAL', 'UNKNOWN']
 const activeFilters = computed(() => {
   const parts: string[] = []
-  if (fromISO.value) parts.push(`from ${fromISO.value}`)
-  if (toISO.value) parts.push(`to ${toISO.value}`)
-  if (userId.value) parts.push(`user ${userId.value}`)
-  if (resourceId.value) parts.push(`resource ${resourceId.value}`)
-  if (resourceKind.value) parts.push(`kind ${resourceKind.value}`)
-  if (upstreamId.value) parts.push(`upstream ${upstreamId.value}`)
+  if (fromISO.value) parts.push(`${$t('usage.filters.time')} ${fromISO.value}`)
+  if (toISO.value) parts.push(`${$t('usage.filters.time')} ${toISO.value}`)
+  if (userId.value) parts.push(`${$t('usage.filters.user')} ${userId.value}`)
+  if (resourceId.value) parts.push(`${$t('usage.filters.resource')} ${resourceId.value}`)
+  if (resourceKind.value) parts.push(`${$t('usage.filters.resourceKind')} ${resourceKind.value}`)
+  if (upstreamId.value) parts.push(`${$t('usage.filters.upstream')} ${upstreamId.value}`)
   if (status.value) parts.push(status.value)
-  if (completeness.value) parts.push(`completeness ${completeness.value}`)
+  if (completeness.value) parts.push(`${$t('usage.filters.completeness')} ${completeness.value}`)
   return parts
 })
 
@@ -149,7 +152,7 @@ const costLabel = computed(() => {
   if (cost.status === 'KNOWN' || cost.status === 'PARTIAL') {
     return `${cost.amount ?? '0'} ${cost.currency ?? ''}`.trim()
   }
-  return 'unknown'
+  return $t('common.unknown').toLowerCase()
 })
 
 const costStatus = computed(() => summary.value?.cost.status ?? 'UNKNOWN')
@@ -183,9 +186,9 @@ function costStatusColor(status: string): string {
 
 function costStatusLabel(status: string): string {
   switch (status) {
-    case 'KNOWN': return 'Known'
-    case 'PARTIAL': return 'Partial'
-    default: return 'Unknown'
+    case 'KNOWN': return $t('usage.costKnown')
+    case 'PARTIAL': return $t('usage.costPartial')
+    default: return $t('usage.costUnknown')
   }
 }
 
@@ -205,14 +208,14 @@ onMounted(refresh)
 
 <template>
   <q-page padding>
-    <PageHeader title="Usage" subtitle="Aggregate usage summary, per-request ledger and pricing.">
+    <PageHeader :title="$t('usage.title')" :subtitle="$t('usage.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
       </template>
     </PageHeader>
     <q-tabs v-model="activeTab" class="q-mb-md" dense align="left">
-      <q-tab name="summary" label="Summary" icon="insights" />
-      <q-tab name="pricing" label="Pricing" icon="sell" />
+      <q-tab name="summary" :label="$t('usage.summary')" icon="insights" />
+      <q-tab name="pricing" :label="$t('pricing.title')" icon="sell" />
     </q-tabs>
 
     <template v-if="activeTab === 'pricing'">
@@ -220,26 +223,26 @@ onMounted(refresh)
     </template>
 
     <div v-else class="row items-center q-gutter-sm q-mb-md flex-wrap">
-      <q-input v-model="fromISO" outlined dense label="From" placeholder="2026-08-01T00:00:00Z" style="width: 190px" />
-      <q-input v-model="toISO" outlined dense label="To" placeholder="2026-08-31T23:59:59Z" style="width: 190px" />
-      <q-btn-dropdown dense flat label="Range" :no-icon-animation="true" class="q-px-xs">
+      <q-input v-model="fromISO" outlined dense :label="$t('usage.filters.time')" placeholder="2026-08-01T00:00:00Z" style="width: 190px" />
+      <q-input v-model="toISO" outlined dense :label="$t('usage.filters.time')" placeholder="2026-08-31T23:59:59Z" style="width: 190px" />
+      <q-btn-dropdown dense flat :label="$t('usage.filters.time')" :no-icon-animation="true" class="q-px-xs">
         <q-list>
-          <q-item clickable v-close-popup @click="applyRange(1)"><q-item-section>Last 24 hours</q-item-section></q-item>
-          <q-item clickable v-close-popup @click="applyRange(7)"><q-item-section>Last 7 days</q-item-section></q-item>
-          <q-item clickable v-close-popup @click="applyRange(30)"><q-item-section>Last 30 days</q-item-section></q-item>
+          <q-item clickable v-close-popup @click="applyRange(1)"><q-item-section>{{ $t('usage.range24h') }}</q-item-section></q-item>
+          <q-item clickable v-close-popup @click="applyRange(7)"><q-item-section>{{ $t('usage.range7d') }}</q-item-section></q-item>
+          <q-item clickable v-close-popup @click="applyRange(30)"><q-item-section>{{ $t('usage.range30d') }}</q-item-section></q-item>
         </q-list>
       </q-btn-dropdown>
-      <q-input v-model="userId" outlined dense label="User ID" placeholder="usr_..." style="width: 160px" />
-      <q-input v-model="resourceId" outlined dense label="Resource ID" placeholder="mdl_..." style="width: 170px" />
-      <q-select v-model="resourceKind" outlined dense label="Kind" :options="resourceKinds" clearable style="width: 150px" />
-      <q-input v-model="upstreamId" outlined dense label="Upstream ID" placeholder="ups_..." style="width: 170px" />
-      <q-select v-model="status" outlined dense label="Status" :options="statuses" clearable style="width: 130px" />
-      <q-select v-model="completeness" outlined dense label="Completeness" :options="completenesses" clearable style="width: 150px" />
-      <q-btn flat dense icon="filter_alt_off" label="Reset" :disable="!activeFilters.length" @click="resetFilters" />
+      <q-input v-model="userId" outlined dense :label="$t('usage.filters.user')" placeholder="usr_..." style="width: 160px" />
+      <q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." style="width: 170px" />
+      <q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable style="width: 150px" />
+      <q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." style="width: 170px" />
+      <q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable style="width: 130px" />
+      <q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable style="width: 150px" />
+      <q-btn flat dense icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" />
     </div>
     <q-banner v-if="activeFilters.length" class="q-mb-md bg-grey-2 rounded-borders">
       <div class="row items-center q-gutter-sm">
-        <span class="text-caption text-grey-7">Active filters:</span>
+        <span class="text-caption text-grey-7">{{ $t('usage.filters.active') }}:</span>
         <q-chip v-for="f in activeFilters" :key="f" dense>{{ f }}</q-chip>
       </div>
     </q-banner>
@@ -251,43 +254,43 @@ onMounted(refresh)
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
-              <div class="text-caption text-grey-7">Requests</div>
+              <div class="text-caption text-grey-7">{{ $t('usage.requests') }}</div>
               <div class="text-h5">{{ summary.requestCount }}</div>
-              <div class="text-caption">forwarded {{ summary.forwardedRequestCount }}</div>
+              <div class="text-caption">{{ $t('usage.detail.forwarded') }} {{ summary.forwardedRequestCount }}</div>
             </q-card-section>
           </q-card>
         </div>
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
-              <div class="text-caption text-grey-7">Bytes</div>
+              <div class="text-caption text-grey-7">{{ $t('usage.bytes') }}</div>
               <div class="text-h5">{{ fmtBytes(summary.requestBytes) }}</div>
-              <div class="text-caption">resp {{ fmtBytes(summary.responseBytes) }}</div>
+              <div class="text-caption">{{ $t('usage.responseBytes') }} {{ fmtBytes(summary.responseBytes) }}</div>
             </q-card-section>
           </q-card>
         </div>
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
-              <div class="text-caption text-grey-7">Cost</div>
+              <div class="text-caption text-grey-7">{{ $t('overview.costStatus') }}</div>
               <div class="text-h5">{{ costLabel }}</div>
-              <q-chip dense :color="costStatusColor(costStatus)" :label="`cost ${costStatus}`" text-color="white" />
+              <q-chip dense :color="costStatusColor(costStatus)" :label="`${$t('overview.costStatus').toLowerCase()} ${costStatus}`" text-color="white" />
             </q-card-section>
           </q-card>
         </div>
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
-              <div class="text-caption text-grey-7">Blocked</div>
+              <div class="text-caption text-grey-7">{{ $t('usage.blocked') }}</div>
               <div class="text-h5">{{ blockedCount }}</div>
-              <div class="text-caption">not forwarded (denied/admission)</div>
+              <div class="text-caption">{{ $t('usage.blockedHint') }}</div>
             </q-card-section>
           </q-card>
         </div>
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
-              <div class="text-caption text-grey-7">Semantic meters by kind</div>
+              <div class="text-caption text-grey-7">{{ $t('usage.semanticMetersByKind') }}</div>
               <template v-for="group in semanticMetersByKind" :key="group.kind">
                 <div class="q-mt-sm">
                   <q-chip dense :color="group.color" text-color="white" :label="group.kind" />
@@ -298,19 +301,19 @@ onMounted(refresh)
                   </q-chip>
                 </div>
               </template>
-              <div v-if="!semanticMeters.length" class="text-body2 text-grey-7">none</div>
-              <div class="text-caption text-grey-7 q-mt-xs">UNKNOWN meters are not shown as 0.</div>
+              <div v-if="!semanticMeters.length" class="text-body2 text-grey-7">{{ $t('common.none') }}</div>
+              <div class="text-caption text-grey-7 q-mt-xs">{{ $t('usage.unknownMetersHint') }}</div>
             </q-card-section>
           </q-card>
         </div>
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
-              <div class="text-caption text-grey-7">Usage completeness</div>
+              <div class="text-caption text-grey-7">{{ $t('overview.usageCompleteness') }}</div>
               <div class="row q-gutter-xs items-center">
-                <q-chip dense color="green" text-color="white">{{ completenessCounts.EXACT }} exact</q-chip>
-                <q-chip dense color="amber" text-color="white">{{ completenessCounts.PARTIAL }} partial</q-chip>
-                <q-chip dense color="grey" text-color="white">{{ completenessCounts.UNKNOWN }} unknown</q-chip>
+                <q-chip dense color="green" text-color="white">{{ completenessCounts.EXACT }} {{ $t('status.EXACT').toLowerCase() }}</q-chip>
+                <q-chip dense color="amber" text-color="white">{{ completenessCounts.PARTIAL }} {{ $t('status.PARTIAL').toLowerCase() }}</q-chip>
+                <q-chip dense color="grey" text-color="white">{{ completenessCounts.UNKNOWN }} {{ $t('status.UNKNOWN').toLowerCase() }}</q-chip>
               </div>
             </q-card-section>
           </q-card>
@@ -319,7 +322,7 @@ onMounted(refresh)
     </template>
 
     <q-card flat bordered>
-      <q-card-section><div class="text-subtitle2">Requests</div></q-card-section>
+      <q-card-section><div class="text-subtitle2">{{ $t('usage.requests') }}</div></q-card-section>
       <q-list separator>
         <q-item v-for="req in requests" :key="req.requestId" clickable @click="openDetail(req)">
           <q-item-section>
@@ -335,13 +338,13 @@ onMounted(refresh)
           </q-item-section>
           <q-item-section side>
             <div class="row items-center q-gutter-sm">
-              <q-chip dense :color="req.forwarded ? 'green-2' : 'orange-2'">{{ req.forwarded ? 'forwarded' : 'blocked' }}</q-chip>
+              <q-chip dense :color="req.forwarded ? 'green-2' : 'orange-2'">{{ req.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }}</q-chip>
               <q-chip dense :class="req.httpStatus >= 400 ? 'text-negative' : 'text-grey-8'">{{ req.httpStatus }}</q-chip>
-              <q-chip v-if="req.upstreamHttpStatus" dense :class="req.upstreamHttpStatus >= 400 ? 'text-negative' : 'text-grey-8'">up {{ req.upstreamHttpStatus }}</q-chip>
+              <q-chip v-if="req.upstreamHttpStatus" dense :class="req.upstreamHttpStatus >= 400 ? 'text-negative' : 'text-grey-8'">{{ $t('usage.detail.upstream') }} {{ req.upstreamHttpStatus }}</q-chip>
             </div>
           </q-item-section>
         </q-item>
-        <q-item v-if="!requests.length"><q-item-section class="text-grey-7">No usage requests recorded.</q-item-section></q-item>
+        <q-item v-if="!requests.length"><q-item-section class="text-grey-7">{{ $t('usage.noRequests') }}</q-item-section></q-item>
       </q-list>
     </q-card>
 
@@ -349,39 +352,39 @@ onMounted(refresh)
     <q-dialog v-model="detailOpen">
       <q-card style="min-width: 640px; max-width: 95vw">
         <q-card-section>
-          <div class="text-h6">Request detail</div>
+          <div class="text-h6">{{ $t('usage.detail.title') }}</div>
           <div class="text-caption text-grey-7">{{ selectedRequest?.requestId }}</div>
         </q-card-section>
         <q-card-section v-if="selectedRequest">
           <q-markup-table flat dense>
             <tbody>
-              <tr><td class="text-grey-7">Request</td><td>{{ selectedRequest.requestId }}</td></tr>
-              <tr v-if="selectedRequest.interactionId"><td class="text-grey-7">Interaction</td><td>{{ selectedRequest.interactionId }}</td></tr>
-              <tr v-if="selectedRequest.userId"><td class="text-grey-7">User</td><td>{{ selectedRequest.userId }}</td></tr>
-              <tr v-if="selectedRequest.deviceId"><td class="text-grey-7">Device</td><td>{{ selectedRequest.deviceId }}</td></tr>
-              <tr><td class="text-grey-7">Resource</td><td>{{ selectedRequest.resourceId }}</td></tr>
-              <tr><td class="text-grey-7">Upstream</td><td>{{ selectedRequest.upstreamId }}</td></tr>
-              <tr><td class="text-grey-7">Runtime route</td><td>{{ selectedRequest.runtimeRouteId }}</td></tr>
-              <tr><td class="text-grey-7">Generation</td><td>generation {{ selectedRequest.managedGeneration }}</td></tr>
-              <tr><td class="text-grey-7">Control revision</td><td>{{ selectedRequest.controlRevision }}</td></tr>
-              <tr><td class="text-grey-7">Status</td><td>{{ selectedRequest.forwarded ? 'forwarded' : 'blocked' }} · {{ selectedRequest.httpStatus }} <template v-if="selectedRequest.upstreamHttpStatus">· upstream {{ selectedRequest.upstreamHttpStatus }}</template></td></tr>
-              <tr><td class="text-grey-7">Duration</td><td>{{ selectedRequest.durationMs }} ms</td></tr>
-              <tr><td class="text-grey-7">Bytes</td><td>{{ fmtBytes(selectedRequest.requestBytes) }} in · {{ fmtBytes(selectedRequest.responseBytes) }} out</td></tr>
-              <tr v-if="selectedRequest.errorClass"><td class="text-grey-7">Error class</td><td><q-chip dense color="negative" text-color="white">{{ selectedRequest.errorClass }}</q-chip></td></tr>
+              <tr><td class="text-grey-7">{{ $t('usage.detail.requestId') }}</td><td>{{ selectedRequest.requestId }}</td></tr>
+              <tr v-if="selectedRequest.interactionId"><td class="text-grey-7">{{ $t('usage.detail.interactionId') }}</td><td>{{ selectedRequest.interactionId }}</td></tr>
+              <tr v-if="selectedRequest.userId"><td class="text-grey-7">{{ $t('usage.detail.user') }}</td><td>{{ selectedRequest.userId }}</td></tr>
+              <tr v-if="selectedRequest.deviceId"><td class="text-grey-7">{{ $t('usage.detail.device') }}</td><td>{{ selectedRequest.deviceId }}</td></tr>
+              <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td>{{ selectedRequest.resourceId }}</td></tr>
+              <tr><td class="text-grey-7">{{ $t('usage.detail.upstream') }}</td><td>{{ selectedRequest.upstreamId }}</td></tr>
+              <tr><td class="text-grey-7">{{ $t('usage.detail.runtimeRoute') }}</td><td>{{ selectedRequest.runtimeRouteId }}</td></tr>
+              <tr><td class="text-grey-7">{{ $t('usage.detail.generation') }}</td><td>{{ $t('releases.generation') }} {{ selectedRequest.managedGeneration }}</td></tr>
+              <tr><td class="text-grey-7">{{ $t('overview.desiredRevision') }}</td><td>{{ selectedRequest.controlRevision }}</td></tr>
+              <tr><td class="text-grey-7">{{ $t('common.status') }}</td><td>{{ selectedRequest.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }} · {{ selectedRequest.httpStatus }} <template v-if="selectedRequest.upstreamHttpStatus">· {{ $t('usage.detail.upstream') }} {{ selectedRequest.upstreamHttpStatus }}</template></td></tr>
+              <tr><td class="text-grey-7">{{ $t('usage.detail.duration') }}</td><td>{{ selectedRequest.durationMs }} ms</td></tr>
+              <tr><td class="text-grey-7">{{ $t('usage.bytes') }}</td><td>{{ fmtBytes(selectedRequest.requestBytes) }} in · {{ fmtBytes(selectedRequest.responseBytes) }} out</td></tr>
+              <tr v-if="selectedRequest.errorClass"><td class="text-grey-7">{{ $t('usage.errorClass') }}</td><td><q-chip dense color="negative" text-color="white">{{ selectedRequest.errorClass }}</q-chip></td></tr>
             </tbody>
           </q-markup-table>
-          <div class="text-caption text-grey-7 q-mt-sm">Semantic meters, usage completeness and cost are shown at the summary level. Prompt/body/Secret content is never exposed.</div>
+          <div class="text-caption text-grey-7 q-mt-sm">{{ $t('usage.detail.secretHint') }}</div>
 
           <!-- Cost completeness for this request's kind -->
-          <div class="text-subtitle2 q-mt-md">Cost & Usage completeness</div>
+          <div class="text-subtitle2 q-mt-md">{{ $t('overview.costStatus') }} & {{ $t('overview.usageCompleteness') }}</div>
           <div class="row items-center q-gutter-sm q-mt-xs">
             <q-chip dense :color="costStatusColor(costStatus)" text-color="white" :label="costStatusLabel(costStatus)" />
-            <q-chip dense :color="costStatusColor(selectedRequest.forwarded ? 'KNOWN' : 'UNKNOWN')" text-color="white" :label="selectedRequest.forwarded ? 'forwarded' : 'blocked'" />
-            <span class="text-caption text-grey-7">UNKNOWN cost means no reliable semantic meter; it is not zero cost.</span>
+            <q-chip dense :color="costStatusColor(selectedRequest.forwarded ? 'KNOWN' : 'UNKNOWN')" text-color="white" :label="selectedRequest.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase()" />
+            <span class="text-caption text-grey-7">{{ $t('usage.costUnknownHint') }}</span>
           </div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="Close" v-close-popup />
+          <q-btn flat :label="$t('common.close')" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>

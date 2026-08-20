@@ -1,6 +1,6 @@
 import { defineConfig } from '@quasar/app-vite/wrappers'
 export default defineConfig(() => ({
-  boot: ['api'],
+  boot: ['i18n', 'api'],
   css: ['app.css'],
   extras: [
     'material-icons',

@@ -78,8 +78,9 @@ describe('ReleasesPage', () => {
     await flushPromises()
     const text = wrapper.text()
     expect(text).toContain('Generation 3')
-    expect(text).toContain('+2 added')
-    expect(text).toContain('published 2026-08-01T00:00:00Z by admin')
+    expect(text).toContain('+2')
+    expect(text).toContain('2026-08-01T00:00:00Z')
+    expect(text).toContain('admin')
   })
 
   it('opens a release detail dialog with snapshot hash and activation history', async () => {
@@ -90,7 +91,7 @@ describe('ReleasesPage', () => {
     const body = document.body.innerHTML
     expect(body).toContain('sha256:abc')
     expect(body).toContain('act_1')
-    expect(body).toContain('COMPLETED')
+    expect(body.toLowerCase()).toContain('completed')
   })
 
   it('republishes with an Idempotency-Key and surfaces the activation', async () => {

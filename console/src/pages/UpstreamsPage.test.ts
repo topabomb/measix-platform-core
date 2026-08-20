@@ -145,12 +145,12 @@ describe('UpstreamsPage', () => {
     await createUpstreamBtn!.trigger('click')
     await flushPromises()
 
-    const authSelect = wrapper.findAllComponents(QSelect).find((s) => (s.props('label') ?? '') === 'Auth type')
+    const authSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label') ?? '').includes('Auth'))
     expect(authSelect).toBeTruthy()
     await authSelect!.setValue('BEARER')
     await flushPromises()
 
-    const secretIdInput = wrapper.findAllComponents(QInput).find((i) => (i.props('label') ?? '') === 'Secret ID')
+    const secretIdInput = wrapper.findAllComponents(QInput).find((i) => String(i.props('label') ?? '').includes('Secret reference') || String(i.props('label') ?? '').includes('Secret ID'))
     expect(secretIdInput).toBeTruthy()
     expect(secretIdInput!.props('modelValue')).toBe('sec_created')
   })

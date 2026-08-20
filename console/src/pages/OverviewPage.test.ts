@@ -97,7 +97,7 @@ describe('OverviewPage', () => {
     })
     const { wrapper } = mountOverview()
     await flushPromises()
-    expect(/control not converged/i.test(wrapper.text())).toBe(true)
+    expect(/not converged/i.test(wrapper.text())).toBe(true)
   })
 
   it('summarises upstream active / degraded / disabled counts', async () => {

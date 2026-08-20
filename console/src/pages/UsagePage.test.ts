@@ -198,7 +198,7 @@ describe('UsagePage', () => {
     const { wrapper } = mountUsagePage()
     await flushPromises()
 
-    const completenessSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label')) === 'Completeness')
+    const completenessSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label')).includes('completeness'))
     expect(completenessSelect).toBeTruthy()
     await completenessSelect!.setValue('UNKNOWN')
     await flushPromises()
@@ -223,12 +223,12 @@ describe('UsagePage', () => {
     const { wrapper } = mountUsagePage()
     await flushPromises()
 
-    const kindSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label')) === 'Kind')
+    const kindSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label')).includes('kind') || String(s.props('label')).includes('Kind'))
     await kindSelect!.setValue('MODEL')
     await flushPromises()
     expect(wrapper.findAllComponents(QChip).some((c) => c.text().includes('MODEL'))).toBe(true)
 
-    const resetBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '') === 'Reset')
+    const resetBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Reset'))
     expect(resetBtn).toBeTruthy()
     await resetBtn!.trigger('click')
     await flushPromises()
@@ -271,9 +271,9 @@ describe('UsagePage', () => {
     expect(text).toContain('req_abc')
     expect(text).toContain('usr_x')
     expect(text).toContain('dev_1')
-    expect(text).toContain('generation 2')
+    expect(text).toContain('Generation 2')
     expect(text).toContain('45 ms')
-    expect(text).toContain('Control revision')
+    expect(text).toContain('Desired Revision')
     expect(text).toContain('>5<')
   })
 

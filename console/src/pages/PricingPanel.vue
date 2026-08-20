@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import { useSessionStore } from '../stores/session'
+
+const { t: $t } = useI18n()
 
 type PricingRule = components['schemas']['PricingRule']
 type PricingSet = components['schemas']['PricingSet']
@@ -91,9 +94,9 @@ async function save() {
 
 function costStatusLabel(status: string): string {
   switch (status) {
-    case 'KNOWN': return 'Known cost'
-    case 'PARTIAL': return 'Partial cost'
-    default: return 'Unknown cost'
+    case 'KNOWN': return $t('usage.costKnown')
+    case 'PARTIAL': return $t('usage.costPartial')
+    default: return $t('usage.costUnknown')
   }
 }
 
@@ -112,15 +115,15 @@ onMounted(refresh)
   <q-card flat bordered>
     <q-card-section class="row items-center justify-between">
       <div>
-        <div class="text-subtitle2">Pricing</div>
+        <div class="text-subtitle2">{{ $t('pricing.title') }}</div>
         <div class="text-caption text-grey-7">
-          Per-meter cost rules applied to usage records. Revision {{ revision ?? '—' }}
+          {{ $t('pricing.subtitle') }} {{ $t('pricing.revision') }} {{ revision ?? '—' }}
         </div>
       </div>
       <div class="q-gutter-sm">
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
-        <q-btn outline icon="add" label="Add rule" @click="addRule" />
-        <q-btn color="primary" icon="save" label="Save" :disable="revision === undefined" :loading="saving" @click="save" />
+        <q-btn outline icon="add" :label="$t('pricing.addRule')" @click="addRule" />
+        <q-btn color="primary" icon="save" :label="$t('common.save')" :disable="revision === undefined" :loading="saving" @click="save" />
       </div>
     </q-card-section>
 
@@ -128,11 +131,11 @@ onMounted(refresh)
     <q-banner v-if="usageCost" class="bg-grey-2 q-ma-md rounded-borders">
       <div class="row items-center q-gutter-md">
         <div>
-          <div class="text-caption text-grey-7">Current cost status</div>
+          <div class="text-caption text-grey-7">{{ $t('pricing.currentCostStatus') }}</div>
           <q-chip dense :color="costStatusColor(usageCost.status)" text-color="white" :label="costStatusLabel(usageCost.status)" />
         </div>
         <div v-if="usageCost.amount" class="text-h6">{{ usageCost.amount }} {{ usageCost.currency ?? '' }}</div>
-        <div class="text-caption text-grey-7">No reliable semantic meter → Unknown. Unknown cost is not zero.</div>
+        <div class="text-caption text-grey-7">{{ $t('pricing.costUnknownHint') }}</div>
       </div>
     </q-banner>
 
@@ -145,26 +148,26 @@ onMounted(refresh)
         <q-item-section>
           <div class="row q-col-gutter-sm items-center">
             <div class="col-12 col-md-2">
-              <q-select v-model="rule.meter" dense outlined :options="METER_OPTIONS" emit-value map-options label="Meter" />
-              <div class="text-caption text-grey-7">Kind: {{ METER_KIND_MAP[rule.meter] ?? '—' }}</div>
+              <q-select v-model="rule.meter" dense outlined :options="METER_OPTIONS" emit-value map-options :label="$t('pricing.meter')" />
+              <div class="text-caption text-grey-7">{{ $t('pricing.meterKind') }}: {{ METER_KIND_MAP[rule.meter] ?? '—' }}</div>
             </div>
             <div class="col-6 col-md-2">
-              <q-input v-model="rule.resourceId" dense outlined label="Resource ID" placeholder="(global)" hint="Scope to resource" />
+              <q-input v-model="rule.resourceId" dense outlined :label="$t('pricing.resourceId')" placeholder="(global)" :hint="$t('pricing.resourceIdHint')" />
             </div>
             <div class="col-6 col-md-2">
-              <q-input v-model="rule.upstreamId" dense outlined label="Upstream ID" placeholder="(all)" hint="Scope to upstream" />
+              <q-input v-model="rule.upstreamId" dense outlined :label="$t('pricing.upstreamId')" placeholder="(all)" :hint="$t('pricing.upstreamIdHint')" />
             </div>
             <div class="col-6 col-md-1">
-              <q-input v-model="rule.unitSize" dense outlined label="Unit size" />
+              <q-input v-model="rule.unitSize" dense outlined :label="$t('pricing.unitSize')" />
             </div>
             <div class="col-6 col-md-1">
-              <q-input v-model="rule.unitPrice" dense outlined label="Price" />
+              <q-input v-model="rule.unitPrice" dense outlined :label="$t('pricing.unitPrice')" />
             </div>
             <div class="col-6 col-md-1">
-              <q-input v-model="rule.currency" dense outlined label="Currency" />
+              <q-input v-model="rule.currency" dense outlined :label="$t('pricing.currency')" />
             </div>
             <div class="col-6 col-md-2">
-              <q-input v-model="rule.effectiveFrom" dense outlined label="Effective from" />
+              <q-input v-model="rule.effectiveFrom" dense outlined :label="$t('pricing.effectiveFrom')" />
             </div>
             <div class="col-12 col-md-1 text-right">
               <q-btn flat dense color="negative" icon="delete" @click="removeRule(idx)" />
@@ -174,7 +177,7 @@ onMounted(refresh)
         </q-item-section>
       </q-item>
       <q-item v-if="!rules.length">
-        <q-item-section class="text-grey-7">No pricing rules yet. Add a rule to price usage.</q-item-section>
+        <q-item-section class="text-grey-7">{{ $t('pricing.noRules') }}</q-item-section>
       </q-item>
     </q-list>
   </q-card>

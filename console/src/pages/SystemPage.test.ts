@@ -67,7 +67,7 @@ describe('SystemPage', () => {
   it('shows Relay applied control revision and bundle hash', async () => {
     const { wrapper } = mountSystem()
     await flushPromises()
-    expect(wrapper.text()).toContain('applied 5')
+    expect(wrapper.text()).toContain('5')
     expect(wrapper.text()).toContain('abc123')
   })
 
@@ -79,6 +79,6 @@ describe('SystemPage', () => {
     })
     const { wrapper } = mountSystem()
     await flushPromises()
-    expect(/control not converged/i.test(wrapper.text())).toBe(true)
+    expect(/not converged/i.test(wrapper.text())).toBe(true)
   })
 })

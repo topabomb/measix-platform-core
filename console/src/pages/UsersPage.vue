@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
@@ -8,6 +9,8 @@ import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { useActivationStore } from '../stores/activation'
 import { useSessionStore } from '../stores/session'
+
+const { t: $t } = useI18n()
 
 type User = components['schemas']['User']
 type UserPage = components['schemas']['UserPage']
@@ -103,14 +106,14 @@ async function runSecurity(path: string) {
 
 async function toggleUser() {
   if (!selected.value) return
-  const action = selected.value.status === 'ACTIVE' ? 'disable' : 'enable'
-  if (!window.confirm(`${action} ${selected.value.displayName}? Runtime enforcement is tracked as an Activation.`)) return
+  const action = selected.value.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')
+  if (!window.confirm($t('users.disableConfirm', { action, name: selected.value.displayName }))) return
   activation.resetCommand()
-  await runSecurity(`/api/admin/v1/users/${encodeURIComponent(selected.value.userId)}:${action}`)
+  await runSecurity(`/api/admin/v1/users/${encodeURIComponent(selected.value.userId)}:${action === $t('common.disable') ? 'disable' : 'enable'}`)
 }
 
 async function revokeDevice(device: Device) {
-  if (!window.confirm(`Revoke device ${device.deviceId}?`)) return
+  if (!window.confirm($t('users.revokeConfirm', { device: device.deviceId }))) return
   activation.resetCommand()
   await runSecurity(`/api/admin/v1/devices/${encodeURIComponent(device.deviceId)}:revoke`)
 }
@@ -120,15 +123,15 @@ onMounted(refresh)
 
 <template>
   <q-page padding data-cy="users-page">
-    <PageHeader title="Users" subtitle="Enterprise users, enrollment and device enforcement.">
+    <PageHeader :title="$t('users.title')" :subtitle="$t('users.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
-        <q-btn color="primary" icon="person_add" label="Create user" data-cy="create-user-btn" :disable="!canMutate" @click="createOpen = true" />
+        <q-btn color="primary" icon="person_add" :label="$t('users.createUser')" data-cy="create-user-btn" :disable="!canMutate" @click="createOpen = true" />
       </template>
     </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
     <q-banner v-if="activation.activation && !activation.succeeded" class="bg-orange-1 q-mb-md rounded-borders">
-      <div class="row items-center justify-between"><span>Security activation {{ activation.activation.activationId }}</span><StatusChip :value="activation.activation.state" /></div>
+      <div class="row items-center justify-between"><span>{{ $t('users.securityActivation', { id: activation.activation.activationId }) }}</span><StatusChip :value="activation.activation.state" /></div>
       <div v-if="activation.activation.errorCode" class="text-caption">{{ activation.activation.errorCode }}</div>
     </q-banner>
     <LoadingState v-if="loading && !users.length" />
@@ -138,21 +141,21 @@ onMounted(refresh)
           <q-item-section><q-item-label>{{ user.displayName }}</q-item-label><q-item-label caption>{{ user.username }} · {{ user.userId }}</q-item-label></q-item-section>
           <q-item-section side><div class="row items-center q-gutter-xs"><q-chip dense>{{ user.role }}</q-chip><StatusChip :value="user.status" /></div></q-item-section>
         </q-item>
-        <q-item v-if="!users.length"><q-item-section class="text-grey-7">No enterprise users.</q-item-section></q-item>
+        <q-item v-if="!users.length"><q-item-section class="text-grey-7">{{ $t('users.noUsers') }}</q-item-section></q-item>
       </q-list>
     </q-card>
 
     <q-dialog v-model="createOpen">
       <q-card style="min-width: 420px">
-        <q-card-section class="text-h6">Create user</q-card-section>
+        <q-card-section class="text-h6">{{ $t('users.createUser') }}</q-card-section>
         <q-card-section class="q-gutter-md">
-          <q-input v-model="createForm.username" outlined label="Username" data-cy="user-form-username" />
-          <q-input v-model="createForm.displayName" outlined label="Display name" data-cy="user-form-display-name" />
-          <q-select v-model="createForm.role" outlined label="Role" :options="['MEMBER','ADMIN']" />
+          <q-input v-model="createForm.username" outlined :label="$t('users.username')" data-cy="user-form-username" />
+          <q-input v-model="createForm.displayName" outlined :label="$t('users.displayName')" data-cy="user-form-display-name" />
+          <q-select v-model="createForm.role" outlined :label="$t('users.role')" :options="['MEMBER','ADMIN']" />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="Cancel" v-close-popup />
-          <q-btn color="primary" label="Create" data-cy="user-form-submit" :disable="!createForm.username.trim() || !createForm.displayName.trim()" @click="createUser" />
+          <q-btn flat :label="$t('common.cancel')" v-close-popup />
+          <q-btn color="primary" :label="$t('common.create')" data-cy="user-form-submit" :disable="!createForm.username.trim() || !createForm.displayName.trim()" @click="createUser" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -161,21 +164,21 @@ onMounted(refresh)
       <q-card v-if="selected" style="width: 760px; max-width: 95vw">
         <q-card-section class="row items-start justify-between"><div><div class="text-h6">{{ selected.displayName }}</div><div class="text-caption">{{ selected.userId }}</div></div><StatusChip :value="selected.status" /></q-card-section>
         <q-separator />
-        <q-card-section><div class="row q-gutter-sm"><q-btn outline color="primary" label="Generate enrollment" @click="createEnrollment" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? 'Disable' : 'Enable'" @click="toggleUser" /></div></q-card-section>
-        <q-card-section><div class="text-subtitle2 q-mb-sm">Devices</div><q-list bordered separator>
-          <q-item v-for="device in devices" :key="device.deviceId"><q-item-section><q-item-label>{{ device.deviceId }}</q-item-label><q-item-label caption>{{ device.appVersion ?? 'unknown app version' }} · last seen {{ device.lastSeenAt ?? 'never' }}</q-item-label></q-item-section><q-item-section side><div class="row items-center q-gutter-sm"><StatusChip :value="device.status" /><q-btn v-if="device.status !== 'REVOKED'" flat dense color="negative" label="Revoke" @click="revokeDevice(device)" /></div></q-item-section></q-item>
-          <q-item v-if="!devices.length"><q-item-section class="text-grey-7">No enrolled devices.</q-item-section></q-item>
+        <q-card-section><div class="row q-gutter-sm"><q-btn outline color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
+        <q-card-section><div class="text-subtitle2 q-mb-sm">{{ $t('users.devices') }}</div><q-list bordered separator>
+          <q-item v-for="device in devices" :key="device.deviceId"><q-item-section><q-item-label>{{ device.deviceId }}</q-item-label><q-item-label caption>{{ device.appVersion ?? $t('common.unknown') }} · {{ $t('users.lastSeen') }} {{ device.lastSeenAt ?? '—' }}</q-item-label></q-item-section><q-item-section side><div class="row items-center q-gutter-sm"><StatusChip :value="device.status" /><q-btn v-if="device.status !== 'REVOKED'" flat dense color="negative" :label="$t('users.revoke')" @click="revokeDevice(device)" /></div></q-item-section></q-item>
+          <q-item v-if="!devices.length"><q-item-section class="text-grey-7">{{ $t('users.noDevices') }}</q-item-section></q-item>
         </q-list></q-card-section>
-        <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /></q-card-actions>
+        <q-card-actions align="right"><q-btn flat :label="$t('common.close')" v-close-popup /></q-card-actions>
       </q-card>
     </q-dialog>
 
     <q-dialog v-model="enrollmentOpen" @hide="clearEnrollment">
-      <q-card v-if="enrollment" style="min-width: 440px"><q-card-section class="text-h6">Enrollment code</q-card-section><q-card-section>
-        <q-banner class="bg-amber-1 q-mb-md rounded-borders">This code is shown once. Copy it before closing.</q-banner>
-        <q-input :model-value="enrollment.code" readonly outlined label="Enrollment code"><template #append><q-btn flat dense icon="content_copy" @click="navigator.clipboard.writeText(enrollment!.code)" /></template></q-input>
-        <div class="text-caption q-mt-sm">Expires {{ enrollment.expiresAt }}</div>
-      </q-card-section><q-card-actions align="right"><q-btn color="primary" label="Done" v-close-popup /></q-card-actions></q-card>
+      <q-card v-if="enrollment" style="min-width: 440px"><q-card-section class="text-h6">{{ $t('users.enrollmentCode') }}</q-card-section><q-card-section>
+        <q-banner class="bg-amber-1 q-mb-md rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
+        <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')"><template #append><q-btn flat dense icon="content_copy" @click="navigator.clipboard.writeText(enrollment!.code)" /></template></q-input>
+        <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ enrollment.expiresAt }}</div>
+      </q-card-section><q-card-actions align="right"><q-btn color="primary" :label="$t('common.done')" v-close-popup /></q-card-actions></q-card>
     </q-dialog>
   </q-page>
 </template>

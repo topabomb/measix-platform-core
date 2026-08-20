@@ -4,7 +4,7 @@ This document defines executable-contract ownership in `measix-platform-core`. S
 
 ## 1. S0 OpenAPI surfaces
 
-The repository owns four separate OpenAPI 3.0.3 documents:
+The repository owns four OpenAPI 3.0.3 documents:
 
 ```text
 api/admin/admin.openapi.yaml
@@ -13,92 +13,59 @@ api/internal/relay-control.openapi.yaml
 api/internal/usage-ingest.openapi.yaml
 ```
 
-They are separated deliberately so Admin/Android consumers do not accidentally generate or depend on Relay-internal APIs.
+They are separated so Admin/Android consumers do not accidentally generate or depend on Relay-internal APIs.
 
 ## 2. Authority boundary
 
-Use this rule when a Markdown statement and OpenAPI detail appear to overlap:
+- architecture repository: lifecycle/state/security/error/idempotency meaning, Managed Capability profile, delivery gates and required behavior;
+- OpenAPI here: exact executable HTTP shape — method, path, required/optional fields, types, enums and request/response schema;
+- generated code: derived representation only.
 
-- architecture repository: **meaning** — lifecycle, state semantics, Managed Capability profile, security, error meaning, idempotency, delivery/Exit gates and required behavior;
-- OpenAPI here: **exact executable shape** — method, path, required/optional fields, types, enum values, request/response schema;
-- generated code: derived consumer representation only.
-
-If an exact schema choice would change architecture meaning, it is not a local OpenAPI detail; resolve architecture first.
+If an exact schema choice can change client interpretation, resolve architecture first.
 
 ## 3. Current S0.1 contract state
 
-The current delivery target is S0.1 Managed Capability Delivery. Until the architecture-defined S0.1 Client Contract Freeze Gate passes, the Client Control OpenAPI and Snapshot v1 are **pre-freeze executable contracts**.
+The current target is S0.1 Managed Capability Delivery. Until C7 passes, Client Control OpenAPI and Snapshot v1 are **pre-freeze executable contracts**.
 
-This has two practical consequences:
-
-1. current code/tests may prove earlier S0 Core semantics without proving the final S0.1 Android-facing contract is complete;
-2. architecture-approved S0.1 schema corrections must be implemented here before Android S0.2 begins, together with fixtures, generated artifacts and executable tests.
-
-The exact required S0.1 Managed Capability profiles and fields are owned by:
+Architecture-approved S0.1 corrections must be implemented here before Android S0.2 begins, together with fixtures, generated artifacts and executable tests. Do not duplicate the complete required field/enum list in this document; use:
 
 - `measix-s0-capability-delivery-contract-spec.md`;
 - `measix-s0-control-protocol.md`;
-- relevant component specs in `topabomb/measix-architecture`.
+- relevant component/product/testing specs.
 
-Do not duplicate their enum/field lists in this document. `docs/s0-execution-progress.md` records the current implementation gaps against that authority.
+Current implementation gaps are recorded only in `docs/s0-execution-progress.md`.
 
 ## 4. Canonical fixtures
 
-Cross-component fixtures live only under:
+Cross-component fixtures live only under `api/fixtures/` and must cover valid representative payloads, required invalid/strict-decoding cases, forward-compatible response behavior, deterministic Snapshot/RuntimeControl canonicalization and all S0.1 required Managed Capability profiles.
 
-```text
-api/fixtures/
-├── problem/
-├── identity/
-├── managed-state/
-├── draft/
-├── snapshot/
-├── runtime-control/
-└── usage/
-```
-
-The fixture taxonomy may grow with implemented S0 contracts, but consumers must not create divergent private copies of the same wire truth.
-
-Required fixture qualities:
-
-- valid minimal and representative payloads;
-- invalid request unknown-field samples where required by contract;
-- response samples containing unknown optional fields for forward compatibility;
-- deterministic Snapshot/RuntimeControl canonicalization/hash golden data;
-- S0.1 representative fixtures for every required Managed Capability profile before freeze;
-- no production credential or user data.
-
-Fixtures change in the same commit as the OpenAPI change they represent.
+Fixtures change in the same commit as the executable contract they represent. They must never contain production credentials or user data.
 
 ## 5. Code generation
 
-Expected consumers:
+Expected consumers include:
 
 - Go server/client types for Hub/Relay surfaces;
 - TypeScript Admin API types;
 - deterministic Android Client wire generation/export from `client-control.openapi.yaml`.
 
-Generator configuration/version is repository-controlled and reproducible. Generated files contain a clear generated marker and are not manually edited.
-
-CI must be able to regenerate from a clean checkout and fail on unexpected drift.
+Generator configuration/version is repository-controlled and reproducible. Generated files are never manually edited. CI must regenerate or verify from a clean checkout and fail on drift.
 
 ## 6. Contract-change workflow
 
 ### Semantic wire change
 
 ```text
-architecture contract change
+architecture authority
 → OpenAPI
 → fixtures
 → generated artifacts
 → component tests
-→ affected S0.1/S0.2/T3/T4 tests
-→ affected external consumer repository
+→ affected T3/T4.1/S0.2 tests
+→ downstream consumer when applicable
 ```
 
 ### Non-semantic completion
-
-For a detail that architecture intentionally leaves to executable schema and that does not change meaning:
 
 ```text
 OpenAPI + fixture
@@ -107,52 +74,56 @@ OpenAPI + fixture
 → consumers
 ```
 
-If implementation discovers that clients could reasonably interpret the detail in incompatible ways, treat it as semantic and return to architecture.
+If implementation discovers that reasonable clients could interpret the detail differently, it is semantic and must return to architecture.
 
 ## 7. S0.1 Client Contract Freeze
 
-The S0.1 freeze is an executable milestone, not a Markdown declaration.
+Freeze is an executable milestone, not a Markdown declaration.
 
-Before S0.2 Android implementation starts, this repository must have:
+Before S0.2 starts, the exact candidate must have:
 
-- Client/Admin/Internal OpenAPI aligned with the merged S0.1 architecture baseline;
-- canonical fixtures for all Android-visible Snapshot resource kinds and policy behavior;
+- Client/Admin/Internal OpenAPI aligned with the pinned S0.1 architecture baseline;
+- canonical fixtures for every Android-visible Snapshot resource/policy behavior;
 - deterministic generation/drift checks Green;
-- Snapshot preview compiled from the same canonical projection as Release Snapshot;
-- deterministic S0.1 system-gate evidence;
+- Snapshot Preview compiled from the same canonical projection as Release Snapshot;
+- required S0.1 deterministic/product system evidence;
 - required real Adapter qualification evidence;
-- a freeze manifest that pins the architecture commit, platform-core commit, Client OpenAPI hash, canonical fixture hash and Snapshot schema version.
+- the architecture-defined machine-readable Freeze manifest.
 
-After that manifest is produced, the pinned Client OpenAPI/fixture set is the S0.2 handoff input. An incompatible Android-visible change cannot silently mutate the frozen v1 contract; follow the compatibility/versioning semantics defined by architecture and create a new freeze candidate.
+The complete manifest evidence contract belongs to `measix-s0-capability-delivery-system-testing-spec.md` and `docs/release.md`; this document intentionally does **not** maintain a second partial field list.
+
+A placeholder or stale `docs/s0-freeze-manifest.json` is invalid. The file may be generated only by a successful C7 candidate verification on the exact candidate SHA.
+
+After freeze, an incompatible Android-visible change cannot silently mutate frozen v1. Follow architecture compatibility/versioning semantics and create a new freeze candidate.
 
 ## 8. Compatibility rules
 
-S0 contract tests must preserve architecture rules including:
+S0 contract tests preserve architecture rules including:
 
-- clients tolerate newly added unknown optional response fields;
-- undeclared request fields are rejected where the S0 protocol requires strict request decoding;
+- clients tolerate added unknown optional response fields;
+- undeclared request fields are rejected where strict request decoding is required;
 - programs branch on HTTP status + stable Problem `code`, not human `detail` text;
 - stable identifier format/ownership is not redefined by generated DTOs;
 - internal APIs never leak into Android/Admin generated clients;
-- `runtimeRouteId`, Upstream internal URL and Secret material never enter the Client Snapshot;
-- unsupported/future client protocol behavior is explicit rather than silent fallback.
+- `runtimeRouteId`, Upstream internal/base URL and Secret material never enter Client Snapshot;
+- unsupported/future protocol behavior is explicit rather than silent fallback.
 
 ## 9. Review requirements
 
-An OpenAPI PR must answer:
+An OpenAPI change must identify:
 
-1. which architecture requirement it implements;
+1. owning architecture requirement;
 2. whether semantics changed;
-3. whether the change is pre-freeze S0.1 work or modifies an already frozen handoff;
-4. which fixtures changed;
-5. which generated consumers changed;
-6. which T0/T1/T2/T3/T4 or `CAP-*` lanes are affected;
-7. whether Android synchronization is required;
-8. whether the change is backward-compatible for existing/frozen S0 clients.
+3. pre-freeze vs frozen-contract impact;
+4. fixtures changed;
+5. generated consumers changed;
+6. affected T0/T1/T2/T3/T4.1/S0.2 lanes;
+7. Android synchronization impact;
+8. backward compatibility.
 
-## 10. CI gate
+## 10. T0 contract gate
 
-The T0 contract gate must include or evolve to include:
+The T0 gate must include or evolve to include:
 
 ```text
 OpenAPI parse/validation
@@ -165,4 +136,4 @@ Admin production typecheck against generated API types
 Android export/generation compatibility for client-control contract
 ```
 
-S0.1 adds a freeze check that computes and records the Client OpenAPI/fixture identities used by the handoff manifest. The implementation tooling may split these into jobs, but the required PR aggregate gate must always report a result for every PR.
+Freeze identity generation is a candidate/C7 concern and must not be confused with ordinary pre-freeze contract drift checks.

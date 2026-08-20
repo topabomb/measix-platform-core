@@ -208,4 +208,60 @@ describe('UpstreamsPage', () => {
     const createCall = fetchSpy.mock.calls.find((c) => c[0] === '/api/admin/v1/upstreams' && c[1]?.method === 'POST')
     expect(createCall).toBeDefined()
   })
+
+  it('tests connection on an upstream detail and shows the result', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    const testResult = { reachable: true, statusCode: 200, latencyMs: 45 }
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.startsWith('/api/admin/v1/upstreams') && !path.includes(':')) return { items: [{ upstreamId: 'ups_test', name: 'OpenAI', configRevision: 1, status: 'ACTIVE' }], nextCursor: undefined }
+      if (path.includes(':test')) return testResult
+      return {}
+    })
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    // Open the upstream detail row.
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+
+    const btns = wrapper.findAllComponents(QBtn)
+    const testBtn = btns.find((b) => String(b.props('label') ?? '') === 'Test connection')
+    expect(testBtn).toBeTruthy()
+    await testBtn!.trigger('click')
+    await flushPromises()
+
+    const testCall = fetchSpy.mock.calls.find((c) => c[0].includes(':test'))
+    expect(testCall).toBeTruthy()
+    expect(testCall![1]!.method).toBe('POST')
+  })
+
+  it('applies an upstream with an Idempotency-Key and surfaces the activation', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.startsWith('/api/admin/v1/upstreams') && !path.includes(':')) return { items: [{ upstreamId: 'ups_test', name: 'OpenAI', configRevision: 1, status: 'INACTIVE' }], nextCursor: undefined }
+      if (path.includes(':apply')) {
+        return { activationId: 'act_001', kind: 'RUNTIME_CONFIG', state: 'COMPLETED', desiredControlRevision: 2 }
+      }
+      return {}
+    })
+    window.confirm = vi.fn(() => true)
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+
+    const btns = wrapper.findAllComponents(QBtn)
+    const applyBtn = btns.find((b) => String(b.props('label') ?? '').includes('Apply'))
+    expect(applyBtn).toBeTruthy()
+    await applyBtn!.trigger('click')
+    await flushPromises()
+
+    const applyCall = fetchSpy.mock.calls.find((c) => c[0].includes(':apply'))
+    expect(applyCall).toBeTruthy()
+    expect((applyCall![1] as RequestInit).headers).toHaveProperty('Idempotency-Key')
+    expect(wrapper.text()).toContain('act_001')
+  })
 })

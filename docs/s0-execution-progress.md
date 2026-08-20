@@ -209,22 +209,25 @@ pkg/platformid           — ok
 ### 前端 Vitest（全部 Green）
 
 ```text
-12 test files, 51 tests, all passed
+13 test files, 56 tests, all passed
   src/api/client.test.ts          → 1 test
   src/api/workflow.test.ts        → 3 tests
   src/router/navigation.test.ts   → 3 tests
   src/stores/workflows.test.ts    → 6 tests
   src/layouts/AdminLayout.test.ts → 3 tests
   src/pages/LoginPage.test.ts     → 2 tests
-  src/pages/UpstreamsPage.test.ts → 3 tests
+  src/pages/UpstreamsPage.test.ts → 5 tests
   src/pages/ResourcesPage.test.ts → 10 tests
   src/pages/UsagePage.test.ts     → 12 tests
   src/pages/PricingPanel.test.ts  → 3 tests
   src/pages/OverviewPage.test.ts  → 3 tests
   src/pages/SystemPage.test.ts    → 2 tests
+  src/pages/ReleasesPage.test.ts  → 3 tests
 ```
 
 `tsc --noEmit` — 无类型错误；`quasar build` production dist/spa 构建成功
+
+Backend：hub + system 共 13 个测试包全 `ok`（含 runtimecontrol apply/republish、usage summary/pricing-set 新增）；`go vet`、`go build ./...` 干净。
 
 ## 契约与管理
 
@@ -266,6 +269,28 @@ pkg/platformid           — ok
    - `PUT /api/admin/v1/pricing` 提交，携带 `expectedPricingRevision` 实现乐观并发，成功后以服务端返回的 revision/rules 为准
    - 对 `rules` 空数组做防御处理（`?? []`），避免渲染崩溃
 3. 新增/更新测试：UsagePage 6 tests、PricingPanel 3 tests；console 共 **10 files / 40 tests** 全 Green；`tsc --noEmit`、production build 全 Green
+
+### C0–C5 测试覆盖补齐（TDD，纯测试为主，无业务代码改动）
+
+针对 C0–C5 安全/核心覆盖审计发现的真实缺口，逐项补齐测试（代码均已有实现，仅补测试证明契约）：
+
+1. **C1 ApplyUpstream**（`runtimecontrol/apply_upstream_test.go`，3 tests）：
+   - HUB-APLY-001 候选→Relay ACK→active revision + READY 闭环
+   - HUB-APLY-002 幂等重放不产生第二个 RUNTIME_CONFIG activation
+   - HUB-APLY-003 未知 upstream 干净失败
+2. **C3 Republish**（`runtimecontrol/republish_test.go`，2 tests）：
+   - HUB-RPBL-001 历史 release republish → 新 release + 新 generation + 唯一 ACTIVE
+   - HUB-RPBL-002 未知 release 干净失败
+3. **C5 Summary 聚合**（`usage/summary_test.go`，2 tests）：
+   - HUB-SUM-001 请求数/字节 + semantic meters EXACT/PARTIAL/UNKNOWN 聚合 + cost UNKNOWN
+   - HUB-SUM-002 completeness filter + 时间范围 + 反序范围 ErrInvalidBatch
+4. **C5 ReplacePricingSet**（`usage/replace_pricing_set_test.go`，2 tests + 7 subtests）：
+   - HUB-PRS-001 整集原子替换 + 新 revision + 过期 revision 冲突
+   - HUB-PRS-002 校验：bad id/空 meter/空 currency/0 unitSize/负 unitPrice/反序有效期/bad upstream ref/重复 id
+5. **前端 C1**（`UpstreamsPage.test.ts` +2）：Test Connection `:test` POST、Apply `:apply` 带 Idempotency-Key + activation 呈现
+6. **前端 C3**（`ReleasesPage.test.ts` 新建 3 tests）：release 列表、detail 对话框（snapshot hash + activation history）、Republish 带 Idempotency-Key
+
+审计澄清：path traversal（RLY-ROUTE-005）与 usage query filter（query_filter_test.go）**已有测试**，非缺口；authz/CSRF 已有 i1/id004/admincsrf 覆盖。
 
 ### Admin Console C5 第二轮完成（§14/§15，frontend-first，TDD）
 

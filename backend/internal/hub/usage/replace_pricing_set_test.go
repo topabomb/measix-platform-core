@@ -58,8 +58,8 @@ func TestHUBPRS002ReplacePricingSetValidation(t *testing.T) {
 	}
 
 	cases := []struct {
-		name  string
-		mut   func(*PricingRuleRecord)
+		name string
+		mut  func(*PricingRuleRecord)
 	}{
 		{"bad id", func(r *PricingRuleRecord) { r.ID = "not-an-id" }},
 		{"empty meter", func(r *PricingRuleRecord) { r.Meter = " " }},

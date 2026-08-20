@@ -4,15 +4,25 @@ type UnauthorizedHandler = (() => void | Promise<void>) | undefined
 let unauthorizedHandler: UnauthorizedHandler
 
 export class ApiProblem extends Error {
+  readonly currentConfigRevision?: number
+  readonly currentSecretVersion?: number
+  readonly currentPricingRevision?: number
+
   constructor(
     readonly status: number,
     readonly code: string,
     message: string,
     readonly activationId?: string,
     readonly currentDraftRevision?: number,
+    extra?: Record<string, unknown>,
   ) {
     super(message)
     this.name = 'ApiProblem'
+    if (extra) {
+      if (typeof extra.currentConfigRevision === 'number') this.currentConfigRevision = extra.currentConfigRevision
+      if (typeof extra.currentSecretVersion === 'number') this.currentSecretVersion = extra.currentSecretVersion
+      if (typeof extra.currentPricingRevision === 'number') this.currentPricingRevision = extra.currentPricingRevision
+    }
   }
 }
 
@@ -62,6 +72,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, csrfToke
       String(body.detail ?? body.title ?? response.statusText),
       typeof body.activationId === 'string' ? body.activationId : undefined,
       typeof body.currentDraftRevision === 'number' ? body.currentDraftRevision : undefined,
+      body,
     )
   }
   if (response.status === 204) return undefined as T

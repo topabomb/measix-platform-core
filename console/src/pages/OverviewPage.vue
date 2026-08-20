@@ -11,10 +11,12 @@ type SystemStatus = components['schemas']['SystemStatus']
 type UsageSummary = components['schemas']['UsageSummary']
 type Upstream = components['schemas']['Upstream']
 type UpstreamPage = components['schemas']['UpstreamPage']
+type Draft = components['schemas']['Draft']
 
 const system = ref<SystemStatus>()
 const usage = ref<UsageSummary>()
 const upstreams = ref<Upstream[]>([])
+const draft = ref<Draft>()
 const loading = ref(false)
 const error = ref<unknown>()
 
@@ -31,18 +33,44 @@ const upstreamCounts = computed(() => {
   return counts
 })
 
+/** Resource counts by kind from the managed draft. */
+const resourceCounts = computed(() => {
+  const c = draft.value?.content
+  if (!c) return { models: 0, tts: 0, asr: 0, mcp: 0, providers: 0 }
+  return {
+    models: c.models.length,
+    tts: c.tts.length,
+    asr: c.asr.length,
+    mcp: c.mcp.length,
+    providers: c.providers.length,
+  }
+})
+
+/** Recent activation failures from latest activation. */
+const recentActivationFailures = computed(() => {
+  if (!system.value?.latestActivation) return []
+  const act = system.value.latestActivation
+  if (act.state === 'FAILED') return [act]
+  return []
+})
+
+/** Cost completeness status. */
+const costCompleteness = computed(() => usage.value?.cost.status ?? 'UNKNOWN')
+
 async function refresh() {
   loading.value = true
   error.value = undefined
   try {
-    const [systemStatus, usageSummary, upstreamPage] = await Promise.all([
+    const [systemStatus, usageSummary, upstreamPage, draftData] = await Promise.all([
       apiFetch<SystemStatus>('/api/admin/v1/system/status'),
       apiFetch<UsageSummary>('/api/admin/v1/usage/summary'),
       apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=200'),
+      apiFetch<Draft>('/api/admin/v1/draft').catch(() => undefined as Draft | undefined),
     ])
     system.value = systemStatus
     usage.value = usageSummary
     upstreams.value = upstreamPage.items
+    draft.value = draftData
   } catch (cause) {
     error.value = cause
   } finally {
@@ -100,6 +128,36 @@ onMounted(refresh)
               <q-item><q-item-section>Degraded</q-item-section><q-item-section side>{{ upstreamCounts.DEGRADED ?? 0 }} degraded</q-item-section></q-item>
               <q-item><q-item-section>Disabled / inactive</q-item-section><q-item-section side>{{ (upstreamCounts.DISABLED ?? 0) + (upstreamCounts.INACTIVE ?? 0) }} disabled</q-item-section></q-item>
               <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">No upstreams configured.</q-item-section></q-item>
+            </q-list>
+          </q-card>
+        </div>
+      </div>
+      <!-- Resource counts by kind -->
+      <div class="row q-col-gutter-md q-mt-xs">
+        <div class="col-12 col-md-6">
+          <q-card flat bordered>
+            <q-card-section class="text-subtitle1 text-weight-medium">Managed resources</q-card-section>
+            <q-list separator>
+              <q-item><q-item-section><q-item-label>Models</q-item-label></q-item-section><q-item-section side><q-badge color="primary" :label="String(resourceCounts.models)" /></q-item-section></q-item>
+              <q-item><q-item-section><q-item-label>TTS</q-item-label></q-item-section><q-item-section side><q-badge color="teal" :label="String(resourceCounts.tts)" /></q-item-section></q-item>
+              <q-item><q-item-section><q-item-label>ASR</q-item-label></q-item-section><q-item-section side><q-badge color="indigo" :label="String(resourceCounts.asr)" /></q-item-section></q-item>
+              <q-item><q-item-section><q-item-label>MCP</q-item-label></q-item-section><q-item-section side><q-badge color="deep-purple" :label="String(resourceCounts.mcp)" /></q-item-section></q-item>
+              <q-item><q-item-section><q-item-label>Providers</q-item-label></q-item-section><q-item-section side><q-badge color="grey" :label="String(resourceCounts.providers)" /></q-item-section></q-item>
+            </q-list>
+          </q-card>
+        </div>
+        <div class="col-12 col-md-6">
+          <q-card flat bordered>
+            <q-card-section class="text-subtitle1 text-weight-medium">Recent activation failures</q-card-section>
+            <q-list separator>
+              <q-item v-for="fail in recentActivationFailures" :key="fail.activationId">
+                <q-item-section>
+                  <q-item-label>{{ fail.activationId }}</q-item-label>
+                  <q-item-label caption>{{ fail.kind }} · {{ fail.errorCode ?? 'no error code' }}</q-item-label>
+                </q-item-section>
+                <q-item-section side><StatusChip :value="fail.state" /></q-item-section>
+              </q-item>
+              <q-item v-if="!recentActivationFailures.length"><q-item-section class="text-positive">No recent activation failures.</q-item-section></q-item>
             </q-list>
           </q-card>
         </div>

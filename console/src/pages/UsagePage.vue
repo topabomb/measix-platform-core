@@ -68,6 +68,28 @@ const semanticMeterKeys = computed(() => {
 
 const semanticMeters = computed(() => summary.value?.semanticMeters ?? [])
 
+/** Group semantic meters by resource kind for display. */
+const semanticMetersByKind = computed(() => {
+  const groups: { kind: string; color: string; meters: typeof semanticMeters.value }[] = []
+  const kindMap = new Map<string, { kind: string; color: string; meters: typeof semanticMeters.value }>()
+  for (const m of semanticMeters.value) {
+    let kind = 'OTHER'
+    let color = 'grey'
+    if (m.meter.includes('TOKEN') || m.meter.includes('CACHED')) { kind = 'MODEL'; color = 'primary' }
+    else if (m.meter === 'CHARACTERS' || m.meter.includes('TTS')) { kind = 'TTS'; color = 'teal' }
+    else if (m.meter.includes('AUDIO') && !m.meter.includes('TTS')) { kind = 'ASR'; color = 'indigo' }
+    else if (m.meter === 'REQUESTS' || m.meter.includes('MCP')) { kind = 'MCP'; color = 'deep-purple' }
+    let group = kindMap.get(kind)
+    if (!group) {
+      group = { kind, color, meters: [] }
+      kindMap.set(kind, group)
+      groups.push(group)
+    }
+    group.meters.push(m)
+  }
+  return groups
+})
+
 const blockedCount = computed(() => {
   if (!summary.value) return 0
   return Math.max(0, summary.value.requestCount - summary.value.forwardedRequestCount)
@@ -156,6 +178,14 @@ function costStatusColor(status: string): string {
     case 'KNOWN': return 'green'
     case 'PARTIAL': return 'amber'
     default: return 'grey'
+  }
+}
+
+function costStatusLabel(status: string): string {
+  switch (status) {
+    case 'KNOWN': return 'Known'
+    case 'PARTIAL': return 'Partial'
+    default: return 'Unknown'
   }
 }
 
@@ -257,11 +287,19 @@ onMounted(refresh)
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
-              <div class="text-caption text-grey-7">Semantic meters</div>
-              <q-chip v-for="m in semanticMeters" :key="m.meter" dense :color="meterColor(m.meter)" text-color="white">
-                {{ m.meter }} {{ m.quantity }} {{ m.confidence }}
-              </q-chip>
+              <div class="text-caption text-grey-7">Semantic meters by kind</div>
+              <template v-for="group in semanticMetersByKind" :key="group.kind">
+                <div class="q-mt-sm">
+                  <q-chip dense :color="group.color" text-color="white" :label="group.kind" />
+                  <q-chip v-for="m in group.meters" :key="m.meter" dense :color="meterColor(m.meter)" text-color="white" size="sm">
+                    {{ m.meter }}: {{ m.quantity }}
+                    <q-badge v-if="m.confidence === 'UNKNOWN'" color="grey" label="?" class="q-ml-xs" />
+                    <q-badge v-else-if="m.confidence === 'PARTIAL'" color="amber" label="~" class="q-ml-xs" />
+                  </q-chip>
+                </div>
+              </template>
               <div v-if="!semanticMeters.length" class="text-body2 text-grey-7">none</div>
+              <div class="text-caption text-grey-7 q-mt-xs">UNKNOWN meters are not shown as 0.</div>
             </q-card-section>
           </q-card>
         </div>
@@ -333,6 +371,14 @@ onMounted(refresh)
             </tbody>
           </q-markup-table>
           <div class="text-caption text-grey-7 q-mt-sm">Semantic meters, usage completeness and cost are shown at the summary level. Prompt/body/Secret content is never exposed.</div>
+
+          <!-- Cost completeness for this request's kind -->
+          <div class="text-subtitle2 q-mt-md">Cost & Usage completeness</div>
+          <div class="row items-center q-gutter-sm q-mt-xs">
+            <q-chip dense :color="costStatusColor(costStatus)" text-color="white" :label="costStatusLabel(costStatus)" />
+            <q-chip dense :color="costStatusColor(selectedRequest.forwarded ? 'KNOWN' : 'UNKNOWN')" text-color="white" :label="selectedRequest.forwarded ? 'forwarded' : 'blocked'" />
+            <span class="text-caption text-grey-7">UNKNOWN cost means no reliable semantic meter; it is not zero cost.</span>
+          </div>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Close" v-close-popup />

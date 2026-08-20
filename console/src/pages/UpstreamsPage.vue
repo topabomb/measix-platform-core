@@ -14,13 +14,11 @@ type UpstreamPage = components['schemas']['UpstreamPage']
 type Activation = components['schemas']['Activation']
 type UpstreamConfig = components['schemas']['UpstreamConfig']
 type UpstreamTestResult = components['schemas']['UpstreamTestResult']
-type TimeoutPolicy = components['schemas']['TimeoutPolicy']
 type Secret = components['schemas']['Secret']
 
 const session = useSessionStore()
 const activation = useActivationStore()
 const upstreams = ref<Upstream[]>([])
-const nextCursor = ref<string>()
 const selected = ref<Upstream>()
 const loading = ref(false)
 const error = ref<unknown>()
@@ -30,12 +28,23 @@ const testing = ref(false)
 const testResult = ref<UpstreamTestResult>()
 const canMutate = computed(() => Boolean(session.csrfToken))
 
-// Inline Secret creation so admins can satisfy C1 (Secret + Upstream) without
-// leaving the UI or using JSON/API directly.
+// Editing state for existing upstream candidate
+const editMode = ref(false)
+const editForm = ref<UpstreamConfig>(emptyConfig())
+const editUpstreamId = ref<string>()
+const editExpectedRevision = ref<number>()
+const editDirty = ref(false)
+const saving = ref(false)
+const conflictRevision = ref<number>()
+
+// Inline Secret creation/replace
 const secretOpen = ref(false)
+const secretMode = ref<'create' | 'replace'>('create')
 const secretName = ref('')
 const secretValue = ref('')
-const creatingSecret = ref(false)
+const replacingSecret = ref(false)
+const replaceSecretId = ref<string>()
+const replaceExpectedVersion = ref<number>()
 
 const AUTH_TYPES = ['NONE', 'BEARER', 'STATIC_HEADER', 'BASIC'] as const
 const USAGE_LEVELS = ['LEVEL_0', 'LEVEL_1', 'LEVEL_2'] as const
@@ -67,7 +76,6 @@ async function refresh() {
   try {
     const page = await apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=200')
     upstreams.value = page.items
-    nextCursor.value = page.nextCursor
   } catch (cause) {
     error.value = cause
   } finally {
@@ -131,7 +139,7 @@ async function createUpstream() {
 async function createSecret() {
   if (!session.csrfToken) return
   if (!secretName.value.trim() || !secretValue.value) return
-  creatingSecret.value = true
+  replacingSecret.value = true
   error.value = undefined
   try {
     const created = await apiFetch<Secret>('/api/admin/v1/secrets', {
@@ -148,14 +156,118 @@ async function createSecret() {
   } catch (cause) {
     error.value = cause
   } finally {
-    creatingSecret.value = false
+    replacingSecret.value = false
   }
 }
 
-async function openUpstream(upstream: Upstream) {
+// --- Existing candidate edit flow ---
+
+function openUpstream(upstream: Upstream) {
   selected.value = upstream
   testResult.value = undefined
   detailOpen.value = true
+  editMode.value = false
+  conflictRevision.value = undefined
+}
+
+function startEdit() {
+  if (!selected.value?.config) return
+  editUpstreamId.value = selected.value.upstreamId
+  editExpectedRevision.value = selected.value.configRevision
+  editForm.value = structuredClone(selected.value.config)
+  editDirty.value = false
+  editMode.value = true
+  conflictRevision.value = undefined
+}
+
+function markEditDirty() {
+  editDirty.value = true
+  conflictRevision.value = undefined
+}
+
+function discardEdit() {
+  if (!selected.value?.config) return
+  editForm.value = structuredClone(selected.value.config)
+  editExpectedRevision.value = selected.value.configRevision
+  editDirty.value = false
+  conflictRevision.value = undefined
+}
+
+async function saveEdit() {
+  if (!session.csrfToken || !editUpstreamId.value || editExpectedRevision.value === undefined) return
+  saving.value = true
+  error.value = undefined
+  try {
+    const updated = await apiFetch<Upstream>(`/api/admin/v1/upstreams/${encodeURIComponent(editUpstreamId.value)}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        expectedConfigRevision: editExpectedRevision.value,
+        config: editForm.value,
+      }),
+    }, session.csrfToken)
+    selected.value = updated
+    editExpectedRevision.value = updated.configRevision
+    editDirty.value = false
+    conflictRevision.value = undefined
+    await refresh()
+    const refreshed = upstreams.value.find((u) => u.upstreamId === updated.upstreamId)
+    if (refreshed) selected.value = refreshed
+  } catch (cause) {
+    if (cause instanceof ApiProblem && cause.status === 409) {
+      conflictRevision.value = cause.currentConfigRevision
+    }
+    error.value = cause
+  } finally {
+    saving.value = false
+  }
+}
+
+function openReplaceSecret(secretIdVal: string, currentVersion: number) {
+  secretMode.value = 'replace'
+  replaceSecretId.value = secretIdVal
+  replaceExpectedVersion.value = currentVersion
+  secretName.value = ''
+  secretValue.value = ''
+  secretOpen.value = true
+}
+
+async function replaceSecret() {
+  if (!session.csrfToken || !replaceSecretId.value || !replaceExpectedVersion.value || !secretValue.value) return
+  replacingSecret.value = true
+  error.value = undefined
+  try {
+    const updated = await apiFetch<Secret>(`/api/admin/v1/secrets/${encodeURIComponent(replaceSecretId.value)}:replace`, {
+      method: 'POST',
+      body: JSON.stringify({
+        expectedSecretVersion: replaceExpectedVersion.value,
+        value: secretValue.value,
+      }),
+    }, session.csrfToken)
+    // Update editForm auth secretRef if it references this secret
+    const auth = editForm.value.auth
+    if (auth && 'secretRef' in auth && auth.secretRef?.secretId === updated.secretId) {
+      auth.secretRef = { secretId: updated.secretId, secretVersion: updated.secretVersion }
+      markEditDirty()
+    }
+    if (auth && 'passwordSecretRef' in auth && auth.passwordSecretRef?.secretId === updated.secretId) {
+      auth.passwordSecretRef = { secretId: updated.secretId, secretVersion: updated.secretVersion }
+      markEditDirty()
+    }
+    secretOpen.value = false
+    secretValue.value = ''
+    secretName.value = ''
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    replacingSecret.value = false
+  }
+}
+
+function handleSecretAction() {
+  if (secretMode.value === 'create') {
+    return createSecret()
+  }
+  return replaceSecret()
 }
 
 async function testUpstream() {
@@ -201,6 +313,16 @@ async function applyUpstream() {
   }
 }
 
+// Candidate vs active display
+const candidateVsActive = computed(() => {
+  if (!selected.value) return null
+  const candidate = selected.value.configRevision
+  const active = selected.value.activeConfigRevision
+  if (active === undefined || active === null) return { candidate, active: null, pending: true }
+  if (candidate !== active) return { candidate, active, pending: true }
+  return { candidate, active, pending: false }
+})
+
 onMounted(refresh)
 </script>
 
@@ -209,7 +331,7 @@ onMounted(refresh)
     <PageHeader title="Upstreams" subtitle="Model provider upstreams, secrets, configuration revisions and runtime activation.">
       <template #actions>
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
-        <q-btn outline color="secondary" icon="key" label="Create secret" :disable="!canMutate" @click="secretOpen = true" />
+        <q-btn outline color="secondary" icon="key" label="Create secret" :disable="!canMutate" @click="secretMode = 'create'; secretName = ''; secretValue = ''; secretOpen = true" />
         <q-btn color="primary" icon="cloud_queue" label="Create upstream" :disable="!canMutate" @click="createOpen = true" />
       </template>
     </PageHeader>
@@ -219,7 +341,8 @@ onMounted(refresh)
         <span>Activation {{ activation.activation.activationId }} ({{ activation.activation.kind }})</span>
         <StatusChip :value="activation.activation.state" />
       </div>
-      <div v-if="activation.activation.errorCode" class="text-caption">{{ activation.activation.errorCode }}</div>
+      <div v-if="activation.activation.errorCode" class="text-caption text-negative">{{ activation.activation.errorCode }}</div>
+      <div class="text-caption text-grey-7">Recovery: refresh the page to recover this activation — no duplicate command will be sent.</div>
     </q-banner>
     <LoadingState v-if="loading && !upstreams.length" />
     <q-card v-else flat bordered>
@@ -227,14 +350,25 @@ onMounted(refresh)
         <q-item v-for="upstream in upstreams" :key="upstream.upstreamId" clickable @click="openUpstream(upstream)">
           <q-item-section>
             <q-item-label>{{ upstream.name }}</q-item-label>
-            <q-item-label caption>{{ upstream.upstreamId }} · revision {{ upstream.configRevision }}<span v-if="upstream.activeConfigRevision"> · active {{ upstream.activeConfigRevision }}</span></q-item-label>
+            <q-item-label caption>
+              {{ upstream.upstreamId }}
+              · candidate rev {{ upstream.configRevision }}
+              <span v-if="upstream.activeConfigRevision"> · active rev {{ upstream.activeConfigRevision }}</span>
+              <span v-else> · no active revision</span>
+            </q-item-label>
           </q-item-section>
-          <q-item-section side><StatusChip :value="upstream.status" /></q-item-section>
+          <q-item-section side>
+            <div class="row items-center q-gutter-xs">
+              <q-badge v-if="upstream.activeConfigRevision !== undefined && upstream.activeConfigRevision !== upstream.configRevision" color="orange" label="pending" />
+              <StatusChip :value="upstream.status" />
+            </div>
+          </q-item-section>
         </q-item>
-        <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">No upstreams configured.</q-item-section></q-item>
+        <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">No upstreams configured. Create one to get started.</q-item-section></q-item>
       </q-list>
     </q-card>
 
+    <!-- Create upstream dialog -->
     <q-dialog v-model="createOpen">
       <q-card style="min-width: 600px; max-width: 95vw">
         <q-card-section class="text-h6">Create upstream</q-card-section>
@@ -270,33 +404,110 @@ onMounted(refresh)
       </q-card>
     </q-dialog>
 
+    <!-- Upstream detail + editor dialog -->
     <q-dialog v-model="detailOpen">
-      <q-card v-if="selected" style="width: 680px; max-width: 95vw">
+      <q-card v-if="selected" style="width: 760px; max-width: 95vw">
         <q-card-section class="row items-start justify-between">
           <div>
             <div class="text-h6">{{ selected.name }}</div>
-            <div class="text-caption">{{ selected.upstreamId }}</div>
+            <div class="text-caption text-grey-7">{{ selected.upstreamId }}</div>
           </div>
-          <StatusChip :value="selected.status" />
+          <div class="text-right">
+            <StatusChip :value="selected.status" />
+            <div v-if="candidateVsActive" class="text-caption q-mt-xs">
+              <span :class="candidateVsActive.pending ? 'text-orange' : 'text-grey-7'">
+                candidate rev {{ candidateVsActive.candidate }}
+                <template v-if="candidateVsActive.active !== null"> · active rev {{ candidateVsActive.active }}</template>
+                <template v-else> · no active revision</template>
+              </span>
+            </div>
+          </div>
         </q-card-section>
         <q-separator />
+
         <q-card-section>
+          <!-- Candidate vs Active banner -->
+          <q-banner v-if="candidateVsActive?.pending" class="bg-orange-1 q-mb-md rounded-borders">
+            <div class="text-body2">Candidate revision {{ candidateVsActive.candidate }} differs from active revision {{ candidateVsActive.active ?? '—' }}.</div>
+            <div class="text-caption text-grey-7">Apply to promote the candidate to active runtime.</div>
+          </q-banner>
+
+          <!-- Stale revision banner -->
+          <q-banner v-if="conflictRevision !== undefined" class="bg-orange-1 q-mb-md rounded-borders">
+            <div class="text-weight-medium">Stale candidate (revision {{ editExpectedRevision }})</div>
+            <div class="text-body2">Server is at revision {{ conflictRevision }}. Discard to pick up the latest changes.</div>
+            <template #action><q-btn flat label="Discard local edits" @click="discardEdit" /></template>
+          </q-banner>
+
+          <!-- Action buttons -->
           <div class="row q-gutter-sm q-mb-md">
-            <q-btn outline color="primary" label="Test connection" :loading="testing" @click="testUpstream" />
+            <q-btn v-if="!editMode" outline color="primary" label="Edit candidate" @click="startEdit" />
+            <template v-else>
+              <q-btn outline color="primary" label="Save candidate" :loading="saving" :disable="!editDirty" @click="saveEdit" />
+              <q-btn flat label="Discard" :disable="!editDirty" @click="discardEdit" />
+            </template>
+            <q-btn outline color="secondary" label="Test connection" :loading="testing" @click="testUpstream" />
             <q-btn outline color="positive" label="Apply to runtime" @click="applyUpstream" />
           </div>
-          <q-markup-table flat dense>
-            <tbody>
-              <tr><td class="text-grey-7">Config revision</td><td>{{ selected.configRevision }}</td></tr>
-              <tr><td class="text-grey-7">Active revision</td><td>{{ selected.activeConfigRevision ?? '—' }}</td></tr>
-              <tr v-if="selected.config"><td class="text-grey-7">Base URL</td><td>{{ selected.config.baseUrl ?? '—' }}</td></tr>
-              <tr v-if="selected.config"><td class="text-grey-7">Auth type</td><td>{{ selected.config.auth?.type ?? '—' }}</td></tr>
-              <tr v-if="selected.config"><td class="text-grey-7">Correlation mode</td><td>{{ selected.config.correlationMode ?? '—' }}</td></tr>
-              <tr v-if="selected.config"><td class="text-grey-7">Usage level</td><td>{{ selected.config.usageCapabilityLevel ?? '—' }}</td></tr>
-              <tr v-if="selected.config"><td class="text-grey-7">Transport</td><td>{{ selected.config.transportCapabilities.join(', ') }}</td></tr>
-            </tbody>
-          </q-markup-table>
 
+          <!-- Read-only or editable config -->
+          <template v-if="!editMode">
+            <q-markup-table flat dense>
+              <tbody>
+                <tr><td class="text-grey-7">Config revision</td><td>{{ selected.configRevision }}</td></tr>
+                <tr><td class="text-grey-7">Active revision</td><td>{{ selected.activeConfigRevision ?? '—' }}</td></tr>
+                <tr v-if="selected.config"><td class="text-grey-7">Base URL</td><td>{{ selected.config.baseUrl ?? '—' }}</td></tr>
+                <tr v-if="selected.config"><td class="text-grey-7">Auth type</td><td>{{ selected.config.auth?.type ?? '—' }}</td></tr>
+                <tr v-if="selected.config?.auth?.type === 'STATIC_HEADER'"><td class="text-grey-7">Header name</td><td>{{ selected.config.auth.headerName ?? '—' }}</td></tr>
+                <tr v-if="selected.config?.auth?.type === 'BASIC'"><td class="text-grey-7">Username</td><td>{{ selected.config.auth.username ?? '—' }}</td></tr>
+                <tr v-if="selected.config?.auth && 'secretRef' in selected.config.auth"><td class="text-grey-7">Secret</td><td>{{ selected.config.auth.secretRef?.secretId ?? '—' }} v{{ selected.config.auth.secretRef?.secretVersion ?? '—' }}</td></tr>
+                <tr v-if="selected.config?.auth && 'passwordSecretRef' in selected.config.auth"><td class="text-grey-7">Password Secret</td><td>{{ selected.config.auth.passwordSecretRef?.secretId ?? '—' }} v{{ selected.config.auth.passwordSecretRef?.secretVersion ?? '—' }}</td></tr>
+                <tr v-if="selected.config"><td class="text-grey-7">Correlation mode</td><td>{{ selected.config.correlationMode ?? '—' }}</td></tr>
+                <tr v-if="selected.config"><td class="text-grey-7">Usage level</td><td>{{ selected.config.usageCapabilityLevel ?? '—' }}</td></tr>
+                <tr v-if="selected.config"><td class="text-grey-7">Transport</td><td>{{ selected.config.transportCapabilities?.join(', ') ?? '—' }}</td></tr>
+                <tr v-if="selected.config?.timeoutDefaults"><td class="text-grey-7">Timeouts</td><td>connect {{ selected.config.timeoutDefaults.connectMs }}ms · response {{ selected.config.timeoutDefaults.responseHeaderMs }}ms · idle {{ selected.config.timeoutDefaults.idleMs }}ms</td></tr>
+              </tbody>
+            </q-markup-table>
+
+            <!-- Secret replace button -->
+            <div v-if="selected.config?.auth && selected.config.auth.type !== 'NONE' && 'secretRef' in selected.config.auth && selected.config.auth.secretRef" class="q-mt-md">
+              <q-btn outline color="warning" icon="key" label="Replace secret" size="sm" @click="openReplaceSecret(selected.config.auth.secretRef!.secretId, selected.config.auth.secretRef!.secretVersion)" />
+              <span class="text-caption text-grey-7 q-ml-sm">Creates a new immutable version; active runtime unchanged until Apply.</span>
+            </div>
+            <div v-if="selected.config?.auth && selected.config.auth.type === 'BASIC' && 'passwordSecretRef' in selected.config.auth && selected.config.auth.passwordSecretRef" class="q-mt-md">
+              <q-btn outline color="warning" icon="key" label="Replace password secret" size="sm" @click="openReplaceSecret(selected.config.auth.passwordSecretRef!.secretId, selected.config.auth.passwordSecretRef!.secretVersion)" />
+            </div>
+          </template>
+
+          <!-- Editable form -->
+          <template v-else>
+            <div class="q-gutter-md">
+              <q-input v-model="editForm.name" outlined label="Name" @update:model-value="markEditDirty" />
+              <q-input v-model="editForm.baseUrl" outlined label="Base URL" placeholder="https://api.example.com" @update:model-value="markEditDirty" />
+              <q-select v-model="editForm.transportCapabilities" outlined label="Transport capabilities" multiple :options="[...TRANSPORT_CAPS]" @update:model-value="markEditDirty" />
+              <div class="text-subtitle2">Authentication</div>
+              <q-select v-model="editForm.auth.type" outlined label="Auth type" :options="[...AUTH_TYPES]" @update:model-value="markEditDirty" />
+              <template v-if="editForm.auth.type !== 'NONE'">
+                <div v-if="'secretRef' in editForm.auth && editForm.auth.secretRef" class="row items-center q-gutter-sm">
+                  <q-input :model-value="editForm.auth.secretRef?.secretId" outlined readonly label="Secret ID" class="col" />
+                  <q-input :model-value="String(editForm.auth.secretRef?.secretVersion ?? '')" outlined readonly label="Version" style="width: 100px" />
+                  <q-btn flat dense color="warning" icon="key" label="Replace" @click="openReplaceSecret(editForm.auth.secretRef!.secretId, editForm.auth.secretRef!.secretVersion)" />
+                </div>
+                <q-input v-if="editForm.auth.type === 'STATIC_HEADER'" v-model="editForm.auth.headerName" outlined label="Header name" placeholder="X-Api-Key" @update:model-value="markEditDirty" />
+                <q-input v-if="editForm.auth.type === 'BASIC'" v-model="editForm.auth.username" outlined label="Username" @update:model-value="markEditDirty" />
+              </template>
+              <q-select v-model="editForm.correlationMode" outlined label="Correlation mode" :options="[...CORRELATION_MODES]" @update:model-value="markEditDirty" />
+              <q-select v-model="editForm.usageCapabilityLevel" outlined label="Usage capability level" :options="[...USAGE_LEVELS]" @update:model-value="markEditDirty" />
+              <div class="text-subtitle2">Timeouts (ms)</div>
+              <div class="row q-gutter-sm">
+                <q-input v-model.number="editForm.timeoutDefaults.connectMs" type="number" outlined label="Connect" class="col" @update:model-value="markEditDirty" />
+                <q-input v-model.number="editForm.timeoutDefaults.responseHeaderMs" type="number" outlined label="Response header" class="col" @update:model-value="markEditDirty" />
+                <q-input v-model.number="editForm.timeoutDefaults.idleMs" type="number" outlined label="Idle" class="col" @update:model-value="markEditDirty" />
+              </div>
+            </div>
+          </template>
+
+          <!-- Test result -->
           <div v-if="testResult" class="q-mt-md">
             <div class="text-subtitle2">Test connection</div>
             <q-banner :class="testResult.reachable ? 'bg-green-1' : 'bg-red-1'" class="rounded-borders q-my-sm">
@@ -323,20 +534,31 @@ onMounted(refresh)
       </q-card>
     </q-dialog>
 
+    <!-- Secret create/replace dialog -->
     <q-dialog v-model="secretOpen">
       <q-card style="min-width: 480px; max-width: 95vw">
-        <q-card-section class="text-h6">Create secret</q-card-section>
+        <q-card-section class="text-h6">{{ secretMode === 'create' ? 'Create secret' : 'Replace secret' }}</q-card-section>
         <q-card-section class="q-gutter-md">
-          <p class="text-body2 text-grey-7 q-mt-none q-mb-sm">
+          <p v-if="secretMode === 'create'" class="text-body2 text-grey-7 q-mt-none q-mb-sm">
             Store an opaque credential in the Hub. Secret values are write-only and are never
             returned by the Admin API.
           </p>
-          <q-input v-model="secretName" outlined label="Secret name" placeholder="OpenAI key" />
-          <q-input v-model="secretValue" outlined label="Secret value" type="password" autocomplete="new-password" placeholder="sk-..." />
+          <p v-else class="text-body2 text-grey-7 q-mt-none q-mb-sm">
+            Replacing a secret creates a new immutable version. The active runtime is unchanged
+            until you Apply the upstream candidate with the new version.
+          </p>
+          <q-input v-if="secretMode === 'create'" v-model="secretName" outlined label="Secret name" placeholder="OpenAI key" />
+          <q-input v-model="secretValue" outlined label="Secret value" type="password" autocomplete="new-password" :placeholder="secretMode === 'create' ? 'sk-...' : 'new value'" />
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Cancel" v-close-popup />
-          <q-btn color="primary" label="Create secret" :disable="!secretName.trim() || !secretValue || creatingSecret" :loading="creatingSecret" @click="createSecret" />
+          <q-btn
+            color="primary"
+            :label="secretMode === 'create' ? 'Create secret' : 'Replace secret'"
+            :disable="secretMode === 'create' ? (!secretName.trim() || !secretValue) : !secretValue"
+            :loading="replacingSecret"
+            @click="handleSecretAction"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>

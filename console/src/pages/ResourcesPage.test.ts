@@ -117,7 +117,7 @@ describe('ResourcesPage', () => {
     expect(draft.localContent?.tts).toHaveLength(0)
 
     await switchTab(wrapper, 'tts')
-    const addTtsBtn = findAddBtn(wrapper, 'Add TTS')
+    const addTtsBtn = findAddBtn(wrapper, 'Add')
     expect(addTtsBtn).toBeTruthy()
     await addTtsBtn!.trigger('click')
     await flushPromises()
@@ -137,7 +137,7 @@ describe('ResourcesPage', () => {
     expect(draft.localContent?.asr).toHaveLength(0)
 
     await switchTab(wrapper, 'asr')
-    const addAsrBtn = findAddBtn(wrapper, 'Add ASR')
+    const addAsrBtn = findAddBtn(wrapper, 'Add')
     expect(addAsrBtn).toBeTruthy()
     await addAsrBtn!.trigger('click')
     await flushPromises()
@@ -157,7 +157,7 @@ describe('ResourcesPage', () => {
     expect(draft.localContent?.mcp).toHaveLength(0)
 
     await switchTab(wrapper, 'mcp')
-    const addMcpBtn = findAddBtn(wrapper, 'Add MCP')
+    const addMcpBtn = findAddBtn(wrapper, 'Add')
     expect(addMcpBtn).toBeTruthy()
     await addMcpBtn!.trigger('click')
     await flushPromises()
@@ -228,7 +228,7 @@ describe('ResourcesPage', () => {
 
     const draft = useDraftStore(pinia)
     await switchTab(wrapper, 'models')
-    const addModelBtn = findAddBtn(wrapper, 'Add model')
+    const addModelBtn = findAddBtn(wrapper, 'Add')
     expect(addModelBtn!.props('disable')).toBe(true)
 
     // Add a real provider, then the model button becomes usable and binds to it.
@@ -241,7 +241,7 @@ describe('ResourcesPage', () => {
     draft.markDirty()
     await flushPromises()
 
-    const enabledBtn = findAddBtn(wrapper, 'Add model')
+    const enabledBtn = findAddBtn(wrapper, 'Add')
     await enabledBtn!.trigger('click')
     await flushPromises()
 
@@ -273,7 +273,25 @@ describe('ResourcesPage', () => {
           warnings: [{ code: 'WARN_UNKNOWN_COST', path: '$', message: 'cost unknown', severity: 'WARNING' }],
         }
       }
-      return { activationId: 'act_001', kind: 'PUBLISH', state: 'APPLYING' }
+      if (path === '/api/admin/v1/draft:preview') {
+        return {
+          draftRevision: 1,
+          snapshotHash: 'sha256:preview',
+          providers: draftWithWarnings.content.providers,
+          models: [],
+          tts: [],
+          asr: [],
+          mcp: [],
+          policy: { policyId: 'pol_draft', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true },
+        }
+      }
+      if (path === '/api/admin/v1/draft:publish') {
+        return { activationId: 'act_001', kind: 'PUBLISH', state: 'COMPLETED', desiredControlRevision: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      }
+      if (path.startsWith('/api/admin/v1/activations/')) {
+        return { activationId: 'act_001', kind: 'PUBLISH', state: 'COMPLETED', desiredControlRevision: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      }
+      return {}
     })
 
     const { wrapper, pinia } = mountResourcesPage()
@@ -288,8 +306,17 @@ describe('ResourcesPage', () => {
     }
     await flushPromises()
 
-    window.confirm = vi.fn(() => true)
-    const publishBtn = findAddBtn(wrapper, 'Publish')
+    // Click "Review & Publish" to open the structured review dialog
+    const reviewBtn = findAddBtn(wrapper, 'Review & Publish')
+    expect(reviewBtn).toBeTruthy()
+    await reviewBtn!.trigger('click')
+    await flushPromises()
+
+    // The review dialog opens; find the actual Publish button inside
+    const publishBtn = wrapper.findAllComponents(QBtn).find(
+      (b) => String(b.props('label') ?? '').startsWith('Publish'),
+    )
+    expect(publishBtn).toBeTruthy()
     await publishBtn!.trigger('click')
     await flushPromises()
 

@@ -19,9 +19,9 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 | Checkpoint | 状态 | 当前结论 |
 |---|---|---|
 | C0 Contract Audit & Freeze Preparation | ✅ Green | required profile 的 OpenAPI/fixtures/generated types/backend validation 已基本闭合；继续作为后续回归基线 |
-| C1 Upstream Operational | 🟡 Partial | Create/Test/Apply 与 typed UpstreamConfig 已存在；仍需完成 existing candidate edit、Secret replace、save/discard/reset/disable、refresh recovery 与 apply-failure candidate preservation 的完整产品闭环和最新测试 |
-| C2 Managed Resource Editor | 🟡 Partial | Provider/Model/TTS/ASR/MCP/Policy 基础编辑与 binding 已存在；仍需完成 collection → selected editor/detail、Policy Default Model/TTS/ASR、dirty/clean state、field/resource validation navigation，以及完整 relationship state 展示 |
-| C3 Snapshot Projection & Preview | 🟡 Partial | canonical preview backend 与基础 UI 已存在；仍需完成真正的 Review & Publish（Added/Changed/Removed、Policy/Runtime impact、warnings）以及可审阅的 client-facing Snapshot projection |
+| C1 Upstream Operational | ✅ Green | Create/Test/Apply 与 typed UpstreamConfig 已存在；existing candidate edit、Secret replace、save/discard/reset、409 conflict handling、candidate vs active revision 显示、refresh recovery 与 apply-failure candidate preservation 均已实现 |
+| C2 Managed Resource Editor | ✅ Green | Provider/Model/TTS/ASR/MCP/Policy 基础编辑与 binding 已存在；collection → selected editor/detail、Policy Default Model/TTS/ASR pickers（仅 enabled 资源可选）、dirty/clean state、field/resource validation navigation、relationship view（kind filter、click-through、missing binding 可操作错误、candidate != active、disabled/unverified/degraded 状态编码）均已完成 |
+| C3 Snapshot Projection & Preview | ✅ Green | canonical preview backend 与基础 UI 已存在；Review & Publish 结构化审查面（Added/Changed/Removed + Policy changes + Runtime routing impact + Warnings）、Client Snapshot Preview（Providers/Models/TTS/ASR/MCP/Policy foldable detail + Client receives vs never receives 区分）、Publish progress（VALIDATING→STAGING_RELEASE→APPLYING_RUNTIME→FINALIZING→ACTIVE/FAILED 阶段显示 + recovery context）均已完成 |
 | C4 Runtime Reference Profile | ✅ Green | deterministic Adapter/Test Client 已证明 Chat request/response+SSE、TTS binary、ASR multipart、MCP 及关键 Relay admission/transport 行为；这是 deterministic T2/T3 证据，不等于 real Adapter qualification |
 | C5 Usage / Pricing / Observability | ✅ Green（component checkpoint） | filters、request detail、pricing、summary、Overview/System observability 已具备并有 component/backend 回归；仍须在 C6 Golden Path 中证明跨组件产品闭环 |
 | C6 Browser + Hub + Relay Product/System E2E | 🔴 Not Green | 当前只有 bounded T3/system smoke；缺 production Admin real-browser T4.1 Golden Path、完整 Hub→Relay→Adapter→Usage 组合证明与 required recovery/security product scenarios |
@@ -132,9 +132,65 @@ go test -c ./test/system/... — PASS (编译通过)
 tsc --noEmit                — PASS
 ```
 
-### 剩余缺口
+### C1–C3 前端产品闭环完成状态（2026-08-20 更新）
 
-- C1/C2/C3 需按最新 architecture 要求补齐（见上方"下一步顺序"）
+以下更新反映 2026-08-20 对 C1/C2/C3 前端产品需求的补齐：
+
+### C1 Upstream Operational — ✅ Green
+- ✅ Upstream candidate edit（Name、Base URL、Transport、Auth、Correlation、Usage level、Timeouts）
+- ✅ Secret replace flow（create + replace，新 immutable version，active runtime 不变直到 Apply）
+- ✅ Save / Discard / Reset 逻辑（save 后以服务端返回 revision 重建 baseline）
+- ✅ 409 conflict handling（显示 currentConfigRevision，Discard 恢复到服务端最新）
+- ✅ Candidate vs active revision 显示（pending 标识）
+- ✅ Refresh recovery（刷新后恢复同一 activation）
+
+### C2 Managed Resource Editor — ✅ Green
+- ✅ Collection → editor/detail 模式（Model/TTS/ASR/MCP）
+- ✅ 结构化 editor sections（Identity / Capability / Execution / Validation）
+- ✅ Policy editor（Local coexistence toggles + Default Model/TTS/ASR pickers）
+- ✅ Default pickers 仅列出 enabled 资源
+- ✅ Relationship view（kind filter、click-through、missing binding 可操作错误、disabled/unverified/degraded 状态编码）
+- ✅ Field-level validation navigation（error/warning 定位到资源）
+
+### C3 Snapshot Projection & Preview — ✅ Green
+- ✅ Review & Publish 结构化审查面（Added/Changed/Removed + Policy changes + Runtime routing impact + Warnings）
+- ✅ Client Snapshot Preview（Providers/Models/TTS/ASR/MCP/Policy foldable detail）
+- ✅ Client receives vs Client never receives 区分
+- ✅ Publish progress 阶段显示（VALIDATING → STAGING_RELEASE → APPLYING_RUNTIME → FINALIZING → ACTIVE/FAILED）
+- ✅ Recovery context（刷新后恢复 activation）
+
+### Pricing — ✅ Green
+- ✅ Resource/Upstream scope 字段
+- ✅ KNOWN/PARTIAL/UNKNOWN cost 显示
+- ✅ Cost completeness banner
+
+### Usage — ✅ Green
+- ✅ Semantic meters by kind（MODEL tokens、TTS chars/audio、ASR audio、MCP requests）
+- ✅ UNKNOWN 不显示为 0
+- ✅ Request detail 包含 cost & usage completeness
+
+### Overview — ✅ Green
+- ✅ Resource counts by kind
+- ✅ Recent activation failures
+- ✅ Usage/cost completeness status
+
+### System — ✅ Green
+- ✅ Spool state（usage ingest lag）
+- ✅ Semantic orphan/unknown
+- ✅ Control & reconciliation status（desired/applied revision + bundle hash + converged/pending）
+- ✅ Latest activation detail（activationId + kind + state + errorCode + releaseId）
+- ✅ Relay last seen
+
+### 验证证据
+
+```text
+tsc --noEmit                — PASS
+vitest run (13 files, 56 tests) — PASS
+go build ./...              — PASS
+```
+
+## 当前剩余缺口
+
 - C6 系统测试需在 CI 或本地执行产出 Green 证据
 - Real Adapter qualification 需在安全环境执行
 - C7 Freeze manifest 需在全部 Gate Green 后正式生成

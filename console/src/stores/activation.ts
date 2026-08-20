@@ -17,6 +17,39 @@ export const useActivationStore = defineStore('activation', () => {
   const succeeded = computed(() => activation.value?.state === 'COMPLETED')
   const failed = computed(() => activation.value?.state === 'FAILED')
 
+  /** Publish progress stages for the activation progress display. */
+  const publishStages = computed(() => {
+    if (!activation.value) return []
+    const stages = [
+      { key: 'VALIDATING', label: 'Validating', icon: 'fact_check' },
+      { key: 'STAGING_RELEASE', label: 'Staging Release', icon: 'inventory_2' },
+      { key: 'APPLYING_RUNTIME', label: 'Applying Runtime', icon: 'settings_apply' },
+      { key: 'FINALIZING', label: 'Finalizing', icon: 'task_alt' },
+      { key: 'ACTIVE', label: 'Active', icon: 'check_circle' },
+    ]
+    const state = activation.value.state
+    if (state === 'COMPLETED') {
+      return stages.map((s) => ({ ...s, status: 'done' as const }))
+    }
+    if (state === 'FAILED') {
+      // Map failed to the appropriate stage based on errorCode or default to STAGING
+      const failedStage = activation.value.errorCode?.includes('VALIDATION') ? 0
+        : activation.value.errorCode?.includes('STAGING') ? 1
+        : activation.value.errorCode?.includes('RUNTIME') ? 2
+        : activation.value.errorCode?.includes('FINAL') ? 3
+        : 1
+      return stages.map((s, i) => ({
+        ...s,
+        status: i < failedStage ? 'done' as const : i === failedStage ? 'failed' as const : 'pending' as const,
+      }))
+    }
+    // APPLYING or UNKNOWN - show in-progress
+    return stages.map((s, i) => ({
+      ...s,
+      status: i < 2 ? 'done' as const : i === 2 ? 'active' as const : 'pending' as const,
+    }))
+  })
+
   function beginCommand(kind: ActivationKind): string {
     if (commandKind.value !== kind || !retryKey.value) {
       commandKind.value = kind
@@ -51,5 +84,5 @@ export const useActivationStore = defineStore('activation', () => {
     lastPollAt.value = undefined
   }
 
-  return { activation, retryKey, commandKind, polling, lastPollAt, pending, succeeded, failed, beginCommand, accept, poll, resetCommand }
+  return { activation, retryKey, commandKind, polling, lastPollAt, pending, succeeded, failed, publishStages, beginCommand, accept, poll, resetCommand }
 })

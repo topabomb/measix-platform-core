@@ -23,7 +23,10 @@ const CLIENT_OPENAPI = join(ROOT, 'api', 'client', 'client-control.openapi.yaml'
 const SNAPSHOT_SCHEMA_VERSION = 1
 
 function sha256(path) {
-  return 'sha256:' + createHash('sha256').update(readFileSync(path)).digest('hex')
+  // Normalize CRLF -> LF so the canonical hash matches the generator and is stable
+  // across Windows/Linux working trees.
+  const data = readFileSync(path).toString('utf-8').replace(/\r\n/g, '\n')
+  return 'sha256:' + createHash('sha256').update(data).digest('hex')
 }
 
 function collectFiles(dir) {
@@ -46,7 +49,7 @@ function fixturesHash() {
   for (const file of files) {
     hash.update(relative(FIXTURES_DIR, file).replace(/\\/g, '/'))
     hash.update('\0')
-    hash.update(readFileSync(file))
+    hash.update(readFileSync(file).toString('utf-8').replace(/\r\n/g, '\n'))
     hash.update('\0')
   }
   return 'sha256:' + hash.digest('hex')

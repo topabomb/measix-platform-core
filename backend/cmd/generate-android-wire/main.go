@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -40,11 +41,10 @@ func main() {
 	if len(payload) == 0 || payload[len(payload)-1] != '\n' {
 		payload = append(payload, '\n')
 	}
-	sum := sha256.Sum256(raw)
 	meta, err := json.MarshalIndent(manifest{
 		Generated:  true,
 		Source:     filepath.ToSlash(source),
-		SourceHash: "sha256:" + hex.EncodeToString(sum[:]),
+		SourceHash: sourceHash(raw),
 		Format:     "openapi-3.0.3-client-schema-only",
 	}, "", "  ")
 	must(err)
@@ -52,6 +52,15 @@ func main() {
 	must(os.MkdirAll(filepath.Dir(output), 0o755))
 	must(os.WriteFile(output, payload, 0o644))
 	must(os.WriteFile(manifestPath, meta, 0o644))
+}
+
+// sourceHash computes a deterministic source hash that is insensitive to CRLF/LF
+// line endings, so the generated manifest is identical whether produced on Windows
+// or Linux/CI. sha256 is applied to the raw bytes with CRLF normalized to LF.
+func sourceHash(raw []byte) string {
+	normalized := bytes.ReplaceAll(raw, []byte("\r\n"), []byte("\n"))
+	sum := sha256.Sum256(normalized)
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func must(err error) {

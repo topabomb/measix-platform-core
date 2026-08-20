@@ -1,9 +1,9 @@
 {
   "manifest": "measix-s0-client-contract-freeze",
   "snapshotSchemaVersion": 1,
-  "platformCoreCommit": "4599f19e3d1bc2010eb1385d51cddd17daaa371f",
-  "workingTreeDirty": false,
-  "clientControlOpenApiHash": "sha256:876b2899588b1587619b3fa38a0e4c8e5688f8a6ae235427797a1cba18f2b3b4",
-  "canonicalFixtureHash": "sha256:a46c1432263186858a31ddfc9d8d075d7f592d6301045a60b429855ce5bbce73",
-  "recordedAt": "2026-08-20T07:46:16.166Z"
+  "platformCoreCommit": "d60d4b201244d2ab4186a98c88bccce1257b0a31",
+  "workingTreeDirty": true,
+  "clientControlOpenApiHash": "sha256:db5d7d3097ae5a639c26124321bfd3508889f73b0025f30637ea7531905ee286",
+  "canonicalFixtureHash": "sha256:0811da69cd8029f6e6afe9aad608ef4146eb83996615ccf97dba254cfa18888d",
+  "recordedAt": "2026-08-20T07:49:10.587Z"
 }

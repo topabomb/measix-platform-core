@@ -71,6 +71,13 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
    - UpstreamsPage 使用正确枚举值，STATIC_HEADER 绑定 headerName、BASIC 绑定 username+passwordSecretRef，Test 结果结构化渲染
    - 新增 5 个契约测试（frozen enum、closed auth、SecretRef、typed ref）全部 Green
 
+4. **Admin Release read model 扩展（P1-B，head `aa08935`）**：
+   - `Release` 补全 publish provenance：sourceDraftRevision、publishedAt、publishedBy、diffSummary、activationHistory
+   - 新增 `DiffSummary`（added/changed/removed + 按 kind 的 `details`）、`ResourceDiff`、`ActivationSummary` schemas
+   - backend `ListReleases`/`GetRelease`/publish 均通过 `buildReleaseView` 计算 diff（对比前一 release 的 draft content，structural JSON hash）与 activation history（按 target_generation 查询）
+   - ReleasesPage 显示 diff summary、published by/at、detail 弹窗含 per-kind 表格与 activation timeline
+   - 新增 3 个契约测试 + 2 个 `releaseContentDiff` 单元测试，全部 Green
+
 ### C2 Managed Resource Editor
 
 1. **ResourcesPage.vue 重写**：

@@ -58,6 +58,30 @@ func (e ActivationState) Valid() bool {
 	}
 }
 
+// Defines values for ActivationSummaryState.
+const (
+	ActivationSummaryStateAPPLYING  ActivationSummaryState = "APPLYING"
+	ActivationSummaryStateCOMPLETED ActivationSummaryState = "COMPLETED"
+	ActivationSummaryStateFAILED    ActivationSummaryState = "FAILED"
+	ActivationSummaryStateUNKNOWN   ActivationSummaryState = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the ActivationSummaryState enum.
+func (e ActivationSummaryState) Valid() bool {
+	switch e {
+	case ActivationSummaryStateAPPLYING:
+		return true
+	case ActivationSummaryStateCOMPLETED:
+		return true
+	case ActivationSummaryStateFAILED:
+		return true
+	case ActivationSummaryStateUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AdminUserSummaryRole.
 const (
 	AdminUserSummaryRoleADMIN  AdminUserSummaryRole = "ADMIN"
@@ -244,6 +268,36 @@ func (e ReleaseStatus) Valid() bool {
 	case ReleaseStatusSTAGED:
 		return true
 	case ReleaseStatusSUPERSEDED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReleaseDiffKind.
+const (
+	ASR      ReleaseDiffKind = "ASR"
+	MCP      ReleaseDiffKind = "MCP"
+	MODEL    ReleaseDiffKind = "MODEL"
+	POLICY   ReleaseDiffKind = "POLICY"
+	PROVIDER ReleaseDiffKind = "PROVIDER"
+	TTS      ReleaseDiffKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the ReleaseDiffKind enum.
+func (e ReleaseDiffKind) Valid() bool {
+	switch e {
+	case ASR:
+		return true
+	case MCP:
+		return true
+	case MODEL:
+		return true
+	case POLICY:
+		return true
+	case PROVIDER:
+		return true
+	case TTS:
 		return true
 	default:
 		return false
@@ -574,6 +628,18 @@ type ActivationState string
 // ActivationId defines model for ActivationId.
 type ActivationId = string
 
+// ActivationSummary defines model for ActivationSummary.
+type ActivationSummary struct {
+	ActivationId ActivationId           `json:"activationId"`
+	CompletedAt  *time.Time             `json:"completedAt,omitempty"`
+	CreatedAt    time.Time              `json:"createdAt"`
+	ErrorCode    *string                `json:"errorCode,omitempty"`
+	State        ActivationSummaryState `json:"state"`
+}
+
+// ActivationSummaryState defines model for ActivationSummary.State.
+type ActivationSummaryState string
+
 // AdminSession defines model for AdminSession.
 type AdminSession struct {
 	CsrfToken string           `json:"csrfToken"`
@@ -664,6 +730,14 @@ type DeviceId = string
 type DevicePage struct {
 	Items      []Device `json:"items"`
 	NextCursor *string  `json:"nextCursor,omitempty"`
+}
+
+// DiffSummary defines model for DiffSummary.
+type DiffSummary struct {
+	Added   int             `json:"added"`
+	Changed int             `json:"changed"`
+	Details *[]ResourceDiff `json:"details,omitempty"`
+	Removed int             `json:"removed"`
 }
 
 // Draft defines model for Draft.
@@ -856,15 +930,23 @@ type PutPricingRequest struct {
 
 // Release defines model for Release.
 type Release struct {
-	CreatedAt         time.Time     `json:"createdAt"`
-	ManagedGeneration int           `json:"managedGeneration"`
-	ReleaseId         ReleaseId     `json:"releaseId"`
-	SnapshotHash      Sha256Hash    `json:"snapshotHash"`
-	Status            ReleaseStatus `json:"status"`
+	ActivationHistory   []ActivationSummary `json:"activationHistory"`
+	CreatedAt           time.Time           `json:"createdAt"`
+	DiffSummary         DiffSummary         `json:"diffSummary"`
+	ManagedGeneration   int                 `json:"managedGeneration"`
+	PublishedAt         time.Time           `json:"publishedAt"`
+	PublishedBy         string              `json:"publishedBy"`
+	ReleaseId           ReleaseId           `json:"releaseId"`
+	SnapshotHash        Sha256Hash          `json:"snapshotHash"`
+	SourceDraftRevision int                 `json:"sourceDraftRevision"`
+	Status              ReleaseStatus       `json:"status"`
 }
 
 // ReleaseStatus defines model for Release.Status.
 type ReleaseStatus string
+
+// ReleaseDiffKind defines model for ReleaseDiffKind.
+type ReleaseDiffKind string
 
 // ReleaseId defines model for ReleaseId.
 type ReleaseId = string
@@ -911,6 +993,14 @@ type RequestUsageView struct {
 	UpstreamHttpStatus *int           `json:"upstreamHttpStatus,omitempty"`
 	UpstreamId         UpstreamId     `json:"upstreamId"`
 	UserId             UserId         `json:"userId"`
+}
+
+// ResourceDiff defines model for ResourceDiff.
+type ResourceDiff struct {
+	Added   int             `json:"added"`
+	Changed int             `json:"changed"`
+	Kind    ReleaseDiffKind `json:"kind"`
+	Removed int             `json:"removed"`
 }
 
 // RuntimeBindingDefinition defines model for RuntimeBindingDefinition.

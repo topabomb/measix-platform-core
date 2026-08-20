@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"measix/platform/ent"
+	"measix/platform/ent/activation"
 	"measix/platform/ent/manageddraft"
 	"measix/platform/ent/managedrelease"
 	"measix/platform/internal/hub/upstream"
@@ -52,6 +53,150 @@ type ReleaseView struct {
 	SnapshotHash      string
 	Status            string
 	CreatedAt         time.Time
+	SourceDraftRevision int
+	PublishedBy         string
+	DiffSummary         adminapi.DiffSummary
+	ActivationHistory   []adminapi.ActivationSummary
+}
+
+// releaseContentDiff computes the Added / Changed / Removed summary between two
+// draft contents (current vs previous). A definition is keyed by its canonical
+// ID; equality is structural (a full JSON compare of the definition body).
+func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminapi.DiffSummary {
+	byKind := map[adminapi.ReleaseDiffKind]*adminapi.ResourceDiff{}
+	ensure := func(kind adminapi.ReleaseDiffKind) *adminapi.ResourceDiff {
+		if byKind[kind] == nil {
+			byKind[kind] = &adminapi.ResourceDiff{Kind: kind}
+		}
+		return byKind[kind]
+	}
+	prev := map[string]string{} // id -> definition hash in the previous release
+	prevKinds := map[string]adminapi.ReleaseDiffKind{}
+	if previous != nil {
+		for _, p := range previous.Providers {
+			prev[p.ProviderId] = defHash(p)
+			prevKinds[p.ProviderId] = adminapi.PROVIDER
+		}
+		for _, m := range previous.Models {
+			prev[m.ModelId] = defHash(m)
+			prevKinds[m.ModelId] = adminapi.MODEL
+		}
+		for _, t := range previous.Tts {
+			prev[t.TtsId] = defHash(t)
+			prevKinds[t.TtsId] = adminapi.TTS
+		}
+		for _, a := range previous.Asr {
+			prev[a.AsrId] = defHash(a)
+			prevKinds[a.AsrId] = adminapi.ASR
+		}
+		for _, m := range previous.Mcp {
+			prev[m.McpServerId] = defHash(m)
+			prevKinds[m.McpServerId] = adminapi.MCP
+		}
+	}
+
+	var summary adminapi.DiffSummary
+	if current == nil {
+		return summary
+	}
+	count := func(kind adminapi.ReleaseDiffKind, id string, oldHash string, exists bool) {
+		d := ensure(kind)
+		if !exists {
+			d.Added++
+			return
+		}
+		if oldHash != currentHash(current, id) {
+			d.Changed++
+		}
+	}
+	process := func(kind adminapi.ReleaseDiffKind, id string) {
+		old, exists := prev[id]
+		count(kind, id, old, exists)
+		delete(prev, id)
+		delete(prevKinds, id)
+	}
+	for _, p := range current.Providers {
+		process(adminapi.PROVIDER, p.ProviderId)
+	}
+	for _, m := range current.Models {
+		process(adminapi.MODEL, m.ModelId)
+	}
+	for _, t := range current.Tts {
+		process(adminapi.TTS, t.TtsId)
+	}
+	for _, a := range current.Asr {
+		process(adminapi.ASR, a.AsrId)
+	}
+	for _, m := range current.Mcp {
+		process(adminapi.MCP, m.McpServerId)
+	}
+	for _, kind := range prevKinds {
+		ensure(kind).Removed++
+	}
+
+	kinds := []adminapi.ReleaseDiffKind{
+		adminapi.PROVIDER,
+		adminapi.MODEL,
+		adminapi.TTS,
+		adminapi.ASR,
+		adminapi.MCP,
+		adminapi.POLICY,
+	}
+	var details []adminapi.ResourceDiff
+	for _, kind := range kinds {
+		if d := byKind[kind]; d != nil {
+			summary.Added += d.Added
+			summary.Changed += d.Changed
+			summary.Removed += d.Removed
+			if d.Added > 0 || d.Changed > 0 || d.Removed > 0 {
+				details = append(details, *d)
+			}
+		}
+	}
+	if len(details) > 0 {
+		summary.Details = &details
+	}
+	return summary
+}
+
+// currentHash returns the canonical JSON hash of the definition with the given
+// ID within the current content, or "" if not present.
+func currentHash(content *adminapi.ManagedDraftContent, id string) string {
+	for _, p := range content.Providers {
+		if p.ProviderId == id {
+			return defHash(p)
+		}
+	}
+	for _, m := range content.Models {
+		if m.ModelId == id {
+			return defHash(m)
+		}
+	}
+	for _, t := range content.Tts {
+		if t.TtsId == id {
+			return defHash(t)
+		}
+	}
+	for _, a := range content.Asr {
+		if a.AsrId == id {
+			return defHash(a)
+		}
+	}
+	for _, m := range content.Mcp {
+		if m.McpServerId == id {
+			return defHash(m)
+		}
+	}
+	return ""
+}
+
+// defHash returns a canonical JSON string for a definition for structural diffing.
+func defHash(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 type SnapshotView struct {
@@ -68,8 +213,8 @@ func (s *Service) ListReleases(ctx context.Context, limit int) ([]ReleaseView, e
 		return nil, err
 	}
 	views := make([]ReleaseView, 0, len(rows))
-	for _, row := range rows {
-		views = append(views, ReleaseView{ReleaseID: row.ID, ManagedGeneration: int(row.ManagedGeneration), SnapshotHash: row.SnapshotHash, Status: row.Status, CreatedAt: row.CreatedAt})
+	for i, row := range rows {
+		views = append(views, s.buildReleaseView(ctx, row, previousReleaseRow(rows, i)))
 	}
 	return views, nil
 }
@@ -82,7 +227,89 @@ func (s *Service) GetRelease(ctx context.Context, releaseID string) (ReleaseView
 	if err != nil {
 		return ReleaseView{}, err
 	}
-	return ReleaseView{ReleaseID: row.ID, ManagedGeneration: int(row.ManagedGeneration), SnapshotHash: row.SnapshotHash, Status: row.Status, CreatedAt: row.CreatedAt}, nil
+	prev, err := s.previousRelease(ctx, row)
+	if err != nil {
+		return ReleaseView{}, err
+	}
+	return s.buildReleaseView(ctx, row, prev), nil
+}
+
+// previousReleaseRow returns the next row in the descending-generation list (the
+// chronologically prior release), or nil if this is the first release.
+func previousReleaseRow(rows []*ent.ManagedRelease, index int) *ent.ManagedRelease {
+	if index >= len(rows)-1 {
+		return nil
+	}
+	return rows[index+1]
+}
+
+func (s *Service) previousRelease(ctx context.Context, row *ent.ManagedRelease) (*ent.ManagedRelease, error) {
+	prev, err := s.Client.ManagedRelease.Query().Where(
+		managedrelease.ManagedGenerationLT(row.ManagedGeneration),
+	).Order(ent.Desc(managedrelease.FieldManagedGeneration)).First(ctx)
+	if ent.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return prev, nil
+}
+
+func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRelease) ReleaseView {
+	var current, previous *adminapi.ManagedDraftContent
+	if len(row.ReleaseContentJSON) > 0 {
+		var c adminapi.ManagedDraftContent
+		if err := json.Unmarshal(row.ReleaseContentJSON, &c); err == nil {
+			current = &c
+		}
+	}
+	if prev != nil && len(prev.ReleaseContentJSON) > 0 {
+		var p adminapi.ManagedDraftContent
+		if err := json.Unmarshal(prev.ReleaseContentJSON, &p); err == nil {
+			previous = &p
+		}
+	}
+	diff := releaseContentDiff(current, previous)
+	history := s.activationHistory(ctx, int(row.ManagedGeneration))
+	return ReleaseView{
+		ReleaseID:           row.ID,
+		ManagedGeneration:   int(row.ManagedGeneration),
+		SnapshotHash:        row.SnapshotHash,
+		Status:              row.Status,
+		CreatedAt:           row.CreatedAt,
+		SourceDraftRevision: int(row.SourceDraftRevision),
+		PublishedBy:         row.CreatedByUserID,
+		DiffSummary:         diff,
+		ActivationHistory:   history,
+	}
+}
+
+// activationHistory returns the ordered activation attempts targeting the given
+// managed generation (release), newest first.
+func (s *Service) activationHistory(ctx context.Context, generation int) []adminapi.ActivationSummary {
+	rows, err := s.Client.Activation.Query().Where(
+		activation.TargetGenerationEQ(int64(generation)),
+	).Order(ent.Desc(activation.FieldCreatedAt)).All(ctx)
+	if err != nil {
+		return nil
+	}
+	out := make([]adminapi.ActivationSummary, 0, len(rows))
+	for _, a := range rows {
+		item := adminapi.ActivationSummary{
+			ActivationId: adminapi.ActivationId(a.ID),
+			State:        adminapi.ActivationSummaryState(a.State),
+			CreatedAt:    a.CreatedAt,
+		}
+		if a.CompletedAt != nil {
+			item.CompletedAt = a.CompletedAt
+		}
+		if a.ErrorCode != nil {
+			item.ErrorCode = a.ErrorCode
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func (s *Service) GetSnapshot(ctx context.Context, generation int) (SnapshotView, error) {
@@ -247,7 +474,7 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 	if err != nil {
 		return ReleaseView{}, err
 	}
-	_, err = s.Client.ManagedRelease.Create().
+	created, err := s.Client.ManagedRelease.Create().
 		SetID(releaseID).
 		SetManagedGeneration(int64(generation)).
 		SetStatus("STAGED").
@@ -262,7 +489,11 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 	if err != nil {
 		return ReleaseView{}, err
 	}
-	return ReleaseView{ReleaseID: releaseID, ManagedGeneration: generation, SnapshotHash: hash, Status: "STAGED", CreatedAt: now}, nil
+	prev, err := s.previousRelease(ctx, created)
+	if err != nil {
+		return ReleaseView{}, err
+	}
+	return s.buildReleaseView(ctx, created, prev), nil
 }
 
 func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedDraftContent) ValidationResult {

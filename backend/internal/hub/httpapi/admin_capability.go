@@ -220,8 +220,16 @@ func activationWire(result runtimecontrol.ActivationResult) adminapi.Activation 
 
 func releaseWire(row capability.ReleaseView) adminapi.Release {
 	return adminapi.Release{
-		ReleaseId: row.ReleaseID, ManagedGeneration: row.ManagedGeneration, SnapshotHash: row.SnapshotHash,
-		Status: adminapi.ReleaseStatus(row.Status), CreatedAt: row.CreatedAt,
+		ReleaseId:           row.ReleaseID,
+		ManagedGeneration:   row.ManagedGeneration,
+		SnapshotHash:        row.SnapshotHash,
+		Status:              adminapi.ReleaseStatus(row.Status),
+		CreatedAt:           row.CreatedAt,
+		SourceDraftRevision: row.SourceDraftRevision,
+		PublishedAt:         row.CreatedAt,
+		PublishedBy:         row.PublishedBy,
+		DiffSummary:         row.DiffSummary,
+		ActivationHistory:   row.ActivationHistory,
 	}
 }
 

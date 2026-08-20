@@ -801,6 +801,30 @@ export interface components {
             mcp: components["schemas"]["McpDefinition"][];
             policy: components["schemas"]["ManagedPolicy"];
         };
+        /** @enum {string} */
+        ReleaseDiffKind: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY";
+        ResourceDiff: {
+            kind: components["schemas"]["ReleaseDiffKind"];
+            added: number;
+            changed: number;
+            removed: number;
+        };
+        DiffSummary: {
+            added: number;
+            changed: number;
+            removed: number;
+            details?: components["schemas"]["ResourceDiff"][];
+        };
+        ActivationSummary: {
+            activationId: components["schemas"]["ActivationId"];
+            /** @enum {string} */
+            state: "APPLYING" | "COMPLETED" | "FAILED" | "UNKNOWN";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            completedAt?: string;
+            errorCode?: string;
+        };
         Release: {
             releaseId: components["schemas"]["ReleaseId"];
             managedGeneration: number;
@@ -809,6 +833,12 @@ export interface components {
             snapshotHash: components["schemas"]["Sha256Hash"];
             /** Format: date-time */
             createdAt: string;
+            sourceDraftRevision: number;
+            /** Format: date-time */
+            publishedAt: string;
+            publishedBy: string;
+            diffSummary: components["schemas"]["DiffSummary"];
+            activationHistory: components["schemas"]["ActivationSummary"][];
         };
         ReleasePage: {
             items: components["schemas"]["Release"][];

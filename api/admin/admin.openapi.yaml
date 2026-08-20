@@ -1785,6 +1785,81 @@ components:
             $ref: '#/components/schemas/McpDefinition'
         policy:
           $ref: '#/components/schemas/ManagedPolicy'
+    ReleaseDiffKind:
+      type: string
+      enum:
+      - PROVIDER
+      - MODEL
+      - TTS
+      - ASR
+      - MCP
+      - POLICY
+    ResourceDiff:
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      - added
+      - changed
+      - removed
+      properties:
+        kind:
+          $ref: '#/components/schemas/ReleaseDiffKind'
+        added:
+          type: integer
+          minimum: 0
+        changed:
+          type: integer
+          minimum: 0
+        removed:
+          type: integer
+          minimum: 0
+    DiffSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - added
+      - changed
+      - removed
+      properties:
+        added:
+          type: integer
+          minimum: 0
+        changed:
+          type: integer
+          minimum: 0
+        removed:
+          type: integer
+          minimum: 0
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceDiff'
+    ActivationSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - activationId
+      - state
+      - createdAt
+      properties:
+        activationId:
+          $ref: '#/components/schemas/ActivationId'
+        state:
+          type: string
+          enum:
+          - APPLYING
+          - COMPLETED
+          - FAILED
+          - UNKNOWN
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        errorCode:
+          type: string
     Release:
       type: object
       additionalProperties: false
@@ -1794,6 +1869,11 @@ components:
       - status
       - snapshotHash
       - createdAt
+      - sourceDraftRevision
+      - publishedAt
+      - publishedBy
+      - diffSummary
+      - activationHistory
       properties:
         releaseId:
           $ref: '#/components/schemas/ReleaseId'
@@ -1812,6 +1892,20 @@ components:
         createdAt:
           type: string
           format: date-time
+        sourceDraftRevision:
+          type: integer
+          minimum: 0
+        publishedAt:
+          type: string
+          format: date-time
+        publishedBy:
+          type: string
+        diffSummary:
+          $ref: '#/components/schemas/DiffSummary'
+        activationHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivationSummary'
     ReleasePage:
       type: object
       additionalProperties: false

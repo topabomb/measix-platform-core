@@ -209,11 +209,13 @@ Relay 侧（4 包全部 Green）：
 ### 4.2 前端 Vitest
 
 ```text
-4 test files, 10 tests, all passed
-  src/api/client.test.ts        → 1 test
-  src/api/workflow.test.ts      → 3 tests
-  src/stores/workflows.test.ts  → 4 tests
-  src/pages/LoginPage.test.ts   → 2 tests
+6 test files, 19 tests, all passed
+  src/api/client.test.ts         → 1 test
+  src/api/workflow.test.ts       → 3 tests
+  src/stores/workflows.test.ts   → 4 tests
+  src/pages/LoginPage.test.ts    → 2 tests
+  src/pages/UpstreamsPage.test.ts → 2 tests
+  src/pages/ResourcesPage.test.ts → 7 tests
 ```
 
 ### 4.3 已知环境问题
@@ -224,18 +226,19 @@ Windows 并发执行 `go test ./...` 时偶发临时二进制文件锁冲突（`
 
 ### 5.1 C0 剩余缺口
 
-- Client/Admin OpenAPI 其余字段/enums 仍需审计（ASR managed semantics 等）
-- usage/preview contract 需完成 closure
-- fixtures/codegen 对新字段需增加更多 boundary case 覆盖
+- ✅ Provider/Model/TTS/ASR/MCP 枚举闭合完成
+- ✅ Snapshot fixtures 覆盖 positive + negative boundary cases
+- ✅ Codegen drift Green
+- ASR managed semantics 等 audit 需在 C4-C6 集成中进一步验证
 
 ### 5.2 C1–C7 状态
 
 | Checkpoint | 状态 | 优先级缺口 |
 |---|---|---|
-| C1 Upstream Operational | 未完成 | Admin auth/SecretRef 完整 workflow、Test/Apply 体验 |
-| C2 Resource Editor | 未完成 | Models/TTS/ASR/MCP/Policy 完整 editor |
-| C3 Snapshot Preview | 部分完成 | structured Review、canonical Client Snapshot Preview |
-| C4 Runtime Profile | 部分完成 | Test Client/Test Adapter 四 profile 闭环 |
+| C1 Upstream Operational | ✅ Green | UpstreamConfig 完整表单 + component TDD 2 tests Green |
+| C2 Resource Editor | ✅ Green | Models/TTS/ASR/MCP/Policy 五类 editor + TDD 7 tests Green |
+| C3 Snapshot Preview | ✅ Green | draft:preview 端点 + UI dialog + TDD Green |
+| C4 Runtime Profile | 未完成 | Test Client/Test Adapter 四 profile (SSE/Binary/Multipart/MCP) 闭环 |
 | C5 Usage/Pricing/Observability | 部分完成 | Admin resource-kind 视角、趋势可视化 |
 | C6 System E2E | 未完成 | real browser + real Hub/Relay + Test Client/Adapter |
 | C7 Contract Freeze | 未开始 | freeze manifest |
@@ -248,7 +251,11 @@ Windows 并发执行 `go test ./...` 时偶发临时二进制文件锁冲突（`
 - Hub 侧全部 MUST 测试场景（HUB-ID/CAP/UPS/ACT/USG/DB）已覆盖并验证 Green
 - Relay 侧全部 MUST 测试场景（RLY-CTL/AUTH/ADM/ROUTE/HDR/TRN/CON/SP）已覆盖并验证 Green
 - 精确十进制算术 (`big.Rat`) 修正完成
-- 全部后端 Go 测试和前端 Vitest 测试通过
+- ✅ C0 Contract Audit & Freeze Prep Green（枚举闭合 + fixtures + codegen）
+- ✅ C1 Upstream Operational Green（完整 UpstreamConfig + TDD）
+- ✅ C2 Managed Resource Editor Green（五类 editor + TDD）
+- ✅ C3 Snapshot Projection & Preview Green（draft:preview 端点 + UI + TDD）
+- 全部后端 Go 测试和前端 Vitest 19 个测试通过
 
 ### 不能宣称
 

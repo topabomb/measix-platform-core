@@ -1,4 +1,4 @@
-import { defineBoot } from '#q-app'
+import { defineBoot } from '@quasar/app-vite/wrappers'
 import { createPinia } from 'pinia'
 import { setUnauthorizedHandler } from '../api/client'
 import { useSessionStore } from '../stores/session'

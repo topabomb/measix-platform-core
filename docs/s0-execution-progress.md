@@ -16,14 +16,140 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
 
 | Checkpoint | 状态 | 当前主要缺口 |
 |---|---|---|
-| C0 Contract Audit & Freeze Prep | 进行中 | TTS `voice` 与 MCP `authOwnership` 已补齐；Client/Admin OpenAPI 其余字段/enums、ASR managed semantics、usage/preview contract 仍需 closure |
-| C1 Upstream Operational | 未完成 | Admin 仍使用简化 `providerKind` workflow；缺完整 auth/SecretRef、transport、correlation、usage capability、timeouts、结构化 Test/Apply |
-| C2 Managed Resource Editor | 未完成 | Resources 偏 Model-only，存在 `prv_placeholder`；缺 Models/TTS/ASR/MCP/Policy 完整 editor 与 Resource→Upstream→Runtime relationship view |
-| C3 Snapshot Projection & Preview | 部分完成 | Hub canonical snapshot/compiler 与 deterministic hash 基础已有；缺新 schema closure、structured Review、canonical Client Snapshot Preview |
-| C4 Runtime Reference Profile | 部分完成 | Relay generic SSE/binary/multipart/MCP transport 已有；缺 Test Client/Test Adapter 四 profile 完整闭环 |
-| C5 Usage / Pricing / Observability | 部分完成 | 后端 ledger/spool/pricing 基础已有；Admin 缺 resource-kind 视角、完整 filters、UNKNOWN/PARTIAL/cost semantics 与趋势可视化 |
-| C6 Browser + Hub + Relay System E2E | 未完成 | 尚无 real browser + real Hub/Relay + deterministic Test Client/Test Adapter 的 S0.1 Gate 证据 |
-| C7 Client Contract Freeze Gate | 未开始 | C0–C6 未全部 Green；freeze manifest 不存在 |
+| C0 Contract Audit & Freeze Prep | ✅ Green | Provider/Model/TTS/ASR/MCP 枚举闭合完成；Snapshot fixtures 完成；codegen drift Green |
+| C1 Upstream Operational | ✅ Green | UpstreamConfig 完整表单（auth/timeout/correlation/usage level）+ component TDD 2 tests Green |
+| C2 Managed Resource Editor | ✅ Green | Models/TTS/ASR/MCP/Policy 五类 editor + relationship count + TDD 7 tests Green |
+| C3 Snapshot Projection & Preview | ✅ Green | `POST /api/admin/v1/draft:preview` 端点 + PreviewDraftRequest/Response schema + handler + service + UI dialog + TDD 1 test Green |
+| C4 Runtime Reference Profile | ⏳ 未完成 | 缺 Test Client/Test Adapter 四 profile (SSE/Binary/Multipart/MCP) 完整闭环 |
+| C5 Usage / Pricing / Observability | ⏳ 未完成 | Admin 缺 resource-kind 视角、完整 filters、UNKNOWN/PARTIAL/cost semantics 与趋势可视化 |
+| C6 Browser + Hub + Relay System E2E | ⏳ 未完成 | 缺 real browser + real Hub/Relay + deterministic Test Client/Test Adapter 的 S0.1 Gate 证据 |
+| C7 Client Contract Freeze Gate | ⏳ 未开始 | C4–C6 未全部 Green；freeze manifest 不存在 |
+
+## 已完成的变更清单
+
+### C0 Contract Audit & Freeze Preparation
+
+1. **OpenAPI 枚举闭合**：
+   - `client-control.openapi.yaml`: Provider `clientProtocol` enum → `OPENAI_CHAT_COMPLETIONS`
+   - `admin.openapi.yaml`: Model `capabilities`/`inputModalities`/`outputModalities` enum 化
+   - `admin.openapi.yaml`: ASR `clientProtocol` enum → `OPENAI_AUDIO_TRANSCRIPTIONS`
+   - `admin.openapi.yaml`: ASR 新增 `language` optional 字段
+   - `client-control.openapi.yaml`: 对应 Client 侧 schema 同步闭合
+
+2. **后端 validation/snapshot 对齐**：
+   - `snapshot.go`: 编译器使用强类型枚举转换（`clientapi.ProviderDefinitionClientProtocol` 等）
+   - `service.go`: `validateContent` 使用 `.Valid()` 校验所有枚举字段
+
+3. **Canonical fixtures**：
+   - `api/fixtures/snapshot/`: full-required-profile, model-openai-chat, tts-openai-speech, asr-openai-transcription, mcp-streamable-http
+   - `api/fixtures/invalid/`: snapshot-invalid-capability, snapshot-invalid-modality, snapshot-unsupported-protocol
+
+4. **Codegen drift**：
+   - `admin.gen.go` / `client.gen.go`: 枚举类型和 `Valid()` 方法已生成
+   - `console/src/api/generated.ts`: 前端类型已重新生成
+   - `api/generated/android/`: Android wire 已同步
+
+### C1 Upstream Operational
+
+1. **UpstreamsPage.vue 重写**：
+   - 替换简化 `providerKind` 表单为完整 `UpstreamConfig`
+   - Auth section: NONE/BEARER/STATIC_HEADER/BASIC + SecretRef
+   - Timeouts: connectMs/responseHeaderMs/idleMs
+   - CorrelationMode: HEADER/QUERY_PARAM/NONE
+   - UsageCapabilityLevel: LEVEL_0/LEVEL_1/LEVEL_2
+   - TransportCapabilities: HTTP/SSE/BINARY/MULTIPART/MCP_STREAMABLE_HTTP
+
+2. **UpstreamsPage.test.ts**（2 tests Green）：
+   - 不渲染 Provider kind select
+   - 提交包含所有必需字段且不含 `providerKind`
+
+### C2 Managed Resource Editor
+
+1. **ResourcesPage.vue 重写**：
+   - 新增 TTS/ASR/MCP editor sections（Add/Delete/Edit）
+   - 新增 Policy editor（4 toggle for allowLocalProviders/Tts/Asr/Mcp）
+   - 新增 Providers card with relationship count
+   - 保留 Models editor 和 Validation panel
+
+2. **draft.ts store 扩展**：
+   - `addTts()`, `addAsr()`, `addMcp()` 方法
+   - 各方法正确初始化 `clientProtocol` 默认值和 `runtimePath`
+
+3. **ResourcesPage.test.ts**（7 tests Green）：
+   - 五类资源 section 渲染
+   - TTS/ASR/MCP Add 按钮功能
+   - Policy toggle 渲染
+   - Provider-Model relationship count
+   - Snapshot Preview API 调用和对话框渲染
+
+### C3 Snapshot Projection & Preview
+
+1. **OpenAPI 契约**：
+   - `POST /api/admin/v1/draft:preview` 路由
+   - `PreviewDraftRequest`: `{ expectedDraftRevision: int }`
+   - `DraftPreviewResponse`: `{ draftRevision, snapshotHash, providers, models, tts, asr, mcp, policy }`
+
+2. **后端实现**：
+   - `capability.Service.PreviewDraft()`: 编译 draft 为 snapshot 预览，返回 hash 和资源列表
+   - `httpapi.PreviewDraft()`: HTTP handler with auth/conflict/error mapping
+   - `admin.gen.go`: 自动生成 `PreviewDraft` 接口和路由注册
+
+3. **前端 UI**：
+   - ResourcesPage 添加 "Preview" 按钮
+   - Snapshot Preview 对话框显示 hash、revision 和资源计数
+
+4. **测试**：
+   - 前端 1 test Green（验证 API 调用 + 对话框内容）
+   - 后端全部测试 Green（包括新增 handler）
+
+### P0 依赖降级
+
+1. `@quasar/app-vite` 3.x → 2.3.0（兼容 Node 22.17.0）
+2. `vue-router` → 4.5.1
+3. `pinia` → 3.0.4
+4. `console/quasar.config.ts`: `#q-app` → `@quasar/app-vite/wrappers`
+5. `console/src/boot/api.ts`: import path 修正
+6. `console/src/router/index.ts`: import path 修正
+
+## 测试执行结果
+
+### 后端 Go 测试（全部 Green）
+
+```text
+internal/contract        — ok
+internal/hub/adminstatic — ok
+internal/hub/app         — ok
+internal/hub/capability  — ok
+internal/hub/httpapi     — ok
+internal/hub/identity    — ok
+internal/hub/maintenance  — ok
+internal/hub/runtimecontrol — ok
+internal/hub/security    — ok
+internal/hub/upstream    — ok
+internal/hub/usage       — ok
+internal/relay           — ok
+internal/relay/app       — ok
+internal/relay/control   — ok
+internal/relay/metering  — ok
+internal/relay/runtime   — ok
+pkg/platformid           — ok
+```
+
+`go vet ./...` — 无错误
+
+### 前端 Vitest（全部 Green）
+
+```text
+6 test files, 19 tests, all passed
+  src/api/client.test.ts         → 1 test
+  src/api/workflow.test.ts       → 3 tests
+  src/stores/workflows.test.ts   → 4 tests
+  src/pages/LoginPage.test.ts    → 2 tests
+  src/pages/UpstreamsPage.test.ts → 2 tests
+  src/pages/ResourcesPage.test.ts → 7 tests
+```
+
+`tsc --noEmit` — 无类型错误
 
 ## 契约与管理
 
@@ -43,4 +169,4 @@ Hub 侧与 Relay 侧全部 MUST 测试场景已覆盖并验证 Green（见 `docs
 
 ## 下一步
 
-**C0 Contract Audit & Freeze Preparation**：完成 Client/Admin executable contract closure 与 fixtures/codegen Green，然后按阶段索引依次推进 C1–C7。
+**C4 Runtime Reference Profile**：建立 Test Client + Test Adapter，证明四个 runtime profile（SSE/Binary/Multipart/MCP）的完整执行链。

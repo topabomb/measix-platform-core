@@ -77,6 +77,21 @@ func (e AdminUserSummaryRole) Valid() bool {
 	}
 }
 
+// Defines values for AsrDefinitionClientProtocol.
+const (
+	OPENAIAUDIOTRANSCRIPTIONS AsrDefinitionClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+)
+
+// Valid indicates whether the value is a known member of the AsrDefinitionClientProtocol enum.
+func (e AsrDefinitionClientProtocol) Valid() bool {
+	switch e {
+	case OPENAIAUDIOTRANSCRIPTIONS:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateUserRequestRole.
 const (
 	CreateUserRequestRoleADMIN  CreateUserRequestRole = "ADMIN"
@@ -140,6 +155,72 @@ const (
 func (e McpDefinitionClientProtocol) Valid() bool {
 	switch e {
 	case MCPSTREAMABLEHTTP:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModelDefinitionCapabilities.
+const (
+	REASONING ModelDefinitionCapabilities = "REASONING"
+	TOOL      ModelDefinitionCapabilities = "TOOL"
+)
+
+// Valid indicates whether the value is a known member of the ModelDefinitionCapabilities enum.
+func (e ModelDefinitionCapabilities) Valid() bool {
+	switch e {
+	case REASONING:
+		return true
+	case TOOL:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModelDefinitionInputModalities.
+const (
+	ModelDefinitionInputModalitiesIMAGE ModelDefinitionInputModalities = "IMAGE"
+	ModelDefinitionInputModalitiesTEXT  ModelDefinitionInputModalities = "TEXT"
+)
+
+// Valid indicates whether the value is a known member of the ModelDefinitionInputModalities enum.
+func (e ModelDefinitionInputModalities) Valid() bool {
+	switch e {
+	case ModelDefinitionInputModalitiesIMAGE:
+		return true
+	case ModelDefinitionInputModalitiesTEXT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModelDefinitionOutputModalities.
+const (
+	ModelDefinitionOutputModalitiesTEXT ModelDefinitionOutputModalities = "TEXT"
+)
+
+// Valid indicates whether the value is a known member of the ModelDefinitionOutputModalities enum.
+func (e ModelDefinitionOutputModalities) Valid() bool {
+	switch e {
+	case ModelDefinitionOutputModalitiesTEXT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProviderDefinitionClientProtocol.
+const (
+	OPENAICHATCOMPLETIONS ProviderDefinitionClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+)
+
+// Valid indicates whether the value is a known member of the ProviderDefinitionClientProtocol enum.
+func (e ProviderDefinitionClientProtocol) Valid() bool {
+	switch e {
+	case OPENAICHATCOMPLETIONS:
 		return true
 	default:
 		return false
@@ -459,13 +540,17 @@ type AdminUserSummaryRole string
 
 // AsrDefinition defines model for AsrDefinition.
 type AsrDefinition struct {
-	AsrId            AsrId   `json:"asrId"`
-	ClientProtocol   string  `json:"clientProtocol"`
-	DisplayName      string  `json:"displayName"`
-	Enabled          bool    `json:"enabled"`
-	RuntimePath      string  `json:"runtimePath"`
-	UpstreamModelKey *string `json:"upstreamModelKey,omitempty"`
+	AsrId            AsrId                       `json:"asrId"`
+	ClientProtocol   AsrDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName      string                      `json:"displayName"`
+	Enabled          bool                        `json:"enabled"`
+	Language         *string                     `json:"language,omitempty"`
+	RuntimePath      string                      `json:"runtimePath"`
+	UpstreamModelKey *string                     `json:"upstreamModelKey,omitempty"`
 }
+
+// AsrDefinitionClientProtocol defines model for AsrDefinition.ClientProtocol.
+type AsrDefinitionClientProtocol string
 
 // AsrId defines model for AsrId.
 type AsrId = string
@@ -538,6 +623,18 @@ type Draft struct {
 // DraftId defines model for DraftId.
 type DraftId = string
 
+// DraftPreviewResponse defines model for DraftPreviewResponse.
+type DraftPreviewResponse struct {
+	Asr           []AsrDefinition      `json:"asr"`
+	DraftRevision int                  `json:"draftRevision"`
+	Mcp           []McpDefinition      `json:"mcp"`
+	Models        []ModelDefinition    `json:"models"`
+	Policy        ManagedPolicy        `json:"policy"`
+	Providers     []ProviderDefinition `json:"providers"`
+	SnapshotHash  Sha256Hash           `json:"snapshotHash"`
+	Tts           []TtsDefinition      `json:"tts"`
+}
+
 // EnrollmentId defines model for EnrollmentId.
 type EnrollmentId = string
 
@@ -606,22 +703,36 @@ type McpServerId = string
 
 // ModelDefinition defines model for ModelDefinition.
 type ModelDefinition struct {
-	Capabilities     []string   `json:"capabilities"`
-	DisplayName      string     `json:"displayName"`
-	Enabled          bool       `json:"enabled"`
-	InputModalities  []string   `json:"inputModalities"`
-	ModelId          ModelId    `json:"modelId"`
-	OutputModalities []string   `json:"outputModalities"`
-	ProviderId       ProviderId `json:"providerId"`
-	RuntimePath      string     `json:"runtimePath"`
-	UpstreamModelKey string     `json:"upstreamModelKey"`
+	Capabilities     []ModelDefinitionCapabilities     `json:"capabilities"`
+	DisplayName      string                            `json:"displayName"`
+	Enabled          bool                              `json:"enabled"`
+	InputModalities  []ModelDefinitionInputModalities  `json:"inputModalities"`
+	ModelId          ModelId                           `json:"modelId"`
+	OutputModalities []ModelDefinitionOutputModalities `json:"outputModalities"`
+	ProviderId       ProviderId                        `json:"providerId"`
+	RuntimePath      string                            `json:"runtimePath"`
+	UpstreamModelKey string                            `json:"upstreamModelKey"`
 }
+
+// ModelDefinitionCapabilities defines model for ModelDefinition.Capabilities.
+type ModelDefinitionCapabilities string
+
+// ModelDefinitionInputModalities defines model for ModelDefinition.InputModalities.
+type ModelDefinitionInputModalities string
+
+// ModelDefinitionOutputModalities defines model for ModelDefinition.OutputModalities.
+type ModelDefinitionOutputModalities string
 
 // ModelId defines model for ModelId.
 type ModelId = string
 
 // PolicyId defines model for PolicyId.
 type PolicyId = string
+
+// PreviewDraftRequest defines model for PreviewDraftRequest.
+type PreviewDraftRequest struct {
+	ExpectedDraftRevision int `json:"expectedDraftRevision"`
+}
 
 // PricingRule defines model for PricingRule.
 type PricingRule struct {
@@ -660,11 +771,14 @@ type Problem struct {
 
 // ProviderDefinition defines model for ProviderDefinition.
 type ProviderDefinition struct {
-	ClientProtocol string     `json:"clientProtocol"`
-	DisplayName    string     `json:"displayName"`
-	Enabled        bool       `json:"enabled"`
-	ProviderId     ProviderId `json:"providerId"`
+	ClientProtocol ProviderDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName    string                           `json:"displayName"`
+	Enabled        bool                             `json:"enabled"`
+	ProviderId     ProviderId                       `json:"providerId"`
 }
+
+// ProviderDefinitionClientProtocol defines model for ProviderDefinition.ClientProtocol.
+type ProviderDefinitionClientProtocol string
 
 // ProviderId defines model for ProviderId.
 type ProviderId = string
@@ -986,6 +1100,11 @@ type PutDraftParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// PreviewDraftParams defines parameters for PreviewDraft.
+type PreviewDraftParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // PublishDraftParams defines parameters for PublishDraft.
 type PublishDraftParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
@@ -1109,6 +1228,9 @@ type SetPasswordParams struct {
 // PutDraftJSONRequestBody defines body for PutDraft for application/json ContentType.
 type PutDraftJSONRequestBody = PutDraftRequest
 
+// PreviewDraftJSONRequestBody defines body for PreviewDraft for application/json ContentType.
+type PreviewDraftJSONRequestBody = PreviewDraftRequest
+
 // PublishDraftJSONRequestBody defines body for PublishDraft for application/json ContentType.
 type PublishDraftJSONRequestBody = PublishDraftRequest
 
@@ -1225,6 +1347,9 @@ type ServerInterface interface {
 
 	// (PUT /api/admin/v1/draft)
 	PutDraft(w http.ResponseWriter, r *http.Request, params PutDraftParams)
+
+	// (POST /api/admin/v1/draft:preview)
+	PreviewDraft(w http.ResponseWriter, r *http.Request, params PreviewDraftParams)
 
 	// (POST /api/admin/v1/draft:publish)
 	PublishDraft(w http.ResponseWriter, r *http.Request, params PublishDraftParams)
@@ -1344,6 +1469,11 @@ func (_ Unimplemented) GetDraft(w http.ResponseWriter, r *http.Request) {
 
 // (PUT /api/admin/v1/draft)
 func (_ Unimplemented) PutDraft(w http.ResponseWriter, r *http.Request, params PutDraftParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/draft:preview)
+func (_ Unimplemented) PreviewDraft(w http.ResponseWriter, r *http.Request, params PreviewDraftParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1669,6 +1799,51 @@ func (siw *ServerInterfaceWrapper) PutDraft(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutDraft(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewDraft operation middleware
+func (siw *ServerInterfaceWrapper) PreviewDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PreviewDraftParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewDraft(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3238,6 +3413,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/draft:publish", wrapper.PublishDraft)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/draft:preview", wrapper.PreviewDraft)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/releases", wrapper.ListReleases)

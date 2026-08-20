@@ -29,6 +29,17 @@ type DraftView struct {
 	Content       adminapi.ManagedDraftContent
 }
 
+type DraftPreview struct {
+	DraftRevision int
+	SnapshotHash  string
+	Providers     []adminapi.ProviderDefinition
+	Models        []adminapi.ModelDefinition
+	TTS           []adminapi.TtsDefinition
+	ASR           []adminapi.AsrDefinition
+	MCP           []adminapi.McpDefinition
+	Policy        adminapi.ManagedPolicy
+}
+
 type ValidationResult struct {
 	Valid    bool
 	Errors   []adminapi.ValidationIssue
@@ -151,6 +162,47 @@ func (s *Service) ValidateDraft(ctx context.Context, expectedRevision int) (Vali
 	return s.validateContent(ctx, draft.Content), nil
 }
 
+// PreviewDraft compiles the current draft into a snapshot preview without persisting a release.
+// It returns the canonical snapshot hash and sorted resource arrays so the operator can
+// review the exact shape that would be published.
+func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (DraftPreview, error) {
+	draft, err := s.GetDraft(ctx)
+	if err != nil {
+		return DraftPreview{}, err
+	}
+	if draft.DraftRevision != expectedRevision {
+		return DraftPreview{}, ErrRevisionConflict
+	}
+	deployment, err := s.Client.Deployment.Query().Only(ctx)
+	if err != nil {
+		return DraftPreview{}, err
+	}
+	_, hash, err := s.CompileSnapshot(SnapshotInput{
+		DeploymentID:      deployment.ID,
+		ReleaseID:         "preview",
+		ManagedGeneration: 1,
+		Content:           draft.Content,
+		PublishedAt:       s.Now().UTC(),
+	})
+	if err != nil {
+		return DraftPreview{}, err
+	}
+	// The preview response uses adminapi types directly from the draft content.
+	// The hash is computed from the canonical (clientapi) snapshot so it matches
+	// what would be persisted on publish.
+	content := draft.Content
+	return DraftPreview{
+		DraftRevision: draft.DraftRevision,
+		SnapshotHash:  hash,
+		Providers:     content.Providers,
+		Models:        content.Models,
+		TTS:           content.Tts,
+		ASR:           content.Asr,
+		MCP:           content.Mcp,
+		Policy:        content.Policy,
+	}, nil
+}
+
 func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDraftRevision int) (ReleaseView, error) {
 	draft, err := s.GetDraft(ctx)
 	if err != nil {
@@ -228,8 +280,11 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 
 	providers := make(map[string]adminapi.ProviderDefinition, len(content.Providers))
-	for _, provider := range content.Providers {
+	for i, provider := range content.Providers {
 		providers[provider.ProviderId] = provider
+		if !provider.ClientProtocol.Valid() {
+			addError("invalid_client_protocol", fmt.Sprintf("providers[%d].clientProtocol", i), "unsupported provider client protocol")
+		}
 	}
 	resources := map[string]bool{}
 	for i, model := range content.Models {
@@ -239,6 +294,21 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 		if !validRuntimePath(model.RuntimePath) {
 			addError("invalid_runtime_path", fmt.Sprintf("models[%d].runtimePath", i), "runtimePath must be an absolute normalized path")
+		}
+		for j, c := range model.Capabilities {
+			if !c.Valid() {
+				addError("invalid_capability", fmt.Sprintf("models[%d].capabilities[%d]", i, j), "unsupported model capability")
+			}
+		}
+		for j, m := range model.InputModalities {
+			if !m.Valid() {
+				addError("invalid_input_modality", fmt.Sprintf("models[%d].inputModalities[%d]", i, j), "unsupported input modality")
+			}
+		}
+		for j, m := range model.OutputModalities {
+			if !m.Valid() {
+				addError("invalid_output_modality", fmt.Sprintf("models[%d].outputModalities[%d]", i, j), "unsupported output modality")
+			}
 		}
 	}
 	for i, value := range content.Tts {
@@ -252,6 +322,9 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for i, value := range content.Asr {
 		resources[value.AsrId] = value.Enabled
+		if !value.ClientProtocol.Valid() {
+			addError("invalid_client_protocol", fmt.Sprintf("asr[%d].clientProtocol", i), "unsupported ASR client protocol")
+		}
 		if !validRuntimePath(value.RuntimePath) {
 			addError("invalid_runtime_path", fmt.Sprintf("asr[%d].runtimePath", i), "runtimePath must be an absolute normalized path")
 		}

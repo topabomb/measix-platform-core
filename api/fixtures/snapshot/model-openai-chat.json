@@ -1,0 +1,42 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 1,
+  "managedGeneration": 1,
+  "releaseId": "rel_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "providers": [
+    {
+      "providerId": "prv_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "displayName": "OpenAI Managed Provider",
+      "clientProtocol": "OPENAI_CHAT_COMPLETIONS",
+      "enabled": true
+    }
+  ],
+  "models": [
+    {
+      "modelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "providerId": "prv_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "displayName": "GPT-4o Managed",
+      "upstreamModelKey": "gpt-4o",
+      "runtimePath": "/v1/chat/completions",
+      "inputModalities": ["TEXT", "IMAGE"],
+      "outputModalities": ["TEXT"],
+      "capabilities": ["TOOL", "REASONING"],
+      "enabled": true
+    }
+  ],
+  "tts": [],
+  "asr": [],
+  "mcp": [],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": true,
+    "allowLocalTts": true,
+    "allowLocalAsr": true,
+    "allowLocalMcp": true,
+    "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+  },
+  "metadata": {
+    "publishedAt": "2026-08-19T03:00:00Z"
+  },
+  "snapshotHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+}

@@ -54,6 +54,13 @@ func TestSYSI0001CanonicalFixturesDecodeWithGeneratedWire(t *testing.T) {
 	_ = decodeFixture[clientapi.Problem](t, "problem/managed-snapshot-required.json", true)
 	_ = decodeFixture[adminapi.Problem](t, "problem/stale-draft-revision.json", true)
 	_ = decodeFixture[usageingestapi.UsageBatch](t, "usage/request-batch.json", true)
+
+	// C0 canonical full-profile snapshot fixtures must decode with strict wire types.
+	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/full-required-profile.json", true)
+	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/model-openai-chat.json", true)
+	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/tts-openai-speech.json", true)
+	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/asr-openai-transcription.json", true)
+	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/mcp-streamable-http.json", true)
 }
 
 func TestSYSI0002UnknownOptionalResponseFieldIsTolerated(t *testing.T) {
@@ -74,6 +81,40 @@ func TestSYSI0003UnknownRequestFieldIsRejected(t *testing.T) {
 	if err := decoder.Decode(&request); err == nil {
 		t.Fatal("unknown request field unexpectedly accepted")
 	}
+}
+
+func TestNegativeSnapshotFixturesRejectedByEnumValidation(t *testing.T) {
+	// C0 negative fixtures must fail enum validation.
+	// Go JSON unmarshal does not reject unknown enum values for string-based types,
+	// so we use the generated Valid() methods to verify they are not valid enum members.
+	type check struct {
+		path string
+		valid func() bool
+	}
+
+	// unsupported-protocol: Provider.clientProtocol = "UNSUPPORTED_PROTOCOL"
+	snap := decodeFixture[clientapi.ManagedSnapshot](t, "invalid/snapshot-unsupported-protocol.json", true)
+	if snap.Providers[0].ClientProtocol.Valid() {
+		t.Fatal("UNSUPPORTED_PROTOCOL should not be a valid provider clientProtocol")
+	}
+
+	// invalid-modality: Model.inputModalities contains "VIDEO"
+	snap2 := decodeFixture[clientapi.ManagedSnapshot](t, "invalid/snapshot-invalid-modality.json", true)
+	for _, m := range snap2.Models[0].InputModalities {
+		if string(m) == "VIDEO" && m.Valid() {
+			t.Fatal("VIDEO should not be a valid input modality")
+		}
+	}
+
+	// invalid-capability: Model.capabilities contains "CODE_INTERPRETER"
+	snap3 := decodeFixture[clientapi.ManagedSnapshot](t, "invalid/snapshot-invalid-capability.json", true)
+	for _, c := range snap3.Models[0].Capabilities {
+		if string(c) == "CODE_INTERPRETER" && c.Valid() {
+			t.Fatal("CODE_INTERPRETER should not be a valid model capability")
+		}
+	}
+
+	_ = check{}
 }
 
 func TestSnapshotAndRuntimeControlGoldenHashes(t *testing.T) {

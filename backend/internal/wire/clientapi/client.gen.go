@@ -12,6 +12,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AsrDefinitionClientProtocol.
+const (
+	OPENAIAUDIOTRANSCRIPTIONS AsrDefinitionClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+)
+
+// Valid indicates whether the value is a known member of the AsrDefinitionClientProtocol enum.
+func (e AsrDefinitionClientProtocol) Valid() bool {
+	switch e {
+	case OPENAIAUDIOTRANSCRIPTIONS:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BootstrapDeviceStatus.
 const (
 	ACTIVE  BootstrapDeviceStatus = "ACTIVE"
@@ -144,6 +159,72 @@ func (e McpDefinitionClientProtocol) Valid() bool {
 	}
 }
 
+// Defines values for ModelDefinitionCapabilities.
+const (
+	REASONING ModelDefinitionCapabilities = "REASONING"
+	TOOL      ModelDefinitionCapabilities = "TOOL"
+)
+
+// Valid indicates whether the value is a known member of the ModelDefinitionCapabilities enum.
+func (e ModelDefinitionCapabilities) Valid() bool {
+	switch e {
+	case REASONING:
+		return true
+	case TOOL:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModelDefinitionInputModalities.
+const (
+	ModelDefinitionInputModalitiesIMAGE ModelDefinitionInputModalities = "IMAGE"
+	ModelDefinitionInputModalitiesTEXT  ModelDefinitionInputModalities = "TEXT"
+)
+
+// Valid indicates whether the value is a known member of the ModelDefinitionInputModalities enum.
+func (e ModelDefinitionInputModalities) Valid() bool {
+	switch e {
+	case ModelDefinitionInputModalitiesIMAGE:
+		return true
+	case ModelDefinitionInputModalitiesTEXT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModelDefinitionOutputModalities.
+const (
+	ModelDefinitionOutputModalitiesTEXT ModelDefinitionOutputModalities = "TEXT"
+)
+
+// Valid indicates whether the value is a known member of the ModelDefinitionOutputModalities enum.
+func (e ModelDefinitionOutputModalities) Valid() bool {
+	switch e {
+	case ModelDefinitionOutputModalitiesTEXT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProviderDefinitionClientProtocol.
+const (
+	OPENAICHATCOMPLETIONS ProviderDefinitionClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+)
+
+// Valid indicates whether the value is a known member of the ProviderDefinitionClientProtocol enum.
+func (e ProviderDefinitionClientProtocol) Valid() bool {
+	switch e {
+	case OPENAICHATCOMPLETIONS:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RuntimeBindingDefinitionTransportPolicy.
 const (
 	HTTPBINARYSTREAM    RuntimeBindingDefinitionTransportPolicy = "HTTP_BINARY_STREAM"
@@ -206,13 +287,17 @@ type ActivationId = string
 
 // AsrDefinition defines model for AsrDefinition.
 type AsrDefinition struct {
-	AsrId            AsrId   `json:"asrId"`
-	ClientProtocol   string  `json:"clientProtocol"`
-	DisplayName      string  `json:"displayName"`
-	Enabled          bool    `json:"enabled"`
-	RuntimePath      string  `json:"runtimePath"`
-	UpstreamModelKey *string `json:"upstreamModelKey,omitempty"`
+	AsrId            AsrId                       `json:"asrId"`
+	ClientProtocol   AsrDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName      string                      `json:"displayName"`
+	Enabled          bool                        `json:"enabled"`
+	Language         *string                     `json:"language,omitempty"`
+	RuntimePath      string                      `json:"runtimePath"`
+	UpstreamModelKey *string                     `json:"upstreamModelKey,omitempty"`
 }
+
+// AsrDefinitionClientProtocol defines model for AsrDefinition.ClientProtocol.
+type AsrDefinitionClientProtocol string
 
 // AsrId defines model for AsrId.
 type AsrId = string
@@ -383,16 +468,25 @@ type McpServerId = string
 
 // ModelDefinition defines model for ModelDefinition.
 type ModelDefinition struct {
-	Capabilities     []string   `json:"capabilities"`
-	DisplayName      string     `json:"displayName"`
-	Enabled          bool       `json:"enabled"`
-	InputModalities  []string   `json:"inputModalities"`
-	ModelId          ModelId    `json:"modelId"`
-	OutputModalities []string   `json:"outputModalities"`
-	ProviderId       ProviderId `json:"providerId"`
-	RuntimePath      string     `json:"runtimePath"`
-	UpstreamModelKey string     `json:"upstreamModelKey"`
+	Capabilities     []ModelDefinitionCapabilities     `json:"capabilities"`
+	DisplayName      string                            `json:"displayName"`
+	Enabled          bool                              `json:"enabled"`
+	InputModalities  []ModelDefinitionInputModalities  `json:"inputModalities"`
+	ModelId          ModelId                           `json:"modelId"`
+	OutputModalities []ModelDefinitionOutputModalities `json:"outputModalities"`
+	ProviderId       ProviderId                        `json:"providerId"`
+	RuntimePath      string                            `json:"runtimePath"`
+	UpstreamModelKey string                            `json:"upstreamModelKey"`
 }
+
+// ModelDefinitionCapabilities defines model for ModelDefinition.Capabilities.
+type ModelDefinitionCapabilities string
+
+// ModelDefinitionInputModalities defines model for ModelDefinition.InputModalities.
+type ModelDefinitionInputModalities string
+
+// ModelDefinitionOutputModalities defines model for ModelDefinition.OutputModalities.
+type ModelDefinitionOutputModalities string
 
 // ModelId defines model for ModelId.
 type ModelId = string
@@ -419,11 +513,14 @@ type Problem struct {
 
 // ProviderDefinition defines model for ProviderDefinition.
 type ProviderDefinition struct {
-	ClientProtocol string     `json:"clientProtocol"`
-	DisplayName    string     `json:"displayName"`
-	Enabled        bool       `json:"enabled"`
-	ProviderId     ProviderId `json:"providerId"`
+	ClientProtocol ProviderDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName    string                           `json:"displayName"`
+	Enabled        bool                             `json:"enabled"`
+	ProviderId     ProviderId                       `json:"providerId"`
 }
+
+// ProviderDefinitionClientProtocol defines model for ProviderDefinition.ClientProtocol.
+type ProviderDefinitionClientProtocol string
 
 // ProviderId defines model for ProviderId.
 type ProviderId = string

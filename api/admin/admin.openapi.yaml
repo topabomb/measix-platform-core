@@ -394,6 +394,33 @@ paths:
       parameters:
       - *id001
       - *id003
+  /api/admin/v1/draft:preview:
+    post:
+      operationId: previewDraft
+      description: Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical snapshot hash and sorted resource arrays so the operator can review the exact shape that would be published.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftPreviewResponse'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewDraftRequest'
+      parameters:
+      - *id001
   /api/admin/v1/releases:
     get:
       operationId: listReleases
@@ -942,7 +969,8 @@ components:
           minLength: 1
         clientProtocol:
           type: string
-          minLength: 1
+          enum:
+          - OPENAI_CHAT_COMPLETIONS
         enabled:
           type: boolean
     ModelDefinition:
@@ -974,14 +1002,22 @@ components:
           type: array
           items:
             type: string
+            enum:
+            - TEXT
+            - IMAGE
         outputModalities:
           type: array
           items:
             type: string
+            enum:
+            - TEXT
         capabilities:
           type: array
           items:
             type: string
+            enum:
+            - TOOL
+            - REASONING
         enabled:
           type: boolean
     TtsDefinition:
@@ -1029,7 +1065,11 @@ components:
           type: string
         clientProtocol:
           type: string
+          enum:
+          - OPENAI_AUDIO_TRANSCRIPTIONS
         upstreamModelKey:
+          type: string
+        language:
           type: string
         runtimePath:
           type: string
@@ -1661,6 +1701,55 @@ components:
           type: array
           items:
             type: string
+    PreviewDraftRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedDraftRevision
+      properties:
+        expectedDraftRevision:
+          type: integer
+          minimum: 0
+    DraftPreviewResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - draftRevision
+      - snapshotHash
+      - providers
+      - models
+      - tts
+      - asr
+      - mcp
+      - policy
+      properties:
+        draftRevision:
+          type: integer
+          minimum: 0
+        snapshotHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderDefinition'
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelDefinition'
+        tts:
+          type: array
+          items:
+            $ref: '#/components/schemas/TtsDefinition'
+        asr:
+          type: array
+          items:
+            $ref: '#/components/schemas/AsrDefinition'
+        mcp:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpDefinition'
+        policy:
+          $ref: '#/components/schemas/ManagedPolicy'
     Release:
       type: object
       additionalProperties: false

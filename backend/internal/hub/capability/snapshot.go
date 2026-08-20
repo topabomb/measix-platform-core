@@ -52,16 +52,25 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	}
 	providers := make([]clientapi.ProviderDefinition, 0, len(input.Content.Providers))
 	for _, value := range input.Content.Providers {
-		providers = append(providers, clientapi.ProviderDefinition{ProviderId: value.ProviderId, DisplayName: value.DisplayName, ClientProtocol: value.ClientProtocol, Enabled: value.Enabled})
+		providers = append(providers, clientapi.ProviderDefinition{ProviderId: value.ProviderId, DisplayName: value.DisplayName, ClientProtocol: clientapi.ProviderDefinitionClientProtocol(value.ClientProtocol), Enabled: value.Enabled})
 	}
 	models := make([]clientapi.ModelDefinition, 0, len(input.Content.Models))
 	for _, value := range input.Content.Models {
-		capabilities := append([]string(nil), value.Capabilities...)
-		inputs := append([]string(nil), value.InputModalities...)
-		outputs := append([]string(nil), value.OutputModalities...)
-		sort.Strings(capabilities)
-		sort.Strings(inputs)
-		sort.Strings(outputs)
+		capabilities := make([]clientapi.ModelDefinitionCapabilities, 0, len(value.Capabilities))
+		for _, c := range value.Capabilities {
+			capabilities = append(capabilities, clientapi.ModelDefinitionCapabilities(c))
+		}
+		inputs := make([]clientapi.ModelDefinitionInputModalities, 0, len(value.InputModalities))
+		for _, m := range value.InputModalities {
+			inputs = append(inputs, clientapi.ModelDefinitionInputModalities(m))
+		}
+		outputs := make([]clientapi.ModelDefinitionOutputModalities, 0, len(value.OutputModalities))
+		for _, m := range value.OutputModalities {
+			outputs = append(outputs, clientapi.ModelDefinitionOutputModalities(m))
+		}
+		sort.Slice(capabilities, func(i, j int) bool { return capabilities[i] < capabilities[j] })
+		sort.Slice(inputs, func(i, j int) bool { return inputs[i] < inputs[j] })
+		sort.Slice(outputs, func(i, j int) bool { return outputs[i] < outputs[j] })
 		models = append(models, clientapi.ModelDefinition{
 			ModelId: value.ModelId, ProviderId: value.ProviderId, DisplayName: value.DisplayName,
 			UpstreamModelKey: value.UpstreamModelKey, RuntimePath: value.RuntimePath, Enabled: value.Enabled,
@@ -74,7 +83,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	}
 	asr := make([]clientapi.AsrDefinition, 0, len(input.Content.Asr))
 	for _, value := range input.Content.Asr {
-		asr = append(asr, clientapi.AsrDefinition{AsrId: value.AsrId, DisplayName: value.DisplayName, ClientProtocol: value.ClientProtocol, UpstreamModelKey: value.UpstreamModelKey, RuntimePath: value.RuntimePath, Enabled: value.Enabled})
+		asr = append(asr, clientapi.AsrDefinition{AsrId: value.AsrId, DisplayName: value.DisplayName, ClientProtocol: clientapi.AsrDefinitionClientProtocol(value.ClientProtocol), UpstreamModelKey: value.UpstreamModelKey, Language: value.Language, RuntimePath: value.RuntimePath, Enabled: value.Enabled})
 	}
 	mcp := make([]clientapi.McpDefinition, 0, len(input.Content.Mcp))
 	for _, value := range input.Content.Mcp {

@@ -212,6 +212,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/draft:preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical snapshot hash and sorted resource arrays so the operator can review the exact shape that would be published. */
+        post: operations["previewDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/releases": {
         parameters: {
             query?: never;
@@ -518,7 +535,8 @@ export interface components {
         ProviderDefinition: {
             providerId: components["schemas"]["ProviderId"];
             displayName: string;
-            clientProtocol: string;
+            /** @enum {string} */
+            clientProtocol: "OPENAI_CHAT_COMPLETIONS";
             enabled: boolean;
         };
         ModelDefinition: {
@@ -527,9 +545,9 @@ export interface components {
             displayName: string;
             upstreamModelKey: string;
             runtimePath: string;
-            inputModalities: string[];
-            outputModalities: string[];
-            capabilities: string[];
+            inputModalities: ("TEXT" | "IMAGE")[];
+            outputModalities: "TEXT"[];
+            capabilities: ("TOOL" | "REASONING")[];
             enabled: boolean;
         };
         TtsDefinition: {
@@ -545,8 +563,10 @@ export interface components {
         AsrDefinition: {
             asrId: components["schemas"]["AsrId"];
             displayName: string;
-            clientProtocol: string;
+            /** @enum {string} */
+            clientProtocol: "OPENAI_AUDIO_TRANSCRIPTIONS";
             upstreamModelKey?: string;
+            language?: string;
             runtimePath: string;
             enabled: boolean;
         };
@@ -759,6 +779,19 @@ export interface components {
         PublishDraftRequest: {
             expectedDraftRevision: number;
             acknowledgedWarningCodes: string[];
+        };
+        PreviewDraftRequest: {
+            expectedDraftRevision: number;
+        };
+        DraftPreviewResponse: {
+            draftRevision: number;
+            snapshotHash: components["schemas"]["Sha256Hash"];
+            providers: components["schemas"]["ProviderDefinition"][];
+            models: components["schemas"]["ModelDefinition"][];
+            tts: components["schemas"]["TtsDefinition"][];
+            asr: components["schemas"]["AsrDefinition"][];
+            mcp: components["schemas"]["McpDefinition"][];
+            policy: components["schemas"]["ManagedPolicy"];
         };
         Release: {
             releaseId: components["schemas"]["ReleaseId"];
@@ -1354,6 +1387,36 @@ export interface operations {
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    previewDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftPreviewResponse"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     listReleases: {

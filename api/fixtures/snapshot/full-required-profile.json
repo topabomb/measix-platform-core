@@ -1,0 +1,74 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 1,
+  "managedGeneration": 42,
+  "releaseId": "rel_660e8400-e29b-41d4-a716-446655440000",
+  "providers": [
+    {
+      "providerId": "prv_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "displayName": "OpenAI Managed Provider",
+      "clientProtocol": "OPENAI_CHAT_COMPLETIONS",
+      "enabled": true
+    }
+  ],
+  "models": [
+    {
+      "modelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "providerId": "prv_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "displayName": "GPT-4o Managed",
+      "upstreamModelKey": "gpt-4o",
+      "runtimePath": "/v1/chat/completions",
+      "inputModalities": ["TEXT", "IMAGE"],
+      "outputModalities": ["TEXT"],
+      "capabilities": ["TOOL", "REASONING"],
+      "enabled": true
+    }
+  ],
+  "tts": [
+    {
+      "ttsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "displayName": "OpenAI TTS",
+      "clientProtocol": "OPENAI_AUDIO_SPEECH",
+      "upstreamModelKey": "tts-1",
+      "voice": "alloy",
+      "runtimePath": "/v1/audio/speech",
+      "enabled": true
+    }
+  ],
+  "asr": [
+    {
+      "asrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "displayName": "OpenAI ASR",
+      "clientProtocol": "OPENAI_AUDIO_TRANSCRIPTIONS",
+      "upstreamModelKey": "whisper-1",
+      "language": "en",
+      "runtimePath": "/v1/audio/transcriptions",
+      "enabled": true
+    }
+  ],
+  "mcp": [
+    {
+      "mcpServerId": "mcp_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      "displayName": "Enterprise MCP Server",
+      "clientProtocol": "MCP_STREAMABLE_HTTP",
+      "runtimePath": "/mcp/v1",
+      "authOwnership": "ENTERPRISE_MANAGED",
+      "enabled": true
+    }
+  ],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": true,
+    "allowLocalTts": true,
+    "allowLocalAsr": true,
+    "allowLocalMcp": true,
+    "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "defaultTtsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+  },
+  "metadata": {
+    "publishedAt": "2026-08-19T03:00:00Z",
+    "publishedByUserId": "usr_550e8400-e29b-41d4-a716-446655440000"
+  },
+  "snapshotHash": "sha256:c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4"
+}

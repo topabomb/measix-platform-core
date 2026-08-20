@@ -1,0 +1,33 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 1,
+  "managedGeneration": 3,
+  "releaseId": "rel_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  "providers": [],
+  "models": [],
+  "tts": [],
+  "asr": [
+    {
+      "asrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "displayName": "OpenAI ASR",
+      "clientProtocol": "OPENAI_AUDIO_TRANSCRIPTIONS",
+      "upstreamModelKey": "whisper-1",
+      "language": "en",
+      "runtimePath": "/v1/audio/transcriptions",
+      "enabled": true
+    }
+  ],
+  "mcp": [],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": true,
+    "allowLocalTts": true,
+    "allowLocalAsr": true,
+    "allowLocalMcp": true,
+    "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+  },
+  "metadata": {
+    "publishedAt": "2026-08-19T03:00:00Z"
+  },
+  "snapshotHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+}

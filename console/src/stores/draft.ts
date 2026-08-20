@@ -56,13 +56,57 @@ export const useDraftStore = defineStore('draft', () => {
       displayName: 'New model',
       upstreamModelKey: '',
       runtimePath: '/',
-      inputModalities: ['text'],
-      outputModalities: ['text'],
+      inputModalities: ['TEXT'],
+      outputModalities: ['TEXT'],
       capabilities: [],
       enabled: true,
     })
     markDirty()
     return modelId
+  }
+
+  function addTts(): string {
+    const ttsId = createCandidateId('tts')
+    requireContent().tts.push({
+      ttsId,
+      displayName: 'New TTS',
+      clientProtocol: 'OPENAI_AUDIO_SPEECH',
+      upstreamModelKey: '',
+      voice: 'alloy',
+      runtimePath: '/v1/audio/speech',
+      enabled: true,
+    })
+    markDirty()
+    return ttsId
+  }
+
+  function addAsr(): string {
+    const asrId = createCandidateId('asr')
+    requireContent().asr.push({
+      asrId,
+      displayName: 'New ASR',
+      clientProtocol: 'OPENAI_AUDIO_TRANSCRIPTIONS',
+      upstreamModelKey: '',
+      language: '',
+      runtimePath: '/v1/audio/transcriptions',
+      enabled: true,
+    })
+    markDirty()
+    return asrId
+  }
+
+  function addMcp(): string {
+    const mcpServerId = createCandidateId('mcp')
+    requireContent().mcp.push({
+      mcpServerId,
+      displayName: 'New MCP Server',
+      clientProtocol: 'MCP_STREAMABLE_HTTP',
+      runtimePath: '/mcp',
+      authOwnership: 'NONE',
+      enabled: true,
+    })
+    markDirty()
+    return mcpServerId
   }
 
   async function save(csrfToken: string) {
@@ -94,6 +138,6 @@ export const useDraftStore = defineStore('draft', () => {
 
   return {
     baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
-    load, save, validate, addModel, markDirty,
+    load, save, validate, addModel, addTts, addAsr, addMcp, markDirty,
   }
 })

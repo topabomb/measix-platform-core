@@ -10,13 +10,28 @@ import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
 
 type Activation = components['schemas']['Activation']
+type ManagedDraftContent = components['schemas']['ManagedDraftContent']
+type ModelDefinition = components['schemas']['ModelDefinition']
+type TtsDefinition = components['schemas']['TtsDefinition']
+type AsrDefinition = components['schemas']['AsrDefinition']
+type McpDefinition = components['schemas']['McpDefinition']
+type ProviderDefinition = components['schemas']['ProviderDefinition']
+type ManagedPolicy = components['schemas']['ManagedPolicy']
 
 const draft = useDraftStore()
 const session = useSessionStore()
 const activation = useActivationStore()
 const error = ref<unknown>()
 const publishing = ref(false)
+const previewing = ref(false)
+const preview = ref<components['schemas']['DraftPreviewResponse']>()
+const previewOpen = ref(false)
 const canMutate = computed(() => Boolean(session.csrfToken))
+
+const INPUT_MODS = ['TEXT', 'IMAGE'] as const
+const OUTPUT_MODS = ['TEXT'] as const
+const MODEL_CAPS = ['TOOL', 'REASONING'] as const
+const AUTH_OWNERSHIPS = ['ENTERPRISE_MANAGED', 'NONE'] as const
 
 async function refresh() {
   error.value = undefined
@@ -59,6 +74,30 @@ async function publish() {
   }
 }
 
+/** Count models referencing a given providerId */
+function modelCountForProvider(providerId: string): number {
+  return draft.localContent?.models.filter((m) => m.providerId === providerId).length ?? 0
+}
+
+async function previewSnapshot() {
+  if (!session.csrfToken) return
+  if (draft.baselineRevision === undefined) return
+  previewing.value = true
+  error.value = undefined
+  try {
+    preview.value = await apiFetch<components['schemas']['DraftPreviewResponse']>(
+      '/api/admin/v1/draft:preview',
+      { method: 'POST', body: JSON.stringify({ expectedDraftRevision: draft.baselineRevision }) },
+      session.csrfToken,
+    )
+    previewOpen.value = true
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    previewing.value = false
+  }
+}
+
 onMounted(refresh)
 </script>
 
@@ -73,6 +112,7 @@ onMounted(refresh)
         <q-btn flat icon="refresh" @click="refresh" />
         <q-btn outline color="primary" label="Validate" :disable="!canMutate || draft.loading" @click="validate" />
         <q-btn outline color="primary" label="Save" :disable="!canMutate || !draft.dirty" :loading="draft.saving" @click="save" />
+        <q-btn outline color="secondary" label="Preview" :disable="!canMutate" :loading="previewing" @click="previewSnapshot" />
         <q-btn color="positive" icon="rocket_launch" label="Publish" :disable="!canMutate" :loading="publishing" @click="publish" />
       </div>
     </div>
@@ -99,14 +139,34 @@ onMounted(refresh)
         </q-card-section>
       </q-card>
 
+      <!-- Providers + Models -->
+      <q-card flat bordered class="q-mb-md">
+        <q-card-section>
+          <div class="row items-center justify-between">
+            <div class="text-subtitle2">Providers</div>
+          </div>
+          <q-list dense class="q-mt-sm">
+            <q-item v-for="provider in draft.localContent.providers" :key="provider.providerId">
+              <q-item-section>
+                <q-item-label>{{ provider.displayName }}</q-item-label>
+                <q-item-label caption>{{ provider.providerId }} · {{ provider.clientProtocol }} · {{ modelCountForProvider(provider.providerId) }} model(s)</q-item-label>
+              </q-item-section>
+              <q-item-section side><q-toggle v-model="provider.enabled" @update:model-value="draft.markDirty()" /></q-item-section>
+            </q-item>
+            <q-item v-if="!draft.localContent.providers.length"><q-item-section class="text-grey-7">No providers.</q-item-section></q-item>
+          </q-list>
+        </q-card-section>
+      </q-card>
+
       <div class="row q-gutter-md">
+        <!-- Models -->
         <q-card flat bordered class="col">
           <q-card-section>
             <div class="row items-center justify-between">
-              <div class="text-subtitle2">Providers</div>
+              <div class="text-subtitle2">Models</div>
               <q-btn flat dense icon="add" label="Add model" size="sm" @click="draft.addModel('prv_placeholder'); draft.markDirty()" />
             </div>
-            <q-list dense>
+            <q-list dense class="q-mt-sm">
               <q-item v-for="(model, idx) in draft.localContent.models" :key="model.modelId">
                 <q-item-section>
                   <q-input v-model="model.displayName" dense outlined label="Name" @update:model-value="draft.markDirty()" />
@@ -123,31 +183,143 @@ onMounted(refresh)
           </q-card-section>
         </q-card>
 
+        <!-- TTS -->
         <q-card flat bordered class="col">
           <q-card-section>
-            <div class="text-subtitle2">Validation</div>
-            <div v-if="!draft.validationResult" class="text-body2 text-grey-7 q-mt-sm">Click Validate to check the draft.</div>
-            <div v-else>
-              <q-banner v-if="draft.validationResult.errors.length === 0 && draft.validationResult.warnings.length === 0" class="bg-green-1 q-mt-sm rounded-borders">
-                Draft is valid.
-              </q-banner>
-              <q-banner v-else class="bg-orange-1 q-mt-sm rounded-borders">
-                <div>{{ draft.validationResult.errors.length }} errors · {{ draft.validationResult.warnings.length }} warnings</div>
-              </q-banner>
-              <q-list dense class="q-mt-sm">
-                <q-item v-for="e in draft.validationResult.errors" :key="e.path + e.code">
-                  <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
-                  <q-item-section>{{ e.path }}: {{ e.code }} — {{ e.detail }}</q-item-section>
-                </q-item>
-                <q-item v-for="w in draft.validationResult.warnings" :key="w.path + w.code">
-                  <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
-                  <q-item-section>{{ w.path }}: {{ w.code }} — {{ w.detail }}</q-item-section>
-                </q-item>
-              </q-list>
+            <div class="row items-center justify-between">
+              <div class="text-subtitle2">TTS</div>
+              <q-btn flat dense icon="add" label="Add TTS" size="sm" @click="draft.addTts()" />
             </div>
+            <q-list dense class="q-mt-sm">
+              <q-item v-for="(tts, idx) in draft.localContent.tts" :key="tts.ttsId">
+                <q-item-section>
+                  <q-input v-model="tts.displayName" dense outlined label="Name" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="tts.voice" dense outlined label="Voice" class="q-mt-xs" @update:model-value="draft.markDirty()" />
+                  <div class="text-caption text-grey-7">{{ tts.ttsId }} · {{ tts.clientProtocol }}</div>
+                </q-item-section>
+                <q-item-section side>
+                  <q-toggle v-model="tts.enabled" @update:model-value="draft.markDirty()" />
+                  <q-btn flat dense color="negative" icon="delete" size="sm" @click="draft.localContent!.tts.splice(idx, 1); draft.markDirty()" />
+                </q-item-section>
+              </q-item>
+              <q-item v-if="!draft.localContent.tts.length"><q-item-section class="text-grey-7">No TTS.</q-item-section></q-item>
+            </q-list>
           </q-card-section>
         </q-card>
       </div>
+
+      <div class="row q-gutter-md q-mt-md">
+        <!-- ASR -->
+        <q-card flat bordered class="col">
+          <q-card-section>
+            <div class="row items-center justify-between">
+              <div class="text-subtitle2">ASR</div>
+              <q-btn flat dense icon="add" label="Add ASR" size="sm" @click="draft.addAsr()" />
+            </div>
+            <q-list dense class="q-mt-sm">
+              <q-item v-for="(asr, idx) in draft.localContent.asr" :key="asr.asrId">
+                <q-item-section>
+                  <q-input v-model="asr.displayName" dense outlined label="Name" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="asr.language" dense outlined label="Language" class="q-mt-xs" @update:model-value="draft.markDirty()" />
+                  <div class="text-caption text-grey-7">{{ asr.asrId }} · {{ asr.clientProtocol }}</div>
+                </q-item-section>
+                <q-item-section side>
+                  <q-toggle v-model="asr.enabled" @update:model-value="draft.markDirty()" />
+                  <q-btn flat dense color="negative" icon="delete" size="sm" @click="draft.localContent!.asr.splice(idx, 1); draft.markDirty()" />
+                </q-item-section>
+              </q-item>
+              <q-item v-if="!draft.localContent.asr.length"><q-item-section class="text-grey-7">No ASR.</q-item-section></q-item>
+            </q-list>
+          </q-card-section>
+        </q-card>
+
+        <!-- MCP -->
+        <q-card flat bordered class="col">
+          <q-card-section>
+            <div class="row items-center justify-between">
+              <div class="text-subtitle2">MCP</div>
+              <q-btn flat dense icon="add" label="Add MCP" size="sm" @click="draft.addMcp()" />
+            </div>
+            <q-list dense class="q-mt-sm">
+              <q-item v-for="(mcp, idx) in draft.localContent.mcp" :key="mcp.mcpServerId">
+                <q-item-section>
+                  <q-input v-model="mcp.displayName" dense outlined label="Name" @update:model-value="draft.markDirty()" />
+                  <div class="text-caption text-grey-7">{{ mcp.mcpServerId }} · {{ mcp.clientProtocol }} · {{ mcp.authOwnership }}</div>
+                </q-item-section>
+                <q-item-section side>
+                  <q-toggle v-model="mcp.enabled" @update:model-value="draft.markDirty()" />
+                  <q-btn flat dense color="negative" icon="delete" size="sm" @click="draft.localContent!.mcp.splice(idx, 1); draft.markDirty()" />
+                </q-item-section>
+              </q-item>
+              <q-item v-if="!draft.localContent.mcp.length"><q-item-section class="text-grey-7">No MCP.</q-item-section></q-item>
+            </q-list>
+          </q-card-section>
+        </q-card>
+      </div>
+
+      <!-- Policy -->
+      <q-card flat bordered class="q-mt-md">
+        <q-card-section>
+          <div class="text-subtitle2 q-mb-sm">Policy</div>
+          <div class="row q-gutter-md">
+            <q-toggle v-model="draft.localContent.policy.allowLocalProviders" label="Allow local providers" @update:model-value="draft.markDirty()" />
+            <q-toggle v-model="draft.localContent.policy.allowLocalTts" label="Allow local TTS" @update:model-value="draft.markDirty()" />
+            <q-toggle v-model="draft.localContent.policy.allowLocalAsr" label="Allow local ASR" @update:model-value="draft.markDirty()" />
+            <q-toggle v-model="draft.localContent.policy.allowLocalMcp" label="Allow local MCP" @update:model-value="draft.markDirty()" />
+          </div>
+          <div class="text-caption text-grey-7 q-mt-sm">Policy ID: {{ draft.localContent.policy.policyId }}</div>
+        </q-card-section>
+      </q-card>
+
+      <!-- Validation -->
+      <q-card flat bordered class="q-mt-md">
+        <q-card-section>
+          <div class="text-subtitle2">Validation</div>
+          <div v-if="!draft.validationResult" class="text-body2 text-grey-7 q-mt-sm">Click Validate to check the draft.</div>
+          <div v-else>
+            <q-banner v-if="draft.validationResult.errors.length === 0 && draft.validationResult.warnings.length === 0" class="bg-green-1 q-mt-sm rounded-borders">
+              Draft is valid.
+            </q-banner>
+            <q-banner v-else class="bg-orange-1 q-mt-sm rounded-borders">
+              <div>{{ draft.validationResult.errors.length }} errors · {{ draft.validationResult.warnings.length }} warnings</div>
+            </q-banner>
+            <q-list dense class="q-mt-sm">
+              <q-item v-for="e in draft.validationResult.errors" :key="e.path + e.code">
+                <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
+                <q-item-section>{{ e.path }}: {{ e.code }} — {{ e.detail }}</q-item-section>
+              </q-item>
+              <q-item v-for="w in draft.validationResult.warnings" :key="w.path + w.code">
+                <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
+                <q-item-section>{{ w.path }}: {{ w.code }} — {{ w.detail }}</q-item-section>
+              </q-item>
+            </q-list>
+          </div>
+        </q-card-section>
+      </q-card>
+
+      <!-- Snapshot Preview Dialog -->
+      <q-dialog v-model="previewOpen">
+        <q-card style="min-width: 600px; max-width: 95vw">
+          <q-card-section class="text-h6">Snapshot Preview</q-card-section>
+          <q-card-section v-if="preview">
+            <div class="text-subtitle2 q-mb-sm">Hash: {{ preview.snapshotHash }}</div>
+            <div class="text-caption text-grey-7 q-mb-md">Revision {{ preview.draftRevision }} · {{ preview.providers.length }} providers · {{ preview.models.length }} models · {{ preview.tts.length }} TTS · {{ preview.asr.length }} ASR · {{ preview.mcp.length }} MCP</div>
+            <q-markup-table flat dense>
+              <tbody>
+                <tr><td class="text-grey-7">Providers</td><td>{{ preview.providers.length }}</td></tr>
+                <tr><td class="text-grey-7">Models</td><td>{{ preview.models.length }}</td></tr>
+                <tr><td class="text-grey-7">TTS</td><td>{{ preview.tts.length }}</td></tr>
+                <tr><td class="text-grey-7">ASR</td><td>{{ preview.asr.length }}</td></tr>
+                <tr><td class="text-grey-7">MCP</td><td>{{ preview.mcp.length }}</td></tr>
+                <tr><td class="text-grey-7">Policy ID</td><td>{{ preview.policy.policyId }}</td></tr>
+              </tbody>
+            </q-markup-table>
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn flat label="Close" v-close-popup />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
     </template>
     <div v-else class="text-body2 text-grey-7">No draft loaded.</div>
   </q-page>

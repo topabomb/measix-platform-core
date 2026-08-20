@@ -68,6 +68,41 @@ func (h *fullAdminHandler) ValidateDraft(w http.ResponseWriter, r *http.Request,
 	writeJSON(w, http.StatusOK, adminapi.ValidateDraftResponse{Valid: result.Valid, Errors: result.Errors, Warnings: result.Warnings})
 }
 
+func (h *fullAdminHandler) PreviewDraft(w http.ResponseWriter, r *http.Request, params adminapi.PreviewDraftParams) {
+	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	var request adminapi.PreviewDraftRequest
+	if err := decodeStrictJSON(r, &request); err != nil {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
+		return
+	}
+	preview, err := h.services.Capability.PreviewDraft(r.Context(), request.ExpectedDraftRevision)
+	if errors.Is(err, capability.ErrRevisionConflict) {
+		writeProblem(w, http.StatusConflict, "stale_draft_revision", "Draft revision conflict")
+		return
+	}
+	if errors.Is(err, capability.ErrInvalidDraft) {
+		writeProblem(w, http.StatusUnprocessableEntity, "invalid_draft", "Invalid draft")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, adminapi.DraftPreviewResponse{
+		DraftRevision: preview.DraftRevision,
+		SnapshotHash:  adminapi.Sha256Hash(preview.SnapshotHash),
+		Providers:     preview.Providers,
+		Models:        preview.Models,
+		Tts:           preview.TTS,
+		Asr:           preview.ASR,
+		Mcp:           preview.MCP,
+		Policy:        preview.Policy,
+	})
+}
+
 func (h *fullAdminHandler) PublishDraft(w http.ResponseWriter, r *http.Request, params adminapi.PublishDraftParams) {
 	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {

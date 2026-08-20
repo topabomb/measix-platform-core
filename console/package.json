@@ -18,13 +18,13 @@
   },
   "dependencies": {
     "@quasar/extras": "^2.0.4",
-    "pinia": "4.0.2",
+    "pinia": "3.0.4",
     "quasar": "2.23.3",
     "vue": "3.5.40",
-    "vue-router": "5.2.0"
+    "vue-router": "4.5.1"
   },
   "devDependencies": {
-    "@quasar/app-vite": "3.7.0",
+    "@quasar/app-vite": "2.3.0",
     "@types/node": "^26.2.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "2.4.6",

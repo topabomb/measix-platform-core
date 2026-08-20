@@ -11,6 +11,8 @@ import { useSessionStore } from '../stores/session'
 type Upstream = components['schemas']['Upstream']
 type UpstreamPage = components['schemas']['UpstreamPage']
 type Activation = components['schemas']['Activation']
+type UpstreamConfig = components['schemas']['UpstreamConfig']
+type TimeoutPolicy = components['schemas']['TimeoutPolicy']
 
 const session = useSessionStore()
 const activation = useActivationStore()
@@ -22,8 +24,28 @@ const error = ref<unknown>()
 const createOpen = ref(false)
 const detailOpen = ref(false)
 const testing = ref(false)
-const createForm = ref({ name: '', baseUrl: '', providerKind: 'OPENAI_COMPATIBLE' as string })
 const canMutate = computed(() => Boolean(session.csrfToken))
+
+const AUTH_TYPES = ['NONE', 'BEARER', 'STATIC_HEADER', 'BASIC'] as const
+const USAGE_LEVELS = ['LEVEL_0', 'LEVEL_1', 'LEVEL_2'] as const
+const CORRELATION_MODES = ['HEADER', 'QUERY_PARAM', 'NONE'] as const
+const TRANSPORT_CAPS = ['HTTP', 'SSE', 'BINARY', 'MULTIPART', 'MCP_STREAMABLE_HTTP'] as const
+
+function emptyConfig(): UpstreamConfig {
+  return {
+    name: '',
+    baseUrl: '',
+    transportCapabilities: ['HTTP', 'SSE', 'BINARY', 'MULTIPART', 'MCP_STREAMABLE_HTTP'],
+    auth: { type: 'NONE' },
+    correlationMode: 'HEADER',
+    usageCapabilityLevel: 'LEVEL_0',
+    timeoutDefaults: { connectMs: 1000, responseHeaderMs: 5000, idleMs: 30000 },
+  }
+}
+
+const createForm = ref<UpstreamConfig>(emptyConfig())
+const secretId = ref('')
+const secretVersion = ref<number | undefined>(undefined)
 
 async function refresh() {
   loading.value = true
@@ -39,16 +61,39 @@ async function refresh() {
   }
 }
 
+function buildAuth(): UpstreamConfig['auth'] {
+  const authType = createForm.value.auth.type
+  if (authType === 'NONE') {
+    return { type: 'NONE' }
+  }
+  if (authType === 'BEARER' && secretId.value && secretVersion.value) {
+    return { type: 'BEARER', secretRef: { secretId: secretId.value, secretVersion: secretVersion.value } }
+  }
+  if (authType === 'STATIC_HEADER' && secretId.value && secretVersion.value) {
+    return { type: 'STATIC_HEADER', secretRef: { secretId: secretId.value, secretVersion: secretVersion.value } }
+  }
+  if (authType === 'BASIC' && secretId.value && secretVersion.value) {
+    return { type: 'BASIC', secretRef: { secretId: secretId.value, secretVersion: secretVersion.value } }
+  }
+  return { type: authType }
+}
+
 async function createUpstream() {
   if (!session.csrfToken) return
   error.value = undefined
   try {
+    const config: UpstreamConfig = {
+      ...createForm.value,
+      auth: buildAuth(),
+    }
     await apiFetch<Upstream>('/api/admin/v1/upstreams', {
       method: 'POST',
-      body: JSON.stringify({ config: { name: createForm.value.name, baseUrl: createForm.value.baseUrl, providerKind: createForm.value.providerKind } }),
+      body: JSON.stringify({ config }),
     }, session.csrfToken)
     createOpen.value = false
-    createForm.value = { name: '', baseUrl: '', providerKind: 'OPENAI_COMPATIBLE' }
+    createForm.value = emptyConfig()
+    secretId.value = ''
+    secretVersion.value = undefined
     await refresh()
   } catch (cause) {
     error.value = cause
@@ -139,12 +184,28 @@ onMounted(refresh)
     </q-card>
 
     <q-dialog v-model="createOpen">
-      <q-card style="min-width: 460px">
+      <q-card style="min-width: 600px; max-width: 95vw">
         <q-card-section class="text-h6">Create upstream</q-card-section>
         <q-card-section class="q-gutter-md">
           <q-input v-model="createForm.name" outlined label="Name" />
           <q-input v-model="createForm.baseUrl" outlined label="Base URL" placeholder="https://api.example.com" />
-          <q-select v-model="createForm.providerKind" outlined label="Provider kind" :options="['OPENAI_COMPATIBLE','ANTHROPIC_COMPATIBLE','CUSTOM']" />
+
+          <div class="text-subtitle2">Authentication</div>
+          <q-select v-model="createForm.auth.type" outlined label="Auth type" :options="[...AUTH_TYPES]" />
+          <template v-if="createForm.auth.type !== 'NONE'">
+            <q-input v-model="secretId" outlined label="Secret ID" placeholder="sec_..." />
+            <q-input v-model.number="secretVersion" type="number" outlined label="Secret version" />
+          </template>
+
+          <q-select v-model="createForm.correlationMode" outlined label="Correlation mode" :options="[...CORRELATION_MODES]" />
+          <q-select v-model="createForm.usageCapabilityLevel" outlined label="Usage capability level" :options="[...USAGE_LEVELS]" />
+
+          <div class="text-subtitle2">Timeouts (ms)</div>
+          <div class="row q-gutter-sm">
+            <q-input v-model.number="createForm.timeoutDefaults.connectMs" type="number" outlined label="Connect" class="col" />
+            <q-input v-model.number="createForm.timeoutDefaults.responseHeaderMs" type="number" outlined label="Response header" class="col" />
+            <q-input v-model.number="createForm.timeoutDefaults.idleMs" type="number" outlined label="Idle" class="col" />
+          </div>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Cancel" v-close-popup />
@@ -173,7 +234,9 @@ onMounted(refresh)
               <tr><td class="text-grey-7">Config revision</td><td>{{ selected.configRevision }}</td></tr>
               <tr><td class="text-grey-7">Active revision</td><td>{{ selected.activeConfigRevision ?? '—' }}</td></tr>
               <tr v-if="selected.config"><td class="text-grey-7">Base URL</td><td>{{ selected.config.baseUrl ?? '—' }}</td></tr>
-              <tr v-if="selected.config"><td class="text-grey-7">Provider kind</td><td>{{ selected.config.providerKind ?? '—' }}</td></tr>
+              <tr v-if="selected.config"><td class="text-grey-7">Auth type</td><td>{{ selected.config.auth?.type ?? '—' }}</td></tr>
+              <tr v-if="selected.config"><td class="text-grey-7">Correlation mode</td><td>{{ selected.config.correlationMode ?? '—' }}</td></tr>
+              <tr v-if="selected.config"><td class="text-grey-7">Usage level</td><td>{{ selected.config.usageCapabilityLevel ?? '—' }}</td></tr>
             </tbody>
           </q-markup-table>
         </q-card-section>

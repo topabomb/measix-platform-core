@@ -66,7 +66,7 @@ func TestHUBCAP002CandidateIDValidation(t *testing.T) {
 		providerID := content.Providers[0].ProviderId
 		content.Providers = append(content.Providers, adminapi.ProviderDefinition{
 			ProviderId: providerID, // duplicate
-			DisplayName: "Duplicate", ClientProtocol: "OPENAI_COMPATIBLE", Enabled: true,
+			DisplayName: "Duplicate", ClientProtocol: adminapi.OPENAICHATCOMPLETIONS, Enabled: true,
 		})
 		_, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 		if err == nil {
@@ -87,7 +87,7 @@ func TestHUBCAP002CandidateIDValidation(t *testing.T) {
 			ModelId: sharedID, // same ID = duplicate
 			ProviderId: content.Providers[0].ProviderId, DisplayName: "Dup Model",
 			UpstreamModelKey: "model-dup", RuntimePath: "/v1/chat/completions", Enabled: false,
-			Capabilities: []string{"CHAT"}, InputModalities: []string{"TEXT"}, OutputModalities: []string{"TEXT"},
+			Capabilities: []adminapi.ModelDefinitionCapabilities{adminapi.TOOL}, InputModalities: []adminapi.ModelDefinitionInputModalities{adminapi.ModelDefinitionInputModalitiesTEXT}, OutputModalities: []adminapi.ModelDefinitionOutputModalities{adminapi.ModelDefinitionOutputModalitiesTEXT},
 		})
 		_, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 		if err == nil {

@@ -1,4 +1,4 @@
-import { defineConfig } from '#q-app'
+import { defineConfig } from '@quasar/app-vite/wrappers'
 export default defineConfig(() => ({
   boot: ['api'],
   css: ['app.css'],

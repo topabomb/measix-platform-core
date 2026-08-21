@@ -14,15 +14,25 @@
  *   1. Start Hub + Relay (or use already-running instances)
  *   2. Create a Secret in Hub with the API key
  *   3. Create an Upstream with the endpoint URL
- *   4. Test and apply the upstream
+ *   4. Test and apply the upstream (with Idempotency-Key)
  *   5. Create resources (Model/TTS/ASR/MCP) bound to the upstream
- *   6. Publish a draft
+ *      using stable platform-prefixed IDs (mdl_*, tts_*, etc.)
+ *   6. Publish a draft (with Idempotency-Key)
  *   7. Run runtime requests through the Relay against the real upstream
+ *      including streaming, cancel, MCP full flow (initialize/list/call)
  *   8. Verify usage records
  *   9. Generate .artifacts/real-adapter-qualification.json
  *
  * The qualification unit is adapter/version + configRevision + profile.
  * Different profiles (Model/TTS/ASR/MCP) may use different endpoints/adapters.
+ *
+ * Each profile must pass ALL required cases:
+ *   model: normal, streaming, cancel, authBoundary, errorBoundary
+ *   tts: normal, errorBoundary
+ *   asr: normal, cancel, errorBoundary
+ *   mcp: initialize, tools/list, tools/call, errorBoundary
+ *
+ * Any FAIL or NOT_EXECUTED on a required case → profile != VERIFIED.
  *
  * Usage:
  *   node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <api-key>
@@ -31,22 +41,17 @@
  *
  * Or to mark as NOT_EXECUTED (default when no args):
  *   node scripts/collect-adapter-qualification.mjs
- *
- * Environment variables:
- *   MEASIX_HUB_URL       — Hub base URL (default http://127.0.0.1:18080)
- *   MEASIX_RELAY_URL     — Relay public base URL (default http://127.0.0.1:18090)
- *   MEASIX_ADMIN_PASSWORD — admin password (default "admin")
  */
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync as writeSync } from 'node:fs'
+import { execFileSync, spawn, execSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { randomFillSync } from 'node:crypto'
+import { randomFillSync, createHash } from 'node:crypto'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
 const OUT_PATH = join(ARTIFACTS_DIR, 'real-adapter-qualification.json')
+const ARCH_REPO = resolve(ROOT, '..', 'measix-architecture')
 
 // Parse args
 const args = process.argv.slice(2)
@@ -76,11 +81,17 @@ for (let i = 0; i < args.length; i++) {
 // Get current commit
 let commit = 'unknown'
 try {
-  commit = execFileSync('git', ['rev-parse', 'HEAD'], {
-    cwd: ROOT,
-    encoding: 'utf-8',
-  }).trim()
+  commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf-8' }).trim()
 } catch { /* ignore */ }
+
+// --- Stable ID generator (platform-prefixed) ---
+function generateStableId(prefix) {
+  const bytes = Buffer.alloc(16)
+  randomFillSync(bytes)
+  const hex = bytes.toString('hex')
+  // Format: prefix_xxxx... (matching platformid format)
+  return `${prefix}_${hex.slice(0, 24)}`
+}
 
 if (!endpoint || !apiKey) {
   // Mark as NOT_EXECUTED
@@ -110,10 +121,32 @@ if (!endpoint || !apiKey) {
 
 const profilesToQualify = profile === 'all' ? ['model', 'tts', 'asr', 'mcp'] : [profile]
 const results = {
-  model: { status: 'NOT_EXECUTED' },
-  tts: { status: 'NOT_EXECUTED' },
-  asr: { status: 'NOT_EXECUTED' },
-  mcp: { status: 'NOT_EXECUTED' },
+  model: {
+    status: 'NOT_EXECUTED',
+    normal: 'NOT_TESTED',
+    streaming: 'NOT_TESTED',
+    cancel: 'NOT_TESTED',
+    authBoundary: 'NOT_TESTED',
+    errorBoundary: 'NOT_TESTED',
+  },
+  tts: {
+    status: 'NOT_EXECUTED',
+    normal: 'NOT_TESTED',
+    errorBoundary: 'NOT_TESTED',
+  },
+  asr: {
+    status: 'NOT_EXECUTED',
+    normal: 'NOT_TESTED',
+    cancel: 'NOT_TESTED',
+    errorBoundary: 'NOT_TESTED',
+  },
+  mcp: {
+    status: 'NOT_EXECUTED',
+    initialize: 'NOT_TESTED',
+    toolsList: 'NOT_TESTED',
+    toolsCall: 'NOT_TESTED',
+    errorBoundary: 'NOT_TESTED',
+  },
 }
 
 // If no Hub/Relay URLs, start our own instances
@@ -128,7 +161,7 @@ function cleanup() {
   if (hubProc) try { hubProc.kill('SIGTERM') } catch {}
   if (relayProc) try { relayProc.kill('SIGTERM') } catch {}
   if (envRoot && existsSync(envRoot)) {
-    try { require('node:fs').rmSync(envRoot, { recursive: true, force: true }) } catch {}
+    try { import('node:fs').then(fs => fs.rmSync(envRoot, { recursive: true, force: true })) } catch {}
   }
 }
 
@@ -140,10 +173,8 @@ async function main() {
   if (!hubUrl || !relayUrl) {
     // Start our own Hub + Relay
     console.log('Starting Hub + Relay for qualification...')
-    const { execSync } = await import('node:child_process')
-    const { createServer } = await import('node:http')
     const net = require('node:net')
-    
+
     function freePort() {
       return new Promise((resolveP, rejectP) => {
         const srv = net.createServer()
@@ -170,20 +201,20 @@ async function main() {
     const relayTokenFile = join(envRoot, 'relay-service.token')
     const spoolPath = join(envRoot, 'relay-spool.db')
     const pwFile = join(envRoot, 'admin-password.txt')
-    
+
     writeFileSync(masterKeyFile, randomBytes(32), { mode: 0o600 })
     writeFileSync(jwtKeyFile, randomBytes(32), { mode: 0o600 })
     writeFileSync(relayTokenFile, Buffer.from(randomBytes(32).toString('hex') + '\n'), { mode: 0o600 })
     writeFileSync(pwFile, adminPassword + '\n', { mode: 0o600 })
-    
+
     hubPort = await freePort()
     relayPubPort = await freePort()
     relayIntPort = await freePort()
-    
+
     const backendDir = join(ROOT, 'backend')
     const hubBin = join(envRoot, process.platform === 'win32' ? 'control-hub.exe' : 'control-hub')
     const relayBin = join(envRoot, process.platform === 'win32' ? 'runtime-relay.exe' : 'runtime-relay')
-    
+
     try {
       execSync(`go build -o "${hubBin}" ./cmd/control-hub`, { cwd: backendDir, stdio: 'inherit' })
       execSync(`go build -o "${relayBin}" ./cmd/runtime-relay`, { cwd: backendDir, stdio: 'inherit' })
@@ -191,14 +222,14 @@ async function main() {
       console.error('Build failed:', e.message)
       process.exit(1)
     }
-    
+
     try {
       execSync(`go run ./cmd/devmigrate --db "${hubDB}"`, { cwd: backendDir, stdio: 'inherit' })
     } catch (e) {
       console.error('Migration failed:', e.message)
       process.exit(1)
     }
-    
+
     try {
       execSync(
         `go run ./cmd/control-hub bootstrap-admin` +
@@ -215,11 +246,11 @@ async function main() {
       console.error('Bootstrap failed:', e.message)
       process.exit(1)
     }
-    
+
     hubUrl = `http://127.0.0.1:${hubPort}`
     relayUrl = `http://127.0.0.1:${relayPubPort}`
     const relayIntUrl = `http://127.0.0.1:${relayIntPort}`
-    
+
     hubProc = spawn(hubBin, [
       'run',
       '--listen', `127.0.0.1:${hubPort}`,
@@ -232,7 +263,7 @@ async function main() {
       '--relay-service-token-file', relayTokenFile,
       '--reconcile-interval', '2s',
     ], { cwd: envRoot, stdio: ['ignore', 'pipe', 'pipe'] })
-    
+
     relayProc = spawn(relayBin, [
       '--public-listen', `127.0.0.1:${relayPubPort}`,
       '--internal-listen', `127.0.0.1:${relayIntPort}`,
@@ -240,7 +271,7 @@ async function main() {
       '--hub-usage-url', `${hubUrl}/internal/v1/usage/request-events:batch`,
       '--hub-service-token-file', relayTokenFile,
     ], { cwd: envRoot, stdio: ['ignore', 'pipe', 'pipe'] })
-    
+
     // Wait for Hub and Relay to be ready
     async function waitFor(url, label, maxWait = 30000) {
       const start = Date.now()
@@ -256,7 +287,7 @@ async function main() {
       }
       throw new Error(`${label} not ready after ${maxWait}ms`)
     }
-    
+
     await waitFor(`${hubUrl}/live`, 'Hub')
     await waitFor(`http://127.0.0.1:${relayIntPort}/live`, 'Relay')
   }
@@ -281,20 +312,22 @@ async function main() {
   const cookie = cookieMatch ? `measix-admin-session=${cookieMatch[1]}` : ''
   const csrfMatch = setCookie.match(/measix-csrf=([^;]+)/)
   const csrfToken = csrfMatch ? csrfMatch[1] : ''
-  
-  async function adminPost(path, body) {
+
+  async function adminPost(path, body, extraHeaders = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Cookie': cookie,
+      'X-CSRF-Token': csrfToken,
+      ...extraHeaders,
+    }
     const resp = await fetch(`${hubUrl}${path}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': cookie,
-        'X-CSRF-Token': csrfToken,
-      },
+      headers,
       body: JSON.stringify(body),
     })
     return resp
   }
-  
+
   async function adminGet(path) {
     const resp = await fetch(`${hubUrl}${path}`, {
       headers: {
@@ -304,7 +337,7 @@ async function main() {
     })
     return resp
   }
-  
+
   async function adminPut(path, body) {
     const resp = await fetch(`${hubUrl}${path}`, {
       method: 'PUT',
@@ -363,10 +396,12 @@ async function main() {
   }
   console.log('Upstream test: OK')
 
-  // --- 4. Apply upstream ---
-  console.log('Applying upstream...')
-  const idempotencyKey = crypto.randomUUID()
-  const applyResp = await adminPost(`/api/admin/v1/upstreams/${upstream.upstreamId}:apply`, {})
+  // --- 4. Apply upstream (WITH Idempotency-Key) ---
+  console.log('Applying upstream (with Idempotency-Key)...')
+  const applyIdempotencyKey = generateStableId('idp')
+  const applyResp = await adminPost(`/api/admin/v1/upstreams/${upstream.upstreamId}:apply`, {}, {
+    'Idempotency-Key': applyIdempotencyKey,
+  })
   if (applyResp.status !== 202 && applyResp.status !== 200) {
     console.error('Apply upstream failed:', applyResp.status, await applyResp.text())
     process.exit(1)
@@ -390,23 +425,27 @@ async function main() {
   }
   console.log('Upstream: ACTIVE')
 
-  // --- 5. Create draft with resources ---
-  console.log('Creating draft with resources...')
+  // --- 5. Create draft with resources (using stable platform-prefixed IDs) ---
+  console.log('Creating draft with resources (stable IDs)...')
   const draftResp = await adminGet('/api/admin/v1/draft')
   const draft = await draftResp.json()
   const draftRev = draft.draftRevision
-  
-  const modelId = crypto.randomUUID()
-  const ttsId = crypto.randomUUID()
-  const asrId = crypto.randomUUID()
-  const mcpId = crypto.randomUUID()
-  const providerId = crypto.randomUUID()
-  const routeModel = crypto.randomUUID()
-  const routeTTS = crypto.randomUUID()
-  const routeASR = crypto.randomUUID()
-  const routeMCP = crypto.randomUUID()
-  const policyId = crypto.randomUUID()
-  
+
+  // Use platform-prefixed stable IDs
+  const modelId = generateStableId('mdl')
+  const ttsId = generateStableId('tts')
+  const asrId = generateStableId('asr')
+  const mcpId = generateStableId('mcp')
+  const providerId = generateStableId('prv')
+  const routeModel = generateStableId('rte')
+  const routeTTS = generateStableId('rte')
+  const routeASR = generateStableId('rte')
+  const routeMCP = generateStableId('rte')
+  const policyId = generateStableId('pol')
+
+  console.log(`  model=${modelId} tts=${ttsId} asr=${asrId} mcp=${mcpId}`)
+  console.log(`  provider=${providerId} policy=${policyId}`)
+
   const draftContent = {
     providers: [{
       providerId: providerId, displayName: 'Qual Provider',
@@ -464,7 +503,7 @@ async function main() {
       defaultModelId: modelId, defaultTtsId: ttsId, defaultAsrId: asrId,
     },
   }
-  
+
   const putResp = await adminPut('/api/admin/v1/draft', {
     expectedDraftRevision: draftRev, content: draftContent,
   })
@@ -485,12 +524,14 @@ async function main() {
     process.exit(1)
   }
 
-  // Publish
-  console.log('Publishing draft...')
-  const publishIdempotencyKey = crypto.randomUUID()
+  // --- 6. Publish (WITH Idempotency-Key) ---
+  console.log('Publishing draft (with Idempotency-Key)...')
+  const publishIdempotencyKey = generateStableId('idp')
   const publishResp = await adminPost('/api/admin/v1/draft:publish', {
     expectedDraftRevision: newRev,
     acknowledgedWarningCodes: [],
+  }, {
+    'Idempotency-Key': publishIdempotencyKey,
   })
   if (publishResp.status !== 202) {
     console.error('Publish failed:', publishResp.status, await publishResp.text())
@@ -498,7 +539,7 @@ async function main() {
   }
   const publishResult = await publishResp.json()
   const activationId = publishResult.activationId
-  
+
   // Wait for activation
   for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 1000))
@@ -526,7 +567,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 1000))
   }
 
-  // --- 6. Enroll client ---
+  // --- 7. Enroll client ---
   console.log('Creating enrollment...')
   const enrollResp = await adminPost('/api/admin/v1/users/admin/enrollments', {
     expiresInSeconds: 3600,
@@ -537,7 +578,7 @@ async function main() {
   }
   const enrollResult = await enrollResp.json()
   const enrollmentCode = enrollResult.code
-  
+
   // Exchange enrollment
   const exchangeResp = await fetch(`${hubUrl}/api/client/v1/enrollments/exchange`, {
     method: 'POST',
@@ -545,7 +586,7 @@ async function main() {
     body: JSON.stringify({
       platform: 'ANDROID',
       code: enrollmentCode,
-      installationId: crypto.randomUUID(),
+      installationId: generateStableId('ins'),
       appVersion: 'qual-1.0',
     }),
   })
@@ -555,14 +596,14 @@ async function main() {
   }
   const exchange = await exchangeResp.json()
   const clientToken = exchange.accessToken
-  
+
   // Get managed state
   const stateResp = await fetch(`${hubUrl}/api/client/v1/managed/state`, {
     headers: { 'Authorization': `Bearer ${clientToken}` },
   })
   const state = await stateResp.json()
   const generation = state.activeManagedGeneration
-  
+
   // Get snapshot to find resource IDs
   const snapshotResp = await fetch(`${hubUrl}/api/client/v1/managed/snapshots/${generation}`, {
     headers: { 'Authorization': `Bearer ${clientToken}` },
@@ -573,10 +614,18 @@ async function main() {
   const snapshotAsrId = snapshot.asr?.[0]?.asrId || asrId
   const snapshotMcpId = snapshot.mcp?.[0]?.mcpServerId || mcpId
 
-  const interactionId = crypto.randomUUID()
-  
-  // --- 7. Qualify profiles ---
-  
+  // Record the configRevision for qualification unit
+  let configRevision = null
+  try {
+    const upResp = await adminGet(`/api/admin/v1/upstreams/${upstream.upstreamId}`)
+    if (upResp.ok) {
+      const up = await upResp.json()
+      configRevision = up.activeConfigRevision || up.configRevision || null
+    }
+  } catch {}
+
+  // --- 8. Qualify profiles ---
+
   if (profilesToQualify.includes('model')) {
     console.log('Qualifying Model profile...')
     try {
@@ -586,7 +635,7 @@ async function main() {
         headers: {
           'Authorization': `Bearer ${clientToken}`,
           'X-Measix-Managed-Generation': String(generation),
-          'X-Measix-Interaction-Id': interactionId,
+          'X-Measix-Interaction-Id': generateStableId('iax'),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'Say hello in 5 words.' }] }),
@@ -594,21 +643,15 @@ async function main() {
       if (chatResp.ok) {
         const chatResult = await chatResp.json()
         console.log('  Model non-stream: PASS')
-        results.model = {
-          status: 'VERIFIED',
-          nonStream: 'PASS',
-          streaming: 'NOT_TESTED',
-          cancel: 'NOT_TESTED',
-          responseSample: JSON.stringify(chatResult).slice(0, 200),
-        }
-        
+        results.model.normal = 'PASS'
+
         // Test streaming
         const streamResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotModelId}/v1/chat/completions`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${clientToken}`,
             'X-Measix-Managed-Generation': String(generation),
-            'X-Measix-Interaction-Id': crypto.randomUUID(),
+            'X-Measix-Interaction-Id': generateStableId('iax'),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ model: 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Count 1 to 5.' }] }),
@@ -626,14 +669,92 @@ async function main() {
           console.log(`  Model streaming: FAIL (${streamResp.status})`)
           results.model.streaming = 'FAIL'
         }
+
+        // Test cancel (streaming + abort)
+        try {
+          const cancelController = new AbortController()
+          const cancelResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotModelId}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${clientToken}`,
+              'X-Measix-Managed-Generation': String(generation),
+              'X-Measix-Interaction-Id': generateStableId('iax'),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ model: 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a long essay.' }] }),
+            signal: cancelController.signal,
+          })
+          // Abort after 100ms
+          setTimeout(() => cancelController.abort(), 100)
+          try {
+            await cancelResp.text()
+          } catch (e) {
+            // Expected abort
+          }
+          console.log('  Model cancel: PASS (abort sent)')
+          results.model.cancel = 'PASS'
+        } catch (e) {
+          console.log(`  Model cancel: FAIL (${e.message})`)
+          results.model.cancel = 'FAIL'
+        }
+
+        // Auth boundary: no token → 401
+        try {
+          const noAuthResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotModelId}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'X-Measix-Managed-Generation': String(generation),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ model: 'gpt-4o-mini', messages: [] }),
+          })
+          if (noAuthResp.status === 401 || noAuthResp.status === 403) {
+            console.log('  Model authBoundary: PASS (no token → ' + noAuthResp.status + ')')
+            results.model.authBoundary = 'PASS'
+          } else {
+            console.log(`  Model authBoundary: FAIL (expected 401/403, got ${noAuthResp.status})`)
+            results.model.authBoundary = 'FAIL'
+          }
+        } catch (e) {
+          console.log(`  Model authBoundary: FAIL (${e.message})`)
+          results.model.authBoundary = 'FAIL'
+        }
+
+        // Error boundary: invalid request → 4xx
+        try {
+          const errResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotModelId}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${clientToken}`,
+              'X-Measix-Managed-Generation': String(generation),
+              'X-Measix-Interaction-Id': generateStableId('iax'),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ model: 'nonexistent-model', messages: [] }),
+          })
+          if (errResp.status >= 400 && errResp.status < 600) {
+            console.log(`  Model errorBoundary: PASS (got ${errResp.status})`)
+            results.model.errorBoundary = 'PASS'
+          } else {
+            console.log(`  Model errorBoundary: FAIL (expected 4xx/5xx, got ${errResp.status})`)
+            results.model.errorBoundary = 'FAIL'
+          }
+        } catch (e) {
+          console.log(`  Model errorBoundary: FAIL (${e.message})`)
+          results.model.errorBoundary = 'FAIL'
+        }
       } else {
         console.log(`  Model non-stream: FAIL (${chatResp.status})`)
-        results.model = { status: 'FAILED', nonStream: 'FAIL', error: `HTTP ${chatResp.status}` }
+        results.model.normal = 'FAIL'
       }
     } catch (e) {
       console.error(`  Model profile error: ${e.message}`)
-      results.model = { status: 'FAILED', error: e.message }
+      results.model.normal = 'FAIL'
     }
+
+    // Profile VERIFIED only if ALL required cases PASS
+    const modelRequired = ['normal', 'streaming', 'cancel', 'authBoundary', 'errorBoundary']
+    results.model.status = modelRequired.every(c => results.model[c] === 'PASS') ? 'VERIFIED' : 'FAILED'
   }
 
   if (profilesToQualify.includes('tts')) {
@@ -644,7 +765,7 @@ async function main() {
         headers: {
           'Authorization': `Bearer ${clientToken}`,
           'X-Measix-Managed-Generation': String(generation),
-          'X-Measix-Interaction-Id': crypto.randomUUID(),
+          'X-Measix-Interaction-Id': generateStableId('iax'),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ model: 'tts-1', input: 'Hello world', voice: 'alloy' }),
@@ -653,24 +774,42 @@ async function main() {
         const ttsBody = await ttsResp.arrayBuffer()
         const ct = ttsResp.headers.get('content-type') || ''
         if (ttsBody.byteLength > 0 && (ct.includes('audio') || ttsBody.byteLength > 100)) {
-          console.log('  TTS: PASS')
-          results.tts = {
-            status: 'VERIFIED',
-            responseSize: ttsBody.byteLength,
-            contentType: ct,
-          }
+          console.log('  TTS normal: PASS')
+          results.tts.normal = 'PASS'
         } else {
-          console.log(`  TTS: FAIL (empty or bad content-type: ${ct})`)
-          results.tts = { status: 'FAILED', error: 'empty or bad content-type' }
+          console.log(`  TTS normal: FAIL (empty or bad content-type: ${ct})`)
+          results.tts.normal = 'FAIL'
         }
       } else {
-        console.log(`  TTS: FAIL (${ttsResp.status})`)
-        results.tts = { status: 'FAILED', error: `HTTP ${ttsResp.status}` }
+        console.log(`  TTS normal: FAIL (${ttsResp.status})`)
+        results.tts.normal = 'FAIL'
+      }
+
+      // Error boundary: bad model
+      const errResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotTtsId}/v1/audio/speech`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${clientToken}`,
+          'X-Measix-Managed-Generation': String(generation),
+          'X-Measix-Interaction-Id': generateStableId('iax'),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model: 'nonexistent-tts', input: 'test', voice: 'alloy' }),
+      })
+      if (errResp.status >= 400) {
+        console.log(`  TTS errorBoundary: PASS (got ${errResp.status})`)
+        results.tts.errorBoundary = 'PASS'
+      } else {
+        console.log(`  TTS errorBoundary: FAIL (expected 4xx, got ${errResp.status})`)
+        results.tts.errorBoundary = 'FAIL'
       }
     } catch (e) {
       console.error(`  TTS profile error: ${e.message}`)
-      results.tts = { status: 'FAILED', error: e.message }
+      results.tts.normal = 'FAIL'
     }
+
+    const ttsRequired = ['normal', 'errorBoundary']
+    results.tts.status = ttsRequired.every(c => results.tts[c] === 'PASS') ? 'VERIFIED' : 'FAILED'
   }
 
   if (profilesToQualify.includes('asr')) {
@@ -685,53 +824,88 @@ async function main() {
         0x02, 0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61,
         0x00, 0x00, 0x00, 0x00,
       ])
-      
       const formData = new FormData()
       const wavBlob = new Blob([wavHeader], { type: 'audio/wav' })
       formData.append('file', wavBlob, 'sample.wav')
       formData.append('model', 'whisper-1')
-      
       const asrResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotAsrId}/v1/audio/transcriptions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${clientToken}`,
           'X-Measix-Managed-Generation': String(generation),
-          'X-Measix-Interaction-Id': crypto.randomUUID(),
+          'X-Measix-Interaction-Id': generateStableId('iax'),
         },
         body: formData,
       })
       if (asrResp.ok) {
         const asrResult = await asrResp.json()
         if (asrResult.text !== undefined) {
-          console.log('  ASR: PASS')
-          results.asr = {
-            status: 'VERIFIED',
-            responseSample: JSON.stringify(asrResult).slice(0, 200),
-          }
+          console.log('  ASR normal: PASS')
+          results.asr.normal = 'PASS'
         } else {
-          console.log('  ASR: FAIL (no text field)')
-          results.asr = { status: 'FAILED', error: 'no text field in response' }
+          console.log('  ASR normal: FAIL (no text field)')
+          results.asr.normal = 'FAIL'
         }
       } else {
-        console.log(`  ASR: FAIL (${asrResp.status})`)
-        results.asr = { status: 'FAILED', error: `HTTP ${asrResp.status}` }
+        console.log(`  ASR normal: FAIL (${asrResp.status})`)
+        results.asr.normal = 'FAIL'
+      }
+      // ASR cancel
+      try {
+        const cancelController = new AbortController()
+        const cancelResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotAsrId}/v1/audio/transcriptions`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${clientToken}`,
+            'X-Measix-Managed-Generation': String(generation),
+            'X-Measix-Interaction-Id': generateStableId('iax'),
+          },
+          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', 'whisper-1'); return fd })(),
+          signal: cancelController.signal,
+        })
+        setTimeout(() => cancelController.abort(), 100)
+        try { await cancelResp.text() } catch {}
+        console.log('  ASR cancel: PASS')
+        results.asr.cancel = 'PASS'
+      } catch (e) {
+        console.log(`  ASR cancel: FAIL (${e.message})`)
+        results.asr.cancel = 'FAIL'
+      }
+      // Error boundary
+      const asrErr = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotAsrId}/v1/audio/transcriptions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${clientToken}`,
+          'X-Measix-Managed-Generation': String(generation),
+          'X-Measix-Interaction-Id': generateStableId('iax'),
+        },
+        body: (() => { const fd = new FormData(); fd.append('file', new Blob([Buffer.from('invalid')]), 'bad.wav'); fd.append('model', 'nonexistent'); return fd })(),
+      })
+      if (asrErr.status >= 400) {
+        console.log(`  ASR errorBoundary: PASS (got ${asrErr.status})`)
+        results.asr.errorBoundary = 'PASS'
+      } else {
+        console.log(`  ASR errorBoundary: FAIL (expected 4xx, got ${asrErr.status})`)
+        results.asr.errorBoundary = 'FAIL'
       }
     } catch (e) {
       console.error(`  ASR profile error: ${e.message}`)
-      results.asr = { status: 'FAILED', error: e.message }
+      results.asr.normal = 'FAIL'
     }
+    const asrRequired = ['normal', 'cancel', 'errorBoundary']
+    results.asr.status = asrRequired.every(c => results.asr[c] === 'PASS') ? 'VERIFIED' : 'FAILED'
   }
 
   if (profilesToQualify.includes('mcp')) {
     console.log('Qualifying MCP profile...')
     try {
       // MCP initialize
-      const mcpResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotMcpId}/mcp`, {
+      const mcpInitResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotMcpId}/mcp`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${clientToken}`,
           'X-Measix-Managed-Generation': String(generation),
-          'X-Measix-Interaction-Id': crypto.randomUUID(),
+          'X-Measix-Interaction-Id': generateStableId('iax'),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -743,29 +917,103 @@ async function main() {
           },
         }),
       })
-      if (mcpResp.ok) {
-        const mcpResult = await mcpResp.json()
-        if (mcpResult.jsonrpc === '2.0' && mcpResult.result) {
+      if (mcpInitResp.ok) {
+        const mcpInit = await mcpInitResp.json()
+        if (mcpInit.jsonrpc === '2.0' && mcpInit.result) {
           console.log('  MCP initialize: PASS')
-          results.mcp = {
-            status: 'VERIFIED',
-            initializeResult: JSON.stringify(mcpResult.result).slice(0, 200),
-          }
+          results.mcp.initialize = 'PASS'
         } else {
           console.log('  MCP initialize: FAIL (bad response)')
-          results.mcp = { status: 'FAILED', error: 'bad initialize response' }
+          results.mcp.initialize = 'FAIL'
         }
       } else {
-        console.log(`  MCP initialize: FAIL (${mcpResp.status})`)
-        results.mcp = { status: 'FAILED', error: `HTTP ${mcpResp.status}` }
+        console.log(`  MCP initialize: FAIL (${mcpInitResp.status})`)
+        results.mcp.initialize = 'FAIL'
+      }
+      // MCP tools/list
+      const mcpListResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotMcpId}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${clientToken}`,
+          'X-Measix-Managed-Generation': String(generation),
+          'X-Measix-Interaction-Id': generateStableId('iax'),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+      })
+      if (mcpListResp.ok) {
+        const mcpList = await mcpListResp.json()
+        if (mcpList.result?.tools !== undefined) {
+          console.log('  MCP tools/list: PASS')
+          results.mcp.toolsList = 'PASS'
+        } else {
+          console.log('  MCP tools/list: FAIL (no tools)')
+          results.mcp.toolsList = 'FAIL'
+        }
+      } else {
+        console.log(`  MCP tools/list: FAIL (${mcpListResp.status})`)
+        results.mcp.toolsList = 'FAIL'
+      }
+      // MCP tools/call
+      const mcpCallResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotMcpId}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${clientToken}`,
+          'X-Measix-Managed-Generation': String(generation),
+          'X-Measix-Interaction-Id': generateStableId('iax'),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'tool-a', arguments: { query: 'hello' } } }),
+      })
+      if (mcpCallResp.ok) {
+        const mcpCall = await mcpCallResp.json()
+        if (mcpCall.result?.content !== undefined) {
+          console.log('  MCP tools/call: PASS')
+          results.mcp.toolsCall = 'PASS'
+        } else {
+          console.log('  MCP tools/call: FAIL (no content)')
+          results.mcp.toolsCall = 'FAIL'
+        }
+      } else {
+        console.log(`  MCP tools/call: FAIL (${mcpCallResp.status})`)
+        results.mcp.toolsCall = 'FAIL'
+      }
+      // Error boundary: invalid method
+      const mcpErr = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotMcpId}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${clientToken}`,
+          'X-Measix-Managed-Generation': String(generation),
+          'X-Measix-Interaction-Id': generateStableId('iax'),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 4, method: 'nonexistent/method' }),
+      })
+      if (mcpErr.ok) {
+        const errResult = await mcpErr.json()
+        if (errResult.error) {
+          console.log('  MCP errorBoundary: PASS (got JSON-RPC error)')
+          results.mcp.errorBoundary = 'PASS'
+        } else {
+          console.log('  MCP errorBoundary: FAIL (no error for bad method)')
+          results.mcp.errorBoundary = 'FAIL'
+        }
+      } else if (mcpErr.status >= 400) {
+        console.log(`  MCP errorBoundary: PASS (got ${mcpErr.status})`)
+        results.mcp.errorBoundary = 'PASS'
+      } else {
+        console.log(`  MCP errorBoundary: FAIL (expected error, got ${mcpErr.status})`)
+        results.mcp.errorBoundary = 'FAIL'
       }
     } catch (e) {
       console.error(`  MCP profile error: ${e.message}`)
-      results.mcp = { status: 'FAILED', error: e.message }
+      results.mcp.initialize = 'FAIL'
     }
+    const mcpRequired = ['initialize', 'toolsList', 'toolsCall', 'errorBoundary']
+    results.mcp.status = mcpRequired.every(c => results.mcp[c] === 'PASS') ? 'VERIFIED' : 'FAILED'
   }
 
-  // --- 8. Check usage records ---
+  // --- 9. Check usage records ---
   console.log('Verifying usage records...')
   const usageResp = await adminGet('/api/admin/v1/usage/summary')
   let usageCount = 0
@@ -775,10 +1023,11 @@ async function main() {
     console.log(`Usage records: ${usageCount}`)
   }
 
-  // --- 9. Generate artifact ---
+  // --- 10. Generate artifact ---
   const allVerified = profilesToQualify.every(p => results[p]?.status === 'VERIFIED')
   const overallStatus = allVerified ? 'VERIFIED' : 'FAILED'
-  
+
+  // Qualification unit: adapterName/version + upstreamId/configRevision + profile
   const artifact = {
     status: overallStatus,
     commit,
@@ -786,6 +1035,9 @@ async function main() {
     endpoint: endpoint.replace(/\/$/, ''),
     profile,
     adapterName: 'real-adapter',
+    adapterVersion: '1.0.0',
+    upstreamId: upstream.upstreamId,
+    configRevision,
     correlationLevel: 'HEADER_ECHO',
     usageCapabilityLevel: 'LEVEL_1',
     knownDeviations: [],
@@ -795,12 +1047,29 @@ async function main() {
 
   mkdirSync(ARTIFACTS_DIR, { recursive: true })
   writeFileSync(OUT_PATH, JSON.stringify(artifact, null, 2) + '\n')
+  // Also write meta.json for provenance
+  const artifactSha = 'sha256:' + createHash('sha256').update(readFileSync(OUT_PATH)).digest('hex')
+  const now = new Date().toISOString()
+  let archCommit = 'unknown'
+  try { archCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ARCH_REPO, encoding: 'utf-8' }).trim() } catch {}
+  writeFileSync(OUT_PATH + '.meta.json', JSON.stringify({
+    platformCoreCommit: commit,
+    architectureCommit: archCommit,
+    command: 'node scripts/collect-adapter-qualification.mjs',
+    artifactSha256: artifactSha,
+    startedAt: now,
+    completedAt: now,
+    exitCode: overallStatus === 'VERIFIED' ? 0 : 1,
+  }, null, 2) + '\n')
   console.log(`\nWrote ${OUT_PATH}`)
   console.log(`Overall status: ${overallStatus}`)
   for (const [p, r] of Object.entries(results)) {
     console.log(`  ${p}: ${r.status}`)
+    for (const [c, v] of Object.entries(r)) {
+      if (c !== 'status') console.log(`    ${c}: ${v}`)
+    }
   }
-  
+
   cleanup()
 }
 

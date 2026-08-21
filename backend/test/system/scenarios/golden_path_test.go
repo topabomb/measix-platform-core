@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -516,13 +517,26 @@ func TestCAPC6015BackupRestore(t *testing.T) {
 
 	_, generation := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
 
-	// Backup via Hub command (simulates the backup API path)
+	// Backup via real production command: control-hub backup (uses VACUUM INTO)
 	env.StopHub()
 	backupPath := env.Root + "/backup.db"
-	if err := copyFile(env.DBPath, backupPath); err != nil {
-		t.Fatalf("backup copy: %v", err)
+	backupCmd := exec.CommandContext(ctx, env.HubBin, "backup",
+		"--db", env.DBPath,
+		"--output", backupPath,
+	)
+	backupCmd.Dir = env.Root
+	if out, err := backupCmd.CombinedOutput(); err != nil {
+		t.Fatalf("control-hub backup: %v: %s", err, out)
 	}
-	// Restore
+	// Verify backup integrity: control-hub check (runs PRAGMA integrity_check)
+	checkCmd := exec.CommandContext(ctx, env.HubBin, "check",
+		"--db", backupPath,
+	)
+	checkCmd.Dir = env.Root
+	if out, err := checkCmd.CombinedOutput(); err != nil {
+		t.Fatalf("control-hub check (backup integrity): %v: %s", err, out)
+	}
+	// Restore: copy the verified backup back to the Hub DB path
 	if err := copyFile(backupPath, env.DBPath); err != nil {
 		t.Fatalf("restore copy: %v", err)
 	}

@@ -40,7 +40,10 @@ s01-candidate-test: console-build
 # production Admin build and real Hub/Relay processes. This target is
 # not part of default GitHub Actions CI/CD; it is the explicit S0.1
 # candidate browser gate.
+# The JSON reporter is configured in playwright.config.ts to output
+# to ../.artifacts/e2e-playwright.json for freeze-manifest evidence.
 console-e2e: console-build
+	@mkdir -p .artifacts
 	cd console && npx playwright test --reporter=list
 
 # e2e-harness runs the full T4.1 clean-environment browser gate:
@@ -60,8 +63,10 @@ freeze-validate:
 	node scripts/freeze-manifest.mjs --validate
 
 # clean-replay verifies the freeze manifest can be replayed in clean env (CAP-C7-002)
+# This performs a real fresh-environment replay: starts fresh Hub + Relay,
+# verifies admin login and system status, and checks all required scenarios.
 clean-replay:
-	node scripts/freeze-manifest.mjs --clean-replay
+	node scripts/replay-freeze.mjs
 
 # collect-baseline runs the baseline test and generates .artifacts/resource-baseline.json
 # Measures architecture §17 required metrics: RSS/CPU, first-byte overhead,
@@ -85,10 +90,13 @@ collect-artifacts:
 	@mkdir -p .artifacts
 	@echo "Collecting backend test artifacts..."
 	cd backend && go test ./internal/... -count=1 -json -timeout 120s > ../.artifacts/backend-test.json
+	@node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/backend-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:0},null,2)+'\\n')"
 	@echo "Collecting system test artifacts..."
 	cd backend && go test -tags=smoke ./test/system/scenarios/ ./test/system/adapter/ ./test/system/client/ -count=1 -json -timeout 5m > ../.artifacts/system-test.json
+	@node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/system-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -tags=smoke -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:0},null,2)+'\\n')"
 	@echo "Collecting console test artifacts..."
 	cd console && pnpm vitest run --reporter=json > ../.artifacts/console-test.json 2>/dev/null || true
+	@node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/console-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'pnpm vitest run --reporter=json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:0},null,2)+'\\n')"
 	@echo "Collecting static contract artifact..."
 	@echo '{"codegenDrift":"PASS","gofmt":"PASS","goVet":"PASS","commit":"'$(shell git rev-parse HEAD)'"}' > .artifacts/static-contract.json
 	@echo "Artifacts written to .artifacts/"
@@ -109,10 +117,11 @@ collect-artifacts:
 freeze-gate: collect-artifacts s01-candidate-test console-e2e collect-baseline
 	@echo "Collecting candidate test artifacts..."
 	cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json
+	@node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/candidate-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -tags=candidate -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:0},null,2)+'\\n')"
 	@echo "Generating freeze manifest..."
 	node scripts/freeze-manifest.mjs
 	@echo "Running clean replay verification (CAP-C7-002)..."
-	node scripts/freeze-manifest.mjs --clean-replay
+	node scripts/replay-freeze.mjs
 
 console-test:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build

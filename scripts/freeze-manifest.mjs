@@ -68,12 +68,23 @@ function deterministicAdapterVersion() {
   if (existsSync(CLIENT_SOURCE)) hash.update(readFileSync(CLIENT_SOURCE).toString('utf-8').replace(/\r\n/g, '\n'))
   return 'sha256:' + hash.digest('hex')
 }
+
+// --- Artifact loaders ---
+
 function loadJsonArtifact(name) {
   const path = join(ARTIFACTS_DIR, name)
   if (!existsSync(path)) return null
   try { return JSON.parse(readFileSync(path, 'utf-8')) }
   catch (err) { return { _error: `Failed to parse ${name}: ${err.message}` } }
 }
+
+function loadMetaArtifact(name) {
+  const metaPath = join(ARTIFACTS_DIR, name + '.meta.json')
+  if (!existsSync(metaPath)) return null
+  try { return JSON.parse(readFileSync(metaPath, 'utf-8')) }
+  catch { return null }
+}
+
 function loadGoTestResults(artifactName) {
   const path = join(ARTIFACTS_DIR, artifactName)
   if (!existsSync(path)) return null
@@ -88,16 +99,28 @@ function loadGoTestResults(artifactName) {
   }
   return results
 }
+
 function loadVitestResults(artifactName) {
   const a = loadJsonArtifact(artifactName)
   if (!a) return null
   const results = new Map()
   if (a.testResults) for (const tr of a.testResults) {
     const name = relative(join(ROOT, 'console'), tr.name).replace(/\\/g, '/')
-    results.set(name, tr.status === 'passed' ? 'PASS' : 'FAIL')
+    // For vitest, we need both file-level and per-test granularity.
+    // Store individual test names too.
+    const fileStatus = tr.status === 'passed' ? 'PASS' : 'FAIL'
+    results.set(name, fileStatus)
+    // Also store individual test cases with their full path
+    if (tr.assertionResults) {
+      for (const ar of tr.assertionResults) {
+        const fullName = name + ' > ' + (ar.fullName || ar.name || 'unknown')
+        results.set(fullName, ar.status === 'passed' ? 'PASS' : 'FAIL')
+      }
+    }
   }
   return results
 }
+
 function loadPlaywrightResults(artifactName) {
   const a = loadJsonArtifact(artifactName)
   if (!a) return null
@@ -105,6 +128,7 @@ function loadPlaywrightResults(artifactName) {
   if (a.suites) for (const suite of a.suites) extractPlaywrightSpecs(suite, results)
   return results
 }
+
 function extractPlaywrightSpecs(suite, results) {
   if (suite.specs) for (const spec of suite.specs) {
     const title = spec.title || spec.name || 'unknown'
@@ -117,10 +141,28 @@ function extractPlaywrightSpecs(suite, results) {
         else if (failed) status = 'FAIL'
       }
     }
+    // Store by exact title (the Playwright spec title)
     results.set(title, status)
+    // Also extract any CAP-XX-NNN stable ID from the title or annotations
+    const capIdMatch = title.match(/CAP-[A-Z0-9-]+-\d+/g)
+    if (capIdMatch) {
+      for (const capId of capIdMatch) {
+        results.set(capId, status)
+      }
+    }
+    // Check for annotations (Playwright supports test annotations)
+    if (spec.annotations) {
+      for (const ann of spec.annotations) {
+        if (ann.type && ann.type.startsWith('CAP-')) {
+          results.set(ann.type, status)
+        }
+      }
+    }
   }
   if (suite.suites) for (const s of suite.suites) extractPlaywrightSpecs(s, results)
 }
+
+// --- Scenario result compilation ---
 
 function compileScenarioResults() {
   const artifacts = {
@@ -133,8 +175,10 @@ function compileScenarioResults() {
     'resource-baseline.json': loadJsonArtifact('resource-baseline.json'),
     'real-adapter-qualification.json': loadJsonArtifact('real-adapter-qualification.json'),
   }
+
   return SCENARIO_DEFS.map(s => {
     let result = 'NOT_EXECUTED'
+
     if (s.id === 'CAP-C0-009') {
       const a = artifacts['static-contract.json']
       if (a && a.codegenDrift === 'PASS') result = 'PASS'
@@ -154,13 +198,68 @@ function compileScenarioResults() {
     } else if (s.artifact && s.testNames.length > 0) {
       const artifact = artifacts[s.artifact]
       if (artifact instanceof Map) {
+        // Use exact match for stable scenario IDs / test names
         const results = s.testNames.map(tn => artifact.get(tn))
         if (results.every(r => r === 'PASS')) result = 'PASS'
         else if (results.some(r => r === 'FAIL')) result = 'FAIL'
       }
     }
-    return { id: s.id, name: s.name, artifact: s.artifact, testNames: s.testNames, required: s.required, result }
+
+    return {
+      id: s.id,
+      name: s.name,
+      artifact: s.artifact,
+      testNames: s.testNames,
+      required: s.required,
+      result,
+    }
   })
+}
+
+// --- Provenance validation ---
+
+function validateArtifactProvenance(artifactName, currentCommit) {
+  const errors = []
+  const metaPath = join(ARTIFACTS_DIR, artifactName + '.meta.json')
+
+  // Try meta.json first (the new provenance envelope)
+  const meta = loadMetaArtifact(artifactName)
+  if (meta) {
+    // Verify meta commit matches current commit
+    if (meta.platformCoreCommit && meta.platformCoreCommit !== currentCommit) {
+      errors.push(`Artifact ${artifactName} meta commit mismatch: meta=${meta.platformCoreCommit} current=${currentCommit}`)
+    }
+
+    // Verify SHA-256 of the artifact matches meta's artifactSha256
+    const artifactPath = join(ARTIFACTS_DIR, artifactName)
+    if (existsSync(artifactPath) && meta.artifactSha256) {
+      const actualSha = 'sha256:' + createHash('sha256').update(readFileSync(artifactPath)).digest('hex')
+      if (actualSha !== meta.artifactSha256) {
+        errors.push(`Artifact ${artifactName} SHA mismatch: meta=${meta.artifactSha256} actual=${actualSha}`)
+      }
+    }
+  } else {
+    // Fall back to legacy: check if artifact is JSON with embedded commit field
+    const artifact = loadJsonArtifact(artifactName)
+    if (artifact && !artifact._error) {
+      if (artifact.commit && artifact.commit !== currentCommit) {
+        errors.push(`Artifact ${artifactName} was generated for commit ${artifact.commit} but current commit is ${currentCommit}`)
+      }
+    }
+    // For NDJSON artifacts (Go test -json), there's no commit field;
+    // meta.json is the only way to provenance them. Warn if missing.
+    if (artifactName.endsWith('.json') && !artifactName.includes('static-contract') &&
+        !artifactName.includes('resource-baseline') && !artifactName.includes('real-adapter') &&
+        !artifactName.includes('e2e-playwright')) {
+      // Go NDJSON artifacts need meta.json
+      const artifactPath = join(ARTIFACTS_DIR, artifactName)
+      if (existsSync(artifactPath) && !meta) {
+        errors.push(`Artifact ${artifactName} has no meta.json provenance envelope. Run collect-artifacts with meta generation.`)
+      }
+    }
+  }
+
+  return errors
 }
 
 // --- Validate mode ---
@@ -182,6 +281,8 @@ if (isValidate) {
 }
 
 // --- Clean replay mode ---
+// This is now a manifest validation only. For real clean-environment replay,
+// use scripts/replay-freeze.mjs (via `make clean-replay`).
 if (isCleanReplay) {
   const manifestPath = join(ROOT, 'docs', 's0-freeze-manifest.json')
   if (!existsSync(manifestPath)) { console.error('ERROR: docs/s0-freeze-manifest.json does not exist. Generate it first.'); process.exit(1) }
@@ -195,8 +296,9 @@ if (isCleanReplay) {
   for (const s of manifest.scenarioResults) { if (s.required && s.result !== 'PASS') errors.push(`  ${s.id} ${s.name}: ${s.result}`) }
   if (manifest.realAdapterQualificationStatus !== 'VERIFIED') errors.push(`realAdapterQualificationStatus is ${manifest.realAdapterQualificationStatus}, expected VERIFIED`)
   if (manifest.resourceBaselineStatus !== 'GREEN') errors.push(`resourceBaselineStatus is ${manifest.resourceBaselineStatus}, expected GREEN`)
-  if (errors.length > 0) { console.error('ERROR: Clean replay validation failed:'); for (const e of errors) console.error(`  ${e}`); process.exit(1) }
-  console.log('Clean replay validation: PASS')
+  if (errors.length > 0) { console.error('ERROR: Clean replay manifest validation failed:'); for (const e of errors) console.error(`  ${e}`); process.exit(1) }
+  console.log('Clean replay manifest validation: PASS')
+  console.log('NOTE: For full clean-environment replay, run: make clean-replay')
   process.exit(0)
 }
 
@@ -244,12 +346,12 @@ if (!playwrightArtifact) {
 }
 
 const currentCommit = gitCommit(ROOT)
-const artifactCommits = ['backend-test.json', 'system-test.json', 'console-test.json', 'candidate-test.json', 'e2e-playwright.json', 'resource-baseline.json', 'real-adapter-qualification.json']
-for (const name of artifactCommits) {
-  const artifact = loadJsonArtifact(name)
-  if (artifact && artifact.commit && artifact.commit !== currentCommit) {
-    errors.push(`Artifact ${name} was generated for commit ${artifact.commit} but current commit is ${currentCommit}`)
-  }
+
+// Validate provenance for all artifacts
+const artifactNames = ['backend-test.json', 'system-test.json', 'console-test.json', 'candidate-test.json', 'e2e-playwright.json', 'resource-baseline.json', 'real-adapter-qualification.json']
+for (const name of artifactNames) {
+  const provenanceErrors = validateArtifactProvenance(name, currentCommit)
+  errors.push(...provenanceErrors)
 }
 
 if (errors.length > 0) {

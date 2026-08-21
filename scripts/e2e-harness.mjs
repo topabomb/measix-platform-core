@@ -39,7 +39,7 @@ import {
 import { join, resolve, extname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
-import { randomFillSync } from 'node:crypto'
+import { randomFillSync, createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { request as httpRequest } from 'node:http'
 
@@ -47,6 +47,7 @@ const require = createRequire(import.meta.url)
 const net = require('node:net')
 
 const ROOT = resolve(import.meta.dirname, '..')
+const ARCH_REPO = resolve(ROOT, '..', 'measix-architecture')
 const KEEP = process.argv.includes('--keep')
 const TIMEOUT = parseInt(process.env.MEASIX_E2E_TIMEOUT || '600000', 10)
 
@@ -286,7 +287,15 @@ const e2eEnv = {
   PLAYWRIGHT_BASE_URL: spaBaseURL,
 }
 
+// Ensure .artifacts directory exists for JSON reporter output
+const artifactsDir = join(ROOT, '.artifacts')
+if (!existsSync(artifactsDir)) {
+  mkdirSync(artifactsDir, { recursive: true })
+}
+
 try {
+  // Use the Playwright config which includes the JSON reporter
+  // outputting to ../.artifacts/e2e-playwright.json
   execSync('npx playwright test --reporter=list', {
     cwd: join(ROOT, 'console'),
     stdio: 'inherit',
@@ -294,8 +303,49 @@ try {
     timeout: TIMEOUT,
   })
   log('E2E tests PASSED')
+
+  // Write artifact metadata envelope for provenance validation
+  const playwrightArtifactPath = join(artifactsDir, 'e2e-playwright.json')
+  if (existsSync(playwrightArtifactPath)) {
+    const artifactSha = 'sha256:' + createHash('sha256').update(readFileSync(playwrightArtifactPath)).digest('hex')
+    const now = new Date().toISOString()
+    const meta = {
+      platformCoreCommit: execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf-8' }).trim(),
+      architectureCommit: (() => {
+        try { return execSync('git rev-parse HEAD', { cwd: ARCH_REPO, encoding: 'utf-8' }).trim() }
+        catch { return 'unknown' }
+      })(),
+      command: 'npx playwright test --reporter=list',
+      artifactSha256: artifactSha,
+      startedAt: now,
+      completedAt: now,
+      exitCode: 0,
+    }
+    writeFileSync(join(artifactsDir, 'e2e-playwright.json.meta.json'), JSON.stringify(meta, null, 2) + '\n')
+    log(`wrote e2e-playwright.json.meta.json (sha=${artifactSha.slice(0, 20)}...)`)
+  }
 } catch (e) {
   log(`E2E tests FAILED: ${e.message}`)
+
+  // Still write meta.json even on failure for provenance
+  const playwrightArtifactPath = join(artifactsDir, 'e2e-playwright.json')
+  if (existsSync(playwrightArtifactPath)) {
+    const artifactSha = 'sha256:' + createHash('sha256').update(readFileSync(playwrightArtifactPath)).digest('hex')
+    const now = new Date().toISOString()
+    const meta = {
+      platformCoreCommit: execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf-8' }).trim(),
+      architectureCommit: (() => {
+        try { return execSync('git rev-parse HEAD', { cwd: ARCH_REPO, encoding: 'utf-8' }).trim() }
+        catch { return 'unknown' }
+      })(),
+      command: 'npx playwright test --reporter=list',
+      artifactSha256: artifactSha,
+      startedAt: now,
+      completedAt: now,
+      exitCode: 1,
+    }
+    writeFileSync(join(artifactsDir, 'e2e-playwright.json.meta.json'), JSON.stringify(meta, null, 2) + '\n')
+  }
   process.exit(1)
 }
 

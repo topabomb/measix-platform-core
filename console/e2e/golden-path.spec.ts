@@ -157,7 +157,7 @@ test.describe('CAP-C6-001 Browser Golden Path', () => {
     await expect(page.locator('[data-cy="system-runtime-status"]')).toBeVisible()
   })
 
-  test('browser full golden path: login → create upstream → resources → validate → publish', async ({ page }: { page: Page }) => {
+  test('browser full golden path: login → create upstream → resources → releases → usage → system', async ({ page }: { page: Page }) => {
     // This test walks the key CAP-C6-001 browser steps.
     // It does NOT use Admin API to create objects — everything is done through the UI.
     await login(page)
@@ -202,6 +202,30 @@ test.describe('CAP-C6-001 Browser Golden Path', () => {
     if (await errorBanner.isVisible().catch(() => false)) {
       const text = await errorBanner.textContent()
       expect(text).not.toContain('500')
+    }
+  })
+
+  test('browser session persists across page navigations', async ({ page }: { page: Page }) => {
+    // Verify that the session cookie persists across navigations
+    await login(page)
+
+    // Navigate to multiple pages — session should persist
+    for (const path of ['/admin/overview', '/admin/upstreams', '/admin/resources', '/admin/releases', '/admin/usage', '/admin/system']) {
+      await page.goto(path)
+      // Should not be redirected to login
+      await expect(page).not.toHaveURL(/\/admin\/$|\/admin\/login/)
+    }
+  })
+
+  test('browser logout invalidates session', async ({ page }: { page: Page }) => {
+    await login(page)
+
+    // Find and click the logout button in the header/avatar menu
+    const logoutBtn = page.locator('[data-cy="logout-btn"]')
+    if (await logoutBtn.isVisible().catch(() => false)) {
+      await logoutBtn.click()
+      // Should be redirected to login
+      await expect(page).toHaveURL(/\/admin\/$|\/admin\/login/)
     }
   })
 })

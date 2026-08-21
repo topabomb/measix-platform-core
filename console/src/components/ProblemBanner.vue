@@ -17,7 +17,7 @@ const detail = computed(() => props.error instanceof Error ? props.error.message
 </script>
 
 <template>
-  <q-banner v-if="visible" class="bg-red-1 text-negative rounded-borders" dense>
+  <q-banner v-if="visible" class="bg-red-1 text-negative rounded-borders" dense data-cy="problem-banner">
     <div class="text-weight-medium">{{ title }}</div>
     <div class="text-body2">{{ detail }}</div>
   </q-banner>

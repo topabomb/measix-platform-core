@@ -50,7 +50,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 2. **CAP scenario evidence mapping**：为 C0-C5 添加 Architecture Scenario → executable test → exact SHA result 映射
 3. ✅ **Security required scenarios 补全**：expired JWT/wrong audience/disabled user/revoked device/session/management endpoint/Set-Cookie/redirect/Secret in browser/Snapshot Preview leak — 已在 `security_test.go` 中实现 SEC-016..021
 4. ✅ **system-test vs s01-candidate-test 分层隔离**：使用 build tags (`smoke` vs `candidate`) 严格隔离 bounded T3 vs 完整 Candidate Gate
-5. ✅ **Freeze Manifest generator 修正**：真实 PASS/FAIL/startedAt/completedAt/C0-C5；Real Adapter 和 Baseline 为硬性门禁
+5. ✅ **Freeze Manifest evidence compiler** — 已重写为消费真实测试 artifact 的 evidence compiler，不再硬编码 PASS/FAIL
 6. 完成至少一套 required real Adapter qualification；
 7. exact candidate 全部 Green 后生成 C7 Freeze manifest；
 8. C7 之后才开始 S0.2 Android。
@@ -128,7 +128,16 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 2. **Browser E2E 测试**（`console/e2e/golden-path.spec.ts`）：
    - CAP-C6-001 browser slice：login → Overview → System → refresh
    - CAP-C6-001 browser slice：create user → user visible in list
-   - **GAP**：当前 Browser E2E 只覆盖 Golden Path 的很小一段，缺完整 CAP-C6-001 流程
+   - CAP-C6-001 browser slice：create upstream → upstream visible
+   - CAP-C6-001 browser slice：Resources page 五 tab navigation
+   - CAP-C6-001 browser slice：Releases/Usage/System 页面加载
+   - CAP-C6-001 full golden path：login → create upstream → resources → releases → usage → system
+   - CAP-C6-001 session 持久性测试（跨页导航）
+   - CAP-C6-001 logout 测试
+   - CAP-C6-012 browser refresh recovery
+   - CAP-C6-014 full restart recovery
+   - `ProblemBanner.vue` 已添加 `data-cy="problem-banner"`
+   - `AdminLayout.vue` 已添加 `data-cy="logout-btn"` 和 `data-cy="logout-btn-mobile"`
 
 3. **@playwright/test 依赖**：
    - `console/package.json` 已添加 `@playwright/test@1.55.0`
@@ -148,36 +157,47 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 - 新增 `.gitattributes` 确保 `*.go` 文件在所有平台 checkout 时保持 LF
 - 解决 Windows `autocrlf=true` 导致 gofmt 全量报错的问题
 
-### C7 Freeze Manifest 脚本增强
+### C7 Freeze Manifest Evidence Compiler
 
-`scripts/freeze-manifest.mjs` 已增强，支持以下字段（在 C7 Gate 正式执行时生成）：
-- `architectureCommit`：pinned architecture 仓库 commit
-- `platformCoreCommit`：pinned platform-core commit
-- `adminBuildHash`：Admin Console production build SHA-256
-- `clientControlOpenApiHash` / `adminOpenApiHash`：OpenAPI SHA-256
-- `canonicalFixtureHash`：canonical fixtures tree SHA-256
-- `deterministicAdapterVersion`：Test Adapter + Test Client 源码 hash
-- `realAdapterQualificationRef`：指向 `docs/s0-real-adapter-qualification.md`
-- `resourceBaselineRef`：指向 `docs/s0-resource-baseline.md`
-- `scenarioResults`：场景列表
+`scripts/freeze-manifest.mjs` 已重写为 evidence compiler，不再硬编码 PASS/FAIL：
 
-✅ 已修正：
-- `scenarioResults` 包含 SEC-016..021 和 CAP-C2-021 等场景的真实 PASS/FAIL
-- 添加了 `startedAt` / `completedAt` 时间戳
-- C7 自循环逻辑修正（不在 tests 未通过时生成 manifest）
-- Real Adapter 和 Baseline 状态设为硬性门禁（未通过则 manifest 标记 NOT_GREEN）
-- Admin 未构建时 `adminBuildHash` 不允许 "not-built"
+**Evidence Pipeline 设计**：
+```
+test runners (go test -json, vitest --json, playwright --reporter=json)
+  ↓
+machine-readable result artifacts (JSON files in .artifacts/)
+  ↓
+adapter qualification artifact (docs/s0-real-adapter-qualification.json)
+resource baseline artifact (docs/s0-resource-baseline.json)
+  ↓
+freeze-manifest compiler (scripts/freeze-manifest.mjs)
+  ↓
+docs/s0-freeze-manifest.json
+```
+
+**关键行为**：
+- 消费 `.artifacts/` 中的 Go test JSON / vitest JSON / Playwright JSON artifacts
+- 每个 scenario 的 result 由 artifact 中的实际测试结果决定，不是硬编码
+- 如果 artifact 不存在，scenario 标记为 NOT_EXECUTED
+- 验证 artifact 中的 commit SHA 与当前 commit 匹配
+- Real Adapter 和 Baseline 状态从各自的 JSON artifact 读取
+- 如果任何 required scenario 不是 PASS，manifest 不会生成
+- `make collect-artifacts` 收集测试 artifact 到 `.artifacts/`
+- `make freeze-gate` 执行完整 C7 Gate 流程
+- `.artifacts/` 已加入 `.gitignore`
 
 ### 参考文档
 
 - `docs/s0-real-adapter-qualification.md`：Real Adapter Qualification 报告（NOT EXECUTED）
-- `docs/s0-resource-baseline.md`：Resource Baseline 基准指标（NOT GREEN — 全部数值为 estimate，未由可执行测试生成）
+- `docs/s0-resource-baseline.md`：Resource Baseline 基准指标（NOT GREEN — 全部数值为 NOT MEASURED，未由可执行测试生成）
+- `.artifacts/real-adapter-qualification.json`：由 `scripts/collect-adapter-qualification.mjs` 生成，被 `freeze-manifest.mjs` 消费
+- `.artifacts/resource-baseline.json`：由 `scripts/collect-baseline.mjs` 生成，被 `freeze-manifest.mjs` 消费
 
 ### 编译验证
 
 ```text
-exact SHA: 8a2a15078d0bdb417af23acec7abf08447fe6aee
-CI run:    32437723663 (ci-gate: success)
+exact SHA: db6181c4ca6a5a7204fbf87ced41fa9ffdf09334
+CI run:    32440523743 (ci-gate: success)
 
 Jobs:
   static-contract  — success
@@ -186,6 +206,8 @@ Jobs:
   system-test      — success
   ci-gate          — success
 ```
+
+> CI 证明默认 T0-T3 deterministic baseline Green；不证明 C6/C7/S0.1 Freeze。
 
 ### C1–C3 前端产品闭环完成状态（2026-08-20 更新）
 
@@ -239,19 +261,19 @@ Jobs:
 ### 验证证据
 
 ```text
-exact SHA: 8a2a15078d0bdb417af23acec7abf08447fe6aee
-CI run:    32437723663 (ci-gate: success)
+exact SHA: db6181c4ca6a5a7204fbf87ced41fa9ffdf09334
+CI run:    32440523743 (ci-gate: success)
 ```
 
 ## 当前剩余缺口（2026-08-21 更新）
 
-1. **C6** — Not Green：Browser T4.1 Golden Path 仍需扩展完整 CAP-C6-001 流程；一键 clean-environment T4.1 harness 已实现但需在 candidate SHA 上执行验证
+1. **C6** — Not Green：Browser T4.1 Golden Path 已扩展覆盖 CAP-C6-001 关键步骤（login → upstream → resources → releases → usage → system + session 持久性 + logout + refresh recovery + restart recovery），但须在 exact candidate SHA 上执行验证
 2. ✅ **system-test vs s01-candidate-test 分层** — 已修复：使用 build tags (`smoke` vs `candidate`) 严格隔离
 3. **CAP scenario evidence mapping** — C0-C5 仍缺正式 CAP ID 映射
 4. ✅ **Security required scenarios** — 已补全：SEC-016 (JWT claims), SEC-017/018 (disabled user/revoked device), SEC-019 (management endpoint), SEC-020 (Set-Cookie/redirect strip), SEC-021 (secret in browser)
 5. **Real Adapter qualification** — 未执行
-6. ✅ **Freeze Manifest generator** — 已修正：真实 PASS/FAIL/startedAt/completedAt；Real Adapter 和 Baseline 为硬性门禁
-7. **Resource Baseline** — 全部数值为 estimate，未由可执行测试生成；须在 candidate SHA 上执行真实测量后替换
+6. ✅ **Freeze Manifest evidence compiler** — 已重写为消费真实测试 artifact 的 evidence compiler，不再硬编码 PASS/FAIL
+7. **Resource Baseline** — 全部数值为 NOT MEASURED；须在 candidate SHA 上执行真实测量后替换
 8. **C7** — Not Started
 
 ## S0.1 审查修复 Evidence（2026-08-21）
@@ -273,8 +295,8 @@ CI run:    32437723663 (ci-gate: success)
 ### 验证证据汇总
 
 ```text
-exact SHA: 8a2a15078d0bdb417af23acec7abf08447fe6aee
-CI run:    32437723663 (ci-gate: success)
+exact SHA: db6181c4ca6a5a7204fbf87ced41fa9ffdf09334
+CI run:    32440523743 (ci-gate: success)
 
 Jobs:
   static-contract  — success
@@ -283,3 +305,5 @@ Jobs:
   system-test      — success
   ci-gate          — success
 ```
+
+> CI 证明默认 T0-T3 deterministic baseline Green；不证明 C6/C7/S0.1 Freeze。

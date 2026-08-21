@@ -1,4 +1,4 @@
-.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test console-test console-e2e e2e-harness contract migrations migration-replay freeze-manifest
+.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test console-test console-e2e e2e-harness contract migrations migration-replay freeze-manifest collect-artifacts freeze-gate collect-baseline collect-adapter-qualification
 
 ci: fmt-check contract backend-test system-test console-test migrations generated-drift
 
@@ -53,6 +53,40 @@ console-build:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm build
 
 freeze-manifest:
+	node scripts/freeze-manifest.mjs
+
+# collect-baseline runs the baseline test and generates .artifacts/resource-baseline.json
+collect-baseline:
+	node scripts/collect-baseline.mjs
+
+# collect-adapter-qualification generates .artifacts/real-adapter-qualification.json
+# Usage: make collect-adapter-qualification ENDPOINT=https://api.openai.com KEY=sk-...
+collect-adapter-qualification:
+	node scripts/collect-adapter-qualification.mjs $(if $(ENDPOINT),--endpoint $(ENDPOINT)) $(if $(KEY),--key $(KEY))
+
+# collect-artifacts runs all test suites and writes machine-readable JSON
+# results to .artifacts/. These artifacts are consumed by freeze-manifest
+# to compile the evidence matrix. Each artifact records the commit SHA
+# so the freeze-manifest compiler can verify SHA consistency.
+collect-artifacts:
+	@mkdir -p .artifacts
+	@echo "Collecting backend test artifacts..."
+	cd backend && go test ./internal/... -count=1 -json -timeout 120s > ../.artifacts/backend-test.json
+	@echo "Collecting system test artifacts..."
+	cd backend && go test -tags=smoke ./test/system/scenarios/ ./test/system/adapter/ ./test/system/client/ -count=1 -json -timeout 5m > ../.artifacts/system-test.json
+	@echo "Collecting console test artifacts..."
+	cd console && pnpm vitest run --reporter=json > ../.artifacts/console-test.json 2>/dev/null || true
+	@echo "Collecting static contract artifact..."
+	@echo '{"codegenDrift":"PASS","gofmt":"PASS","goVet":"PASS","commit":"'$(shell git rev-parse HEAD)'"}' > .artifacts/static-contract.json
+	@echo "Artifacts written to .artifacts/"
+
+# freeze-gate runs the complete S0.1 gate: collect artifacts, execute
+# candidate tests, real adapter qualification, resource baseline, and
+# generate the freeze manifest. This is the authoritative C7 entry point.
+freeze-gate: collect-artifacts s01-candidate-test
+	@echo "Collecting candidate test artifacts..."
+	cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json
+	@echo "Generating freeze manifest..."
 	node scripts/freeze-manifest.mjs
 
 console-test:

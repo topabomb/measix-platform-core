@@ -104,7 +104,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
         >
           <q-menu>
             <q-list>
-              <q-item clickable v-close-popup @click="logout">
+              <q-item clickable v-close-popup data-cy="logout-btn" @click="logout">
                 <q-item-section avatar><q-icon name="logout" /></q-item-section>
                 <q-item-section>{{ $t('login.signOut') }}</q-item-section>
               </q-item>
@@ -115,6 +115,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
           v-if="session.authenticated"
           flat dense round icon="logout"
           class="lt-md"
+          data-cy="logout-btn-mobile"
           :aria-label="$t('login.signOut')"
           @click="logout"
         />

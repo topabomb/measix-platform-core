@@ -404,9 +404,10 @@ function startAdapter(port) {
 
 // ---------------------------------------------------------------------------
 // Same-origin SPA proxy
-// Serves production dist/spa at /admin/* and proxies /api/*, /internal/*,
-// /live, /ready to Hub. This ensures browser fetch('/api/...') hits the
-// same origin, satisfying credentials: 'same-origin'.
+// Serves production dist/spa at /admin/* and proxies /api/*, /live, /ready
+// to Hub. Per architecture, /internal/* MUST NOT be reachable from the
+// public origin — it must only exist on the Hub's private listener.
+// The Relay internal listener is on a separate port/address.
 // ---------------------------------------------------------------------------
 
 function startSpaProxy(port, spaDir, hubPort) {
@@ -414,9 +415,10 @@ function startSpaProxy(port, spaDir, hubPort) {
     const url = new URL(req.url, `http://127.0.0.1:${port}`)
     const path = url.pathname
 
-    // Proxy API and internal requests to Hub via raw HTTP pipeline
-    if (path.startsWith('/api/') || path.startsWith('/internal/') ||
-        path === '/live' || path === '/ready') {
+    // Proxy API requests to Hub via raw HTTP pipeline.
+    // /internal/* is intentionally NOT proxied — architecture requires
+    // management/internal endpoints to be unreachable from public origin.
+    if (path.startsWith('/api/') || path === '/live' || path === '/ready') {
       const proxyReq = httpRequest({
         hostname: '127.0.0.1',
         port: hubPort,

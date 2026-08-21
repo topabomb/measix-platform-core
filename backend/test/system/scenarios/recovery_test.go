@@ -5,6 +5,7 @@ package scenarios
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -254,7 +255,14 @@ func TestCAPC6013SQLiteBusyTransient(t *testing.T) {
 // This test strengthens CAP-C6-004 by explicitly asserting:
 // 1. The old generation request returns 428 with forwarded=false.
 // 2. The upstream Adapter received NO request body for the denied request.
-// 3. Usage records the correct generation for each request.
+// 3. The same client session syncs to generation N+1 via managed/state — NO re-enrollment.
+// 4. New generation interaction succeeds with the same access token.
+// 5. Usage records the correct generation for each request.
+//
+// Per architecture §13 CAP-C6-004:
+//   "Test Client fetches new snapshot" — NOT "re-enrolls".
+//   The client uses managed/state to discover the new active generation,
+//   fetches the new snapshot, and continues with the same session/token.
 func TestCAPC6004EnhancedNoForwardAndUsageGeneration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -342,13 +350,32 @@ func TestCAPC6004EnhancedNoForwardAndUsageGeneration(t *testing.T) {
 		t.Fatalf("adapter received request body for denied old-generation call: %+v", fact)
 	}
 
-	// Fetch new snapshot with new generation.
-	newEnrollmentCode := gp.createEnrollment(ctx, admin, gp.lastUserID)
-	_, generationN1 := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, newEnrollmentCode)
+	// Same-session sync: use the SAME access token to discover the new
+	// active generation via managed/state — NO re-enrollment.
+	// Per architecture §13 CAP-C6-004: "Test Client fetches new snapshot."
+	stateReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, env.HubBaseURL+"/api/client/v1/managed/state", nil)
+	stateReq.Header.Set("Authorization", "Bearer "+clientToken)
+	stateResp, err := http.DefaultClient.Do(stateReq)
+	if err != nil {
+		t.Fatalf("get managed state for N+1: %v", err)
+	}
+	var stateN1 struct {
+		ActiveManagedGeneration int `json:"activeManagedGeneration"`
+	}
+	if err := json.NewDecoder(stateResp.Body).Decode(&stateN1); err != nil {
+		t.Fatalf("decode managed state N+1: %v", err)
+	}
+	stateResp.Body.Close()
+	generationN1 := stateN1.ActiveManagedGeneration
 	if generationN1 <= generationN {
 		t.Fatalf("generation should increment: %d -> %d", generationN, generationN1)
 	}
 
+	// Fetch the new snapshot with the SAME access token — no re-enrollment.
+	idsN1 := gp.getSnapshotResourceIDs(ctx, env.HubBaseURL, clientToken, generationN1, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID)
+
+	// Create a new client instance with the SAME token but updated generation.
+	// The access token is still valid — the client just needs to use the new generation.
 	tc2 := client.New(client.Options{
 		RuntimeBaseURL:    env.RelayPubBaseURL,
 		AccessToken:       clientToken,
@@ -356,9 +383,9 @@ func TestCAPC6004EnhancedNoForwardAndUsageGeneration(t *testing.T) {
 		InteractionID:     platformid.New(platformid.Interaction),
 	})
 
-	// New generation should succeed.
-	if _, _, err := tc2.ChatCompletion(ctx, ids.model, "/v1/chat/completions", `{"model":"gpt-test","messages":[]}`); err != nil {
-		t.Fatalf("generation N+1 should succeed: %v", err)
+	// New generation should succeed with the same session/token.
+	if _, _, err := tc2.ChatCompletion(ctx, idsN1.model, "/v1/chat/completions", `{"model":"gpt-test","messages":[]}`); err != nil {
+		t.Fatalf("generation N+1 should succeed with same session: %v", err)
 	}
 
 	// Wait for usage to record the new-generation request.

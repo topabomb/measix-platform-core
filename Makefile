@@ -1,4 +1,4 @@
-.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test console-test console-e2e e2e-harness contract migrations migration-replay freeze-manifest collect-artifacts freeze-gate collect-baseline collect-adapter-qualification
+.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test console-test console-e2e e2e-harness contract migrations migration-replay freeze-manifest freeze-validate clean-replay collect-artifacts freeze-gate collect-baseline collect-adapter-qualification
 
 ci: fmt-check contract backend-test system-test console-test migrations generated-drift
 
@@ -55,12 +55,25 @@ console-build:
 freeze-manifest:
 	node scripts/freeze-manifest.mjs
 
+# freeze-validate validates an existing manifest against current SHA/builds
+freeze-validate:
+	node scripts/freeze-manifest.mjs --validate
+
+# clean-replay verifies the freeze manifest can be replayed in clean env (CAP-C7-002)
+clean-replay:
+	node scripts/freeze-manifest.mjs --clean-replay
+
 # collect-baseline runs the baseline test and generates .artifacts/resource-baseline.json
+# Measures architecture §17 required metrics: RSS/CPU, first-byte overhead,
+# stream memory, multipart memory/disk, cancel cleanup, spool drain, SQLite growth.
+# GREEN is computed from metric completeness, not hardcoded.
 collect-baseline:
 	node scripts/collect-baseline.mjs
 
 # collect-adapter-qualification generates .artifacts/real-adapter-qualification.json
 # Usage: make collect-adapter-qualification ENDPOINT=https://api.openai.com KEY=sk-...
+# Implements real qualification runner: Hub → Relay → real Adapter for
+# Model streaming, TTS, ASR, MCP profiles per architecture qualification spec.
 collect-adapter-qualification:
 	node scripts/collect-adapter-qualification.mjs $(if $(ENDPOINT),--endpoint $(ENDPOINT)) $(if $(KEY),--key $(KEY))
 
@@ -79,15 +92,27 @@ collect-artifacts:
 	@echo "Collecting static contract artifact..."
 	@echo '{"codegenDrift":"PASS","gofmt":"PASS","goVet":"PASS","commit":"'$(shell git rev-parse HEAD)'"}' > .artifacts/static-contract.json
 	@echo "Artifacts written to .artifacts/"
+	@# Browser T4.1 Playwright evidence is collected separately via console-e2e target
+	@# and is expected at .artifacts/e2e-playwright.json by freeze-manifest.mjs
 
-# freeze-gate runs the complete S0.1 gate: collect artifacts, execute
-# candidate tests, real adapter qualification, resource baseline, and
-# generate the freeze manifest. This is the authoritative C7 entry point.
-freeze-gate: collect-artifacts s01-candidate-test
+# freeze-gate runs the complete S0.1 C7 gate:
+#   T0-T3 artifacts → candidate system tests → Browser T4.1 →
+#   resource baseline → real adapter qualification → evidence validation →
+#   manifest generation → clean replay verification.
+# This is the authoritative C7 entry point.
+#
+# Prerequisite: real adapter qualification must be run separately BEFORE
+# freeze-gate, as it requires a real upstream endpoint and API key:
+#   make collect-adapter-qualification ENDPOINT=https://api.openai.com KEY=sk-...
+# The freeze-manifest script will hard-fail if the artifact is missing or
+# not VERIFIED.
+freeze-gate: collect-artifacts s01-candidate-test console-e2e collect-baseline
 	@echo "Collecting candidate test artifacts..."
 	cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json
 	@echo "Generating freeze manifest..."
 	node scripts/freeze-manifest.mjs
+	@echo "Running clean replay verification (CAP-C7-002)..."
+	node scripts/freeze-manifest.mjs --clean-replay
 
 console-test:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build

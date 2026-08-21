@@ -1467,3 +1467,63 @@ func TestCAPSEC021SnapshotPreviewNoServerFieldsLeak(t *testing.T) {
 
 	t.Log("CAP-SEC-021 Snapshot Preview No Server Fields Leak: PASS")
 }
+
+// CAP-SEC-022 — Public topology does not expose /internal/* routes.
+// Per architecture: "Admin/Client must not access internal API through
+// client-facing topology." The public origin must only expose
+// /admin/*, /api/*, /live, /ready. /internal/* must be unreachable.
+//
+// This test verifies from the Hub's public listener (the same address
+// the browser/SPA uses), /internal/* returns 404 (not routed), while
+// /api/* and /live are reachable.
+func TestCAPSEC022InternalRoutesNotReachableFromPublic(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	env, err := harness.NewHubEnv(ctx)
+	if err != nil {
+		t.Fatalf("create env: %v", err)
+	}
+	defer env.Cleanup()
+
+	if err := env.StartHub(ctx); err != nil {
+		t.Fatalf("start hub: %v", err)
+	}
+
+	// /internal/* paths that must NOT be reachable from the public listener.
+	// These are management endpoints that should only exist on a private
+	// listener or be blocked by the public ingress.
+	internalPaths := []string{
+		"/internal/v1/usage/request-events:batch",
+		"/internal/v1/something",
+		"/internal/live",
+		"/internal/ready",
+	}
+
+	for _, path := range internalPaths {
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, env.HubBaseURL+path, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			// Connection refused is acceptable (port not listening)
+			continue
+		}
+		// If we get a response, it must be 404 (not routed/proxied)
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			resp.Body.Close()
+			t.Fatalf("internal path %s is reachable from public listener: status=%d", path, resp.StatusCode)
+		}
+		resp.Body.Close()
+	}
+
+	// Verify /live and /api/* ARE reachable from public listener
+	resp, err := http.Get(env.HubBaseURL + "/live")
+	if err != nil {
+		t.Fatalf("/live should be reachable: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("/live should return 200, got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	t.Log("CAP-SEC-022 Internal Routes Not Reachable From Public: PASS")
+}

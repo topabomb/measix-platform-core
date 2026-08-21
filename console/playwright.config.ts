@@ -21,6 +21,7 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-report' }],
+    ['json', { outputFile: '../.artifacts/e2e-playwright.json' }],
   ],
   timeout: 120_000,
   expect: {

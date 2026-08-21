@@ -16,7 +16,7 @@ contract:
 backend-test:
 	cd backend && go test ./... -count=1
 	cd backend && go vet ./...
-	cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/sqliteutil ./internal/relay/metering -count=1
+	cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/sqliteutil ./internal/relay/metering ./internal/relay/control ./internal/relay/runtime -count=1
 	@# Verify candidate-tagged system scenarios compile, but do NOT run them in backend-test.
 	@# They require real Hub/Relay processes and are executed via s01-candidate-test.
 	cd backend && go test -tags=candidate -run=^$$ ./test/system/scenarios/ -count=1

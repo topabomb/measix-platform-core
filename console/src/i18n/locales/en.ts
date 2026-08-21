@@ -130,6 +130,7 @@ export default {
     generateEnrollment: 'Generate enrollment',
     enrollmentCode: 'Enrollment code',
     enrollmentCodeHint: 'This code is shown once. Copy it before closing.',
+    enrollmentQr: 'QR code',
     expiresAt: 'Expires',
     revoke: 'Revoke',
     revokeConfirm: 'Revoke device {device}?',

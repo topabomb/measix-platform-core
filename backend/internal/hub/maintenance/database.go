@@ -65,6 +65,12 @@ func Check(ctx context.Context, db *sql.DB) (CheckResult, error) {
 	return CheckResult{Integrity: integrity, Tables: len(requiredTables)}, nil
 }
 
+// RequiredTableList returns the list of required table names that must exist
+// in a valid Hub database.
+func RequiredTableList() []string {
+	return append([]string(nil), requiredTables...)
+}
+
 func Backup(ctx context.Context, db *sql.DB, outputPath, build string, now time.Time) (string, error) {
 	if db == nil || strings.TrimSpace(outputPath) == "" {
 		return "", fmt.Errorf("invalid backup request")

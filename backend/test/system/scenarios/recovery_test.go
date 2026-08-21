@@ -260,9 +260,10 @@ func TestCAPC6013SQLiteBusyTransient(t *testing.T) {
 // 5. Usage records the correct generation for each request.
 //
 // Per architecture §13 CAP-C6-004:
-//   "Test Client fetches new snapshot" — NOT "re-enrolls".
-//   The client uses managed/state to discover the new active generation,
-//   fetches the new snapshot, and continues with the same session/token.
+//
+//	"Test Client fetches new snapshot" — NOT "re-enrolls".
+//	The client uses managed/state to discover the new active generation,
+//	fetches the new snapshot, and continues with the same session/token.
 func TestCAPC6004EnhancedNoForwardAndUsageGeneration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()

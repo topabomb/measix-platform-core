@@ -1,6 +1,6 @@
 # S0.1 Platform Core 进展
 
-> Architecture authority：`topabomb/measix-architecture@6eda9eb9bb842b4cbd3fa36f78e6c481ed35c55b`  
+> Architecture authority：`topabomb/measix-architecture@dbb56952ab1cf60fa55e4cbb8d14ee70eda43a48`  
 > Implementation branch：`agent/s0-platform-core`  
 > 当前阶段：**S0.1 Managed Capability Delivery**  
 > 阶段阅读清单：`topabomb/measix-architecture/docs/measix-stage-document-index.md`
@@ -32,9 +32,18 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 - `make s01-candidate-test` 提供 deterministic candidate system scenarios；只有在 exact candidate SHA 上实际执行后的结果才是 C6 evidence。
 - `console/e2e/golden-path.spec.ts` + `console/e2e/topology-security.spec.ts` + `scripts/e2e-harness.mjs` 已提供 real-browser/clean-environment 基础设施，包括 topology security 验证（`/internal/*` 不可达）和 session 持久性；Playwright JSON reporter 输出到 `.artifacts/e2e-playwright.json`。
 - `scripts/collect-adapter-qualification.mjs` 已实现完整自动化 Hub→Relay→real Adapter qualification flow（Secret/Upstream/Test/Apply/Resources/Publish/runtime 请求/usage 验证）；须用真实 endpoint/key 执行。
-- `scripts/collect-baseline.mjs` / `baseline_test.go` 已扩充为采集 architecture §17 全部 9 类指标（Hub/Relay RSS/CPU、first-byte overhead、concurrent stream memory、multipart memory/disk、cancel cleanup、spool drain、SQLite growth）；GREEN 由 metric completeness 计算。
+- `scripts/collect-baseline.mjs` / `baseline_test.go` 已扩充为采集 architecture §17 全部 9 类指标（**Hub/Relay 读取真实进程 RSS/threads** 而非 test runner process）；GREEN 由 metric completeness 计算。
 - `scripts/freeze-manifest.mjs` 从真实 artifact 编译结果而非硬编码；scenario definitions 外置到 `scripts/scenario-definitions.json`（84 个 CAP scenario → test → artifact 映射）；artifact 缺失或 SHA 不匹配时 hard fail。
 - `make freeze-gate` 为 authoritative C7 entry point：collect-artifacts → s01-candidate-test → console-e2e → collect-baseline → freeze-manifest → clean-replay。Real adapter qualification 须单独先执行。
+
+## 本轮完成的 P0 修复
+
+1. ✅ **P0-1**: `gofmt` 修复 `recovery_test.go`，T0-T3 baseline 全绿。
+2. ✅ **P0-1b**: 架构基准 SHA 从 `6eda9eb` 更新为 `dbb56952`（docs + freeze-manifest）。
+3. ✅ **P0-2**: 重写 HUB-DB-001~010 测试，使用真实 migration/backup/restore 语义（seed 真实数据、backup/restore round-trip、wrong-key fail-closed、encrypted payload NOT NULL 校验）。
+4. ✅ **P0-3**: 新增 A-E 五个确定性崩溃点测试（intent commit 前/后、Relay apply 前、ACK 丢失、finalize 前/后），验证 reconciliation 收敛且无重复 generation。
+5. ✅ **P0-4**: 资源基准采集修复——新增 `process_metrics.go`，通过 PID 读取真实 Hub/Relay 进程 RSS/threads（Linux `/proc/<pid>/status`），替换原来的 `runtime.ReadMemStats()`（test runner process）。
+6. ✅ **P0-14**: `-race` 扩展到 `relay/control` 和 `relay/runtime` 包。
 
 ## 下一轮阻塞问题与顺序
 

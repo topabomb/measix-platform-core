@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 
@@ -60,18 +59,18 @@ func TestBaseline(t *testing.T) {
 	// --- §17.1: Hub idle RSS/CPU ---
 	// Give the Hub a moment to settle after startup.
 	time.Sleep(2 * time.Second)
-	var hubMemStatBefore runtime.MemStats
-	runtime.ReadMemStats(&hubMemStatBefore)
+	hubMetricsBefore := env.HubProcessMetrics()
 	hubDBSizeBefore := dbFileSize(env.DBPath)
-	t.Logf("BASELINE Hub idle RSS: %d bytes", hubMemStatBefore.Sys)
-	t.Logf("BASELINE Hub idle CPU goroutines: %d", runtime.NumGoroutine())
+	t.Logf("BASELINE Hub idle RSS: %d bytes", hubMetricsBefore.RSSBytes)
+	t.Logf("BASELINE Hub idle threads: %d", hubMetricsBefore.GoRoutines)
 	t.Logf("BASELINE Hub idle SQLite size: %d bytes", hubDBSizeBefore)
 
 	// --- §17.2: Relay idle RSS/CPU ---
-	// The Relay is a separate process; we measure its spool DB size.
+	// The Relay is a separate process; we measure its real RSS and spool DB size.
+	relayMetricsBefore := env.RelayProcessMetrics()
 	relaySpoolSizeBefore := dbFileSize(env.Root + "/relay-spool.db")
+	t.Logf("BASELINE Relay idle RSS: %d bytes", relayMetricsBefore.RSSBytes)
 	t.Logf("BASELINE Relay idle spool size: %d bytes", relaySpoolSizeBefore)
-	t.Logf("BASELINE Relay idle goroutines (test process): %d", runtime.NumGoroutine())
 
 	// --- §17.3: Admin CRUD/Publish baseline latency ---
 	// Measure login latency
@@ -217,9 +216,8 @@ func TestBaseline(t *testing.T) {
 	t.Logf("BASELINE streaming latency (model, %d chunks): %v", chunkCount, streamLatency)
 
 	// --- §17.5: Concurrent streaming memory growth ---
-	// Run 10 concurrent streams and measure memory growth.
-	var memBeforeConc runtime.MemStats
-	runtime.ReadMemStats(&memBeforeConc)
+	// Run 10 concurrent streams and measure real Relay memory growth.
+	relayMemBeforeConc := env.RelayProcessMetrics()
 	concStart := time.Now()
 	concWG := make(chan error, 10)
 	for i := 0; i < 10; i++ {
@@ -240,10 +238,9 @@ func TestBaseline(t *testing.T) {
 		}
 	}
 	concDuration := time.Since(concStart)
-	var memAfterConc runtime.MemStats
-	runtime.ReadMemStats(&memAfterConc)
-	concMemGrowth := int64(memAfterConc.Sys) - int64(memBeforeConc.Sys)
-	t.Logf("BASELINE concurrent streaming memory growth (10 streams): %d bytes", concMemGrowth)
+	relayMemAfterConc := env.RelayProcessMetrics()
+	concMemGrowth := relayMemAfterConc.RSSBytes - relayMemBeforeConc.RSSBytes
+	t.Logf("BASELINE concurrent streaming memory growth (10 streams): %d bytes (relay RSS before=%d after=%d)", concMemGrowth, relayMemBeforeConc.RSSBytes, relayMemAfterConc.RSSBytes)
 	t.Logf("BASELINE concurrent streaming duration (10 streams): %v", concDuration)
 
 	// Measure TTS latency
@@ -256,20 +253,18 @@ func TestBaseline(t *testing.T) {
 	t.Logf("BASELINE TTS latency: %v", ttsLatency)
 
 	// --- §17.6: Multipart temporary memory/disk behavior ---
-	// Measure ASR multipart upload memory behavior.
-	var memBeforeMultipart runtime.MemStats
-	runtime.ReadMemStats(&memBeforeMultipart)
+	// Measure ASR multipart upload memory behavior (real Relay process).
+	relayMemBeforeMultipart := env.RelayProcessMetrics()
 	asrStart := time.Now()
 	_, _, err = tc.Transcription(ctx, ids.asr, "/v1/audio/transcriptions", "whisper-test", "sample.wav", []byte("RIFF"))
 	if err != nil {
 		t.Fatalf("asr: %v", err)
 	}
 	asrLatency := time.Since(asrStart)
-	var memAfterMultipart runtime.MemStats
-	runtime.ReadMemStats(&memAfterMultipart)
-	multipartMemGrowth := int64(memAfterMultipart.Sys) - int64(memBeforeMultipart.Sys)
+	relayMemAfterMultipart := env.RelayProcessMetrics()
+	multipartMemGrowth := relayMemAfterMultipart.RSSBytes - relayMemBeforeMultipart.RSSBytes
 	t.Logf("BASELINE ASR latency: %v", asrLatency)
-	t.Logf("BASELINE multipart memory/disk behavior: %d bytes growth", multipartMemGrowth)
+	t.Logf("BASELINE multipart memory/disk behavior: %d bytes growth (relay RSS before=%d after=%d)", multipartMemGrowth, relayMemBeforeMultipart.RSSBytes, relayMemAfterMultipart.RSSBytes)
 
 	// Measure MCP latency
 	mcpStart := time.Now()
@@ -319,16 +314,18 @@ func TestBaseline(t *testing.T) {
 	t.Logf("BASELINE SQLite growth (relay spool): %d bytes (before=%d after=%d)", relaySpoolGrowth, relaySpoolSizeBefore, relaySpoolSizeAfter)
 
 	// --- §17.1/2 post-load: Hub/Relay RSS/CPU after load ---
-	var hubMemStatAfter runtime.MemStats
-	runtime.ReadMemStats(&hubMemStatAfter)
-	t.Logf("BASELINE Hub post-load RSS: %d bytes", hubMemStatAfter.Sys)
-	t.Logf("BASELINE Hub post-load goroutines: %d", runtime.NumGoroutine())
+	hubMetricsAfter := env.HubProcessMetrics()
+	relayMetricsAfter := env.RelayProcessMetrics()
+	t.Logf("BASELINE Hub post-load RSS: %d bytes", hubMetricsAfter.RSSBytes)
+	t.Logf("BASELINE Hub post-load threads: %d", hubMetricsAfter.GoRoutines)
+	t.Logf("BASELINE Relay post-load RSS: %d bytes", relayMetricsAfter.RSSBytes)
 
 	// Summary
 	t.Log("=== BASELINE SUMMARY ===")
-	t.Logf("Hub idle RSS:            %d bytes", hubMemStatBefore.Sys)
-	t.Logf("Hub idle goroutines:     %d", runtime.NumGoroutine())
+	t.Logf("Hub idle RSS:            %d bytes", hubMetricsBefore.RSSBytes)
+	t.Logf("Hub idle threads:        %d", hubMetricsBefore.GoRoutines)
 	t.Logf("Hub idle SQLite size:    %d bytes", hubDBSizeBefore)
+	t.Logf("Relay idle RSS:          %d bytes", relayMetricsBefore.RSSBytes)
 	t.Logf("Relay idle spool size:   %d bytes", relaySpoolSizeBefore)
 	t.Logf("Login:                   %v", loginLatency)
 	t.Logf("Create User:             %v", userLatency)
@@ -355,7 +352,8 @@ func TestBaseline(t *testing.T) {
 	t.Logf("Usage backlog drain:     %v", drainLatency)
 	t.Logf("SQLite growth (hub):    %d bytes", hubDBGrowth)
 	t.Logf("SQLite growth (spool):  %d bytes", relaySpoolGrowth)
-	t.Logf("Hub post-load RSS:       %d bytes", hubMemStatAfter.Sys)
+	t.Logf("Hub post-load RSS:       %d bytes", hubMetricsAfter.RSSBytes)
+	t.Logf("Relay post-load RSS:     %d bytes", relayMetricsAfter.RSSBytes)
 	t.Log("=== BASELINE COMPLETE ===")
 
 	_ = fmt.Sprintf // keep import if needed

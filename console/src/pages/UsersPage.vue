@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
@@ -8,6 +8,7 @@ import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { useActivationStore } from '../stores/activation'
+import QRCode from 'qrcode'
 import { useSessionStore } from '../stores/session'
 
 const { t: $t } = useI18n()
@@ -72,6 +73,19 @@ async function openUser(user: User) {
 function clearEnrollment() {
   enrollment.value = undefined
 }
+
+const qrCanvas = ref<HTMLCanvasElement>()
+
+async function renderQrCode() {
+  if (!enrollment.value?.code || !qrCanvas.value) return
+  try {
+    await QRCode.toCanvas(qrCanvas.value, enrollment.value.code, { width: 200, margin: 2 })
+  } catch {
+    // QR rendering is best-effort — do not block the enrollment flow
+  }
+}
+
+watch(() => enrollment.value, () => { nextTick(renderQrCode) }, { deep: true })
 
 async function createEnrollment() {
   if (!selected.value || !session.csrfToken) return
@@ -177,6 +191,7 @@ onMounted(refresh)
       <q-card v-if="enrollment" class="responsive-modal" style="max-width: 95vw"><q-card-section class="text-h6">{{ $t('users.enrollmentCode') }}</q-card-section><q-card-section>
         <q-banner class="bg-amber-1 q-mb-md rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
         <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')"><template #append><q-btn flat dense icon="content_copy" @click="navigator.clipboard.writeText(enrollment!.code)" /></template></q-input>
+        <div class="row justify-center q-mt-md"><div class="text-center"><div class="text-caption q-mb-xs">{{ $t('users.enrollmentQr') }}</div><canvas ref="qrCanvas" data-cy="enrollment-qr" /></div></div>
         <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ enrollment.expiresAt }}</div>
       </q-card-section><q-card-actions align="right"><q-btn color="primary" :label="$t('common.done')" v-close-popup /></q-card-actions></q-card>
     </q-dialog>

@@ -130,6 +130,7 @@ export default {
     generateEnrollment: '生成注册码',
     enrollmentCode: '注册码',
     enrollmentCodeHint: '此注册码仅显示一次，请在关闭前复制。',
+    enrollmentQr: '二维码',
     expiresAt: '过期时间',
     revoke: '吊销',
     revokeConfirm: '吊销设备 {device}？',

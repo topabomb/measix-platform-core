@@ -208,8 +208,8 @@ if (gitDirty(ROOT)) errors.push('Working tree is dirty. Commit or stash changes 
 if (gitDirty(ARCH_REPO)) errors.push('Architecture repo is dirty. This may cause SHA mismatch.')
 
 const archCommit = gitCommit(ARCH_REPO)
-if (archCommit !== '6eda9eb9bb842b4cbd3fa36f78e6c481ed35c55b') {
-  warnings.push(`Architecture commit is ${archCommit}, expected 6eda9eb9...`)
+if (archCommit !== 'dbb56952ab1cf60fa55e4cbb8d14ee70eda43a48') {
+  warnings.push(`Architecture commit is ${archCommit}, expected dbb56952...`)
 }
 
 const buildHash = adminBuildHash()

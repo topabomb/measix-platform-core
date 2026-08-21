@@ -1,6 +1,6 @@
 # Admin Console 实现规范
 
-> Architecture authority：`topabomb/measix-architecture@6eda9eb9bb842b4cbd3fa36f78e6c481ed35c55b`  
+> Architecture authority：`topabomb/measix-architecture@dbb56952ab1cf60fa55e4cbb8d14ee70eda43a48`  
 > Product/UX：`measix-s0-admin-console-product-requirements.md`  
 > Component architecture：`measix-s0-admin-console.md`  
 > Required tests：`measix-s0-admin-console-testing-spec.md` + `measix-s0-capability-delivery-system-testing-spec.md`

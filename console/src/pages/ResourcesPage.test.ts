@@ -5,6 +5,7 @@ import {
   QCard, QCardSection, QCardActions, QInput, QBtn, QBanner,
   QSelect, QToggle, QDialog, QSeparator, QTab, QTabs, QBadge, QChip,
   QList, QItem, QItemSection, QItemLabel, QMarkupTable, QSpinner, QIcon,
+  QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, QBtnToggle, QExpansionItem,
   ClosePopup,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
@@ -38,7 +39,8 @@ function mountResourcesPage() {
             QLayout, QPage, QPageContainer, QCard, QCardSection, QCardActions,
             QInput, QBtn, QBanner, QSelect, QToggle, QDialog, QSeparator, QTab, QTabs,
             QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip, QBadge,
-            QSpinner, QIcon,
+            QSpinner, QIcon, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, QBtnToggle,
+            QExpansionItem,
           },
           directives: { ClosePopup },
         }], pinia, router],

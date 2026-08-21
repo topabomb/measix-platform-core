@@ -7,14 +7,14 @@
  * Usage: node scripts/collect-baseline.mjs
  *
  * The baseline test (backend/test/system/scenarios/baseline_test.go)
- * logs lines like:
- *   BASELINE Hub idle RSS: 12345 bytes
- *   BASELINE login latency: 12.3ms
- *   ...
+ * emits a typed JSON metrics line:
+ *   BASELINE_JSON_METRICS: {"hub_idle_rss_bytes":...}
  *
- * This script parses those lines and produces a JSON artifact.
- * GREEN status is computed from metric completeness — all required
- * §17 metrics must be present.
+ * This script parses that typed JSON and produces a JSON artifact.
+ * GREEN status is computed strictly from typed metric completeness —
+ * all required §17 numeric metrics must be present and non-null.
+ * Text log lines are kept only for human readability; they do NOT
+ * contribute to the GREEN/NOT_GREEN decision.
  */
 import { execFileSync } from 'node:child_process'
 import { writeFileSync, mkdirSync } from 'node:fs'
@@ -50,36 +50,83 @@ try {
 
 console.log('Parsing baseline output...')
 
-// Parse lines like "BASELINE <name>: <value> <unit>"
+// Parse text log lines for human readability (not used for GREEN decision)
 const metrics = {}
 const lines = output.split('\n')
 for (const line of lines) {
-  const match = line.match(/BASELINE\s+(.+?):\s+([\d.]+)\s*(bytes|ms|s|µs|ns)?/)
+  const match = line.match(/BASELINE\s+(.+?):\s+([\d.]+\w*)\s*(bytes|ms|s|µs|ns|%)?/)
   if (match) {
     const [, name, value, unit] = match
     metrics[name.trim()] = unit ? `${value}${unit}` : `${value}`
   }
 }
 
-// Required §17 metrics — GREEN is computed from completeness.
-// All required metric categories must have at least one measurement.
-const requiredMetricCategories = [
-  { category: 'Hub idle RSS', patterns: ['Hub idle RSS'] },
-  { category: 'Relay idle RSS/CPU', patterns: ['Relay idle spool size', 'Relay idle goroutines'] },
-  { category: 'Admin CRUD/Publish latency', patterns: ['login latency', 'create user latency', 'publish + activation latency'] },
-  { category: 'Relay first-byte overhead', patterns: ['first-byte overhead'] },
-  { category: 'Concurrent streaming memory growth', patterns: ['concurrent streaming memory growth'] },
-  { category: 'Multipart memory/disk behavior', patterns: ['multipart memory/disk behavior'] },
-  { category: 'Cancel release time', patterns: ['cancel release time'] },
-  { category: 'Usage backlog drain', patterns: ['usage backlog drain'] },
-  { category: 'SQLite growth', patterns: ['SQLite growth'] },
+// Parse the typed JSON metrics line — this is the authoritative source
+let typedMetrics = null
+for (const line of lines) {
+  const jsonMatch = line.match(/BASELINE_JSON_METRICS:\s*(\{.+\})/)
+  if (jsonMatch) {
+    try { typedMetrics = JSON.parse(jsonMatch[1]) } catch {}
+    break
+  }
+}
+
+// Required §17 typed metrics — GREEN is computed strictly from typed JSON
+// completeness. Each required metric key must exist in typedMetrics and
+// have a non-null, non-undefined value. Boolean metrics (cancel_adapter_observed)
+// must be explicitly true.
+const requiredTypedMetrics = [
+  // §17.1: Hub idle RSS/CPU
+  { key: 'hub_idle_rss_bytes', category: 'Hub idle RSS', mustBeNumber: true },
+  { key: 'hub_idle_cpu_percent', category: 'Hub idle CPU', mustBeNumber: true },
+  // §17.2: Relay idle RSS/CPU
+  { key: 'relay_idle_rss_bytes', category: 'Relay idle RSS', mustBeNumber: true },
+  { key: 'relay_idle_cpu_percent', category: 'Relay idle CPU', mustBeNumber: true },
+  // §17.4: Relay first-byte overhead (direct vs relay)
+  { key: 'direct_adapter_ttfb_ms', category: 'Direct adapter TTFB', mustBeNumber: true },
+  { key: 'relay_ttfb_ms', category: 'Relay TTFB', mustBeNumber: true },
+  { key: 'first_byte_overhead_ms', category: 'Relay first-byte overhead', mustBeNumber: true },
+  // §17.5: Concurrent streaming memory growth (1, 10, 50 streams)
+  { key: 'concurrent_stream_mem_growth_bytes', category: 'Concurrent streaming memory growth (10)', mustBeNumber: true },
+  { key: 'concurrent_stream_50_mem_growth_bytes', category: 'Concurrent streaming memory growth (50)', mustBeNumber: true },
+  // §17.6: Multipart memory/disk behavior
+  { key: 'multipart_mem_growth_bytes', category: 'Multipart memory growth', mustBeNumber: true },
+  { key: 'large_multipart_mem_growth_bytes', category: 'Large multipart memory growth', mustBeNumber: true },
+  // §17.7: Cancel release time + adapter observation
+  { key: 'cancel_release_time_ms', category: 'Cancel release time', mustBeNumber: true },
+  { key: 'cancel_adapter_observed', category: 'Cancel adapter observed', mustBeBoolean: true },
+  // §17.8: Hub outage → spool → drain
+  { key: 'hub_outage_spool_during_bytes', category: 'Hub outage spool during', mustBeNumber: true },
+  { key: 'hub_outage_spool_drained_bytes', category: 'Hub outage spool drained', mustBeNumber: true },
+  { key: 'usage_backlog_drain_ms', category: 'Usage backlog drain', mustBeNumber: true },
+  // §17.9: SQLite growth
+  { key: 'sqlite_growth_hub_bytes', category: 'SQLite growth (hub)', mustBeNumber: true },
+  { key: 'sqlite_growth_spool_bytes', category: 'SQLite growth (spool)', mustBeNumber: true },
+  // §17.x: TTS buffering
+  { key: 'tts_buffering_latency_ms', category: 'TTS buffering latency', mustBeNumber: true },
+  { key: 'tts_buffering_mem_growth_bytes', category: 'TTS buffering memory growth', mustBeNumber: true },
 ]
 
 const missingCategories = []
-for (const req of requiredMetricCategories) {
-  const found = req.patterns.some(p => Object.keys(metrics).some(k => k.toLowerCase().includes(p.toLowerCase())))
-  if (!found) {
-    missingCategories.push(req.category)
+if (!typedMetrics) {
+  // If no typed JSON at all, everything is missing
+  missingCategories.push(...requiredTypedMetrics.map(r => r.category))
+} else {
+  for (const req of requiredTypedMetrics) {
+    const val = typedMetrics[req.key]
+    if (val === undefined || val === null) {
+      missingCategories.push(req.category)
+      continue
+    }
+    if (req.mustBeNumber && typeof val !== 'number') {
+      missingCategories.push(req.category)
+    }
+    if (req.mustBeBoolean && typeof val !== 'boolean') {
+      missingCategories.push(req.category)
+    }
+    if (req.mustBeBoolean && val !== true) {
+      missingCategories.push(req.category)
+    }
   }
 }
 
@@ -99,7 +146,8 @@ const artifact = {
   commit,
   measuredAt: new Date().toISOString(),
   metrics,
-  requiredMetrics: requiredMetricCategories.map(r => r.category),
+  typedMetrics,
+  requiredMetrics: requiredTypedMetrics.map(r => r.category),
   missingMetrics: missingCategories,
 }
 

@@ -66,6 +66,7 @@ func run(args []string, log *slog.Logger) error {
 	defer runtime.Close()
 	group, runCtx := errgroup.WithContext(ctx)
 	group.Go(func() error { return server.New(cfg.ListenAddr, runtime.Handler).Run(runCtx, log) })
+	group.Go(func() error { return server.New(cfg.InternalListenAddr, runtime.InternalHandler).Run(runCtx, log) })
 	group.Go(func() error {
 		err := runtime.RunReconciler(runCtx)
 		if err == context.Canceled {

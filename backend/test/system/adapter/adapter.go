@@ -105,6 +105,13 @@ func (a *Adapter) Cancelled() bool {
 	return a.cancelled
 }
 
+// ClearCancelled resets the cancelled flag. Useful for isolated cancel tests.
+func (a *Adapter) ClearCancelled() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cancelled = false
+}
+
 // SetTimeout makes every subsequent request sleep before responding.
 func (a *Adapter) SetTimeout(d time.Duration) {
 	a.mu.Lock()

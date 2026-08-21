@@ -23,46 +23,50 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 | C3 Snapshot Projection & Preview | ✅ Green | canonical projection、Review、Client Snapshot Preview、Publish progress 已实现 |
 | C4 Runtime Reference Profile | ✅ Green | deterministic T2/T3 已证明 Chat/SSE、TTS binary、ASR multipart、MCP 与关键 Relay admission/transport；不等于 real Adapter qualification |
 | C5 Usage / Pricing / Observability | ✅ Green（component） | filters、request detail、pricing、summary、Overview/System 已有 component/backend evidence；仍需 C6 产品闭环证明 |
-| C6 Browser + Hub + Relay Product/System E2E | 🟡 Code Ready | Browser T4.1 Golden Path、topology security（`/internal/*` 不可达）、session/logout、refresh/restart recovery 已实现；CAP-C6-004 Enhanced 已修正为同一 session 同步 snapshot（禁止重新 enrollment）；须在 exact candidate SHA 上执行验证 |
-| C7 Client Contract Freeze Gate | 🟡 Code Ready | `make freeze-gate` 为 authoritative entry point；`freeze-manifest.mjs` 消费真实 artifact（Go JSON / vitest JSON / Playwright JSON / baseline / adapter-qualification）；`freeze-validate` 和 `clean-replay` 可验证已有 manifest；scenario definitions 外置到 `scripts/scenario-definitions.json`（84 个 CAP scenario）；须在 C6 Green + adapter VERIFIED + baseline GREEN 后执行 |
+| C6 Browser + Hub + Relay Product/System E2E | 🔴 Incomplete | Browser Golden Path 仍不完整（缺少 Resource authoring/Policy/Pricing/Validate/Preview/Publish/Activation 的真实 UI 操作）；Resource Baseline 仍有假 Green（CPU 未实现、GoRoutines 读取 OS Threads 而非 goroutines、first-byte 非 Relay overhead）；Hub crash A-E 语义未完全匹配；Relay concurrency RLY-CON-005/006 断言不足 |
+| C7 Client Contract Freeze Gate | ⛔ Blocked | C7 evidence pipeline 存在逻辑自锁（clean replay 被自身 CAP-C7-002 阻断）；collect-artifacts exit code 可能被覆盖；clean replay 未真正重放 Browser/Test Client/4 profiles/Usage；须在 C6 Green + adapter VERIFIED + baseline GREEN 后执行 |
 
 ## 当前有效证据
 
 - 默认 `ci-gate` 只证明当前 PR head 的 deterministic T0–T3 baseline；**不证明 C6/C7/S0.1 Freeze**。
 - `make s01-candidate-test` 提供 deterministic candidate system scenarios；只有在 exact candidate SHA 上实际执行后的结果才是 C6 evidence。
 - `console/e2e/golden-path.spec.ts` + `console/e2e/topology-security.spec.ts` + `scripts/e2e-harness.mjs` 已提供 real-browser/clean-environment 基础设施，包括 topology security 验证（`/internal/*` 不可达）和 session 持久性；Playwright JSON reporter 输出到 `.artifacts/e2e-playwright.json`。
-- `scripts/collect-adapter-qualification.mjs` 已实现完整自动化 Hub→Relay→real Adapter qualification flow（Secret/Upstream/Test/Apply/Resources/Publish/runtime 请求/usage 验证）；须用真实 endpoint/key 执行。
-- `scripts/collect-baseline.mjs` / `baseline_test.go` 已扩充为采集 architecture §17 全部 9 类指标（**Hub/Relay 读取真实进程 RSS/threads** 而非 test runner process）；GREEN 由 metric completeness 计算。
-- `scripts/freeze-manifest.mjs` 从真实 artifact 编译结果而非硬编码；scenario definitions 外置到 `scripts/scenario-definitions.json`（84 个 CAP scenario → test → artifact 映射）；artifact 缺失或 SHA 不匹配时 hard fail。
-- `make freeze-gate` 为 authoritative C7 entry point：collect-artifacts → s01-candidate-test → console-e2e → collect-baseline → freeze-manifest → clean-replay。Real adapter qualification 须单独先执行。
+- `scripts/collect-adapter-qualification.mjs` 已实现自动化 Hub→Relay→real Adapter qualification flow；须用真实 endpoint/key 执行。
+- `scripts/collect-baseline.mjs` / `baseline_test.go` 已扩充为采集 architecture §17 指标（Hub/Relay 读取真实进程 RSS/threads）；GREEN 由 metric completeness 计算。
+- `scripts/freeze-manifest.mjs` 从真实 artifact 编译结果而非硬编码；scenario definitions 外置到 `scripts/scenario-definitions.json`；artifact 缺失或 SHA 不匹配时 hard fail。
+- `make freeze-gate` 为 authoritative C7 entry point。Real adapter qualification 须单独先执行。
 
-## 本轮完成的 P0 修复
+## 本轮修正中的 P0 问题
 
-1. ✅ **P0-1**: `gofmt` 修复 `recovery_test.go`，T0-T3 baseline 全绿。
-2. ✅ **P0-1b**: 架构基准 SHA 从 `6eda9eb` 更新为 `dbb56952`（docs + freeze-manifest）。
-3. ✅ **P0-2**: 重写 HUB-DB-001~010 测试，使用真实 migration/backup/restore 语义（seed 真实数据、backup/restore round-trip、wrong-key fail-closed、encrypted payload NOT NULL 校验）。
-4. ✅ **P0-3**: 新增 A-E 五个确定性崩溃点测试（intent commit 前/后、Relay apply 前、ACK 丢失、finalize 前/后），验证 reconciliation 收敛且无重复 generation。
-5. ✅ **P0-4**: 资源基准采集修复——新增 `process_metrics.go`，通过 PID 读取真实 Hub/Relay 进程 RSS/threads（Linux `/proc/<pid>/status`），替换原来的 `runtime.ReadMemStats()`（test runner process）。
-6. ✅ **P0-14**: `-race` 扩展到 `relay/control` 和 `relay/runtime` 包。
+以下问题已识别并正在修正：
+
+1. 🔧 **Browser Golden Path 假闭合** — `golden-path.spec.ts` 实际只做 login、create user、navigation、logout；缺少 Resource authoring、Policy/Pricing、Validate、Preview、Publish、Activation 的完整 UI 操作。修正为单一 `test()` + `test.step()` 覆盖完整连续 workflow。
+2. 🔧 **Hub topology 已修复** — Hub 已有独立 private/internal listener；public router 不注册 `/internal/*`；SPA proxy 也阻挡 `/internal/*`。T3 直接验证 public listener 上 `/internal/*` 不存在。
+3. 🔧 **C7 逻辑自锁** — 改为两阶段：candidate manifest → clean replay → replay artifact PASS → final freeze manifest。
+4. 🔧 **Resource Baseline 假 Green** — `CPUPercent` 未实现，`GoRoutines` 读取的是 OS `Threads`。改为输出 typed JSON metrics，直接测量真实 Hub/Relay RSS+CPU、direct Adapter TTFB vs Relay TTFB、1/10/50 stream、真实大 binary/multipart、temp-disk、Adapter cancel observation、Hub outage→spool→drain、DB growth。
+5. 🔧 **Adapter Qualification runner 不符合 contract** — 使用自造 `${prefix}_${24 hex}` ID 而非正式 `prefix_<UUIDv4>`；硬编码 adapterName/version/profile/configRevision。改为复用正式 platform ID generator，由 qualification profile 输入。
+6. 🔧 **HUB-DB-002/003/005/006 测试语义未匹配** — DB-002 空数据库当 previous schema；DB-003 没验证 Atlas migration history；DB-005 只比较源码 SQL 文件 hash；DB-006 是 current-schema seed→backup。改为保存真实 previous-supported-schema fixture，执行正式 Atlas upgrade，验证 migration revision/history/checksum。
+7. 🔧 **Hub crash A-E 语义未完全匹配** — A 的注释要求 intent commit 前无 Activation，但测试实际制造 Relay Apply failure；D 没有真正停在 ACK 后/finalize 前。改为在 Publish pipeline 加 test-only deterministic barrier/failure hook。
+8. 🔧 **Evidence mapping 不可靠** — `scenario-definitions.json` 没有 HUB-*/RLY-* component matrix；Browser CAP 仍映射到 mock Vitest。改为建立 machine-readable HUB/RLY/ADM/CAP evidence matrix。
 
 ## 下一轮阻塞问题与顺序
 
-1. ✅ **完成 Browser C6 Golden Path**  
+1. ⏳ **完成 Browser C6 Golden Path**  
    通过 production SPA + real Hub/Relay，只使用 Admin UI 完成 User/Enrollment、Secret、Upstream Test/Apply、Model/TTS/ASR/MCP、Policy/Pricing、Validate、Review/Preview、Publish、Activation、Usage/System；不得用 Admin API/DB/internal shortcut 替代被测 UI 操作。
 
 2. ✅ **收紧 T4.1 public topology**  
    public platform origin 不暴露 `/internal/*`；Hub↔Relay internal control 保持私有边界，并增加明确的不可达验证。
 
-3. ✅ **修正 generation update system proof**  
+3. ⏳ **修正 generation update system proof**  
    generation N 请求成功 → Publish N+1 → stale request 428/no-forward → **同一 Client Session** 获取 managed state / Snapshot N+1 → 新 interaction 成功；不得通过重新 Enrollment 绕过 update flow，也不得自动 replay 原请求。
 
-4. ✅ **闭合 C7 evidence pipeline**  
+4. ⏳ **闭合 C7 evidence pipeline**  
    将 candidate Go results、production Browser Playwright JSON、static/contract、resource baseline、real Adapter qualification 全部作为 exact-SHA machine-readable evidence；artifact 缺失、SHA 不匹配或 NOT_EXECUTED 必须 hard fail。
 
-5. ✅ **完成 Resource Baseline**  
+5. ⏳ **完成 Resource Baseline**  
    补齐 architecture 要求的 Hub/Relay RSS/CPU、Relay first-byte overhead、concurrent stream memory、TTS buffering、ASR memory/temp-disk、cancel cleanup、usage backlog drain、SQLite growth；缺 required metric 不得标记 GREEN。
 
-6. ✅ **完成 Real Adapter Qualification runner**  
+6. ⏳ **完成 Real Adapter Qualification runner**  
    实现完整自动化 Hub→Relay→real Adapter qualification flow（Secret/Upstream/Test/Apply/Resources/Publish/runtime 请求/usage 验证）；须用真实 endpoint/key 执行。
 
 7. ⏳ **执行 Real Adapter Qualification**  

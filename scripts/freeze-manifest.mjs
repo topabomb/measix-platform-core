@@ -194,6 +194,9 @@ function compileScenarioResults() {
     } else if (s.id === 'CAP-C7-001') {
       result = 'PASS'
     } else if (s.id === 'CAP-C7-002') {
+      // Two-phase freeze: candidate manifest writes NOT_EXECUTED.
+      // After clean replay passes, the final manifest writes PASS.
+      // The replay-freeze.mjs script updates the manifest after successful replay.
       result = isCleanReplay ? 'PASS' : 'NOT_EXECUTED'
     } else if (s.artifact && s.testNames.length > 0) {
       const artifact = artifacts[s.artifact]
@@ -237,6 +240,13 @@ function validateArtifactProvenance(artifactName, currentCommit) {
       if (actualSha !== meta.artifactSha256) {
         errors.push(`Artifact ${artifactName} SHA mismatch: meta=${meta.artifactSha256} actual=${actualSha}`)
       }
+    }
+
+    // Verify exit code — a non-zero exit code means the test command failed
+    // but the artifact file was still written (partial output). This must
+    // be treated as a failure.
+    if (meta.exitCode !== undefined && meta.exitCode !== 0) {
+      errors.push(`Artifact ${artifactName} was generated with non-zero exit code ${meta.exitCode}. Test command failed.`)
     }
   } else {
     // Fall back to legacy: check if artifact is JSON with embedded commit field

@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	ListenAddr            string
+	InternalListenAddr    string
 	PublicBaseURL         string
 	RuntimeAPIBase        string
 	DBPath                string
@@ -38,6 +39,7 @@ func Load(args []string) (Config, error) {
 	}
 	cfg := Config{
 		ListenAddr:            env("HUB_LISTEN_ADDR", ":8080"),
+		InternalListenAddr:    env("HUB_INTERNAL_LISTEN_ADDR", ":8081"),
 		PublicBaseURL:         env("HUB_PUBLIC_BASE_URL", ""),
 		RuntimeAPIBase:        env("HUB_RUNTIME_API_BASE", ""),
 		DBPath:                env("HUB_DB_PATH", ""),
@@ -50,6 +52,7 @@ func Load(args []string) (Config, error) {
 		ReconcileInterval:     reconcileInterval,
 	}
 	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "public listen address")
+	fs.StringVar(&cfg.InternalListenAddr, "internal-listen", cfg.InternalListenAddr, "internal (private) listen address for Relay→Hub service APIs")
 	fs.StringVar(&cfg.PublicBaseURL, "public-base-url", cfg.PublicBaseURL, "public platform URL")
 	fs.StringVar(&cfg.RuntimeAPIBase, "runtime-api-base", cfg.RuntimeAPIBase, "Runtime Relay public base URL")
 	fs.StringVar(&cfg.DBPath, "db", cfg.DBPath, "SQLite database path")

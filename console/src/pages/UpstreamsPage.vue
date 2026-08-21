@@ -463,8 +463,8 @@ onMounted(refresh)
               <q-btn outline color="primary" :label="$t('upstreams.saveCandidate')" :loading="saving" :disable="!editDirty" @click="saveEdit" />
               <q-btn flat :label="$t('common.discard')" :disable="!editDirty" @click="discardEdit" />
             </template>
-            <q-btn outline color="secondary" :label="$t('upstreams.test')" :loading="testing" @click="testUpstream" />
-            <q-btn outline color="positive" :label="$t('upstreams.apply')" @click="applyUpstream" />
+            <q-btn outline color="secondary" :label="$t('upstreams.test')" :loading="testing" @click="testUpstream" data-cy="upstream-test-btn" />
+            <q-btn outline color="positive" :label="$t('upstreams.apply')" @click="applyUpstream" data-cy="upstream-apply-btn" />
           </div>
 
           <!-- Read-only or editable config -->
@@ -562,8 +562,8 @@ onMounted(refresh)
           <p v-else class="text-body2 text-grey-7 q-mt-none q-mb-sm">
             {{ $t('upstreams.secretReplaceHint') }}
           </p>
-          <q-input v-if="secretMode === 'create'" v-model="secretName" outlined :label="$t('upstreams.secretName')" placeholder="OpenAI key" />
-          <q-input v-model="secretValue" outlined :label="$t('upstreams.secretValue')" type="password" autocomplete="new-password" :placeholder="secretMode === 'create' ? 'sk-...' : $t('upstreams.newValue')" />
+          <q-input v-if="secretMode === 'create'" v-model="secretName" outlined :label="$t('upstreams.secretName')" placeholder="OpenAI key" data-cy="secret-form-name" />
+          <q-input v-model="secretValue" outlined :label="$t('upstreams.secretValue')" type="password" autocomplete="new-password" :placeholder="secretMode === 'create' ? 'sk-...' : $t('upstreams.newValue')" data-cy="secret-form-value" />
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat :label="$t('common.cancel')" v-close-popup />
@@ -573,6 +573,7 @@ onMounted(refresh)
             :disable="secretMode === 'create' ? (!secretName.trim() || !secretValue) : !secretValue"
             :loading="replacingSecret"
             @click="handleSecretAction"
+            data-cy="secret-form-submit"
           />
         </q-card-actions>
       </q-card>

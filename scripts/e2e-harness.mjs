@@ -118,12 +118,14 @@ const spoolPath = join(envRoot, 'relay-spool.db')
 const pwFile = join(envRoot, 'admin-password.txt')
 
 const hubPort = await freePort()
+const hubInternalPort = await freePort()
 const relayPubPort = await freePort()
 const relayIntPort = await freePort()
 const adapterPort = await freePort()
 const spaPort = await freePort()
 
 const hubBaseURL = `http://127.0.0.1:${hubPort}`
+const hubInternalBaseURL = `http://127.0.0.1:${hubInternalPort}`
 const relayPubBaseURL = `http://127.0.0.1:${relayPubPort}`
 const relayIntBaseURL = `http://127.0.0.1:${relayIntPort}`
 const adapterBaseURL = `http://127.0.0.1:${adapterPort}`
@@ -131,6 +133,7 @@ const spaBaseURL = `http://127.0.0.1:${spaPort}`
 
 log(`temp dir: ${envRoot}`)
 log(`hub: ${hubBaseURL}`)
+log(`hub internal: ${hubInternalBaseURL}`)
 log(`relay public: ${relayPubBaseURL}`)
 log(`relay internal: ${relayIntBaseURL}`)
 log(`adapter: ${adapterBaseURL}`)
@@ -200,6 +203,7 @@ log('starting Control Hub...')
 const hubProc = spawn(hubBin, [
   'run',
   '--listen', `127.0.0.1:${hubPort}`,
+  '--internal-listen', `127.0.0.1:${hubInternalPort}`,
   '--public-base-url', hubBaseURL,
   '--runtime-api-base', relayPubBaseURL,
   '--db', hubDB,
@@ -223,7 +227,7 @@ const relayProc = spawn(relayBin, [
   '--public-listen', `127.0.0.1:${relayPubPort}`,
   '--internal-listen', `127.0.0.1:${relayIntPort}`,
   '--spool', spoolPath,
-  '--hub-usage-url', `${hubBaseURL}/internal/v1/usage/request-events:batch`,
+  '--hub-usage-url', `${hubInternalBaseURL}/internal/v1/usage/request-events:batch`,
   '--hub-service-token-file', relayTokenFile,
 ], {
   cwd: envRoot,
@@ -283,6 +287,8 @@ log('running Playwright E2E tests...')
 const e2eEnv = {
   ...process.env,
   MEASIX_E2E_BASE_URL: spaBaseURL,
+  MEASIX_E2E_HUB_BASE_URL: hubBaseURL,
+  MEASIX_E2E_ADAPTER_URL: adapterBaseURL,
   MEASIX_E2E_ADMIN_PASSWORD: adminPassword,
   PLAYWRIGHT_BASE_URL: spaBaseURL,
 }
@@ -296,7 +302,9 @@ if (!existsSync(artifactsDir)) {
 try {
   // Use the Playwright config which includes the JSON reporter
   // outputting to ../.artifacts/e2e-playwright.json
-  execSync('npx playwright test --reporter=list', {
+  // Do NOT pass --reporter=list — it would override the config's reporters
+  // and prevent the JSON artifact from being generated.
+  execSync('npx playwright test', {
     cwd: join(ROOT, 'console'),
     stdio: 'inherit',
     env: e2eEnv,
@@ -315,7 +323,7 @@ try {
         try { return execSync('git rev-parse HEAD', { cwd: ARCH_REPO, encoding: 'utf-8' }).trim() }
         catch { return 'unknown' }
       })(),
-      command: 'npx playwright test --reporter=list',
+      command: 'npx playwright test',
       artifactSha256: artifactSha,
       startedAt: now,
       completedAt: now,
@@ -338,7 +346,7 @@ try {
         try { return execSync('git rev-parse HEAD', { cwd: ARCH_REPO, encoding: 'utf-8' }).trim() }
         catch { return 'unknown' }
       })(),
-      command: 'npx playwright test --reporter=list',
+      command: 'npx playwright test',
       artifactSha256: artifactSha,
       startedAt: now,
       completedAt: now,

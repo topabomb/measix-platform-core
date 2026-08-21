@@ -31,6 +31,7 @@ import (
 
 type Runtime struct {
 	Handler           http.Handler
+	InternalHandler   http.Handler
 	Store             *store.Store
 	Services          httpapi.Services
 	Health            *health.State
@@ -111,19 +112,25 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	router.Get("/live", h.Live)
 	router.Get("/ready", h.Ready)
 	httpapi.RegisterFull(router, services, httpapi.Options{PublicBaseURL: cfg.PublicBaseURL, RuntimeAPIBase: cfg.RuntimeAPIBase})
-	usageingestapi.HandlerFromMux(usage.NewHandler(usageService, serviceCredential), router)
 	if options.AdminAssets != nil {
 		static := adminstatic.New(options.AdminAssets)
 		router.Handle("/admin", static)
 		router.Handle("/admin/*", static)
 	}
 
+	// Internal/private router: only Relay→Hub service APIs (usage ingest, etc.).
+	// Per architecture: /internal/* must NOT be exposed on the public listener.
+	internalRouter := chi.NewRouter()
+	internalRouter.Get("/live", h.Live)
+	internalRouter.Get("/ready", h.Ready)
+	usageingestapi.HandlerFromMux(usage.NewHandler(usageService, serviceCredential), internalRouter)
+
 	// Relay connectivity is operational state. A failed startup reconcile leaves Runtime DEGRADED,
 	// while the fully initialized Admin/diagnostics surface remains available for recovery.
 	_, _ = runtimeControl.Reconcile(ctx)
 	h.SetReady(true)
 	return &Runtime{
-		Handler: router, Store: st, Services: services, Health: h,
+		Handler: router, InternalHandler: internalRouter, Store: st, Services: services, Health: h,
 		RuntimeControl: runtimeControl, ReconcileInterval: cfg.ReconcileInterval,
 	}, nil
 }

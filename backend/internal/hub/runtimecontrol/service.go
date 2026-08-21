@@ -62,10 +62,44 @@ type Service struct {
 	Signer     *security.AccessSigner
 	Relay      RelayClient
 	Now        func() time.Time
+
+	// testHooks are test-only deterministic barrier/failure hooks that
+	// simulate Hub crashes at precise points in the Publish pipeline.
+	// They are nil in production and only set by test code.
+	testHooks PublishBarrierHooks
 }
 
 func NewService(client *ent.Client, capabilityService *capability.Service, upstreamService *upstream.Service, signer *security.AccessSigner, relay RelayClient) *Service {
 	return &Service{Client: client, Capability: capabilityService, Upstream: upstreamService, Signer: signer, Relay: relay, Now: time.Now}
+}
+
+// PublishBarrierHooks provides test-only deterministic hooks at the five
+// critical points of the Publish pipeline (crash points A through E):
+//
+//	A: BeforeIntentCommit  — before persistPublishIntent commits.
+//	B: AfterIntentCommit   — after intent is durable, before Relay.Apply.
+//	C: AfterRelayApplied   — after Relay.Apply returns success (ACK received).
+//	D: AfterAck            — after ACK is validated, before finalizePublish.
+//	E: AfterFinalize       — after finalizePublish commits, before response.
+//
+// If a hook returns a non-nil error, Publish simulates a crash at that point
+// by returning the error immediately (without proceeding to the next step).
+// The Hub DB state is left exactly as it was at that point in the pipeline,
+// allowing reconciliation tests to verify recovery.
+//
+// These hooks are never set in production code.
+type PublishBarrierHooks struct {
+	BeforeIntentCommit func(ctx context.Context) error // Crash point A
+	AfterIntentCommit  func(ctx context.Context) error // Crash point B
+	AfterRelayApplied  func(ctx context.Context) error // Crash point C (rarely needed; Relay controls this)
+	AfterAck           func(ctx context.Context) error // Crash point D
+	AfterFinalize      func(ctx context.Context) error // Crash point E
+}
+
+// SetTestBarrierHooks sets test-only barrier hooks. This function must
+// never be called from production code.
+func (s *Service) SetTestBarrierHooks(hooks PublishBarrierHooks) {
+	s.testHooks = hooks
 }
 
 func IsIdempotencyConflict(err error) bool { return errors.Is(err, ErrIdempotencyConflict) }
@@ -158,6 +192,13 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 		return ActivationResult{}, err
 	}
 
+	// Crash point A: before intent durable commit.
+	if s.testHooks.BeforeIntentCommit != nil {
+		if err := s.testHooks.BeforeIntentCommit(ctx); err != nil {
+			return ActivationResult{}, err
+		}
+	}
+
 	if err := s.persistPublishIntent(ctx, publishIntent{
 		Request: request, RequestHash: requestHash, ReleaseID: releaseID, ActivationID: activationID,
 		Generation: generation, ControlRevision: controlRevision, BundleHash: string(hash), DescriptorJSON: descriptorJSON,
@@ -172,6 +213,15 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 		return ActivationResult{}, err
 	}
 
+	// Crash point B: intent is durable, before Relay.Apply.
+	if s.testHooks.AfterIntentCommit != nil {
+		if err := s.testHooks.AfterIntentCommit(ctx); err != nil {
+			// Intent is already committed; return the activation as UNKNOWN.
+			_ = s.markUnknown(ctx, activationID, "crash_after_intent_commit")
+			return s.loadActivation(ctx, activationID)
+		}
+	}
+
 	ack, err := s.Relay.Apply(ctx, state)
 	if err != nil {
 		if code, rejected := relayValidationRejected(err); rejected {
@@ -183,13 +233,42 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 		_ = s.markUnknown(ctx, activationID, "relay_apply_unknown")
 		return s.loadActivation(ctx, activationID)
 	}
+	// Crash point C: Relay applied successfully (ACK received),
+	// but Hub may lose the ACK before processing it.
+	if s.testHooks.AfterRelayApplied != nil {
+		if err := s.testHooks.AfterRelayApplied(ctx); err != nil {
+			_ = s.markUnknown(ctx, activationID, "crash_after_relay_applied")
+			return s.loadActivation(ctx, activationID)
+		}
+	}
+
 	if ack.AppliedControlRevision != controlRevision || string(ack.BundleHash) != string(hash) || ack.ActiveManagedGeneration != generation {
 		_ = s.markFailed(ctx, activationID, "relay_ack_mismatch")
 		return ActivationResult{}, ErrRelayAckMismatch
 	}
+	// Crash point D: ACK validated, before finalizePublish.
+	if s.testHooks.AfterAck != nil {
+		if err := s.testHooks.AfterAck(ctx); err != nil {
+			_ = s.markUnknown(ctx, activationID, "crash_after_ack")
+			return s.loadActivation(ctx, activationID)
+		}
+	}
+
 	if err := s.finalizePublish(ctx, activationID, releaseID, generation, controlRevision, string(hash)); err != nil {
 		return ActivationResult{}, err
 	}
+
+	// Crash point E: finalize committed, before response returned to Admin.
+	if s.testHooks.AfterFinalize != nil {
+		if err := s.testHooks.AfterFinalize(ctx); err != nil {
+			// Everything is persisted; return the activation as COMPLETED
+			// so the caller sees the finalized state even though the
+			// "response was lost". A retry with the same idempotency key
+			// must return the same result.
+			return s.loadActivation(ctx, activationID)
+		}
+	}
+
 	return s.loadActivation(ctx, activationID)
 }
 

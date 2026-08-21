@@ -178,7 +178,7 @@ onMounted(refresh)
       <q-card v-if="selected" style="width: 760px; max-width: 95vw">
         <q-card-section class="row items-start justify-between"><div><div class="text-h6">{{ selected.displayName }}</div><div class="text-caption">{{ selected.userId }}</div></div><StatusChip :value="selected.status" /></q-card-section>
         <q-separator />
-        <q-card-section><div class="row q-gutter-sm"><q-btn outline color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
+        <q-card-section><div class="row q-gutter-sm"><q-btn outline color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
         <q-card-section><div class="text-subtitle2 q-mb-sm">{{ $t('users.devices') }}</div><q-list bordered separator>
           <q-item v-for="device in devices" :key="device.deviceId"><q-item-section><q-item-label>{{ device.deviceId }}</q-item-label><q-item-label caption>{{ device.appVersion ?? $t('common.unknown') }} · {{ $t('users.lastSeen') }} {{ device.lastSeenAt ?? '—' }}</q-item-label></q-item-section><q-item-section side><div class="row items-center q-gutter-sm"><StatusChip :value="device.status" /><q-btn v-if="device.status !== 'REVOKED'" flat dense color="negative" :label="$t('users.revoke')" @click="revokeDevice(device)" /></div></q-item-section></q-item>
           <q-item v-if="!devices.length"><q-item-section class="text-grey-7">{{ $t('users.noDevices') }}</q-item-section></q-item>
@@ -190,7 +190,7 @@ onMounted(refresh)
     <q-dialog v-model="enrollmentOpen" @hide="clearEnrollment">
       <q-card v-if="enrollment" class="responsive-modal" style="max-width: 95vw"><q-card-section class="text-h6">{{ $t('users.enrollmentCode') }}</q-card-section><q-card-section>
         <q-banner class="bg-amber-1 q-mb-md rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
-        <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')"><template #append><q-btn flat dense icon="content_copy" @click="navigator.clipboard.writeText(enrollment!.code)" /></template></q-input>
+        <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field"><template #append><q-btn flat dense icon="content_copy" @click="navigator.clipboard.writeText(enrollment!.code)" /></template></q-input>
         <div class="row justify-center q-mt-md"><div class="text-center"><div class="text-caption q-mb-xs">{{ $t('users.enrollmentQr') }}</div><canvas ref="qrCanvas" data-cy="enrollment-qr" /></div></div>
         <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ enrollment.expiresAt }}</div>
       </q-card-section><q-card-actions align="right"><q-btn color="primary" :label="$t('common.done')" v-close-popup /></q-card-actions></q-card>

@@ -16,7 +16,7 @@ contract:
 backend-test:
 	cd backend && go test ./... -count=1
 	cd backend && go vet ./...
-	cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/sqliteutil ./internal/relay/metering ./internal/relay/control ./internal/relay/runtime -count=1
+	cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/sqliteutil ./internal/relay/... -count=1
 	@# Verify candidate-tagged system scenarios compile, but do NOT run them in backend-test.
 	@# They require real Hub/Relay processes and are executed via s01-candidate-test.
 	cd backend && go test -tags=candidate -run=^$$ ./test/system/scenarios/ -count=1
@@ -36,21 +36,21 @@ system-test:
 s01-candidate-test: console-build
 	cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -timeout 15m -v
 
-# console-e2e runs the Playwright browser T4.1 suite. Requires a
-# production Admin build and real Hub/Relay processes. This target is
-# not part of default GitHub Actions CI/CD; it is the explicit S0.1
-# candidate browser gate.
-# The JSON reporter is configured in playwright.config.ts to output
-# to ../.artifacts/e2e-playwright.json for freeze-manifest evidence.
-console-e2e: console-build
-	@mkdir -p .artifacts
-	cd console && npx playwright test --reporter=list
-
 # e2e-harness runs the full T4.1 clean-environment browser gate:
 # temp DB, Hub, Relay, deterministic Adapter, production SPA, Playwright.
 # This is the one-click harness required by architecture for S0.1 Gate.
-e2e-harness: console-build
+# It uses the Playwright config reporters (list + JSON) without override.
+s01-browser-candidate: console-build
 	node scripts/e2e-harness.mjs
+
+# Alias for backwards compatibility
+console-e2e: s01-browser-candidate
+
+# e2e-harness is the full T4.1 clean-environment browser gate:
+# temp DB, Hub, Relay, deterministic Adapter, production SPA, Playwright.
+# This is the one-click harness required by architecture for S0.1 Gate.
+# Alias retained for backwards compatibility.
+e2e-harness: s01-browser-candidate
 
 console-build:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm build
@@ -89,24 +89,29 @@ collect-adapter-qualification:
 collect-artifacts:
 	@mkdir -p .artifacts
 	@echo "Collecting backend test artifacts..."
-	cd backend && go test ./internal/... -count=1 -json -timeout 120s > ../.artifacts/backend-test.json
-	@node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/backend-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:0},null,2)+'\\n')"
+	@cd backend && go test ./internal/... -count=1 -json -timeout 120s > ../.artifacts/backend-test.json; exit_code=$$?; \
+	node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/backend-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:process.argv[2]},null,2)+'\n')" $$exit_code; \
+	if [ $$exit_code -ne 0 ]; then echo "ERROR: backend tests failed (exit $$exit_code)"; exit $$exit_code; fi
 	@echo "Collecting system test artifacts..."
-	cd backend && go test -tags=smoke ./test/system/scenarios/ ./test/system/adapter/ ./test/system/client/ -count=1 -json -timeout 5m > ../.artifacts/system-test.json
-	@node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/system-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -tags=smoke -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:0},null,2)+'\\n')"
+	@cd backend && go test -tags=smoke ./test/system/scenarios/ ./test/system/adapter/ ./test/system/client/ -count=1 -json -timeout 5m > ../.artifacts/system-test.json; exit_code=$$?; \
+	node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/system-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -tags=smoke -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:process.argv[2]},null,2)+'\n')" $$exit_code; \
+	if [ $$exit_code -ne 0 ]; then echo "ERROR: system tests failed (exit $$exit_code)"; exit $$exit_code; fi
 	@echo "Collecting console test artifacts..."
-	cd console && pnpm vitest run --reporter=json > ../.artifacts/console-test.json 2>/dev/null || true
-	@node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/console-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'pnpm vitest run --reporter=json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:0},null,2)+'\\n')"
+	@cd console && pnpm vitest run --reporter=json --outputFile=../.artifacts/console-test.json 2>../.artifacts/console-test.stderr.log; exit_code=$$?; \
+	node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/console-test.json';const hash=fs.existsSync(f)?'sha256:'+crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex'):'missing';fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'pnpm vitest run --reporter=json --outputFile',artifactSha256:hash,startedAt:now,completedAt:now,exitCode:process.argv[2]},null,2)+'\n')" $$exit_code; \
+	if [ $$exit_code -ne 0 ]; then echo "ERROR: console tests failed (exit $$exit_code)"; exit $$exit_code; fi
 	@echo "Collecting static contract artifact..."
 	@echo '{"codegenDrift":"PASS","gofmt":"PASS","goVet":"PASS","commit":"'$(shell git rev-parse HEAD)'"}' > .artifacts/static-contract.json
 	@echo "Artifacts written to .artifacts/"
 	@# Browser T4.1 Playwright evidence is collected separately via console-e2e target
 	@# and is expected at .artifacts/e2e-playwright.json by freeze-manifest.mjs
 
-# freeze-gate runs the complete S0.1 C7 gate:
-#   T0-T3 artifacts → candidate system tests → Browser T4.1 →
-#   resource baseline → real adapter qualification → evidence validation →
-#   manifest generation → clean replay verification.
+# freeze-gate runs the complete S0.1 C7 gate (two-phase):
+#   Phase 1 (candidate): T0-T3 artifacts → candidate system tests → Browser T4.1 →
+#     resource baseline → candidate manifest (CAP-C7-002=NOT_EXECUTED)
+#   Phase 2 (clean replay): fresh Hub/Relay/Adapter → replay T4.1 Golden Path +
+#     Test Client four capabilities + Usage closure → topology security →
+#     update manifest (CAP-C7-002=PASS + replay artifact hash)
 # This is the authoritative C7 entry point.
 #
 # Prerequisite: real adapter qualification must be run separately BEFORE
@@ -114,10 +119,11 @@ collect-artifacts:
 #   make collect-adapter-qualification ENDPOINT=https://api.openai.com KEY=sk-...
 # The freeze-manifest script will hard-fail if the artifact is missing or
 # not VERIFIED.
-freeze-gate: collect-artifacts s01-candidate-test console-e2e collect-baseline
+freeze-gate: collect-artifacts s01-candidate-test s01-browser-candidate collect-baseline
 	@echo "Collecting candidate test artifacts..."
-	cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json
-	@node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/candidate-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -tags=candidate -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:0},null,2)+'\\n')"
+	@cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json; exit_code=$$?; \
+	node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/candidate-test.json';const hash=fs.existsSync(f)?'sha256:'+crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex'):'missing';fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -tags=candidate -json',artifactSha256:hash,startedAt:now,completedAt:now,exitCode:process.argv[2]},null,2)+'\n')" $$exit_code; \
+	if [ $$exit_code -ne 0 ]; then echo "ERROR: candidate tests failed (exit $$exit_code)"; exit $$exit_code; fi
 	@echo "Generating freeze manifest..."
 	node scripts/freeze-manifest.mjs
 	@echo "Running clean replay verification (CAP-C7-002)..."

@@ -22,24 +22,26 @@ import (
 // with its own SQLite database, Ed25519 keys, and service credential.
 // It owns no product assertions.
 type HubEnv struct {
-	Root            string
-	HubBin          string
-	RelayBin        string
-	DBPath          string
-	MasterKeyFile   string
-	JWTKeyFile      string
-	RelayTokenFile  string
-	HubPort         int
-	RelayPubPort    int
-	RelayIntPort    int
-	HubBaseURL      string
-	RelayPubBaseURL string
-	RelayIntBaseURL string
-	AdminPassword   string
-	hubLog          *os.File
-	relayLog        *os.File
-	hubProc         *Process
-	relayProc       *Process
+	Root               string
+	HubBin             string
+	RelayBin           string
+	DBPath             string
+	MasterKeyFile      string
+	JWTKeyFile         string
+	RelayTokenFile     string
+	HubPort            int
+	HubInternalPort    int
+	RelayPubPort       int
+	RelayIntPort       int
+	HubBaseURL         string
+	HubInternalBaseURL string
+	RelayPubBaseURL    string
+	RelayIntBaseURL    string
+	AdminPassword      string
+	hubLog             *os.File
+	relayLog           *os.File
+	hubProc            *Process
+	relayProc          *Process
 }
 
 // NewHubEnv allocates directories, generates crypto material, applies migrations
@@ -51,6 +53,11 @@ func NewHubEnv(ctx context.Context) (*HubEnv, error) {
 		return nil, err
 	}
 	hubPort, err := freePort()
+	if err != nil {
+		_ = os.RemoveAll(root)
+		return nil, err
+	}
+	hubInternalPort, err := freePort()
 	if err != nil {
 		_ = os.RemoveAll(root)
 		return nil, err
@@ -67,17 +74,19 @@ func NewHubEnv(ctx context.Context) (*HubEnv, error) {
 	}
 
 	env := &HubEnv{
-		Root:            root,
-		DBPath:          filepath.Join(root, "hub.db"),
-		MasterKeyFile:   filepath.Join(root, "master.key"),
-		JWTKeyFile:      filepath.Join(root, "jwt-ed25519.seed"),
-		RelayTokenFile:  filepath.Join(root, "relay-service.token"),
-		HubPort:         hubPort,
-		RelayPubPort:    relayPub,
-		RelayIntPort:    relayInt,
-		HubBaseURL:      fmt.Sprintf("http://127.0.0.1:%d", hubPort),
-		RelayPubBaseURL: fmt.Sprintf("http://127.0.0.1:%d", relayPub),
-		RelayIntBaseURL: fmt.Sprintf("http://127.0.0.1:%d", relayInt),
+		Root:               root,
+		DBPath:             filepath.Join(root, "hub.db"),
+		MasterKeyFile:      filepath.Join(root, "master.key"),
+		JWTKeyFile:         filepath.Join(root, "jwt-ed25519.seed"),
+		RelayTokenFile:     filepath.Join(root, "relay-service.token"),
+		HubPort:            hubPort,
+		HubInternalPort:    hubInternalPort,
+		RelayPubPort:       relayPub,
+		RelayIntPort:       relayInt,
+		HubBaseURL:         fmt.Sprintf("http://127.0.0.1:%d", hubPort),
+		HubInternalBaseURL: fmt.Sprintf("http://127.0.0.1:%d", hubInternalPort),
+		RelayPubBaseURL:    fmt.Sprintf("http://127.0.0.1:%d", relayPub),
+		RelayIntBaseURL:    fmt.Sprintf("http://127.0.0.1:%d", relayInt),
 	}
 
 	// Generate crypto material.
@@ -165,6 +174,7 @@ func (e *HubEnv) StartHub(ctx context.Context) error {
 	proc, err := e.startProcess(ctx, logFile, e.HubBin,
 		"run",
 		"--listen", fmt.Sprintf("127.0.0.1:%d", e.HubPort),
+		"--internal-listen", fmt.Sprintf("127.0.0.1:%d", e.HubInternalPort),
 		"--public-base-url", e.HubBaseURL,
 		"--runtime-api-base", e.RelayPubBaseURL,
 		"--db", e.DBPath,
@@ -203,7 +213,7 @@ func (e *HubEnv) StartRelay(ctx context.Context) error {
 		"--public-listen", fmt.Sprintf("127.0.0.1:%d", e.RelayPubPort),
 		"--internal-listen", fmt.Sprintf("127.0.0.1:%d", e.RelayIntPort),
 		"--spool", spoolPath,
-		"--hub-usage-url", fmt.Sprintf("%s/internal/v1/usage/request-events:batch", e.HubBaseURL),
+		"--hub-usage-url", fmt.Sprintf("%s/internal/v1/usage/request-events:batch", e.HubInternalBaseURL),
 		"--hub-service-token-file", e.RelayTokenFile,
 	)
 	if err != nil {

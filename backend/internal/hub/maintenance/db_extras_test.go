@@ -229,7 +229,7 @@ func seedUserData(t *testing.T, db *sql.DB) (userID, upstreamID, releaseID strin
 func TestHUBDB002PreviousSchemaUpgrade(t *testing.T) {
 	// Read the previous-schema fixture
 	_, file, _, _ := runtime.Caller(0)
-	prevSchemaPath := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../migrations/fixture_previous_schema_v0.1.sql"))
+	prevSchemaPath := filepath.Clean(filepath.Join(filepath.Dir(file), "testdata/fixture_previous_schema_v0.1.sql"))
 	prevSchemaSQL, err := os.ReadFile(prevSchemaPath)
 	if err != nil {
 		t.Fatalf("read previous schema fixture: %v", err)
@@ -512,7 +512,7 @@ func TestHUBDB006MigrationPreservesCriticalIDs(t *testing.T) {
 
 	// Read the previous-schema fixture
 	_, file, _, _ := runtime.Caller(0)
-	prevSchemaPath := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../migrations/fixture_previous_schema_v0.1.sql"))
+	prevSchemaPath := filepath.Clean(filepath.Join(filepath.Dir(file), "testdata/fixture_previous_schema_v0.1.sql"))
 	prevSchemaSQL, err := os.ReadFile(prevSchemaPath)
 	if err != nil {
 		t.Fatalf("read previous schema fixture: %v", err)

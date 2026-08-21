@@ -36,10 +36,13 @@ responses.
 | ASR (multipart) | `POST /v1/audio/transcriptions` | HTTP_MULTIPART | JSON `{text:...}` |
 | MCP (Streamable HTTP) | `POST /mcp` | HTTP_REQUEST_RESPONSE | JSON `{jsonrpc:2.0,...}` |
 
-The deterministic adapter faithfully implements the OpenAI Chat Completions,
-Audio Speech, Audio Transcriptions, and MCP Streamable HTTP protocols. Its
-response shapes (JSON structure, SSE event format, binary content type,
-multipart parsing) match the OpenAI API specification.
+The deterministic adapter implements the OpenAI Chat Completions,
+Audio Speech, and Audio Transcriptions protocols with response shapes
+(JSON structure, SSE event format, binary content type, multipart parsing)
+that match the OpenAI API specification. For MCP, the adapter implements
+a minimal JSON-RPC 2.0 protocol flow (initialize → tools/list → tools/call)
+sufficient for deterministic testing; it is NOT a full MCP Streamable HTTP
+server and must not be used to qualify real MCP endpoint compatibility.
 
 ## 3. Real Endpoint Qualification Procedure
 

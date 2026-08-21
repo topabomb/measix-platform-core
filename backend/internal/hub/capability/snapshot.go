@@ -159,3 +159,84 @@ func HashSnapshot(snapshot clientapi.ManagedSnapshot) (string, error) {
 	sum := sha256.Sum256(payload)
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
+
+// projectionToAdminProviders converts clientapi projection back to adminapi types for preview.
+func projectionToAdminProviders(src []clientapi.ProviderDefinition) []adminapi.ProviderDefinition {
+	dst := make([]adminapi.ProviderDefinition, len(src))
+	for i, v := range src {
+		dst[i] = adminapi.ProviderDefinition{
+			ProviderId:     v.ProviderId,
+			DisplayName:    v.DisplayName,
+			ClientProtocol: adminapi.ProviderDefinitionClientProtocol(string(v.ClientProtocol)),
+			Enabled:        v.Enabled,
+		}
+	}
+	return dst
+}
+
+// projectionToAdminModels converts clientapi projection back to adminapi types for preview.
+func projectionToAdminModels(src []clientapi.ModelDefinition) []adminapi.ModelDefinition {
+	dst := make([]adminapi.ModelDefinition, len(src))
+	for i, v := range src {
+		caps := make([]adminapi.ModelDefinitionCapabilities, len(v.Capabilities))
+		for j, c := range v.Capabilities {
+			caps[j] = adminapi.ModelDefinitionCapabilities(string(c))
+		}
+		inputs := make([]adminapi.ModelDefinitionInputModalities, len(v.InputModalities))
+		for j, m := range v.InputModalities {
+			inputs[j] = adminapi.ModelDefinitionInputModalities(string(m))
+		}
+		outputs := make([]adminapi.ModelDefinitionOutputModalities, len(v.OutputModalities))
+		for j, m := range v.OutputModalities {
+			outputs[j] = adminapi.ModelDefinitionOutputModalities(string(m))
+		}
+		dst[i] = adminapi.ModelDefinition{
+			ModelId: v.ModelId, ProviderId: v.ProviderId, DisplayName: v.DisplayName,
+			UpstreamModelKey: v.UpstreamModelKey, RuntimePath: v.RuntimePath, Enabled: v.Enabled,
+			Capabilities: caps, InputModalities: inputs, OutputModalities: outputs,
+		}
+	}
+	return dst
+}
+
+// projectionToAdminTts converts clientapi projection back to adminapi types for preview.
+func projectionToAdminTts(src []clientapi.TtsDefinition) []adminapi.TtsDefinition {
+	dst := make([]adminapi.TtsDefinition, len(src))
+	for i, v := range src {
+		dst[i] = adminapi.TtsDefinition{
+			TtsId: v.TtsId, DisplayName: v.DisplayName,
+			ClientProtocol:   adminapi.TtsDefinitionClientProtocol(string(v.ClientProtocol)),
+			UpstreamModelKey: v.UpstreamModelKey, Voice: v.Voice,
+			RuntimePath: v.RuntimePath, Enabled: v.Enabled,
+		}
+	}
+	return dst
+}
+
+// projectionToAdminAsr converts clientapi projection back to adminapi types for preview.
+func projectionToAdminAsr(src []clientapi.AsrDefinition) []adminapi.AsrDefinition {
+	dst := make([]adminapi.AsrDefinition, len(src))
+	for i, v := range src {
+		dst[i] = adminapi.AsrDefinition{
+			AsrId: v.AsrId, DisplayName: v.DisplayName,
+			ClientProtocol:   adminapi.AsrDefinitionClientProtocol(string(v.ClientProtocol)),
+			UpstreamModelKey: v.UpstreamModelKey, Language: v.Language,
+			RuntimePath: v.RuntimePath, Enabled: v.Enabled,
+		}
+	}
+	return dst
+}
+
+// projectionToAdminMcp converts clientapi projection back to adminapi types for preview.
+func projectionToAdminMcp(src []clientapi.McpDefinition) []adminapi.McpDefinition {
+	dst := make([]adminapi.McpDefinition, len(src))
+	for i, v := range src {
+		dst[i] = adminapi.McpDefinition{
+			McpServerId: v.McpServerId, DisplayName: v.DisplayName,
+			ClientProtocol: adminapi.McpDefinitionClientProtocol(string(v.ClientProtocol)),
+			AuthOwnership:  adminapi.McpDefinitionAuthOwnership(string(v.AuthOwnership)),
+			RuntimePath:    v.RuntimePath, Enabled: v.Enabled,
+		}
+	}
+	return dst
+}

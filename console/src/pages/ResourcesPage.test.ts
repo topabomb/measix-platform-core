@@ -276,7 +276,7 @@ describe('ResourcesPage', () => {
       if (path === '/api/admin/v1/draft:preview') {
         return {
           draftRevision: 1,
-          snapshotHash: 'sha256:preview',
+          projectionHash: 'sha256:preview',
           providers: draftWithWarnings.content.providers,
           models: [],
           tts: [],
@@ -335,7 +335,7 @@ describe('ResourcesPage', () => {
       if (path === '/api/admin/v1/draft:preview' && init?.method === 'POST') {
         return {
           draftRevision: 1,
-          snapshotHash: 'sha256:abc123',
+          projectionHash: 'sha256:abc123',
           providers: [],
           models: [],
           tts: [],

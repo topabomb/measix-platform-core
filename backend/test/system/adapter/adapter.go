@@ -284,6 +284,40 @@ func (a *Adapter) handleTranscriptions(w http.ResponseWriter, r *http.Request) {
 
 func (a *Adapter) handleMCP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"tool-a"}]}}`)
+
+	// Parse JSON-RPC request to determine method
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}`)
+		return
+	}
+
+	var rpcReq struct {
+		JSONRPC string          `json:"jsonrpc"`
+		ID      json.RawMessage `json:"id"`
+		Method  string          `json:"method"`
+		Params  json.RawMessage `json:"params,omitempty"`
+	}
+	if err := json.Unmarshal(body, &rpcReq); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid Request"}}`)
+		return
+	}
+
+	// MCP Streamable HTTP: respond based on method
+	switch rpcReq.Method {
+	case "initialize":
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":`+string(rpcReq.ID)+`,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"measix-test-adapter","version":"1.0.0"}}}`)
+	case "tools/list":
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":`+string(rpcReq.ID)+`,"result":{"tools":[{"name":"tool-a","description":"Test tool A","inputSchema":{"type":"object","properties":{"query":{"type":"string"}}}}]}}`)
+	case "tools/call":
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":`+string(rpcReq.ID)+`,"result":{"content":[{"type":"text","text":"tool-a executed"}]}}`)
+	default:
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":`+string(rpcReq.ID)+`,"error":{"code":-32601,"message":"Method not found"}}`)
+	}
 }

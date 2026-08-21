@@ -368,7 +368,7 @@ export default {
       bindingsRemoved: '移除绑定',
       warningsAck: '警告（发布时确认）',
       blockingErrors: '{count} 个阻塞性错误 — 无法发布。',
-      snapshotHash: '快照哈希',
+      projectionHash: '投影哈希',
     },
     publish: {
       progress: {
@@ -453,6 +453,8 @@ export default {
     unreachable: '不可达',
     verifiedCapabilities: '已验证能力',
     warnings: '警告',
+    secretBound: '密钥已绑定（版本 {version}）',
+    noSecretBound: '未绑定密钥 — 请创建一个以启用认证。',
     secretCreateHint: '在 Hub 中存储不透明凭据。密钥值只写，Admin API 不会返回。',
     secretReplaceHint: '替换密钥会创建新的不可变版本。活跃运行时在您应用包含新版本的上游候选之前不会更改。',
     newValue: '新值',
@@ -529,7 +531,7 @@ export default {
     bytes: '字节',
     responseBytes: '响应',
     blockedHint: '未转发（拒绝/准入）',
-    semanticMetersByKind: '按类型的语义计量',
+    semanticMeters: '语义计量',
     unknownMetersHint: 'UNKNOWN 计量不显示为 0。',
     noRequests: '暂无用请求记录。',
     range24h: '最近 24 小时',

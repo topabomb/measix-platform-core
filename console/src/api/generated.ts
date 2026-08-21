@@ -221,7 +221,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical snapshot hash and sorted resource arrays so the operator can review the exact shape that would be published. */
+        /** @description Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical projection hash and sorted resource arrays so the operator can review the exact shape that would be published. The projectionHash is computed from the same canonical projection as a real snapshot but uses placeholder releaseId/generation/publishedAt — it is NOT the final snapshotHash. */
         post: operations["previewDraft"];
         delete?: never;
         options?: never;
@@ -531,6 +531,10 @@ export interface components {
             severity: "ERROR" | "WARNING";
             path: string;
             message: string;
+            /** @enum {string} */
+            resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY" | "BINDING";
+            resourceId?: string;
+            field?: string;
         };
         ProviderDefinition: {
             providerId: components["schemas"]["ProviderId"];
@@ -555,7 +559,7 @@ export interface components {
             displayName: string;
             /** @enum {string} */
             clientProtocol: "OPENAI_AUDIO_SPEECH";
-            upstreamModelKey?: string;
+            upstreamModelKey: string;
             voice: string;
             runtimePath: string;
             enabled: boolean;
@@ -565,7 +569,7 @@ export interface components {
             displayName: string;
             /** @enum {string} */
             clientProtocol: "OPENAI_AUDIO_TRANSCRIPTIONS";
-            upstreamModelKey?: string;
+            upstreamModelKey: string;
             language?: string;
             runtimePath: string;
             enabled: boolean;
@@ -793,7 +797,7 @@ export interface components {
         };
         DraftPreviewResponse: {
             draftRevision: number;
-            snapshotHash: components["schemas"]["Sha256Hash"];
+            projectionHash: components["schemas"]["Sha256Hash"];
             providers: components["schemas"]["ProviderDefinition"][];
             models: components["schemas"]["ModelDefinition"][];
             tts: components["schemas"]["TtsDefinition"][];

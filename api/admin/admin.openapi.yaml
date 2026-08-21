@@ -397,7 +397,7 @@ paths:
   /api/admin/v1/draft:preview:
     post:
       operationId: previewDraft
-      description: Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical snapshot hash and sorted resource arrays so the operator can review the exact shape that would be published.
+      description: Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical projection hash and sorted resource arrays so the operator can review the exact shape that would be published. The projectionHash is computed from the same canonical projection as a real snapshot but uses placeholder releaseId/generation/publishedAt — it is NOT the final snapshotHash.
       responses:
         '200':
           description: OK
@@ -1020,6 +1020,20 @@ components:
           type: string
         message:
           type: string
+        resourceKind:
+          type: string
+          enum:
+          - PROVIDER
+          - MODEL
+          - TTS
+          - ASR
+          - MCP
+          - POLICY
+          - BINDING
+        resourceId:
+          type: string
+        field:
+          type: string
     ProviderDefinition:
       type: object
       additionalProperties: false
@@ -1094,6 +1108,7 @@ components:
       - ttsId
       - displayName
       - clientProtocol
+      - upstreamModelKey
       - runtimePath
       - voice
       - enabled
@@ -1108,6 +1123,7 @@ components:
           - OPENAI_AUDIO_SPEECH
         upstreamModelKey:
           type: string
+          minLength: 1
         voice:
           type: string
           minLength: 1
@@ -1123,6 +1139,7 @@ components:
       - asrId
       - displayName
       - clientProtocol
+      - upstreamModelKey
       - runtimePath
       - enabled
       properties:
@@ -1136,6 +1153,7 @@ components:
           - OPENAI_AUDIO_TRANSCRIPTIONS
         upstreamModelKey:
           type: string
+          minLength: 1
         language:
           type: string
         runtimePath:
@@ -1817,7 +1835,7 @@ components:
       additionalProperties: false
       required:
       - draftRevision
-      - snapshotHash
+      - projectionHash
       - providers
       - models
       - tts
@@ -1828,7 +1846,7 @@ components:
         draftRevision:
           type: integer
           minimum: 0
-        snapshotHash:
+        projectionHash:
           $ref: '#/components/schemas/Sha256Hash'
         providers:
           type: array

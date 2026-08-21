@@ -17,11 +17,11 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 
 | Checkpoint | 状态 | 当前结论 |
 |---|---|---|
-| C0 Contract Audit & Freeze Preparation | ✅ Green | required profile 的 OpenAPI/fixtures/generated types/backend validation 已基本闭合；继续作为后续回归基线 |
-| C1 Upstream Operational | ✅ Green | Create/Test/Apply 与 typed UpstreamConfig 已存在；existing candidate edit、Secret replace、save/discard/reset、409 conflict handling、candidate vs active revision 显示、refresh recovery 与 apply-failure candidate preservation 均已实现 |
-| C2 Managed Resource Editor | ✅ Green | Provider/Model/TTS/ASR/MCP/Policy 基础编辑与 binding 已存在；collection → selected editor/detail、Policy Default Model/TTS/ASR pickers（仅 enabled 资源可选）、dirty/clean state、field/resource validation navigation、relationship view（kind filter、click-through、missing binding 可操作错误、candidate != active、disabled/unverified/degraded 状态编码）均已完成 |
-| C3 Snapshot Projection & Preview | ✅ Green | canonical preview backend 与基础 UI 已存在；Review & Publish 结构化审查面（Added/Changed/Removed + Policy changes + Runtime routing impact + Warnings）、Client Snapshot Preview（Providers/Models/TTS/ASR/MCP/Policy foldable detail + Client receives vs never receives 区分）、Publish progress（VALIDATING→STAGING_RELEASE→APPLYING_RUNTIME→FINALIZING→ACTIVE/FAILED 阶段显示 + recovery context）均已完成 |
-| C4 Runtime Reference Profile | ✅ Green | deterministic Adapter/Test Client 已证明 Chat request/response+SSE、TTS binary、ASR multipart、MCP 及关键 Relay admission/transport 行为；这是 deterministic T2/T3 证据，不等于 real Adapter qualification |
+| C0 Contract Audit & Freeze Preparation | ✅ Green | required profile 的 OpenAPI/fixtures/generated types/backend validation 已闭合；TTS/ASR `upstreamModelKey` 已 required；`ValidationIssue` 已增加 `resourceKind/resourceId/field` 结构化定位；`DraftPreviewResponse` 使用 `projectionHash` 而非 `snapshotHash` |
+| C1 Upstream Operational | ✅ Green | Create/Test/Apply 与 typed UpstreamConfig 已存在；existing candidate edit、Secret replace（内联创建工作流，不暴露裸 sec_* ID）、save/discard/reset、409 conflict handling、candidate vs active revision 显示、refresh recovery 与 apply-failure candidate preservation 均已实现；modal 支持 320px 响应式 |
+| C2 Managed Resource Editor | ✅ Green | Provider/Model/TTS/ASR/MCP/Policy 编辑与 binding 已存在；collection → selected editor/detail、Policy Default pickers、dirty/clean state、结构化 validation navigation（`resourceId` 精确定位）、relationship view 均已完成；diff/validation 逻辑已抽取到 `composables/useResourceDiff.ts` |
+| C3 Snapshot Projection & Preview | ✅ Green | canonical preview backend 返回 compiler 输出的规范化投影数组；`projectionHash` 使用 placeholder releaseId/generation/publishedAt，不是最终 `snapshotHash`；Review & Publish 结构化审查面、Client Snapshot Preview、Publish progress 均已完成 |
+| C4 Runtime Reference Profile | ✅ Green | deterministic Adapter/Test Client 已证明 Chat request/response+SSE、TTS binary、ASR multipart、MCP（JSON-RPC initialize → tools/list → tools/call）及关键 Relay admission/transport 行为；这是 deterministic T2/T3 证据，不等于 real Adapter qualification |
 | C5 Usage / Pricing / Observability | ✅ Green（component checkpoint） | filters、request detail、pricing、summary、Overview/System observability 已具备并有 component/backend 回归；仍须在 C6 Golden Path 中证明跨组件产品闭环 |
 | C6 Browser + Hub + Relay Product/System E2E | 🔴 Not Green | 当前只有 bounded T3/system smoke；缺 production Admin real-browser T4.1 Golden Path、完整 Hub→Relay→Adapter→Usage 组合证明与 required recovery/security product scenarios |
 | C7 Client Contract Freeze Gate | 🔴 Not Started | C6 未 Green；real Adapter qualification 未完成；没有有效 Freeze manifest |
@@ -91,7 +91,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
    - `TestCAPC6013SQLiteBusyTransient`：SQLite busy/transient 错误恢复，验证 bounded retry 语义和无数据损坏
    - `TestCAPC6004EnhancedNoForwardAndUsageGeneration`：强化 CAP-C6-004，明确断言 428 forwarded=false、Adapter 无 request body、Usage 记录正确的 generation
 
-6. **Security Suite**（`security_test.go`，15 场景）：
+6. **Security Suite**（`security_test.go`，21 场景）：
    - SEC-001：未认证 admin API 访问拒绝（401）
    - SEC-002：CSRF token 强制校验
    - SEC-003：Session cookie HttpOnly + Secure + SameSite=Strict
@@ -107,6 +107,12 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
    - SEC-013：Request body 大小限制
    - SEC-014：System status 不泄漏内部配置
    - SEC-015：幂等 Publish
+   - SEC-016：JWT claims 验证（过期/错误 audience/issuer）
+   - SEC-017：Disabled user 请求被拒绝
+   - SEC-018：Revoked device/session 请求被拒绝
+   - SEC-019：Management endpoint 认证强制
+   - SEC-020：Set-Cookie/Location header 被 Relay 剥离
+   - SEC-021：Secret plaintext 不进入浏览器持久状态
 
 7. **Resource Baseline**（`baseline_test.go`）：
    - 测量 Admin login/CRUD/Publish/convergence/runtime 延迟
@@ -165,8 +171,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 ### 参考文档
 
 - `docs/s0-real-adapter-qualification.md`：Real Adapter Qualification 报告（NOT EXECUTED）
-- `docs/s0-resource-baseline.md`：Resource Baseline 基准指标（NOT GREEN — 多数指标未测量）
-- `docs/s0-clean-replay-report.md`：Clean Replay 验证报告（NOT GREEN）
+- `docs/s0-resource-baseline.md`：Resource Baseline 基准指标（NOT GREEN — 全部数值为 estimate，未由可执行测试生成）
 
 ### 编译验证
 
@@ -250,9 +255,8 @@ vitest run (13 files, 56 tests) — PASS
 4. ✅ **Security required scenarios** — 已补全：SEC-016 (JWT claims), SEC-017/018 (disabled user/revoked device), SEC-019 (management endpoint), SEC-020 (Set-Cookie/redirect strip), SEC-021 (secret in browser)
 5. **Real Adapter qualification** — 未执行
 6. ✅ **Freeze Manifest generator** — 已修正：真实 PASS/FAIL/startedAt/completedAt；Real Adapter 和 Baseline 为硬性门禁
-7. **Resource Baseline** — 多数指标未测量；文档事实错误已修正
-8. **Clean Replay report** — 已修正为 NOT GREEN
-9. **C7** — Not Started
+7. **Resource Baseline** — 全部数值为 estimate，未由可执行测试生成；须在 candidate SHA 上执行真实测量后替换
+8. **C7** — Not Started
 
 ## S0.1 审查修复 Evidence（2026-08-21）
 

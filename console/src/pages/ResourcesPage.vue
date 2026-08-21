@@ -10,6 +10,7 @@ import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import { useResourceDiff } from '../composables/useResourceDiff'
 
 type Activation = components['schemas']['Activation']
 type ManagedDraftContent = components['schemas']['ManagedDraftContent']
@@ -29,6 +30,7 @@ const { t: $t } = useI18n()
 const draft = useDraftStore()
 const session = useSessionStore()
 const activation = useActivationStore()
+const { reviewDiff, routingImpact, reviewWarnings, reviewTotalChanges, hasBlockingErrors, validationIssuesFor } = useResourceDiff(draft)
 const error = ref<unknown>()
 const publishing = ref(false)
 const previewing = ref(false)
@@ -336,77 +338,6 @@ function selectModel(id: string) { selectedResourceId.value = id }
 function selectTts(id: string) { selectedResourceId.value = id }
 function selectAsr(id: string) { selectedResourceId.value = id }
 function selectMcp(id: string) { selectedResourceId.value = id }
-
-/** Validation issue path for a resource. */
-function validationIssuesFor(resourceId: string) {
-  const errors = draft.validationResult?.errors.filter((e) => e.path.includes(resourceId)) ?? []
-  const warnings = draft.validationResult?.warnings.filter((w) => w.path.includes(resourceId)) ?? []
-  return { errors, warnings }
-}
-
-/** Structured diff between baseline and local draft content for the Review workspace. */
-const reviewDiff = computed(() => {
-  const base = draft.baselineContent
-  const local = draft.localContent
-  if (!base || !local) return null
-
-  function diffList<T extends { modelId?: string; ttsId?: string; asrId?: string; mcpServerId?: string; providerId?: string }>(
-    baseArr: T[], localArr: T[], idFn: (item: T) => string,
-  ): { added: T[]; changed: { item: T; baseItem?: T }[]; removed: T[] } {
-    const baseMap = new Map(baseArr.map((item) => [idFn(item), item]))
-    const localMap = new Map(localArr.map((item) => [idFn(item), item]))
-    const added: T[] = []
-    const changed: { item: T; baseItem?: T }[] = []
-    const removed: T[] = []
-    for (const item of localArr) {
-      const id = idFn(item)
-      if (!baseMap.has(id)) added.push(item)
-      else changed.push({ item, baseItem: baseMap.get(id) })
-    }
-    for (const item of baseArr) {
-      const id = idFn(item)
-      if (!localMap.has(id)) removed.push(item)
-    }
-    return { added, changed, removed }
-  }
-
-  const providers = diffList(base.providers, local.providers, (p) => p.providerId)
-  const models = diffList(base.models, local.models, (m) => m.modelId)
-  const tts = diffList(base.tts, local.tts, (t) => t.ttsId)
-  const asr = diffList(base.asr, local.asr, (a) => a.asrId)
-  const mcp = diffList(base.mcp, local.mcp, (m) => m.mcpServerId)
-  const bindings = diffList(base.bindings, local.bindings, (b) => b.resourceId)
-
-  // Policy diff
-  const policyChanged = JSON.stringify(base.policy) !== JSON.stringify(local.policy)
-
-  return { providers, models, tts, asr, mcp, bindings, policyChanged }
-})
-
-/** Runtime routing impact summary for the Review workspace. */
-const routingImpact = computed(() => {
-  if (!reviewDiff.value) return { added: 0, changed: 0, removed: 0 }
-  const b = reviewDiff.value.bindings
-  return { added: b.added.length, changed: b.changed.length, removed: b.removed.length }
-})
-
-/** Warnings from validation that need acknowledgment before publish. */
-const reviewWarnings = computed(() => draft.validationResult?.warnings ?? [])
-
-/** Total resource changes count for review summary. */
-const reviewTotalChanges = computed(() => {
-  if (!reviewDiff.value) return 0
-  const d = reviewDiff.value
-  return d.providers.added.length + d.providers.changed.length + d.providers.removed.length
-    + d.models.added.length + d.models.changed.length + d.models.removed.length
-    + d.tts.added.length + d.tts.changed.length + d.tts.removed.length
-    + d.asr.added.length + d.asr.changed.length + d.asr.removed.length
-    + d.mcp.added.length + d.mcp.changed.length + d.mcp.removed.length
-    + (d.policyChanged ? 1 : 0)
-})
-
-/** Has blocking errors that prevent publish. */
-const hasBlockingErrors = computed(() => (draft.validationResult?.errors.length ?? 0) > 0)
 
 onMounted(refresh)
 </script>
@@ -1097,7 +1028,7 @@ onMounted(refresh)
 
       <!-- Review & Publish Dialog (structured diff, not a simple confirm) -->
       <q-dialog v-model="reviewOpen" persistent>
-        <q-card style="min-width: 800px; max-width: 95vw">
+        <q-card class="responsive-modal" style="max-width: 95vw">
           <q-card-section class="row items-center justify-between">
             <div>
               <div class="text-h6">{{ $t('resources.review.title') }}</div>
@@ -1240,7 +1171,7 @@ onMounted(refresh)
 
             <!-- Snapshot hash -->
             <div v-if="preview" class="text-caption text-grey-7">
-              {{ $t('resources.review.snapshotHash') }}: <code>{{ preview.snapshotHash }}</code>
+              {{ $t('resources.review.projectionHash') }}: <code>{{ preview.projectionHash }}</code>
             </div>
           </q-card-section>
 
@@ -1261,10 +1192,10 @@ onMounted(refresh)
 
       <!-- Snapshot Preview Dialog -->
       <q-dialog v-model="previewOpen">
-        <q-card style="min-width: 700px; max-width: 95vw">
+        <q-card class="responsive-modal" style="max-width: 95vw">
           <q-card-section class="text-h6">{{ $t('resources.preview.title') }}</q-card-section>
           <q-card-section v-if="preview">
-            <div class="text-subtitle2 q-mb-sm">{{ $t('resources.preview.hash') }}: {{ preview.snapshotHash }}</div>
+            <div class="text-subtitle2 q-mb-sm">{{ $t('resources.preview.hash') }}: {{ preview.projectionHash }}</div>
             <div class="text-caption text-grey-7 q-mb-md">{{ $t('resources.draft.revision') }} {{ preview.draftRevision }}</div>
 
             <q-banner class="bg-blue-1 q-mb-md rounded-borders">

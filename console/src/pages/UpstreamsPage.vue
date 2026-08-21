@@ -49,6 +49,13 @@ const replacingSecret = ref(false)
 const replaceSecretId = ref<string>()
 const replaceExpectedVersion = ref<number>()
 
+// Inline Secret creation state — replaces bare secretId/version input fields.
+// User creates a Secret by name+value; the Hub returns the immutable secretId+version
+// and we auto-bind it to the auth config. The raw ID is never hand-typed.
+const createdSecretLabel = ref('')
+const createdSecretVersion = ref<number>()
+const createdSecretId = ref('')
+
 const AUTH_TYPES = ['NONE', 'BEARER', 'STATIC_HEADER', 'BASIC'] as const
 const USAGE_LEVELS = ['LEVEL_0', 'LEVEL_1', 'LEVEL_2'] as const
 const CORRELATION_MODES = ['HEADER_ECHO', 'VIRTUAL_KEY', 'REQUEST_LOG_ID', 'USAGE_API', 'WEBHOOK', 'NONE'] as const
@@ -67,11 +74,8 @@ function emptyConfig(): UpstreamConfig {
 }
 
 const createForm = ref<UpstreamConfig>(emptyConfig())
-const secretId = ref('')
-const secretVersion = ref<number | undefined>(undefined)
 const headerName = ref('')
 const username = ref('')
-const authSecret = ref('')
 
 async function refresh() {
   loading.value = true
@@ -86,27 +90,25 @@ async function refresh() {
   }
 }
 
-function secretRefFor(value: string): { secretId: string; secretVersion: number } | undefined {
-  const v = Number(value)
-  if (!secretId.value || !Number.isInteger(v) || v < 1) return undefined
-  return { secretId: secretId.value, secretVersion: v }
+/** Build a SecretRef from the inline-created secret, if one exists. */
+function inlineSecretRef(): { secretId: string; secretVersion: number } | undefined {
+  if (!createdSecretId.value || !createdSecretVersion.value) return undefined
+  return { secretId: createdSecretId.value, secretVersion: createdSecretVersion.value }
 }
 
 function buildAuth(): UpstreamConfig['auth'] {
   const authType = createForm.value.auth.type
   if (authType === 'NONE') return { type: 'NONE' }
+  const ref = inlineSecretRef()
   if (authType === 'BEARER') {
-    const ref = secretRefFor(authSecret.value)
     return ref ? { type: 'BEARER', secretRef: ref } : { type: 'BEARER' }
   }
   if (authType === 'STATIC_HEADER') {
-    const ref = secretRefFor(authSecret.value)
     return headerName.value.trim()
       ? { type: 'STATIC_HEADER', headerName: headerName.value.trim(), ...(ref ? { secretRef: ref } : {}) }
       : { type: 'STATIC_HEADER', ...(ref ? { secretRef: ref } : {}) }
   }
   if (authType === 'BASIC') {
-    const ref = secretRefFor(authSecret.value)
     return username.value.trim()
       ? { type: 'BASIC', username: username.value.trim(), ...(ref ? { passwordSecretRef: ref } : {}) }
       : { type: 'BASIC', ...(ref ? { passwordSecretRef: ref } : {}) }
@@ -128,9 +130,9 @@ async function createUpstream() {
     }, session.csrfToken)
     createOpen.value = false
     createForm.value = emptyConfig()
-    secretId.value = ''
-    secretVersion.value = undefined
-    authSecret.value = ''
+    createdSecretId.value = ''
+    createdSecretVersion.value = undefined
+    createdSecretLabel.value = ''
     headerName.value = ''
     username.value = ''
     await refresh()
@@ -149,9 +151,10 @@ async function createSecret() {
       method: 'POST',
       body: JSON.stringify({ name: secretName.value.trim(), value: secretValue.value }),
     }, session.csrfToken)
-    secretId.value = created.secretId
-    secretVersion.value = created.secretVersion
-    authSecret.value = String(created.secretVersion)
+    // Auto-bind the newly created secret to the create form
+    createdSecretId.value = created.secretId
+    createdSecretVersion.value = created.secretVersion
+    createdSecretLabel.value = secretName.value.trim()
     secretOpen.value = false
     secretName.value = ''
     secretValue.value = ''
@@ -371,7 +374,7 @@ onMounted(refresh)
 
     <!-- Create upstream dialog -->
     <q-dialog v-model="createOpen">
-      <q-card style="min-width: 600px; max-width: 95vw">
+      <q-card class="responsive-modal" style="max-width: 95vw">
         <q-card-section class="text-h6">{{ $t('upstreams.createUpstream') }}</q-card-section>
         <q-card-section class="q-gutter-md">
           <q-input v-model="createForm.name" outlined :label="$t('upstreams.name')" />
@@ -382,8 +385,21 @@ onMounted(refresh)
           <div class="text-subtitle2">{{ $t('upstreams.auth') }}</div>
           <q-select v-model="createForm.auth.type" outlined :label="$t('upstreams.authMode')" :options="[...AUTH_TYPES]" />
           <template v-if="createForm.auth.type !== 'NONE'">
-            <q-input v-model="secretId" outlined :label="$t('upstreams.secretRef')" placeholder="sec_..." />
-            <q-input v-model="authSecret" outlined :label="$t('upstreams.secretVersion')" placeholder="1" />
+            <!-- Typed Secret picker: user creates a secret inline, never types raw sec_* IDs -->
+            <div v-if="createdSecretLabel" class="row items-center q-gutter-sm">
+              <q-icon name="vpn_key" color="positive" />
+              <div class="col">
+                <div class="text-body2">{{ createdSecretLabel }}</div>
+                <div class="text-caption text-grey-7">{{ $t('upstreams.secretBound', { version: createdSecretVersion }) }}</div>
+              </div>
+              <q-btn flat dense color="warning" icon="refresh" :label="$t('upstreams.replaceSecret')" @click="secretMode = 'create'; secretName = ''; secretValue = ''; secretOpen = true" />
+            </div>
+            <q-banner v-else class="bg-grey-1 rounded-borders">
+              <div class="row items-center justify-between">
+                <span class="text-body2 text-grey-7">{{ $t('upstreams.noSecretBound') }}</span>
+                <q-btn outline color="primary" icon="add_circle" :label="$t('upstreams.createSecret')" size="sm" @click="secretMode = 'create'; secretName = ''; secretValue = ''; secretOpen = true" />
+              </div>
+            </q-banner>
             <q-input v-if="createForm.auth.type === 'STATIC_HEADER'" v-model="headerName" outlined :label="$t('upstreams.headerName')" placeholder="X-Api-Key" />
             <q-input v-if="createForm.auth.type === 'BASIC'" v-model="username" outlined :label="$t('upstreams.username')" />
           </template>
@@ -407,7 +423,7 @@ onMounted(refresh)
 
     <!-- Upstream detail + editor dialog -->
     <q-dialog v-model="detailOpen">
-      <q-card v-if="selected" style="width: 760px; max-width: 95vw">
+      <q-card v-if="selected" class="responsive-modal" style="max-width: 95vw">
         <q-card-section class="row items-start justify-between">
           <div>
             <div class="text-h6">{{ selected.name }}</div>
@@ -537,7 +553,7 @@ onMounted(refresh)
 
     <!-- Secret create/replace dialog -->
     <q-dialog v-model="secretOpen">
-      <q-card style="min-width: 480px; max-width: 95vw">
+      <q-card class="responsive-modal" style="max-width: 95vw">
         <q-card-section class="text-h6">{{ secretMode === 'create' ? $t('upstreams.createSecret') : $t('upstreams.replaceSecret') }}</q-card-section>
         <q-card-section class="q-gutter-md">
           <p v-if="secretMode === 'create'" class="text-body2 text-grey-7 q-mt-none q-mb-sm">

@@ -293,7 +293,7 @@ type AsrDefinition struct {
 	Enabled          bool                        `json:"enabled"`
 	Language         *string                     `json:"language,omitempty"`
 	RuntimePath      string                      `json:"runtimePath"`
-	UpstreamModelKey *string                     `json:"upstreamModelKey,omitempty"`
+	UpstreamModelKey string                      `json:"upstreamModelKey"`
 }
 
 // AsrDefinitionClientProtocol defines model for AsrDefinition.ClientProtocol.
@@ -583,7 +583,7 @@ type TtsDefinition struct {
 	Enabled          bool                        `json:"enabled"`
 	RuntimePath      string                      `json:"runtimePath"`
 	TtsId            TtsId                       `json:"ttsId"`
-	UpstreamModelKey *string                     `json:"upstreamModelKey,omitempty"`
+	UpstreamModelKey string                      `json:"upstreamModelKey"`
 	Voice            string                      `json:"voice"`
 }
 

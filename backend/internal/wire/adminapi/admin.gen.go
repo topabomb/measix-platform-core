@@ -586,6 +586,39 @@ func (e UserStatus) Valid() bool {
 	}
 }
 
+// Defines values for ValidationIssueResourceKind.
+const (
+	ValidationIssueResourceKindASR      ValidationIssueResourceKind = "ASR"
+	ValidationIssueResourceKindBINDING  ValidationIssueResourceKind = "BINDING"
+	ValidationIssueResourceKindMCP      ValidationIssueResourceKind = "MCP"
+	ValidationIssueResourceKindMODEL    ValidationIssueResourceKind = "MODEL"
+	ValidationIssueResourceKindPOLICY   ValidationIssueResourceKind = "POLICY"
+	ValidationIssueResourceKindPROVIDER ValidationIssueResourceKind = "PROVIDER"
+	ValidationIssueResourceKindTTS      ValidationIssueResourceKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the ValidationIssueResourceKind enum.
+func (e ValidationIssueResourceKind) Valid() bool {
+	switch e {
+	case ValidationIssueResourceKindASR:
+		return true
+	case ValidationIssueResourceKindBINDING:
+		return true
+	case ValidationIssueResourceKindMCP:
+		return true
+	case ValidationIssueResourceKindMODEL:
+		return true
+	case ValidationIssueResourceKindPOLICY:
+		return true
+	case ValidationIssueResourceKindPROVIDER:
+		return true
+	case ValidationIssueResourceKindTTS:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ValidationIssueSeverity.
 const (
 	ValidationIssueSeverityERROR   ValidationIssueSeverity = "ERROR"
@@ -803,7 +836,7 @@ type AsrDefinition struct {
 	Enabled          bool                        `json:"enabled"`
 	Language         *string                     `json:"language,omitempty"`
 	RuntimePath      string                      `json:"runtimePath"`
-	UpstreamModelKey *string                     `json:"upstreamModelKey,omitempty"`
+	UpstreamModelKey string                      `json:"upstreamModelKey"`
 }
 
 // AsrDefinitionClientProtocol defines model for AsrDefinition.ClientProtocol.
@@ -890,14 +923,14 @@ type DraftId = string
 
 // DraftPreviewResponse defines model for DraftPreviewResponse.
 type DraftPreviewResponse struct {
-	Asr           []AsrDefinition      `json:"asr"`
-	DraftRevision int                  `json:"draftRevision"`
-	Mcp           []McpDefinition      `json:"mcp"`
-	Models        []ModelDefinition    `json:"models"`
-	Policy        ManagedPolicy        `json:"policy"`
-	Providers     []ProviderDefinition `json:"providers"`
-	SnapshotHash  Sha256Hash           `json:"snapshotHash"`
-	Tts           []TtsDefinition      `json:"tts"`
+	Asr            []AsrDefinition      `json:"asr"`
+	DraftRevision  int                  `json:"draftRevision"`
+	Mcp            []McpDefinition      `json:"mcp"`
+	Models         []ModelDefinition    `json:"models"`
+	Policy         ManagedPolicy        `json:"policy"`
+	ProjectionHash Sha256Hash           `json:"projectionHash"`
+	Providers      []ProviderDefinition `json:"providers"`
+	Tts            []TtsDefinition      `json:"tts"`
 }
 
 // EnrollmentId defines model for EnrollmentId.
@@ -1222,7 +1255,7 @@ type TtsDefinition struct {
 	Enabled          bool                        `json:"enabled"`
 	RuntimePath      string                      `json:"runtimePath"`
 	TtsId            TtsId                       `json:"ttsId"`
-	UpstreamModelKey *string                     `json:"upstreamModelKey,omitempty"`
+	UpstreamModelKey string                      `json:"upstreamModelKey"`
 	Voice            string                      `json:"voice"`
 }
 
@@ -1376,11 +1409,17 @@ type ValidateDraftResponse struct {
 
 // ValidationIssue defines model for ValidationIssue.
 type ValidationIssue struct {
-	Code     string                  `json:"code"`
-	Message  string                  `json:"message"`
-	Path     string                  `json:"path"`
-	Severity ValidationIssueSeverity `json:"severity"`
+	Code         string                       `json:"code"`
+	Field        *string                      `json:"field,omitempty"`
+	Message      string                       `json:"message"`
+	Path         string                       `json:"path"`
+	ResourceId   *string                      `json:"resourceId,omitempty"`
+	ResourceKind *ValidationIssueResourceKind `json:"resourceKind,omitempty"`
+	Severity     ValidationIssueSeverity      `json:"severity"`
 }
+
+// ValidationIssueResourceKind defines model for ValidationIssue.ResourceKind.
+type ValidationIssueResourceKind string
 
 // ValidationIssueSeverity defines model for ValidationIssue.Severity.
 type ValidationIssueSeverity string

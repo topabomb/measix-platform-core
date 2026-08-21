@@ -31,14 +31,14 @@ type DraftView struct {
 }
 
 type DraftPreview struct {
-	DraftRevision int
-	SnapshotHash  string
-	Providers     []adminapi.ProviderDefinition
-	Models        []adminapi.ModelDefinition
-	TTS           []adminapi.TtsDefinition
-	ASR           []adminapi.AsrDefinition
-	MCP           []adminapi.McpDefinition
-	Policy        adminapi.ManagedPolicy
+	DraftRevision  int
+	ProjectionHash string
+	Providers      []adminapi.ProviderDefinition
+	Models         []adminapi.ModelDefinition
+	TTS            []adminapi.TtsDefinition
+	ASR            []adminapi.AsrDefinition
+	MCP            []adminapi.McpDefinition
+	Policy         adminapi.ManagedPolicy
 }
 
 type ValidationResult struct {
@@ -390,8 +390,11 @@ func (s *Service) ValidateDraft(ctx context.Context, expectedRevision int) (Vali
 }
 
 // PreviewDraft compiles the current draft into a snapshot preview without persisting a release.
-// It returns the canonical snapshot hash and sorted resource arrays so the operator can
-// review the exact shape that would be published.
+// It returns the canonical projection hash and sorted resource arrays so the operator can
+// review the exact shape that would be published. The projectionHash is computed from
+// the same canonical projection as a real snapshot but uses placeholder
+// releaseId/generation/publishedAt — it is NOT the final snapshotHash that will be
+// assigned on Publish.
 func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (DraftPreview, error) {
 	draft, err := s.GetDraft(ctx)
 	if err != nil {
@@ -404,7 +407,10 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	if err != nil {
 		return DraftPreview{}, err
 	}
-	_, hash, err := s.CompileSnapshot(SnapshotInput{
+	// Compile the snapshot using the same canonical projection as Publish.
+	// The placeholder releaseId/generation/publishedAt are used only for hash computation;
+	// they do NOT appear in the returned projectionHash as the final snapshotHash.
+	snapshot, hash, err := s.CompileSnapshot(SnapshotInput{
 		DeploymentID:      deployment.ID,
 		ReleaseID:         platformid.New(platformid.Release),
 		ManagedGeneration: 1,
@@ -414,19 +420,26 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	if err != nil {
 		return DraftPreview{}, err
 	}
-	// The preview response uses adminapi types directly from the draft content.
-	// The hash is computed from the canonical (clientapi) snapshot so it matches
-	// what would be persisted on publish.
-	content := draft.Content
+	// Return the canonical projection (sorted arrays from compiler output),
+	// not the raw Draft arrays. This ensures Preview == actual Snapshot shape.
 	return DraftPreview{
-		DraftRevision: draft.DraftRevision,
-		SnapshotHash:  hash,
-		Providers:     content.Providers,
-		Models:        content.Models,
-		TTS:           content.Tts,
-		ASR:           content.Asr,
-		MCP:           content.Mcp,
-		Policy:        content.Policy,
+		DraftRevision:  draft.DraftRevision,
+		ProjectionHash: hash,
+		Providers:      projectionToAdminProviders(snapshot.Providers),
+		Models:         projectionToAdminModels(snapshot.Models),
+		TTS:            projectionToAdminTts(snapshot.Tts),
+		ASR:            projectionToAdminAsr(snapshot.Asr),
+		MCP:            projectionToAdminMcp(snapshot.Mcp),
+		Policy: adminapi.ManagedPolicy{
+			PolicyId:            snapshot.Policy.PolicyId,
+			AllowLocalProviders: snapshot.Policy.AllowLocalProviders,
+			AllowLocalTts:       snapshot.Policy.AllowLocalTts,
+			AllowLocalAsr:       snapshot.Policy.AllowLocalAsr,
+			AllowLocalMcp:       snapshot.Policy.AllowLocalMcp,
+			DefaultModelId:      snapshot.Policy.DefaultModelId,
+			DefaultTtsId:        snapshot.Policy.DefaultTtsId,
+			DefaultAsrId:        snapshot.Policy.DefaultAsrId,
+		},
 	}, nil
 }
 
@@ -498,14 +511,23 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 
 func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedDraftContent) ValidationResult {
 	result := ValidationResult{Errors: []adminapi.ValidationIssue{}, Warnings: []adminapi.ValidationIssue{}}
-	addError := func(code, path, message string) {
-		result.Errors = append(result.Errors, adminapi.ValidationIssue{Code: code, Path: path, Message: message, Severity: adminapi.ValidationIssueSeverityERROR})
+	addError := func(code, path, message string, kind *adminapi.ValidationIssueResourceKind, resourceID *string, field *string) {
+		result.Errors = append(result.Errors, adminapi.ValidationIssue{Code: code, Path: path, Message: message, Severity: adminapi.ValidationIssueSeverityERROR, ResourceKind: kind, ResourceId: resourceID, Field: field})
 	}
-	addWarning := func(code, path, message string) {
-		result.Warnings = append(result.Warnings, adminapi.ValidationIssue{Code: code, Path: path, Message: message, Severity: adminapi.ValidationIssueSeverityWARNING})
+	addWarning := func(code, path, message string, kind *adminapi.ValidationIssueResourceKind, resourceID *string, field *string) {
+		result.Warnings = append(result.Warnings, adminapi.ValidationIssue{Code: code, Path: path, Message: message, Severity: adminapi.ValidationIssueSeverityWARNING, ResourceKind: kind, ResourceId: resourceID, Field: field})
 	}
+	// Helpers for common patterns
+	kindProvider := adminapi.ValidationIssueResourceKind("PROVIDER")
+	kindModel := adminapi.ValidationIssueResourceKind("MODEL")
+	kindTTS := adminapi.ValidationIssueResourceKind("TTS")
+	kindASR := adminapi.ValidationIssueResourceKind("ASR")
+	kindMCP := adminapi.ValidationIssueResourceKind("MCP")
+	kindPolicy := adminapi.ValidationIssueResourceKind("POLICY")
+	kindBinding := adminapi.ValidationIssueResourceKind("BINDING")
+	ptrStr := func(s string) *string { return &s }
 	if err := validateCandidateIDs(content); err != nil {
-		addError("invalid_candidate_id", "$", err.Error())
+		addError("invalid_candidate_id", "$", err.Error(), nil, nil, nil)
 		result.Valid = false
 		return result
 	}
@@ -514,62 +536,71 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	for i, provider := range content.Providers {
 		providers[provider.ProviderId] = provider
 		if !provider.ClientProtocol.Valid() {
-			addError("invalid_client_protocol", fmt.Sprintf("providers[%d].clientProtocol", i), "unsupported provider client protocol")
+			addError("invalid_client_protocol", fmt.Sprintf("providers[%d].clientProtocol", i), "unsupported provider client protocol", &kindProvider, ptrStr(provider.ProviderId), ptrStr("clientProtocol"))
 		}
 	}
 	resources := map[string]bool{}
 	for i, model := range content.Models {
 		resources[model.ModelId] = model.Enabled
 		if _, ok := providers[model.ProviderId]; !ok {
-			addError("missing_provider", fmt.Sprintf("models[%d].providerId", i), "model references an unknown provider")
+			addError("missing_provider", fmt.Sprintf("models[%d].providerId", i), "model references an unknown provider", &kindModel, ptrStr(model.ModelId), ptrStr("providerId"))
 		}
 		if !validRuntimePath(model.RuntimePath) {
-			addError("invalid_runtime_path", fmt.Sprintf("models[%d].runtimePath", i), "runtimePath must be an absolute normalized path")
+			addError("invalid_runtime_path", fmt.Sprintf("models[%d].runtimePath", i), "runtimePath must be an absolute normalized path", &kindModel, ptrStr(model.ModelId), ptrStr("runtimePath"))
 		}
 		for j, c := range model.Capabilities {
 			if !c.Valid() {
-				addError("invalid_capability", fmt.Sprintf("models[%d].capabilities[%d]", i, j), "unsupported model capability")
+				addError("invalid_capability", fmt.Sprintf("models[%d].capabilities[%d]", i, j), "unsupported model capability", &kindModel, ptrStr(model.ModelId), ptrStr("capabilities"))
 			}
 		}
 		for j, m := range model.InputModalities {
 			if !m.Valid() {
-				addError("invalid_input_modality", fmt.Sprintf("models[%d].inputModalities[%d]", i, j), "unsupported input modality")
+				addError("invalid_input_modality", fmt.Sprintf("models[%d].inputModalities[%d]", i, j), "unsupported input modality", &kindModel, ptrStr(model.ModelId), ptrStr("inputModalities"))
 			}
 		}
 		for j, m := range model.OutputModalities {
 			if !m.Valid() {
-				addError("invalid_output_modality", fmt.Sprintf("models[%d].outputModalities[%d]", i, j), "unsupported output modality")
+				addError("invalid_output_modality", fmt.Sprintf("models[%d].outputModalities[%d]", i, j), "unsupported output modality", &kindModel, ptrStr(model.ModelId), ptrStr("outputModalities"))
 			}
 		}
 	}
 	for i, value := range content.Tts {
 		resources[value.TtsId] = value.Enabled
+		if !value.ClientProtocol.Valid() {
+			addError("invalid_client_protocol", fmt.Sprintf("tts[%d].clientProtocol", i), "unsupported TTS client protocol", &kindTTS, ptrStr(value.TtsId), ptrStr("clientProtocol"))
+		}
+		if strings.TrimSpace(value.UpstreamModelKey) == "" {
+			addError("missing_tts_model_key", fmt.Sprintf("tts[%d].upstreamModelKey", i), "TTS requires a non-empty upstreamModelKey", &kindTTS, ptrStr(value.TtsId), ptrStr("upstreamModelKey"))
+		}
 		if value.Enabled && strings.TrimSpace(value.Voice) == "" {
-			addError("missing_tts_voice", fmt.Sprintf("tts[%d].voice", i), "enabled TTS requires a non-empty voice")
+			addError("missing_tts_voice", fmt.Sprintf("tts[%d].voice", i), "enabled TTS requires a non-empty voice", &kindTTS, ptrStr(value.TtsId), ptrStr("voice"))
 		}
 		if !validRuntimePath(value.RuntimePath) {
-			addError("invalid_runtime_path", fmt.Sprintf("tts[%d].runtimePath", i), "runtimePath must be an absolute normalized path")
+			addError("invalid_runtime_path", fmt.Sprintf("tts[%d].runtimePath", i), "runtimePath must be an absolute normalized path", &kindTTS, ptrStr(value.TtsId), ptrStr("runtimePath"))
 		}
 	}
 	for i, value := range content.Asr {
 		resources[value.AsrId] = value.Enabled
 		if !value.ClientProtocol.Valid() {
-			addError("invalid_client_protocol", fmt.Sprintf("asr[%d].clientProtocol", i), "unsupported ASR client protocol")
+			addError("invalid_client_protocol", fmt.Sprintf("asr[%d].clientProtocol", i), "unsupported ASR client protocol", &kindASR, ptrStr(value.AsrId), ptrStr("clientProtocol"))
+		}
+		if strings.TrimSpace(value.UpstreamModelKey) == "" {
+			addError("missing_asr_model_key", fmt.Sprintf("asr[%d].upstreamModelKey", i), "ASR requires a non-empty upstreamModelKey", &kindASR, ptrStr(value.AsrId), ptrStr("upstreamModelKey"))
 		}
 		if !validRuntimePath(value.RuntimePath) {
-			addError("invalid_runtime_path", fmt.Sprintf("asr[%d].runtimePath", i), "runtimePath must be an absolute normalized path")
+			addError("invalid_runtime_path", fmt.Sprintf("asr[%d].runtimePath", i), "runtimePath must be an absolute normalized path", &kindASR, ptrStr(value.AsrId), ptrStr("runtimePath"))
 		}
 	}
 	for i, value := range content.Mcp {
 		resources[value.McpServerId] = value.Enabled
 		if !value.ClientProtocol.Valid() {
-			addError("invalid_client_protocol", fmt.Sprintf("mcp[%d].clientProtocol", i), "unsupported MCP client protocol")
+			addError("invalid_client_protocol", fmt.Sprintf("mcp[%d].clientProtocol", i), "unsupported MCP client protocol", &kindMCP, ptrStr(value.McpServerId), ptrStr("clientProtocol"))
 		}
 		if !value.AuthOwnership.Valid() {
-			addError("invalid_mcp_auth_ownership", fmt.Sprintf("mcp[%d].authOwnership", i), "MCP authOwnership must be ENTERPRISE_MANAGED or NONE")
+			addError("invalid_mcp_auth_ownership", fmt.Sprintf("mcp[%d].authOwnership", i), "MCP authOwnership must be ENTERPRISE_MANAGED or NONE", &kindMCP, ptrStr(value.McpServerId), ptrStr("authOwnership"))
 		}
 		if !validRuntimePath(value.RuntimePath) {
-			addError("invalid_runtime_path", fmt.Sprintf("mcp[%d].runtimePath", i), "runtimePath must be an absolute normalized path")
+			addError("invalid_runtime_path", fmt.Sprintf("mcp[%d].runtimePath", i), "runtimePath must be an absolute normalized path", &kindMCP, ptrStr(value.McpServerId), ptrStr("runtimePath"))
 		}
 	}
 
@@ -577,69 +608,69 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	for i, binding := range content.Bindings {
 		path := fmt.Sprintf("bindings[%d]", i)
 		if _, ok := resources[binding.ResourceId]; !ok {
-			addError("missing_resource", path+".resourceId", "binding references an unknown runtime resource")
+			addError("missing_resource", path+".resourceId", "binding references an unknown runtime resource", &kindBinding, ptrStr(binding.ResourceId), ptrStr("resourceId"))
 		} else if bound[binding.ResourceId] {
-			addError("duplicate_binding", path+".resourceId", "resource has more than one runtime binding")
+			addError("duplicate_binding", path+".resourceId", "resource has more than one runtime binding", &kindBinding, ptrStr(binding.ResourceId), ptrStr("resourceId"))
 		} else {
 			bound[binding.ResourceId] = true
 		}
 		if !binding.TransportPolicy.Valid() {
-			addError("invalid_transport_policy", path+".transportPolicy", "unsupported transport policy")
+			addError("invalid_transport_policy", path+".transportPolicy", "unsupported transport policy", &kindBinding, ptrStr(binding.ResourceId), ptrStr("transportPolicy"))
 		}
 		if len(binding.AllowedMethods) == 0 {
-			addError("missing_method_policy", path+".allowedMethods", "at least one HTTP method is required")
+			addError("missing_method_policy", path+".allowedMethods", "at least one HTTP method is required", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedMethods"))
 		}
 		for _, method := range binding.AllowedMethods {
 			if !validMethod(method) {
-				addError("invalid_method", path+".allowedMethods", "method policy contains an unsupported method")
+				addError("invalid_method", path+".allowedMethods", "method policy contains an unsupported method", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedMethods"))
 			}
 		}
 		if len(binding.AllowedPathPrefixes) == 0 {
-			addError("missing_path_policy", path+".allowedPathPrefixes", "at least one path prefix is required")
+			addError("missing_path_policy", path+".allowedPathPrefixes", "at least one path prefix is required", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedPathPrefixes"))
 		}
 		for _, prefix := range binding.AllowedPathPrefixes {
 			if !validRuntimePath(prefix) {
-				addError("invalid_path_prefix", path+".allowedPathPrefixes", "path prefix must be normalized and absolute")
+				addError("invalid_path_prefix", path+".allowedPathPrefixes", "path prefix must be normalized and absolute", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedPathPrefixes"))
 			}
 		}
 		row, err := s.Client.Upstream.Get(ctx, binding.UpstreamId)
 		if ent.IsNotFound(err) {
-			addError("missing_upstream", path+".upstreamId", "binding references an unknown upstream")
+			addError("missing_upstream", path+".upstreamId", "binding references an unknown upstream", &kindBinding, ptrStr(binding.ResourceId), ptrStr("upstreamId"))
 			continue
 		}
 		if err != nil {
-			addError("upstream_lookup_failed", path+".upstreamId", err.Error())
+			addError("upstream_lookup_failed", path+".upstreamId", err.Error(), &kindBinding, ptrStr(binding.ResourceId), ptrStr("upstreamId"))
 			continue
 		}
 		if row.Status == "DISABLED" {
-			addError("upstream_disabled", path+".upstreamId", "binding references a disabled upstream")
+			addError("upstream_disabled", path+".upstreamId", "binding references a disabled upstream", &kindBinding, ptrStr(binding.ResourceId), ptrStr("upstreamId"))
 		}
 		if row.Status == "INACTIVE" {
-			addWarning("upstream_not_active", path+".upstreamId", "upstream has not yet been applied to Runtime Relay")
+			addWarning("upstream_not_active", path+".upstreamId", "upstream has not yet been applied to Runtime Relay", &kindBinding, ptrStr(binding.ResourceId), ptrStr("upstreamId"))
 		}
 		config, err := upstream.LoadCandidateConfig(ctx, s.Client, row.ID)
 		if err != nil || upstream.ValidateConfig(ctx, s.Client, config) != nil {
-			addError("invalid_upstream_config", path+".upstreamId", "upstream candidate config or SecretRef is invalid")
+			addError("invalid_upstream_config", path+".upstreamId", "upstream candidate config or SecretRef is invalid", &kindBinding, ptrStr(binding.ResourceId), ptrStr("upstreamId"))
 		}
 	}
 	for resourceID, enabled := range resources {
 		if enabled && !bound[resourceID] {
-			addError("missing_binding", "bindings", "enabled resource has no runtime binding")
+			addError("missing_binding", "bindings", "enabled resource has no runtime binding", nil, ptrStr(resourceID), nil)
 		}
 	}
 	if content.Policy.DefaultModelId != nil {
 		if _, ok := resources[*content.Policy.DefaultModelId]; !ok {
-			addError("invalid_default_model", "policy.defaultModelId", "default model is not defined")
+			addError("invalid_default_model", "policy.defaultModelId", "default model is not defined", &kindPolicy, content.Policy.DefaultModelId, ptrStr("defaultModelId"))
 		}
 	}
 	if content.Policy.DefaultTtsId != nil {
 		if _, ok := resources[*content.Policy.DefaultTtsId]; !ok {
-			addError("invalid_default_tts", "policy.defaultTtsId", "default TTS is not defined")
+			addError("invalid_default_tts", "policy.defaultTtsId", "default TTS is not defined", &kindPolicy, content.Policy.DefaultTtsId, ptrStr("defaultTtsId"))
 		}
 	}
 	if content.Policy.DefaultAsrId != nil {
 		if _, ok := resources[*content.Policy.DefaultAsrId]; !ok {
-			addError("invalid_default_asr", "policy.defaultAsrId", "default ASR is not defined")
+			addError("invalid_default_asr", "policy.defaultAsrId", "default ASR is not defined", &kindPolicy, content.Policy.DefaultAsrId, ptrStr("defaultAsrId"))
 		}
 	}
 	sort.Slice(result.Errors, func(i, j int) bool {

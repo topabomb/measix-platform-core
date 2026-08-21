@@ -121,7 +121,7 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 	}
 
 	// TTS binary (CAP-C4-010/011)
-	ttsBody, ct, err := c.Speech(ctx, ttsID, "/v1/audio/speech", `{"input":"hi","voice":"alloy"}`)
+	ttsBody, ct, err := c.Speech(ctx, ttsID, "/v1/audio/speech", `{"model":"tts-1","input":"hi","voice":"alloy"}`)
 	if err != nil {
 		t.Fatalf("speech: %v", err)
 	}

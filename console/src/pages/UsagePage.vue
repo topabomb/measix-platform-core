@@ -71,26 +71,10 @@ const semanticMeterKeys = computed(() => {
 
 const semanticMeters = computed(() => summary.value?.semanticMeters ?? [])
 
-/** Group semantic meters by resource kind for display. */
-const semanticMetersByKind = computed(() => {
-  const groups: { kind: string; color: string; meters: typeof semanticMeters.value }[] = []
-  const kindMap = new Map<string, { kind: string; color: string; meters: typeof semanticMeters.value }>()
-  for (const m of semanticMeters.value) {
-    let kind = 'OTHER'
-    let color = 'grey'
-    if (m.meter.includes('TOKEN') || m.meter.includes('CACHED')) { kind = 'MODEL'; color = 'primary' }
-    else if (m.meter === 'CHARACTERS' || m.meter.includes('TTS')) { kind = 'TTS'; color = 'teal' }
-    else if (m.meter.includes('AUDIO') && !m.meter.includes('TTS')) { kind = 'ASR'; color = 'indigo' }
-    else if (m.meter === 'REQUESTS' || m.meter.includes('MCP')) { kind = 'MCP'; color = 'deep-purple' }
-    let group = kindMap.get(kind)
-    if (!group) {
-      group = { kind, color, meters: [] }
-      kindMap.set(kind, group)
-      groups.push(group)
-    }
-    group.meters.push(m)
-  }
-  return groups
+/** Display semantic meters as a flat list — do NOT guess resource kind from meter strings.
+ *  Users can filter by resourceKind using the API filter which uses real resource attribution. */
+const semanticMetersDisplay = computed(() => {
+  return semanticMeters.value
 })
 
 const blockedCount = computed(() => {
@@ -290,17 +274,14 @@ onMounted(refresh)
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
-              <div class="text-caption text-grey-7">{{ $t('usage.semanticMetersByKind') }}</div>
-              <template v-for="group in semanticMetersByKind" :key="group.kind">
-                <div class="q-mt-sm">
-                  <q-chip dense :color="group.color" text-color="white" :label="group.kind" />
-                  <q-chip v-for="m in group.meters" :key="m.meter" dense :color="meterColor(m.meter)" text-color="white" size="sm">
-                    {{ m.meter }}: {{ m.quantity }}
-                    <q-badge v-if="m.confidence === 'UNKNOWN'" color="grey" label="?" class="q-ml-xs" />
-                    <q-badge v-else-if="m.confidence === 'PARTIAL'" color="amber" label="~" class="q-ml-xs" />
-                  </q-chip>
-                </div>
-              </template>
+              <div class="text-caption text-grey-7">{{ $t('usage.semanticMeters') }}</div>
+              <div class="q-mt-sm">
+                <q-chip v-for="m in semanticMetersDisplay" :key="m.meter" dense :color="meterColor(m.meter)" text-color="white" size="sm">
+                  {{ m.meter }}: {{ m.quantity }}
+                  <q-badge v-if="m.confidence === 'UNKNOWN'" color="grey" label="?" class="q-ml-xs" />
+                  <q-badge v-else-if="m.confidence === 'PARTIAL'" color="amber" label="~" class="q-ml-xs" />
+                </q-chip>
+              </div>
               <div v-if="!semanticMeters.length" class="text-body2 text-grey-7">{{ $t('common.none') }}</div>
               <div class="text-caption text-grey-7 q-mt-xs">{{ $t('usage.unknownMetersHint') }}</div>
             </q-card-section>
@@ -350,7 +331,7 @@ onMounted(refresh)
 
     <!-- Request Detail (Usage Admin UX §14): never shows prompt/body/Secret. -->
     <q-dialog v-model="detailOpen">
-      <q-card style="min-width: 640px; max-width: 95vw">
+      <q-card class="responsive-modal" style="max-width: 95vw">
         <q-card-section>
           <div class="text-h6">{{ $t('usage.detail.title') }}</div>
           <div class="text-caption text-grey-7">{{ selectedRequest?.requestId }}</div>

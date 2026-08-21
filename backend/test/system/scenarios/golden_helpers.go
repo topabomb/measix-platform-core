@@ -527,18 +527,20 @@ func (g *goldenPathTest) getSnapshotResourceIDs(ctx context.Context, hubBaseURL,
 			result.mcp = m["mcpServerId"].(string)
 		}
 	}
-	// Verify snapshot IDs match expected (they should be the same)
+	// Verify snapshot has no server-only fields
+	// NO FALLBACK: if snapshot is missing resource IDs, the test MUST fail.
+	// This proves resource IDs truly originate from the Snapshot, not from test expectations.
 	if result.model == "" {
-		result.model = expectedModel
+		g.t.Fatalf("snapshot missing model resource ID — resource IDs must originate from Snapshot")
 	}
 	if result.tts == "" {
-		result.tts = expectedTTS
+		g.t.Fatalf("snapshot missing tts resource ID — resource IDs must originate from Snapshot")
 	}
 	if result.asr == "" {
-		result.asr = expectedASR
+		g.t.Fatalf("snapshot missing asr resource ID — resource IDs must originate from Snapshot")
 	}
 	if result.mcp == "" {
-		result.mcp = expectedMCP
+		g.t.Fatalf("snapshot missing mcp resource ID — resource IDs must originate from Snapshot")
 	}
 	// Verify snapshot has no server-only fields
 	raw, _ := json.Marshal(snap)
@@ -585,8 +587,8 @@ func runAllFourProfiles(ctx context.Context, tc *client.Client, ids snapshotReso
 	if chunks < 2 {
 		return fmt.Errorf("expected >=2 stream chunks, got %d", chunks)
 	}
-	// TTS binary
-	ttsBody, ct, err := tc.Speech(ctx, ids.tts, "/v1/audio/speech", `{"input":"hi","voice":"alloy"}`)
+	// TTS binary — body must include model + input + voice per architecture required profile
+	ttsBody, ct, err := tc.Speech(ctx, ids.tts, "/v1/audio/speech", `{"model":"tts-test","input":"hi","voice":"alloy"}`)
 	if err != nil {
 		return fmt.Errorf("tts: %w", err)
 	}

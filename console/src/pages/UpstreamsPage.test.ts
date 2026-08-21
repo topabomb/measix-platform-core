@@ -95,26 +95,43 @@ describe('UpstreamsPage', () => {
     expect(providerKindSelect).toBeUndefined()
   })
 
-  it('can create a secret inline and auto-fills the auth secret reference', async () => {
+  it('can create a secret inline within the create-upstream dialog and auto-binds it', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path === '/api/admin/v1/secrets' && init?.method === 'POST') {
         return { secretId: 'sec_created', name: 'My Key', secretVersion: 1 }
       }
-      return { items: [], nextCursor: undefined }
+      if (path.startsWith('/api/admin/v1/upstreams')) return { items: [], nextCursor: undefined }
+      return {}
     })
 
     const { wrapper, pinia } = mountUpstreamsPage()
     setupSession(pinia)
     await flushPromises()
 
-    // Open the create-secret helper dialog.
+    // Open the create-upstream dialog first.
     const btns = wrapper.findAllComponents(QBtn)
-    const secretBtn = btns.find((b) => String(b.props('label') ?? '').includes('Create secret'))
-    expect(secretBtn).toBeTruthy()
-    await secretBtn!.trigger('click')
+    const createUpstreamBtn = btns.find((b) => String(b.props('label') ?? '').includes('Create upstream'))
+    expect(createUpstreamBtn).toBeTruthy()
+    await createUpstreamBtn!.trigger('click')
     await flushPromises()
 
+    // Switch auth to BEARER so the Secret picker becomes visible.
+    const authSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label') ?? '').includes('Auth'))
+    expect(authSelect).toBeTruthy()
+    await authSelect!.setValue('BEARER')
+    await flushPromises()
+
+    // The "No secret bound" banner shows a "Create secret" button.
+    const bannerBtns = wrapper.findAllComponents(QBtn)
+    const inlineCreateSecretBtn = bannerBtns.find((b) =>
+      String(b.props('label') ?? '') === 'Create secret' && b.props('icon') === 'add_circle',
+    )
+    expect(inlineCreateSecretBtn).toBeTruthy()
+    await inlineCreateSecretBtn!.trigger('click')
+    await flushPromises()
+
+    // Fill the secret dialog.
     const inputs = wrapper.findAllComponents(QInput)
     const nameInput = inputs.find((i) => (i.props('label') ?? '') === 'Secret name')
     const valueInput = inputs.find((i) => (i.props('label') ?? '') === 'Secret value')
@@ -124,9 +141,8 @@ describe('UpstreamsPage', () => {
     await valueInput!.setValue('sk-super-secret')
     await flushPromises()
 
+    // Submit the secret creation.
     const dialogBtns = wrapper.findAllComponents(QBtn)
-    // The dialog's submit button is rendered after the header button with the
-    // same label; pick the last match to target the dialog action.
     const createSecretBtns = dialogBtns.filter((b) => String(b.props('label') ?? '') === 'Create secret')
     expect(createSecretBtns.length).toBeGreaterThanOrEqual(2)
     await createSecretBtns[createSecretBtns.length - 1]!.trigger('click')
@@ -137,22 +153,12 @@ describe('UpstreamsPage', () => {
     const secretBody = JSON.parse((secretCall![1] as RequestInit).body as string)
     expect(secretBody).toEqual({ name: 'My Key', value: 'sk-super-secret' })
 
-    // The created secret reference is applied to the create-upstream auth
-    // section: open create-upstream, switch auth to BEARER, and the Secret ID
-    // field is pre-filled.
-    const allBtns = wrapper.findAllComponents(QBtn)
-    const createUpstreamBtn = allBtns.find((b) => String(b.props('label') ?? '').includes('Create upstream'))
-    await createUpstreamBtn!.trigger('click')
-    await flushPromises()
-
-    const authSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label') ?? '').includes('Auth'))
-    expect(authSelect).toBeTruthy()
-    await authSelect!.setValue('BEARER')
-    await flushPromises()
-
-    const secretIdInput = wrapper.findAllComponents(QInput).find((i) => String(i.props('label') ?? '').includes('Secret reference') || String(i.props('label') ?? '').includes('Secret ID'))
-    expect(secretIdInput).toBeTruthy()
-    expect(secretIdInput!.props('modelValue')).toBe('sec_created')
+    // The created secret is now bound in the create-upstream form.
+    // The UI shows the secret name (not the raw sec_* ID) and a "Secret bound" label.
+    // Dialogs are teleported to document.body, so check body.innerHTML.
+    const body = document.body.innerHTML
+    expect(body).toContain('My Key')
+    expect(body).toContain('Secret bound')
   })
 
   it('create upstream submits UpstreamConfig with all required fields, not providerKind', async () => {

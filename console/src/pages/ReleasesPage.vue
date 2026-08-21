@@ -112,7 +112,7 @@ onMounted(refresh)
     </q-card>
 
     <q-dialog v-model="detailOpen">
-      <q-card v-if="detailRelease" style="min-width: 480px; max-width: 640px">
+      <q-card v-if="detailRelease" class="responsive-modal" style="max-width: 95vw">
         <q-card-section class="row items-center justify-between">
           <div>
             <div class="text-h6">{{ $t('releases.generation') }} {{ detailRelease.managedGeneration }}</div>

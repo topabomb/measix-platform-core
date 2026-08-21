@@ -368,7 +368,7 @@ export default {
       bindingsRemoved: 'Bindings removed',
       warningsAck: 'Warnings (acknowledged on publish)',
       blockingErrors: '{count} blocking error(s) — cannot publish.',
-      snapshotHash: 'Snapshot hash',
+      projectionHash: 'Projection hash',
     },
     publish: {
       progress: {
@@ -453,6 +453,8 @@ export default {
     unreachable: 'Unreachable',
     verifiedCapabilities: 'Verified capabilities',
     warnings: 'Warnings',
+    secretBound: 'Secret bound (version {version})',
+    noSecretBound: 'No secret bound — create one to enable authentication.',
     secretCreateHint: 'Store an opaque credential in the Hub. Secret values are write-only and are never returned by the Admin API.',
     secretReplaceHint: 'Replacing a secret creates a new immutable version. The active runtime is unchanged until you Apply the upstream candidate with the new version.',
     newValue: 'new value',
@@ -529,7 +531,7 @@ export default {
     bytes: 'Bytes',
     responseBytes: 'resp',
     blockedHint: 'not forwarded (denied/admission)',
-    semanticMetersByKind: 'Semantic meters by kind',
+    semanticMeters: 'Semantic meters',
     unknownMetersHint: 'UNKNOWN meters are not shown as 0.',
     noRequests: 'No usage requests recorded.',
     range24h: 'Last 24 hours',

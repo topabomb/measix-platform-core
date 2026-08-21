@@ -351,6 +351,7 @@ components:
       - ttsId
       - displayName
       - clientProtocol
+      - upstreamModelKey
       - runtimePath
       - voice
       - enabled
@@ -365,6 +366,7 @@ components:
           - OPENAI_AUDIO_SPEECH
         upstreamModelKey:
           type: string
+          minLength: 1
         voice:
           type: string
           minLength: 1
@@ -380,6 +382,7 @@ components:
       - asrId
       - displayName
       - clientProtocol
+      - upstreamModelKey
       - runtimePath
       - enabled
       properties:
@@ -393,6 +396,7 @@ components:
           - OPENAI_AUDIO_TRANSCRIPTIONS
         upstreamModelKey:
           type: string
+          minLength: 1
         language:
           type: string
         runtimePath:

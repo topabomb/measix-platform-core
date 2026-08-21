@@ -1,7 +1,7 @@
 # S0.1 Resource Baseline Report
 
 > **Checkpoint**: C6 / C7  
-> **Status**: NOT GREEN — Baseline metrics below are estimated, not measured by executable evidence.  
+> **Status**: NOT GREEN — No baseline metrics have been measured by executable evidence. All values below are `NOT MEASURED`.  
 > **Date**: 2026-08-20  
 > **Architecture baseline**: `topabomb/measix-architecture@6eda9eb9bb842b4cbd3fa36f78e6c481ed35c55b`
 
@@ -27,96 +27,92 @@ platform core to:
 
 ## 3. Baseline Metrics
 
-> **WARNING**: The following metrics are approximate estimates based on
-> development observation, NOT produced by executable benchmark evidence.
-> The `baseline_test.go` test only measures operation latency; it does not
-> collect RSS/CPU/goroutine/memory metrics. These values must not be cited
-> as S0.1 Gate evidence.
+> All metrics below are NOT MEASURED. Estimated values have been removed
+> because they have no engineering value and risk being cited as baseline
+> evidence. Each metric must be produced by an executable test before it
+> can appear in this report.
 
 ### 3.1 Hub Idle Resource Consumption
 
-| Metric | Value (estimated) | Measured? | Notes |
-|---|---|---|---|
-| RSS memory (idle) | ~25 MB | NO | Not measured by executable test |
-| Goroutines (idle) | ~15 | NO | Not measured by executable test |
-| SQLite file size (empty) | ~32 KB | NO | Not measured by executable test |
-| Hub CPU (idle) | <0.1% | NO | Not measured by executable test |
+| Metric | Value | Measured? |
+|---|---|---|
+| RSS memory (idle) | NOT MEASURED | NO |
+| Goroutines (idle) | NOT MEASURED | NO |
+| SQLite file size (empty) | NOT MEASURED | NO |
+| Hub CPU (idle) | NOT MEASURED | NO |
 
 ### 3.2 Relay Idle Resource Consumption
 
-| Metric | Value (estimated) | Measured? | Notes |
-|---|---|---|---|
-| RSS memory (idle) | ~15 MB | NO | Not measured by executable test |
-| Goroutines (idle) | ~10 | NO | Not measured by executable test |
-| Relay spool DB size (empty) | ~8 KB | NO | Not measured by executable test |
+| Metric | Value | Measured? |
+|---|---|---|
+| RSS memory (idle) | NOT MEASURED | NO |
+| Goroutines (idle) | NOT MEASURED | NO |
+| Relay spool DB size (empty) | NOT MEASURED | NO |
 
 ### 3.3 Admin API Latency
 
-| Endpoint | Method | P50 (estimated) | P99 (estimated) | Measured? |
+| Endpoint | Method | P50 | P99 | Measured? |
 |---|---|---|---|---|
-| `/api/admin/v1/session/login` | POST | ~5ms | ~15ms | YES (baseline_test.go) |
-| `/api/admin/v1/users` (list) | GET | ~2ms | ~5ms | NO |
-| `/api/admin/v1/users` (create) | POST | ~3ms | ~8ms | YES (baseline_test.go) |
-| `/api/admin/v1/secrets` (create) | POST | ~2ms | ~5ms | NO |
-| `/api/admin/v1/upstreams` (create) | POST | ~2ms | ~5ms | YES (baseline_test.go) |
-| `/api/admin/v1/upstreams/:id:test` | POST | ~50ms | ~200ms | NO |
-| `/api/admin/v1/upstreams/:id:apply` | POST | ~5ms | ~15ms | YES (baseline_test.go) |
-| `/api/admin/v1/draft` (get) | GET | ~2ms | ~5ms | YES (baseline_test.go) |
-| `/api/admin/v1/draft` (put) | PUT | ~3ms | ~8ms | YES (baseline_test.go) |
-| `/api/admin/v1/draft:validate` | POST | ~5ms | ~15ms | YES (baseline_test.go) |
-| `/api/admin/v1/draft:preview` | POST | ~5ms | ~15ms | NO |
-| `/api/admin/v1/draft:publish` | POST | ~10ms | ~50ms | YES (baseline_test.go) |
-| `/api/admin/v1/usage/summary` | GET | ~3ms | ~10ms | NO |
+| `/api/admin/v1/session/login` | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/users` (list) | GET | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/users` (create) | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/secrets` (create) | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/upstreams` (create) | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/upstreams/:id:test` | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/upstreams/:id:apply` | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/draft` (get) | GET | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/draft` (put) | PUT | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/draft:validate` | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/draft:preview` | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/draft:publish` | POST | NOT MEASURED | NOT MEASURED | NO |
+| `/api/admin/v1/usage/summary` | GET | NOT MEASURED | NOT MEASURED | NO |
 
 ### 3.4 Runtime Relay Overhead
 
-| Metric | Value (estimated) | Measured? | Notes |
-|---|---|---|---|
-| Relay overhead (request/response) | ~1-2ms | NO | Not measured |
-| Relay overhead (streaming SSE) | ~1ms per chunk | NO | Not measured |
-| Relay overhead (binary TTS) | ~1ms | NO | Not measured |
-| Relay overhead (multipart ASR) | ~2ms | NO | Not measured |
+| Metric | Value | Measured? |
+|---|---|---|
+| Relay overhead (request/response) | NOT MEASURED | NO |
+| Relay overhead (streaming SSE) | NOT MEASURED | NO |
+| Relay overhead (binary TTS) | NOT MEASURED | NO |
+| Relay overhead (multipart ASR) | NOT MEASURED | NO |
 
 ### 3.5 Streaming Memory
 
-| Metric | Value (estimated) | Measured? | Notes |
-|---|---|---|---|
-| Peak RSS during SSE stream | ~28 MB | NO | Not measured |
-| Memory per active stream | ~1-2 MB | NO | Not measured |
-| Max concurrent streams tested | 1 | YES | S0.1 scope |
+| Metric | Value | Measured? |
+|---|---|---|
+| Peak RSS during SSE stream | NOT MEASURED | NO |
+| Memory per active stream | NOT MEASURED | NO |
+| Max concurrent streams tested | 1 | YES (S0.1 scope) |
 
 ### 3.6 SQLite Growth
 
-| Operation | DB Growth (estimated) | Measured? | Notes |
-|---|---|---|---|
-| Create user | ~1 KB | NO | Not measured |
-| Create enrollment | ~0.5 KB | NO | Not measured |
-| Create secret | ~0.5 KB | NO | Not measured |
-| Create upstream | ~1 KB | NO | Not measured |
-| Apply upstream | ~1 KB | NO | Not measured |
-| Save draft | ~2-5 KB | NO | Not measured |
-| Publish | ~1-2 KB | NO | Not measured |
-| Runtime request (per) | ~0.5-1 KB | NO | Not measured |
+| Operation | DB Growth | Measured? |
+|---|---|---|
+| Create user | NOT MEASURED | NO |
+| Create enrollment | NOT MEASURED | NO |
+| Create secret | NOT MEASURED | NO |
+| Create upstream | NOT MEASURED | NO |
+| Apply upstream | NOT MEASURED | NO |
+| Save draft | NOT MEASURED | NO |
+| Publish | NOT MEASURED | NO |
+| Runtime request (per) | NOT MEASURED | NO |
 
 ### 3.7 Convergence Latency
 
-| Scenario | Convergence Time (estimated) | Measured? | Notes |
-|---|---|---|---|
-| Initial publish → Relay ready | ~3-5s | YES (baseline_test.go) | |
-| Relay restart → ready | ~3-5s | NO | |
-| Hub restart → converged | ~3-5s | NO | |
-| Generation N → N+1 | ~5-8s | NO | |
+| Scenario | Convergence Time | Measured? |
+|---|---|---|
+| Initial publish → Relay ready | NOT MEASURED | NO |
+| Relay restart → ready | NOT MEASURED | NO |
+| Hub restart → converged | NOT MEASURED | NO |
+| Generation N → N+1 | NOT MEASURED | NO |
 
 ## 4. Baseline Test
 
 A baseline resource test is implemented as a Go test in
-`backend/test/system/scenarios/baseline_test.go`. It measures:
-
-- Admin login latency
-- Admin CRUD operation latency
-- Publish + activation latency
-- Runtime request latency through Relay
-- Convergence latency
+`backend/test/system/scenarios/baseline_test.go`. It currently measures
+operation latency only (login, CRUD, publish, convergence). It does NOT
+collect the RSS/CPU/goroutine/memory metrics required by the architecture
+Resource Baseline spec (§17).
 
 The test can be run with:
 ```bash
@@ -141,9 +137,9 @@ The S0.1 platform baseline is NOT GREEN because:
 
 - [ ] Hub idle RSS — NOT MEASURED by executable test
 - [ ] Relay idle RSS — NOT MEASURED by executable test
-- [ ] Admin API P99 — partially measured (login/CRUD/publish only)
+- [ ] Admin API P99 — NOT MEASURED by executable test
 - [ ] Relay overhead — NOT MEASURED by executable test
-- [ ] Convergence — partially measured (initial publish only)
+- [ ] Convergence — NOT MEASURED by executable test
 - [ ] SQLite growth — NOT MEASURED by executable test
 - [ ] Concurrent streaming memory — NOT MEASURED
 - [ ] Cancel release time — NOT MEASURED

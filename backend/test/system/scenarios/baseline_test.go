@@ -173,7 +173,7 @@ func TestBaseline(t *testing.T) {
 
 	// Measure TTS latency
 	ttsStart := time.Now()
-	_, _, err = tc.Speech(ctx, ids.tts, "/v1/audio/speech", `{"input":"hi","voice":"alloy"}`)
+	_, _, err = tc.Speech(ctx, ids.tts, "/v1/audio/speech", `{"model":"tts-test","input":"hi","voice":"alloy"}`)
 	if err != nil {
 		t.Fatalf("tts: %v", err)
 	}

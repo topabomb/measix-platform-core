@@ -980,8 +980,8 @@ func TestCAPSEC016ExpiredAndWrongClaimJWTRejected(t *testing.T) {
 	forge := func(modify func(claims *accessClaimsForTest)) string {
 		claims := &accessClaimsForTest{
 			DeploymentID: deploymentID,
-			DeviceID:      deviceID,
-			SessionID:     sessionID,
+			DeviceID:     deviceID,
+			SessionID:    sessionID,
 			RegisteredClaims: jwt.RegisteredClaims{
 				Issuer:    deploymentID,
 				Subject:   userID,
@@ -1002,8 +1002,8 @@ func TestCAPSEC016ExpiredAndWrongClaimJWTRejected(t *testing.T) {
 
 	// Generate properly-signed JWTs with specific claim errors.
 	invalidTokens := map[string]string{
-		"expired":     forge(func(c *accessClaimsForTest) { c.ExpiresAt = jwt.NewNumericDate(now.Add(-1 * time.Minute)) }),
-		"wrong-aud":   forge(func(c *accessClaimsForTest) { c.Audience = jwt.ClaimStrings{"wrong-audience"} }),
+		"expired":   forge(func(c *accessClaimsForTest) { c.ExpiresAt = jwt.NewNumericDate(now.Add(-1 * time.Minute)) }),
+		"wrong-aud": forge(func(c *accessClaimsForTest) { c.Audience = jwt.ClaimStrings{"wrong-audience"} }),
 		"wrong-issuer": forge(func(c *accessClaimsForTest) {
 			c.Issuer = "wrong-issuer"
 			c.DeploymentID = "wrong-issuer"

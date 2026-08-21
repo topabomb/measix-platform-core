@@ -1,0 +1,30 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 1,
+  "managedGeneration": 99,
+  "releaseId": "rel_invalid000-0000-4000-8000-000000000000",
+  "providers": [],
+  "models": [],
+  "tts": [],
+  "asr": [
+    {
+      "asrId": "asr_invalid000-0000-4000-8000-000000000000",
+      "displayName": "Invalid ASR",
+      "clientProtocol": "OPENAI_AUDIO_TRANSCRIPTIONS",
+      "runtimePath": "/v1/audio/transcriptions",
+      "enabled": true
+    }
+  ],
+  "mcp": [],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": true,
+    "allowLocalTts": true,
+    "allowLocalAsr": true,
+    "allowLocalMcp": true
+  },
+  "metadata": {
+    "publishedAt": "2026-08-19T03:00:00Z"
+  },
+  "snapshotHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

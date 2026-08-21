@@ -41,10 +41,9 @@ func TestCAPC0004TTSVoiceRequired(t *testing.T) {
 	}
 	content := validDraft(up.UpstreamID)
 	ttsID := platformid.New(platformid.TTS)
-	ttsModelKey := "tts-1"
 	content.Tts = []adminapi.TtsDefinition{{
 		TtsId: ttsID, DisplayName: "Managed TTS", ClientProtocol: adminapi.OPENAIAUDIOSPEECH,
-		UpstreamModelKey: &ttsModelKey, RuntimePath: "/v1/audio/speech", Enabled: true,
+		UpstreamModelKey: "tts-1", RuntimePath: "/v1/audio/speech", Enabled: true,
 		// voice intentionally empty — must be a validation error per CAP-C0-004
 	}}
 	content.Bindings = append(content.Bindings, adminapi.RuntimeBindingDefinition{
@@ -131,5 +130,123 @@ func TestCAPC0006MCPAuthOwnershipValidation(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected an authOwnership validation error for MCP, got %+v", result.Errors)
+	}
+}
+
+// CAP-C0-007: enabled Managed TTS without upstreamModelKey must fail validation.
+func TestCAPC0007TTSUpstreamModelKeyRequired(t *testing.T) {
+	ctx := context.Background()
+	st, boot, now := bootstrapI2(t)
+	box, err := security.NewSecretBox(bytes.Repeat([]byte{0x42}, 32), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ups := upstream.NewService(st.Client, box)
+	ups.Now = func() time.Time { return now }
+	secret, err := ups.CreateSecret(ctx, boot.AdminUserID, "provider-token", "super-secret-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up, err := ups.CreateUpstream(ctx, boot.AdminUserID, testUpstreamConfig(secret.SecretID, secret.SecretVersion))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cap := capability.NewService(st.Client)
+	cap.Now = func() time.Time { return now }
+
+	draft, err := cap.GetDraft(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := validDraft(up.UpstreamID)
+	ttsID := platformid.New(platformid.TTS)
+	content.Tts = []adminapi.TtsDefinition{{
+		TtsId: ttsID, DisplayName: "Managed TTS", ClientProtocol: adminapi.OPENAIAUDIOSPEECH,
+		UpstreamModelKey: "", Voice: "alloy", RuntimePath: "/v1/audio/speech", Enabled: true,
+		// upstreamModelKey intentionally empty — must be a validation error per CAP-C0-007
+	}}
+	content.Bindings = append(content.Bindings, adminapi.RuntimeBindingDefinition{
+		RuntimeRouteId: platformid.New(platformid.Route), ResourceId: ttsID, UpstreamId: up.UpstreamID,
+		AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/audio/speech"}, TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE,
+	})
+	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid {
+		t.Fatalf("validation should fail for TTS without upstreamModelKey, result=%+v", result)
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Path, "tts") && strings.Contains(strings.ToLower(e.Code), "model_key") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected an upstreamModelKey validation error for TTS, got %+v", result.Errors)
+	}
+}
+
+// CAP-C0-008: enabled Managed ASR without upstreamModelKey must fail validation.
+func TestCAPC0008ASRUpstreamModelKeyRequired(t *testing.T) {
+	ctx := context.Background()
+	st, boot, now := bootstrapI2(t)
+	box, err := security.NewSecretBox(bytes.Repeat([]byte{0x42}, 32), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ups := upstream.NewService(st.Client, box)
+	ups.Now = func() time.Time { return now }
+	secret, err := ups.CreateSecret(ctx, boot.AdminUserID, "provider-token", "super-secret-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up, err := ups.CreateUpstream(ctx, boot.AdminUserID, testUpstreamConfig(secret.SecretID, secret.SecretVersion))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cap := capability.NewService(st.Client)
+	cap.Now = func() time.Time { return now }
+
+	draft, err := cap.GetDraft(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := validDraft(up.UpstreamID)
+	asrID := platformid.New(platformid.ASR)
+	content.Asr = []adminapi.AsrDefinition{{
+		AsrId: asrID, DisplayName: "Managed ASR", ClientProtocol: adminapi.AsrDefinitionClientProtocol("OPENAI_AUDIO_TRANSCRIPTIONS"),
+		UpstreamModelKey: "", RuntimePath: "/v1/audio/transcriptions", Enabled: true,
+		// upstreamModelKey intentionally empty — must be a validation error per CAP-C0-008
+	}}
+	content.Bindings = append(content.Bindings, adminapi.RuntimeBindingDefinition{
+		RuntimeRouteId: platformid.New(platformid.Route), ResourceId: asrID, UpstreamId: up.UpstreamID,
+		AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/audio/transcriptions"}, TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPMULTIPART,
+	})
+	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid {
+		t.Fatalf("validation should fail for ASR without upstreamModelKey, result=%+v", result)
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Path, "asr") && strings.Contains(strings.ToLower(e.Code), "model_key") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected an upstreamModelKey validation error for ASR, got %+v", result.Errors)
 	}
 }

@@ -146,7 +146,7 @@ onMounted(refresh)
     </q-card>
 
     <q-dialog v-model="createOpen">
-      <q-card style="min-width: 420px">
+      <q-card class="responsive-modal" style="max-width: 95vw">
         <q-card-section class="text-h6">{{ $t('users.createUser') }}</q-card-section>
         <q-card-section class="q-gutter-md">
           <q-input v-model="createForm.username" outlined :label="$t('users.username')" data-cy="user-form-username" />
@@ -174,7 +174,7 @@ onMounted(refresh)
     </q-dialog>
 
     <q-dialog v-model="enrollmentOpen" @hide="clearEnrollment">
-      <q-card v-if="enrollment" style="min-width: 440px"><q-card-section class="text-h6">{{ $t('users.enrollmentCode') }}</q-card-section><q-card-section>
+      <q-card v-if="enrollment" class="responsive-modal" style="max-width: 95vw"><q-card-section class="text-h6">{{ $t('users.enrollmentCode') }}</q-card-section><q-card-section>
         <q-banner class="bg-amber-1 q-mb-md rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
         <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')"><template #append><q-btn flat dense icon="content_copy" @click="navigator.clipboard.writeText(enrollment!.code)" /></template></q-input>
         <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ enrollment.expiresAt }}</div>

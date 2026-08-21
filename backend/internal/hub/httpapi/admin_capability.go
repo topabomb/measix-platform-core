@@ -92,14 +92,14 @@ func (h *fullAdminHandler) PreviewDraft(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	writeJSON(w, http.StatusOK, adminapi.DraftPreviewResponse{
-		DraftRevision: preview.DraftRevision,
-		SnapshotHash:  adminapi.Sha256Hash(preview.SnapshotHash),
-		Providers:     preview.Providers,
-		Models:        preview.Models,
-		Tts:           preview.TTS,
-		Asr:           preview.ASR,
-		Mcp:           preview.MCP,
-		Policy:        preview.Policy,
+		DraftRevision:  preview.DraftRevision,
+		ProjectionHash: adminapi.Sha256Hash(preview.ProjectionHash),
+		Providers:      preview.Providers,
+		Models:         preview.Models,
+		Tts:            preview.TTS,
+		Asr:            preview.ASR,
+		Mcp:            preview.MCP,
+		Policy:         preview.Policy,
 	})
 }
 

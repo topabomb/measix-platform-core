@@ -343,7 +343,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding>
+  <q-page padding data-cy="resources-page">
     <PageHeader :title="$t('nav.resources')" :subtitle="$t('resources.subtitle')">
       <template #primary>
         <q-btn color="positive" icon="rocket_launch" :label="$t('resources.draft.review')" :disable="!canMutate || draft.dirty" :loading="reviewing" @click="openReview" />
@@ -411,19 +411,19 @@ onMounted(refresh)
       <!-- Tabbed resource editors -->
       <q-tabs v-model="activeTab" class="q-mb-md" dense align="left">
         <q-tab name="overview" :label="$t('resources.overview.providers')" icon="account_tree" />
-        <q-tab name="models" :label="$t('resources.tabs.models')" icon="smart_toy">
+        <q-tab name="models" :label="$t('resources.tabs.models')" icon="smart_toy" data-cy="tab-models">
           <q-badge v-if="draft.localContent.models.length" color="primary" rounded floating :label="draft.localContent.models.length" />
         </q-tab>
-        <q-tab name="tts" :label="$t('resources.tabs.tts')" icon="record_voice_over">
+        <q-tab name="tts" :label="$t('resources.tabs.tts')" icon="record_voice_over" data-cy="tab-tts">
           <q-badge v-if="draft.localContent.tts.length" color="teal" rounded floating :label="draft.localContent.tts.length" />
         </q-tab>
-        <q-tab name="asr" :label="$t('resources.tabs.asr')" icon="hearing">
+        <q-tab name="asr" :label="$t('resources.tabs.asr')" icon="hearing" data-cy="tab-asr">
           <q-badge v-if="draft.localContent.asr.length" color="indigo" rounded floating :label="draft.localContent.asr.length" />
         </q-tab>
-        <q-tab name="mcp" :label="$t('resources.tabs.mcp')" icon="link">
+        <q-tab name="mcp" :label="$t('resources.tabs.mcp')" icon="link" data-cy="tab-mcp">
           <q-badge v-if="draft.localContent.mcp.length" color="deep-purple" rounded floating :label="draft.localContent.mcp.length" />
         </q-tab>
-        <q-tab name="policy" :label="$t('resources.tabs.policy')" icon="policy" />
+        <q-tab name="policy" :label="$t('resources.tabs.policy')" icon="policy" data-cy="tab-policy" />
       </q-tabs>
 
       <!-- ===== Overview: relationship view + providers ===== -->

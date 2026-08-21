@@ -21,7 +21,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 | C1 Upstream Operational | ✅ Green | Create/Test/Apply 与 typed UpstreamConfig 已存在；existing candidate edit、Secret replace（内联创建工作流，不暴露裸 sec_* ID）、save/discard/reset、409 conflict handling、candidate vs active revision 显示、refresh recovery 与 apply-failure candidate preservation 均已实现；modal 支持 320px 响应式 |
 | C2 Managed Resource Editor | ✅ Green | Provider/Model/TTS/ASR/MCP/Policy 编辑与 binding 已存在；collection → selected editor/detail、Policy Default pickers、dirty/clean state、结构化 validation navigation（`resourceId` 精确定位）、relationship view 均已完成；diff/validation 逻辑已抽取到 `composables/useResourceDiff.ts` |
 | C3 Snapshot Projection & Preview | ✅ Green | canonical preview backend 返回 compiler 输出的规范化投影数组；`projectionHash` 使用 placeholder releaseId/generation/publishedAt，不是最终 `snapshotHash`；Review & Publish 结构化审查面、Client Snapshot Preview、Publish progress 均已完成 |
-| C4 Runtime Reference Profile | ✅ Green | deterministic Adapter/Test Client 已证明 Chat request/response+SSE、TTS binary、ASR multipart、MCP（JSON-RPC initialize → tools/list → tools/call）及关键 Relay admission/transport 行为；这是 deterministic T2/T3 证据，不等于 real Adapter qualification |
+| C4 Runtime Reference Profile | ✅ Green | deterministic Adapter/Test Client 已证明 Chat request/response+SSE、TTS binary（model+input+voice）、ASR multipart、MCP（JSON-RPC initialize → tools/list → tools/call）及关键 Relay admission/transport 行为；这是 deterministic T2/T3 证据，不等于 real Adapter qualification |
 | C5 Usage / Pricing / Observability | ✅ Green（component checkpoint） | filters、request detail、pricing、summary、Overview/System observability 已具备并有 component/backend 回归；仍须在 C6 Golden Path 中证明跨组件产品闭环 |
 | C6 Browser + Hub + Relay Product/System E2E | 🔴 Not Green | 当前只有 bounded T3/system smoke；缺 production Admin real-browser T4.1 Golden Path、完整 Hub→Relay→Adapter→Usage 组合证明与 required recovery/security product scenarios |
 | C7 Client Contract Freeze Gate | 🔴 Not Started | C6 未 Green；real Adapter qualification 未完成；没有有效 Freeze manifest |
@@ -176,14 +176,15 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 ### 编译验证
 
 ```text
-gofmt -l backend/           — PASS (零文件需格式化)
-go build ./...              — PASS
-go vet ./...                — PASS
-go test -c ./test/system/... — PASS (编译通过)
-pnpm build                  — PASS (production build)
-pnpm typecheck              — PASS
-tsc --noEmit -p tsconfig.e2e.json — PASS (Playwright E2E typecheck)
-vitest run (13 files, 56 tests) — PASS
+exact SHA: 8a2a15078d0bdb417af23acec7abf08447fe6aee
+CI run:    32437723663 (ci-gate: success)
+
+Jobs:
+  static-contract  — success
+  console-test     — success
+  backend-test     — success
+  system-test      — success
+  ci-gate          — success
 ```
 
 ### C1–C3 前端产品闭环完成状态（2026-08-20 更新）
@@ -238,13 +239,8 @@ vitest run (13 files, 56 tests) — PASS
 ### 验证证据
 
 ```text
-gofmt -l backend/           — PASS (零文件需格式化)
-go build ./...              — PASS
-go vet ./...                — PASS
-pnpm build                  — PASS (production build)
-pnpm typecheck              — PASS
-tsc --noEmit -p tsconfig.e2e.json — PASS (Playwright E2E typecheck)
-vitest run (13 files, 56 tests) — PASS
+exact SHA: 8a2a15078d0bdb417af23acec7abf08447fe6aee
+CI run:    32437723663 (ci-gate: success)
 ```
 
 ## 当前剩余缺口（2026-08-21 更新）
@@ -277,13 +273,13 @@ vitest run (13 files, 56 tests) — PASS
 ### 验证证据汇总
 
 ```text
-go build ./...                     — PASS
-go vet ./...                        — PASS
-go test ./... -count=1              — PASS (all packages)
-go test -tags=smoke ./test/system/  — PASS (bounded T3 smoke)
-go test -tags=candidate -run=^$     — PASS (candidate compilation)
-pnpm typecheck                      — PASS
-vitest run (13 files, 56 tests)     — PASS
-node --check scripts/e2e-harness.mjs — PASS
-node --check scripts/freeze-manifest.mjs — PASS
+exact SHA: 8a2a15078d0bdb417af23acec7abf08447fe6aee
+CI run:    32437723663 (ci-gate: success)
+
+Jobs:
+  static-contract  — success
+  console-test     — success
+  backend-test     — success
+  system-test      — success
+  ci-gate          — success
 ```

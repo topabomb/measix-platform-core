@@ -77,7 +77,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding>
+  <q-page padding data-cy="releases-page">
     <PageHeader :title="$t('releases.title')" :subtitle="$t('releases.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />

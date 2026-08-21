@@ -603,13 +603,30 @@ func runAllFourProfiles(ctx context.Context, tc *client.Client, ids snapshotReso
 	if !strings.Contains(string(asrBody), `"text"`) {
 		return fmt.Errorf("asr bad response: %s", asrBody)
 	}
-	// MCP
-	mcpBody, _, err := tc.MCP(ctx, ids.mcp, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	// MCP — full JSON-RPC minimal flow: initialize → tools/list → tools/call
+	mcpInitBody, _, err := tc.MCP(ctx, ids.mcp, "/mcp",
+		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"measix-test-client","version":"1.0.0"}}}`)
 	if err != nil {
-		return fmt.Errorf("mcp: %w", err)
+		return fmt.Errorf("mcp initialize: %w", err)
 	}
-	if !strings.Contains(string(mcpBody), `"tools"`) {
-		return fmt.Errorf("mcp bad response: %s", mcpBody)
+	if !strings.Contains(string(mcpInitBody), `"protocolVersion"`) {
+		return fmt.Errorf("mcp initialize bad response: %s", mcpInitBody)
+	}
+	mcpListBody, _, err := tc.MCP(ctx, ids.mcp, "/mcp",
+		`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
+	if err != nil {
+		return fmt.Errorf("mcp tools/list: %w", err)
+	}
+	if !strings.Contains(string(mcpListBody), `"tools"`) {
+		return fmt.Errorf("mcp tools/list bad response: %s", mcpListBody)
+	}
+	mcpCallBody, _, err := tc.MCP(ctx, ids.mcp, "/mcp",
+		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tool-a","arguments":{"query":"hello"}}}`)
+	if err != nil {
+		return fmt.Errorf("mcp tools/call: %w", err)
+	}
+	if !strings.Contains(string(mcpCallBody), `"content"`) || !strings.Contains(string(mcpCallBody), `"tool-a executed"`) {
+		return fmt.Errorf("mcp tools/call bad response: %s", mcpCallBody)
 	}
 	return nil
 }

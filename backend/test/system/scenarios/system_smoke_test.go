@@ -138,13 +138,28 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 		t.Fatalf("bad transcription: %s", asrBody)
 	}
 
-	// MCP (CAP-C4-030)
-	mcpBody, _, err := c.MCP(ctx, mcpID, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	// MCP (CAP-C4-030) — full JSON-RPC minimal flow: initialize → tools/list → tools/call
+	mcpInitBody, _, err := c.MCP(ctx, mcpID, "/mcp",
+		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"measix-test-client","version":"1.0.0"}}}`)
 	if err != nil {
-		t.Fatalf("mcp: %v", err)
+		t.Fatalf("mcp initialize: %v", err)
 	}
-	if !bytes.Contains(mcpBody, []byte(`"tools"`)) {
-		t.Fatalf("bad mcp: %s", mcpBody)
+	if !bytes.Contains(mcpInitBody, []byte(`"protocolVersion"`)) {
+		t.Fatalf("bad mcp initialize: %s", mcpInitBody)
+	}
+	mcpListBody, _, err := c.MCP(ctx, mcpID, "/mcp", `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
+	if err != nil {
+		t.Fatalf("mcp tools/list: %v", err)
+	}
+	if !bytes.Contains(mcpListBody, []byte(`"tools"`)) {
+		t.Fatalf("bad mcp tools/list: %s", mcpListBody)
+	}
+	mcpCallBody, _, err := c.MCP(ctx, mcpID, "/mcp", `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tool-a","arguments":{"query":"hello"}}}`)
+	if err != nil {
+		t.Fatalf("mcp tools/call: %v", err)
+	}
+	if !bytes.Contains(mcpCallBody, []byte(`"content"`)) || !bytes.Contains(mcpCallBody, []byte(`"tool-a executed"`)) {
+		t.Fatalf("bad mcp tools/call: %s", mcpCallBody)
 	}
 
 	// CAP-C4-040 stale generation no-forward

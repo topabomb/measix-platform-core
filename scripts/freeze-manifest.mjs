@@ -177,10 +177,10 @@ const scenarioResults = [
   { id: 'CAP-C3-008', name: 'Warning acknowledgement', file: 'backend/internal/hub/capability/', required: true, result: 'PASS', testNames: ['TestHUBCAP010WarningsCannotBypassServerValidation'] },
   { id: 'CAP-C3-009', name: 'Invalid Draft Publish', file: 'backend/internal/hub/capability/', required: true, result: 'PASS', testNames: ['TestHUBCAP010WarningsCannotBypassServerValidation'] },
   // C4 — Runtime Transport
-  { id: 'CAP-C4-001', name: 'Chat request/response', file: 'backend/test/system/adapter/', required: true, result: 'NOT_EXECUTED', testNames: ['TestAdapter'] },
+  { id: 'CAP-C4-001', name: 'Chat request/response', file: 'backend/test/system/client/client_test.go', required: true, result: 'PASS', testNames: ['TestCAPC4001ClientChatNonStream'] },
   { id: 'CAP-C4-002', name: 'Chat streaming', file: 'backend/internal/relay/runtime/', required: true, result: 'PASS', testNames: ['TestRLYTRN001002SSEFirstFlushAndOrderPreserved'] },
   { id: 'CAP-C4-003', name: 'Model cancel', file: 'backend/internal/relay/runtime/', required: true, result: 'PASS', testNames: ['TestRLYTRN004ClientCancelPropagates'] },
-  { id: 'CAP-C4-010', name: 'TTS request', file: 'backend/test/system/adapter/', required: true, result: 'NOT_EXECUTED', testNames: ['TestAdapter'] },
+  { id: 'CAP-C4-010', name: 'TTS request', file: 'backend/test/system/client/client_test.go', required: true, result: 'PASS', testNames: ['TestCAPC4010ClientTTSBinary'] },
   { id: 'CAP-C4-011', name: 'Binary integrity', file: 'backend/internal/relay/runtime/', required: true, result: 'PASS', testNames: ['TestRLYTRN006BinaryPayloadExact'] },
   { id: 'CAP-C4-012', name: 'TTS failure', file: 'backend/internal/relay/runtime/', required: true, result: 'PASS', testNames: ['TestRLYHDRUpstreamErrorPreserved'] },
   { id: 'CAP-C4-020', name: 'Multipart transcription', file: 'backend/internal/relay/runtime/', required: true, result: 'PASS', testNames: ['TestRLYTRN009MultipartPreserved'] },
@@ -257,7 +257,7 @@ const scenarioResults = [
   // itself and the clean replay proof. They are recorded as NOT_EXECUTED
   // until the manifest is actually generated and clean replay is proven.
   { id: 'CAP-C7-001', name: 'Freeze Manifest Generated', file: 'scripts/freeze-manifest.mjs', required: false, result: 'NOT_EXECUTED' },
-  { id: 'CAP-C7-002', name: 'Clean Replay', file: 'docs/s0-clean-replay-report.md', required: false, result: 'NOT_EXECUTED' },
+  { id: 'CAP-C7-002', name: 'Clean Replay — re-run required S0.1 system path from manifest', file: 'scripts/freeze-manifest.mjs', required: false, result: 'NOT_EXECUTED' },
   // Baseline
   { id: 'BASELINE', name: 'Resource Baseline', file: 'baseline_test.go', required: false, result: 'NOT_EXECUTED' },
 ]

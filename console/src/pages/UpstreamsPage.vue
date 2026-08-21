@@ -331,12 +331,12 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding>
+  <q-page padding data-cy="upstreams-page">
     <PageHeader :title="$t('upstreams.title')" :subtitle="$t('upstreams.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
         <q-btn outline color="secondary" icon="key" :label="$t('upstreams.createSecret')" :disable="!canMutate" @click="secretMode = 'create'; secretName = ''; secretValue = ''; secretOpen = true" />
-        <q-btn color="primary" icon="cloud_queue" :label="$t('upstreams.createUpstream')" :disable="!canMutate" @click="createOpen = true" />
+        <q-btn color="primary" icon="cloud_queue" :label="$t('upstreams.createUpstream')" :disable="!canMutate" @click="createOpen = true" data-cy="create-upstream-btn" />
       </template>
     </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
@@ -351,7 +351,7 @@ onMounted(refresh)
     <LoadingState v-if="loading && !upstreams.length" />
     <q-card v-else flat bordered>
       <q-list separator>
-        <q-item v-for="upstream in upstreams" :key="upstream.upstreamId" clickable @click="openUpstream(upstream)">
+        <q-item v-for="upstream in upstreams" :key="upstream.upstreamId" clickable data-cy="upstream-row" @click="openUpstream(upstream)">
           <q-item-section>
             <q-item-label>{{ upstream.name }}</q-item-label>
             <q-item-label caption>
@@ -377,8 +377,8 @@ onMounted(refresh)
       <q-card class="responsive-modal" style="max-width: 95vw">
         <q-card-section class="text-h6">{{ $t('upstreams.createUpstream') }}</q-card-section>
         <q-card-section class="q-gutter-md">
-          <q-input v-model="createForm.name" outlined :label="$t('upstreams.name')" />
-          <q-input v-model="createForm.baseUrl" outlined :label="$t('upstreams.baseUrl')" placeholder="https://api.example.com" />
+          <q-input v-model="createForm.name" outlined :label="$t('upstreams.name')" data-cy="upstream-form-name" />
+          <q-input v-model="createForm.baseUrl" outlined :label="$t('upstreams.baseUrl')" placeholder="https://api.example.com" data-cy="upstream-form-base-url" />
 
           <q-select v-model="createForm.transportCapabilities" outlined :label="$t('upstreams.transportCapabilities')" multiple :options="[...TRANSPORT_CAPS]" />
 
@@ -416,7 +416,7 @@ onMounted(refresh)
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat :label="$t('common.cancel')" v-close-popup />
-          <q-btn color="primary" :label="$t('common.create')" :disable="!createForm.name.trim() || !createForm.baseUrl.trim()" @click="createUpstream" />
+          <q-btn color="primary" :label="$t('common.create')" :disable="!createForm.name.trim() || !createForm.baseUrl.trim()" @click="createUpstream" data-cy="upstream-form-submit" />
         </q-card-actions>
       </q-card>
     </q-dialog>

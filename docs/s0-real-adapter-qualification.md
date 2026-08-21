@@ -12,6 +12,11 @@ The S0.1 Gate requires qualification of at least one real OpenAI-compatible
 endpoint through the full Hub→Relay→Adapter path, proving that the
 deterministic Test Adapter is a faithful stand-in for a real upstream.
 
+Per architecture qualification spec, the qualification unit is
+adapter/version + configRevision + profile. Different profiles (Model/TTS/ASR/MCP)
+may use different endpoints/adapters; a single adapter is NOT required to
+cover all four capabilities.
+
 This report covers:
 
 1. **Deterministic Adapter Qualification** — the in-repo `test/system/adapter`
@@ -41,8 +46,10 @@ Audio Speech, and Audio Transcriptions protocols with response shapes
 (JSON structure, SSE event format, binary content type, multipart parsing)
 that match the OpenAI API specification. For MCP, the adapter implements
 a minimal JSON-RPC 2.0 protocol flow (initialize → tools/list → tools/call)
-sufficient for deterministic testing; it is NOT a full MCP Streamable HTTP
-server and must not be used to qualify real MCP endpoint compatibility.
+sufficient for deterministic testing of the required MCP Streamable HTTP
+profile. It does not implement SSE-backed Streamable HTTP sessions or
+resource completion; it must not be used to qualify real MCP endpoint
+compatibility beyond the basic request/response transport.
 
 ## 3. Real Endpoint Qualification Procedure
 

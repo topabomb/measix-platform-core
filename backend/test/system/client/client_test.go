@@ -104,12 +104,39 @@ func TestCAPC4030ClientMCP(t *testing.T) {
 	env := newEnv(t)
 	defer env.close()
 	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
-	body, _, err := c.MCP(context.Background(), env.resourceIDs.mcp, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+
+	// CAP-C4-030: MCP Streamable HTTP requires a real JSON-RPC minimal flow:
+	// initialize → tools/list → tools/call. The deterministic Adapter must
+	// parse the JSON-RPC method and respond appropriately for each step.
+
+	// Step 1: initialize
+	initBody, _, err := c.MCP(context.Background(), env.resourceIDs.mcp, "/mcp",
+		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"measix-test-client","version":"1.0.0"}}}`)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("mcp initialize: %v", err)
 	}
-	if !bytes.Contains(body, []byte(`"tools"`)) {
-		t.Fatalf("bad MCP body: %s", body)
+	if !bytes.Contains(initBody, []byte(`"protocolVersion"`)) {
+		t.Fatalf("bad MCP initialize response: %s", initBody)
+	}
+
+	// Step 2: tools/list
+	listBody, _, err := c.MCP(context.Background(), env.resourceIDs.mcp, "/mcp",
+		`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
+	if err != nil {
+		t.Fatalf("mcp tools/list: %v", err)
+	}
+	if !bytes.Contains(listBody, []byte(`"tools"`)) {
+		t.Fatalf("bad MCP tools/list response: %s", listBody)
+	}
+
+	// Step 3: tools/call — prove the Adapter executes the tool and returns content
+	callBody, _, err := c.MCP(context.Background(), env.resourceIDs.mcp, "/mcp",
+		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tool-a","arguments":{"query":"hello"}}}`)
+	if err != nil {
+		t.Fatalf("mcp tools/call: %v", err)
+	}
+	if !bytes.Contains(callBody, []byte(`"content"`)) || !bytes.Contains(callBody, []byte(`"tool-a executed"`)) {
+		t.Fatalf("bad MCP tools/call response: %s", callBody)
 	}
 }
 

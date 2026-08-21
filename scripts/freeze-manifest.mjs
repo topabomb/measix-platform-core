@@ -413,7 +413,7 @@ if (realAdapterArtifact) {
   realAdapterStatus = realAdapterArtifact.status || 'NOT_EXECUTED'
 }
 if (realAdapterStatus === 'NOT_EXECUTED') {
-  errors.push('Real adapter qualification has not been executed. See docs/s0-real-adapter-qualification.md')
+  errors.push('Real adapter qualification has not been executed. Run scripts/collect-adapter-qualification.mjs with a real endpoint.')
 }
 
 // 6. Resource baseline must be GREEN
@@ -423,7 +423,7 @@ if (baselineArtifact) {
   resourceBaselineStatus = baselineArtifact.status || 'NOT_GREEN'
 }
 if (resourceBaselineStatus !== 'GREEN') {
-  errors.push(`Resource baseline is ${resourceBaselineStatus}. See docs/s0-resource-baseline.md`)
+  errors.push(`Resource baseline is ${resourceBaselineStatus}. Run scripts/collect-baseline.mjs to measure.`)
 }
 
 // 7. Check for artifact/commit mismatch
@@ -461,9 +461,9 @@ const manifest = {
   adminOpenApiHash: sha256(ADMIN_OPENAPI),
   canonicalFixtureHash: fixturesHash(),
   deterministicAdapterVersion: deterministicAdapterVersion(),
-  realAdapterQualificationRef: 'docs/s0-real-adapter-qualification.md',
+  realAdapterQualificationRef: '.artifacts/real-adapter-qualification.json',
   realAdapterQualificationStatus: realAdapterStatus,
-  resourceBaselineRef: 'docs/s0-resource-baseline.md',
+  resourceBaselineRef: '.artifacts/resource-baseline.json',
   resourceBaselineStatus,
   scenarioResults,
   startedAt: now,

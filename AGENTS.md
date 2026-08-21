@@ -4,8 +4,11 @@ This repository implements MEASIX Control Hub, Runtime Relay and Admin Console.
 
 ## Before changing behavior
 
-1. Read `docs/documentation-governance.md` and `ARCHITECTURE.md`.
+1. Read `ARCHITECTURE.md` (includes documentation governance).
 2. Use `topabomb/measix-architecture/docs/measix-stage-document-index.md` to identify the architecture documents for the current stage/workstream.
+
+   **Local-first principle**: the architecture repository is cloned locally at `../measix-architecture` (relative to this repository root, i.e. a sibling directory). Always read architecture documents from the local checkout first. If the local checkout is missing, clone `git@github.com:topabomb/measix-architecture.git` (or the HTTPS equivalent) to that sibling path before proceeding. Do not infer architecture semantics from memory or from this repository's implementation alone.
+
 3. Read the relevant local implementation document (`docs/api-contracts.md`, `docs/admin-console-implementation.md`, `docs/testing.md`, etc.).
 
 Architecture owns product/wire/state/security meaning. Do not infer a different semantic from existing code.

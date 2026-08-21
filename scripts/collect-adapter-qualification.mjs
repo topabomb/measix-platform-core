@@ -55,7 +55,7 @@ if (!endpoint || !apiKey) {
     status: 'NOT_EXECUTED',
     commit,
     qualifiedAt: null,
-    reason: 'No endpoint or API key provided. See docs/s0-real-adapter-qualification.md for the qualification procedure.',
+    reason: 'No endpoint or API key provided. See architecture qualification spec for the procedure.',
     profiles: {
       model: { status: 'NOT_EXECUTED' },
       tts: { status: 'NOT_EXECUTED' },
@@ -69,7 +69,7 @@ if (!endpoint || !apiKey) {
   console.log('To execute real adapter qualification:')
   console.log('  1. Start Hub + Relay (see scripts/e2e-harness.mjs)')
   console.log('  2. Run: node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <api-key>')
-  console.log('  3. Follow the procedure in docs/s0-real-adapter-qualification.md')
+  console.log('  3. Follow the architecture adapter qualification spec')
   process.exit(0)
 }
 
@@ -91,7 +91,7 @@ console.log(`  Endpoint: ${endpoint}`)
 console.log(`  Profile: ${profile}`)
 console.log('')
 console.log('This script is a placeholder for the automated qualification flow.')
-console.log('Follow the manual procedure in docs/s0-real-adapter-qualification.md.')
+console.log('Follow the manual procedure per the architecture adapter qualification spec.')
 console.log('')
 
 const artifact = {

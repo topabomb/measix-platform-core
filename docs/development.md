@@ -58,7 +58,7 @@ branch
 
 GitHub Actions is the executor in this mode for the repository's normal T0–T3/build gates. T4.1 browser/system E2E is deliberately excluded from GitHub Actions CI/CD; C6/C7 completion requires a separate explicit candidate run on the exact candidate SHA.
 
-Static code review alone is not test execution. See `docs/tdd.md` for the evidence contract.
+Static code review alone is not test execution. See `docs/testing.md` (§11–18) for the TDD evidence contract.
 
 ## 3. I0 target repository structure
 

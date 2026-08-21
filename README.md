@@ -19,9 +19,7 @@ Product semantics, stage scope, stable IDs, cross-component behavior and require
 
 - `docs/development.md` — local/build/codegen workflow
 - `docs/api-contracts.md` — OpenAPI/fixtures/codegen/freeze
-- `docs/testing.md` — executable test/CI organization
-- `docs/tdd.md` — Red → Green → Refactor
+- `docs/testing.md` — executable test/CI organization and TDD
 - `docs/database-migrations.md` — migration workflow
 - `docs/operations.md` — runtime/backup/restore
 - `docs/release.md` — S0.1 freeze and final S0 RC evidence
-- `docs/documentation-governance.md` — documentation ownership/synchronization

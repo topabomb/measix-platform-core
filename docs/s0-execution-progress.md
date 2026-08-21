@@ -29,7 +29,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 ## 当前有效证据如何解释
 
 - `ci-gate` / backend / console / current system smoke：证明最新执行 SHA 对应的 T0–T3 deterministic baseline；**不证明 C6/C7/S0.1 Freeze**。
-- `docs/s0-review-report.md`：旧 architecture baseline 下的历史审查/回归映射，只作 historical evidence，不再作为当前 S0.1 completion source。
+- 旧基线历史审查报告已删除；旧 Green 只作回归参考，不能用来推断当前 checkpoint。
 - real Adapter qualification：必须按 architecture qualification spec 单独执行并形成证据；deterministic Adapter 不能替代。
 - Browser T4.1：必须对 exact candidate SHA 显式执行 production SPA + real Hub + real Relay + deterministic Adapter/Test Client；默认 GitHub Actions 不执行该 gate。
 
@@ -116,7 +116,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 
 7. **Resource Baseline**（`baseline_test.go`）：
    - 测量 Admin login/CRUD/Publish/convergence/runtime 延迟
-   - 报告：`docs/s0-resource-baseline.md`
+   - 报告：由 `scripts/collect-baseline.mjs` 生成 `.artifacts/resource-baseline.json`（未执行时为 NOT MEASURED）
 
 ### Browser E2E 基础设施（新增）
 
@@ -188,8 +188,8 @@ docs/s0-freeze-manifest.json
 
 ### 参考文档
 
-- `docs/s0-real-adapter-qualification.md`：Real Adapter Qualification 报告（NOT EXECUTED）
-- `docs/s0-resource-baseline.md`：Resource Baseline 基准指标（NOT GREEN — 全部数值为 NOT MEASURED，未由可执行测试生成）
+- Real Adapter Qualification：状态为 NOT EXECUTED，由 `scripts/collect-adapter-qualification.mjs` 生成 `.artifacts/real-adapter-qualification.json`
+- Resource Baseline：状态为 NOT GREEN（全部 NOT MEASURED），由 `scripts/collect-baseline.mjs` 生成 `.artifacts/resource-baseline.json`
 - `.artifacts/real-adapter-qualification.json`：由 `scripts/collect-adapter-qualification.mjs` 生成，被 `freeze-manifest.mjs` 消费
 - `.artifacts/resource-baseline.json`：由 `scripts/collect-baseline.mjs` 生成，被 `freeze-manifest.mjs` 消费
 

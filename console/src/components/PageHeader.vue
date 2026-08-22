@@ -2,10 +2,21 @@
 import { useRouter } from 'vue-router'
 import StatusChip from './StatusChip.vue'
 
-// PageHeader (implementation §3.3): consistent page header for every business
-// page — breadcrumbs on deep routes, title + concise context, authoritative
-// status, primary + secondary actions. Narrow screens keep only the primary
-// action and push the rest into an overflow menu.
+// PageHeader — consistent page header for every business page.
+//
+// Design:
+//   - Left: title + optional subtitle, breadcrumbs, status chip.
+//   - Right: #actions slot — all page-level action buttons go here.
+//   - Wide screens (sm+): actions rendered inline.
+//   - Narrow screens (xs): actions collapsed into an overflow dropdown.
+//
+// Usage:
+//   <PageHeader title="..." :subtitle="...">
+//     <template #actions>
+//       <q-btn ... />
+//       <q-btn ... />
+//     </template>
+//   </PageHeader>
 
 defineProps<{
   title: string
@@ -35,19 +46,14 @@ const router = useRouter()
       </div>
       <div v-if="subtitle" class="text-body2 text-grey-7">{{ subtitle }}</div>
     </div>
-    <div class="row items-center q-gutter-sm">
-      <!-- Primary action: exactly one visual primary button per page. -->
-      <slot name="primary" />
-      <!-- Secondary actions on wide screens only. -->
-      <div v-if="$slots.actions" class="gt-sm row items-center q-gutter-sm">
-        <slot name="actions" />
-      </div>
-      <!-- On narrow screens the overflow menu carries secondary actions. -->
-      <q-btn-dropdown v-if="$slots.actions" flat round icon="more_vert" class="lt-md">
-        <q-list>
-          <slot name="actions" />
-        </q-list>
-      </q-btn-dropdown>
+    <!-- Actions: visible inline on sm+, collapsed into dropdown on xs -->
+    <div v-if="$slots.actions" class="row items-center q-gutter-sm gt-xs">
+      <slot name="actions" />
     </div>
+    <q-btn-dropdown v-if="$slots.actions" flat round dense icon="more_vert" class="xs">
+      <q-list>
+        <slot name="actions" />
+      </q-list>
+    </q-btn-dropdown>
   </div>
 </template>

@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import { useSessionStore } from '../stores/session'
@@ -113,19 +114,13 @@ onMounted(refresh)
 
 <template>
   <q-card flat bordered>
-    <q-card-section class="row items-center justify-between">
-      <div>
-        <div class="text-subtitle2">{{ $t('pricing.title') }}</div>
-        <div class="text-caption text-grey-7">
-          {{ $t('pricing.subtitle') }} {{ $t('pricing.revision') }} {{ revision ?? '—' }}
-        </div>
-      </div>
-      <div class="q-gutter-sm">
+    <PageHeader :title="$t('pricing.title')" :subtitle="`${$t('pricing.subtitle')} ${$t('pricing.revision')} ${revision ?? '—'}`">
+      <template #actions>
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
         <q-btn outline icon="add" :label="$t('pricing.addRule')" @click="addRule" data-cy="pricing-add-rule-btn" />
         <q-btn color="primary" icon="save" :label="$t('common.save')" :disable="revision === undefined" :loading="saving" @click="save" data-cy="pricing-save-btn" />
-      </div>
-    </q-card-section>
+      </template>
+    </PageHeader>
 
     <!-- Cost completeness banner -->
     <q-banner v-if="usageCost" class="bg-grey-2 q-ma-md rounded-borders">

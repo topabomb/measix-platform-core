@@ -22,6 +22,21 @@ if ($q.screen.gt.md) {
   drawerOpen.value = true
 }
 
+// When the viewport crosses the gt.md threshold, open or close the drawer
+// automatically.  This fixes the "narrow → wide" scenario where the drawer
+// stays hidden even though there is now room for a persistent rail.
+watch(
+  () => $q.screen.gt.md,
+  (isWide) => {
+    if (isWide) {
+      drawerOpen.value = true
+    } else if (drawerOpen.value) {
+      // Switched to compact — collapse to overlay (closed by default).
+      drawerOpen.value = false
+    }
+  },
+)
+
 // On medium and below the drawer is an overlay; close it after navigating.
 // On wide screens the drawer is persistent; do NOT close it.
 function onNavigate() {

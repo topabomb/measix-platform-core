@@ -345,14 +345,12 @@ onMounted(refresh)
 <template>
   <q-page padding data-cy="resources-page">
     <PageHeader :title="$t('nav.resources')" :subtitle="$t('resources.subtitle')">
-      <template #primary>
-        <q-btn color="positive" icon="rocket_launch" :label="$t('resources.draft.review')" :disable="!canMutate || draft.dirty" :loading="reviewing" @click="openReview" data-cy="draft-review-btn" />
-      </template>
       <template #actions>
         <q-btn flat icon="refresh" :loading="draft.loading" @click="refresh" />
         <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate" :loading="previewing" @click="previewSnapshot" data-cy="draft-preview-btn" />
         <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || draft.loading" @click="validate" data-cy="draft-validate-btn" />
         <q-btn outline color="primary" :label="$t('common.save')" :disable="!canMutate || !draft.dirty" :loading="draft.saving" @click="save" data-cy="draft-save-btn" />
+        <q-btn color="positive" icon="rocket_launch" :label="$t('resources.draft.review')" :disable="!canMutate || draft.dirty" :loading="reviewing" @click="openReview" data-cy="draft-review-btn" />
       </template>
     </PageHeader>
 

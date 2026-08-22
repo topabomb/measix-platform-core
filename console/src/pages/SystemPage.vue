@@ -41,7 +41,9 @@ onMounted(refresh)
 <template>
   <q-page padding data-cy="system-page">
     <PageHeader :title="$t('system.title')" :subtitle="$t('system.subtitle')">
-      <template #primary><q-btn flat icon="refresh" @click="refresh" /></template>
+      <template #actions>
+        <q-btn flat icon="refresh" @click="refresh" />
+      </template>
     </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
     <LoadingState v-if="loading && !status" />

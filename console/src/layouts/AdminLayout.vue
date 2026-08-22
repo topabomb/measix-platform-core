@@ -17,9 +17,9 @@ import { switchLocale, currentLocale, SUPPORTED_LOCALES, type LocaleCode } from 
 //   • v-model="drawerOpen"  →  only tracks user toggles in overlay mode.
 //     On wide screens Quasar manages visibility internally.
 //
-// No manual $q.screen watchers needed — Quasar's internal belowBreakpoint
-// watcher (QDrawer.js lines 372-391) handles the open/close transitions
-// across the breakpoint automatically.
+// CRITICAL: do NOT set drawerOpen=false on route change when the screen
+// is above the breakpoint — that would close the persistent drawer.
+// Only close on narrow screens (overlay mode).
 
 const $t = useI18n().t
 const $q = useQuasar()
@@ -29,14 +29,17 @@ const session = useSessionStore()
 const drawerOpen = ref(false)
 const navItems = visibleNavItems()
 
-// Close the overlay drawer after navigating on narrow screens.
-// On wide screens the drawer is persistent — Quasar keeps it open.
+// Close the overlay drawer after navigating — but ONLY on narrow screens.
+// On wide screens the drawer is persistent (managed by Quasar show-if-above).
 watch(
   () => route.fullPath,
   () => {
-    // $q.screen is reactive; on wide screens Quasar's persistent drawer
-    // ignores v-model changes.  Setting false only affects overlay mode.
-    drawerOpen.value = false
+    // $q.screen.lt.sm means viewport < 600px; but our breakpoint is 1023px.
+    // Use $q.screen size to approximate: below breakpoint = overlay mode.
+    // Quasar's $q.screen.lt.lg means < 1024px, which matches breakpoint 1023.
+    if ($q.screen.lt.lg) {
+      drawerOpen.value = false
+    }
   },
 )
 

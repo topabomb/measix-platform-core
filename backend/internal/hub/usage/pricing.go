@@ -259,7 +259,8 @@ func validCompleteness(value Completeness) bool {
 // validMeter returns true if the meter string is one of the standard meters
 // defined in architecture s0-control-protocol §13.
 // Standard meters for S0.1 required profile:
-//   INPUT_TOKENS, OUTPUT_TOKENS, CACHED_TOKENS, CHARACTERS, AUDIO_SECONDS, REQUESTS
+//
+//	INPUT_TOKENS, OUTPUT_TOKENS, CACHED_TOKENS, CHARACTERS, AUDIO_SECONDS, REQUESTS
 func validMeter(value string) bool {
 	switch strings.TrimSpace(value) {
 	case "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "CHARACTERS", "AUDIO_SECONDS", "REQUESTS":

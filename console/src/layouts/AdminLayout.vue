@@ -8,6 +8,19 @@ import { visibleNavItems } from '../router/navigation'
 import HealthIndicator from '../components/HealthIndicator.vue'
 import { switchLocale, currentLocale, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 
+// Layout strategy — leveraging Quasar's built-in responsive drawer logic:
+//
+//   • show-if-above="true"  →  Quasar auto-opens the drawer on wide screens
+//     (above the breakpoint) and auto-closes it when shrinking below.
+//   • breakpoint="1023"     →  the px threshold; screens > 1023px get a
+//     persistent rail, screens ≤ 1023px get an overlay drawer.
+//   • v-model="drawerOpen"  →  only tracks user toggles in overlay mode.
+//     On wide screens Quasar manages visibility internally.
+//
+// No manual $q.screen watchers needed — Quasar's internal belowBreakpoint
+// watcher (QDrawer.js lines 372-391) handles the open/close transitions
+// across the breakpoint automatically.
+
 const $t = useI18n().t
 const $q = useQuasar()
 const route = useRoute()
@@ -16,44 +29,14 @@ const session = useSessionStore()
 const drawerOpen = ref(false)
 const navItems = visibleNavItems()
 
-// On wide screens (lg+) the drawer is persistent; ensure it starts open.
-// On medium and below it is an overlay that starts closed.
-if ($q.screen.gt.md) {
-  drawerOpen.value = true
-}
-
-// When the viewport crosses the gt.md threshold, open or close the drawer
-// automatically.  This fixes the "narrow → wide" scenario where the drawer
-// stays hidden even though there is now room for a persistent rail.
-watch(
-  () => $q.screen.gt.md,
-  (isWide) => {
-    if (isWide) {
-      drawerOpen.value = true
-    } else if (drawerOpen.value) {
-      // Switched to compact — collapse to overlay (closed by default).
-      drawerOpen.value = false
-    }
-  },
-)
-
-// On medium and below the drawer is an overlay; close it after navigating.
-// On wide screens the drawer is persistent; do NOT close it.
-function onNavigate() {
-  if (!$q.screen.gt.md) {
-    drawerOpen.value = false
-  }
-}
-
-// On mobile the drawer is an overlay; close it after navigating so the user
-// returns to the chosen page (implementation §5 Mobile, §12).
-// On wide screens the drawer is persistent; do NOT close it.
+// Close the overlay drawer after navigating on narrow screens.
+// On wide screens the drawer is persistent — Quasar keeps it open.
 watch(
   () => route.fullPath,
   () => {
-    if (!$q.screen.gt.md) {
-      drawerOpen.value = false
-    }
+    // $q.screen is reactive; on wide screens Quasar's persistent drawer
+    // ignores v-model changes.  Setting false only affects overlay mode.
+    drawerOpen.value = false
   },
 )
 
@@ -87,9 +70,11 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
   <q-layout view="hHh Lpr fFf" class="admin-shell">
     <q-header bordered class="bg-white text-dark">
       <q-toolbar>
+        <!-- Hamburger toggle — always visible. On wide screens the drawer is
+             persistent (managed by Quasar show-if-above), so this button has
+             no visual effect there. On narrow screens it toggles the overlay. -->
         <q-btn
           flat round dense icon="menu"
-          class="lt-lg"
           :aria-label="$t('nav.system')"
           @click="drawerOpen = !drawerOpen"
         />
@@ -139,17 +124,20 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
       </q-toolbar>
     </q-header>
 
-    <!-- Responsive primary navigation (implementation §5):
-         Wide = persistent rail, Compact = collapsible mini, Mobile = overlay drawer. -->
+    <!-- Responsive navigation drawer:
+         • show-if-above: Quasar auto-opens on wide screens (> breakpoint)
+         • breakpoint: 1023px — above = persistent rail, below = overlay
+         • Quasar manages the belowBreakpoint ↔ aboveBreakpoint transition
+           internally, including auto-show when resizing narrow → wide. -->
     <q-drawer
       v-model="drawerOpen"
-      :show-if-above="$q.screen.gt.md"
+      show-if-above
+      :breakpoint="1023"
       bordered
       :width="240"
-      :mini="false"
     >
       <q-list padding>
-        <q-item-label header class="gt-sm">{{ $t('nav.runtimeFoundation') }}</q-item-label>
+        <q-item-label header>{{ $t('nav.runtimeFoundation') }}</q-item-label>
         <q-item
           v-for="item in navItems"
           :key="item.id"
@@ -157,7 +145,6 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
           :to="item.path"
           exact
           active-class="bg-grey-2 text-primary"
-          @click="onNavigate"
         >
           <q-item-section avatar><q-icon :name="item.icon" /></q-item-section>
           <q-item-section>{{ navLabel(item.id) }}</q-item-section>

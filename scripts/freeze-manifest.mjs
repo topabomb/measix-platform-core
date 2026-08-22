@@ -1,34 +1,29 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
-import { execFileSync } from 'node:child_process'
 
-const ROOT = resolve(import.meta.dirname, '..')
+import {
+  resolveRoot,
+  collectFiles,
+  gitCommit,
+  gitDirty,
+  adminBuildHash,
+  deterministicAdapterVersion,
+  sha256File,
+} from './lib/harness.mjs'
+
+const ROOT = resolveRoot(import.meta.dirname)
 const FIXTURES_DIR = join(ROOT, 'api', 'fixtures')
 const CLIENT_OPENAPI = join(ROOT, 'api', 'client', 'client-control.openapi.yaml')
 const ADMIN_OPENAPI = join(ROOT, 'api', 'admin', 'admin.openapi.yaml')
-const ADAPTER_SOURCE = join(ROOT, 'backend', 'test', 'system', 'adapter', 'adapter.go')
-const ADAPTER_TEST = join(ROOT, 'backend', 'test', 'system', 'adapter', 'adapter_test.go')
-const CLIENT_SOURCE = join(ROOT, 'backend', 'test', 'system', 'client', 'client.go')
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
 const ARCH_REPO = resolve(ROOT, '..', 'measix-architecture')
 const SCENARIO_DEFS = JSON.parse(readFileSync(join(ROOT, 'scripts', 'scenario-definitions.json'), 'utf-8'))
 const isCleanReplay = process.argv.includes('--clean-replay')
 const isValidate = process.argv.includes('--validate')
 
-function sha256(path) {
-  return 'sha256:' + createHash('sha256').update(readFileSync(path).toString('utf-8').replace(/\r\n/g, '\n')).digest('hex')
-}
-function collectFiles(dir) {
-  const out = []
-  for (const entry of readdirSync(dir).sort()) {
-    const full = join(dir, entry)
-    if (statSync(full).isDirectory()) out.push(...collectFiles(full))
-    else out.push(full)
-  }
-  return out
-}
+// Local-only: fixtures hash (not shared with harness.mjs)
 function fixturesHash() {
   const hash = createHash('sha256')
   for (const file of collectFiles(FIXTURES_DIR).sort()) {
@@ -37,35 +32,6 @@ function fixturesHash() {
     hash.update(readFileSync(file).toString('utf-8').replace(/\r\n/g, '\n'))
     hash.update('\0')
   }
-  return 'sha256:' + hash.digest('hex')
-}
-function gitCommit(cwd) {
-  try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf-8' }).trim() }
-  catch { return 'unknown' }
-}
-function gitDirty(cwd) {
-  try { return execFileSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf-8' }).trim().length > 0 }
-  catch { return true }
-}
-function adminBuildHash() {
-  const distDir = join(ROOT, 'console', 'dist', 'spa')
-  if (!existsSync(distDir)) return 'not-built'
-  const hash = createHash('sha256')
-  for (const file of collectFiles(distDir).sort()) {
-    hash.update(relative(distDir, file).replace(/\\/g, '/'))
-    hash.update('\0')
-    hash.update(readFileSync(file))
-    hash.update('\0')
-  }
-  return 'sha256:' + hash.digest('hex')
-}
-function deterministicAdapterVersion() {
-  const hash = createHash('sha256')
-  hash.update(readFileSync(ADAPTER_SOURCE).toString('utf-8').replace(/\r\n/g, '\n'))
-  hash.update('\0')
-  if (existsSync(ADAPTER_TEST)) hash.update(readFileSync(ADAPTER_TEST).toString('utf-8').replace(/\r\n/g, '\n'))
-  hash.update('\0')
-  if (existsSync(CLIENT_SOURCE)) hash.update(readFileSync(CLIENT_SOURCE).toString('utf-8').replace(/\r\n/g, '\n'))
   return 'sha256:' + hash.digest('hex')
 }
 
@@ -282,7 +248,7 @@ if (isValidate) {
   const archCommit = gitCommit(ARCH_REPO)
   if (manifest.platformCoreCommit !== currentCommit) errors.push(`platformCoreCommit mismatch: manifest=${manifest.platformCoreCommit} current=${currentCommit}`)
   if (manifest.architectureCommit !== archCommit) errors.push(`architectureCommit mismatch: manifest=${manifest.architectureCommit} current=${archCommit}`)
-  if (manifest.adminBuildHash !== adminBuildHash()) errors.push('adminBuildHash mismatch — rebuild required')
+  if (manifest.adminBuildHash !== adminBuildHash(ROOT)) errors.push('adminBuildHash mismatch — rebuild required')
   const notPass = manifest.scenarioResults.filter(s => s.required && s.result !== 'PASS')
   if (notPass.length > 0) { errors.push(`${notPass.length} required scenarios are not PASS:`); for (const s of notPass) errors.push(`  ${s.id} ${s.name}: ${s.result}`) }
   if (errors.length > 0) { console.error('ERROR: Manifest validation failed:'); for (const e of errors) console.error(`  ${e}`); process.exit(1) }
@@ -302,7 +268,7 @@ if (isCleanReplay) {
   const archCommit = gitCommit(ARCH_REPO)
   if (manifest.platformCoreCommit !== currentCommit) errors.push(`platformCoreCommit mismatch: manifest=${manifest.platformCoreCommit} current=${currentCommit}`)
   if (manifest.architectureCommit !== archCommit) errors.push(`architectureCommit mismatch: manifest=${manifest.architectureCommit} current=${archCommit}`)
-  if (manifest.adminBuildHash !== adminBuildHash()) errors.push('adminBuildHash mismatch — rebuild required')
+  if (manifest.adminBuildHash !== adminBuildHash(ROOT)) errors.push('adminBuildHash mismatch — rebuild required')
   for (const s of manifest.scenarioResults) { if (s.required && s.result !== 'PASS') errors.push(`  ${s.id} ${s.name}: ${s.result}`) }
   if (manifest.realAdapterQualificationStatus !== 'VERIFIED') errors.push(`realAdapterQualificationStatus is ${manifest.realAdapterQualificationStatus}, expected VERIFIED`)
   if (manifest.resourceBaselineStatus !== 'GREEN') errors.push(`resourceBaselineStatus is ${manifest.resourceBaselineStatus}, expected GREEN`)
@@ -324,7 +290,7 @@ if (archCommit !== 'dbb56952ab1cf60fa55e4cbb8d14ee70eda43a48') {
   warnings.push(`Architecture commit is ${archCommit}, expected dbb56952...`)
 }
 
-const buildHash = adminBuildHash()
+const buildHash = adminBuildHash(ROOT)
 if (buildHash === 'not-built') errors.push('Admin production build not found. Run "make console-build" before generating freeze manifest.')
 
 const scenarioResults = compileScenarioResults()
@@ -382,10 +348,10 @@ const manifest = {
   platformCoreCommit: currentCommit,
   workingTreeDirty: gitDirty(ROOT),
   adminBuildHash: buildHash,
-  clientControlOpenApiHash: sha256(CLIENT_OPENAPI),
-  adminOpenApiHash: sha256(ADMIN_OPENAPI),
+  clientControlOpenApiHash: sha256File(CLIENT_OPENAPI),
+  adminOpenApiHash: sha256File(ADMIN_OPENAPI),
   canonicalFixtureHash: fixturesHash(),
-  deterministicAdapterVersion: deterministicAdapterVersion(),
+  deterministicAdapterVersion: deterministicAdapterVersion(ROOT),
   realAdapterQualificationRef: '.artifacts/real-adapter-qualification.json',
   realAdapterQualificationStatus: realAdapterStatus,
   resourceBaselineRef: '.artifacts/resource-baseline.json',

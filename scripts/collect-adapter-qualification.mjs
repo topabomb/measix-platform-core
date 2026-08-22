@@ -42,14 +42,21 @@
  * Or to mark as NOT_EXECUTED (default when no args):
  *   node scripts/collect-adapter-qualification.mjs
  */
-import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, mkdtempSync } from 'node:fs'
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { execFileSync, spawn, execSync } from 'node:child_process'
-import { tmpdir } from 'node:os'
-import { randomFillSync, createHash, randomUUID } from 'node:crypto'
-import { createServer } from 'node:net'
+import { execFileSync, execSync } from 'node:child_process'
+import { createHash, randomUUID } from 'node:crypto'
 
-const ROOT = resolve(import.meta.dirname, '..')
+import {
+  resolveRoot,
+  freePort,
+  waitFor,
+  startHubAndRelay,
+  cleanupEnvironment,
+  createFreshEnvironment,
+} from './lib/harness.mjs'
+
+const ROOT = resolveRoot(import.meta.dirname)
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
 const OUT_PATH = join(ARTIFACTS_DIR, 'real-adapter-qualification.json')
 const ARCH_REPO = resolve(ROOT, '..', 'measix-architecture')
@@ -91,6 +98,8 @@ function generateStableId(prefix) {
   const uuid = randomUUID()
   return `${prefix}_${uuid}`
 }
+
+// re-export for internal use (randomBytes comes from harness.mjs now)
 
 // Derive adapter name from the endpoint URL hostname.
 // e.g., https://api.openai.com → "api.openai.com"
@@ -220,11 +229,10 @@ let relayPubPort = 0
 let relayIntPort = 0
 
 function cleanup() {
-  if (hubProc) try { hubProc.kill('SIGTERM') } catch {}
-  if (relayProc) try { relayProc.kill('SIGTERM') } catch {}
-  if (envRoot && existsSync(envRoot)) {
-    try { rmSync(envRoot, { recursive: true, force: true }) } catch {}
-  }
+  const processes = []
+  if (hubProc) processes.push(hubProc)
+  if (relayProc) processes.push(relayProc)
+  cleanupEnvironment(processes, [], envRoot, false, null)
 }
 
 process.on('SIGINT', () => { cleanup(); process.exit(1) })
@@ -237,121 +245,40 @@ async function main() {
     console.log('Starting Hub + Relay for qualification...')
     const net = { createServer }
 
-    function freePort() {
-      return new Promise((resolveP, rejectP) => {
-        const srv = net.createServer()
-        srv.listen(0, '127.0.0.1', () => {
-          const port = srv.address().port
-          srv.close(() => resolveP(port))
-        })
-        srv.on('error', rejectP)
-      })
-    }
+    // Use shared harness to create fresh environment and start Hub + Relay
+    const env = await createFreshEnvironment(ROOT, {
+      prefix: 'measix-qual',
+      deploymentName: 'QUAL-TEST',
+      displayName: 'Qual Admin',
+      adminPasswordPrefix: 'qual-admin',
+      adminPasswordOverride: adminPassword,
+    })
 
-    function randomBytes(n) {
-      const buf = Buffer.alloc(n)
-      randomFillSync(buf)
-      return buf
-    }
+    envRoot = env.envRoot
+    hubPort = env.hubPort
+    hubInternalPort = env.hubInternalPort
+    relayPubPort = env.relayPubPort
+    relayIntPort = env.relayIntPort
 
-    envRoot = mkdtempSync(join(tmpdir(), 'measix-qual-'))
-    const hubDB = join(envRoot, 'hub.db')
-    const masterKeyFile = join(envRoot, 'master.key')
-    const jwtKeyFile = join(envRoot, 'jwt-ed25519.seed')
-    const relayTokenFile = join(envRoot, 'relay-service.token')
-    const spoolPath = join(envRoot, 'relay-spool.db')
-    const pwFile = join(envRoot, 'admin-password.txt')
+    hubUrl = env.hubBaseURL
+    relayUrl = env.relayPubBaseURL
+    const relayIntUrl = env.relayIntBaseURL
 
-    writeFileSync(masterKeyFile, randomBytes(32), { mode: 0o600 })
-    writeFileSync(jwtKeyFile, randomBytes(32), { mode: 0o600 })
-    writeFileSync(relayTokenFile, Buffer.from(randomBytes(32).toString('hex') + '\n'), { mode: 0o600 })
-    writeFileSync(pwFile, adminPassword + '\n', { mode: 0o600 })
-
-    hubPort = await freePort()
-    hubInternalPort = await freePort()
-    relayPubPort = await freePort()
-    relayIntPort = await freePort()
-
-    const backendDir = join(ROOT, 'backend')
-    const hubBin = join(envRoot, process.platform === 'win32' ? 'control-hub.exe' : 'control-hub')
-    const relayBin = join(envRoot, process.platform === 'win32' ? 'runtime-relay.exe' : 'runtime-relay')
-
-    try {
-      execSync(`go build -o "${hubBin}" ./cmd/control-hub`, { cwd: backendDir, stdio: 'inherit' })
-      execSync(`go build -o "${relayBin}" ./cmd/runtime-relay`, { cwd: backendDir, stdio: 'inherit' })
-    } catch (e) {
-      console.error('Build failed:', e.message)
-      process.exit(1)
-    }
-
-    try {
-      execSync(`go run ./cmd/devmigrate --db "${hubDB}"`, { cwd: backendDir, stdio: 'inherit' })
-    } catch (e) {
-      console.error('Migration failed:', e.message)
-      process.exit(1)
-    }
-
-    try {
-      execSync(
-        `go run ./cmd/control-hub bootstrap-admin` +
-        ` --db "${hubDB}"` +
-        ` --master-key-file "${masterKeyFile}"` +
-        ` --jwt-private-key-file "${jwtKeyFile}"` +
-        ` --deployment-name "QUAL-TEST"` +
-        ` --username "admin"` +
-        ` --display-name "Qual Admin"` +
-        ` --password-file "${pwFile}"`,
-        { cwd: backendDir, stdio: 'inherit' },
-      )
-    } catch (e) {
-      console.error('Bootstrap failed:', e.message)
-      process.exit(1)
-    }
-
-    hubUrl = `http://127.0.0.1:${hubPort}`
-    relayUrl = `http://127.0.0.1:${relayPubPort}`
-    const relayIntUrl = `http://127.0.0.1:${relayIntPort}`
-
-    hubProc = spawn(hubBin, [
-      'run',
-      '--listen', `127.0.0.1:${hubPort}`,
-      '--internal-listen', `127.0.0.1:${hubInternalPort}`,
-      '--public-base-url', hubUrl,
-      '--runtime-api-base', relayUrl,
-      '--db', hubDB,
-      '--master-key-file', masterKeyFile,
-      '--jwt-private-key-file', jwtKeyFile,
-      '--relay-internal-url', relayIntUrl,
-      '--relay-service-token-file', relayTokenFile,
-      '--reconcile-interval', '2s',
-    ], { cwd: envRoot, stdio: ['ignore', 'pipe', 'pipe'] })
-
-    relayProc = spawn(relayBin, [
-      '--public-listen', `127.0.0.1:${relayPubPort}`,
-      '--internal-listen', `127.0.0.1:${relayIntPort}`,
-      '--spool', spoolPath,
-      '--hub-usage-url', `http://127.0.0.1:${hubInternalPort}/internal/v1/usage/request-events:batch`,
-      '--hub-service-token-file', relayTokenFile,
-    ], { cwd: envRoot, stdio: ['ignore', 'pipe', 'pipe'] })
+    const { hubProc: hp, relayProc: rp } = startHubAndRelay(env, { stdio: 'pipe' })
+    hubProc = hp
+    relayProc = rp
 
     // Wait for Hub and Relay to be ready
-    async function waitFor(url, label, maxWait = 30000) {
-      const start = Date.now()
-      while (Date.now() - start < maxWait) {
-        try {
-          const resp = await fetch(url)
-          if (resp.ok || resp.status === 401 || resp.status === 404) {
-            console.log(`${label} ready`)
-            return
-          }
-        } catch {}
-        await new Promise(r => setTimeout(r, 500))
-      }
-      throw new Error(`${label} not ready after ${maxWait}ms`)
+    const hubReady = await waitFor(`${hubUrl}/live`, 'Hub', 30000)
+    if (!hubReady) {
+      console.error('Hub not ready')
+      process.exit(1)
     }
-
-    await waitFor(`${hubUrl}/live`, 'Hub')
-    await waitFor(`http://127.0.0.1:${relayIntPort}/live`, 'Relay')
+    const relayReady = await waitFor(`http://127.0.0.1:${relayIntPort}/live`, 'Relay', 30000)
+    if (!relayReady) {
+      console.error('Relay not ready')
+      process.exit(1)
+    }
   }
 
   console.log(`Hub URL: ${hubUrl}`)

@@ -90,15 +90,15 @@ collect-artifacts:
 	@mkdir -p .artifacts
 	@echo "Collecting backend test artifacts..."
 	@cd backend && go test ./internal/... -count=1 -json -timeout 120s > ../.artifacts/backend-test.json; exit_code=$$?; \
-	node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/backend-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:process.argv[2]},null,2)+'\n')" $$exit_code; \
+	node scripts/write-meta.mjs backend-test.json 'go test -json' $$exit_code; \
 	if [ $$exit_code -ne 0 ]; then echo "ERROR: backend tests failed (exit $$exit_code)"; exit $$exit_code; fi
 	@echo "Collecting system test artifacts..."
 	@cd backend && go test -tags=smoke ./test/system/scenarios/ ./test/system/adapter/ ./test/system/client/ -count=1 -json -timeout 5m > ../.artifacts/system-test.json; exit_code=$$?; \
-	node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/system-test.json';const hash=crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -tags=smoke -json',artifactSha256:'sha256:'+hash,startedAt:now,completedAt:now,exitCode:process.argv[2]},null,2)+'\n')" $$exit_code; \
+	node scripts/write-meta.mjs system-test.json 'go test -tags=smoke -json' $$exit_code; \
 	if [ $$exit_code -ne 0 ]; then echo "ERROR: system tests failed (exit $$exit_code)"; exit $$exit_code; fi
 	@echo "Collecting console test artifacts..."
 	@cd console && pnpm vitest run --reporter=json --outputFile=../.artifacts/console-test.json 2>../.artifacts/console-test.stderr.log; exit_code=$$?; \
-	node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/console-test.json';const hash=fs.existsSync(f)?'sha256:'+crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex'):'missing';fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'pnpm vitest run --reporter=json --outputFile',artifactSha256:hash,startedAt:now,completedAt:now,exitCode:process.argv[2]},null,2)+'\n')" $$exit_code; \
+	node scripts/write-meta.mjs console-test.json 'pnpm vitest run --reporter=json --outputFile' $$exit_code; \
 	if [ $$exit_code -ne 0 ]; then echo "ERROR: console tests failed (exit $$exit_code)"; exit $$exit_code; fi
 	@echo "Collecting static contract artifact..."
 	@echo '{"codegenDrift":"PASS","gofmt":"PASS","goVet":"PASS","commit":"'$(shell git rev-parse HEAD)'"}' > .artifacts/static-contract.json
@@ -122,7 +122,7 @@ collect-artifacts:
 freeze-gate: collect-artifacts s01-candidate-test s01-browser-candidate collect-baseline
 	@echo "Collecting candidate test artifacts..."
 	@cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json; exit_code=$$?; \
-	node -e "const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const sha=cp.execSync('git rev-parse HEAD',{encoding:'utf-8'}).trim();const now=new Date().toISOString();const f='.artifacts/candidate-test.json';const hash=fs.existsSync(f)?'sha256:'+crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex'):'missing';fs.writeFileSync(f+'.meta.json',JSON.stringify({platformCoreCommit:sha,command:'go test -tags=candidate -json',artifactSha256:hash,startedAt:now,completedAt:now,exitCode:process.argv[2]},null,2)+'\n')" $$exit_code; \
+	node scripts/write-meta.mjs candidate-test.json 'go test -tags=candidate -json' $$exit_code; \
 	if [ $$exit_code -ne 0 ]; then echo "ERROR: candidate tests failed (exit $$exit_code)"; exit $$exit_code; fi
 	@echo "Generating freeze manifest..."
 	node scripts/freeze-manifest.mjs

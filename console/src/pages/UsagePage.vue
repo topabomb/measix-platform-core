@@ -206,23 +206,23 @@ onMounted(refresh)
       <PricingPanel />
     </template>
 
-    <div v-else class="row items-center q-gutter-sm q-mb-md flex-wrap">
-      <q-input v-model="fromISO" outlined dense :label="$t('usage.filters.time')" placeholder="2026-08-01T00:00:00Z" style="width: 190px" />
-      <q-input v-model="toISO" outlined dense :label="$t('usage.filters.time')" placeholder="2026-08-31T23:59:59Z" style="width: 190px" />
-      <q-btn-dropdown dense flat :label="$t('usage.filters.time')" :no-icon-animation="true" class="q-px-xs">
+    <div v-else class="row items-end q-col-gutter-sm q-mb-md">
+      <div class="col-auto"><q-input v-model="fromISO" outlined dense :label="$t('usage.filters.time')" placeholder="2026-08-01T00:00:00Z" style="width: 190px" /></div>
+      <div class="col-auto"><q-input v-model="toISO" outlined dense :label="$t('usage.filters.time')" placeholder="2026-08-31T23:59:59Z" style="width: 190px" /></div>
+      <div class="col-auto"><q-btn-dropdown dense flat :label="$t('usage.filters.time')" :no-icon-animation="true" class="q-px-xs">
         <q-list>
           <q-item clickable v-close-popup @click="applyRange(1)"><q-item-section>{{ $t('usage.range24h') }}</q-item-section></q-item>
           <q-item clickable v-close-popup @click="applyRange(7)"><q-item-section>{{ $t('usage.range7d') }}</q-item-section></q-item>
           <q-item clickable v-close-popup @click="applyRange(30)"><q-item-section>{{ $t('usage.range30d') }}</q-item-section></q-item>
         </q-list>
-      </q-btn-dropdown>
-      <q-input v-model="userId" outlined dense :label="$t('usage.filters.user')" placeholder="usr_..." style="width: 160px" />
-      <q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." style="width: 170px" />
-      <q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable style="width: 150px" />
-      <q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." style="width: 170px" />
-      <q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable style="width: 130px" />
-      <q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable style="width: 150px" />
-      <q-btn flat dense icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" />
+      </q-btn-dropdown></div>
+      <div class="col-auto"><q-input v-model="userId" outlined dense :label="$t('usage.filters.user')" placeholder="usr_..." style="width: 160px" /></div>
+      <div class="col-auto"><q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." style="width: 170px" /></div>
+      <div class="col-auto"><q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable style="width: 150px" /></div>
+      <div class="col-auto"><q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." style="width: 170px" /></div>
+      <div class="col-auto"><q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable style="width: 130px" /></div>
+      <div class="col-auto"><q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable style="width: 150px" /></div>
+      <div class="col-auto"><q-btn flat dense icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" /></div>
     </div>
     <q-banner v-if="activeFilters.length" class="q-mb-md bg-grey-2 rounded-borders">
       <div class="row items-center q-gutter-sm">

@@ -38,8 +38,10 @@ const router = useRouter()
     <div class="row items-center q-gutter-sm">
       <!-- Primary action: exactly one visual primary button per page. -->
       <slot name="primary" />
-      <!-- Secondary actions on wide screens. -->
-      <slot name="actions" />
+      <!-- Secondary actions on wide screens only. -->
+      <div v-if="$slots.actions" class="gt-sm row items-center q-gutter-sm">
+        <slot name="actions" />
+      </div>
       <!-- On narrow screens the overflow menu carries secondary actions. -->
       <q-btn-dropdown v-if="$slots.actions" flat round icon="more_vert" class="lt-md">
         <q-list>

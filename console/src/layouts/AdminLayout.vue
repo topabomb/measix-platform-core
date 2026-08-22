@@ -16,14 +16,16 @@ const session = useSessionStore()
 const drawerOpen = ref(false)
 const navItems = visibleNavItems()
 
-// On wide screens the drawer is persistent; ensure it starts open.
-if ($q.screen.gt.sm) {
+// On wide screens (lg+) the drawer is persistent; ensure it starts open.
+// On medium and below it is an overlay that starts closed.
+if ($q.screen.gt.md) {
   drawerOpen.value = true
 }
 
-// On wide screens the drawer stays persistent; on compact/mobile it closes.
+// On medium and below the drawer is an overlay; close it after navigating.
+// On wide screens the drawer is persistent; do NOT close it.
 function onNavigate() {
-  if (!$q.screen.gt.sm) {
+  if (!$q.screen.gt.md) {
     drawerOpen.value = false
   }
 }
@@ -34,7 +36,7 @@ function onNavigate() {
 watch(
   () => route.fullPath,
   () => {
-    if (!$q.screen.gt.sm) {
+    if (!$q.screen.gt.md) {
       drawerOpen.value = false
     }
   },
@@ -72,7 +74,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
       <q-toolbar>
         <q-btn
           flat round dense icon="menu"
-          class="lt-md"
+          class="lt-lg"
           :aria-label="$t('nav.system')"
           @click="drawerOpen = !drawerOpen"
         />
@@ -126,11 +128,10 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
          Wide = persistent rail, Compact = collapsible mini, Mobile = overlay drawer. -->
     <q-drawer
       v-model="drawerOpen"
-      :show-if-above="$q.screen.gt.sm"
+      :show-if-above="$q.screen.gt.md"
       bordered
-      :width="$q.screen.gt.md ? 240 : 240"
-      :mini="$q.screen.md && !$q.screen.gt.md && !drawerOpen"
-      :mini-to-overlay="true"
+      :width="240"
+      :mini="false"
     >
       <q-list padding>
         <q-item-label header class="gt-sm">{{ $t('nav.runtimeFoundation') }}</q-item-label>

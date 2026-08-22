@@ -98,16 +98,16 @@ onMounted(refresh)
       </q-banner>
       <div class="row q-col-gutter-md">
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.managedRuntime') }}</div><StatusChip :value="system.runtimeStatus" /><div class="text-caption q-mt-sm">{{ $t('system.relay') }} {{ system.relayReady ? $t('status.READY').toLowerCase() : $t('status.NOT_CONVERGED').toLowerCase() }}</div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.managedRuntime') }}</div><div class="q-mt-xs"><StatusChip :value="system.runtimeStatus" /></div><div class="text-caption q-mt-sm">{{ $t('system.relay') }} {{ system.relayReady ? $t('status.READY').toLowerCase() : $t('status.NOT_CONVERGED').toLowerCase() }}</div></q-card-section></q-card>
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.activeGeneration') }}</div><div class="text-h4">{{ system.activeManagedGeneration }}</div><div class="text-caption">{{ $t('system.managedStateRevision') }} {{ system.managedStateRevision }}</div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.activeGeneration') }}</div><div class="text-h4 q-mt-xs">{{ system.activeManagedGeneration }}</div><div class="text-caption q-mt-sm">{{ $t('system.managedStateRevision') }} {{ system.managedStateRevision }}</div></q-card-section></q-card>
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.desiredRevision') }}</div><div class="text-h4">{{ system.desiredControlRevision }}</div><div class="text-caption">{{ $t('system.relay') }} {{ system.appliedControlRevision ?? '—' }} · <span class="text-caption">{{ $t('system.bundle').toLowerCase() }} {{ system.desiredBundleHash ? system.desiredBundleHash.slice(7, 19) : '—' }}</span></div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.desiredRevision') }}</div><div class="text-h4 q-mt-xs">{{ system.desiredControlRevision }}</div><div class="text-caption q-mt-sm">{{ $t('system.relay') }} {{ system.appliedControlRevision ?? '—' }} · <span class="text-caption">{{ $t('system.bundle').toLowerCase() }} {{ system.desiredBundleHash ? system.desiredBundleHash.slice(7, 19) : '—' }}</span></div></q-card-section></q-card>
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.requests') }}</div><div class="text-h4">{{ usage?.requestCount ?? 0 }}</div><div class="text-caption">{{ usage?.forwardedRequestCount ?? 0 }} {{ $t('usage.detail.forwarded').toLowerCase() }}</div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.requests') }}</div><div class="text-h4 q-mt-xs">{{ usage?.requestCount ?? 0 }}</div><div class="text-caption q-mt-sm">{{ usage?.forwardedRequestCount ?? 0 }} {{ $t('usage.detail.forwarded').toLowerCase() }}</div></q-card-section></q-card>
         </div>
       </div>
       <div class="row q-col-gutter-md q-mt-xs">

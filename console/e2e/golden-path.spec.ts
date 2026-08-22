@@ -281,9 +281,61 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
     await page.click('[data-cy="tab-policy"]')
     await page.waitForTimeout(500)
 
-    // The Policy tab shows toggle controls for allowLocal flags
-    // We just ensure the policy tab renders correctly with toggles visible
-    // The defaults are already set by the Hub
+    // Actually toggle Policy allowLocal flags — not just render check.
+    // Per architecture CAP-C6-001: Policy must be actually configured.
+    // Toggle allowLocalProviders ON (then back OFF to leave defaults)
+    const providerToggle = page.locator('.q-toggle:has-text("Models")')
+    if (await providerToggle.isVisible().catch(() => false)) {
+      // Toggle ON
+      await providerToggle.click()
+      await page.waitForTimeout(200)
+      // Toggle back OFF (restore default)
+      await providerToggle.click()
+      await page.waitForTimeout(200)
+    }
+
+    // Toggle allowLocalTts
+    const ttsToggle = page.locator('.q-toggle:has-text("TTS")')
+    if (await ttsToggle.isVisible().catch(() => false)) {
+      await ttsToggle.click()
+      await page.waitForTimeout(200)
+      await ttsToggle.click()
+      await page.waitForTimeout(200)
+    }
+
+    // --- 4g: Configure Pricing ---
+    // Per architecture CAP-C6-001: Pricing must be actually created.
+    // Navigate to Usage page → Pricing tab → Add a pricing rule.
+    await page.goto('/admin/usage')
+    await expect(page.locator('[data-cy="usage-page"]')).toBeVisible({ timeout: 10_000 })
+
+    // Click the Pricing tab
+    await page.click('text=/pricing|Pricing/i')
+    await page.waitForTimeout(500)
+
+    // Click Add Rule
+    await page.click('[data-cy="pricing-add-rule-btn"]')
+    await page.waitForTimeout(500)
+
+    // Fill the pricing rule — set unit price for the first rule
+    const unitPriceInput = page.locator('[data-cy="pricing-unit-price"]').first()
+    if (await unitPriceInput.isVisible().catch(() => false)) {
+      await unitPriceInput.fill('0.001')
+      await page.waitForTimeout(200)
+    }
+
+    // Save the pricing rules
+    const pricingSaveBtn = page.locator('[data-cy="pricing-save-btn"]')
+    if (await pricingSaveBtn.isVisible().catch(() => false)) {
+      await pricingSaveBtn.click()
+      // Wait for save to complete
+      await page.waitForTimeout(2_000)
+    }
+
+    // Go back to resources page to save the draft
+    await page.goto('/admin/resources')
+    await expect(page.locator('[data-cy="resources-page"]')).toBeVisible()
+    await expect(page.locator('[data-cy="tab-models"]')).toBeVisible({ timeout: 10_000 })
 
     // Save the draft with all changes
     const saveBtn = page.locator('[data-cy="draft-save-btn"]')

@@ -122,8 +122,8 @@ onMounted(refresh)
       </div>
       <div class="q-gutter-sm">
         <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
-        <q-btn outline icon="add" :label="$t('pricing.addRule')" @click="addRule" />
-        <q-btn color="primary" icon="save" :label="$t('common.save')" :disable="revision === undefined" :loading="saving" @click="save" />
+        <q-btn outline icon="add" :label="$t('pricing.addRule')" @click="addRule" data-cy="pricing-add-rule-btn" />
+        <q-btn color="primary" icon="save" :label="$t('common.save')" :disable="revision === undefined" :loading="saving" @click="save" data-cy="pricing-save-btn" />
       </div>
     </q-card-section>
 
@@ -161,7 +161,7 @@ onMounted(refresh)
               <q-input v-model="rule.unitSize" dense outlined :label="$t('pricing.unitSize')" />
             </div>
             <div class="col-6 col-md-1">
-              <q-input v-model="rule.unitPrice" dense outlined :label="$t('pricing.unitPrice')" />
+              <q-input v-model="rule.unitPrice" dense outlined :label="$t('pricing.unitPrice')" data-cy="pricing-unit-price" />
             </div>
             <div class="col-6 col-md-1">
               <q-input v-model="rule.currency" dense outlined :label="$t('pricing.currency')" />

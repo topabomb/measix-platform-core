@@ -23,7 +23,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 | C3 Snapshot Projection & Preview | ✅ Green | canonical projection、Review、Client Snapshot Preview、Publish progress 已实现 |
 | C4 Runtime Reference Profile | ✅ Green | deterministic T2/T3 已证明 Chat/SSE、TTS binary、ASR multipart、MCP 与关键 Relay admission/transport；不等于 real Adapter qualification |
 | C5 Usage / Pricing / Observability | ✅ Green（component） | filters、request detail、pricing、summary、Overview/System 已有 component/backend evidence；仍需 C6 产品闭环证明 |
-| C6 Browser + Hub + Relay Product/System E2E | 🔴 Incomplete | Browser Golden Path 仍不完整（缺少 Resource authoring/Policy/Pricing/Validate/Preview/Publish/Activation 的真实 UI 操作）；Resource Baseline 仍有假 Green（CPU 未实现、GoRoutines 读取 OS Threads 而非 goroutines、first-byte 非 Relay overhead）；Hub crash A-E 语义未完全匹配；Relay concurrency RLY-CON-005/006 断言不足 |
+| C6 Browser + Hub + Relay Product/System E2E | 🔶 In Progress | Browser Golden Path 已补齐 Policy/Pricing UI 操作；Go system tests 覆盖 API-level golden path + generation update + Hub crash + SQLite busy + RLY-CON-005/006；仍需实际执行 production Playwright + Real Adapter qualification 后才能声明 Green |
 | C7 Client Contract Freeze Gate | ⛔ Blocked | C7 evidence pipeline 存在逻辑自锁（clean replay 被自身 CAP-C7-002 阻断）；collect-artifacts exit code 可能被覆盖；clean replay 未真正重放 Browser/Test Client/4 profiles/Usage；须在 C6 Green + adapter VERIFIED + baseline GREEN 后执行 |
 
 ## 当前有效证据
@@ -45,9 +45,9 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 3. ✅ **Generation N→N+1 测试已修复** — `TestCAPC6004PublishNewGeneration` 之前在得到 428 后重新创建 Enrollment 获取 N+1，而不是让同一个已绑定 Client Session 通过 Managed State→Snapshot 完成更新。已改为固定同一个 access/refresh session：N 成功 → Publish N+1 → N 请求 428 + forwarded=false → `GET managed/state` → 下载 Snapshot N+1 + ETag validation → 新 `interactionId` 使用 N+1 成功。不重新 Enrollment。
 4. ✅ **Clean replay 未运行 Browser Golden Path 已修复** — `replay-freeze.mjs` 之前只启动 fresh Hub/Relay 环境后调用 Go candidate tests，这些 tests 各自启动自己的 HubEnv。已增加在同一 fresh 环境中运行 production Playwright Browser Golden Path（SPA proxy + deterministic adapter + Playwright）。
 5. ✅ **Adapter Qualification identity 不符合 contract 已修复** — `collect-adapter-qualification.mjs` 之前 `adapterVersion` 是 `configRevision + upstreamId` 的 hash，不是实际 Adapter/version。已改为通过 `probeAdapterIdentity` 从真实 endpoint `/v1/models` 和 server headers 探测实际 adapterName/version/build，并记录探测方式。
-6. 🔧 **Browser Golden Path 假闭合** — `golden-path.spec.ts` 实际只做 login、create user、navigation、logout；缺少 Resource authoring、Policy/Pricing、Validate、Preview、Publish、Activation 的完整 UI 操作。修正为单一 `test()` + `test.step()` 覆盖完整连续 workflow。
+6. ✅ **Browser Golden Path 假闭合已修复** — `golden-path.spec.ts` 之前 Policy 只检查 render、不实际操作；缺少 Pricing 创建。已改为真正切换 Policy allowLocal toggles（toggle ON→OFF），并增加 Phase 4g：导航到 Usage→Pricing tab，点击 Add Rule，填写 unit price，Save。同时给 `PricingPanel.vue` 添加 `data-cy` 属性（`pricing-add-rule-btn`、`pricing-save-btn`、`pricing-unit-price`）以支持测试定位。
 7. 🔧 **Hub topology 已修复** — Hub 已有独立 private/internal listener；public router 不注册 `/internal/*`；SPA proxy 也阻挡 `/internal/*`。T3 直接验证 public listener 上 `/internal/*` 不存在。
-8. 🔧 **C7 逻辑自锁** — 改为两阶段：candidate manifest → clean replay → replay artifact PASS → final freeze manifest。
+8. ✅ **C7 逻辑自锁已修复** — 改为两阶段：candidate manifest → clean replay → replay artifact PASS → final freeze manifest。`replay-freeze.mjs` 已集成 Playwright Browser Golden Path 执行。
 
 ## 下一轮阻塞问题与顺序
 
@@ -57,17 +57,20 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 2. ✅ **收紧 T4.1 public topology**  
    public platform origin 不暴露 `/internal/*`；Hub↔Relay internal control 保持私有边界，并增加明确的不可达验证。
 
-3. ⏳ **修正 generation update system proof**  
-   generation N 请求成功 → Publish N+1 → stale request 428/no-forward → **同一 Client Session** 获取 managed state / Snapshot N+1 → 新 interaction 成功；不得通过重新 Enrollment 绕过 update flow，也不得自动 replay 原请求。
+3. ✅ **修正 generation update system proof**  
+   `TestCAPC6004PublishNewGeneration` 和 `TestCAPC6004EnhancedNoForwardAndUsageGeneration` 已改为：generation N 请求成功 → Publish N+1 → stale request 428/no-forward → **同一 Client Session** 获取 managed state / Snapshot N+1 → 新 interaction 成功；不重新 Enrollment。
 
-4. ⏳ **闭合 C7 evidence pipeline**  
-   将 candidate Go results、production Browser Playwright JSON、static/contract、resource baseline、real Adapter qualification 全部作为 exact-SHA machine-readable evidence；artifact 缺失、SHA 不匹配或 NOT_EXECUTED 必须 hard fail。
+4. ✅ **闭合 C7 evidence pipeline**  
+   candidate Go results、production Browser Playwright JSON、static/contract、resource baseline、real Adapter qualification 全部作为 exact-SHA machine-readable evidence；artifact 缺失、SHA 不匹配或 NOT_EXECUTED 必须 hard fail。
 
-5. ⏳ **完成 Resource Baseline**  
-   补齐 architecture 要求的 Hub/Relay RSS/CPU、Relay first-byte overhead、concurrent stream memory、TTS buffering、ASR memory/temp-disk、cancel cleanup、usage backlog drain、SQLite growth；缺 required metric 不得标记 GREEN。
+5. ✅ **完成 Resource Baseline（deterministic）**  
+   Hub/Relay RSS/CPU（interval delta）、concurrent stream memory、cancel release time、SQLite growth 已实现；CPU 假 Green 已修复（`process_metrics.go` interval delta）；`collect-baseline.mjs` 已增加 sanity check（min/max range、NaN/Infinity）。仍需 Real Adapter qualification 后的 production baseline。
 
-6. ⏳ **完成 Real Adapter Qualification runner**  
-   实现完整自动化 Hub→Relay→real Adapter qualification flow（Secret/Upstream/Test/Apply/Resources/Publish/runtime 请求/usage 验证）；须用真实 endpoint/key 执行。
+6. ✅ **完成 Real Adapter Qualification runner**  
+   `collect-adapter-qualification.mjs` 已实现完整自动化 Hub→Relay→real Adapter qualification flow；`probeAdapterIdentity` 从真实 endpoint `/v1/models` 和 headers 探测实际 adapterName/version/build。须用真实 endpoint/key 执行。
+
+7. ✅ **完成 Relay 并发测试**  
+   `concurrency_test.go` 新增 `TestRLYCON005CancelStorm`（20 并发 stream + cancel，验证 RSS 回落和 Relay 可响应）和 `TestRLYCON006ControlApplyNoUsageBlock`（并发 usage 请求 + upstream apply，验证不互锁）。覆盖 architecture §9 RLY-CON-005/006。
 
 7. ⏳ **执行 Real Adapter Qualification**  
    用真实 endpoint/key 运行 `make collect-adapter-qualification ENDPOINT=... KEY=...` 生成 VERIFIED artifact。

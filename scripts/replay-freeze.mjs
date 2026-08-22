@@ -26,7 +26,7 @@
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, readdirSync, statSync } from 'node:fs'
-import { join, resolve, relative } from 'node:path'
+import { join, resolve, relative, extname } from 'node:path'
 import { execSync, spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { randomFillSync } from 'node:crypto'
@@ -34,6 +34,9 @@ import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 const net = require('node:net')
+const http = require('node:http')
+const { createServer } = http
+const { request: httpRequest } = http
 
 const ROOT = resolve(import.meta.dirname, '..')
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
@@ -300,29 +303,83 @@ if (!hubReady || !relayReady) {
 }
 
 // --- 9. Run real replay tests ---
-// Run the deterministic T4.1 Golden Path + Test Client four capabilities + Usage closure
-// using the Go test system scenarios against the fresh environment.
+// Per architecture CAP-C7-002: clean replay must run against the SAME
+// fresh environment. This means:
+//   a. Production Playwright Browser Golden Path against this fresh Hub/Relay
+//   b. Deterministic Go candidate system tests (these start their own HubEnv,
+//      proving the system works from a completely clean environment)
+//   c. Topology security + admin login + system status smoke tests
+//
+// The Playwright test runs against the SAME fresh environment we just started.
+// The Go candidate tests start their own independent HubEnv, which proves
+// the system can be deployed from scratch (not just that our running instance works).
+
+let browserGoldenPathPassed = false
+let browserGoldenPathOutput = ''
 let replayTestsPassed = false
 let replayTestOutput = ''
 
+// --- 9a. Run Playwright Browser Golden Path against this fresh environment ---
+// We need a SPA proxy and adapter for the browser test.
+// Start a deterministic adapter on a free port.
+const adapterPort = await freePort()
+const spaPort = await freePort()
+const adapterBaseURL = `http://127.0.0.1:${adapterPort}`
+const spaBaseURL = `http://127.0.0.1:${spaPort}`
+
+// Start a simple deterministic adapter (inline HTTP server)
+const adapterServer = createRequireAdapter(adapterPort)
+
+// Start SPA proxy (same-origin as browser expects)
+const spaDir = join(ROOT, 'console', 'dist', 'spa')
+if (existsSync(spaDir)) {
+  const spaServer = createSpaProxy(spaPort, spaDir, hubPort)
+  await waitFor(spaBaseURL, 'SPA')
+
+  try {
+    log('Running Playwright Browser Golden Path against fresh environment...')
+    const e2eEnv = {
+      ...process.env,
+      MEASIX_E2E_BASE_URL: spaBaseURL,
+      MEASIX_E2E_HUB_BASE_URL: hubBaseURL,
+      MEASIX_E2E_ADAPTER_URL: adapterBaseURL,
+      MEASIX_E2E_ADMIN_PASSWORD: adminPassword,
+      PLAYWRIGHT_BASE_URL: spaBaseURL,
+    }
+    browserGoldenPathOutput = execSync(
+      'npx playwright test --reporter=line',
+      { cwd: join(ROOT, 'console'), encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], env: e2eEnv, timeout: 600000 },
+    )
+    browserGoldenPathPassed = true
+    log('Browser Golden Path PASSED')
+  } catch (e) {
+    browserGoldenPathOutput = (e.stdout || '') + (e.stderr || '')
+    log('Browser Golden Path FAILED')
+    console.error('Browser test failure:', browserGoldenPathOutput.slice(0, 2000))
+  }
+
+  try { spaServer.close() } catch {}
+} else {
+  log('WARNING: SPA build not found at console/dist/spa — skipping Browser Golden Path.')
+  log('Run "make console-build" before clean replay to include browser tests.')
+  browserGoldenPathPassed = false
+}
+
+try { adapterServer.close() } catch {}
+
+// --- 9b. Run deterministic Go candidate tests ---
+// These tests start their OWN HubEnv (independent of the one we started above).
+// They prove the system can be deployed from a completely clean environment.
 try {
   log('Running deterministic T4.1 replay tests (Golden Path + Test Client + Usage closure)...')
-
-  // Run a subset of the candidate system tests that cover the core replay path:
-  // - TestCAPC6001GoldenPath (full golden path including 4 capabilities)
-  // - TestCAPC6002TestClientFourCapabilities (explicit 4-capability test)
-  // - TestCAPC6003UsageClosure (usage verification)
-  //
-  // These tests start their own HubEnv, so they are fully independent
-  // and prove the system works from a clean environment.
   replayTestOutput = execSync(
     `go test -tags=candidate -run "TestCAPC6001GoldenPath|TestCAPC6002TestClientFourCapabilities|TestCAPC6003UsageClosure" -v -timeout 10m ./test/system/scenarios/`,
     { cwd: backendDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
   )
   replayTestsPassed = true
-  log('Replay tests PASSED')
+  log('Deterministic replay tests PASSED')
 } catch (e) {
-  log('Replay tests FAILED')
+  log('Deterministic replay tests FAILED')
   replayTestOutput = (e.stdout || '') + (e.stderr || '')
   console.error('Replay test failure:', replayTestOutput.slice(0, 2000))
 }
@@ -398,8 +455,9 @@ setTimeout(() => {
   rmSync(envRoot, { recursive: true, force: true })
 }, 3000)
 
-if (!replayTestsPassed || !loginOk || !statusOk || !topologySecurityPassed) {
+if (!browserGoldenPathPassed || !replayTestsPassed || !loginOk || !statusOk || !topologySecurityPassed) {
   console.error('ERROR: Clean replay failed:')
+  if (!browserGoldenPathPassed) console.error('  - Browser Golden Path did not pass')
   if (!replayTestsPassed) console.error('  - Deterministic replay tests did not pass')
   if (!loginOk) console.error('  - Admin login failed in fresh environment')
   if (!statusOk) console.error('  - System status check failed')
@@ -425,6 +483,12 @@ const replayArtifact = {
     adminLoginOk: loginOk,
     systemStatusOk: statusOk,
     topologySecurityPassed,
+    spaBaseURL,
+    adapterBaseURL,
+  },
+  browserGoldenPath: {
+    passed: browserGoldenPathPassed,
+    outputHash: 'sha256:' + createHash('sha256').update(browserGoldenPathOutput).digest('hex'),
   },
   replayTests: {
     passed: replayTestsPassed,
@@ -461,3 +525,125 @@ log(`updated ${relative(ROOT, manifestPath)}: CAP-C7-002=PASS`)
 
 log('Clean replay: PASS')
 log('CAP-C7-002: PASS')
+
+// --- Helper functions for browser golden path replay ---
+
+function createRequireAdapter(port) {
+  const ttsBytes = Buffer.from([
+    0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ])
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, `http://127.0.0.1:${port}`)
+    const bodyChunks = []
+    req.on('data', (chunk) => bodyChunks.push(chunk))
+    req.on('end', () => {
+      const body = Buffer.concat(bodyChunks)
+      let bodyJSON = null
+      try {
+        if (req.headers['content-type']?.includes('application/json') && body.length > 0) {
+          bodyJSON = JSON.parse(body.toString())
+        }
+      } catch {}
+      const path = url.pathname
+      if (path === '/v1/chat/completions') {
+        const streaming = bodyJSON?.stream === true
+        if (streaming) {
+          res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
+          const chunks = [
+            `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}`,
+            `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"hel"}}]}`,
+            `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"lo"}}]}`,
+            `data: [DONE]`,
+          ]
+          for (const c of chunks) { res.write(c + '\n\n') }
+          res.end()
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ id: '1', object: 'chat.completion', choices: [{ index: 0, message: { role: 'assistant', content: 'hello' }, finish_reason: 'stop' }] }))
+        }
+        return
+      }
+      if (path === '/v1/audio/speech') {
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg' })
+        res.end(ttsBytes)
+        return
+      }
+      if (path === '/v1/audio/transcriptions') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ text: 'transcribed' }))
+        return
+      }
+      if (path === '/mcp') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { tools: [{ name: 'tool-a' }] } }))
+        return
+      }
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'not found' }))
+    })
+  })
+  server.listen(port, '127.0.0.1')
+  return server
+}
+
+function createSpaProxy(port, spaDir, hubPort) {
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, `http://127.0.0.1:${port}`)
+    const path = url.pathname
+    if (path.startsWith('/api/') || path === '/live' || path === '/ready') {
+      const proxyReq = httpRequest({
+        hostname: '127.0.0.1', port: hubPort, path: req.url, method: req.method, headers: req.headers,
+      }, (proxyResp) => {
+        res.writeHead(proxyResp.statusCode, proxyResp.headers)
+        proxyResp.pipe(res)
+      })
+      proxyReq.on('error', () => {
+        if (!res.headersSent) { res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'proxy error' })) }
+      })
+      req.pipe(proxyReq)
+      return
+    }
+    if (path === '/admin' || path.startsWith('/admin/')) {
+      let filePath = path.replace(/^\/admin\/?/, '')
+      if (!filePath) filePath = 'index.html'
+      const full = join(spaDir, filePath)
+      if (existsSync(full) && statSync(full).isFile()) {
+        const data = readFileSync(full)
+        const ext = extname(filePath)
+        const mimeTypes = {
+          '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',
+          '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
+          '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg',
+          '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
+        }
+        res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
+        res.writeHead(200)
+        res.end(data)
+        return
+      }
+      if (!filePath.startsWith('assets/') && !extname(filePath)) {
+        const index = join(spaDir, 'index.html')
+        if (existsSync(index)) {
+          const data = readFileSync(index)
+          res.setHeader('Content-Type', 'text/html; charset=utf-8')
+          res.writeHead(200)
+          res.end(data)
+          return
+        }
+      }
+      res.writeHead(404)
+      res.end('not found')
+      return
+    }
+    if (path === '/' || path === '') {
+      res.writeHead(302, { Location: '/admin' })
+      res.end()
+      return
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'not found' }))
+  })
+  server.listen(port, '127.0.0.1')
+  return server
+}

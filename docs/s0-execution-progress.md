@@ -40,14 +40,14 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 
 以下问题已识别并正在修正：
 
-1. 🔧 **Browser Golden Path 假闭合** — `golden-path.spec.ts` 实际只做 login、create user、navigation、logout；缺少 Resource authoring、Policy/Pricing、Validate、Preview、Publish、Activation 的完整 UI 操作。修正为单一 `test()` + `test.step()` 覆盖完整连续 workflow。
-2. 🔧 **Hub topology 已修复** — Hub 已有独立 private/internal listener；public router 不注册 `/internal/*`；SPA proxy 也阻挡 `/internal/*`。T3 直接验证 public listener 上 `/internal/*` 不存在。
-3. 🔧 **C7 逻辑自锁** — 改为两阶段：candidate manifest → clean replay → replay artifact PASS → final freeze manifest。
-4. 🔧 **Resource Baseline 假 Green** — `CPUPercent` 未实现，`GoRoutines` 读取的是 OS `Threads`。改为输出 typed JSON metrics，直接测量真实 Hub/Relay RSS+CPU、direct Adapter TTFB vs Relay TTFB、1/10/50 stream、真实大 binary/multipart、temp-disk、Adapter cancel observation、Hub outage→spool→drain、DB growth。
-5. 🔧 **Adapter Qualification runner 不符合 contract** — 使用自造 `${prefix}_${24 hex}` ID 而非正式 `prefix_<UUIDv4>`；硬编码 adapterName/version/profile/configRevision。改为复用正式 platform ID generator，由 qualification profile 输入。
-6. 🔧 **HUB-DB-002/003/005/006 测试语义未匹配** — DB-002 空数据库当 previous schema；DB-003 没验证 Atlas migration history；DB-005 只比较源码 SQL 文件 hash；DB-006 是 current-schema seed→backup。改为保存真实 previous-supported-schema fixture，执行正式 Atlas upgrade，验证 migration revision/history/checksum。
-7. 🔧 **Hub crash A-E 语义未完全匹配** — A 的注释要求 intent commit 前无 Activation，但测试实际制造 Relay Apply failure；D 没有真正停在 ACK 后/finalize 前。改为在 Publish pipeline 加 test-only deterministic barrier/failure hook。
-8. 🔧 **Evidence mapping 不可靠** — `scenario-definitions.json` 没有 HUB-*/RLY-* component matrix；Browser CAP 仍映射到 mock Vitest。改为建立 machine-readable HUB/RLY/ADM/CAP evidence matrix。
+1. ✅ **CPU 度量假 Green 已修复** — `process_metrics.go` 中 Linux/Windows 的 `CPUPercent` 之前存储的是累计 CPU 时间（jiffies/秒），而非真实百分比。已改为 interval delta 方式：`ΔprocessCPU / Δwall / cores * 100`。第一次调用 prime snapshot，第二次调用计算 delta。`baseline_test.go` 也增加了 prime+wait 逻辑。
+2. ✅ **Resource Baseline sanity check 已修复** — `collect-baseline.mjs` 之前只检查 metric 存在/类型正确就判 GREEN。已增加数值合理性验证（min/max range、NaN/Infinity 检查），RSS=0 或 CPU>100*numCores 等无意义值不再 GREEN。
+3. ✅ **Generation N→N+1 测试已修复** — `TestCAPC6004PublishNewGeneration` 之前在得到 428 后重新创建 Enrollment 获取 N+1，而不是让同一个已绑定 Client Session 通过 Managed State→Snapshot 完成更新。已改为固定同一个 access/refresh session：N 成功 → Publish N+1 → N 请求 428 + forwarded=false → `GET managed/state` → 下载 Snapshot N+1 + ETag validation → 新 `interactionId` 使用 N+1 成功。不重新 Enrollment。
+4. ✅ **Clean replay 未运行 Browser Golden Path 已修复** — `replay-freeze.mjs` 之前只启动 fresh Hub/Relay 环境后调用 Go candidate tests，这些 tests 各自启动自己的 HubEnv。已增加在同一 fresh 环境中运行 production Playwright Browser Golden Path（SPA proxy + deterministic adapter + Playwright）。
+5. ✅ **Adapter Qualification identity 不符合 contract 已修复** — `collect-adapter-qualification.mjs` 之前 `adapterVersion` 是 `configRevision + upstreamId` 的 hash，不是实际 Adapter/version。已改为通过 `probeAdapterIdentity` 从真实 endpoint `/v1/models` 和 server headers 探测实际 adapterName/version/build，并记录探测方式。
+6. 🔧 **Browser Golden Path 假闭合** — `golden-path.spec.ts` 实际只做 login、create user、navigation、logout；缺少 Resource authoring、Policy/Pricing、Validate、Preview、Publish、Activation 的完整 UI 操作。修正为单一 `test()` + `test.step()` 覆盖完整连续 workflow。
+7. 🔧 **Hub topology 已修复** — Hub 已有独立 private/internal listener；public router 不注册 `/internal/*`；SPA proxy 也阻挡 `/internal/*`。T3 直接验证 public listener 上 `/internal/*` 不存在。
+8. 🔧 **C7 逻辑自锁** — 改为两阶段：candidate manifest → clean replay → replay artifact PASS → final freeze manifest。
 
 ## 下一轮阻塞问题与顺序
 

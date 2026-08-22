@@ -93,6 +93,7 @@ function generateStableId(prefix) {
 
 // Derive adapter name from the endpoint URL hostname.
 // e.g., https://api.openai.com → "api.openai.com"
+// This identifies the actual adapter endpoint being qualified.
 function deriveAdapterName(endpoint) {
   try {
     const url = new URL(endpoint)
@@ -102,16 +103,50 @@ function deriveAdapterName(endpoint) {
   }
 }
 
-// Derive adapter version from configRevision + upstreamId hash.
-// This is a deterministic version string derived from the actual upstream configuration,
-// not a hardcoded value.
-function deriveAdapterVersion(configRevision, upstreamId) {
-  if (!configRevision) return 'unknown'
-  const hash = createHash('sha256')
-  hash.update(configRevision || '')
-  hash.update('\0')
-  hash.update(upstreamId || '')
-  return 'sha256:' + hash.digest('hex').slice(0, 12)
+// Probe the real adapter for its identity.
+// Tries to read server headers or /v1/models response to identify the actual
+// adapter software/version. Falls back to endpoint-derived identity.
+async function probeAdapterIdentity(endpoint, apiKey) {
+  let adapterName = deriveAdapterName(endpoint)
+  let adapterVersion = 'unknown'
+  let adapterBuild = null
+  let detectedVia = 'endpoint-hostname'
+
+  try {
+    // Try /v1/models endpoint — many OpenAI-compatible adapters expose model list
+    const resp = await fetch(`${endpoint.replace(/\/$/, '')}/v1/models`, {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (resp.ok) {
+      // Check for server identification headers
+      const serverHeader = resp.headers.get('server') || ''
+      const viaHeader = resp.headers.get('via') || ''
+      const xRequestId = resp.headers.get('x-request-id') || ''
+      if (serverHeader) {
+        adapterName = serverHeader
+        detectedVia = 'server-header'
+      } else if (viaHeader) {
+        adapterName = viaHeader
+        detectedVia = 'via-header'
+      }
+      // Try to get version from body
+      const body = await resp.text()
+      try {
+        const data = JSON.parse(body)
+        if (data.object && typeof data.object === 'string') {
+          // Some adapters return their version in the response
+          adapterVersion = `api-${data.object}`
+          detectedVia = detectedVia === 'endpoint-hostname' ? 'models-endpoint' : detectedVia
+        }
+        // Check for any version-like fields
+        if (data.version) adapterVersion = String(data.version)
+        if (data.build) adapterBuild = String(data.build)
+      } catch {}
+    }
+  } catch {}
+
+  return { adapterName, adapterVersion, adapterBuild, detectedVia }
 }
 
 if (!endpoint || !apiKey) {
@@ -1175,11 +1210,13 @@ async function main() {
   const allVerified = profilesToQualify.every(p => results[p]?.status === 'VERIFIED')
   const overallStatus = allVerified ? 'VERIFIED' : 'FAILED'
 
-  // Qualification unit: adapterName/version + upstreamId/configRevision + profile
-  // Derive adapterName/version from the endpoint URL hostname (not hardcoded).
-  // Derive correlationLevel and usageCapabilityLevel from actual test observations.
-  const adapterName = deriveAdapterName(endpoint)
-  const adapterVersion = deriveAdapterVersion(configRevision, upstream.upstreamId)
+// Qualification unit: adapterName/version + upstreamId/configRevision + profile
+// Per architecture §1: qualification unit must be adapterName/version +
+// upstreamId/configRevision + clientProtocol profile + transport + correlation/usage.
+// The adapterName/version is probed from the real adapter endpoint, not derived
+// from configRevision hash. The configRevision is recorded separately as the
+// tested configuration revision.
+const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityDetectedVia } = await probeAdapterIdentity(endpoint, apiKey)
 
   // Derive correlation level from test observations:
   // If all model streaming tests passed with proper SSE, correlation is at least HEADER_ECHO.
@@ -1201,18 +1238,20 @@ async function main() {
   }
 
   const artifact = {
-    status: overallStatus,
-    commit,
-    qualifiedAt: new Date().toISOString(),
-    endpoint: endpoint.replace(/\/$/, ''),
-    profile,
-    adapterName,
-    adapterVersion,
-    upstreamId: upstream.upstreamId,
-    configRevision,
-    correlationLevel,
-    usageCapabilityLevel,
-    knownDeviations: [],
+status: overallStatus,
+commit,
+qualifiedAt: new Date().toISOString(),
+endpoint: endpoint.replace(/\/$/, ''),
+profile,
+adapterName,
+adapterVersion,
+adapterBuild,
+adapterIdentityDetectedVia,
+upstreamId: upstream.upstreamId,
+configRevision,
+correlationLevel,
+usageCapabilityLevel,
+knownDeviations: [],
     usageRecordsCount: usageCount,
     profiles: results,
   }

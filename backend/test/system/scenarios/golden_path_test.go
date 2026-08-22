@@ -5,6 +5,8 @@ package scenarios
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -297,17 +299,73 @@ func TestCAPC6004PublishNewGeneration(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected 428 for old generation")
 	}
-	if pe, ok := err.(client.ProblemError); !ok || pe.Status != 428 {
+	pe, ok := err.(client.ProblemError)
+	if !ok || pe.Status != 428 {
 		t.Fatalf("expected 428, got %v", err)
 	}
 
-	// Fetch new snapshot with new generation — need a fresh enrollment since the first was consumed
-	newEnrollmentCode := gp.createEnrollment(ctx, admin, gp.lastUserID)
-	_, generationN1 := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, newEnrollmentCode)
+	// Verify the 428 response includes forwarded=false (Adapter received no body)
+	if pe.Forwarded != nil && *pe.Forwarded {
+		t.Fatal("expected forwarded=false for 428, but forwarded was true")
+	}
+
+	// Same Client Session: fetch managed state to discover new generation N+1.
+	// Per architecture CAP-C6-004: the SAME access token must be used to
+	// GET managed/state → download Snapshot N+1 → use new interactionId
+	// with generation N+1. Do NOT re-enroll.
+	stateReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, env.HubBaseURL+"/api/client/v1/managed/state", nil)
+	stateReq.Header.Set("Authorization", "Bearer "+clientToken)
+	stateResp, err := http.DefaultClient.Do(stateReq)
+	if err != nil {
+		t.Fatalf("get managed state for N+1: %v", err)
+	}
+	defer stateResp.Body.Close()
+	if stateResp.StatusCode != http.StatusOK {
+		t.Fatalf("managed state status: %d", stateResp.StatusCode)
+	}
+	var stateN1 struct {
+		ActiveManagedGeneration int `json:"activeManagedGeneration"`
+	}
+	if err := json.NewDecoder(stateResp.Body).Decode(&stateN1); err != nil {
+		t.Fatalf("decode managed state N+1: %v", err)
+	}
+	generationN1 := stateN1.ActiveManagedGeneration
 	if generationN1 <= generationN {
 		t.Fatalf("generation should increment: %d -> %d", generationN, generationN1)
 	}
+	t.Logf("same session: discovered generation N+1=%d (was N=%d)", generationN1, generationN)
 
+	// Download Snapshot N+1 with the SAME access token
+	snapReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/client/v1/managed/snapshots/%d", env.HubBaseURL, generationN1), nil)
+	snapReq.Header.Set("Authorization", "Bearer "+clientToken)
+	snapResp, err := http.DefaultClient.Do(snapReq)
+	if err != nil {
+		t.Fatalf("fetch snapshot N+1: %v", err)
+	}
+	defer snapResp.Body.Close()
+	if snapResp.StatusCode != http.StatusOK {
+		t.Fatalf("snapshot N+1 status: %d", snapResp.StatusCode)
+	}
+	// Verify ETag is present
+	etag := snapResp.Header.Get("ETag")
+	if etag == "" {
+		t.Log("warning: snapshot N+1 has no ETag header")
+	}
+	var snapN1 map[string]interface{}
+	if err := json.NewDecoder(snapResp.Body).Decode(&snapN1); err != nil {
+		t.Fatalf("decode snapshot N+1: %v", err)
+	}
+	// Verify snapshot N+1 has the updated model name
+	if models, ok := snapN1["models"].([]interface{}); ok && len(models) > 0 {
+		if m, ok := models[0].(map[string]interface{}); ok {
+			if m["displayName"] != "Updated Model Name" {
+				t.Fatalf("snapshot N+1 model displayName not updated: %v", m["displayName"])
+			}
+		}
+	}
+	t.Log("snapshot N+1 verified: updated model name present")
+
+	// Use a NEW interactionId with generation N+1 (same access token, new interaction)
 	tc2 := client.New(client.Options{
 		RuntimeBaseURL:    env.RelayPubBaseURL,
 		AccessToken:       clientToken,

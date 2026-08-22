@@ -60,12 +60,20 @@ func TestBaseline(t *testing.T) {
 	admin := harness.NewAdminClient(env.HubBaseURL)
 
 	// --- §17.1: Hub idle RSS/CPU ---
-	// Give the Hub a moment to settle after startup.
+	// Prime the CPU snapshot with an initial reading, then wait for a
+	// meaningful interval before sampling again to get a true delta.
+	// The first call to HubProcessMetrics returns CPUPercent=0 (no
+	// previous snapshot); the second call computes the interval delta.
 	time.Sleep(2 * time.Second)
+	_ = env.HubProcessMetrics()   // prime the snapshot
+	_ = env.RelayProcessMetrics() // prime the relay snapshot
+	time.Sleep(2 * time.Second)   // wait for measurable CPU delta
+
 	hubMetricsBefore := env.HubProcessMetrics()
 	hubDBSizeBefore := dbFileSize(env.DBPath)
 	t.Logf("BASELINE Hub idle RSS: %d bytes", hubMetricsBefore.RSSBytes)
 	t.Logf("BASELINE Hub idle CPU: %.2f%%", hubMetricsBefore.CPUPercent)
+	t.Logf("BASELINE Hub idle CPU seconds (cumulative): %.2f", hubMetricsBefore.CumulativeCPUSeconds)
 	t.Logf("BASELINE Hub idle threads: %d", hubMetricsBefore.Threads)
 	t.Logf("BASELINE Hub idle SQLite size: %d bytes", hubDBSizeBefore)
 
@@ -419,13 +427,19 @@ func TestBaseline(t *testing.T) {
 	t.Logf("BASELINE SQLite growth (relay spool): %d bytes (before=%d after=%d)", relaySpoolGrowth, relaySpoolSizeBefore, relaySpoolSizeAfter)
 
 	// --- §17.1/2 post-load: Hub/Relay RSS/CPU after load ---
+	// Prime the CPU snapshot again for post-load delta measurement.
+	_ = env.HubProcessMetrics()
+	_ = env.RelayProcessMetrics()
+	time.Sleep(2 * time.Second) // wait for measurable CPU delta
 	hubMetricsAfter := env.HubProcessMetrics()
 	relayMetricsAfter := env.RelayProcessMetrics()
 	t.Logf("BASELINE Hub post-load RSS: %d bytes", hubMetricsAfter.RSSBytes)
 	t.Logf("BASELINE Hub post-load CPU: %.2f%%", hubMetricsAfter.CPUPercent)
+	t.Logf("BASELINE Hub post-load CPU seconds (cumulative): %.2f", hubMetricsAfter.CumulativeCPUSeconds)
 	t.Logf("BASELINE Hub post-load threads: %d", hubMetricsAfter.Threads)
 	t.Logf("BASELINE Relay post-load RSS: %d bytes", relayMetricsAfter.RSSBytes)
 	t.Logf("BASELINE Relay post-load CPU: %.2f%%", relayMetricsAfter.CPUPercent)
+	t.Logf("BASELINE Relay post-load CPU seconds (cumulative): %.2f", relayMetricsAfter.CumulativeCPUSeconds)
 	t.Logf("BASELINE Relay post-load threads: %d", relayMetricsAfter.Threads)
 
 	// --- TTS buffering test ---

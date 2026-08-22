@@ -57,7 +57,7 @@ describe('PricingPanel', () => {
         return {
           pricingRevision: 7,
           rules: [
-            { pricingRuleId: 'pr_1', meter: 'prompt_tokens', unitSize: '1000', unitPrice: '0.0015', currency: 'USD', effectiveFrom: '2026-08-01T00:00:00Z' },
+            { pricingRuleId: 'pr_1', meter: 'INPUT_TOKENS', unitSize: '1000', unitPrice: '0.0015', currency: 'USD', effectiveFrom: '2026-08-01T00:00:00Z' },
           ],
         }
       }
@@ -66,7 +66,7 @@ describe('PricingPanel', () => {
     const { wrapper } = mountPanel()
     await flushPromises()
     expect(wrapper.text()).toContain('7')
-    expect(wrapper.text()).toContain('prompt_tokens')
+    expect(wrapper.text()).toContain('INPUT_TOKENS')
   })
 
   it('adds a rule then saves with expectedPricingRevision and CSRF', async () => {
@@ -100,8 +100,8 @@ describe('PricingPanel', () => {
         return {
           pricingRevision: 1,
           rules: [
-            { pricingRuleId: 'pr_a', meter: 'a', unitSize: '1', unitPrice: '0.01', currency: 'USD', effectiveFrom: '2026-08-01T00:00:00Z' },
-            { pricingRuleId: 'pr_b', meter: 'b', unitSize: '1', unitPrice: '0.02', currency: 'USD', effectiveFrom: '2026-08-01T00:00:00Z' },
+            { pricingRuleId: 'pr_a', meter: 'INPUT_TOKENS', unitSize: '1', unitPrice: '0.01', currency: 'USD', effectiveFrom: '2026-08-01T00:00:00Z' },
+            { pricingRuleId: 'pr_b', meter: 'OUTPUT_TOKENS', unitSize: '1', unitPrice: '0.02', currency: 'USD', effectiveFrom: '2026-08-01T00:00:00Z' },
           ],
         }
       }

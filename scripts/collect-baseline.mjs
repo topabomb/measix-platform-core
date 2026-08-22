@@ -19,6 +19,7 @@
 import { execFileSync } from 'node:child_process'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { cpus } from 'node:os'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
@@ -80,16 +81,17 @@ for (const line of lines) {
 // A metric that exists but has a nonsensical value (e.g., RSS=0, CPU>100*numCores)
 // is treated as missing and blocks GREEN. This prevents false GREEN from
 // broken measurements.
-const numCores = require('node:os').cpus().length || 1
+const numCores = cpus().length || 1
 const maxCpuPercent = 100 * numCores
 
 const requiredTypedMetrics = [
   // §17.1: Hub idle RSS/CPU
-  { key: 'hub_idle_rss_bytes', category: 'Hub idle RSS', mustBeNumber: true, min: 1_000_000, max: 2_000_000_000 },
-  { key: 'hub_idle_cpu_percent', category: 'Hub idle CPU', mustBeNumber: true, min: 0, max: maxCpuPercent },
+  // Idle RSS should be under 500MB for a Go service; idle CPU under 50%.
+  { key: 'hub_idle_rss_bytes', category: 'Hub idle RSS', mustBeNumber: true, min: 1_000_000, max: 500_000_000 },
+  { key: 'hub_idle_cpu_percent', category: 'Hub idle CPU', mustBeNumber: true, min: 0, max: 50 },
   // §17.2: Relay idle RSS/CPU
-  { key: 'relay_idle_rss_bytes', category: 'Relay idle RSS', mustBeNumber: true, min: 1_000_000, max: 2_000_000_000 },
-  { key: 'relay_idle_cpu_percent', category: 'Relay idle CPU', mustBeNumber: true, min: 0, max: maxCpuPercent },
+  { key: 'relay_idle_rss_bytes', category: 'Relay idle RSS', mustBeNumber: true, min: 1_000_000, max: 500_000_000 },
+  { key: 'relay_idle_cpu_percent', category: 'Relay idle CPU', mustBeNumber: true, min: 0, max: 50 },
   // §17.4: Relay first-byte overhead (direct vs relay)
   { key: 'direct_adapter_ttfb_ms', category: 'Direct adapter TTFB', mustBeNumber: true, min: 0, max: 60_000 },
   { key: 'relay_ttfb_ms', category: 'Relay TTFB', mustBeNumber: true, min: 0, max: 60_000 },

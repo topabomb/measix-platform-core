@@ -11,7 +11,7 @@ import (
 )
 
 func pricingRule(id string, effectiveFrom time.Time) PricingRuleRecord {
-	return PricingRuleRecord{ID: id, Meter: "input_tokens", UnitSize: "1000", UnitPrice: "0.0015", Currency: "USD", EffectiveFrom: effectiveFrom}
+	return PricingRuleRecord{ID: id, Meter: "INPUT_TOKENS", UnitSize: "1000", UnitPrice: "0.0015", Currency: "USD", EffectiveFrom: effectiveFrom}
 }
 
 // HUB-PRS-001: ReplacePricingSet replaces the whole set atomically and returns
@@ -62,7 +62,7 @@ func TestHUBPRS002ReplacePricingSetValidation(t *testing.T) {
 		mut  func(*PricingRuleRecord)
 	}{
 		{"bad id", func(r *PricingRuleRecord) { r.ID = "not-an-id" }},
-		{"empty meter", func(r *PricingRuleRecord) { r.Meter = " " }},
+		{"invalid meter", func(r *PricingRuleRecord) { r.Meter = "invalid_meter" }},
 		{"empty currency", func(r *PricingRuleRecord) { r.Currency = "" }},
 		{"zero unit size", func(r *PricingRuleRecord) { r.UnitSize = "0" }},
 		{"negative unit price", func(r *PricingRuleRecord) { r.UnitPrice = "-0.01" }},

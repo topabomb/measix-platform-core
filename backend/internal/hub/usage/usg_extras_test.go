@@ -22,7 +22,7 @@ func TestHUBUSG004UnknownPartialDoNotFabricateCost(t *testing.T) {
 	// Create a pricing rule
 	_, err := service.CreatePricingRule(context.Background(), PricingRuleInput{
 		ResourceID: &resourceID, UpstreamID: &upstreamID,
-		Meter: "input_tokens", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.002", Currency: "USD",
+		Meter: "INPUT_TOKENS", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.002", Currency: "USD",
 		EffectiveFrom: now.Add(-time.Hour),
 	})
 	if err != nil {
@@ -31,7 +31,7 @@ func TestHUBUSG004UnknownPartialDoNotFabricateCost(t *testing.T) {
 
 	// UNKNOWN must not produce a cost
 	unknown, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "input_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "INPUT_TOKENS",
 		QuantityDecimal: "1500", Completeness: CompletenessUnknown, OccurredAt: now,
 	})
 	if err != nil {
@@ -43,7 +43,7 @@ func TestHUBUSG004UnknownPartialDoNotFabricateCost(t *testing.T) {
 
 	// PARTIAL must produce a PARTIAL cost (amount known but state is PARTIAL)
 	partial, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "input_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "INPUT_TOKENS",
 		QuantityDecimal: "1500", Completeness: CompletenessPartial, OccurredAt: now,
 	})
 	if err != nil {
@@ -55,7 +55,7 @@ func TestHUBUSG004UnknownPartialDoNotFabricateCost(t *testing.T) {
 
 	// COMPLETE must produce a KNOWN cost
 	complete, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "input_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "INPUT_TOKENS",
 		QuantityDecimal: "1500", Completeness: CompletenessComplete, OccurredAt: now,
 	})
 	if err != nil {
@@ -74,9 +74,9 @@ func TestHUBUSG006MissingMeterOrPriceGivesUnknownCost(t *testing.T) {
 	resourceID := platformid.New(platformid.Model)
 	service := NewService(store.Client)
 
-	// No pricing rules created — meter missing
+	// No pricing rules created — valid meter but no matching rule
 	result, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "nonexistent_meter",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "REQUESTS",
 		QuantityDecimal: "100", Completeness: CompletenessComplete, OccurredAt: now,
 	})
 	if err != nil {
@@ -89,14 +89,14 @@ func TestHUBUSG006MissingMeterOrPriceGivesUnknownCost(t *testing.T) {
 	// Create a rule for one meter but query a different meter
 	_, err = service.CreatePricingRule(context.Background(), PricingRuleInput{
 		ResourceID: &resourceID, UpstreamID: &upstreamID,
-		Meter: "input_tokens", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.002", Currency: "USD",
+		Meter: "INPUT_TOKENS", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.002", Currency: "USD",
 		EffectiveFrom: now.Add(-time.Hour),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	result2, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "output_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "OUTPUT_TOKENS",
 		QuantityDecimal: "100", Completeness: CompletenessComplete, OccurredAt: now,
 	})
 	if err != nil {
@@ -118,7 +118,7 @@ func TestHUBUSG007DecimalArithmeticNoFloatErrors(t *testing.T) {
 
 	_, err := service.CreatePricingRule(context.Background(), PricingRuleInput{
 		ResourceID: &resourceID, UpstreamID: &upstreamID,
-		Meter: "input_tokens", UnitSizeDecimal: "3", UnitPriceDecimal: "0.1", Currency: "USD",
+		Meter: "INPUT_TOKENS", UnitSizeDecimal: "3", UnitPriceDecimal: "0.1", Currency: "USD",
 		EffectiveFrom: now.Add(-time.Hour),
 	})
 	if err != nil {
@@ -132,14 +132,14 @@ func TestHUBUSG007DecimalArithmeticNoFloatErrors(t *testing.T) {
 	// Let's use quantity=10, unitSize=5, unitPrice=0.1 → (10/5)*0.1 = 2*0.1 = 0.2
 	_, err = service.CreatePricingRule(context.Background(), PricingRuleInput{
 		ResourceID: &resourceID, UpstreamID: &upstreamID,
-		Meter: "simple_tokens", UnitSizeDecimal: "5", UnitPriceDecimal: "0.1", Currency: "USD",
+		Meter: "CACHED_TOKENS", UnitSizeDecimal: "5", UnitPriceDecimal: "0.1", Currency: "USD",
 		EffectiveFrom: now.Add(-time.Hour),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	result, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "simple_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "CACHED_TOKENS",
 		QuantityDecimal: "10", Completeness: CompletenessComplete, OccurredAt: now,
 	})
 	if err != nil {
@@ -154,14 +154,14 @@ func TestHUBUSG007DecimalArithmeticNoFloatErrors(t *testing.T) {
 	// cost = 999999999999 * 0.001 = 999999999.999
 	_, err = service.CreatePricingRule(context.Background(), PricingRuleInput{
 		ResourceID: &resourceID, UpstreamID: &upstreamID,
-		Meter: "large_tokens", UnitSizeDecimal: "1", UnitPriceDecimal: "0.001", Currency: "USD",
+		Meter: "REQUESTS", UnitSizeDecimal: "1", UnitPriceDecimal: "0.001", Currency: "USD",
 		EffectiveFrom: now.Add(-time.Hour),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	result2, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "large_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "REQUESTS",
 		QuantityDecimal: "999999999999", Completeness: CompletenessComplete, OccurredAt: now,
 	})
 	if err != nil {

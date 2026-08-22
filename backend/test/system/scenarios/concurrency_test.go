@@ -107,25 +107,16 @@ func TestRLYCON005CancelStorm(t *testing.T) {
 	}
 	t.Logf("cancel storm: %d/%d streams cancelled with error, %d completed normally", cancelledCount, stormSize, stormSize-cancelledCount)
 
-	// Verify the adapter observed at least some cancellations.
-	// (The deterministic adapter records cancel events.)
-	ad.ClearCancelled()
-	// Re-run a single cancel to verify propagation still works.
-	verifyCtx, verifyCancel := context.WithCancel(ctx)
-	tc := client.New(client.Options{
-		RuntimeBaseURL:    env.RelayPubBaseURL,
-		AccessToken:       clientToken,
-		ManagedGeneration: generation,
-		InteractionID:     platformid.New(platformid.Interaction),
-	})
-	go func() {
-		time.Sleep(200 * time.Millisecond)
-		verifyCancel()
-	}()
-	_ = tc.ChatCompletionStream(verifyCtx, ids.model, "/v1/chat/completions",
-		`{"model":"gpt-test","stream":true}`, func([]byte) {})
+	// Verify the adapter observed cancellations during the storm.
+	// The deterministic adapter sets cancelled=true when any client context
+	// is cancelled. This is real evidence that cancel propagation worked
+	// for the storm — not a post-hoc re-test that erases storm evidence.
+	if !ad.Cancelled() {
+		t.Fatal("adapter did not observe any cancellations during cancel storm — cancel propagation may be broken")
+	}
+	t.Log("adapter observed cancellations during storm")
 
-	// Give the Relay a moment to clean up resources.
+	// Give the Relay a moment to clean up resources after the storm.
 	time.Sleep(2 * time.Second)
 
 	// Measure Relay RSS after cleanup.
@@ -133,9 +124,10 @@ func TestRLYCON005CancelStorm(t *testing.T) {
 	t.Logf("relay RSS after cancel storm: %d bytes", metricsAfter.RSSBytes)
 
 	// RSS should not have grown excessively (allow some overhead for GC).
-	// A 50MB growth is acceptable for 20 cancelled streams with buffers.
+	// 20MB is a tight but reasonable bound for 20 cancelled streams with
+	// bounded buffers. 50MB was too permissive and could mask real leaks.
 	rssGrowth := metricsAfter.RSSBytes - metricsBefore.RSSBytes
-	if rssGrowth > 50*1024*1024 {
+	if rssGrowth > 20*1024*1024 {
 		t.Errorf("relay RSS grew %d bytes after cancel storm — possible resource leak", rssGrowth)
 	}
 
@@ -194,17 +186,22 @@ func TestRLYCON006ControlApplyNoUsageBlock(t *testing.T) {
 	ids := gp.getSnapshotResourceIDs(ctx, env.HubBaseURL, clientToken, generation, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID)
 
 	// Phase 1: Start continuous runtime requests in background (usage spool activity).
-	usageDone := make(chan struct{})
+	// stopCh: main goroutine signals the worker to stop (main closes it).
+	// doneCh: worker signals it has exited (worker defers close it).
+	// This separation avoids the close-of-closed-channel race that occurs
+	// when a single channel is both closed by the worker (defer) and by main.
+	stopCh := make(chan struct{})
+	doneCh := make(chan struct{})
 	usageCount := 0
 	var usageMu sync.Mutex
 
 	go func() {
-		defer close(usageDone)
+		defer close(doneCh)
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-usageDone:
+			case <-stopCh:
 				return
 			default:
 				tc := client.New(client.Options{
@@ -245,8 +242,8 @@ func TestRLYCON006ControlApplyNoUsageBlock(t *testing.T) {
 	}
 
 	// Phase 3: Stop usage and verify count.
-	close(usageDone)
-	<-usageDone // wait for goroutine to exit
+	close(stopCh)
+	<-doneCh // wait for goroutine to exit
 
 	usageMu.Lock()
 	finalCount := usageCount

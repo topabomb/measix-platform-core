@@ -73,7 +73,7 @@ type CostResult struct {
 }
 
 func (s *Service) RecordSemantic(ctx context.Context, input SemanticInput) (string, bool, error) {
-	if s.Client == nil || platformid.Validate(platformid.Upstream, input.UpstreamID) != nil || strings.TrimSpace(input.Meter) == "" || strings.TrimSpace(input.Source) == "" || input.OccurredAt.IsZero() || !validCompleteness(input.Completeness) {
+	if s.Client == nil || platformid.Validate(platformid.Upstream, input.UpstreamID) != nil || !validMeter(input.Meter) || strings.TrimSpace(input.Source) == "" || input.OccurredAt.IsZero() || !validCompleteness(input.Completeness) {
 		return "", false, ErrInvalidBatch
 	}
 	if input.ResourceID != "" && !runtimeResourceID(input.ResourceID) {
@@ -142,7 +142,7 @@ func (s *Service) RecordSemantic(ctx context.Context, input SemanticInput) (stri
 }
 
 func (s *Service) CreatePricingRule(ctx context.Context, input PricingRuleInput) (string, error) {
-	if s.Client == nil || strings.TrimSpace(input.Meter) == "" || strings.TrimSpace(input.Currency) == "" || input.EffectiveFrom.IsZero() {
+	if s.Client == nil || !validMeter(input.Meter) || strings.TrimSpace(input.Currency) == "" || input.EffectiveFrom.IsZero() {
 		return "", ErrInvalidBatch
 	}
 	if input.ResourceID != nil && !runtimeResourceID(*input.ResourceID) {
@@ -182,7 +182,7 @@ func (s *Service) CreatePricingRule(ctx context.Context, input PricingRuleInput)
 }
 
 func (s *Service) CalculateCost(ctx context.Context, input CostInput) (CostResult, error) {
-	if s.Client == nil || platformid.Validate(platformid.Upstream, input.UpstreamID) != nil || !runtimeResourceID(input.ResourceID) || strings.TrimSpace(input.Meter) == "" || input.OccurredAt.IsZero() || !validCompleteness(input.Completeness) {
+	if s.Client == nil || platformid.Validate(platformid.Upstream, input.UpstreamID) != nil || !runtimeResourceID(input.ResourceID) || !validMeter(input.Meter) || input.OccurredAt.IsZero() || !validCompleteness(input.Completeness) {
 		return CostResult{}, ErrInvalidBatch
 	}
 	quantity, ok := decimalRat(input.QuantityDecimal)
@@ -254,6 +254,18 @@ func (s *Service) CalculateCost(ctx context.Context, input CostInput) (CostResul
 
 func validCompleteness(value Completeness) bool {
 	return value == CompletenessUnknown || value == CompletenessPartial || value == CompletenessComplete
+}
+
+// validMeter returns true if the meter string is one of the standard meters
+// defined in architecture s0-control-protocol §13.
+// Standard meters for S0.1 required profile:
+//   INPUT_TOKENS, OUTPUT_TOKENS, CACHED_TOKENS, CHARACTERS, AUDIO_SECONDS, REQUESTS
+func validMeter(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "CHARACTERS", "AUDIO_SECONDS", "REQUESTS":
+		return true
+	}
+	return false
 }
 
 func runtimeResourceID(value string) bool {

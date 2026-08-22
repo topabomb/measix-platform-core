@@ -2045,7 +2045,7 @@ components:
             - confidence
             properties:
               meter:
-                type: string
+                $ref: '#/components/schemas/PricingMeter'
               quantity:
                 type: string
               confidence:
@@ -2147,6 +2147,21 @@ components:
             $ref: '#/components/schemas/RequestUsageView'
         nextCursor:
           type: string
+    PricingMeter:
+      type: string
+      enum:
+      - INPUT_TOKENS
+      - OUTPUT_TOKENS
+      - CACHED_TOKENS
+      - CHARACTERS
+      - AUDIO_SECONDS
+      - REQUESTS
+      description: |
+        Standard meters per architecture s0-control-protocol §13.
+        MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+        TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+        ASR    → AUDIO_SECONDS + REQUESTS
+        MCP    → REQUESTS
     PricingRule:
       type: object
       additionalProperties: false
@@ -2165,7 +2180,7 @@ components:
         upstreamId:
           $ref: '#/components/schemas/UpstreamId'
         meter:
-          type: string
+          $ref: '#/components/schemas/PricingMeter'
         unitSize:
           type: string
         unitPrice:

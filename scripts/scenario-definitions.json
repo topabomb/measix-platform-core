@@ -1966,18 +1966,18 @@
   {
     "id": "RLY-CON-005",
     "name": "Cancel storm no leak",
-    "artifact": "backend-test.json",
+    "artifact": "candidate-test.json",
     "testNames": [
-      "TestRLYCON005CancelStormNoLeak"
+      "TestRLYCON005CancelStorm"
     ],
     "required": true
   },
   {
     "id": "RLY-CON-006",
     "name": "Control apply and usage sender no deadlock",
-    "artifact": "backend-test.json",
+    "artifact": "candidate-test.json",
     "testNames": [
-      "TestRLYCON006ControlApplyAndUsageSenderNoDeadlock"
+      "TestRLYCON006ControlApplyNoUsageBlock"
     ],
     "required": true
   },

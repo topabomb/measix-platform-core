@@ -19,7 +19,7 @@ func TestHUBI5SemanticUsageDedupeAndCompleteness(t *testing.T) {
 		UpstreamID:      upstreamID,
 		ResourceID:      platformid.New(platformid.Model),
 		SourceEventID:   "provider-event-42",
-		Meter:           "input_tokens",
+		Meter:           "INPUT_TOKENS",
 		QuantityDecimal: "1234",
 		Completeness:    CompletenessPartial,
 		Source:          "provider_response",
@@ -44,21 +44,21 @@ func TestHUBI5PricingUsesSpecificEffectiveRuleAndDecimalArithmetic(t *testing.T)
 
 	if _, err := service.CreatePricingRule(context.Background(), PricingRuleInput{
 		UpstreamID: &upstreamID,
-		Meter:      "input_tokens", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.0015", Currency: "USD",
+		Meter:      "INPUT_TOKENS", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.0015", Currency: "USD",
 		EffectiveFrom: now.Add(-24 * time.Hour),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.CreatePricingRule(context.Background(), PricingRuleInput{
 		ResourceID: &resourceID, UpstreamID: &upstreamID,
-		Meter: "input_tokens", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.002", Currency: "USD",
+		Meter: "INPUT_TOKENS", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.002", Currency: "USD",
 		EffectiveFrom: now.Add(-time.Hour),
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	cost, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "input_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "INPUT_TOKENS",
 		QuantityDecimal: "1500", Completeness: CompletenessComplete, OccurredAt: now,
 	})
 	if err != nil {
@@ -69,7 +69,7 @@ func TestHUBI5PricingUsesSpecificEffectiveRuleAndDecimalArithmetic(t *testing.T)
 	}
 
 	partial, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "input_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "INPUT_TOKENS",
 		QuantityDecimal: "1500", Completeness: CompletenessPartial, OccurredAt: now,
 	})
 	if err != nil {
@@ -80,7 +80,7 @@ func TestHUBI5PricingUsesSpecificEffectiveRuleAndDecimalArithmetic(t *testing.T)
 	}
 
 	unknown, err := service.CalculateCost(context.Background(), CostInput{
-		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "output_tokens",
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "OUTPUT_TOKENS",
 		QuantityDecimal: "1", Completeness: CompletenessComplete, OccurredAt: now,
 	})
 	if err != nil {

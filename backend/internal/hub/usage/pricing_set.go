@@ -90,7 +90,7 @@ func (s *Service) ReplacePricingSet(ctx context.Context, expectedRevision int, r
 }
 
 func validatePricingRecord(rule PricingRuleRecord) error {
-	if platformid.Validate(platformid.PricingRule, rule.ID) != nil || strings.TrimSpace(rule.Meter) == "" || strings.TrimSpace(rule.Currency) == "" || rule.EffectiveFrom.IsZero() {
+	if platformid.Validate(platformid.PricingRule, rule.ID) != nil || !validMeter(rule.Meter) || strings.TrimSpace(rule.Currency) == "" || rule.EffectiveFrom.IsZero() {
 		return ErrInvalidBatch
 	}
 	if rule.ResourceID != nil && !runtimeResourceID(*rule.ResourceID) {

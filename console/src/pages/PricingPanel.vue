@@ -22,23 +22,23 @@ const rules = ref<PricingRule[]>([])
 const usageCost = ref<UsageSummary['cost']>()
 
 const METER_OPTIONS = [
-  { label: 'MODEL · prompt_tokens', value: 'prompt_tokens' },
-  { label: 'MODEL · output_tokens', value: 'output_tokens' },
-  { label: 'MODEL · cached_tokens', value: 'cached_tokens' },
-  { label: 'MODEL · requests', value: 'requests' },
-  { label: 'TTS · characters', value: 'characters' },
-  { label: 'TTS · audio_seconds', value: 'audio_seconds' },
-  { label: 'ASR · audio_seconds', value: 'audio_seconds' },
-  { label: 'MCP · requests', value: 'requests' },
+  { label: 'MODEL · INPUT_TOKENS', value: 'INPUT_TOKENS' },
+  { label: 'MODEL · OUTPUT_TOKENS', value: 'OUTPUT_TOKENS' },
+  { label: 'MODEL · CACHED_TOKENS', value: 'CACHED_TOKENS' },
+  { label: 'MODEL · REQUESTS', value: 'REQUESTS' },
+  { label: 'TTS · CHARACTERS', value: 'CHARACTERS' },
+  { label: 'TTS · AUDIO_SECONDS', value: 'AUDIO_SECONDS' },
+  { label: 'ASR · AUDIO_SECONDS', value: 'AUDIO_SECONDS' },
+  { label: 'MCP · REQUESTS', value: 'REQUESTS' },
 ]
 
 const METER_KIND_MAP: Record<string, string> = {
-  prompt_tokens: 'MODEL',
-  output_tokens: 'MODEL',
-  cached_tokens: 'MODEL',
-  requests: 'MCP',
-  characters: 'TTS',
-  audio_seconds: 'ASR',
+  INPUT_TOKENS: 'MODEL',
+  OUTPUT_TOKENS: 'MODEL',
+  CACHED_TOKENS: 'MODEL',
+  REQUESTS: 'MCP',
+  CHARACTERS: 'TTS',
+  AUDIO_SECONDS: 'ASR',
 }
 
 async function refresh() {
@@ -62,7 +62,7 @@ async function refresh() {
 function addRule() {
   rules.value.push({
     pricingRuleId: `prc_${crypto.randomUUID()}`,
-    meter: 'prompt_tokens',
+    meter: 'INPUT_TOKENS',
     unitSize: '1000',
     unitPrice: '',
     currency: 'USD',

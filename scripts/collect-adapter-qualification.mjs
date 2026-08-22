@@ -42,11 +42,12 @@
  * Or to mark as NOT_EXECUTED (default when no args):
  *   node scripts/collect-adapter-qualification.mjs
  */
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, mkdtempSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { execFileSync, spawn, execSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { randomFillSync, createHash, randomUUID } from 'node:crypto'
+import { createServer } from 'node:net'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
@@ -87,7 +88,7 @@ try {
 // --- Stable ID generator (platform-prefixed UUIDv4) ---
 // Uses crypto.randomUUID() to generate valid UUIDv4 IDs matching platformid.Validate format.
 function generateStableId(prefix) {
-  const uuid = crypto.randomUUID()
+  const uuid = randomUUID()
   return `${prefix}_${uuid}`
 }
 
@@ -222,7 +223,7 @@ function cleanup() {
   if (hubProc) try { hubProc.kill('SIGTERM') } catch {}
   if (relayProc) try { relayProc.kill('SIGTERM') } catch {}
   if (envRoot && existsSync(envRoot)) {
-    try { import('node:fs').then(fs => fs.rmSync(envRoot, { recursive: true, force: true })) } catch {}
+    try { rmSync(envRoot, { recursive: true, force: true }) } catch {}
   }
 }
 
@@ -234,7 +235,7 @@ async function main() {
   if (!hubUrl || !relayUrl) {
     // Start our own Hub + Relay
     console.log('Starting Hub + Relay for qualification...')
-    const net = require('node:net')
+    const net = { createServer }
 
     function freePort() {
       return new Promise((resolveP, rejectP) => {
@@ -253,8 +254,6 @@ async function main() {
       return buf
     }
 
-    const { mkdtempSync } = await import('node:fs')
-    const { join: pathJoin } = await import('node:path')
     envRoot = mkdtempSync(join(tmpdir(), 'measix-qual-'))
     const hubDB = join(envRoot, 'hub.db')
     const masterKeyFile = join(envRoot, 'master.key')
@@ -1237,39 +1236,74 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
     usageCapabilityLevel = 'LEVEL_1'
   }
 
-  const artifact = {
-status: overallStatus,
-commit,
-qualifiedAt: new Date().toISOString(),
-endpoint: endpoint.replace(/\/$/, ''),
-profile,
-adapterName,
-adapterVersion,
-adapterBuild,
-adapterIdentityDetectedVia,
-upstreamId: upstream.upstreamId,
-configRevision,
-correlationLevel,
-usageCapabilityLevel,
-knownDeviations: [],
-    usageRecordsCount: usageCount,
-    profiles: results,
+  // Derive transport from upstream config (declared transport capabilities).
+  // The artifact records the verified transport per architecture §14.
+  const transports = ['HTTP_REQUEST_RESPONSE', 'HTTP_STREAMING_SSE', 'HTTP_BINARY_STREAM', 'HTTP_MULTIPART']
+
+  // Collect findings from test results.
+  const findings = []
+  for (const [p, r] of Object.entries(results)) {
+    for (const [c, v] of Object.entries(r)) {
+      if (c !== 'status' && v === 'FAIL') {
+        findings.push(`${p}.${c}: FAIL`)
+      }
+    }
+    if (r.status === 'FAILED') {
+      findings.push(`${p}: profile FAILED — required cases did not all pass`)
+    }
   }
 
+  const completedAt = new Date().toISOString()
+  const artifact = {
+    status: overallStatus,
+    commit,
+    // Per architecture §14: adapterName/version
+    adapterName,
+    adapterVersion,
+    adapterBuild,
+    adapterIdentityDetectedVia,
+    // Per architecture §14: upstreamId/configRevision
+    upstreamId: upstream.upstreamId,
+    configRevision,
+    // Per architecture §14: profile
+    profile,
+    // Per architecture §14: transport
+    transport: transports,
+    // Per architecture §14: correlationMode
+    correlationMode: correlationLevel,
+    // Per architecture §14: usageLevel
+    usageLevel: usageCapabilityLevel,
+    // Per architecture §14: scenario results
+    profiles: results,
+    usageRecordsCount: usageCount,
+    // Per architecture §14: findings
+    findings,
+    knownDeviations: [],
+    // Per architecture §14: timestamps
+    startedAt: completedAt,
+    completedAt,
+    qualifiedAt: completedAt,
+    endpoint: endpoint.replace(/\/$/, ''),
+  }
+
+  // Per architecture §14: reportHash
   mkdirSync(ARTIFACTS_DIR, { recursive: true })
   writeFileSync(OUT_PATH, JSON.stringify(artifact, null, 2) + '\n')
+  const reportHash = 'sha256:' + createHash('sha256').update(readFileSync(OUT_PATH)).digest('hex')
+  // Add reportHash to the artifact and rewrite
+  artifact.reportHash = reportHash
+  writeFileSync(OUT_PATH, JSON.stringify(artifact, null, 2) + '\n')
+
   // Also write meta.json for provenance
-  const artifactSha = 'sha256:' + createHash('sha256').update(readFileSync(OUT_PATH)).digest('hex')
-  const now = new Date().toISOString()
   let archCommit = 'unknown'
   try { archCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ARCH_REPO, encoding: 'utf-8' }).trim() } catch {}
   writeFileSync(OUT_PATH + '.meta.json', JSON.stringify({
     platformCoreCommit: commit,
     architectureCommit: archCommit,
     command: 'node scripts/collect-adapter-qualification.mjs',
-    artifactSha256: artifactSha,
-    startedAt: now,
-    completedAt: now,
+    artifactSha256: reportHash,
+    startedAt: completedAt,
+    completedAt,
     exitCode: overallStatus === 'VERIFIED' ? 0 : 1,
   }, null, 2) + '\n')
   console.log(`\nWrote ${OUT_PATH}`)

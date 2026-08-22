@@ -37,9 +37,9 @@ func TestHUBSUM001SummaryAggregatesCompletenessAndCost(t *testing.T) {
 		quantity     string
 		completeness Completeness
 	}{
-		{"input_tokens", "1000", CompletenessComplete},
-		{"input_tokens", "500", CompletenessPartial},
-		{"output_tokens", "250", CompletenessUnknown},
+		{"INPUT_TOKENS", "1000", CompletenessComplete},
+		{"INPUT_TOKENS", "500", CompletenessPartial},
+		{"OUTPUT_TOKENS", "250", CompletenessUnknown},
 	} {
 		if _, _, err := service.RecordSemantic(ctx, SemanticInput{
 			UpstreamID: upstreamID, ResourceID: resourceID, SourceEventID: "e-" + tc.meter + "-" + strconv.Itoa(i),
@@ -67,10 +67,10 @@ func TestHUBSUM001SummaryAggregatesCompletenessAndCost(t *testing.T) {
 	}
 	var input, output *MeterSummary
 	for i := range sum.Meters {
-		if sum.Meters[i].Meter == "input_tokens" {
+		if sum.Meters[i].Meter == "INPUT_TOKENS" {
 			input = &sum.Meters[i]
 		}
-		if sum.Meters[i].Meter == "output_tokens" {
+		if sum.Meters[i].Meter == "OUTPUT_TOKENS" {
 			output = &sum.Meters[i]
 		}
 	}
@@ -99,7 +99,7 @@ func TestHUBSUM002SummaryFilterAndInvalidRange(t *testing.T) {
 
 	if _, _, err := service.RecordSemantic(ctx, SemanticInput{
 		UpstreamID: upstreamID, ResourceID: resourceID, SourceEventID: "e-1",
-		Meter: "input_tokens", QuantityDecimal: "100", Completeness: CompletenessComplete,
+		Meter: "INPUT_TOKENS", QuantityDecimal: "100", Completeness: CompletenessComplete,
 		Source: "provider_response", OccurredAt: now,
 	}); err != nil {
 		t.Fatal(err)

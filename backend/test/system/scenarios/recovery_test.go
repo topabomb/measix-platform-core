@@ -336,6 +336,11 @@ func TestCAPC6004EnhancedNoForwardAndUsageGeneration(t *testing.T) {
 	if !ok || pe.Status != 428 {
 		t.Fatalf("expected 428, got %v", err)
 	}
+	// Assert the problem code is managed_snapshot_required per architecture
+	// §13 SYS-GEN-001 and control-protocol §14.
+	if pe.Code != "managed_snapshot_required" {
+		t.Fatalf("expected problem code 'managed_snapshot_required', got %q", pe.Code)
+	}
 	// Assert forwarded is explicitly false, not just absent.
 	if pe.Forwarded == nil {
 		t.Fatal("forwarded field is absent in 428 response — must be explicitly false")
@@ -345,10 +350,19 @@ func TestCAPC6004EnhancedNoForwardAndUsageGeneration(t *testing.T) {
 	}
 
 	// Assert the adapter received NO request for the denied call.
+	// Per architecture SYS-SEC-012: deny/428 occurs before Adapter body receive.
 	// Give a brief moment for any in-flight to potentially arrive (it should not).
 	time.Sleep(500 * time.Millisecond)
 	if fact := ad.LastRequest("/v1/chat/completions"); fact != nil {
 		t.Fatalf("adapter received request body for denied old-generation call: %+v", fact)
+	}
+
+	// Assert no automatic replay: the old interaction that got 428 must NOT
+	// be retried by the client/relay. We verify by checking that the adapter
+	// still has no request facts after another brief wait.
+	time.Sleep(500 * time.Millisecond)
+	if fact := ad.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatalf("adapter received replay request after 428 — no automatic replay allowed: %+v", fact)
 	}
 
 	// Same-session sync: use the SAME access token to discover the new

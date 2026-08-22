@@ -281,27 +281,25 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
     await page.click('[data-cy="tab-policy"]')
     await page.waitForTimeout(500)
 
-    // Actually toggle Policy allowLocal flags — not just render check.
+    // Actually toggle Policy allowLocal flags — hard assertions.
     // Per architecture CAP-C6-001: Policy must be actually configured.
     // Toggle allowLocalProviders ON (then back OFF to leave defaults)
     const providerToggle = page.locator('.q-toggle:has-text("Models")')
-    if (await providerToggle.isVisible().catch(() => false)) {
-      // Toggle ON
-      await providerToggle.click()
-      await page.waitForTimeout(200)
-      // Toggle back OFF (restore default)
-      await providerToggle.click()
-      await page.waitForTimeout(200)
-    }
+    await expect(providerToggle).toBeVisible({ timeout: 5_000 })
+    // Toggle ON
+    await providerToggle.click()
+    await page.waitForTimeout(200)
+    // Toggle back OFF (restore default)
+    await providerToggle.click()
+    await page.waitForTimeout(200)
 
     // Toggle allowLocalTts
     const ttsToggle = page.locator('.q-toggle:has-text("TTS")')
-    if (await ttsToggle.isVisible().catch(() => false)) {
-      await ttsToggle.click()
-      await page.waitForTimeout(200)
-      await ttsToggle.click()
-      await page.waitForTimeout(200)
-    }
+    await expect(ttsToggle).toBeVisible({ timeout: 5_000 })
+    await ttsToggle.click()
+    await page.waitForTimeout(200)
+    await ttsToggle.click()
+    await page.waitForTimeout(200)
 
     // --- 4g: Configure Pricing ---
     // Per architecture CAP-C6-001: Pricing must be actually created.
@@ -319,18 +317,16 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
 
     // Fill the pricing rule — set unit price for the first rule
     const unitPriceInput = page.locator('[data-cy="pricing-unit-price"]').first()
-    if (await unitPriceInput.isVisible().catch(() => false)) {
-      await unitPriceInput.fill('0.001')
-      await page.waitForTimeout(200)
-    }
+    await expect(unitPriceInput).toBeVisible({ timeout: 5_000 })
+    await unitPriceInput.fill('0.001')
+    await page.waitForTimeout(200)
 
     // Save the pricing rules
     const pricingSaveBtn = page.locator('[data-cy="pricing-save-btn"]')
-    if (await pricingSaveBtn.isVisible().catch(() => false)) {
-      await pricingSaveBtn.click()
-      // Wait for save to complete
-      await page.waitForTimeout(2_000)
-    }
+    await expect(pricingSaveBtn).toBeVisible({ timeout: 5_000 })
+    await pricingSaveBtn.click()
+    // Wait for save to complete
+    await page.waitForTimeout(2_000)
 
     // Go back to resources page to save the draft
     await page.goto('/admin/resources')
@@ -359,15 +355,12 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
     // Wait for validation to complete — allow processing
     await page.waitForTimeout(2_000)
 
-    // The validation result chip should show either "valid" or warnings
-    // For the golden path, the draft should be valid or have only warnings
-    // The ProblemBanner should not show blocking errors
+    // The validation result chip should show "valid" (not warnings/errors)
+    // Per architecture CAP-C6-001: Validate must pass with no blocking errors.
     const validChip = page.locator('text=/valid/i')
-    const warningChip = page.locator('text=/warning/i')
-    const errorChip = page.locator('.text-negative').filter({ hasText: /error/i })
-
-    // At least one of these should be visible after validation
-    await expect(validChip.or(warningChip)).toBeVisible({ timeout: 10_000 })
+    await expect(validChip).toBeVisible({ timeout: 10_000 })
+    // Ensure no blocking errors are visible
+    await expect(page.locator('.text-negative').filter({ hasText: /error/i })).not.toBeVisible()
   })
 
   // ========================================================================
@@ -454,33 +447,76 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
   })
 
   // ========================================================================
-  // Phase 9: Usage verification
+  // Phase 9: Usage verification — CAP-C6-003 Usage Closure
+  // Per architecture §13 CAP-C6-003: Browser returns to Usage/System and verifies:
+  //   - four resource kinds;
+  //   - filters;
+  //   - details;
+  //   - known/partial/unknown semantic/cost;
+  //   - runtime/relay health.
   // ========================================================================
-  await test.step('verify usage page loads and shows data', async () => {
+  await test.step('CAP-C6-003 usage closure — verify data, filters, details, cost', async () => {
     await page.goto('/admin/usage')
     await expect(page.locator('[data-cy="usage-page"]')).toBeVisible()
 
-    // The usage page should load without errors
     // Verify filter controls are visible
     await expect(page.locator('text=/filter|Filter/i').or(page.locator('.q-select')).first()).toBeVisible({ timeout: 5_000 })
 
-    // The usage page should show either data rows or an empty state
-    // (actual usage data depends on Test Client calls which are in Go system tests)
-    // But the page must load successfully
+    // The usage page must show either data rows or an empty state.
+    // Go system tests (TestCAPC6001GoldenPath) generate runtime traffic
+    // before this E2E test runs, so rows are expected in most cases.
+    const usageRows = page.locator('[data-cy="usage-row"]')
+    const usageEmpty = page.locator('text=/no data|empty|no usage/i')
+    await expect(usageRows.or(usageEmpty)).toBeVisible({ timeout: 10_000 })
+
+    // If there are usage rows, verify at least one resource kind is visible.
+    // Per architecture: four resource kinds (MODEL, TTS, ASR, MCP) should
+    // be represented in the usage data.
+    if (await usageRows.count() > 0) {
+      // Verify resource kind column exists and shows a known kind
+      const kindText = await page.locator('[data-cy="usage-row"]').first().textContent()
+      // At least one known resource kind should appear in the row text
+      expect(kindText).toMatch(/MODEL|TTS|ASR|MCP|model|tts|asr|mcp/i)
+
+      // Try to open a usage detail row to verify requestId/interactionId/
+      // resource/upstream/status/duration/forwarded + semantic/cost completeness.
+      // Click the first row to expand details.
+      await usageRows.first().click()
+      await page.waitForTimeout(500)
+
+      // The detail panel should show at least some of these fields.
+      // Per architecture SYS-USG-001: Request detail must show requestId,
+      // interactionId, resource, upstream, status, duration, forwarded,
+      // and semantic/cost completeness (KNOWN/PARTIAL/UNKNOWN).
+      const detailPanel = page.locator('[data-cy="usage-detail"]')
+      if (await detailPanel.isVisible().catch(() => false)) {
+        const detailText = await detailPanel.textContent()
+        // Verify semantic/cost completeness is shown
+        expect(detailText).toMatch(/KNOWN|PARTIAL|UNKNOWN|known|partial|unknown/i)
+      }
+    }
   })
 
   // ========================================================================
-  // Phase 10: System verification
+  // Phase 10: System verification — CAP-C6-003 runtime/relay health
+  // Per architecture §13 CAP-C6-003: verify runtime/relay health.
   // ========================================================================
-  await test.step('verify system page shows Hub/Relay status', async () => {
+  await test.step('CAP-C6-003 system closure — verify Hub/Relay health', async () => {
     await page.goto('/admin/system')
     await expect(page.locator('[data-cy="system-page"]')).toBeVisible()
     await expect(page.locator('[data-cy="system-runtime-status"]')).toBeVisible()
 
     // The runtime status should be visible (READY or DEGRADED)
-    // This verifies the system diagnostics surface is working
+    // Per architecture CAP-C6-003: runtime/relay health must be visible.
     const statusText = await page.locator('[data-cy="system-runtime-status"]').textContent()
     expect(statusText).toMatch(/READY|DEGRADED|NOT_READY/i)
+
+    // Verify Relay status is also shown — hard assertion.
+    // Per architecture CAP-C6-003: both Hub and Relay health must be visible.
+    const relayStatus = page.locator('[data-cy="system-relay-status"]')
+    await expect(relayStatus).toBeVisible({ timeout: 5_000 })
+    const relayText = await relayStatus.textContent()
+    expect(relayText).toMatch(/READY|DEGRADED|NOT_READY|OFFLINE/i)
   })
 
   // ========================================================================
@@ -507,8 +543,7 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
     await page.locator('[data-cy="upstream-row"]').first().click()
     await page.waitForTimeout(500)
 
-    // The detail view should show candidate and active revision
-    // Verify the upstream detail dialog or panel is visible
+    // The detail view must show candidate or active revision — hard assertion.
     await expect(page.locator('text=/candidate|Candidate/i').or(page.locator('text=/active|Active/i'))).toBeVisible({ timeout: 5_000 })
   })
 
@@ -516,18 +551,17 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
   // Phase 13: Logout
   // ========================================================================
   await test.step('logout works', async () => {
-    // Find and click logout button
+    // Find and click logout button — hard assertion
     const logoutBtn = page.locator('[data-cy="logout-btn"]')
+    const logoutMobile = page.locator('[data-cy="logout-btn-mobile"]')
+    // At least one logout button must be visible
+    await expect(logoutBtn.or(logoutMobile)).toBeVisible({ timeout: 5_000 })
+
     if (await logoutBtn.isVisible().catch(() => false)) {
       await logoutBtn.click()
-      await expect(page).toHaveURL(/\/admin\/$|\/admin\/login/)
     } else {
-      // Try mobile logout button
-      const logoutMobile = page.locator('[data-cy="logout-btn-mobile"]')
-      if (await logoutMobile.isVisible().catch(() => false)) {
-        await logoutMobile.click()
-        await expect(page).toHaveURL(/\/admin\/$|\/admin\/login/)
-      }
+      await logoutMobile.click()
     }
+    await expect(page).toHaveURL(/\/admin\/$|\/admin\/login/)
   })
 })

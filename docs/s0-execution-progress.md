@@ -23,7 +23,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 | C3 Snapshot Projection & Preview | ✅ Green | canonical projection、Review、Client Snapshot Preview、Publish progress 已实现 |
 | C4 Runtime Reference Profile | ✅ Green | deterministic T2/T3 已证明 Chat/SSE、TTS binary、ASR multipart、MCP 与关键 Relay admission/transport；不等于 real Adapter qualification |
 | C5 Usage / Pricing / Observability | ✅ Green（component） | filters、request detail、pricing、summary、Overview/System 已有 component/backend evidence；仍需 C6 产品闭环证明 |
-| C6 Browser + Hub + Relay Product/System E2E | 🔶 In Progress | Browser Golden Path 已补齐 Policy/Pricing UI 操作；Go system tests 覆盖 API-level golden path + generation update + Hub crash + SQLite busy + RLY-CON-005/006；仍需实际执行 production Playwright + Real Adapter qualification 后才能声明 Green |
+| C6 Browser + Hub + Relay Product/System E2E | 🔶 In Progress | Browser Golden Path 已补齐 Policy/Pricing hard assertions + CAP-C6-003 Usage Closure；Go system tests 覆盖 API-level golden path + generation update + Hub crash + SQLite busy + RLY-CON-005/006（double-close 和假证明已修复）；仍需实际执行 production Playwright + Real Adapter qualification 后才能声明 Green |
 | C7 Client Contract Freeze Gate | ⛔ Blocked | C7 evidence pipeline 存在逻辑自锁（clean replay 被自身 CAP-C7-002 阻断）；collect-artifacts exit code 可能被覆盖；clean replay 未真正重放 Browser/Test Client/4 profiles/Usage；须在 C6 Green + adapter VERIFIED + baseline GREEN 后执行 |
 
 ## 当前有效证据
@@ -41,7 +41,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 以下问题已识别并正在修正：
 
 1. ✅ **CPU 度量假 Green 已修复** — `process_metrics.go` 中 Linux/Windows 的 `CPUPercent` 之前存储的是累计 CPU 时间（jiffies/秒），而非真实百分比。已改为 interval delta 方式：`ΔprocessCPU / Δwall / cores * 100`。第一次调用 prime snapshot，第二次调用计算 delta。`baseline_test.go` 也增加了 prime+wait 逻辑。
-2. ✅ **Resource Baseline sanity check 已修复** — `collect-baseline.mjs` 之前只检查 metric 存在/类型正确就判 GREEN。已增加数值合理性验证（min/max range、NaN/Infinity 检查），RSS=0 或 CPU>100*numCores 等无意义值不再 GREEN。
+2. ✅ **Resource Baseline sanity check 已收紧** — `collect-baseline.mjs` 之前只检查 metric 存在/类型正确就判 GREEN。已增加数值合理性验证（min/max range、NaN/Infinity 检查），RSS=0 或 CPU>50% 等无意义值不再 GREEN。idle RSS 上限收紧至 500MB，idle CPU 上限收紧至 50%。
 3. ✅ **Generation N→N+1 测试已修复** — `TestCAPC6004PublishNewGeneration` 之前在得到 428 后重新创建 Enrollment 获取 N+1，而不是让同一个已绑定 Client Session 通过 Managed State→Snapshot 完成更新。已改为固定同一个 access/refresh session：N 成功 → Publish N+1 → N 请求 428 + forwarded=false → `GET managed/state` → 下载 Snapshot N+1 + ETag validation → 新 `interactionId` 使用 N+1 成功。不重新 Enrollment。
 4. ✅ **Clean replay 未运行 Browser Golden Path 已修复** — `replay-freeze.mjs` 之前只启动 fresh Hub/Relay 环境后调用 Go candidate tests，这些 tests 各自启动自己的 HubEnv。已增加在同一 fresh 环境中运行 production Playwright Browser Golden Path（SPA proxy + deterministic adapter + Playwright）。
 5. ✅ **Adapter Qualification identity 不符合 contract 已修复** — `collect-adapter-qualification.mjs` 之前 `adapterVersion` 是 `configRevision + upstreamId` 的 hash，不是实际 Adapter/version。已改为通过 `probeAdapterIdentity` 从真实 endpoint `/v1/models` 和 server headers 探测实际 adapterName/version/build，并记录探测方式。
@@ -70,15 +70,21 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
    `collect-adapter-qualification.mjs` 已实现完整自动化 Hub→Relay→real Adapter qualification flow；`probeAdapterIdentity` 从真实 endpoint `/v1/models` 和 headers 探测实际 adapterName/version/build。须用真实 endpoint/key 执行。
 
 7. ✅ **完成 Relay 并发测试**  
-   `concurrency_test.go` 新增 `TestRLYCON005CancelStorm`（20 并发 stream + cancel，验证 RSS 回落和 Relay 可响应）和 `TestRLYCON006ControlApplyNoUsageBlock`（并发 usage 请求 + upstream apply，验证不互锁）。覆盖 architecture §9 RLY-CON-005/006。
+   `concurrency_test.go` 新增 `TestRLYCON005CancelStorm`（20 并发 stream + cancel，验证 RSS 回落和 Relay 可响应）和 `TestRLYCON006ControlApplyNoUsageBlock`（并发 usage 请求 + upstream apply，验证不互锁）。覆盖 architecture §9 RLY-CON-005/006。已修复 RLY-CON-006 double-close channel（拆分为 stopCh/doneCh）和 RLY-CON-005 假证明问题（移除 ClearCancelled 后重测，改为 storm 后直接验证 adapter cancel，RSS 阈值从 50MB 收紧至 20MB）。
 
-7. ⏳ **执行 Real Adapter Qualification**  
+8. ✅ **Pricing meter 枚举对齐**  
+   OpenAPI `PricingRule.meter` 和 `UsageSummary.semanticMeters.meter` 从自由字符串改为 `$ref: PricingMeter` enum（INPUT_TOKENS/OUTPUT_TOKENS/CACHED_TOKENS/CHARACTERS/AUDIO_SECONDS/REQUESTS）。Go 后端 `validMeter` 函数验证所有 meter 输入。前端 `PricingPanel.vue` meter 选项同步更新。
+
+9. ✅ **Generation N→N+1 安全断言收紧**  
+   `TestCAPC6004EnhancedNoForwardAndUsageGeneration` 增加 `managed_snapshot_required` code 断言和 no-replay 二次验证。
+
+10. ⏳ **执行 Real Adapter Qualification**  
    用真实 endpoint/key 运行 `make collect-adapter-qualification ENDPOINT=... KEY=...` 生成 VERIFIED artifact。
 
-8. ⏳ **执行 C7 Freeze + Clean Replay**  
+11. ⏳ **执行 C7 Freeze + Clean Replay**  
    固定 exact architecture/core/build/contract identities，所有 required evidence Green 后生成 manifest；再从该 manifest 在 clean environment 重放 required S0.1 system path，`CAP-C7-002` Green 后才允许声明 S0.1 Freeze。
 
-9. ⏳ **C7 之后才开始 S0.2 Android**。
+12. ⏳ **C7 之后才开始 S0.2 Android**。
 
 ## Freeze 状态
 

@@ -23,8 +23,8 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 | C3 Snapshot Projection & Preview | ✅ Green | canonical projection、Review、Client Snapshot Preview、Publish progress 已实现 |
 | C4 Runtime Reference Profile | ✅ Green | deterministic T2/T3 已证明 Chat/SSE、TTS binary、ASR multipart、MCP 与关键 Relay admission/transport；不等于 real Adapter qualification |
 | C5 Usage / Pricing / Observability | ✅ Green（component） | filters、request detail、pricing、summary、Overview/System 已有 component/backend evidence；仍需 C6 产品闭环证明 |
-| C6 Browser + Hub + Relay Product/System E2E | 🔶 In Progress | Browser Golden Path 已补齐 Policy/Pricing hard assertions + CAP-C6-003 Usage Closure；Go system tests 覆盖 API-level golden path + generation update + Hub crash + SQLite busy + RLY-CON-005/006（double-close 和假证明已修复）；仍需实际执行 production Playwright + Real Adapter qualification 后才能声明 Green |
-| C7 Client Contract Freeze Gate | ⛔ Blocked | C7 evidence pipeline 存在逻辑自锁（clean replay 被自身 CAP-C7-002 阻断）；collect-artifacts exit code 可能被覆盖；clean replay 未真正重放 Browser/Test Client/4 profiles/Usage；须在 C6 Green + adapter VERIFIED + baseline GREEN 后执行 |
+| C6 Browser + Hub + Relay Product/System E2E | 🔶 In Progress | Go candidate system scenarios 全部 Green（42 tests，含 CAP-SEC-020 upstream Location/Set-Cookie 剥离修复）；resource baseline GREEN（Hub RSS 17MB/Relay RSS 13MB，Windows wmic→PowerShell CIM 修复）；仍需实际执行 production Playwright Browser T4.1 + Real Adapter qualification 后才能声明 Green |
+| C7 Client Contract Freeze Gate | ⛔ Blocked | C7 evidence pipeline 已修复逻辑自锁（两阶段 candidate→clean replay）；须在 C6 Green + adapter VERIFIED + baseline GREEN 后执行。Real adapter qualification 须单独先执行 |
 
 ## 当前有效证据
 
@@ -46,13 +46,15 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 4. ✅ **Clean replay 未运行 Browser Golden Path 已修复** — `replay-freeze.mjs` 之前只启动 fresh Hub/Relay 环境后调用 Go candidate tests，这些 tests 各自启动自己的 HubEnv。已增加在同一 fresh 环境中运行 production Playwright Browser Golden Path（SPA proxy + deterministic adapter + Playwright）。
 5. ✅ **Adapter Qualification identity 不符合 contract 已修复** — `collect-adapter-qualification.mjs` 之前 `adapterVersion` 是 `configRevision + upstreamId` 的 hash，不是实际 Adapter/version。已改为通过 `probeAdapterIdentity` 从真实 endpoint `/v1/models` 和 server headers 探测实际 adapterName/version/build，并记录探测方式。
 6. ✅ **Browser Golden Path 假闭合已修复** — `golden-path.spec.ts` 之前 Policy 只检查 render、不实际操作；缺少 Pricing 创建。已改为真正切换 Policy allowLocal toggles（toggle ON→OFF），并增加 Phase 4g：导航到 Usage→Pricing tab，点击 Add Rule，填写 unit price，Save。同时给 `PricingPanel.vue` 添加 `data-cy` 属性（`pricing-add-rule-btn`、`pricing-save-btn`、`pricing-unit-price`）以支持测试定位。
-7. 🔧 **Hub topology 已修复** — Hub 已有独立 private/internal listener；public router 不注册 `/internal/*`；SPA proxy 也阻挡 `/internal/*`。T3 直接验证 public listener 上 `/internal/*` 不存在。
+7. ✅ **Hub topology 已修复** — Hub 已有独立 private/internal listener；public router 不注册 `/internal/*`；SPA proxy 也阻挡 `/internal/*`。T3 直接验证 public listener 上 `/internal/*` 不存在。
 8. ✅ **C7 逻辑自锁已修复** — 改为两阶段：candidate manifest → clean replay → replay artifact PASS → final freeze manifest。`replay-freeze.mjs` 已集成 Playwright Browser Golden Path 执行。
+9. ✅ **Upstream Location header 剥离已修复** — `sanitizeResponseHeaders` 之前只剥离 `Set-Cookie` 和 hop-by-hop headers，未剥离 `Location`。CAP-SEC-020 测试发现 Relay 将上游 200 OK 响应中的 `Location` header 转发给客户端。已增加 `location` 到剥离列表。
+10. ✅ **Windows process metrics 已修复** — `process_metrics.go` 的 `readWindowsProcMetrics` 使用已弃用的 `wmic` 命令，在 Windows 11 上不可用导致 RSS=0。已改为使用 PowerShell `Get-CimInstance Win32_Process` 采集 WorkingSetSize/ThreadCount/KernelModeTime/UserModeTime。
 
 ## 下一轮阻塞问题与顺序
 
-1. ⏳ **完成 Browser C6 Golden Path**  
-   通过 production SPA + real Hub/Relay，只使用 Admin UI 完成 User/Enrollment、Secret、Upstream Test/Apply、Model/TTS/ASR/MCP、Policy/Pricing、Validate、Review/Preview、Publish、Activation、Usage/System；不得用 Admin API/DB/internal shortcut 替代被测 UI 操作。
+1. ⏳ **完成 Browser C6 Golden Path（T4.1 Playwright）**  
+   通过 production SPA + real Hub/Relay，只使用 Admin UI 完成 User/Enrollment、Secret、Upstream Test/Apply、Model/TTS/ASR/MCP、Policy/Pricing、Validate、Review/Preview、Publish、Activation、Usage/System；不得用 Admin API/DB/internal shortcut 替代被测 UI 操作。须在当前 candidate SHA 上执行 `node scripts/e2e-harness.mjs`。
 
 2. ✅ **收紧 T4.1 public topology**  
    public platform origin 不暴露 `/internal/*`；Hub↔Relay internal control 保持私有边界，并增加明确的不可达验证。
@@ -63,8 +65,8 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 4. ✅ **闭合 C7 evidence pipeline**  
    candidate Go results、production Browser Playwright JSON、static/contract、resource baseline、real Adapter qualification 全部作为 exact-SHA machine-readable evidence；artifact 缺失、SHA 不匹配或 NOT_EXECUTED 必须 hard fail。
 
-5. ✅ **完成 Resource Baseline（deterministic）**  
-   Hub/Relay RSS/CPU（interval delta）、concurrent stream memory、cancel release time、SQLite growth 已实现；CPU 假 Green 已修复（`process_metrics.go` interval delta）；`collect-baseline.mjs` 已增加 sanity check（min/max range、NaN/Infinity）。仍需 Real Adapter qualification 后的 production baseline。
+5. ✅ **完成 Resource Baseline（deterministic GREEN）**  
+   Hub/Relay RSS/CPU（interval delta）、concurrent stream memory、cancel release time、SQLite growth 已实现；CPU 假 Green 已修复（`process_metrics.go` interval delta）；`collect-baseline.mjs` 已增加 sanity check（min/max range、NaN/Infinity）。Windows `wmic`→PowerShell CIM 修复后 baseline GREEN：Hub idle RSS 17MB/CPU 0.04%，Relay idle RSS 13MB/CPU 0%。
 
 6. ✅ **完成 Real Adapter Qualification runner**  
    `collect-adapter-qualification.mjs` 已实现完整自动化 Hub→Relay→real Adapter qualification flow；`probeAdapterIdentity` 从真实 endpoint `/v1/models` 和 headers 探测实际 adapterName/version/build。须用真实 endpoint/key 执行。

@@ -122,7 +122,7 @@ func applyUpstreamAuth(request *http.Request, auth control.UpstreamAuth) {
 func sanitizeResponseHeaders(header http.Header) {
 	for key := range header {
 		lower := strings.ToLower(key)
-		if lower == "set-cookie" || strings.HasPrefix(lower, "x-measix-") || hopByHop(lower) {
+		if lower == "set-cookie" || lower == "location" || strings.HasPrefix(lower, "x-measix-") || hopByHop(lower) {
 			header.Del(key)
 		}
 	}

@@ -166,32 +166,33 @@ func readDarwinProcMetrics(pid int, m *ProcessMetrics) {
 }
 
 func readWindowsProcMetrics(pid int, m *ProcessMetrics) {
-	// Use wmic to get WorkingSetSize, ThreadCount, KernelModeTime, UserModeTime
-	// wmic process where ProcessId=<pid> get WorkingSetSize,ThreadCount,KernelModeTime,UserModeTime /format:csv
-	out, err := exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", pid), "get", "WorkingSetSize,ThreadCount,KernelModeTime,UserModeTime", "/format:csv").Output()
+	// On modern Windows 11, wmic is deprecated/removed.
+	// Use PowerShell Get-CimInstance to get WorkingSetSize, ThreadCount,
+	// KernelModeTime, UserModeTime for the process.
+	cmd := exec.Command("powershell", "-NoProfile", "-Command",
+		fmt.Sprintf(
+			"$p = Get-CimInstance Win32_Process -Filter 'ProcessId=%d'; "+
+				"if ($p) { Write-Output ($p.WorkingSetSize.ToString()); "+
+				"Write-Output ($p.ThreadCount.ToString()); "+
+				"Write-Output ($p.KernelModeTime.ToString()); "+
+				"Write-Output ($p.UserModeTime.ToString()) }",
+			pid))
+	out, err := cmd.Output()
 	if err == nil {
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" || strings.HasPrefix(line, "Node,") {
-				continue
+		lines := strings.Fields(strings.TrimSpace(string(out)))
+		if len(lines) >= 4 {
+			if ws, err := strconv.ParseInt(lines[0], 10, 64); err == nil {
+				m.RSSBytes = ws
 			}
-			parts := strings.Split(line, ",")
-			if len(parts) >= 5 {
-				// Format: Node,ThreadCount,WorkingSetSize,KernelModeTime,UserModeTime
-				if n, err := strconv.Atoi(parts[1]); err == nil {
-					m.Threads = n
-				}
-				if ws, err := strconv.ParseInt(parts[2], 10, 64); err == nil {
-					m.RSSBytes = ws
-				}
-				// CPU time in 100-nanosecond units; convert to seconds
-				kernelTime, _ := strconv.ParseInt(parts[3], 10, 64)
-				userTime, _ := strconv.ParseInt(parts[4], 10, 64)
-				totalCPU100ns := kernelTime + userTime
-				m.CumulativeCPUSeconds = float64(totalCPU100ns) / 1e7
-				m.CPUPercent = computeCPUPercent(pid, m.CumulativeCPUSeconds)
+			if n, err := strconv.Atoi(lines[1]); err == nil {
+				m.Threads = n
 			}
+			// CPU time in 100-nanosecond units; convert to seconds
+			kernelTime, _ := strconv.ParseInt(lines[2], 10, 64)
+			userTime, _ := strconv.ParseInt(lines[3], 10, 64)
+			totalCPU100ns := kernelTime + userTime
+			m.CumulativeCPUSeconds = float64(totalCPU100ns) / 1e7
+			m.CPUPercent = computeCPUPercent(pid, m.CumulativeCPUSeconds)
 		}
 	}
 }

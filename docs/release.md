@@ -1,72 +1,113 @@
-# Release and S0 Release-Candidate Verification
+# Release, S0.1 Freeze and Final S0 Release-Candidate Verification
 
-This document defines how an implementation candidate is composed and proven reproducibly. The architecture S0 System Testing Spec remains authoritative for what must pass before S0 can be declared complete.
+This document defines how implementation candidates are composed and proven reproducibly. The architecture S0.1 Capability Delivery System Testing Spec and final S0 System Testing Spec remain authoritative for what must pass.
 
 ## 1. Release principle
 
-A release candidate is not “whatever is currently on main.” It is a fixed, reproducible composition of source commits, generated contracts, binaries/builds and test evidence.
-
-For S0, the cross-repository composition at minimum fixes:
+A candidate is a fixed, reproducible composition of source commits, generated contracts, builds and test evidence — never an implicit moving branch head.
 
 ```text
-measix-platform-core commit SHA
-rikkahub_mcp commit SHA
+S0.1 Client Contract Freeze Candidate
+  → pre-Android server-side product closure
+
+Final S0 Release Candidate
+  → pinned S0.1 contract + real Android S0.2 integration + final S0 Exit gate
 ```
 
-The release manifest should also record the `measix-architecture` commit used as the governing architecture baseline.
+GitHub Actions CI/CD provides the fast deterministic T0–T3 baseline. Browser T4.1 and real external Adapter qualification are explicit promotion gates on an exact candidate SHA.
 
-## 2. Candidate manifest
+## 2. S0.1 freeze candidate
 
-The system/RC harness produces a machine-readable manifest containing at least the fields required by the architecture System Testing Spec. Implementation governance adds `architectureCommit` for traceability.
+S0.1 is intentionally pre-Android. A freeze candidate can exist only after the architecture-defined C6/C7 requirements are Green.
 
-Expected shape conceptually:
+The machine-readable manifest must include the identities required by the current architecture System Testing Spec, including:
 
 ```text
 architectureCommit
 platformCoreCommit
-androidCommit
 adminBuildHash
-openApiFixtureHash
-hubBuild
-relayBuild
-adapterName/version/configRevision
-androidAppVersion
+clientControlOpenApiHash
+canonicalFixtureHash
+snapshotSchemaVersion
+deterministicAdapterVersion
+realAdapterQualificationRef
 scenarioResults
-startedAt/completedAt
+startedAt
+completedAt
 ```
 
-The exact serialized schema belongs to the test harness once implemented; do not copy a second manually maintained schema into this document.
+It does **not** require `androidCommit`; Android S0.2 starts only after this freeze.
 
-## 3. Promotion stages
+The exact serialized manifest schema is implemented by the candidate/system harness. Markdown documents must not create a competing schema or use different field names such as a generic `adapterQualificationRef` when architecture requires `realAdapterQualificationRef`.
+
+### No placeholder manifest
+
+`docs/s0-freeze-manifest.json` is generated evidence, not a planning/config file. It must not exist as a stale/preliminary placeholder. Generate it only when the exact candidate has passed all required C6/C7 scenarios and real Adapter qualification. If the candidate SHA changes, rerun the required gate and generate new evidence.
+
+## 3. Final S0 release candidate
+
+Final S0 RC consumes a specific valid S0.1 freeze and adds the real Android implementation.
+
+At minimum the composition fixes:
+
+```text
+measix-platform-core commit SHA
+rikkahub_mcp commit SHA
+measix-architecture commit SHA
+S0.1 freeze manifest identity/hash
+```
+
+The final manifest additionally records the build/qualification/scenario evidence required by `measix-s0-system-testing-spec.md`.
+
+## 4. Promotion stages
 
 ### Pull request
 
-T0/T1/T2 for the affected repository surface, with Red/Green evidence for behavior changes.
+Run affected T0/T1/T2 plus bounded deterministic T3 where required. Behavior changes retain Red/Green evidence. Default PR CI does not run full browser T4.1.
 
 ### Main / integration candidate
 
-Adds required T3 lanes, migration/static-host checks and deterministic system-harness backend scenarios.
+Adds required T3 lanes, migration/static-host checks and deterministic backend/system-harness scenarios. GitHub Actions still does not imply S0.1 C6/C7 completion.
 
-### S0 Release Candidate
+### S0.1 freeze candidate
 
-Runs all required current-release S0 gates, including:
+Pin the exact platform-core SHA/build and run all requirements in `measix-s0-capability-delivery-system-testing-spec.md`, including:
 
+- real Admin browser through real Hub;
+- real Hub↔Relay control/runtime paths;
+- deterministic Test Client using public Client Control + Runtime APIs;
+- deterministic Test Adapter for stable success/failure/no-forward evidence;
+- required Model/TTS/ASR/MCP profile scenarios;
+- Snapshot Preview/Release equivalence;
+- Usage/Pricing/UNKNOWN/PARTIAL visibility;
+- recovery/security/generation scenarios;
+- required real Adapter qualification;
+- Client OpenAPI/fixture/schema freeze evidence;
+- no unexplained critical `CAP-*` skip.
+
+The run may execute in a controlled local/dedicated environment, but it must use the exact pinned SHA and produce durable machine-readable evidence. A Green GitHub `ci-gate` is necessary baseline evidence but never substitutes for this gate.
+
+Only after this candidate passes may S0.2 treat the Client contract as frozen input.
+
+### Final S0 release candidate
+
+Final S0 verification extends the frozen S0.1 composition with Android and all applicable current-release gates, including:
+
+- valid pinned S0.1 freeze;
 - applicable Component Testing Spec MUST scenarios;
-- all applicable `SYS-*` critical scenarios;
-- Android emulator E2E;
+- applicable final `AND-*` / `SYS-*` scenarios;
+- Android emulator/device E2E;
 - Admin real-browser E2E;
 - required real Adapter qualification;
 - Hub/Relay restart/reconcile;
 - backup/restore;
 - usage spool/replay;
 - target-resource/load validation;
-- no unexplained critical test skip.
+- no unexplained critical skip.
 
-The architecture document is the authority for the exact S0 Exit list. This document only defines how the repository packages and preserves evidence.
+Architecture is authoritative for exact Exit requirements.
 
-## 4. Deterministic vs real-external lanes
-
-Two distinct system lanes are maintained:
+## 5. Deterministic vs real-external lanes
 
 ```text
 Deterministic lane
@@ -74,51 +115,55 @@ Deterministic lane
   deterministic Test Adapter
   no public Provider dependency
 
-RC external qualification lane
-  fixed Adapter version/config revision
+External qualification lane
+  fixed Adapter version/config/profile
   real required upstream capability
   qualification evidence
 ```
 
-A flaky public Provider must not make normal PR CI nondeterministic. Conversely, a deterministic fake cannot be used to claim real Adapter qualification.
+A flaky public Provider must not make normal PR CI nondeterministic. Conversely, deterministic Adapter evidence cannot be reported as real Adapter qualification.
 
-## 5. Build identity
+## 6. Client contract identity
 
-Every RC binary/static build must be traceable to its source commit and build configuration. The exact build metadata mechanism is implemented in I0/I5 tooling, but release evidence must make it possible to determine which Hub, Relay and Admin build was tested.
+The S0.1 freeze makes the Android handoff reproducible by pinning at least:
 
-## 6. GitHub Actions evidence
+- `api/client/client-control.openapi.yaml` identity/hash;
+- canonical fixture set identity/hash;
+- Snapshot schema version;
+- architecture commit defining semantic contract;
+- platform-core commit/build serving the contract.
 
-RC workflows publish:
+After freeze, an incompatible Android-visible change creates a new architecture-approved contract/freeze candidate; old evidence is immutable.
+
+## 7. Build identity and evidence
+
+Every freeze/RC binary/static build must be traceable to source commit and build configuration. Candidate evidence preserves as applicable:
 
 - machine-readable manifest;
-- test result files;
-- bounded diagnostic logs;
-- browser/emulator failure artifacts when useful;
-- qualification reports;
-- resource/load summaries.
+- exact source/build identities;
+- scenario result files;
+- bounded safe diagnostics;
+- browser/emulator failure artifacts;
+- deterministic Adapter version;
+- real Adapter qualification reference;
+- started/completed timestamps.
 
-Artifacts must not contain production credentials, real user conversations or secret plaintext.
-
-A successful workflow status without the required scenario/report evidence is not sufficient for S0 RC.
-
-## 7. Reproduction
-
-An RC should be reproducible by checking out the pinned source commits, restoring the repository-controlled toolchain/lockfiles, rebuilding the artifacts, and rerunning the deterministic T4 harness with the same declared inputs.
-
-Moving `main` branches are never used as implicit test inputs after the candidate manifest is created.
+Artifacts must not contain production credentials, real user conversations or Secret plaintext.
 
 ## 8. Failed candidate
 
-When an RC scenario fails:
+When a freeze/RC scenario fails:
 
-1. keep the failing run/artifact for diagnosis;
-2. reproduce with the smallest relevant test where possible;
-3. apply TDD regression workflow (Red already demonstrated by the failing scenario; add a narrower durable regression test when useful);
+1. retain failing evidence for diagnosis;
+2. reproduce with the smallest relevant durable test where possible;
+3. apply TDD regression workflow;
 4. create a new candidate composition after fixes;
-5. rerun affected gates and the full required RC gate before promotion.
+5. rerun affected gates and the full required candidate gate before promotion.
 
-Do not mutate the evidence of a failed candidate to make it look successful.
+Do not mutate failed evidence to make it appear successful.
 
-## 9. Tag/version policy
+## 9. Reproduction and versioning
 
-Concrete repository tag/release naming is intentionally not invented by this documentation baseline. Define and document it before the first real RC/release, then keep the naming rule here. Whatever naming is chosen, commit SHAs remain the reproducibility identity used by system-test manifests.
+A candidate must be reproducible by checking out pinned commits, restoring repository-controlled toolchains/lockfiles, rebuilding artifacts and rerunning the corresponding deterministic/system verification with declared inputs.
+
+Concrete tag/release naming may be defined before the first real freeze/release tag. Commit SHAs and manifest hashes remain the primary reproducibility identities.

@@ -1,0 +1,14 @@
+body { background: #f5f6f8; }
+
+/* Responsive modal: works from 320px viewport to desktop.
+   Uses min() so the card never overflows small viewports. */
+.responsive-modal {
+  width: min(640px, calc(100vw - 24px));
+  min-width: 0;
+}
+
+@media (min-width: 600px) {
+  .responsive-modal {
+    width: min(760px, calc(100vw - 48px));
+  }
+}

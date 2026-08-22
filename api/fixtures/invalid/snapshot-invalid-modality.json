@@ -1,0 +1,41 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 1,
+  "managedGeneration": 99,
+  "releaseId": "rel_invalid001-0000-4000-8000-000000000000",
+  "providers": [
+    {
+      "providerId": "prv_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "displayName": "OpenAI Managed Provider",
+      "clientProtocol": "OPENAI_CHAT_COMPLETIONS",
+      "enabled": true
+    }
+  ],
+  "models": [
+    {
+      "modelId": "mdl_invalid001-0000-4000-8000-000000000000",
+      "providerId": "prv_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "displayName": "Invalid Modality Model",
+      "upstreamModelKey": "bad-model",
+      "runtimePath": "/v1/chat/completions",
+      "inputModalities": ["VIDEO"],
+      "outputModalities": ["TEXT"],
+      "capabilities": ["TOOL"],
+      "enabled": true
+    }
+  ],
+  "tts": [],
+  "asr": [],
+  "mcp": [],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": true,
+    "allowLocalTts": true,
+    "allowLocalAsr": true,
+    "allowLocalMcp": true
+  },
+  "metadata": {
+    "publishedAt": "2026-08-19T03:00:00Z"
+  },
+  "snapshotHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

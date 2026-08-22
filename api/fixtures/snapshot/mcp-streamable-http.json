@@ -1,0 +1,31 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 1,
+  "managedGeneration": 4,
+  "releaseId": "rel_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  "providers": [],
+  "models": [],
+  "tts": [],
+  "asr": [],
+  "mcp": [
+    {
+      "mcpServerId": "mcp_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      "displayName": "Enterprise MCP Server",
+      "clientProtocol": "MCP_STREAMABLE_HTTP",
+      "runtimePath": "/mcp/v1",
+      "authOwnership": "ENTERPRISE_MANAGED",
+      "enabled": true
+    }
+  ],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": true,
+    "allowLocalTts": true,
+    "allowLocalAsr": true,
+    "allowLocalMcp": true
+  },
+  "metadata": {
+    "publishedAt": "2026-08-19T03:00:00Z"
+  },
+  "snapshotHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+}

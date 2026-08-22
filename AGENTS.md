@@ -1,112 +1,61 @@
 # Repository Guidelines for Coding Agents
 
-This file is the execution contract for AI/coding agents working in `measix-platform-core`.
+This repository implements MEASIX Control Hub, Runtime Relay and Admin Console.
 
-## 1. Read before implementation
+## Before changing behavior
 
-Before changing behavior, read:
+1. Read `ARCHITECTURE.md` (includes documentation governance).
+2. Use `topabomb/measix-architecture/docs/measix-stage-document-index.md` to identify the architecture documents for the current stage/workstream.
 
-1. `docs/documentation-governance.md`;
-2. `ARCHITECTURE.md`;
-3. relevant documents in `topabomb/measix-architecture`:
-   - S0 Foundation Contract;
-   - Implementation Decision;
-   - Control Protocol when cross-component;
-   - relevant Component Architecture;
-   - relevant Component Implementation Spec;
-   - relevant Component Testing Spec;
-   - S0 System Testing Spec for cross-component/system work.
+   **Local-first principle**: the architecture repository is cloned locally at `../measix-architecture` (relative to this repository root, i.e. a sibling directory). Always read architecture documents from the local checkout first. If the local checkout is missing, clone `git@github.com:topabomb/measix-architecture.git` (or the HTTPS equivalent) to that sibling path before proceeding. Do not infer architecture semantics from memory or from this repository's implementation alone.
 
-Do not infer a new platform semantic from existing code when architecture already owns the meaning.
+3. Read the relevant local implementation document (`docs/api-contracts.md`, `docs/admin-console-implementation.md`, `docs/testing.md`, etc.).
 
-## 2. Change classification is mandatory
+Architecture owns product/wire/state/security meaning. Do not infer a different semantic from existing code.
 
-Before editing, decide whether the task changes architecture semantics, executable contracts, implementation only, or fixes a regression.
+## TDD
 
-If the change alters terminology, stable IDs, state/wire/error semantics, security invariants or required S0 scenarios, update/resolve `measix-architecture` first. Do not silently encode a new semantic in Go, TypeScript, OpenAPI or tests.
-
-## 3. TDD by default
-
-For new behavior and bug fixes:
+Behavior changes and bug fixes use:
 
 ```text
 Red → Green → Refactor
 ```
 
 - add the smallest meaningful failing test first;
-- confirm it fails for the intended reason;
-- implement only enough to pass;
-- refactor while preserving Green;
-- run the complete affected gate before declaring completion.
+- verify the intended failure;
+- implement the minimum change;
+- keep generated artifacts/migrations synchronized;
+- run the affected gate and observe the latest result before reporting Green.
 
-Do not delete, skip, relax or retry-away the failing requirement.
+Docs-only changes do not require artificial Red tests.
 
-Docs-only changes and pure generated-output regeneration do not require an artificial Red test, but generated drift/validation still must pass.
+## Boundaries
 
-## 4. GitHub-only execution mode
+- Runtime Relay must not import Hub domain/Ent packages or access `hub.db`.
+- Admin Console calls only the Control Hub Admin API; never Relay internal APIs.
+- generated wire types come from OpenAPI; do not maintain duplicate DTOs.
+- canonical cross-component fixtures live under `api/fixtures/`.
+- Relay remains provider-agnostic; provider-specific body translation does not belong there.
+- Secret plaintext must not enter persistent browser state or logs.
 
-When no local shell/runtime is available, do not pretend tests were run locally.
+## Contract changes
 
-Use a branch + Draft PR and GitHub Actions as the test executor:
+A semantic wire/state/ID/security change requires architecture authority first. Then update, as applicable:
 
-1. commit/push the Red test;
-2. inspect the PR workflow run/check and verify the expected failure;
-3. commit the minimum implementation;
-4. inspect the latest commit's workflow run/check and verify Green;
-5. inspect logs/artifacts for the affected test lane;
-6. refactor and re-run;
-7. only claim tests passed when GitHub reports the relevant checks successful on the latest commit SHA.
+```text
+OpenAPI → fixtures → generated artifacts → tests → implementation
+```
 
-If CI cannot execute the required test, report that as a verification gap; do not substitute static inspection for an executed test.
+Client Control/Snapshot v1 remains pre-freeze until the S0.1 C7 gate produces the required manifest. After freeze, incompatible changes require an explicit compatibility/versioning decision.
 
-## 5. Local execution mode
+## Frontend dependencies
 
-When a local checkout/runtime is available:
+Normal Vue/browser package selection belongs to this repository. `console/package.json` and `pnpm-lock.yaml` are the concrete dependency authority. Do not require an architecture whitelist for ordinary helpers, visualization, date/time, accessibility or server-state packages.
 
-- run the narrow failing test continuously during Red/Green;
-- run the affected package/component suite before push;
-- let GitHub CI independently repeat the required gate;
-- never treat a local pass as a reason to ignore a CI failure.
+New dependencies must have a real feature use, avoid duplicating Quasar or business/wire authority, and pass typecheck/test/build. See `docs/admin-console-implementation.md`.
 
-Exact commands are documented only after their corresponding tooling exists; use `docs/development.md` and `docs/testing.md` rather than inventing commands.
+## Completion claims
 
-## 6. Dependency boundaries
+Do not claim S0.1, S0.2 or S0 Exit unless the corresponding architecture gate has executed and the required evidence exists. Historical Green runs are regression evidence only; they do not satisfy a newer head commit.
 
-- Runtime Relay must not import Hub domain/service/Ent packages.
-- Admin Console must not call Relay internal APIs.
-- generated wire types come from OpenAPI; do not hand-maintain duplicate DTOs.
-- canonical cross-component fixtures belong under `api/fixtures/`.
-- production code must not depend on test harness packages.
-
-## 7. Generated code and OpenAPI
-
-Never hand-edit generated outputs. Change OpenAPI/generator source, regenerate, then verify drift.
-
-A semantic wire change requires architecture approval first. A schema completion that preserves existing meaning may land here, but ambiguity must be escalated rather than guessed.
-
-## 8. Persistence and migrations
-
-- no ORM AutoMigrate in production;
-- published Atlas migrations are immutable;
-- schema changes require migration generation/review and replay/upgrade tests;
-- Relay never reads or writes `hub.db`.
-
-## 9. Testing expectations
-
-Architecture scenario IDs are requirements, not test implementation names. Reference `HUB-*`, `RLY-*`, `ADM-*` and `SYS-*` where the test proves a critical scenario; ordinary unit tests do not need artificial IDs.
-
-Tests must be deterministic, isolated, bounded by deadlines, use synthetic credentials/content, and avoid public-network dependencies in normal PR CI.
-
-## 10. Completion report
-
-For implementation work, report:
-
-- files/areas changed;
-- architecture reference or `Architecture impact: none`;
-- Red evidence;
-- Green evidence;
-- exact test layers/checks executed;
-- remaining verification gaps;
-- migrations/generated artifacts/operational impact when applicable.
-
-Never state that a test passed unless it actually executed locally or in CI and the result was observed.
+Implementation reports should state changed areas, architecture impact, Red/Green evidence, executed checks and remaining gaps.

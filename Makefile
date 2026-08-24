@@ -43,13 +43,8 @@ s01-candidate-test: console-build
 s01-browser-candidate: console-build
 	node scripts/e2e-harness.mjs
 
-# Alias for backwards compatibility
+# Backwards-compatible aliases for s01-browser-candidate
 console-e2e: s01-browser-candidate
-
-# e2e-harness is the full T4.1 clean-environment browser gate:
-# temp DB, Hub, Relay, deterministic Adapter, production SPA, Playwright.
-# This is the one-click harness required by architecture for S0.1 Gate.
-# Alias retained for backwards compatibility.
 e2e-harness: s01-browser-candidate
 
 console-build:

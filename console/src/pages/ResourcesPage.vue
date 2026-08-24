@@ -195,6 +195,11 @@ async function openReview() {
   reviewing.value = true
   error.value = undefined
   try {
+    // Re-validate before opening the review dialog to ensure
+    // acknowledgedWarningCodes includes all current warnings.
+    // The backend re-runs validation on publish and rejects if
+    // any warning code is not in acknowledgedWarningCodes.
+    await draft.validate(session.csrfToken)
     // Ensure we have a fresh preview before the review dialog
     if (!preview.value || preview.value.draftRevision !== draft.baselineRevision) {
       preview.value = await apiFetch<DraftPreviewResponse>(
@@ -230,7 +235,7 @@ async function publish() {
     }, session.csrfToken)
     activation.accept(result)
     if (result.state === 'APPLYING' || result.state === 'UNKNOWN') {
-      await activation.poll(result.activationId)
+      await activation.pollUntilSettled(result.activationId, { timeoutMs: 60_000 })
     }
     reviewOpen.value = false
     await refresh()

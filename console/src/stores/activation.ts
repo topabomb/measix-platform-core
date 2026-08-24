@@ -77,6 +77,20 @@ export const useActivationStore = defineStore('activation', () => {
     }
   }
 
+  /** Poll the activation status until it reaches a terminal state (COMPLETED or FAILED). */
+  async function pollUntilSettled(activationId: string, opts: { timeoutMs?: number; intervalMs?: number } = {}): Promise<Activation> {
+    const timeoutMs = opts.timeoutMs ?? 60_000
+    const intervalMs = opts.intervalMs ?? 1_000
+    const deadline = Date.now() + timeoutMs
+    let value: Activation
+    do {
+      value = await poll(activationId)
+      if (value.state === 'COMPLETED' || value.state === 'FAILED') return value
+      if (Date.now() > deadline) return value
+      await new Promise((r) => setTimeout(r, intervalMs))
+    } while (true)
+  }
+
   function resetCommand() {
     activation.value = undefined
     retryKey.value = undefined
@@ -84,5 +98,5 @@ export const useActivationStore = defineStore('activation', () => {
     lastPollAt.value = undefined
   }
 
-  return { activation, retryKey, commandKind, polling, lastPollAt, pending, succeeded, failed, publishStages, beginCommand, accept, poll, resetCommand }
+  return { activation, retryKey, commandKind, polling, lastPollAt, pending, succeeded, failed, publishStages, beginCommand, accept, poll, pollUntilSettled, resetCommand }
 })

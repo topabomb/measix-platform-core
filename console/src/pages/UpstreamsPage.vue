@@ -305,7 +305,7 @@ async function applyUpstream() {
     )
     activation.accept(result)
     if (result.state === 'APPLYING' || result.state === 'UNKNOWN') {
-      await activation.poll(result.activationId)
+      await activation.pollUntilSettled(result.activationId, { timeoutMs: 60_000 })
     }
     await refresh()
     if (selected.value) {

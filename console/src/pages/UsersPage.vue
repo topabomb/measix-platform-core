@@ -107,7 +107,7 @@ async function runSecurity(path: string) {
   try {
     const result = await apiFetch<Activation>(path, { method: 'POST', headers: { 'Idempotency-Key': key } }, session.csrfToken)
     activation.accept(result)
-    if (result.state === 'APPLYING' || result.state === 'UNKNOWN') await activation.poll(result.activationId)
+    if (result.state === 'APPLYING' || result.state === 'UNKNOWN') await activation.pollUntilSettled(result.activationId, { timeoutMs: 60_000 })
     await refresh()
     if (selected.value) {
       selected.value = users.value.find((item) => item.userId === selected.value?.userId)

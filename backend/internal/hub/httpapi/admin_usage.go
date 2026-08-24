@@ -79,7 +79,7 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 		RequestBytes: int(summary.RequestBytes), ResponseBytes: int(summary.ResponseBytes),
 		SemanticMeters: []struct {
 			Confidence adminapi.UsageSummarySemanticMetersConfidence `json:"confidence"`
-			Meter      adminapi.PricingMeter                          `json:"meter"`
+			Meter      adminapi.PricingMeter                         `json:"meter"`
 			Quantity   string                                        `json:"quantity"`
 		}{},
 	}
@@ -93,7 +93,7 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 		}
 		wire.SemanticMeters = append(wire.SemanticMeters, struct {
 			Confidence adminapi.UsageSummarySemanticMetersConfidence `json:"confidence"`
-			Meter      adminapi.PricingMeter                          `json:"meter"`
+			Meter      adminapi.PricingMeter                         `json:"meter"`
 			Quantity   string                                        `json:"quantity"`
 		}{Confidence: confidence, Meter: adminapi.PricingMeter(meter.Meter), Quantity: meter.Quantity})
 	}

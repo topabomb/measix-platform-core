@@ -14,7 +14,7 @@
     "name": "Unsupported protocol",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestCAPC0002UnsupportedProtocol"
+      "TestNegativeSnapshotFixturesRejectedByEnumValidation"
     ],
     "required": true
   },
@@ -23,7 +23,10 @@
     "name": "Model vocabulary",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestCAPC0003ModelVocabulary"
+      "TestCAPC0002ModelInputModalitiesFrozenEnum",
+      "TestCAPC0002ModelOutputModalitiesFrozenEnum",
+      "TestCAPC0002ModelCapabilitiesFrozenEnum",
+      "TestNegativeSnapshotFixturesRejectedByEnumValidation"
     ],
     "required": true
   },
@@ -41,7 +44,8 @@
     "name": "ASR HTTP transcription",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestCAPC0005ASRHTTPTranscription"
+      "TestCAPC0003AsrClientProtocolFrozenEnum",
+      "TestCAPC0003AsrLanguageOptionalField"
     ],
     "required": true
   },
@@ -104,7 +108,7 @@
     "name": "STATIC_HEADER/BASIC",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBUPS001CandidateAndActiveConfigRevisionsAreSeparate"
+      "TestRLYHDRCredentialHeaderCannotRestoreReservedHeaders"
     ],
     "required": true
   },
@@ -185,7 +189,7 @@
     "name": "Model capabilities",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestCAPC2002ModelCapabilities"
+      "TestCAPC0002ModelCapabilitiesFrozenEnum"
     ],
     "required": true
   },
@@ -194,7 +198,7 @@
     "name": "Missing Provider",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestCAPC2003MissingProvider"
+      "TestHUBCAP004RouteUpstreamValidation"
     ],
     "required": true
   },
@@ -203,7 +207,7 @@
     "name": "Missing Binding",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestCAPC2004MissingBinding"
+      "TestHUBCAP004RouteUpstreamValidation"
     ],
     "required": true
   },
@@ -302,7 +306,7 @@
     "name": "Route safety",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestCAPC2043RouteSafety"
+      "TestHUBCAP004RouteUpstreamValidation"
     ],
     "required": true
   },
@@ -554,7 +558,8 @@
     "name": "Model request usage",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBI5RequestUsageBatchIsIdempotent"
+      "TestHUBI5RequestUsageBatchIsIdempotent",
+      "TestHUBI5RequestUsageRejectsInvalidIdentity"
     ],
     "required": true
   },
@@ -590,6 +595,7 @@
     "name": "Hub usage outage",
     "artifact": "backend-test.json",
     "testNames": [
+      "TestRLYSPHubOutageKeepsRowsAndRecordsBackoff",
       "TestRLYSPHubAckDeletesOnlyAcknowledgedBatch"
     ],
     "required": true
@@ -977,7 +983,7 @@
     "name": "Expired/Wrong-Claim JWT Rejected",
     "artifact": "candidate-test.json",
     "testNames": [
-      "TestCAPSEC016ExpiredWrongClaimJWTRejected"
+      "TestCAPSEC016ExpiredAndWrongClaimJWTRejected"
     ],
     "required": true
   },
@@ -1004,7 +1010,7 @@
     "name": "Management Endpoint Not Reachable",
     "artifact": "candidate-test.json",
     "testNames": [
-      "TestCAPSEC019ManagementEndpointNotReachable"
+      "TestCAPSEC019ManagementEndpointNotReachableViaResource"
     ],
     "required": true
   },
@@ -1013,7 +1019,7 @@
     "name": "Upstream Set-Cookie/Redirect Stripped",
     "artifact": "candidate-test.json",
     "testNames": [
-      "TestCAPSEC020UpstreamSetCookieRedirectStripped"
+      "TestCAPSEC020UpstreamSetCookieAndRedirectStripped"
     ],
     "required": true
   },

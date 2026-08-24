@@ -24,7 +24,7 @@
  * Usage:
  *   node scripts/replay-freeze.mjs
  */
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { execSync } from 'node:child_process'
@@ -221,7 +221,170 @@ if (existsSync(spaDir)) {
 
 try { adapterServer.close() } catch {}
 
-// --- 9b. Run deterministic Go candidate tests ---
+// --- 9b. Run four-capability runtime traffic against SAME fresh environment ---
+// Per architecture CAP-C7-002: the clean replay must prove a complete product
+// loop in the SAME deployment: Browser config/Publish → Test Client four
+// capabilities → Usage → Browser Usage/System. The Browser Golden Path already
+// configured and published the snapshot. Now we send four runtime requests
+// through the SAME Relay to generate usage data.
+let fourCapabilityPassed = false
+let fourCapabilityOutput = ''
+if (browserGoldenPathPassed) {
+  try {
+    log('Running four-capability runtime traffic against same fresh environment...')
+
+    // Login as admin to get CSRF token + cookie
+    const loginResp = await fetch(`${env.hubBaseURL}/api/admin/v1/session/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: adminPassword }),
+    })
+    if (!loginResp.ok) throw new Error(`admin login failed: ${loginResp.status}`)
+    const loginJson = await loginResp.json()
+    const csrfToken = loginJson.csrfToken
+    const cookie = loginResp.headers.get('set-cookie')?.split(';')[0] || ''
+
+    // Create a managed user (userId must be usr_* format)
+    const userResp = await fetch(`${env.hubBaseURL}/api/admin/v1/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': cookie,
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({ username: 'replay-user-' + Date.now(), displayName: 'Replay User', role: 'MEMBER' }),
+    })
+    if (!userResp.ok) throw new Error(`create user failed: ${userResp.status}`)
+    const userJson = await userResp.json()
+    const managedUserId = userJson.userId
+
+    // Create enrollment for the managed user
+    const enrollResp = await fetch(`${env.hubBaseURL}/api/admin/v1/users/${managedUserId}/enrollments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': cookie,
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({ expiresInSeconds: 3600 }),
+    })
+    if (!enrollResp.ok) throw new Error(`create enrollment failed: ${enrollResp.status}`)
+    const enrollJson = await enrollResp.json()
+    const enrollmentCode = enrollJson.code
+
+    // Exchange enrollment for access token
+    const exchangeResp = await fetch(`${env.hubBaseURL}/api/client/v1/enrollments/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        platform: 'ANDROID',
+        code: enrollmentCode,
+        installationId: `ins_${randomUUID()}`,
+        appVersion: 'replay-1.0',
+      }),
+    })
+    if (!exchangeResp.ok) throw new Error(`exchange enrollment failed: ${exchangeResp.status}`)
+    const exchangeJson = await exchangeResp.json()
+    const clientToken = exchangeJson.accessToken
+
+    // Get managed state for generation + resource IDs
+    const stateResp = await fetch(`${env.hubBaseURL}/api/client/v1/managed/state`, {
+      headers: { 'Authorization': `Bearer ${clientToken}` },
+    })
+    const stateJson = await stateResp.json()
+    const generation = stateJson.activeManagedGeneration
+
+    // Fetch the snapshot to get resource IDs
+    const snapResp = await fetch(`${env.hubBaseURL}/api/client/v1/managed/snapshots/${generation}`, {
+      headers: { 'Authorization': `Bearer ${clientToken}` },
+    })
+    const snapJson = await snapResp.json()
+
+    // Extract resource IDs from snapshot
+    const modelId = snapJson.models?.[0]?.modelId
+    const ttsId = snapJson.tts?.[0]?.ttsId
+    const asrId = snapJson.asr?.[0]?.asrId
+    const mcpId = snapJson.mcp?.[0]?.mcpServerId
+
+    if (!modelId || !ttsId || !asrId || !mcpId) {
+      throw new Error(`snapshot missing resource IDs: model=${modelId} tts=${ttsId} asr=${asrId} mcp=${mcpId}`)
+    }
+
+    const relayUrl = env.relayPubBaseURL
+    const headers = {
+      'Authorization': `Bearer ${clientToken}`,
+      'X-Measix-Managed-Generation': String(generation),
+      'Content-Type': 'application/json',
+    }
+
+    // 1. Model streaming
+    const modelResp = await fetch(`${relayUrl}/runtime/v1/resources/${modelId}/v1/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model: 'gpt-test', stream: true, messages: [{ role: 'user', content: 'Say hello' }] }),
+    })
+    if (!modelResp.ok) throw new Error(`model request failed: ${modelResp.status}`)
+
+    // 2. TTS
+    const ttsResp = await fetch(`${relayUrl}/runtime/v1/resources/${ttsId}/v1/audio/speech`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model: 'tts-test', input: 'hello', voice: 'alloy' }),
+    })
+    if (!ttsResp.ok) throw new Error(`tts request failed: ${ttsResp.status}`)
+
+    // 3. ASR
+    const asrFormData = new FormData()
+    asrFormData.append('file', new Blob([Buffer.from('RIFF')]), 'sample.wav')
+    asrFormData.append('model', 'whisper-test')
+    const asrResp = await fetch(`${relayUrl}/runtime/v1/resources/${asrId}/v1/audio/transcriptions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${clientToken}`, 'X-Measix-Managed-Generation': String(generation) },
+      body: asrFormData,
+    })
+    if (!asrResp.ok) throw new Error(`asr request failed: ${asrResp.status}`)
+
+    // 4. MCP
+    const mcpResp = await fetch(`${relayUrl}/runtime/v1/resources/${mcpId}/mcp`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'replay-client', version: '1.0' } } }),
+    })
+    if (!mcpResp.ok) throw new Error(`mcp request failed: ${mcpResp.status}`)
+
+    log('Four-capability runtime requests sent successfully')
+
+    // Wait for usage to be recorded (bounded polling)
+    let usageRecorded = false
+    for (let i = 0; i < 30; i++) {
+      const usageResp = await fetch(`${env.hubBaseURL}/api/admin/v1/usage/summary`, {
+        headers: { 'Cookie': cookie, 'X-CSRF-Token': csrfToken },
+      })
+      if (usageResp.ok) {
+        const usageJson = await usageResp.json()
+        if (usageJson.requestCount && usageJson.requestCount >= 4) {
+          usageRecorded = true
+          log(`Usage recorded: ${usageJson.requestCount} requests`)
+          break
+        }
+      }
+      await new Promise(r => setTimeout(r, 1000))
+    }
+    if (!usageRecorded) {
+      throw new Error('usage not recorded within 30s (expected >= 4 requests)')
+    }
+
+    fourCapabilityPassed = true
+    fourCapabilityOutput = 'four capabilities: PASS, usage recorded'
+  } catch (e) {
+    fourCapabilityOutput = `four capabilities: FAIL — ${e.message}`
+    log(`Four-capability runtime traffic FAILED: ${e.message}`)
+  }
+} else {
+  log('Skipping four-capability traffic — Browser Golden Path did not pass')
+}
+
+// --- 9c. Run deterministic Go candidate tests ---
 // These tests start their OWN HubEnv (independent of the one we started above).
 // They prove the system can be deployed from a completely clean environment.
 try {
@@ -303,9 +466,10 @@ try {
 log('Cleaning up fresh environment...')
 cleanupEnvironment(processes, servers, env.envRoot, false, log)
 
-if (!browserGoldenPathPassed || !replayTestsPassed || !loginOk || !statusOk || !topologySecurityPassed) {
+if (!browserGoldenPathPassed || !fourCapabilityPassed || !replayTestsPassed || !loginOk || !statusOk || !topologySecurityPassed) {
   console.error('ERROR: Clean replay failed:')
   if (!browserGoldenPathPassed) console.error('  - Browser Golden Path did not pass')
+  if (!fourCapabilityPassed) console.error('  - Four-capability runtime traffic did not pass')
   if (!replayTestsPassed) console.error('  - Deterministic replay tests did not pass')
   if (!loginOk) console.error('  - Admin login failed in fresh environment')
   if (!statusOk) console.error('  - System status check failed')

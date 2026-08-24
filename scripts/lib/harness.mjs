@@ -525,6 +525,13 @@ export function startSpaProxy(port, spaDir, hubPort) {
     res.end(JSON.stringify({ error: 'not found' }))
   })
 
+  // Ensure keep-alive connections don't hang — Chromium headless uses
+  // keep-alive aggressively and the default Node.js timeouts (5s keep-alive,
+  // 60s headers) can cause races where the server closes the connection
+  // while Chromium still has pending requests, resulting in ERR_ABORTED.
+  server.keepAliveTimeout = 30000
+  server.headersTimeout = 35000
+
   server.listen(port, '127.0.0.1')
   return server
 }
@@ -541,6 +548,7 @@ function serveStaticFile(res, fullPath, name) {
   const ext = extname(name)
   const ct = MIME_TYPES[ext] || 'application/octet-stream'
   res.setHeader('Content-Type', ct)
+  res.setHeader('Content-Length', data.length)
   res.writeHead(200)
   res.end(data)
 }

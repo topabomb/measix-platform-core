@@ -40,6 +40,9 @@
 /console/src/api/generated.ts.bak
 # Volar / Vue 类型缓存
 /console/.vite/
+# Playwright test results and reports (local, not committed)
+/console/test-results/
+/console/playwright-report/
 # 日志
 /console/npm-debug.log*
 /console/pnpm-debug.log*

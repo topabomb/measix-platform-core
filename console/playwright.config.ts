@@ -36,7 +36,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Use the full Chromium binary instead of the headless shell,
+        // which has a loopback networking bug on Windows that prevents
+        // connections to local Node.js HTTP servers.
+        channel: 'chromium',
+      },
     },
   ],
 })

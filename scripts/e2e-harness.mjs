@@ -30,12 +30,11 @@
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { Worker } from 'node:worker_threads'
 
 import {
   resolveRoot,
   freePort,
-  startDeterministicAdapter,
-  startSpaProxy,
   waitFor,
   createFreshEnvironment,
   startHubAndRelay,
@@ -95,9 +94,7 @@ processes.push(hubProc, relayProc)
 
 // --- Start deterministic Adapter ---
 
-log('starting deterministic Adapter...')
-const adapterServer = startDeterministicAdapter(adapterPort)
-servers.push(adapterServer)
+log('starting deterministic Adapter (in worker)...')
 
 // --- Wait for Hub and Relay to be ready ---
 
@@ -110,15 +107,22 @@ if (!hubReady || !relayReady) {
 
 // --- Start same-origin SPA proxy ---
 
-log('starting same-origin SPA proxy...')
+log('starting same-origin SPA proxy (in worker)...')
 const spaDir = join(ROOT, 'console', 'dist', 'spa')
 if (!existsSync(spaDir)) {
   log('SPA build not found. Run "make console-build" first.')
   process.exit(1)
 }
 
-const spaServer = startSpaProxy(spaPort, spaDir, env.hubPort)
-servers.push(spaServer)
+// Start HTTP servers (SPA proxy + Adapter) in a worker thread to avoid
+// blocking the Node.js event loop when using execSync for Playwright.
+const worker = new Worker(join(ROOT, 'scripts', '_server-worker.mjs'), {
+  workerData: { spaPort, spaDir, adapterPort, hubPort: env.hubPort },
+})
+await new Promise((resolve, reject) => {
+  worker.on('message', (msg) => { if (msg.ready) resolve() })
+  worker.on('error', reject)
+})
 
 const spaReady = await waitFor(spaBaseURL, 'SPA', 30000, log)
 if (!spaReady) {
@@ -129,6 +133,21 @@ if (!spaReady) {
 // --- Run Playwright E2E ---
 
 log('running Playwright E2E tests...')
+
+// Verify SPA proxy is reachable before running Playwright
+try {
+  const resp = await fetch(`${spaBaseURL}/admin/`)
+  const text = await resp.text()
+  log(`SPA proxy check: ${resp.status} (${text.length} bytes)`)
+  if (!resp.ok) {
+    log('ERROR: SPA proxy not serving /admin/ correctly')
+    process.exit(1)
+  }
+} catch (e) {
+  log(`ERROR: SPA proxy unreachable: ${e.message}`)
+  process.exit(1)
+}
+
 const e2eEnv = {
   ...process.env,
   MEASIX_E2E_BASE_URL: spaBaseURL,
@@ -147,28 +166,35 @@ if (!existsSync(artifactsDir)) {
 // Track envRoot for cleanup
 env.envRoot_ref = env.envRoot
 
+// Use execSync to run Playwright — this is safe because the HTTP servers
+// (SPA proxy + Adapter) run in a worker thread, so execSync's event loop
+// blocking does not prevent Chromium from accessing the HTTP servers.
+let exitCode = 1
 try {
-  // Use the Playwright config which includes the JSON reporter
-  // outputting to ../.artifacts/e2e-playwright.json
-  // Do NOT pass --reporter=list — it would override the config's reporters
-  // and prevent the JSON artifact from being generated.
   execSync('npx playwright test', {
     cwd: join(ROOT, 'console'),
     stdio: 'inherit',
     env: e2eEnv,
     timeout: TIMEOUT,
   })
-  log('E2E tests PASSED')
+  exitCode = 0
+} catch (e) {
+  exitCode = e.status ?? 1
+}
 
-  // Write artifact metadata envelope for provenance validation
+// Shutdown the worker
+worker.postMessage({ shutdown: true })
+await new Promise(r => setTimeout(r, 500))
+try { worker.terminate() } catch {}
+
+if (exitCode === 0) {
+  log('E2E tests PASSED')
   writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'npx playwright test', 0)
   log('wrote e2e-playwright.json.meta.json')
-} catch (e) {
-  log(`E2E tests FAILED: ${e.message}`)
-
-  // Still write meta.json even on failure for provenance
-  writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'npx playwright test', 1)
-  process.exit(1)
+} else {
+  log(`E2E tests FAILED (exit=${exitCode})`)
+  writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'npx playwright test', exitCode)
+  process.exit(exitCode)
 }
 
 // --- Done ---

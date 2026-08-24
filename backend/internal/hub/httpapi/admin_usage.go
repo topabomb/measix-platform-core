@@ -79,7 +79,7 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 		RequestBytes: int(summary.RequestBytes), ResponseBytes: int(summary.ResponseBytes),
 		SemanticMeters: []struct {
 			Confidence adminapi.UsageSummarySemanticMetersConfidence `json:"confidence"`
-			Meter      string                                        `json:"meter"`
+			Meter      adminapi.PricingMeter                          `json:"meter"`
 			Quantity   string                                        `json:"quantity"`
 		}{},
 	}
@@ -93,9 +93,9 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 		}
 		wire.SemanticMeters = append(wire.SemanticMeters, struct {
 			Confidence adminapi.UsageSummarySemanticMetersConfidence `json:"confidence"`
-			Meter      string                                        `json:"meter"`
+			Meter      adminapi.PricingMeter                          `json:"meter"`
 			Quantity   string                                        `json:"quantity"`
-		}{Confidence: confidence, Meter: meter.Meter, Quantity: meter.Quantity})
+		}{Confidence: confidence, Meter: adminapi.PricingMeter(meter.Meter), Quantity: meter.Quantity})
 	}
 	wire.Cost.Status = adminapi.UsageSummaryCostStatusUNKNOWN
 	if summary.Cost.State == usage.CostKnown || summary.Cost.State == usage.CostPartial {
@@ -143,7 +143,7 @@ func (h *fullAdminHandler) PutPricing(w http.ResponseWriter, r *http.Request, pa
 		}
 		rules = append(rules, usage.PricingRuleRecord{
 			ID: rule.PricingRuleId, ResourceID: resourceID, UpstreamID: upstreamID,
-			Meter: rule.Meter, UnitSize: rule.UnitSize, UnitPrice: rule.UnitPrice, Currency: rule.Currency,
+			Meter: string(rule.Meter), UnitSize: rule.UnitSize, UnitPrice: rule.UnitPrice, Currency: rule.Currency,
 			EffectiveFrom: rule.EffectiveFrom,
 		})
 	}
@@ -212,7 +212,7 @@ func pricingSetWire(revision int, rows []usage.PricingRuleRecord) adminapi.Prici
 		}
 		items = append(items, adminapi.PricingRule{
 			PricingRuleId: row.ID, ResourceId: row.ResourceID, UpstreamId: upstreamID,
-			Meter: row.Meter, UnitSize: row.UnitSize, UnitPrice: row.UnitPrice, Currency: row.Currency,
+			Meter: adminapi.PricingMeter(row.Meter), UnitSize: row.UnitSize, UnitPrice: row.UnitPrice, Currency: row.Currency,
 			EffectiveFrom: row.EffectiveFrom,
 		})
 	}

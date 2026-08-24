@@ -431,7 +431,7 @@ onMounted(refresh)
           <q-card-section>
             <div class="row items-center justify-between">
               <div class="text-subtitle2">{{ $t('resources.overview.providers') }}</div>
-              <q-btn flat dense icon="add" :label="$t('resources.overview.addProvider')" size="sm" @click="addProvider()" />
+                <q-btn flat dense icon="add" :label="$t('resources.overview.addProvider')" size="sm" data-cy="add-provider-btn" @click="addProvider()" />
             </div>
             <q-list dense class="q-mt-sm">
               <q-item v-for="provider in draft.localContent.providers" :key="provider.providerId">
@@ -522,7 +522,7 @@ onMounted(refresh)
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
                 <div class="text-subtitle2">{{ $t('resources.tabs.models') }}</div>
-                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" :disable="!draft.localContent.providers.length" @click="addModel()" />
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-model-btn" :disable="!draft.localContent.providers.length" @click="addModel()" />
               </q-card-section>
               <q-list separator>
                 <q-item v-for="(model, idx) in draft.localContent.models" :key="model.modelId"
@@ -568,8 +568,8 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.model.identity') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-input v-model="selectedModel.displayName" dense outlined :label="$t('resources.model.displayName')" class="col" @update:model-value="draft.markDirty()" />
-                  <q-select v-model="selectedModel.providerId" dense outlined :label="$t('resources.model.provider')" :options="draft.localContent.providers.map((p) => ({ label: p.displayName, value: p.providerId }))" emit-value map-options class="col" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedModel.displayName" dense outlined :label="$t('resources.model.displayName')" class="col" data-cy="model-display-name" @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.providerId" dense outlined :label="$t('resources.model.provider')" :options="draft.localContent.providers.map((p) => ({ label: p.displayName, value: p.providerId }))" emit-value map-options class="col" data-cy="model-provider-select" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ selectedModel.modelId }} ({{ $t('resources.model.logicalIdentity') }})</div>
               </q-card-section>
@@ -585,7 +585,7 @@ onMounted(refresh)
                   </div>
                   <div class="col">
                     <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.model.upstreamModelKey') }}</div>
-                    <q-input v-model="selectedModel.upstreamModelKey" dense outlined :label="$t('resources.model.upstreamModelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" @update:model-value="draft.markDirty()" />
+                    <q-input v-model="selectedModel.upstreamModelKey" dense outlined :label="$t('resources.model.upstreamModelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" data-cy="model-upstream-key" @update:model-value="draft.markDirty()" />
                   </div>
                 </div>
                 <div class="row q-gutter-sm">
@@ -601,8 +601,8 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.model.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
-                  <q-input v-model="selectedModel.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" data-cy="model-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
+                  <q-input v-model="selectedModel.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="model-runtime-path" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">
                   {{ $t('resources.model.transportSummary') }}
@@ -648,7 +648,7 @@ onMounted(refresh)
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
                 <div class="text-subtitle2">{{ $t('resources.tabs.tts') }} <span class="text-caption text-grey-7">· {{ $t('resources.tts.protocolBadge') }}</span></div>
-                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" @click="draft.addTts(); selectedResourceId = draft.localContent?.tts[draft.localContent.tts.length - 1]?.ttsId" />
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-tts-btn" @click="draft.addTts(); selectedResourceId = draft.localContent?.tts[draft.localContent.tts.length - 1]?.ttsId" />
               </q-card-section>
               <q-list separator>
                 <q-item v-for="(tts, idx) in draft.localContent.tts" :key="tts.ttsId"
@@ -683,15 +683,15 @@ onMounted(refresh)
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.identity') }}</div>
-                <q-input v-model="selectedTts.displayName" dense outlined :label="$t('resources.tts.displayName')" @update:model-value="draft.markDirty()" />
+                <q-input v-model="selectedTts.displayName" dense outlined :label="$t('resources.tts.displayName')" data-cy="tts-display-name" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.speechProfile') }}</div>
                 <div class="row q-gutter-sm q-mb-sm">
-                  <q-input v-model="selectedTts.upstreamModelKey" dense outlined :label="$t('resources.tts.modelKey')" :hint="$t('resources.tts.transport')" class="col" @update:model-value="draft.markDirty()" />
-                  <q-input v-model="selectedTts.voice" dense outlined :label="$t('resources.tts.voice')" :hint="$t('resources.tts.voiceHint')" class="col"
+                  <q-input v-model="selectedTts.upstreamModelKey" dense outlined :label="$t('resources.tts.modelKey')" :hint="$t('resources.tts.transport')" class="col" data-cy="tts-model-key" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedTts.voice" dense outlined :label="$t('resources.tts.voice')" :hint="$t('resources.tts.voiceHint')" class="col" data-cy="tts-voice"
                     :rules="[(v: string) => !!v || $t('resources.tts.voiceRequired')]"
                     @update:model-value="draft.markDirty()" />
                 </div>
@@ -714,8 +714,8 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId ?? ''" dense outlined :label="$t('resources.tts.transport')" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedTts!.ttsId, v, 'HTTP_BINARY_STREAM')" />
-                  <q-input v-model="selectedTts.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId ?? ''" dense outlined :label="$t('resources.tts.transport')" :options="upstreamOptions" emit-value map-options class="col" data-cy="tts-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedTts!.ttsId, v, 'HTTP_BINARY_STREAM')" />
+                  <q-input v-model="selectedTts.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="tts-runtime-path" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.tts.transportSummary') }}</div>
               </q-card-section>
@@ -755,7 +755,7 @@ onMounted(refresh)
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
                 <div class="text-subtitle2">{{ $t('resources.tabs.asr') }} <span class="text-caption text-grey-7">· {{ $t('resources.asr.protocolBadge') }} (HTTP)</span></div>
-                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" @click="draft.addAsr(); selectedResourceId = draft.localContent?.asr[draft.localContent.asr.length - 1]?.asrId" />
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-asr-btn" @click="draft.addAsr(); selectedResourceId = draft.localContent?.asr[draft.localContent.asr.length - 1]?.asrId" />
               </q-card-section>
               <q-list separator>
                 <q-item v-for="(asr, idx) in draft.localContent.asr" :key="asr.asrId"
@@ -789,14 +789,14 @@ onMounted(refresh)
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.identity') }}</div>
-                <q-input v-model="selectedAsr.displayName" dense outlined :label="$t('resources.asr.displayName')" @update:model-value="draft.markDirty()" />
+                <q-input v-model="selectedAsr.displayName" dense outlined :label="$t('resources.asr.displayName')" data-cy="asr-display-name" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.transcriptionProfile') }}</div>
                 <div class="row q-gutter-sm q-mb-sm">
-                  <q-input v-model="selectedAsr.upstreamModelKey" dense outlined :label="$t('resources.asr.modelKey')" :hint="$t('resources.asr.transport')" class="col" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedAsr.upstreamModelKey" dense outlined :label="$t('resources.asr.modelKey')" :hint="$t('resources.asr.transport')" class="col" data-cy="asr-model-key" @update:model-value="draft.markDirty()" />
                   <q-input v-model="selectedAsr.language" dense outlined :label="$t('resources.asr.optionalLanguage')" :hint="$t('resources.asr.optionalLanguageHint')" class="col" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="row q-gutter-sm items-center">
@@ -816,8 +816,8 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedAsr!.asrId, v, 'HTTP_MULTIPART')" />
-                  <q-input v-model="selectedAsr.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" data-cy="asr-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedAsr!.asrId, v, 'HTTP_MULTIPART')" />
+                  <q-input v-model="selectedAsr.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="asr-runtime-path" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.asr.transportSummary') }}</div>
               </q-card-section>
@@ -857,7 +857,7 @@ onMounted(refresh)
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
                 <div class="text-subtitle2">{{ $t('resources.tabs.mcp') }} <span class="text-caption text-grey-7">· {{ $t('resources.mcp.transport') }}</span></div>
-                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" @click="draft.addMcp(); selectedResourceId = draft.localContent?.mcp[draft.localContent.mcp.length - 1]?.mcpServerId" />
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-mcp-btn" @click="draft.addMcp(); selectedResourceId = draft.localContent?.mcp[draft.localContent.mcp.length - 1]?.mcpServerId" />
               </q-card-section>
               <q-list separator>
                 <q-item v-for="(mcp, idx) in draft.localContent.mcp" :key="mcp.mcpServerId"
@@ -891,7 +891,7 @@ onMounted(refresh)
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.mcp.identity') }}</div>
-                <q-input v-model="selectedMcp.displayName" dense outlined :label="$t('resources.mcp.displayName')" @update:model-value="draft.markDirty()" />
+                <q-input v-model="selectedMcp.displayName" dense outlined :label="$t('resources.mcp.displayName')" data-cy="mcp-display-name" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
@@ -919,8 +919,8 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.mcp.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" @update:model-value="(v: string) => draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
-                  <q-input v-model="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" @update:model-value="draft.markDirty()" />
+                  <q-select :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" data-cy="mcp-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
+                  <q-input v-model="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="mcp-runtime-path" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.mcp.transportSummary') }}</div>
               </q-card-section>
@@ -969,10 +969,10 @@ onMounted(refresh)
             <div class="text-subtitle2 q-mb-sm">{{ $t('resources.policy.localCoexistence') }}</div>
             <div class="text-body2 text-grey-7 q-mb-md">{{ $t('resources.policy.coexistenceHint') }}</div>
             <div class="row q-gutter-md">
-              <q-toggle v-model="draft.localContent.policy.allowLocalProviders" :label="$t('resources.policy.allowLocalModels')" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalTts" :label="$t('resources.policy.allowLocalTts')" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalAsr" :label="$t('resources.policy.allowLocalAsr')" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalMcp" :label="$t('resources.policy.allowLocalMcp')" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalProviders" :label="$t('resources.policy.allowLocalModels')" data-cy="policy-allow-local-models" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalTts" :label="$t('resources.policy.allowLocalTts')" data-cy="policy-allow-local-tts" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalAsr" :label="$t('resources.policy.allowLocalAsr')" data-cy="policy-allow-local-asr" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalMcp" :label="$t('resources.policy.allowLocalMcp')" data-cy="policy-allow-local-mcp" @update:model-value="draft.markDirty()" />
             </div>
           </q-card-section>
           <q-separator />

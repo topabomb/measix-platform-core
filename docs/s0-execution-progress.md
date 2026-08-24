@@ -23,7 +23,7 @@ S0 Core 基础已经建立：Identity/Enrollment、Draft/Release/Snapshot、Runt
 | C3 Snapshot Projection & Preview | ✅ Green | canonical projection、Review、Client Snapshot Preview、Publish progress 已实现 |
 | C4 Runtime Reference Profile | ✅ Green | deterministic T2/T3 已证明 Chat/SSE、TTS binary、ASR multipart、MCP 与关键 Relay admission/transport；不等于 real Adapter qualification |
 | C5 Usage / Pricing / Observability | ✅ Green（component） | filters、request detail、pricing、summary、Overview/System 已有 component/backend evidence；仍需 C6 产品闭环证明 |
-| C6 Browser + Hub + Relay Product/System E2E | 🔶 In Progress | Go candidate system scenarios 全部 Green（42 tests，含 CAP-SEC-020 upstream Location/Set-Cookie 剥离修复）；resource baseline GREEN（Hub RSS 17MB/Relay RSS 13MB，Windows wmic→PowerShell CIM 修复）；仍需实际执行 production Playwright Browser T4.1 + Real Adapter qualification 后才能声明 Green |
+| C6 Browser + Hub + Relay Product/System E2E | 🔶 In Progress | Go candidate system scenarios 全部 Green（42 tests，含 CAP-SEC-020 upstream Location/Set-Cookie 剥离修复）；resource baseline GREEN（Hub RSS 17MB/Relay RSS 13MB，Windows wmic→PowerShell CIM 修复）；Browser E2E topology-security GREEN；Browser golden-path 已修复 Phase 4 选择器问题（添加 `data-cy` 属性到 ResourcesPage 所有交互元素，用 `aria-checked` 验证 Policy toggle 状态，用 `selectOption` helper 替代脆弱的 label-text 选择器）；**核心修复已完成**：Playwright `execSync` 阻塞事件循环导致 SPA proxy 无法响应 Chromium 请求（ERR_ABORTED）→ 改用 `worker_threads` 运行 HTTP servers；Playwright headless shell 在 Windows 上无法连接本地 HTTP server → `channel: 'chromium'` 使用完整 Chromium 二进制 |
 | C7 Client Contract Freeze Gate | ⛔ Blocked | C7 evidence pipeline 已修复逻辑自锁（两阶段 candidate→clean replay）；须在 C6 Green + adapter VERIFIED + baseline GREEN 后执行。Real adapter qualification 须单独先执行 |
 
 ## 当前有效证据

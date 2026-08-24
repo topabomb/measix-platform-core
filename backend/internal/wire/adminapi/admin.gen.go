@@ -235,6 +235,36 @@ func (e ModelDefinitionOutputModalities) Valid() bool {
 	}
 }
 
+// Defines values for PricingMeter.
+const (
+	AUDIOSECONDS PricingMeter = "AUDIO_SECONDS"
+	CACHEDTOKENS PricingMeter = "CACHED_TOKENS"
+	CHARACTERS   PricingMeter = "CHARACTERS"
+	INPUTTOKENS  PricingMeter = "INPUT_TOKENS"
+	OUTPUTTOKENS PricingMeter = "OUTPUT_TOKENS"
+	REQUESTS     PricingMeter = "REQUESTS"
+)
+
+// Valid indicates whether the value is a known member of the PricingMeter enum.
+func (e PricingMeter) Valid() bool {
+	switch e {
+	case AUDIOSECONDS:
+		return true
+	case CACHEDTOKENS:
+		return true
+	case CHARACTERS:
+		return true
+	case INPUTTOKENS:
+		return true
+	case OUTPUTTOKENS:
+		return true
+	case REQUESTS:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProviderDefinitionClientProtocol.
 const (
 	OPENAICHATCOMPLETIONS ProviderDefinitionClientProtocol = "OPENAI_CHAT_COMPLETIONS"
@@ -1032,11 +1062,24 @@ type PreviewDraftRequest struct {
 	ExpectedDraftRevision int `json:"expectedDraftRevision"`
 }
 
+// PricingMeter Standard meters per architecture s0-control-protocol §13.
+// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+// ASR    → AUDIO_SECONDS + REQUESTS
+// MCP    → REQUESTS
+type PricingMeter string
+
 // PricingRule defines model for PricingRule.
 type PricingRule struct {
-	Currency      string        `json:"currency"`
-	EffectiveFrom time.Time     `json:"effectiveFrom"`
-	Meter         string        `json:"meter"`
+	Currency      string    `json:"currency"`
+	EffectiveFrom time.Time `json:"effectiveFrom"`
+
+	// Meter Standard meters per architecture s0-control-protocol §13.
+	// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+	// ASR    → AUDIO_SECONDS + REQUESTS
+	// MCP    → REQUESTS
+	Meter         PricingMeter  `json:"meter"`
 	PricingRuleId PricingRuleId `json:"pricingRuleId"`
 	ResourceId    *string       `json:"resourceId,omitempty"`
 	UnitPrice     string        `json:"unitPrice"`
@@ -1357,8 +1400,14 @@ type UsageSummary struct {
 	ResponseBytes         int       `json:"responseBytes"`
 	SemanticMeters        []struct {
 		Confidence UsageSummarySemanticMetersConfidence `json:"confidence"`
-		Meter      string                               `json:"meter"`
-		Quantity   string                               `json:"quantity"`
+
+		// Meter Standard meters per architecture s0-control-protocol §13.
+		// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+		// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+		// ASR    → AUDIO_SECONDS + REQUESTS
+		// MCP    → REQUESTS
+		Meter    PricingMeter `json:"meter"`
+		Quantity string       `json:"quantity"`
 	} `json:"semanticMeters"`
 	To time.Time `json:"to"`
 }

@@ -858,7 +858,7 @@ export interface components {
             requestBytes: number;
             responseBytes: number;
             semanticMeters: {
-                meter: string;
+                meter: components["schemas"]["PricingMeter"];
                 quantity: string;
                 /** @enum {string} */
                 confidence: "EXACT" | "PARTIAL" | "UNKNOWN";
@@ -897,11 +897,20 @@ export interface components {
             items: components["schemas"]["RequestUsageView"][];
             nextCursor?: string;
         };
+        /**
+         * @description Standard meters per architecture s0-control-protocol §13.
+         *     MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+         *     TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+         *     ASR    → AUDIO_SECONDS + REQUESTS
+         *     MCP    → REQUESTS
+         * @enum {string}
+         */
+        PricingMeter: "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS" | "REQUESTS";
         PricingRule: {
             pricingRuleId: components["schemas"]["PricingRuleId"];
             resourceId?: string;
             upstreamId?: components["schemas"]["UpstreamId"];
-            meter: string;
+            meter: components["schemas"]["PricingMeter"];
             unitSize: string;
             unitPrice: string;
             currency: string;

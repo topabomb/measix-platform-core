@@ -37,7 +37,15 @@
  * Usage:
  *   node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <api-key>
  *   [--hub-url <url>] [--relay-url <url>] [--admin-password <pw>]
- *   [--profile all|model|tts|asr|mcp]
+ *   [--profile all|model|tts|asr|mcp] [--merge]
+ *
+ * Per audit P0-5: multi-profile aggregation.
+ *   Each --profile run can store partial results. Use --merge to accumulate:
+ *     node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <key> --profile model --merge
+ *     node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <key> --profile tts --merge
+ *     node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <key> --profile asr --merge
+ *     node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <key> --profile mcp --merge
+ *   After all four are VERIFIED individually, top-level status becomes VERIFIED.
  *
  * Or to mark as NOT_EXECUTED (default when no args):
  *   node scripts/collect-adapter-qualification.mjs
@@ -69,6 +77,7 @@ let profile = 'all'
 let hubUrl = process.env.MEASIX_HUB_URL || null
 let relayUrl = process.env.MEASIX_RELAY_URL || null
 let adminPassword = process.env.MEASIX_ADMIN_PASSWORD || 'admin'
+let mergeMode = false  // Per audit P0-5: merge new profile results into existing artifact
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--endpoint' && i + 1 < args.length) {
@@ -83,6 +92,8 @@ for (let i = 0; i < args.length; i++) {
     relayUrl = args[++i]
   } else if (args[i] === '--admin-password' && i + 1 < args.length) {
     adminPassword = args[++i]
+  } else if (args[i] === '--merge') {
+    mergeMode = true
   }
 }
 
@@ -1351,9 +1362,40 @@ async function main() {
   // (Model/TTS/ASR/MCP) to be individually VERIFIED. Running only a subset
   // (e.g., --profile model) produces profile-level evidence but CANNOT
   // produce top-level VERIFIED — untested profiles remain NOT_EXECUTED.
+  //
+  // Per audit P0-5: multi-profile aggregation via --merge. When --merge is set,
+  // the script reads the existing artifact and merges newly qualified profiles
+  // into it, preserving previously VERIFIED profiles.
   const REQUIRED_PROFILES = ['model', 'tts', 'asr', 'mcp']
-  const allVerified = REQUIRED_PROFILES.every(p => results[p]?.status === 'VERIFIED')
-  const overallStatus = allVerified ? 'VERIFIED' : 'FAILED'
+
+  // Attempt to load existing artifact for merge
+  let existingArtifact = null
+  if (mergeMode && existsSync(OUT_PATH)) {
+    try {
+      existingArtifact = JSON.parse(readFileSync(OUT_PATH, 'utf-8'))
+      console.log('Merge mode: loaded existing artifact, preserving verified profiles...')
+    } catch {
+      console.warn('WARNING: could not parse existing artifact, starting fresh')
+    }
+  }
+
+  // Merge newly qualified profiles into existing data
+  const mergedProfiles = existingArtifact?.profiles || {}
+  for (const p of profilesToQualify) {
+    if (results[p]?.status !== 'NOT_EXECUTED') {
+      mergedProfiles[p] = results[p]
+    }
+  }
+  // For profiles NOT in either existing or current run, keep existing or default
+  for (const p of REQUIRED_PROFILES) {
+    if (!mergedProfiles[p]) {
+      mergedProfiles[p] = existingArtifact?.profiles?.[p] || { status: 'NOT_EXECUTED' }
+    }
+  }
+
+  // Compute overall status from merged profiles
+  const allMergedVerified = REQUIRED_PROFILES.every(p => mergedProfiles[p]?.status === 'VERIFIED')
+  const overallStatus = allMergedVerified ? 'VERIFIED' : 'FAILED'
 
 // Qualification unit: adapterName/version + upstreamId/configRevision + profile
 // Per architecture §1: qualification unit must be adapterName/version +
@@ -1419,8 +1461,8 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
     correlationMode: correlationLevel,
     // Per architecture §14: usageLevel
     usageLevel: usageCapabilityLevel,
-    // Per architecture §14: scenario results
-    profiles: results,
+    // Per architecture §14: scenario results (merged if --merge used)
+    profiles: mergedProfiles,
     usageRecordsCount: usageCount,
     // Per architecture §14: findings
     findings,
@@ -1465,8 +1507,8 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
     exitCode: overallStatus === 'VERIFIED' ? 0 : 1,
   }, null, 2) + '\n')
   console.log(`\nWrote ${OUT_PATH}`)
-  console.log(`Overall status: ${overallStatus}`)
-  for (const [p, r] of Object.entries(results)) {
+  console.log(`Overall status: ${overallStatus}${mergeMode ? ' (merged)' : ''}`)
+  for (const [p, r] of Object.entries(mergedProfiles)) {
     console.log(`  ${p}: ${r.status}`)
     for (const [c, v] of Object.entries(r)) {
       if (c !== 'status') console.log(`    ${c}: ${v}`)

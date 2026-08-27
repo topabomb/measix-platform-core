@@ -55,12 +55,21 @@ function log(msg) {
 }
 
 function cleanup() {
-  cleanupEnvironment(processes, servers, '', KEEP, log)
+  // Per audit P1-1: pass the real envRoot so temp dir is cleaned up.
+  // Previously passed '' which left temp directories behind on failure.
+  cleanupEnvironment(processes, servers, env?.envRoot || '', KEEP, log)
 }
 
 process.on('SIGINT', () => { cleanup(); process.exit(1) })
 process.on('SIGTERM', () => { cleanup(); process.exit(1) })
 process.on('exit', () => cleanup())
+
+// Per audit P1-1: ensure cleanup runs even on uncaught exception
+process.on('uncaughtException', (err) => {
+  log(`Uncaught exception: ${err.message}`)
+  cleanup()
+  process.exit(1)
+})
 
 // --- Setup ---
 
@@ -169,6 +178,9 @@ env.envRoot_ref = env.envRoot
 // Use execSync to run Playwright — this is safe because the HTTP servers
 // (SPA proxy + Adapter) run in a worker thread, so execSync's event loop
 // blocking does not prevent Chromium from accessing the HTTP servers.
+//
+// Per audit P1-1: use try/finally to ensure Worker, Hub, Relay, Adapter,
+// SPA proxy and temp directory are cleaned up regardless of pass/fail.
 let exitCode = 1
 try {
   execSync('npx playwright test', {
@@ -180,25 +192,27 @@ try {
   exitCode = 0
 } catch (e) {
   exitCode = e.status ?? 1
-}
+} finally {
+  // Shutdown the worker — must happen even on failure
+  try { worker.postMessage({ shutdown: true }) } catch {}
+  await new Promise(r => setTimeout(r, 500))
+  try { worker.terminate() } catch {}
 
-// Shutdown the worker
-worker.postMessage({ shutdown: true })
-await new Promise(r => setTimeout(r, 500))
-try { worker.terminate() } catch {}
+  // Write meta.json for provenance regardless of pass/fail
+  writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'npx playwright test', exitCode)
+
+  // Always run cleanup — temp dir, processes, servers
+  cleanup()
+}
 
 if (exitCode === 0) {
   log('E2E tests PASSED')
-  writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'npx playwright test', 0)
   log('wrote e2e-playwright.json.meta.json')
 } else {
   log(`E2E tests FAILED (exit=${exitCode})`)
-  writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'npx playwright test', exitCode)
   process.exit(exitCode)
 }
 
 // --- Done ---
 
 log('all steps completed successfully')
-log(`evidence dir: ${env.envRoot}`)
-cleanup()

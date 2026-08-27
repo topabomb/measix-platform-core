@@ -167,18 +167,21 @@ let browserGoldenPathOutput = ''
 let replayTestsPassed = false
 let replayTestOutput = ''
 
-// --- 9a. Run Playwright Browser Golden Path against this fresh environment ---
-// We need a SPA proxy and adapter for the browser test.
-// Start a deterministic adapter on a free port.
+// Per audit P0-3: Adapter lifecycle covers Browser config/Publish, Test Client
+// traffic, AND Usage wait. All phases go inside try/finally; only close the
+// Adapter after all phases complete.
+
+// Start a deterministic adapter on a free port (covers entire pipeline)
 const adapterPort = await freePort()
 const spaPort = await freePort()
 const adapterBaseURL = `http://127.0.0.1:${adapterPort}`
 const spaBaseURL = `http://127.0.0.1:${spaPort}`
 
-// Start a simple deterministic adapter (inline HTTP server)
+// Start deterministic adapter — remains alive through all phases
 const adapterServer = startDeterministicAdapter(adapterPort)
 const servers = [adapterServer]
 
+// --- 9a. Run Playwright Browser Golden Path against this fresh environment ---
 // Start SPA proxy (same-origin as browser expects)
 const spaDir = join(ROOT, 'console', 'dist', 'spa')
 if (existsSync(spaDir)) {
@@ -197,8 +200,9 @@ if (existsSync(spaDir)) {
         MEASIX_E2E_ADMIN_PASSWORD: adminPassword,
         PLAYWRIGHT_BASE_URL: spaBaseURL,
       }
+      // Per audit P0-2: use orchestrator for split authoring/usage phases
       browserGoldenPathOutput = execSync(
-        'npx playwright test --reporter=line',
+        'npx playwright test --reporter=line golden-path-authoring.spec.ts',
         { cwd: join(ROOT, 'console'), encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], env: e2eEnv, timeout: 600000 },
       )
       browserGoldenPathPassed = true
@@ -219,7 +223,8 @@ if (existsSync(spaDir)) {
   browserGoldenPathPassed = false
 }
 
-try { adapterServer.close() } catch {}
+// NOTE: adapterServer is NOT closed here — it must remain alive for the
+// four-capability traffic phase (per audit P0-3). It is closed in cleanup.
 
 // --- 9b. Run four-capability runtime traffic against SAME fresh environment ---
 // Per architecture CAP-C7-002: the clean replay must prove a complete product
@@ -227,6 +232,8 @@ try { adapterServer.close() } catch {}
 // capabilities → Usage → Browser Usage/System. The Browser Golden Path already
 // configured and published the snapshot. Now we send four runtime requests
 // through the SAME Relay to generate usage data.
+// Per audit P0-3: Adapter is still running — this phase would fail if Adapter
+// were closed prematurely.
 let fourCapabilityPassed = false
 let fourCapabilityOutput = ''
 if (browserGoldenPathPassed) {
@@ -384,7 +391,52 @@ if (browserGoldenPathPassed) {
   log('Skipping four-capability traffic — Browser Golden Path did not pass')
 }
 
-// --- 9c. Run deterministic Go candidate tests ---
+// --- 9c. Run Browser Usage/System verification (Phase 9-13) ---
+// Per audit P0-2: usage/system verification runs AFTER four-capability traffic.
+// Per audit P0-3: SPA proxy and Adapter are still alive for this phase.
+let browserUsagePassed = false
+let browserUsageOutput = ''
+if (fourCapabilityPassed) {
+  try {
+    log('Starting SPA proxy for usage/system verification phase...')
+    const usageSpaPort = await freePort()
+    const usageSpaServer = startSpaProxy(usageSpaPort, spaDir, env.hubPort)
+    servers.push(usageSpaServer)
+    const usageSpaBaseURL = `http://127.0.0.1:${usageSpaPort}`
+    const usageSpaReady = await waitFor(usageSpaBaseURL, 'usage SPA', 30000, log)
+
+    if (usageSpaReady) {
+      const usageE2eEnv = {
+        ...process.env,
+        MEASIX_E2E_BASE_URL: usageSpaBaseURL,
+        MEASIX_E2E_HUB_BASE_URL: env.hubBaseURL,
+        MEASIX_E2E_ADAPTER_URL: adapterBaseURL,
+        MEASIX_E2E_ADMIN_PASSWORD: adminPassword,
+        PLAYWRIGHT_BASE_URL: usageSpaBaseURL,
+      }
+      browserUsageOutput = execSync(
+        'npx playwright test --reporter=line golden-path-usage.spec.ts',
+        { cwd: join(ROOT, 'console'), encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], env: usageE2eEnv, timeout: 300000 },
+      )
+      browserUsagePassed = true
+      log('Browser Usage/System verification PASSED')
+    } else {
+      browserUsageOutput = 'SPA proxy not ready for usage phase'
+      log('WARNING: SPA proxy not ready — skipping Browser Usage/System verification.')
+    }
+    try { usageSpaServer.close() } catch {}
+  } catch (e) {
+    browserUsageOutput = (e.stdout || '') + (e.stderr || '')
+    log('Browser Usage/System verification FAILED')
+    console.error('Browser usage failure:', browserUsageOutput.slice(0, 2000))
+  }
+} else {
+  log('Skipping Browser Usage/System verification — four-capability traffic did not pass')
+}
+
+// Per audit P0-3: adapterServer is closed AFTER all phases complete (in cleanup).
+
+// --- 9d. Run deterministic Go candidate tests ---
 // These tests start their OWN HubEnv (independent of the one we started above).
 // They prove the system can be deployed from a completely clean environment.
 try {
@@ -466,10 +518,11 @@ try {
 log('Cleaning up fresh environment...')
 cleanupEnvironment(processes, servers, env.envRoot, false, log)
 
-if (!browserGoldenPathPassed || !fourCapabilityPassed || !replayTestsPassed || !loginOk || !statusOk || !topologySecurityPassed) {
+if (!browserGoldenPathPassed || !fourCapabilityPassed || !browserUsagePassed || !replayTestsPassed || !loginOk || !statusOk || !topologySecurityPassed) {
   console.error('ERROR: Clean replay failed:')
-  if (!browserGoldenPathPassed) console.error('  - Browser Golden Path did not pass')
+  if (!browserGoldenPathPassed) console.error('  - Browser Golden Path (authoring/publish) did not pass')
   if (!fourCapabilityPassed) console.error('  - Four-capability runtime traffic did not pass')
+  if (!browserUsagePassed) console.error('  - Browser Usage/System verification did not pass')
   if (!replayTestsPassed) console.error('  - Deterministic replay tests did not pass')
   if (!loginOk) console.error('  - Admin login failed in fresh environment')
   if (!statusOk) console.error('  - System status check failed')
@@ -499,8 +552,19 @@ const replayArtifact = {
     adapterBaseURL,
   },
   browserGoldenPath: {
+    phase: 'authoring/publish (golden-path-authoring.spec.ts)',
     passed: browserGoldenPathPassed,
     outputHash: 'sha256:' + createHash('sha256').update(browserGoldenPathOutput).digest('hex'),
+  },
+  fourCapabilityTraffic: {
+    passed: fourCapabilityPassed,
+    description: 'Model/TTS/ASR/MCP runtime traffic against same fresh environment',
+    output: fourCapabilityOutput,
+  },
+  browserUsageSystem: {
+    phase: 'usage/system verification (golden-path-usage.spec.ts)',
+    passed: browserUsagePassed,
+    outputHash: 'sha256:' + createHash('sha256').update(browserUsageOutput).digest('hex'),
   },
   replayTests: {
     passed: replayTestsPassed,
@@ -511,6 +575,15 @@ const replayArtifact = {
     ],
     outputHash: 'sha256:' + createHash('sha256').update(replayTestOutput).digest('hex'),
   },
+  // Per audit P0-2: execution order is now documented in the artifact
+  executionOrder: [
+    '1. Browser Admin (authoring/publish): golden-path-authoring.spec.ts',
+    '2. Four-capability runtime traffic: Model/TTS/ASR/MCP',
+    '3. Wait for Usage ingestion (>= 4 requests)',
+    '4. Browser Admin (usage/system): golden-path-usage.spec.ts',
+    '5. Deterministic Go candidate tests',
+    '6. Topology security + smoke tests',
+  ],
   manifestScenarioResults: manifest.scenarioResults.filter(s => s.required),
 }
 

@@ -147,8 +147,11 @@ function compileScenarioResults() {
 
     if (s.id === 'CAP-C0-009') {
       const a = artifacts['static-contract.json']
-      if (a && a.codegenDrift === 'PASS') result = 'PASS'
-      else if (a && a.codegenDrift === 'FAIL') result = 'FAIL'
+      // Per audit P0-4: static-contract.json now stores {status, outputHash}
+      // for each check. Top-level PASS requires all three sub-checks to PASS.
+      if (a && a.codegenDrift?.status === 'PASS' && a.gofmt?.status === 'PASS' && a.goVet?.status === 'PASS') result = 'PASS'
+      else if (a && (a.codegenDrift?.status === 'FAIL' || a.gofmt?.status === 'FAIL' || a.goVet?.status === 'FAIL')) result = 'FAIL'
+      else if (a && a._error) result = 'FAIL'
     } else if (s.id === 'BASELINE') {
       const a = artifacts['resource-baseline.json']
       if (a && a.status === 'GREEN') result = 'PASS'
@@ -286,9 +289,11 @@ if (gitDirty(ROOT)) errors.push('Working tree is dirty. Commit or stash changes 
 if (gitDirty(ARCH_REPO)) errors.push('Architecture repo is dirty. This may cause SHA mismatch.')
 
 const archCommit = gitCommit(ARCH_REPO)
-if (archCommit !== 'dbb56952ab1cf60fa55e4cbb8d14ee70eda43a48') {
-  warnings.push(`Architecture commit is ${archCommit}, expected dbb56952...`)
-}
+// Per audit P2-1: do not hardcode an architecture commit. Instead, record the
+// architecture commit in the manifest so that freeze-validate can verify the
+// correct architecture commit is checked out at validation time. The expected
+// architecture commit is implicitly the one shipped with this platform-core
+// commit (they are version-coupled).
 
 const buildHash = adminBuildHash(ROOT)
 if (buildHash === 'not-built') errors.push('Admin production build not found. Run "make console-build" before generating freeze manifest.')

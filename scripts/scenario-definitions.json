@@ -781,7 +781,7 @@
     "required": true
   },
   {
-    "id": "CAP-C6-006",
+    "id": "REGRESS-C6-006",
     "name": "Browser Topology Security (/internal/* unreachable)",
     "artifact": "e2e-playwright.json",
     "testNames": [
@@ -844,7 +844,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-001",
+    "id": "REGRESS-SEC-001",
     "name": "Unauthenticated Access Denied",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -853,7 +853,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-002",
+    "id": "REGRESS-SEC-002",
     "name": "CSRF Enforced",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -862,7 +862,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-003",
+    "id": "REGRESS-SEC-003",
     "name": "Session Cookie Attributes",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -871,7 +871,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-004",
+    "id": "REGRESS-SEC-004",
     "name": "Snapshot No Server Fields Leak",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -880,7 +880,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-005",
+    "id": "REGRESS-SEC-005",
     "name": "Usage Detail No Content Leak",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -889,7 +889,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-006",
+    "id": "REGRESS-SEC-006",
     "name": "Invalid Enrollment Rejected",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -898,7 +898,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-007",
+    "id": "REGRESS-SEC-007",
     "name": "Invalid Access Token Rejected",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -907,7 +907,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-008",
+    "id": "REGRESS-SEC-008",
     "name": "Strict JSON Validation",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -916,7 +916,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-009",
+    "id": "REGRESS-SEC-009",
     "name": "Client Header Spoof Stripped",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -925,7 +925,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-010",
+    "id": "REGRESS-SEC-010",
     "name": "Secret Value Never Returned",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -934,7 +934,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-011",
+    "id": "REGRESS-SEC-011",
     "name": "Logout Invalidates Session",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -943,7 +943,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-012",
+    "id": "REGRESS-SEC-012",
     "name": "Client API Auth Enforced",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -952,7 +952,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-013",
+    "id": "REGRESS-SEC-013",
     "name": "Request Body Size Limit",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -961,7 +961,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-014",
+    "id": "REGRESS-SEC-014",
     "name": "System Status No Internal Config",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -970,7 +970,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-015",
+    "id": "REGRESS-SEC-015",
     "name": "Idempotent Publish",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -979,7 +979,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-016",
+    "id": "REGRESS-SEC-016",
     "name": "Expired/Wrong-Claim JWT Rejected",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -988,7 +988,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-017",
+    "id": "REGRESS-SEC-017",
     "name": "Disabled User Rejected",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -997,7 +997,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-018",
+    "id": "REGRESS-SEC-018",
     "name": "Revoked Device Rejected",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -1006,7 +1006,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-019",
+    "id": "REGRESS-SEC-019",
     "name": "Management Endpoint Not Reachable",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -1015,7 +1015,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-020",
+    "id": "REGRESS-SEC-020",
     "name": "Upstream Set-Cookie/Redirect Stripped",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -1024,7 +1024,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-021",
+    "id": "REGRESS-SEC-021",
     "name": "Snapshot Preview No Server Fields Leak",
     "artifact": "candidate-test.json",
     "testNames": [
@@ -1033,7 +1033,7 @@
     "required": true
   },
   {
-    "id": "CAP-SEC-022",
+    "id": "REGRESS-SEC-022",
     "name": "Internal Routes Not Reachable From Public",
     "artifact": "candidate-test.json",
     "testNames": [

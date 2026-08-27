@@ -1,4 +1,4 @@
-.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test console-test console-e2e e2e-harness contract migrations migration-replay freeze-manifest freeze-validate clean-replay collect-artifacts freeze-gate collect-baseline collect-adapter-qualification
+.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test console-test console-e2e e2e-harness contract migrations migration-replay freeze-manifest freeze-validate clean-replay collect-artifacts collect-static-contract freeze-gate collect-baseline collect-adapter-qualification
 
 ci: fmt-check contract backend-test system-test console-test migrations generated-drift
 
@@ -95,8 +95,31 @@ collect-artifacts:
 	@cd console && pnpm vitest run --reporter=json --outputFile=../.artifacts/console-test.json 2>../.artifacts/console-test.stderr.log; exit_code=$$?; \
 	node scripts/write-meta.mjs console-test.json 'pnpm vitest run --reporter=json --outputFile' $$exit_code; \
 	if [ $$exit_code -ne 0 ]; then echo "ERROR: console tests failed (exit $$exit_code)"; exit $$exit_code; fi
-	@echo "Collecting static contract artifact..."
-	@echo '{"codegenDrift":"PASS","gofmt":"PASS","goVet":"PASS","commit":"'$(shell git rev-parse HEAD)'"}' > .artifacts/static-contract.json
+# collect-static-contract runs actual commands and records their exit codes.
+# Comments explaining static-contract behavior:
+#   - Each check captures exit code AND SHA-256 of command output
+#   - PASS/FAIL status is DERIVED from exit code — never hardcoded
+#   - Output hash provides tamper-evidence for audit verification
+collect-static-contract:
+	@echo "Running static contract checks (no hardcoded PASS per audit P0-4)..."
+	@mkdir -p .artifacts
+	@# gofmt: list files needing formatting (empty output = clean)
+	gofmt_result=$$(cd backend && find . -name '*.go' -type f -print0 | xargs -0 gofmt -l 2>/dev/null | wc -l | tr -d ' '); \
+	if [ "$$gofmt_result" = "0" ]; then gofmt_status="PASS"; gofmt_hash="$$(cd backend && find . -name '*.go' -type f -print0 | xargs -0 gofmt -l 2>/dev/null | sha256sum | cut -d' ' -f1)"; else gofmt_status="FAIL"; gofmt_hash="raw://$$gofmt_result-files-need-formatting"; fi; \
+	@# go vet: compile-time static analysis
+	vet_out=$$(cd backend && go vet ./... 2>&1); vet_exit=$$?; \
+	if [ $$vet_exit -eq 0 ]; then vet_status="PASS"; else vet_status="FAIL"; fi; \
+	vet_hash=$$(echo "$$vet_out" | sha256sum | cut -d' ' -f1); \
+	@# codegen drift: verify all generated artifacts match source
+	drift_exit=$$(git diff --exit-code --quiet -- backend/go.mod backend/go.sum backend/ent backend/internal/wire backend/migrations/atlas.sum api/generated/android console/pnpm-lock.yaml console/src/api/generated.ts 2>/dev/null; echo $$?); \
+	if [ "$$drift_exit" = "0" ]; then drift_status="PASS"; drift_hash="clean"; else drift_status="FAIL"; drift_hash="$$drift_exit"; fi; \
+	echo "{\"codegenDrift\":{\"status\":\"$$drift_status\",\"outputHash\":\"$$drift_hash\"},\"gofmt\":{\"status\":\"$$gofmt_status\",\"outputHash\":\"$$gofmt_hash\",\"filesNeedingFormat\":$$gofmt_result},\"goVet\":{\"status\":\"$$vet_status\",\"outputHash\":\"$$vet_hash\"},\"commit\":\"$$(git rev-parse HEAD)\",\"platform\":\"$$(go version)\",\"collectedAt\":\"$$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > .artifacts/static-contract.json; \
+	echo "Static contract: gofmt=$$gofmt_status, goVet=$$vet_status, codegenDrift=$$drift_status" ; \
+	if [ "$$gofmt_status" != "PASS" ] || [ "$$vet_status" != "PASS" ] || [ "$$drift_status" != "PASS" ]; then \
+		echo "ERROR: one or more static contract checks failed"; \
+		cat .artifacts/static-contract.json; \
+		exit 1; \
+	fi
 	@echo "Artifacts written to .artifacts/"
 	@# Browser T4.1 Playwright evidence is collected separately via console-e2e target
 	@# and is expected at .artifacts/e2e-playwright.json by freeze-manifest.mjs
@@ -114,7 +137,7 @@ collect-artifacts:
 #   make collect-adapter-qualification ENDPOINT=https://api.openai.com KEY=sk-...
 # The freeze-manifest script will hard-fail if the artifact is missing or
 # not VERIFIED.
-freeze-gate: collect-artifacts s01-candidate-test s01-browser-candidate collect-baseline
+freeze-gate: collect-artifacts collect-static-contract s01-candidate-test s01-browser-candidate collect-baseline
 	@echo "Collecting candidate test artifacts..."
 	@cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json; exit_code=$$?; \
 	node scripts/write-meta.mjs candidate-test.json 'go test -tags=candidate -json' $$exit_code; \

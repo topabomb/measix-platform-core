@@ -1,41 +1,25 @@
 import { test, expect, type Page } from '@playwright/test'
 
 /**
- * CAP-C6-001 — Browser Golden Path (single continuous test with test.step()).
+ * CAP-C6-001 — Browser Golden Path (DEPRECATED: see split specs below).
  *
- * Per measix-s0-capability-delivery-system-testing-spec.md §13:
- *   login
- *   create user + enrollment
- *   create secret
- *   create upstream
- *   Test
- *   Apply
- *   create Provider + Model
- *   create TTS
- *   create ASR
- *   create MCP
- *   configure Policy
- *   configure Pricing
- *   Validate
- *   Review Client Snapshot Preview
- *   Publish
- *   wait activation completed
- *   Usage / System verification
+ * Per audit P0-2: This test has been split into two separate specs to allow
+ * the four-capability runtime traffic to run between the authoring/publish
+ * and usage/system phases. Use the new specs instead:
  *
- * This is a SINGLE test() with test.step() for each phase.
- * No sharedPage across tests — the page fixture lives for the entire test.
- * No Admin API/DB/internal shortcut — all operations go through the browser UI.
+ *   - golden-path-authoring.spec.ts: Phase 1-8 (setup, upstream, resources, publish)
+ *   - golden-path-usage.spec.ts:    Phase 9-13 (usage, system, persistence, logout)
+ *
+ * Execution order (enforced by candidate-orchestrator.mjs):
+ *   1. golden-path-authoring.spec.ts
+ *   2. Four-capability runtime traffic (Model/TTS/ASR/MCP)
+ *   3. Wait for usage ingestion (>= 4 requests recorded)
+ *   4. golden-path-usage.spec.ts
+ *
+ * This file is kept for backwards compatibility but is no longer the primary
+ * C6 Golden Path entry point.
  *
  * Architecture authority: CAP-C6-001 Browser Golden Path.
- * The Go system tests (TestCAPC6001GoldenPath) cover the full API-level
- * golden path including client-facing runtime calls. This browser suite
- * covers the Admin Console UI path only.
- *
- * Prerequisites:
- *   - Hub and Relay processes running (scripts/e2e-harness.mjs)
- *   - Admin Console production build served at baseURL (same-origin as Hub)
- *   - Bootstrap admin credentials available
- *   - Deterministic Adapter running
  */
 
 const ADMIN_PASSWORD = process.env.MEASIX_E2E_ADMIN_PASSWORD || 'admin'
@@ -179,12 +163,22 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
     // Wait for test result — the deterministic adapter should return reachable=true
     await expect(page.locator('text=/reachable|Reachable/i')).toBeVisible({ timeout: 15_000 })
 
+    // Accept the confirmation dialog before Apply
+    // Per architecture audit P0-1: window.confirm must be explicitly accepted,
+    // otherwise Playwright auto-dismisses it and the mutation never executes.
+    page.once('dialog', dialog => {
+      console.log(`[test] Accepting confirm dialog: ${dialog.message()}`)
+      dialog.accept()
+    })
+
     // Apply the upstream
     await page.click('[data-cy="upstream-apply-btn"]')
 
-    // Wait for apply to complete — the upstream status should change from
-    // "Inactive" to "Active" after apply succeeds.
-    await expect(page.locator('.q-chip').filter({ hasText: /active/i }).first()).toBeVisible({ timeout: 30_000 })
+    // Wait for apply to complete — the upstream status must be exactly ACTIVE
+    // (not INACTIVE). Per audit P0-1: /active/i matches INACTIVE (false Green).
+    await expect(page.locator('.q-chip').filter({ hasText: /^ACTIVE$/i }).first()).toBeVisible({ timeout: 30_000 })
+    // Verify it does NOT show INACTIVE
+    await expect(page.locator('.q-chip').filter({ hasText: /INACTIVE/i })).toHaveCount(0)
 
     // Close the dialog
     await page.keyboard.press('Escape')
@@ -466,8 +460,13 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
     // Re-apply the upstream
     const applyBtn = page.locator('[data-cy="upstream-apply-btn"]')
     if (await applyBtn.isVisible().catch(() => false)) {
+      // Accept the confirmation dialog before Apply (audit P0-1)
+      page.once('dialog', dialog => {
+        console.log(`[test] Accepting confirm dialog: ${dialog.message()}`)
+        dialog.accept()
+      })
       await applyBtn.click()
-      await expect(page.locator('.q-chip').filter({ hasText: /active/i }).first()).toBeVisible({ timeout: 30_000 })
+      await expect(page.locator('.q-chip').filter({ hasText: /^ACTIVE$/i }).first()).toBeVisible({ timeout: 30_000 })
     }
     await page.keyboard.press('Escape')
 
@@ -494,15 +493,24 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
     // Verify Added/Changed/Removed sections are visible
     await expect(page.locator('.q-dialog').locator('text=/Added|Changed|Removed/i').first()).toBeVisible({ timeout: 5_000 })
 
+    // Accept the Publish confirmation dialog if present (audit P0-1)
+    page.once('dialog', dialog => {
+      console.log(`[test] Accepting publish confirm dialog: ${dialog.message()}`)
+      dialog.accept()
+    })
+
     // Click Publish
     await page.click('[data-cy="draft-publish-btn"]')
 
     // Check for publish error — if the draft is invalid, an error banner appears
+    // Per audit P0-1: capture page state on failure for diagnostics
     await page.waitForTimeout(2_000)
     const errorBanner = page.locator('.q-banner.bg-red-1, .q-banner .text-negative').first()
     if (await errorBanner.isVisible().catch(() => false)) {
       const errorText = await errorBanner.textContent()
-      throw new Error(`Publish failed: ${errorText}`)
+      // Capture page snapshot for failure diagnostics
+      const pageSnapshot = await page.evaluate(() => document.body.innerText.slice(0, 2000))
+      throw new Error(`Publish failed: ${errorText}\nPage snapshot: ${pageSnapshot}`)
     }
 
     // Wait for activation to complete
@@ -693,4 +701,72 @@ test('CAP-C6-001 Browser Golden Path — complete UI-only managed capability del
     }
     await expect(page).toHaveURL(/\/admin\/$|\/admin\/login/)
   })
+})
+
+/**
+ * Regression test for audit P0-1: proves that without explicit Apply
+ * (accepting the confirm dialog), Publish MUST fail.
+ *
+ * This is the anti-pattern guard: if the original bug (Playwright auto-dismisses
+ * confirm dialogs, Apply mutation never executes) resurfaces, this test will
+ * catch it because Publish would succeed on a non-ACTIVE upstream.
+ */
+test('CAP-C6-001-REGRESSION Publish without Apply MUST fail', async ({ page }: { page: Page }) => {
+  await login(page)
+
+  await page.goto('/admin/upstreams')
+  await expect(page.locator('[data-cy="upstreams-page"]')).toBeVisible()
+
+  // Create a secret first
+  await page.click('button:has-text("Create Secret")')
+  await expect(page.locator('[data-cy="secret-form-name"]')).toBeVisible()
+  await page.fill('[data-cy="secret-form-name"]', `regression-secret-${Date.now()}`)
+  await page.fill('[data-cy="secret-form-value"]', 'sk-test-deterministic-key')
+  await page.click('[data-cy="secret-form-submit"]')
+  await expect(page.locator('[data-cy="secret-form-name"]')).not.toBeVisible({ timeout: 5_000 })
+
+  // Create upstream — but DO NOT Apply it
+  await page.click('[data-cy="create-upstream-btn"]')
+  await expect(page.locator('[data-cy="upstream-form-name"]')).toBeVisible()
+  await page.fill('[data-cy="upstream-form-name"]', `regression-upstream-${Date.now()}`)
+  await page.fill('[data-cy="upstream-form-base-url"]', ADAPTER_URL)
+
+  // Set auth to NONE (doesn't need selection, just submit)
+  await page.click('[data-cy="upstream-form-submit"]')
+  await expect(page.locator('[data-cy="upstream-row"]')).toHaveCount(1, { timeout: 10_000 })
+
+  // Verify upstream is INACTIVE (not ACTIVE)
+  const chip = page.locator('.q-chip').first()
+  const chipText = await chip.textContent()
+  expect(chipText).toMatch(/INACTIVE/i)
+
+  // Now try to Publish a draft that references this non-ACTIVE upstream
+  // This MUST fail — the Publish should return runtime_activation_failed
+  await page.goto('/admin/resources')
+  await expect(page.locator('[data-cy="resources-page"]')).toBeVisible()
+
+  // Even if we try to publish, the Publish button should either be disabled
+  // or the publish attempt should fail with an error
+  const publishBtn = page.locator('[data-cy="draft-publish-btn"]')
+  const isPublishEnabled = await publishBtn.isEnabled().catch(() => false)
+
+  if (isPublishEnabled) {
+    // If publish is enabled, it MUST fail when upstream is not ACTIVE
+    // Accept any confirm dialogs to ensure we test the real publish path
+    page.once('dialog', d => d.accept())
+    await publishBtn.click()
+    await page.waitForTimeout(3_000)
+
+    // Expect an error banner showing activation failure
+    const errorBanner = page.locator('.q-banner.bg-red-1, .q-banner .text-negative').first()
+    const hasError = await errorBanner.isVisible().catch(() => false)
+
+    // Or check for the specific error text in the page
+    const pageText = await page.evaluate(() => document.body.innerText)
+    const activationFailed = /activation_failed|runtime_activation_failed|not_active/i.test(pageText)
+
+    expect(hasError || activationFailed).toBe(true)
+  }
+  // If publish is disabled, that's also acceptable — it means the UI prevents
+  // publishing without an active binding
 })

@@ -20,7 +20,9 @@ export default defineConfig({
   workers: 1,
   reporter: [
     ['list'],
-    ['html', { outputFolder: 'playwright-report' }],
+    // Per audit P1-1: use open: 'never' to prevent the HTML reporter from
+    // starting a local server that blocks non-interactive CI/harness runs.
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['json', { outputFile: '../.artifacts/e2e-playwright.json' }],
   ],
   timeout: 120_000,

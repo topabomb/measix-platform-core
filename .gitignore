@@ -106,6 +106,8 @@ Thumbs.db
 # ----------------------------------------------------------------------------
 # Temporary scripts / data files (local debugging, not committed)
 # ----------------------------------------------------------------------------
-/scripts/_*.mjs
+# NOTE: scripts/_server-worker.mjs is a real runtime dependency of
+# e2e-harness.mjs and must be committed. Only ignore _*.txt and _*.json
+# debug files.
 /scripts/_*.txt
 /scripts/_*.json

@@ -307,13 +307,14 @@ async function runFourCapabilityTraffic(env, adminPassword) {
     const headers = {
       'Authorization': `Bearer ${clientToken}`,
       'X-Measix-Managed-Generation': String(generation),
+      'X-Measix-Interaction-Id': `int_${randomUUID()}`,
       'Content-Type': 'application/json',
     }
 
     // 1. Model streaming
     const modelResp = await fetch(`${relayUrl}/runtime/v1/resources/${modelId}/v1/chat/completions`, {
       method: 'POST',
-      headers,
+      headers: { ...headers, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
       body: JSON.stringify({ model: 'gpt-test', stream: true, messages: [{ role: 'user', content: 'Say hello' }] }),
     })
     if (!modelResp.ok) throw new Error(`model request failed: ${modelResp.status}`)
@@ -323,7 +324,7 @@ async function runFourCapabilityTraffic(env, adminPassword) {
     // 2. TTS
     const ttsResp = await fetch(`${relayUrl}/runtime/v1/resources/${ttsId}/v1/audio/speech`, {
       method: 'POST',
-      headers,
+      headers: { ...headers, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
       body: JSON.stringify({ model: 'tts-test', input: 'hello', voice: 'alloy' }),
     })
     if (!ttsResp.ok) throw new Error(`tts request failed: ${ttsResp.status}`)
@@ -335,7 +336,7 @@ async function runFourCapabilityTraffic(env, adminPassword) {
     asrFormData.append('model', 'whisper-test')
     const asrResp = await fetch(`${relayUrl}/runtime/v1/resources/${asrId}/v1/audio/transcriptions`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${clientToken}`, 'X-Measix-Managed-Generation': String(generation) },
+      headers: { 'Authorization': `Bearer ${clientToken}`, 'X-Measix-Managed-Generation': String(generation), 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
       body: asrFormData,
     })
     if (!asrResp.ok) throw new Error(`asr request failed: ${asrResp.status}`)
@@ -344,7 +345,7 @@ async function runFourCapabilityTraffic(env, adminPassword) {
     // 4. MCP
     const mcpResp = await fetch(`${relayUrl}/runtime/v1/resources/${mcpId}/mcp`, {
       method: 'POST',
-      headers,
+      headers: { ...headers, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'orchestrator-client', version: '1.0' } } }),
     })
     if (!mcpResp.ok) throw new Error(`mcp request failed: ${mcpResp.status}`)

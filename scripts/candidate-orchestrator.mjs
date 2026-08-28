@@ -28,7 +28,7 @@
  */
 import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 
 import {
@@ -96,6 +96,16 @@ async function main() {
   servers.push(spaServer)
   const spaBaseURL = `http://127.0.0.1:${spaPort}`
 
+  // Debug: verify SPA proxy is actually listening
+  log(`SPA proxy supposed to be on port ${spaPort}, base URL: ${spaBaseURL}`)
+  await new Promise(r => setTimeout(r, 500))
+  try {
+    const debugResp = await fetch(`${spaBaseURL}/admin/`)
+    log(`Debug: SPA /admin/ returned status ${debugResp.status}, content-length: ${debugResp.headers.get('content-length')}`)
+  } catch (e) {
+    log(`Debug: SPA fetch FAILED: ${e.message}`)
+  }
+
   const spaReady = await waitFor(`${spaBaseURL}/admin/`, 'SPA', 30000, log)
   if (!spaReady) {
     log('ERROR: SPA proxy not ready')
@@ -126,10 +136,7 @@ async function main() {
     // Per P0-2: First phase — configure and publish the snapshot
     // ================================================================
     log('--- Phase A: Browser Admin (authoring/publish) ---')
-    execSync(
-      'npx playwright test --reporter=line golden-path-authoring.spec.ts',
-      { cwd: join(ROOT, 'console'), stdio: 'inherit', env: e2eEnv, timeout: 600000 },
-    )
+    await runPlaywright('golden-path-authoring.spec.ts', e2eEnv, 600000, log)
     log('Phase A PASSED')
 
     // ================================================================
@@ -157,10 +164,7 @@ async function main() {
     // Per P0-2: Third phase — verify usage data and system health
     // ================================================================
     log('--- Phase D: Browser Admin (usage/system verification) ---')
-    execSync(
-      'npx playwright test --reporter=line golden-path-usage.spec.ts',
-      { cwd: join(ROOT, 'console'), stdio: 'inherit', env: e2eEnv, timeout: 300000 },
-    )
+    await runPlaywright('golden-path-usage.spec.ts', e2eEnv, 300000, log)
     log('Phase D PASSED')
 
     exitCode = 0
@@ -177,6 +181,42 @@ async function main() {
   }
 
   process.exit(exitCode)
+}
+
+/**
+ * Run Playwright tests asynchronously using spawn (not execSync).
+ * execSync blocks the Node.js event loop, which prevents the SPA proxy
+ * and other HTTP servers from responding to browser requests during tests.
+ * spawn keeps the event loop running so all HTTP servers remain responsive.
+ */
+function runPlaywright(specFile, env, timeoutMs, logFn) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('npx', ['playwright', 'test', '--reporter=line', specFile], {
+      cwd: join(ROOT, 'console'),
+      stdio: 'inherit',
+      env,
+      shell: true,
+    })
+
+    const timer = setTimeout(() => {
+      proc.kill('SIGTERM')
+      reject(new Error(`Playwright timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+
+    proc.on('error', (err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
+
+    proc.on('exit', (code) => {
+      clearTimeout(timer)
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`Playwright exited with code ${code}`))
+      }
+    })
+  })
 }
 
 /**

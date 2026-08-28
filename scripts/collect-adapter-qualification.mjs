@@ -35,16 +35,30 @@
  * Any FAIL or NOT_EXECUTED on a required case → profile != VERIFIED.
  *
  * Usage:
+ *   node scripts/collect-adapter-qualification.mjs --dotenv
  *   node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <api-key>
  *   [--hub-url <url>] [--relay-url <url>] [--admin-password <pw>]
- *   [--profile all|model|tts|asr|mcp] [--merge]
+ *   [--profile all|model|tts|asr|mcp] [--merge] [--model <id>]
+ *   [--tts-model <id> --tts-voice <voice>] [--asr-model <id>]
+ *
+ * Dotenv mode (preferred for credential safety):
+ *   node scripts/collect-adapter-qualification.mjs --dotenv
+ *   Reads .env.adapter-qualification (gitignored) with:
+ *     ADAPTER_ENDPOINT=https://...
+ *     ADAPTER_API_KEY=sk-...
+ *     ADAPTER_MODEL_ID=gpt-4o-mini
+ *     ADAPTER_TTS_MODEL=tts-1 (optional, leave empty to skip TTS)
+ *     ADAPTER_TTS_VOICE=alloy (optional)
+ *     ADAPTER_ASR_MODEL=whisper-1 (optional, leave empty to skip ASR)
+ *     ADAPTER_MCP_ENDPOINT=https://... (optional)
+ *     ADAPTER_MCP_API_KEY=... (optional)
  *
  * Per audit P0-5: multi-profile aggregation.
  *   Each --profile run can store partial results. Use --merge to accumulate:
- *     node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <key> --profile model --merge
- *     node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <key> --profile tts --merge
- *     node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <key> --profile asr --merge
- *     node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <key> --profile mcp --merge
+ *     node scripts/collect-adapter-qualification.mjs --dotenv --profile model --merge
+ *     node scripts/collect-adapter-qualification.mjs --dotenv --profile tts --merge
+ *     node scripts/collect-adapter-qualification.mjs --dotenv --profile asr --merge
+ *     node scripts/collect-adapter-qualification.mjs --dotenv --profile mcp --merge
  *   After all four are VERIFIED individually, top-level status becomes VERIFIED.
  *
  * Or to mark as NOT_EXECUTED (default when no args):
@@ -69,6 +83,33 @@ const ARTIFACTS_DIR = join(ROOT, '.artifacts')
 const OUT_PATH = join(ARTIFACTS_DIR, 'real-adapter-qualification.json')
 const ARCH_REPO = resolve(ROOT, '..', 'measix-architecture')
 
+// --- Dotenv loader (no external dependency) ---
+// Parses a simple KEY=VALUE .env file. Ignores blank lines and # comments.
+// Values may be quoted or unquoted. Does NOT support multi-line values.
+function loadDotEnv(filePath) {
+  if (!existsSync(filePath)) {
+    console.error(`ERROR: dotenv file not found: ${filePath}`)
+    console.error('Create it from .env.adapter-qualification.example')
+    process.exit(1)
+  }
+  const content = readFileSync(filePath, 'utf-8')
+  const env = {}
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eqIndex = trimmed.indexOf('=')
+    if (eqIndex === -1) continue
+    const key = trimmed.slice(0, eqIndex).trim()
+    let value = trimmed.slice(eqIndex + 1).trim()
+    // Strip surrounding quotes if present
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1)
+    }
+    env[key] = value
+  }
+  return env
+}
+
 // Parse args
 const args = process.argv.slice(2)
 let endpoint = null
@@ -78,9 +119,18 @@ let hubUrl = process.env.MEASIX_HUB_URL || null
 let relayUrl = process.env.MEASIX_RELAY_URL || null
 let adminPassword = process.env.MEASIX_ADMIN_PASSWORD || 'admin'
 let mergeMode = false  // Per audit P0-5: merge new profile results into existing artifact
+let useDotEnv = false
+let modelId = null
+let ttsModel = null
+let ttsVoice = 'alloy'
+let asrModel = null
+let mcpEndpoint = null
+let mcpApiKey = null
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--endpoint' && i + 1 < args.length) {
+  if (args[i] === '--dotenv') {
+    useDotEnv = true
+  } else if (args[i] === '--endpoint' && i + 1 < args.length) {
     endpoint = args[++i]
   } else if (args[i] === '--key' && i + 1 < args.length) {
     apiKey = args[++i]
@@ -94,7 +144,55 @@ for (let i = 0; i < args.length; i++) {
     adminPassword = args[++i]
   } else if (args[i] === '--merge') {
     mergeMode = true
+  } else if (args[i] === '--model' && i + 1 < args.length) {
+    modelId = args[++i]
+  } else if (args[i] === '--tts-model' && i + 1 < args.length) {
+    ttsModel = args[++i]
+  } else if (args[i] === '--tts-voice' && i + 1 < args.length) {
+    ttsVoice = args[++i]
+  } else if (args[i] === '--asr-model' && i + 1 < args.length) {
+    asrModel = args[++i]
+  } else if (args[i] === '--mcp-endpoint' && i + 1 < args.length) {
+    mcpEndpoint = args[++i]
+  } else if (args[i] === '--mcp-key' && i + 1 < args.length) {
+    mcpApiKey = args[++i]
   }
+}
+
+// --- Apply dotenv configuration (if --dotenv flag) ---
+// dotenv values are used as defaults; explicit CLI args override them.
+if (useDotEnv) {
+  const dotenvPath = join(ROOT, '.env.adapter-qualification')
+  const dotenv = loadDotEnv(dotenvPath)
+  if (!endpoint) endpoint = dotenv.ADAPTER_ENDPOINT || null
+  if (!apiKey) apiKey = dotenv.ADAPTER_API_KEY || null
+  if (!modelId) modelId = dotenv.ADAPTER_MODEL_ID || null
+  if (!ttsModel) ttsModel = dotenv.ADAPTER_TTS_MODEL || null
+  if (ttsVoice === 'alloy' && dotenv.ADAPTER_TTS_VOICE) ttsVoice = dotenv.ADAPTER_TTS_VOICE
+  if (!asrModel) asrModel = dotenv.ADAPTER_ASR_MODEL || null
+  if (!mcpEndpoint) mcpEndpoint = dotenv.ADAPTER_MCP_ENDPOINT || null
+  if (!mcpApiKey) mcpApiKey = dotenv.ADAPTER_MCP_API_KEY || null
+  if (dotenv.MEASIX_ADMIN_PASSWORD) adminPassword = dotenv.MEASIX_ADMIN_PASSWORD
+}
+
+// --- Determine which profiles to skip based on available config ---
+const skipTTS = !ttsModel
+const skipASR = !asrModel
+const skipMCP = !mcpEndpoint
+
+// Adjust profile selection: if running 'all', skip profiles without config
+if (profile === 'all') {
+  const requested = ['model', 'tts', 'asr', 'mcp']
+  // Filter out profiles that don't have config
+  const available = requested.filter(p => {
+    if (p === 'tts') return !skipTTS
+    if (p === 'asr') return !skipASR
+    if (p === 'mcp') return !skipMCP
+    return true  // model always available if endpoint + key provided
+  })
+  // For 'all' mode, we set profile to the available list but keep using
+  // the original 'all' logic for results initialization
+  profilesToQualifyOverride = available
 }
 
 // Get current commit
@@ -191,15 +289,23 @@ if (!endpoint || !apiKey) {
   writeMetaJson(ARTIFACTS_DIR, 'real-adapter-qualification.json', ROOT, ARCH_REPO, 'node scripts/collect-adapter-qualification.mjs', 0)
   console.log(`Wrote ${OUT_PATH} (NOT_EXECUTED)`)
   console.log('To execute real adapter qualification:')
-  console.log('  1. Start Hub + Relay (scripts/e2e-harness.mjs or manually)')
-  console.log('  2. Run: node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <api-key>')
-  console.log('  3. Or use --hub-url and --relay-url to connect to running instances')
+  console.log('  Option A (dotenv — preferred):')
+  console.log('    1. cp .env.adapter-qualification.example .env.adapter-qualification')
+  console.log('    2. Edit .env.adapter-qualification with your endpoint and API key')
+  console.log('    3. node scripts/collect-adapter-qualification.mjs --dotenv')
+  console.log('  Option B (CLI args):')
+  console.log('    1. Start Hub + Relay (scripts/e2e-harness.mjs or manually)')
+  console.log('    2. Run: node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <api-key>')
+  console.log('    3. Or use --hub-url and --relay-url to connect to running instances')
   process.exit(0)
 }
 
 // --- Qualification flow ---
 
-const profilesToQualify = profile === 'all' ? ['model', 'tts', 'asr', 'mcp'] : [profile]
+// Use the override from dotenv config if available, otherwise use CLI profile
+const profilesToQualify = (profile === 'all' && typeof profilesToQualifyOverride !== 'undefined')
+  ? profilesToQualifyOverride
+  : (profile === 'all' ? ['model', 'tts', 'asr', 'mcp'] : [profile])
 const results = {
   model: {
     status: 'NOT_EXECUTED',
@@ -463,18 +569,18 @@ async function main() {
     }],
     models: [{
       modelId: modelId, providerId: providerId, displayName: 'Qual Model',
-      upstreamModelKey: 'gpt-4o-mini', runtimePath: '/v1/chat/completions',
+      upstreamModelKey: modelId || 'gpt-4o-mini', runtimePath: '/v1/chat/completions',
       inputModalities: ['TEXT'], outputModalities: ['TEXT'],
       capabilities: ['TOOL'], enabled: true,
     }],
     tts: [{
       ttsId: ttsId, displayName: 'Qual TTS', clientProtocol: 'OPENAI_AUDIO_SPEECH',
-      upstreamModelKey: 'tts-1', voice: 'alloy', runtimePath: '/v1/audio/speech',
+      upstreamModelKey: ttsModel || 'tts-1', voice: ttsVoice, runtimePath: '/v1/audio/speech',
       enabled: true,
     }],
     asr: [{
       asrId: asrId, displayName: 'Qual ASR', clientProtocol: 'OPENAI_AUDIO_TRANSCRIPTIONS',
-      upstreamModelKey: 'whisper-1', runtimePath: '/v1/audio/transcriptions',
+      upstreamModelKey: asrModel || 'whisper-1', runtimePath: '/v1/audio/transcriptions',
       enabled: true,
     }],
     mcp: [{
@@ -668,7 +774,7 @@ async function main() {
           'X-Measix-Interaction-Id': generateStableId('int'),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'Say hello in 5 words.' }] }),
+        body: JSON.stringify({ model: modelId || 'gpt-4o-mini', messages: [{ role: 'user', content: 'Say hello in 5 words.' }] }),
       })
       if (chatResp.ok) {
         const chatResult = await chatResp.json()
@@ -684,7 +790,7 @@ async function main() {
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ model: 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Count 1 to 5.' }] }),
+          body: JSON.stringify({ model: modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Count 1 to 5.' }] }),
         })
         if (streamResp.ok) {
           const streamText = await streamResp.text()
@@ -711,7 +817,7 @@ async function main() {
               'X-Measix-Interaction-Id': generateStableId('int'),
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ model: 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a long essay about the history of computing.' }] }),
+            body: JSON.stringify({ model: modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a long essay about the history of computing.' }] }),
             signal: cancelController.signal,
           })
           let receivedChunks = false
@@ -766,7 +872,7 @@ async function main() {
               'X-Measix-Interaction-Id': generateStableId('int'),
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ model: 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a very long essay about history.' }] }),
+            body: JSON.stringify({ model: modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a very long essay about history.' }] }),
             signal: timeoutController.signal,
           })
           // Abort after 50ms — this is a client-side cancellation that mimics a timeout
@@ -807,7 +913,7 @@ async function main() {
               'X-Measix-Managed-Generation': String(generation),
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ model: 'gpt-4o-mini', messages: [] }),
+            body: JSON.stringify({ model: modelId || 'gpt-4o-mini', messages: [] }),
           })
           if (noAuthResp.status === 401 || noAuthResp.status === 403) {
             console.log('  Model authBoundary: PASS (no token → ' + noAuthResp.status + ')')
@@ -869,7 +975,7 @@ async function main() {
           'X-Measix-Interaction-Id': generateStableId('int'),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ model: 'tts-1', input: 'Hello world', voice: 'alloy' }),
+        body: JSON.stringify({ model: ttsModel || 'tts-1', input: 'Hello world', voice: ttsVoice }),
       })
       if (ttsResp.ok) {
         const ttsBody = await ttsResp.arrayBuffer()
@@ -896,7 +1002,7 @@ async function main() {
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ model: 'tts-1', input: 'This is a longer text to test streaming binary data delivery through the relay.', voice: 'alloy' }),
+          body: JSON.stringify({ model: ttsModel || 'tts-1', input: 'This is a longer text to test streaming binary data delivery through the relay.', voice: ttsVoice }),
         })
         if (streamResp.ok) {
           const streamBody = await streamResp.arrayBuffer()
@@ -927,7 +1033,7 @@ async function main() {
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ model: 'tts-test', input: 'Generate a long audio about the history of computing.', voice: 'alloy' }),
+          body: JSON.stringify({ model: ttsModel || 'tts-1', input: 'Generate a long audio about the history of computing.', voice: ttsVoice }),
           signal: cancelController.signal,
         })
         // Abort immediately to prevent normal completion
@@ -966,7 +1072,7 @@ async function main() {
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ model: 'tts-test', input: 'Generate a very long audio about history.', voice: 'alloy' }),
+          body: JSON.stringify({ model: ttsModel || 'tts-1', input: 'Generate a very long audio about history.', voice: ttsVoice }),
           signal: timeoutController.signal,
         })
         setTimeout(() => timeoutController.abort(), 50)
@@ -1035,7 +1141,7 @@ async function main() {
       const formData = new FormData()
       const wavBlob = new Blob([wavHeader], { type: 'audio/wav' })
       formData.append('file', wavBlob, 'sample.wav')
-      formData.append('model', 'whisper-1')
+      formData.append('model', asrModel || 'whisper-1')
       const asrResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotAsrId}/v1/audio/transcriptions`, {
         method: 'POST',
         headers: {
@@ -1068,7 +1174,7 @@ async function main() {
             'X-Measix-Managed-Generation': String(generation),
             'X-Measix-Interaction-Id': generateStableId('int'),
           },
-          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', 'whisper-1'); return fd })(),
+          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', asrModel || 'whisper-1'); return fd })(),
           signal: cancelController.signal,
         })
         // Abort immediately to prevent normal completion
@@ -1105,7 +1211,7 @@ async function main() {
             'X-Measix-Managed-Generation': String(generation),
             'X-Measix-Interaction-Id': generateStableId('int'),
           },
-          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', 'whisper-1'); return fd })(),
+          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', asrModel || 'whisper-1'); return fd })(),
           signal: timeoutController.signal,
         })
         setTimeout(() => timeoutController.abort(), 50)

@@ -5,8 +5,7 @@
 >
 > 审计日期：2026-08-27  
 > platform-core：`agent/s0-platform-core` @ `11e2b2efffac3ecb5690f08e3a03303d09d240eb`  
-> 架构基线：本地 `measix-architecture` 当前 `main` @ `dbb56952ab1cf60fa55e4cbb8d14ee70eda43a48`，工作树含尚未提交的
-> S0.1→S0.2 决议变更；该状态不能生成 Freeze 身份。
+> 架构基线：本地 `measix-architecture` 当前 `main` @ `cc60f8f`，S0.1/S0.2 架构决议已提交。
 
 ## 1. 结论先行
 

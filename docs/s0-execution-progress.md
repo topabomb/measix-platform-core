@@ -1,6 +1,6 @@
 # S0.1 Platform Core 进展
 
-> Architecture authority：`topabomb/measix-architecture@dbb56952ab1cf60fa55e4cbb8d14ee70eda43a48`  
+> Architecture authority：`topabomb/measix-architecture@cc60f8f`  
 > Implementation branch：`agent/s0-platform-core`  
 > 当前阶段：**S0.1 Managed Capability Delivery**  
 > 阶段阅读清单：`topabomb/measix-architecture/docs/measix-stage-document-index.md`

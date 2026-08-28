@@ -111,3 +111,12 @@ Thumbs.db
 # debug files.
 /scripts/_*.txt
 /scripts/_*.json
+
+# ----------------------------------------------------------------------------
+# Real Adapter Qualification — dotenv configuration
+# ----------------------------------------------------------------------------
+# The .env.adapter-qualification file contains real API keys and endpoints.
+# It is NEVER committed. Only the .example template is committed.
+/.env.adapter-qualification
+/.env.*
+!/.env.adapter-qualification.example

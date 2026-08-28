@@ -22,6 +22,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'Resources', label: 'Resources', icon: 'hub', order: 20, path: '/resources', visible: true },
   { id: 'Upstreams', label: 'Upstreams', icon: 'cloud', order: 30, path: '/upstreams', visible: true },
   { id: 'Releases', label: 'Releases', icon: 'rocket_launch', order: 40, path: '/releases', visible: true },
+  { id: 'EnterpriseUpdates', label: 'Enterprise Updates', icon: 'campaign', order: 45, path: '/enterprise-updates', visible: true },
   { id: 'Usage', label: 'Usage', icon: 'query_stats', order: 50, path: '/usage', visible: true },
   { id: 'System', label: 'System', icon: 'monitor_heart', order: 60, path: '/system', visible: true },
 ]

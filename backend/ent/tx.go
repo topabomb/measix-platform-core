@@ -20,6 +20,8 @@ type Tx struct {
 	Device *DeviceClient
 	// Enrollment is the client for interacting with the Enrollment builders.
 	Enrollment *EnrollmentClient
+	// EnterpriseUpdate is the client for interacting with the EnterpriseUpdate builders.
+	EnterpriseUpdate *EnterpriseUpdateClient
 	// IdempotencyRecord is the client for interacting with the IdempotencyRecord builders.
 	IdempotencyRecord *IdempotencyRecordClient
 	// ManagedDraft is the client for interacting with the ManagedDraft builders.
@@ -181,6 +183,7 @@ func (tx *Tx) init() {
 	tx.Deployment = NewDeploymentClient(tx.config)
 	tx.Device = NewDeviceClient(tx.config)
 	tx.Enrollment = NewEnrollmentClient(tx.config)
+	tx.EnterpriseUpdate = NewEnterpriseUpdateClient(tx.config)
 	tx.IdempotencyRecord = NewIdempotencyRecordClient(tx.config)
 	tx.ManagedDraft = NewManagedDraftClient(tx.config)
 	tx.ManagedRelease = NewManagedReleaseClient(tx.config)

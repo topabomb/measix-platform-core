@@ -17,6 +17,7 @@ import (
 	"measix/platform/internal/hub/adminstatic"
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/config"
+	"measix/platform/internal/hub/enterpriseupdate"
 	"measix/platform/internal/hub/httpapi"
 	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/maintenance"
@@ -94,6 +95,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	}
 	upstreamService := upstream.NewService(st.Client, box)
 	capabilityService := capability.NewService(st.Client)
+	enterpriseUpdateService := enterpriseupdate.NewService(st.Client)
 	client := options.HTTPClient
 	if client == nil {
 		client = &http.Client{Timeout: 20 * time.Second}
@@ -104,7 +106,8 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	systemService := system.New(st, runtimeControl, options.BuildVersion)
 	services := httpapi.Services{
 		Identity: identityService, Capability: capabilityService, Upstream: upstreamService,
-		RuntimeControl: runtimeControl, Usage: usageService, System: systemService, BuildVersion: options.BuildVersion,
+		RuntimeControl: runtimeControl, Usage: usageService, System: systemService,
+		EnterpriseUpdate: enterpriseUpdateService, BuildVersion: options.BuildVersion,
 	}
 
 	router := chi.NewRouter()

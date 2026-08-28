@@ -485,6 +485,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/enterprise-updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listEnterpriseUpdates"];
+        put?: never;
+        post: operations["createEnterpriseUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/enterprise-updates/{enterpriseUpdateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getEnterpriseUpdate"];
+        put: operations["updateEnterpriseUpdate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/enterprise-updates/{enterpriseUpdateId}:publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publishEnterpriseUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/enterprise-updates/{enterpriseUpdateId}:withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["withdrawEnterpriseUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -511,6 +575,9 @@ export interface components {
         InteractionId: string;
         PricingRuleId: string;
         IdempotencyKey: string;
+        AssistantDefinitionId: string;
+        StarterId: string;
+        EnterpriseUpdateId: string;
         Sha256Hash: string;
         Problem: {
             /** @default about:blank */
@@ -532,7 +599,7 @@ export interface components {
             path: string;
             message: string;
             /** @enum {string} */
-            resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY" | "BINDING";
+            resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY" | "BINDING" | "ASSISTANT" | "STARTER";
             resourceId?: string;
             field?: string;
         };
@@ -618,6 +685,27 @@ export interface components {
             mcp: components["schemas"]["McpDefinition"][];
             bindings: components["schemas"]["RuntimeBindingDefinition"][];
             policy: components["schemas"]["ManagedPolicy"];
+            assistants?: components["schemas"]["ManagedAssistantDefinition"][];
+            starters?: components["schemas"]["AssistantStarterDefinition"][];
+        };
+        ManagedAssistantDefinition: {
+            assistantDefinitionId: components["schemas"]["AssistantDefinitionId"];
+            displayName: string;
+            description?: string;
+            systemPrompt: string;
+            modelId: components["schemas"]["ModelId"];
+            memorySeed: string[];
+            mcpServerIds: components["schemas"]["McpServerId"][];
+            enabled: boolean;
+        };
+        AssistantStarterDefinition: {
+            starterId: components["schemas"]["StarterId"];
+            assistantDefinitionId: components["schemas"]["AssistantDefinitionId"];
+            title: string;
+            prompt: string;
+            description?: string;
+            sortOrder: number;
+            enabled: boolean;
         };
         AdminUserSummary: {
             userId: components["schemas"]["UserId"];
@@ -804,9 +892,11 @@ export interface components {
             asr: components["schemas"]["AsrDefinition"][];
             mcp: components["schemas"]["McpDefinition"][];
             policy: components["schemas"]["ManagedPolicy"];
+            assistants?: components["schemas"]["ManagedAssistantDefinition"][];
+            starters?: components["schemas"]["AssistantStarterDefinition"][];
         };
         /** @enum {string} */
-        ReleaseDiffKind: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY";
+        ReleaseDiffKind: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY" | "ASSISTANT" | "STARTER";
         ResourceDiff: {
             kind: components["schemas"]["ReleaseDiffKind"];
             added: number;
@@ -947,6 +1037,34 @@ export interface components {
         Health: {
             live: boolean;
             ready: boolean;
+        };
+        /** @enum {string} */
+        EnterpriseUpdateStatus: "DRAFT" | "PUBLISHED" | "WITHDRAWN";
+        EnterpriseUpdate: {
+            enterpriseUpdateId: components["schemas"]["EnterpriseUpdateId"];
+            title: string;
+            content: string;
+            status: components["schemas"]["EnterpriseUpdateStatus"];
+            /** Format: date-time */
+            publishedAt: string;
+            feedRevision: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        EnterpriseUpdatePage: {
+            items: components["schemas"]["EnterpriseUpdate"][];
+            feedRevision: number;
+            nextCursor?: string;
+        };
+        CreateEnterpriseUpdateRequest: {
+            title: string;
+            content: string;
+        };
+        UpdateEnterpriseUpdateRequest: {
+            title: string;
+            content: string;
         };
     };
     responses: {
@@ -1996,6 +2114,174 @@ export interface operations {
                     "application/json": components["schemas"]["Health"];
                 };
             };
+        };
+    };
+    listEnterpriseUpdates: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnterpriseUpdatePage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    createEnterpriseUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEnterpriseUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnterpriseUpdate"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    getEnterpriseUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                enterpriseUpdateId: components["schemas"]["EnterpriseUpdateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnterpriseUpdate"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    updateEnterpriseUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                enterpriseUpdateId: components["schemas"]["EnterpriseUpdateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEnterpriseUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnterpriseUpdate"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    publishEnterpriseUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                enterpriseUpdateId: components["schemas"]["EnterpriseUpdateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnterpriseUpdate"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    withdrawEnterpriseUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                enterpriseUpdateId: components["schemas"]["EnterpriseUpdateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnterpriseUpdate"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
 }

@@ -33,6 +33,9 @@ const (
 	Idempotency  Kind = "idem"
 	UsageEvent   Kind = "usg"
 	PricingRule  Kind = "prc"
+	Assistant    Kind = "asd"
+	Starter      Kind = "str"
+	EntUpdate    Kind = "eup"
 )
 
 var ErrInvalid = errors.New("invalid platform id")
@@ -42,6 +45,7 @@ var known = map[Kind]struct{}{
 	Provider: {}, Model: {}, TTS: {}, ASR: {}, MCP: {}, Policy: {}, Draft: {}, Release: {},
 	Upstream: {}, Secret: {}, Route: {}, Activation: {}, Request: {}, Interaction: {},
 	Idempotency: {}, UsageEvent: {}, PricingRule: {},
+	Assistant: {}, Starter: {}, EntUpdate: {},
 }
 
 func New(kind Kind) string {

@@ -4,12 +4,14 @@
 package clientapi
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for AsrDefinitionClientProtocol.
@@ -93,12 +95,15 @@ func (e EnrollmentExchangeRequestPlatform) Valid() bool {
 // Defines values for ManagedSnapshotSchemaVersion.
 const (
 	ManagedSnapshotSchemaVersionN1 ManagedSnapshotSchemaVersion = 1
+	ManagedSnapshotSchemaVersionN2 ManagedSnapshotSchemaVersion = 2
 )
 
 // Valid indicates whether the value is a known member of the ManagedSnapshotSchemaVersion enum.
 func (e ManagedSnapshotSchemaVersion) Valid() bool {
 	switch e {
 	case ManagedSnapshotSchemaVersionN1:
+		return true
+	case ManagedSnapshotSchemaVersionN2:
 		return true
 	default:
 		return false
@@ -302,6 +307,20 @@ type AsrDefinitionClientProtocol string
 // AsrId defines model for AsrId.
 type AsrId = string
 
+// AssistantDefinitionId defines model for AssistantDefinitionId.
+type AssistantDefinitionId = string
+
+// AssistantStarterDefinition defines model for AssistantStarterDefinition.
+type AssistantStarterDefinition struct {
+	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
+	Description           *string               `json:"description,omitempty"`
+	Enabled               bool                  `json:"enabled"`
+	Prompt                string                `json:"prompt"`
+	SortOrder             int                   `json:"sortOrder"`
+	StarterId             StarterId             `json:"starterId"`
+	Title                 string                `json:"title"`
+}
+
 // Bootstrap defines model for Bootstrap.
 type Bootstrap struct {
 	Deployment struct {
@@ -380,6 +399,24 @@ type EnrollmentExchangeResponse struct {
 // EnrollmentId defines model for EnrollmentId.
 type EnrollmentId = string
 
+// EnterpriseUpdateFeed defines model for EnterpriseUpdateFeed.
+type EnterpriseUpdateFeed struct {
+	EnterpriseTimezone string                 `json:"enterpriseTimezone"`
+	Items              []EnterpriseUpdateItem `json:"items"`
+	Truncated          bool                   `json:"truncated"`
+}
+
+// EnterpriseUpdateId defines model for EnterpriseUpdateId.
+type EnterpriseUpdateId = string
+
+// EnterpriseUpdateItem defines model for EnterpriseUpdateItem.
+type EnterpriseUpdateItem struct {
+	Content     string             `json:"content"`
+	PublishedAt time.Time          `json:"publishedAt"`
+	Title       string             `json:"title"`
+	UpdateId    EnterpriseUpdateId `json:"updateId"`
+}
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
@@ -389,15 +426,29 @@ type InstallationId = string
 // InteractionId defines model for InteractionId.
 type InteractionId = string
 
+// ManagedAssistantDefinition defines model for ManagedAssistantDefinition.
+type ManagedAssistantDefinition struct {
+	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
+	Description           *string               `json:"description,omitempty"`
+	DisplayName           string                `json:"displayName"`
+	Enabled               bool                  `json:"enabled"`
+	McpServerIds          []McpServerId         `json:"mcpServerIds"`
+	MemorySeed            []string              `json:"memorySeed"`
+	ModelId               ModelId               `json:"modelId"`
+	SystemPrompt          string                `json:"systemPrompt"`
+}
+
 // ManagedDraftContent defines model for ManagedDraftContent.
 type ManagedDraftContent struct {
-	Asr       []AsrDefinition            `json:"asr"`
-	Bindings  []RuntimeBindingDefinition `json:"bindings"`
-	Mcp       []McpDefinition            `json:"mcp"`
-	Models    []ModelDefinition          `json:"models"`
-	Policy    ManagedPolicy              `json:"policy"`
-	Providers []ProviderDefinition       `json:"providers"`
-	Tts       []TtsDefinition            `json:"tts"`
+	Asr        []AsrDefinition               `json:"asr"`
+	Assistants *[]ManagedAssistantDefinition `json:"assistants,omitempty"`
+	Bindings   []RuntimeBindingDefinition    `json:"bindings"`
+	Mcp        []McpDefinition               `json:"mcp"`
+	Models     []ModelDefinition             `json:"models"`
+	Policy     ManagedPolicy                 `json:"policy"`
+	Providers  []ProviderDefinition          `json:"providers"`
+	Starters   *[]AssistantStarterDefinition `json:"starters,omitempty"`
+	Tts        []TtsDefinition               `json:"tts"`
 }
 
 // ManagedPolicy defines model for ManagedPolicy.
@@ -414,10 +465,11 @@ type ManagedPolicy struct {
 
 // ManagedSnapshot defines model for ManagedSnapshot.
 type ManagedSnapshot struct {
-	Asr               []AsrDefinition `json:"asr"`
-	DeploymentId      DeploymentId    `json:"deploymentId"`
-	ManagedGeneration int             `json:"managedGeneration"`
-	Mcp               []McpDefinition `json:"mcp"`
+	Asr               []AsrDefinition              `json:"asr"`
+	Assistants        []ManagedAssistantDefinition `json:"assistants"`
+	DeploymentId      DeploymentId                 `json:"deploymentId"`
+	ManagedGeneration int                          `json:"managedGeneration"`
+	Mcp               []McpDefinition              `json:"mcp"`
 	Metadata          struct {
 		PublishedAt       time.Time `json:"publishedAt"`
 		PublishedByUserId *UserId   `json:"publishedByUserId,omitempty"`
@@ -428,6 +480,7 @@ type ManagedSnapshot struct {
 	ReleaseId     ReleaseId                    `json:"releaseId"`
 	SchemaVersion ManagedSnapshotSchemaVersion `json:"schemaVersion"`
 	SnapshotHash  Sha256Hash                   `json:"snapshotHash"`
+	Starters      []AssistantStarterDefinition `json:"starters"`
 	Tts           []TtsDefinition              `json:"tts"`
 }
 
@@ -568,6 +621,9 @@ type SessionId = string
 // Sha256Hash defines model for Sha256Hash.
 type Sha256Hash = string
 
+// StarterId defines model for StarterId.
+type StarterId = string
+
 // TimeoutPolicy defines model for TimeoutPolicy.
 type TimeoutPolicy struct {
 	ConnectMs        int  `json:"connectMs"`
@@ -610,6 +666,14 @@ type ValidationIssue struct {
 // ValidationIssueSeverity defines model for ValidationIssue.Severity.
 type ValidationIssueSeverity string
 
+// ListEnterpriseUpdatesParams defines parameters for ListEnterpriseUpdates.
+type ListEnterpriseUpdatesParams struct {
+	StartDate   *openapi_types.Date `form:"start_date,omitempty" json:"start_date,omitempty"`
+	EndDate     *openapi_types.Date `form:"end_date,omitempty" json:"end_date,omitempty"`
+	Limit       *int                `form:"limit,omitempty" json:"limit,omitempty"`
+	IfNoneMatch *string             `json:"If-None-Match,omitempty"`
+}
+
 // GetManagedSnapshotParams defines parameters for GetManagedSnapshot.
 type GetManagedSnapshotParams struct {
 	IfNoneMatch *string `json:"If-None-Match,omitempty"`
@@ -641,6 +705,12 @@ type ServerInterface interface {
 	// (POST /api/client/v1/enrollments/exchange)
 	ExchangeEnrollment(w http.ResponseWriter, r *http.Request)
 
+	// (GET /api/client/v1/enterprise-updates)
+	ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request, params ListEnterpriseUpdatesParams)
+
+	// (GET /api/client/v1/enterprise-updates/{enterpriseUpdateId})
+	GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId)
+
 	// (GET /api/client/v1/managed/snapshots/{generation})
 	GetManagedSnapshot(w http.ResponseWriter, r *http.Request, generation int, params GetManagedSnapshotParams)
 
@@ -670,6 +740,16 @@ func (_ Unimplemented) Bootstrap(w http.ResponseWriter, r *http.Request) {
 
 // (POST /api/client/v1/enrollments/exchange)
 func (_ Unimplemented) ExchangeEnrollment(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/client/v1/enterprise-updates)
+func (_ Unimplemented) ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request, params ListEnterpriseUpdatesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/client/v1/enterprise-updates/{enterpriseUpdateId})
+func (_ Unimplemented) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -735,6 +815,112 @@ func (siw *ServerInterfaceWrapper) ExchangeEnrollment(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ExchangeEnrollment(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEnterpriseUpdates operation middleware
+func (siw *ServerInterfaceWrapper) ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListEnterpriseUpdatesParams
+
+	// ------------- Optional query parameter "start_date" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "start_date", r.URL.Query(), &params.StartDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start_date"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start_date", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "end_date" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "end_date", r.URL.Query(), &params.EndDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end_date"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end_date", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEnterpriseUpdates(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEnterpriseUpdate operation middleware
+func (siw *ServerInterfaceWrapper) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "enterpriseUpdateId" -------------
+	var enterpriseUpdateId EnterpriseUpdateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "enterpriseUpdateId", chi.URLParam(r, "enterpriseUpdateId"), &enterpriseUpdateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enterpriseUpdateId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEnterpriseUpdate(w, r, enterpriseUpdateId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -996,6 +1182,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/client/v1/managed/snapshots/{generation}", wrapper.GetManagedSnapshot)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/client/v1/enterprise-updates", wrapper.ListEnterpriseUpdates)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/client/v1/enterprise-updates/{enterpriseUpdateId}", wrapper.GetEnterpriseUpdate)
 	})
 
 	return r

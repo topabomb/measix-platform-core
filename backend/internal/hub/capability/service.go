@@ -39,6 +39,8 @@ type DraftPreview struct {
 	ASR            []adminapi.AsrDefinition
 	MCP            []adminapi.McpDefinition
 	Policy         adminapi.ManagedPolicy
+	Assistants     []adminapi.ManagedAssistantDefinition
+	Starters       []adminapi.AssistantStarterDefinition
 }
 
 type ValidationResult struct {
@@ -93,6 +95,18 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 			prev[m.McpServerId] = defHash(m)
 			prevKinds[m.McpServerId] = adminapi.ReleaseDiffKindMCP
 		}
+	if previous.Assistants != nil {
+		for _, a := range *previous.Assistants {
+			prev[string(a.AssistantDefinitionId)] = defHash(a)
+			prevKinds[string(a.AssistantDefinitionId)] = adminapi.ReleaseDiffKindASSISTANT
+		}
+	}
+	if previous.Starters != nil {
+		for _, s := range *previous.Starters {
+			prev[string(s.StarterId)] = defHash(s)
+			prevKinds[string(s.StarterId)] = adminapi.ReleaseDiffKindSTARTER
+		}
+	}
 	}
 
 	var summary adminapi.DiffSummary
@@ -130,6 +144,16 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 	for _, m := range current.Mcp {
 		process(adminapi.ReleaseDiffKindMCP, m.McpServerId)
 	}
+	if current.Assistants != nil {
+		for _, a := range *current.Assistants {
+			process(adminapi.ReleaseDiffKindASSISTANT, string(a.AssistantDefinitionId))
+		}
+	}
+	if current.Starters != nil {
+		for _, s := range *current.Starters {
+			process(adminapi.ReleaseDiffKindSTARTER, string(s.StarterId))
+		}
+	}
 	for _, kind := range prevKinds {
 		ensure(kind).Removed++
 	}
@@ -141,6 +165,8 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 		adminapi.ReleaseDiffKindASR,
 		adminapi.ReleaseDiffKindMCP,
 		adminapi.ReleaseDiffKindPOLICY,
+		adminapi.ReleaseDiffKindASSISTANT,
+		adminapi.ReleaseDiffKindSTARTER,
 	}
 	var details []adminapi.ResourceDiff
 	for _, kind := range kinds {
@@ -185,6 +211,20 @@ func currentHash(content *adminapi.ManagedDraftContent, id string) string {
 	for _, m := range content.Mcp {
 		if m.McpServerId == id {
 			return defHash(m)
+		}
+	}
+	if content.Assistants != nil {
+		for _, a := range *content.Assistants {
+			if string(a.AssistantDefinitionId) == id {
+				return defHash(a)
+			}
+		}
+	}
+	if content.Starters != nil {
+		for _, s := range *content.Starters {
+			if string(s.StarterId) == id {
+				return defHash(s)
+			}
 		}
 	}
 	return ""
@@ -440,6 +480,8 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 			DefaultTtsId:        snapshot.Policy.DefaultTtsId,
 			DefaultAsrId:        snapshot.Policy.DefaultAsrId,
 		},
+		Assistants: projectionToAdminAssistants(snapshot.Assistants),
+		Starters:   projectionToAdminStarters(snapshot.Starters),
 	}, nil
 }
 
@@ -492,7 +534,7 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 		SetManagedGeneration(int64(generation)).
 		SetStatus("STAGED").
 		SetReleaseContentJSON(releaseJSON).
-		SetSnapshotSchemaVersion(1).
+		SetSnapshotSchemaVersion(2).
 		SetSnapshotJSON(snapshotJSON).
 		SetSnapshotHash(hash).
 		SetSourceDraftRevision(int64(draft.DraftRevision)).
@@ -525,6 +567,8 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	kindMCP := adminapi.ValidationIssueResourceKind("MCP")
 	kindPolicy := adminapi.ValidationIssueResourceKind("POLICY")
 	kindBinding := adminapi.ValidationIssueResourceKind("BINDING")
+	kindAssistant := adminapi.ValidationIssueResourceKind("ASSISTANT")
+	kindStarter := adminapi.ValidationIssueResourceKind("STARTER")
 	ptrStr := func(s string) *string { return &s }
 	if err := validateCandidateIDs(content); err != nil {
 		addError("invalid_candidate_id", "$", err.Error(), nil, nil, nil)
@@ -601,6 +645,61 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 		if !validRuntimePath(value.RuntimePath) {
 			addError("invalid_runtime_path", fmt.Sprintf("mcp[%d].runtimePath", i), "runtimePath must be an absolute normalized path", &kindMCP, ptrStr(value.McpServerId), ptrStr("runtimePath"))
+		}
+	}
+
+	// Validate assistants
+	enabledModels := map[string]bool{}
+	for _, m := range content.Models {
+		enabledModels[m.ModelId] = m.Enabled
+	}
+	enabledMcp := map[string]bool{}
+	for _, m := range content.Mcp {
+		enabledMcp[m.McpServerId] = m.Enabled
+	}
+	assistantIds := map[string]bool{}
+	if content.Assistants != nil {
+		for i, a := range *content.Assistants {
+			path := fmt.Sprintf("assistants[%d]", i)
+			if strings.TrimSpace(a.DisplayName) == "" {
+				addError("missing_display_name", path+".displayName", "assistant displayName is required", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("displayName"))
+			}
+			if strings.TrimSpace(a.SystemPrompt) == "" {
+				addError("missing_system_prompt", path+".systemPrompt", "assistant systemPrompt is required", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("systemPrompt"))
+			}
+			if !enabledModels[string(a.ModelId)] {
+				addError("invalid_model_ref", path+".modelId", "assistant references an unknown or disabled model", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("modelId"))
+			}
+			if len(a.MemorySeed) == 0 {
+				addError("missing_memory_seed", path+".memorySeed", "assistant requires at least one memory seed item", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("memorySeed"))
+			}
+			for j, s := range a.MemorySeed {
+				if strings.TrimSpace(s) == "" {
+					addError("empty_memory_seed", fmt.Sprintf("%s.memorySeed[%d]", path, j), "memory seed item must be non-empty", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("memorySeed"))
+				}
+			}
+			for j, m := range a.McpServerIds {
+				if !enabledMcp[string(m)] {
+					addError("invalid_mcp_ref", fmt.Sprintf("%s.mcpServerIds[%d]", path, j), "assistant references an unknown or disabled MCP server", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("mcpServerIds"))
+				}
+			}
+			assistantIds[string(a.AssistantDefinitionId)] = a.Enabled
+		}
+	}
+
+	// Validate starters
+	if content.Starters != nil {
+		for i, s := range *content.Starters {
+			path := fmt.Sprintf("starters[%d]", i)
+			if strings.TrimSpace(s.Title) == "" {
+				addError("missing_title", path+".title", "starter title is required", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("title"))
+			}
+			if strings.TrimSpace(s.Prompt) == "" {
+				addError("missing_prompt", path+".prompt", "starter prompt is required", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("prompt"))
+			}
+			if !assistantIds[string(s.AssistantDefinitionId)] {
+				addError("invalid_assistant_ref", path+".assistantDefinitionId", "starter references an unknown or disabled assistant", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("assistantDefinitionId"))
+			}
 		}
 	}
 
@@ -735,6 +834,20 @@ func validateCandidateIDs(content adminapi.ManagedDraftContent) error {
 		}
 		if err := platformid.Validate(platformid.Upstream, value.UpstreamId); err != nil {
 			return fmt.Errorf("bindings[%d] has invalid upstream id", i)
+		}
+	}
+	if content.Assistants != nil {
+		for i, value := range *content.Assistants {
+			if err := check(platformid.Assistant, string(value.AssistantDefinitionId), fmt.Sprintf("assistants[%d]", i)); err != nil {
+				return err
+			}
+		}
+	}
+	if content.Starters != nil {
+		for i, value := range *content.Starters {
+			if err := check(platformid.Starter, string(value.StarterId), fmt.Sprintf("starters[%d]", i)); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

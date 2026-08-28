@@ -895,6 +895,137 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+  /api/admin/v1/enterprise-updates:
+    get:
+      operationId: listEnterpriseUpdates
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnterpriseUpdatePage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters: *id006
+    post:
+      operationId: createEnterpriseUpdate
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnterpriseUpdate'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEnterpriseUpdateRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/enterprise-updates/{enterpriseUpdateId}:
+    get:
+      operationId: getEnterpriseUpdate
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnterpriseUpdate'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - &id010
+        name: enterpriseUpdateId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/EnterpriseUpdateId'
+    put:
+      operationId: updateEnterpriseUpdate
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnterpriseUpdate'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEnterpriseUpdateRequest'
+      parameters:
+      - *id010
+      - *id001
+  /api/admin/v1/enterprise-updates/{enterpriseUpdateId}:publish:
+    post:
+      operationId: publishEnterpriseUpdate
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnterpriseUpdate'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id010
+      - *id001
+  /api/admin/v1/enterprise-updates/{enterpriseUpdateId}:withdraw:
+    post:
+      operationId: withdrawEnterpriseUpdate
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnterpriseUpdate'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id010
+      - *id001
 components:
   schemas:
     DeploymentId:
@@ -963,6 +1094,15 @@ components:
     IdempotencyKey:
       type: string
       pattern: ^idem_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AssistantDefinitionId:
+      type: string
+      pattern: ^asd_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    StarterId:
+      type: string
+      pattern: ^str_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    EnterpriseUpdateId:
+      type: string
+      pattern: ^eup_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
     Sha256Hash:
       type: string
       pattern: ^sha256:[0-9a-f]{64}$
@@ -1030,6 +1170,8 @@ components:
           - MCP
           - POLICY
           - BINDING
+          - ASSISTANT
+          - STARTER
         resourceId:
           type: string
         field:
@@ -1311,6 +1453,78 @@ components:
             $ref: '#/components/schemas/RuntimeBindingDefinition'
         policy:
           $ref: '#/components/schemas/ManagedPolicy'
+        assistants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagedAssistantDefinition'
+        starters:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantStarterDefinition'
+    ManagedAssistantDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - assistantDefinitionId
+      - displayName
+      - systemPrompt
+      - modelId
+      - memorySeed
+      - mcpServerIds
+      - enabled
+      properties:
+        assistantDefinitionId:
+          $ref: '#/components/schemas/AssistantDefinitionId'
+        displayName:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        systemPrompt:
+          type: string
+          minLength: 1
+        modelId:
+          $ref: '#/components/schemas/ModelId'
+        memorySeed:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        mcpServerIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpServerId'
+        enabled:
+          type: boolean
+    AssistantStarterDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - starterId
+      - assistantDefinitionId
+      - title
+      - prompt
+      - sortOrder
+      - enabled
+      properties:
+        starterId:
+          $ref: '#/components/schemas/StarterId'
+        assistantDefinitionId:
+          $ref: '#/components/schemas/AssistantDefinitionId'
+        title:
+          type: string
+          minLength: 1
+        prompt:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        sortOrder:
+          type: integer
+          minimum: 0
+        enabled:
+          type: boolean
     AdminUserSummary:
       type: object
       additionalProperties: false
@@ -1870,6 +2084,14 @@ components:
             $ref: '#/components/schemas/McpDefinition'
         policy:
           $ref: '#/components/schemas/ManagedPolicy'
+        assistants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagedAssistantDefinition'
+        starters:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantStarterDefinition'
     ReleaseDiffKind:
       type: string
       enum:
@@ -1879,6 +2101,8 @@ components:
       - ASR
       - MCP
       - POLICY
+      - ASSISTANT
+      - STARTER
     ResourceDiff:
       type: object
       additionalProperties: false
@@ -2283,6 +2507,89 @@ components:
           type: boolean
         ready:
           type: boolean
+    EnterpriseUpdateStatus:
+      type: string
+      enum:
+      - DRAFT
+      - PUBLISHED
+      - WITHDRAWN
+    EnterpriseUpdate:
+      type: object
+      additionalProperties: false
+      required:
+      - enterpriseUpdateId
+      - title
+      - content
+      - status
+      - publishedAt
+      - feedRevision
+      - createdAt
+      - updatedAt
+      properties:
+        enterpriseUpdateId:
+          $ref: '#/components/schemas/EnterpriseUpdateId'
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
+        status:
+          $ref: '#/components/schemas/EnterpriseUpdateStatus'
+        publishedAt:
+          type: string
+          format: date-time
+        feedRevision:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    EnterpriseUpdatePage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      - feedRevision
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnterpriseUpdate'
+        feedRevision:
+          type: integer
+          minimum: 1
+        nextCursor:
+          type: string
+    CreateEnterpriseUpdateRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - title
+      - content
+      properties:
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
+    UpdateEnterpriseUpdateRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - title
+      - content
+      properties:
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
   responses:
     Problem:
       description: Problem response

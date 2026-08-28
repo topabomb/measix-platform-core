@@ -79,6 +79,41 @@ var (
 		Columns:    EnrollmentsColumns,
 		PrimaryKey: []*schema.Column{EnrollmentsColumns[0]},
 	}
+	// EnterpriseUpdatesColumns holds the columns for the "enterprise_updates" table.
+	EnterpriseUpdatesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "title", Type: field.TypeString},
+		{Name: "content", Type: field.TypeString, Size: 2147483647},
+		{Name: "status", Type: field.TypeString},
+		{Name: "published_at", Type: field.TypeTime, Nullable: true},
+		{Name: "feed_revision", Type: field.TypeInt64},
+		{Name: "created_by_user_id", Type: field.TypeString},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// EnterpriseUpdatesTable holds the schema information for the "enterprise_updates" table.
+	EnterpriseUpdatesTable = &schema.Table{
+		Name:       "enterprise_updates",
+		Columns:    EnterpriseUpdatesColumns,
+		PrimaryKey: []*schema.Column{EnterpriseUpdatesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "enterpriseupdate_status",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseUpdatesColumns[3]},
+			},
+			{
+				Name:    "enterpriseupdate_feed_revision",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseUpdatesColumns[5]},
+			},
+			{
+				Name:    "enterpriseupdate_published_at",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseUpdatesColumns[4]},
+			},
+		},
+	}
 	// IdempotencyRecordsColumns holds the columns for the "idempotency_records" table.
 	IdempotencyRecordsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -379,6 +414,7 @@ var (
 		DeploymentsTable,
 		DevicesTable,
 		EnrollmentsTable,
+		EnterpriseUpdatesTable,
 		IdempotencyRecordsTable,
 		ManagedDraftsTable,
 		ManagedReleasesTable,

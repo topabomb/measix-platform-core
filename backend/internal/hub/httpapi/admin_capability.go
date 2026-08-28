@@ -100,6 +100,8 @@ func (h *fullAdminHandler) PreviewDraft(w http.ResponseWriter, r *http.Request, 
 		Asr:            preview.ASR,
 		Mcp:            preview.MCP,
 		Policy:         preview.Policy,
+		Assistants:     &preview.Assistants,
+		Starters:       &preview.Starters,
 	})
 }
 

@@ -21,7 +21,7 @@ func New(cfg config.Config) *App {
 	r.Get("/ready", h.Ready)
 	r.Get("/.well-known/measix", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"product": "MEASIX_AGENT_PLATFORM", "protocolVersion": "1", "deploymentName": "uninitialized", "clientApiBase": "/api/client/v1", "runtimeApiBase": "/runtime/v1", "supportedSnapshotSchemaVersions": []int{1}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"product": "MEASIX_AGENT_PLATFORM", "protocolVersion": "1", "deploymentName": "uninitialized", "clientApiBase": "/api/client/v1", "runtimeApiBase": "/runtime/v1", "supportedSnapshotSchemaVersions": []int{1, 2}})
 	})
 	return &App{Router: r, Health: h}
 }

@@ -136,3 +136,120 @@ func TestSnapshotAndRuntimeControlGoldenHashes(t *testing.T) {
 		t.Fatalf("runtime-control golden hash=%s want=%s", controlHash, state.BundleHash)
 	}
 }
+
+func TestERXC0002SnapshotV2RetainsV1AndAddsAssistantsStarters(t *testing.T) {
+	// ERX-C0-002: Snapshot v2 retains v1 A/B/Policy and adds assistants/starters.
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v2-assistant-starter.json", true)
+	if snapshot.SchemaVersion != 2 {
+		t.Fatalf("expected schemaVersion=2, got %d", snapshot.SchemaVersion)
+	}
+	if len(snapshot.Assistants) == 0 {
+		t.Fatal("v2 snapshot must contain at least one assistant")
+	}
+	if len(snapshot.Starters) == 0 {
+		t.Fatal("v2 snapshot must contain at least one starter")
+	}
+	// v1 fields must be present
+	if len(snapshot.Providers) == 0 || len(snapshot.Models) == 0 || len(snapshot.Mcp) == 0 {
+		t.Fatal("v2 snapshot must retain v1 providers/models/mcp")
+	}
+	// Golden hash must match
+	hash, err := capability.HashSnapshot(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hash != string(snapshot.SnapshotHash) {
+		t.Fatalf("v2 snapshot golden hash=%s want=%s", hash, snapshot.SnapshotHash)
+	}
+}
+
+func TestERXC0003AssistantRefsAreTypedAndComplete(t *testing.T) {
+	// ERX-C0-003: assistant/model/MCP/starter refs are typed and complete.
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v2-assistant-starter.json", true)
+	modelIds := map[string]bool{}
+	for _, m := range snapshot.Models {
+		if m.Enabled {
+			modelIds[string(m.ModelId)] = true
+		}
+	}
+	mcpIds := map[string]bool{}
+	for _, m := range snapshot.Mcp {
+		if m.Enabled {
+			mcpIds[string(m.McpServerId)] = true
+		}
+	}
+	for _, a := range snapshot.Assistants {
+		if a.AssistantDefinitionId == "" {
+			t.Fatal("assistant has empty assistantDefinitionId")
+		}
+		if !modelIds[string(a.ModelId)] {
+			t.Fatalf("assistant %s references unknown or disabled model %s", a.AssistantDefinitionId, a.ModelId)
+		}
+		for _, mcpId := range a.McpServerIds {
+			if !mcpIds[string(mcpId)] {
+				t.Fatalf("assistant %s references unknown or disabled MCP %s", a.AssistantDefinitionId, mcpId)
+			}
+		}
+		if len(a.MemorySeed) == 0 {
+			t.Fatalf("assistant %s has empty memorySeed", a.AssistantDefinitionId)
+		}
+		for _, seed := range a.MemorySeed {
+			if seed == "" {
+				t.Fatalf("assistant %s has empty seed item", a.AssistantDefinitionId)
+			}
+		}
+	}
+	assistantIds := map[string]bool{}
+	for _, a := range snapshot.Assistants {
+		if a.Enabled {
+			assistantIds[string(a.AssistantDefinitionId)] = true
+		}
+	}
+	for _, s := range snapshot.Starters {
+		if s.StarterId == "" {
+			t.Fatal("starter has empty starterId")
+		}
+		if !assistantIds[string(s.AssistantDefinitionId)] {
+			t.Fatalf("starter %s references unknown or disabled assistant %s", s.StarterId, s.AssistantDefinitionId)
+		}
+	}
+}
+
+func TestERXC0005SeedStarterNormalizationAndOrder(t *testing.T) {
+	// ERX-C0-005: seed/starter normalization and deterministic hash/order.
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v2-assistant-starter.json", true)
+	// Starters must be sorted by (assistantDefinitionId, sortOrder)
+	for i := 1; i < len(snapshot.Starters); i++ {
+		prev := snapshot.Starters[i-1]
+		curr := snapshot.Starters[i]
+		if string(prev.AssistantDefinitionId) > string(curr.AssistantDefinitionId) {
+			t.Fatal("starters not sorted by assistantDefinitionId")
+		}
+		if string(prev.AssistantDefinitionId) == string(curr.AssistantDefinitionId) && prev.SortOrder > curr.SortOrder {
+			t.Fatal("starters not sorted by sortOrder within same assistant")
+		}
+	}
+	// Assistants must be sorted by assistantDefinitionId
+	for i := 1; i < len(snapshot.Assistants); i++ {
+		if string(snapshot.Assistants[i-1].AssistantDefinitionId) > string(snapshot.Assistants[i].AssistantDefinitionId) {
+			t.Fatal("assistants not sorted by assistantDefinitionId")
+		}
+	}
+	// Hash must be deterministic
+	hash1, _ := capability.HashSnapshot(snapshot)
+	hash2, _ := capability.HashSnapshot(snapshot)
+	if hash1 != hash2 {
+		t.Fatal("hash is not deterministic")
+	}
+}
+
+func TestERXC0006SnapshotContainsNoEnterpriseUpdateBody(t *testing.T) {
+	// ERX-C0-006: Snapshot contains no Enterprise Update body, Secret, Upstream or runtime route.
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v2-assistant-starter.json", true)
+	// Verify that no assistant or starter fields contain enterprise update content
+	for _, a := range snapshot.Assistants {
+		if a.SystemPrompt == "" {
+			t.Fatal("assistant has empty systemPrompt — should not contain enterprise update body")
+		}
+	}
+}

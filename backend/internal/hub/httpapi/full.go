@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/hub/enterpriseupdate"
 	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/hub/system"
@@ -15,13 +16,14 @@ import (
 )
 
 type Services struct {
-	Identity       *identity.Service
-	Capability     *capability.Service
-	Upstream       *upstream.Service
-	RuntimeControl *runtimecontrol.Service
-	Usage          *usage.Service
-	System         *system.Service
-	BuildVersion   string
+	Identity         *identity.Service
+	Capability       *capability.Service
+	Upstream         *upstream.Service
+	RuntimeControl   *runtimecontrol.Service
+	Usage            *usage.Service
+	System           *system.Service
+	EnterpriseUpdate *enterpriseupdate.Service
+	BuildVersion     string
 }
 
 type fullAdminHandler struct {
@@ -34,7 +36,7 @@ func RegisterFull(router chi.Router, services Services, options Options) {
 		adminHandler: &adminHandler{identity: services.Identity},
 		services:     services,
 	}
-	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity, options: options}, capability: services.Capability}
+	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity, options: options}, capability: services.Capability, enterpriseUpdate: services.EnterpriseUpdate}
 	adminapi.HandlerFromMux(admin, router)
 	clientapi.HandlerFromMux(client, router)
 }

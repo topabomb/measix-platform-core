@@ -5,12 +5,14 @@ import (
 	"net/http"
 
 	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/hub/enterpriseupdate"
 	"measix/platform/internal/wire/clientapi"
 )
 
 type fullClientHandler struct {
 	*clientHandler
-	capability *capability.Service
+	capability       *capability.Service
+	enterpriseUpdate *enterpriseupdate.Service
 }
 
 func (h *fullClientHandler) GetManagedSnapshot(w http.ResponseWriter, r *http.Request, generation int, params clientapi.GetManagedSnapshotParams) {

@@ -56,6 +56,18 @@ func (f EnrollmentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnrollmentMutation", m)
 }
 
+// The EnterpriseUpdateFunc type is an adapter to allow the use of ordinary
+// function as EnterpriseUpdate mutator.
+type EnterpriseUpdateFunc func(context.Context, *ent.EnterpriseUpdateMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EnterpriseUpdateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EnterpriseUpdateMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EnterpriseUpdateMutation", m)
+}
+
 // The IdempotencyRecordFunc type is an adapter to allow the use of ordinary
 // function as IdempotencyRecord mutator.
 type IdempotencyRecordFunc func(context.Context, *ent.IdempotencyRecordMutation) (ent.Value, error)

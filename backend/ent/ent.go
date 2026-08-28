@@ -10,6 +10,7 @@ import (
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enrollment"
+	"measix/platform/ent/enterpriseupdate"
 	"measix/platform/ent/idempotencyrecord"
 	"measix/platform/ent/manageddraft"
 	"measix/platform/ent/managedrelease"
@@ -93,6 +94,7 @@ func checkColumn(t, c string) error {
 			deployment.Table:             deployment.ValidColumn,
 			device.Table:                 device.ValidColumn,
 			enrollment.Table:             enrollment.ValidColumn,
+			enterpriseupdate.Table:       enterpriseupdate.ValidColumn,
 			idempotencyrecord.Table:      idempotencyrecord.ValidColumn,
 			manageddraft.Table:           manageddraft.ValidColumn,
 			managedrelease.Table:         managedrelease.ValidColumn,

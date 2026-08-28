@@ -268,7 +268,7 @@ func (h *clientHandler) Discover(w http.ResponseWriter, r *http.Request) {
 		DeploymentName:                  view.DeploymentName,
 		ClientApiBase:                   base + "/api/client/v1",
 		RuntimeApiBase:                  runtimeBase,
-		SupportedSnapshotSchemaVersions: []int{1},
+		SupportedSnapshotSchemaVersions: []int{1, 2},
 	})
 }
 
@@ -343,7 +343,7 @@ func (h *clientHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 	response.Session.SessionId = view.Principal.SessionID
 	response.Session.ExpiresAt = view.SessionExpiresAt
 	response.ManagedState = managedStateWire(view.ManagedState, nil)
-	response.SupportedSnapshotSchemaVersions = []int{1}
+	response.SupportedSnapshotSchemaVersions = []int{1, 2}
 	writeJSON(w, http.StatusOK, response)
 }
 

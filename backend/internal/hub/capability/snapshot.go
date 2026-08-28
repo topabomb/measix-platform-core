@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"sort"
+	"strings"
 	"time"
 
 	"measix/platform/internal/wire/adminapi"
@@ -22,17 +23,19 @@ type SnapshotInput struct {
 }
 
 type snapshotDescriptor struct {
-	DeploymentID      string                         `json:"deploymentId"`
-	SchemaVersion     int                            `json:"schemaVersion"`
-	ManagedGeneration int                            `json:"managedGeneration"`
-	ReleaseID         string                         `json:"releaseId"`
-	Providers         []clientapi.ProviderDefinition `json:"providers"`
-	Models            []clientapi.ModelDefinition    `json:"models"`
-	TTS               []clientapi.TtsDefinition      `json:"tts"`
-	ASR               []clientapi.AsrDefinition      `json:"asr"`
-	MCP               []clientapi.McpDefinition      `json:"mcp"`
-	Policy            clientapi.ManagedPolicy        `json:"policy"`
-	Metadata          snapshotMetadata               `json:"metadata"`
+	DeploymentID      string                                 `json:"deploymentId"`
+	SchemaVersion     int                                    `json:"schemaVersion"`
+	ManagedGeneration int                                    `json:"managedGeneration"`
+	ReleaseID         string                                 `json:"releaseId"`
+	Providers         []clientapi.ProviderDefinition         `json:"providers"`
+	Models            []clientapi.ModelDefinition            `json:"models"`
+	TTS               []clientapi.TtsDefinition               `json:"tts"`
+	ASR               []clientapi.AsrDefinition               `json:"asr"`
+	MCP               []clientapi.McpDefinition               `json:"mcp"`
+	Policy            clientapi.ManagedPolicy                 `json:"policy"`
+	Metadata          snapshotMetadata                       `json:"metadata"`
+	Assistants        []clientapi.ManagedAssistantDefinition `json:"assistants,omitempty"`
+	Starters          []clientapi.AssistantStarterDefinition `json:"starters,omitempty"`
 }
 
 type snapshotMetadata struct {
@@ -89,6 +92,56 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	for _, value := range input.Content.Mcp {
 		mcp = append(mcp, clientapi.McpDefinition{McpServerId: value.McpServerId, DisplayName: value.DisplayName, ClientProtocol: clientapi.McpDefinitionClientProtocol(value.ClientProtocol), AuthOwnership: clientapi.McpDefinitionAuthOwnership(value.AuthOwnership), RuntimePath: value.RuntimePath, Enabled: value.Enabled})
 	}
+	// Compile assistants
+	var assistants []clientapi.ManagedAssistantDefinition
+	if input.Content.Assistants != nil {
+		assistants = make([]clientapi.ManagedAssistantDefinition, 0, len(*input.Content.Assistants))
+		for _, a := range *input.Content.Assistants {
+			seed := make([]string, len(a.MemorySeed))
+			for i, s := range a.MemorySeed {
+				seed[i] = strings.TrimSpace(s)
+			}
+			mcpIds := make([]clientapi.McpServerId, len(a.McpServerIds))
+			for i, m := range a.McpServerIds {
+				mcpIds[i] = clientapi.McpServerId(m)
+			}
+			sort.Strings(seed)
+			sort.Slice(mcpIds, func(i, j int) bool { return mcpIds[i] < mcpIds[j] })
+			assistants = append(assistants, clientapi.ManagedAssistantDefinition{
+				AssistantDefinitionId: a.AssistantDefinitionId,
+				DisplayName:           a.DisplayName,
+				Description:           a.Description,
+				SystemPrompt:          a.SystemPrompt,
+				ModelId:               a.ModelId,
+				MemorySeed:            seed,
+				McpServerIds:          mcpIds,
+				Enabled:               a.Enabled,
+			})
+		}
+	}
+	// Compile starters
+	var starters []clientapi.AssistantStarterDefinition
+	if input.Content.Starters != nil {
+		starters = make([]clientapi.AssistantStarterDefinition, 0, len(*input.Content.Starters))
+		for _, s := range *input.Content.Starters {
+			starters = append(starters, clientapi.AssistantStarterDefinition{
+				StarterId:             s.StarterId,
+				AssistantDefinitionId: s.AssistantDefinitionId,
+				Title:                 s.Title,
+				Prompt:                s.Prompt,
+				Description:           s.Description,
+				SortOrder:             s.SortOrder,
+				Enabled:               s.Enabled,
+			})
+		}
+	}
+	sort.Slice(assistants, func(i, j int) bool { return assistants[i].AssistantDefinitionId < assistants[j].AssistantDefinitionId })
+	sort.Slice(starters, func(i, j int) bool {
+		if starters[i].AssistantDefinitionId == starters[j].AssistantDefinitionId {
+			return starters[i].SortOrder < starters[j].SortOrder
+		}
+		return starters[i].AssistantDefinitionId < starters[j].AssistantDefinitionId
+	})
 	sort.Slice(providers, func(i, j int) bool { return providers[i].ProviderId < providers[j].ProviderId })
 	sort.Slice(models, func(i, j int) bool { return models[i].ModelId < models[j].ModelId })
 	sort.Slice(tts, func(i, j int) bool { return tts[i].TtsId < tts[j].TtsId })
@@ -112,8 +165,9 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	}
 	metadata := snapshotMetadata{PublishedAt: input.PublishedAt.UTC(), PublishedByUserID: publishedBy}
 	descriptor := snapshotDescriptor{
-		DeploymentID: input.DeploymentID, SchemaVersion: 1, ManagedGeneration: input.ManagedGeneration,
+		DeploymentID: input.DeploymentID, SchemaVersion: 2, ManagedGeneration: input.ManagedGeneration,
 		ReleaseID: input.ReleaseID, Providers: providers, Models: models, TTS: tts, ASR: asr, MCP: mcp, Policy: policy, Metadata: metadata,
+		Assistants: assistants, Starters: starters,
 	}
 	payload, err := json.Marshal(descriptor)
 	if err != nil {
@@ -123,7 +177,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	hash := "sha256:" + hex.EncodeToString(sum[:])
 	var snapshot clientapi.ManagedSnapshot
 	snapshot.DeploymentId = input.DeploymentID
-	snapshot.SchemaVersion = clientapi.ManagedSnapshotSchemaVersionN1
+	snapshot.SchemaVersion = clientapi.ManagedSnapshotSchemaVersionN2
 	snapshot.ManagedGeneration = input.ManagedGeneration
 	snapshot.ReleaseId = input.ReleaseID
 	snapshot.SnapshotHash = hash
@@ -135,6 +189,8 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	snapshot.Policy = policy
 	snapshot.Metadata.PublishedAt = metadata.PublishedAt
 	snapshot.Metadata.PublishedByUserId = metadata.PublishedByUserID
+	snapshot.Assistants = assistants
+	snapshot.Starters = starters
 	return snapshot, hash, nil
 }
 
@@ -152,12 +208,59 @@ func HashSnapshot(snapshot clientapi.ManagedSnapshot) (string, error) {
 		ReleaseID: string(snapshot.ReleaseId), Providers: snapshot.Providers, Models: snapshot.Models, TTS: snapshot.Tts, ASR: snapshot.Asr, MCP: snapshot.Mcp,
 		Policy: snapshot.Policy, Metadata: metadata,
 	}
+	// Only include v2 fields (assistants, starters) for schemaVersion >= 2.
+	// v1 snapshots must produce the same hash as before the v2 fields were added.
+	if snapshot.SchemaVersion >= 2 {
+		descriptor.Assistants = snapshot.Assistants
+		descriptor.Starters = snapshot.Starters
+	}
 	payload, err := json.Marshal(descriptor)
 	if err != nil {
 		return "", err
 	}
 	sum := sha256.Sum256(payload)
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+func projectionToAdminAssistants(src []clientapi.ManagedAssistantDefinition) []adminapi.ManagedAssistantDefinition {
+	dst := make([]adminapi.ManagedAssistantDefinition, len(src))
+	for i, a := range src {
+		seed := make([]string, len(a.MemorySeed))
+		for j, s := range a.MemorySeed {
+			seed[j] = string(s)
+		}
+		mcpIds := make([]adminapi.McpServerId, len(a.McpServerIds))
+		for j, m := range a.McpServerIds {
+			mcpIds[j] = adminapi.McpServerId(string(m))
+		}
+		dst[i] = adminapi.ManagedAssistantDefinition{
+			AssistantDefinitionId: adminapi.AssistantDefinitionId(a.AssistantDefinitionId),
+			DisplayName:           a.DisplayName,
+			Description:            a.Description,
+			SystemPrompt:          a.SystemPrompt,
+			ModelId:               adminapi.ModelId(a.ModelId),
+			MemorySeed:            seed,
+			McpServerIds:          mcpIds,
+			Enabled:               a.Enabled,
+		}
+	}
+	return dst
+}
+
+func projectionToAdminStarters(src []clientapi.AssistantStarterDefinition) []adminapi.AssistantStarterDefinition {
+	dst := make([]adminapi.AssistantStarterDefinition, len(src))
+	for i, s := range src {
+		dst[i] = adminapi.AssistantStarterDefinition{
+			StarterId:             adminapi.StarterId(s.StarterId),
+			AssistantDefinitionId: adminapi.AssistantDefinitionId(s.AssistantDefinitionId),
+			Title:                 s.Title,
+			Prompt:                s.Prompt,
+			Description:           s.Description,
+			SortOrder:             s.SortOrder,
+			Enabled:               s.Enabled,
+		}
+	}
+	return dst
 }
 
 // projectionToAdminProviders converts clientapi projection back to adminapi types for preview.

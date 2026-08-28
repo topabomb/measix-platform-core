@@ -15,6 +15,7 @@ import (
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enrollment"
+	"measix/platform/ent/enterpriseupdate"
 	"measix/platform/ent/idempotencyrecord"
 	"measix/platform/ent/manageddraft"
 	"measix/platform/ent/managedrelease"
@@ -47,6 +48,8 @@ type Client struct {
 	Device *DeviceClient
 	// Enrollment is the client for interacting with the Enrollment builders.
 	Enrollment *EnrollmentClient
+	// EnterpriseUpdate is the client for interacting with the EnterpriseUpdate builders.
+	EnterpriseUpdate *EnterpriseUpdateClient
 	// IdempotencyRecord is the client for interacting with the IdempotencyRecord builders.
 	IdempotencyRecord *IdempotencyRecordClient
 	// ManagedDraft is the client for interacting with the ManagedDraft builders.
@@ -88,6 +91,7 @@ func (c *Client) init() {
 	c.Deployment = NewDeploymentClient(c.config)
 	c.Device = NewDeviceClient(c.config)
 	c.Enrollment = NewEnrollmentClient(c.config)
+	c.EnterpriseUpdate = NewEnterpriseUpdateClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
 	c.ManagedDraft = NewManagedDraftClient(c.config)
 	c.ManagedRelease = NewManagedReleaseClient(c.config)
@@ -197,6 +201,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Deployment:             NewDeploymentClient(cfg),
 		Device:                 NewDeviceClient(cfg),
 		Enrollment:             NewEnrollmentClient(cfg),
+		EnterpriseUpdate:       NewEnterpriseUpdateClient(cfg),
 		IdempotencyRecord:      NewIdempotencyRecordClient(cfg),
 		ManagedDraft:           NewManagedDraftClient(cfg),
 		ManagedRelease:         NewManagedReleaseClient(cfg),
@@ -233,6 +238,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Deployment:             NewDeploymentClient(cfg),
 		Device:                 NewDeviceClient(cfg),
 		Enrollment:             NewEnrollmentClient(cfg),
+		EnterpriseUpdate:       NewEnterpriseUpdateClient(cfg),
 		IdempotencyRecord:      NewIdempotencyRecordClient(cfg),
 		ManagedDraft:           NewManagedDraftClient(cfg),
 		ManagedRelease:         NewManagedReleaseClient(cfg),
@@ -275,10 +281,10 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Activation, c.Deployment, c.Device, c.Enrollment, c.IdempotencyRecord,
-		c.ManagedDraft, c.ManagedRelease, c.ManagedState, c.PricingRule,
-		c.RequestUsage, c.Secret, c.SecretVersion, c.SemanticUsage, c.Session,
-		c.Upstream, c.UpstreamConfigRevision, c.User,
+		c.Activation, c.Deployment, c.Device, c.Enrollment, c.EnterpriseUpdate,
+		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
+		c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion, c.SemanticUsage,
+		c.Session, c.Upstream, c.UpstreamConfigRevision, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -288,10 +294,10 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Activation, c.Deployment, c.Device, c.Enrollment, c.IdempotencyRecord,
-		c.ManagedDraft, c.ManagedRelease, c.ManagedState, c.PricingRule,
-		c.RequestUsage, c.Secret, c.SecretVersion, c.SemanticUsage, c.Session,
-		c.Upstream, c.UpstreamConfigRevision, c.User,
+		c.Activation, c.Deployment, c.Device, c.Enrollment, c.EnterpriseUpdate,
+		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
+		c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion, c.SemanticUsage,
+		c.Session, c.Upstream, c.UpstreamConfigRevision, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -308,6 +314,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Device.mutate(ctx, m)
 	case *EnrollmentMutation:
 		return c.Enrollment.mutate(ctx, m)
+	case *EnterpriseUpdateMutation:
+		return c.EnterpriseUpdate.mutate(ctx, m)
 	case *IdempotencyRecordMutation:
 		return c.IdempotencyRecord.mutate(ctx, m)
 	case *ManagedDraftMutation:
@@ -868,6 +876,139 @@ func (c *EnrollmentClient) mutate(ctx context.Context, m *EnrollmentMutation) (V
 		return (&EnrollmentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Enrollment mutation op: %q", m.Op())
+	}
+}
+
+// EnterpriseUpdateClient is a client for the EnterpriseUpdate schema.
+type EnterpriseUpdateClient struct {
+	config
+}
+
+// NewEnterpriseUpdateClient returns a client for the EnterpriseUpdate from the given config.
+func NewEnterpriseUpdateClient(c config) *EnterpriseUpdateClient {
+	return &EnterpriseUpdateClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `enterpriseupdate.Hooks(f(g(h())))`.
+func (c *EnterpriseUpdateClient) Use(hooks ...Hook) {
+	c.hooks.EnterpriseUpdate = append(c.hooks.EnterpriseUpdate, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `enterpriseupdate.Intercept(f(g(h())))`.
+func (c *EnterpriseUpdateClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EnterpriseUpdate = append(c.inters.EnterpriseUpdate, interceptors...)
+}
+
+// Create returns a builder for creating a EnterpriseUpdate entity.
+func (c *EnterpriseUpdateClient) Create() *EnterpriseUpdateCreate {
+	mutation := newEnterpriseUpdateMutation(c.config, OpCreate)
+	return &EnterpriseUpdateCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EnterpriseUpdate entities.
+func (c *EnterpriseUpdateClient) CreateBulk(builders ...*EnterpriseUpdateCreate) *EnterpriseUpdateCreateBulk {
+	return &EnterpriseUpdateCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EnterpriseUpdateClient) MapCreateBulk(slice any, setFunc func(*EnterpriseUpdateCreate, int)) *EnterpriseUpdateCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EnterpriseUpdateCreateBulk{err: fmt.Errorf("calling to EnterpriseUpdateClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EnterpriseUpdateCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EnterpriseUpdateCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EnterpriseUpdate.
+func (c *EnterpriseUpdateClient) Update() *EnterpriseUpdateUpdate {
+	mutation := newEnterpriseUpdateMutation(c.config, OpUpdate)
+	return &EnterpriseUpdateUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EnterpriseUpdateClient) UpdateOne(_m *EnterpriseUpdate) *EnterpriseUpdateUpdateOne {
+	mutation := newEnterpriseUpdateMutation(c.config, OpUpdateOne, withEnterpriseUpdate(_m))
+	return &EnterpriseUpdateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EnterpriseUpdateClient) UpdateOneID(id string) *EnterpriseUpdateUpdateOne {
+	mutation := newEnterpriseUpdateMutation(c.config, OpUpdateOne, withEnterpriseUpdateID(id))
+	return &EnterpriseUpdateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EnterpriseUpdate.
+func (c *EnterpriseUpdateClient) Delete() *EnterpriseUpdateDelete {
+	mutation := newEnterpriseUpdateMutation(c.config, OpDelete)
+	return &EnterpriseUpdateDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EnterpriseUpdateClient) DeleteOne(_m *EnterpriseUpdate) *EnterpriseUpdateDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EnterpriseUpdateClient) DeleteOneID(id string) *EnterpriseUpdateDeleteOne {
+	builder := c.Delete().Where(enterpriseupdate.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EnterpriseUpdateDeleteOne{builder}
+}
+
+// Query returns a query builder for EnterpriseUpdate.
+func (c *EnterpriseUpdateClient) Query() *EnterpriseUpdateQuery {
+	return &EnterpriseUpdateQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEnterpriseUpdate},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EnterpriseUpdate entity by its id.
+func (c *EnterpriseUpdateClient) Get(ctx context.Context, id string) (*EnterpriseUpdate, error) {
+	return c.Query().Where(enterpriseupdate.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EnterpriseUpdateClient) GetX(ctx context.Context, id string) *EnterpriseUpdate {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EnterpriseUpdateClient) Hooks() []Hook {
+	return c.hooks.EnterpriseUpdate
+}
+
+// Interceptors returns the client interceptors.
+func (c *EnterpriseUpdateClient) Interceptors() []Interceptor {
+	return c.inters.EnterpriseUpdate
+}
+
+func (c *EnterpriseUpdateClient) mutate(ctx context.Context, m *EnterpriseUpdateMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EnterpriseUpdateCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EnterpriseUpdateUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EnterpriseUpdateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EnterpriseUpdateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EnterpriseUpdate mutation op: %q", m.Op())
 	}
 }
 
@@ -2603,14 +2744,15 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Activation, Deployment, Device, Enrollment, IdempotencyRecord, ManagedDraft,
-		ManagedRelease, ManagedState, PricingRule, RequestUsage, Secret, SecretVersion,
-		SemanticUsage, Session, Upstream, UpstreamConfigRevision, User []ent.Hook
+		Activation, Deployment, Device, Enrollment, EnterpriseUpdate, IdempotencyRecord,
+		ManagedDraft, ManagedRelease, ManagedState, PricingRule, RequestUsage, Secret,
+		SecretVersion, SemanticUsage, Session, Upstream, UpstreamConfigRevision,
+		User []ent.Hook
 	}
 	inters struct {
-		Activation, Deployment, Device, Enrollment, IdempotencyRecord, ManagedDraft,
-		ManagedRelease, ManagedState, PricingRule, RequestUsage, Secret, SecretVersion,
-		SemanticUsage, Session, Upstream, UpstreamConfigRevision,
+		Activation, Deployment, Device, Enrollment, EnterpriseUpdate, IdempotencyRecord,
+		ManagedDraft, ManagedRelease, ManagedState, PricingRule, RequestUsage, Secret,
+		SecretVersion, SemanticUsage, Session, Upstream, UpstreamConfigRevision,
 		User []ent.Interceptor
 	}
 )

@@ -152,6 +152,78 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/client/v1/enterprise-updates:
+    get:
+      operationId: listEnterpriseUpdates
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 10
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnterpriseUpdateFeed'
+        '304':
+          description: Not Modified
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/client/v1/enterprise-updates/{enterpriseUpdateId}:
+    get:
+      operationId: getEnterpriseUpdate
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: enterpriseUpdateId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/EnterpriseUpdateId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnterpriseUpdateItem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
 components:
   schemas:
     DeploymentId:
@@ -220,6 +292,15 @@ components:
     IdempotencyKey:
       type: string
       pattern: ^idem_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AssistantDefinitionId:
+      type: string
+      pattern: ^asd_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    StarterId:
+      type: string
+      pattern: ^str_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    EnterpriseUpdateId:
+      type: string
+      pattern: ^eup_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
     Sha256Hash:
       type: string
       pattern: ^sha256:[0-9a-f]{64}$
@@ -554,6 +635,14 @@ components:
             $ref: '#/components/schemas/RuntimeBindingDefinition'
         policy:
           $ref: '#/components/schemas/ManagedPolicy'
+        assistants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagedAssistantDefinition'
+        starters:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantStarterDefinition'
     Discovery:
       type: object
       additionalProperties: false
@@ -771,6 +860,8 @@ components:
       - mcp
       - policy
       - metadata
+      - assistants
+      - starters
       properties:
         deploymentId:
           $ref: '#/components/schemas/DeploymentId'
@@ -778,6 +869,7 @@ components:
           type: integer
           enum:
           - 1
+          - 2
         managedGeneration:
           type: integer
           minimum: 1
@@ -818,6 +910,114 @@ components:
               format: date-time
             publishedByUserId:
               $ref: '#/components/schemas/UserId'
+        assistants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagedAssistantDefinition'
+        starters:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantStarterDefinition'
+    ManagedAssistantDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - assistantDefinitionId
+      - displayName
+      - systemPrompt
+      - modelId
+      - memorySeed
+      - mcpServerIds
+      - enabled
+      properties:
+        assistantDefinitionId:
+          $ref: '#/components/schemas/AssistantDefinitionId'
+        displayName:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        systemPrompt:
+          type: string
+          minLength: 1
+        modelId:
+          $ref: '#/components/schemas/ModelId'
+        memorySeed:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        mcpServerIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpServerId'
+        enabled:
+          type: boolean
+    AssistantStarterDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - starterId
+      - assistantDefinitionId
+      - title
+      - prompt
+      - sortOrder
+      - enabled
+      properties:
+        starterId:
+          $ref: '#/components/schemas/StarterId'
+        assistantDefinitionId:
+          $ref: '#/components/schemas/AssistantDefinitionId'
+        title:
+          type: string
+          minLength: 1
+        prompt:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        sortOrder:
+          type: integer
+          minimum: 0
+        enabled:
+          type: boolean
+    EnterpriseUpdateItem:
+      type: object
+      additionalProperties: false
+      required:
+      - updateId
+      - title
+      - content
+      - publishedAt
+      properties:
+        updateId:
+          $ref: '#/components/schemas/EnterpriseUpdateId'
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
+        publishedAt:
+          type: string
+          format: date-time
+    EnterpriseUpdateFeed:
+      type: object
+      additionalProperties: false
+      required:
+      - enterpriseTimezone
+      - items
+      - truncated
+      properties:
+        enterpriseTimezone:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnterpriseUpdateItem'
+        truncated:
+          type: boolean
   responses:
     Problem:
       description: Problem response

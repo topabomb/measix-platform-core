@@ -151,6 +151,27 @@ func (e DeviceStatus) Valid() bool {
 	}
 }
 
+// Defines values for EnterpriseUpdateStatus.
+const (
+	DRAFT     EnterpriseUpdateStatus = "DRAFT"
+	PUBLISHED EnterpriseUpdateStatus = "PUBLISHED"
+	WITHDRAWN EnterpriseUpdateStatus = "WITHDRAWN"
+)
+
+// Valid indicates whether the value is a known member of the EnterpriseUpdateStatus enum.
+func (e EnterpriseUpdateStatus) Valid() bool {
+	switch e {
+	case DRAFT:
+		return true
+	case PUBLISHED:
+		return true
+	case WITHDRAWN:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for McpDefinitionAuthOwnership.
 const (
 	McpDefinitionAuthOwnershipENTERPRISEMANAGED McpDefinitionAuthOwnership = "ENTERPRISE_MANAGED"
@@ -306,18 +327,22 @@ func (e ReleaseStatus) Valid() bool {
 
 // Defines values for ReleaseDiffKind.
 const (
-	ReleaseDiffKindASR      ReleaseDiffKind = "ASR"
-	ReleaseDiffKindMCP      ReleaseDiffKind = "MCP"
-	ReleaseDiffKindMODEL    ReleaseDiffKind = "MODEL"
-	ReleaseDiffKindPOLICY   ReleaseDiffKind = "POLICY"
-	ReleaseDiffKindPROVIDER ReleaseDiffKind = "PROVIDER"
-	ReleaseDiffKindTTS      ReleaseDiffKind = "TTS"
+	ReleaseDiffKindASR       ReleaseDiffKind = "ASR"
+	ReleaseDiffKindASSISTANT ReleaseDiffKind = "ASSISTANT"
+	ReleaseDiffKindMCP       ReleaseDiffKind = "MCP"
+	ReleaseDiffKindMODEL     ReleaseDiffKind = "MODEL"
+	ReleaseDiffKindPOLICY    ReleaseDiffKind = "POLICY"
+	ReleaseDiffKindPROVIDER  ReleaseDiffKind = "PROVIDER"
+	ReleaseDiffKindSTARTER   ReleaseDiffKind = "STARTER"
+	ReleaseDiffKindTTS       ReleaseDiffKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ReleaseDiffKind enum.
 func (e ReleaseDiffKind) Valid() bool {
 	switch e {
 	case ReleaseDiffKindASR:
+		return true
+	case ReleaseDiffKindASSISTANT:
 		return true
 	case ReleaseDiffKindMCP:
 		return true
@@ -326,6 +351,8 @@ func (e ReleaseDiffKind) Valid() bool {
 	case ReleaseDiffKindPOLICY:
 		return true
 	case ReleaseDiffKindPROVIDER:
+		return true
+	case ReleaseDiffKindSTARTER:
 		return true
 	case ReleaseDiffKindTTS:
 		return true
@@ -618,19 +645,23 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for ValidationIssueResourceKind.
 const (
-	ValidationIssueResourceKindASR      ValidationIssueResourceKind = "ASR"
-	ValidationIssueResourceKindBINDING  ValidationIssueResourceKind = "BINDING"
-	ValidationIssueResourceKindMCP      ValidationIssueResourceKind = "MCP"
-	ValidationIssueResourceKindMODEL    ValidationIssueResourceKind = "MODEL"
-	ValidationIssueResourceKindPOLICY   ValidationIssueResourceKind = "POLICY"
-	ValidationIssueResourceKindPROVIDER ValidationIssueResourceKind = "PROVIDER"
-	ValidationIssueResourceKindTTS      ValidationIssueResourceKind = "TTS"
+	ValidationIssueResourceKindASR       ValidationIssueResourceKind = "ASR"
+	ValidationIssueResourceKindASSISTANT ValidationIssueResourceKind = "ASSISTANT"
+	ValidationIssueResourceKindBINDING   ValidationIssueResourceKind = "BINDING"
+	ValidationIssueResourceKindMCP       ValidationIssueResourceKind = "MCP"
+	ValidationIssueResourceKindMODEL     ValidationIssueResourceKind = "MODEL"
+	ValidationIssueResourceKindPOLICY    ValidationIssueResourceKind = "POLICY"
+	ValidationIssueResourceKindPROVIDER  ValidationIssueResourceKind = "PROVIDER"
+	ValidationIssueResourceKindSTARTER   ValidationIssueResourceKind = "STARTER"
+	ValidationIssueResourceKindTTS       ValidationIssueResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ValidationIssueResourceKind enum.
 func (e ValidationIssueResourceKind) Valid() bool {
 	switch e {
 	case ValidationIssueResourceKindASR:
+		return true
+	case ValidationIssueResourceKindASSISTANT:
 		return true
 	case ValidationIssueResourceKindBINDING:
 		return true
@@ -641,6 +672,8 @@ func (e ValidationIssueResourceKind) Valid() bool {
 	case ValidationIssueResourceKindPOLICY:
 		return true
 	case ValidationIssueResourceKindPROVIDER:
+		return true
+	case ValidationIssueResourceKindSTARTER:
 		return true
 	case ValidationIssueResourceKindTTS:
 		return true
@@ -875,6 +908,20 @@ type AsrDefinitionClientProtocol string
 // AsrId defines model for AsrId.
 type AsrId = string
 
+// AssistantDefinitionId defines model for AssistantDefinitionId.
+type AssistantDefinitionId = string
+
+// AssistantStarterDefinition defines model for AssistantStarterDefinition.
+type AssistantStarterDefinition struct {
+	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
+	Description           *string               `json:"description,omitempty"`
+	Enabled               bool                  `json:"enabled"`
+	Prompt                string                `json:"prompt"`
+	SortOrder             int                   `json:"sortOrder"`
+	StarterId             StarterId             `json:"starterId"`
+	Title                 string                `json:"title"`
+}
+
 // CreateEnrollmentRequest defines model for CreateEnrollmentRequest.
 type CreateEnrollmentRequest struct {
 	ExpiresInSeconds *int `json:"expiresInSeconds,omitempty"`
@@ -885,6 +932,12 @@ type CreateEnrollmentResponse struct {
 	Code         string       `json:"code"`
 	EnrollmentId EnrollmentId `json:"enrollmentId"`
 	ExpiresAt    time.Time    `json:"expiresAt"`
+}
+
+// CreateEnterpriseUpdateRequest defines model for CreateEnterpriseUpdateRequest.
+type CreateEnterpriseUpdateRequest struct {
+	Content string `json:"content"`
+	Title   string `json:"title"`
 }
 
 // CreateSecretRequest defines model for CreateSecretRequest.
@@ -953,18 +1006,45 @@ type DraftId = string
 
 // DraftPreviewResponse defines model for DraftPreviewResponse.
 type DraftPreviewResponse struct {
-	Asr            []AsrDefinition      `json:"asr"`
-	DraftRevision  int                  `json:"draftRevision"`
-	Mcp            []McpDefinition      `json:"mcp"`
-	Models         []ModelDefinition    `json:"models"`
-	Policy         ManagedPolicy        `json:"policy"`
-	ProjectionHash Sha256Hash           `json:"projectionHash"`
-	Providers      []ProviderDefinition `json:"providers"`
-	Tts            []TtsDefinition      `json:"tts"`
+	Asr            []AsrDefinition               `json:"asr"`
+	Assistants     *[]ManagedAssistantDefinition `json:"assistants,omitempty"`
+	DraftRevision  int                           `json:"draftRevision"`
+	Mcp            []McpDefinition               `json:"mcp"`
+	Models         []ModelDefinition             `json:"models"`
+	Policy         ManagedPolicy                 `json:"policy"`
+	ProjectionHash Sha256Hash                    `json:"projectionHash"`
+	Providers      []ProviderDefinition          `json:"providers"`
+	Starters       *[]AssistantStarterDefinition `json:"starters,omitempty"`
+	Tts            []TtsDefinition               `json:"tts"`
 }
 
 // EnrollmentId defines model for EnrollmentId.
 type EnrollmentId = string
+
+// EnterpriseUpdate defines model for EnterpriseUpdate.
+type EnterpriseUpdate struct {
+	Content            string                 `json:"content"`
+	CreatedAt          time.Time              `json:"createdAt"`
+	EnterpriseUpdateId EnterpriseUpdateId     `json:"enterpriseUpdateId"`
+	FeedRevision       int                    `json:"feedRevision"`
+	PublishedAt        time.Time              `json:"publishedAt"`
+	Status             EnterpriseUpdateStatus `json:"status"`
+	Title              string                 `json:"title"`
+	UpdatedAt          time.Time              `json:"updatedAt"`
+}
+
+// EnterpriseUpdateId defines model for EnterpriseUpdateId.
+type EnterpriseUpdateId = string
+
+// EnterpriseUpdatePage defines model for EnterpriseUpdatePage.
+type EnterpriseUpdatePage struct {
+	FeedRevision int                `json:"feedRevision"`
+	Items        []EnterpriseUpdate `json:"items"`
+	NextCursor   *string            `json:"nextCursor,omitempty"`
+}
+
+// EnterpriseUpdateStatus defines model for EnterpriseUpdateStatus.
+type EnterpriseUpdateStatus string
 
 // Health defines model for Health.
 type Health struct {
@@ -987,15 +1067,29 @@ type LoginRequest struct {
 	Username string `json:"username"`
 }
 
+// ManagedAssistantDefinition defines model for ManagedAssistantDefinition.
+type ManagedAssistantDefinition struct {
+	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
+	Description           *string               `json:"description,omitempty"`
+	DisplayName           string                `json:"displayName"`
+	Enabled               bool                  `json:"enabled"`
+	McpServerIds          []McpServerId         `json:"mcpServerIds"`
+	MemorySeed            []string              `json:"memorySeed"`
+	ModelId               ModelId               `json:"modelId"`
+	SystemPrompt          string                `json:"systemPrompt"`
+}
+
 // ManagedDraftContent defines model for ManagedDraftContent.
 type ManagedDraftContent struct {
-	Asr       []AsrDefinition            `json:"asr"`
-	Bindings  []RuntimeBindingDefinition `json:"bindings"`
-	Mcp       []McpDefinition            `json:"mcp"`
-	Models    []ModelDefinition          `json:"models"`
-	Policy    ManagedPolicy              `json:"policy"`
-	Providers []ProviderDefinition       `json:"providers"`
-	Tts       []TtsDefinition            `json:"tts"`
+	Asr        []AsrDefinition               `json:"asr"`
+	Assistants *[]ManagedAssistantDefinition `json:"assistants,omitempty"`
+	Bindings   []RuntimeBindingDefinition    `json:"bindings"`
+	Mcp        []McpDefinition               `json:"mcp"`
+	Models     []ModelDefinition             `json:"models"`
+	Policy     ManagedPolicy                 `json:"policy"`
+	Providers  []ProviderDefinition          `json:"providers"`
+	Starters   *[]AssistantStarterDefinition `json:"starters,omitempty"`
+	Tts        []TtsDefinition               `json:"tts"`
 }
 
 // ManagedPolicy defines model for ManagedPolicy.
@@ -1261,6 +1355,9 @@ type SetPasswordRequest struct {
 // Sha256Hash defines model for Sha256Hash.
 type Sha256Hash = string
 
+// StarterId defines model for StarterId.
+type StarterId = string
+
 // SystemStatus defines model for SystemStatus.
 type SystemStatus struct {
 	ActiveManagedGeneration      int                       `json:"activeManagedGeneration"`
@@ -1307,6 +1404,12 @@ type TtsDefinitionClientProtocol string
 
 // TtsId defines model for TtsId.
 type TtsId = string
+
+// UpdateEnterpriseUpdateRequest defines model for UpdateEnterpriseUpdateRequest.
+type UpdateEnterpriseUpdateRequest struct {
+	Content string `json:"content"`
+	Title   string `json:"title"`
+}
 
 // UpdateUpstreamRequest defines model for UpdateUpstreamRequest.
 type UpdateUpstreamRequest struct {
@@ -1500,6 +1603,32 @@ type ValidateDraftParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// ListEnterpriseUpdatesParams defines parameters for ListEnterpriseUpdates.
+type ListEnterpriseUpdatesParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// CreateEnterpriseUpdateParams defines parameters for CreateEnterpriseUpdate.
+type CreateEnterpriseUpdateParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// UpdateEnterpriseUpdateParams defines parameters for UpdateEnterpriseUpdate.
+type UpdateEnterpriseUpdateParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// PublishEnterpriseUpdateParams defines parameters for PublishEnterpriseUpdate.
+type PublishEnterpriseUpdateParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// WithdrawEnterpriseUpdateParams defines parameters for WithdrawEnterpriseUpdate.
+type WithdrawEnterpriseUpdateParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // PutPricingParams defines parameters for PutPricing.
 type PutPricingParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
@@ -1659,6 +1788,12 @@ type PublishDraftJSONRequestBody = PublishDraftRequest
 // ValidateDraftJSONRequestBody defines body for ValidateDraft for application/json ContentType.
 type ValidateDraftJSONRequestBody = ValidateDraftRequest
 
+// CreateEnterpriseUpdateJSONRequestBody defines body for CreateEnterpriseUpdate for application/json ContentType.
+type CreateEnterpriseUpdateJSONRequestBody = CreateEnterpriseUpdateRequest
+
+// UpdateEnterpriseUpdateJSONRequestBody defines body for UpdateEnterpriseUpdate for application/json ContentType.
+type UpdateEnterpriseUpdateJSONRequestBody = UpdateEnterpriseUpdateRequest
+
 // PutPricingJSONRequestBody defines body for PutPricing for application/json ContentType.
 type PutPricingJSONRequestBody = PutPricingRequest
 
@@ -1712,6 +1847,24 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/draft:validate)
 	ValidateDraft(w http.ResponseWriter, r *http.Request, params ValidateDraftParams)
+
+	// (GET /api/admin/v1/enterprise-updates)
+	ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request, params ListEnterpriseUpdatesParams)
+
+	// (POST /api/admin/v1/enterprise-updates)
+	CreateEnterpriseUpdate(w http.ResponseWriter, r *http.Request, params CreateEnterpriseUpdateParams)
+
+	// (GET /api/admin/v1/enterprise-updates/{enterpriseUpdateId})
+	GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId)
+
+	// (PUT /api/admin/v1/enterprise-updates/{enterpriseUpdateId})
+	UpdateEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId, params UpdateEnterpriseUpdateParams)
+
+	// (POST /api/admin/v1/enterprise-updates/{enterpriseUpdateId}:publish)
+	PublishEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId, params PublishEnterpriseUpdateParams)
+
+	// (POST /api/admin/v1/enterprise-updates/{enterpriseUpdateId}:withdraw)
+	WithdrawEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId, params WithdrawEnterpriseUpdateParams)
 
 	// (GET /api/admin/v1/pricing)
 	GetPricing(w http.ResponseWriter, r *http.Request)
@@ -1840,6 +1993,36 @@ func (_ Unimplemented) PublishDraft(w http.ResponseWriter, r *http.Request, para
 
 // (POST /api/admin/v1/draft:validate)
 func (_ Unimplemented) ValidateDraft(w http.ResponseWriter, r *http.Request, params ValidateDraftParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/enterprise-updates)
+func (_ Unimplemented) ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request, params ListEnterpriseUpdatesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/enterprise-updates)
+func (_ Unimplemented) CreateEnterpriseUpdate(w http.ResponseWriter, r *http.Request, params CreateEnterpriseUpdateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/enterprise-updates/{enterpriseUpdateId})
+func (_ Unimplemented) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/admin/v1/enterprise-updates/{enterpriseUpdateId})
+func (_ Unimplemented) UpdateEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId, params UpdateEnterpriseUpdateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/enterprise-updates/{enterpriseUpdateId}:publish)
+func (_ Unimplemented) PublishEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId, params PublishEnterpriseUpdateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/enterprise-updates/{enterpriseUpdateId}:withdraw)
+func (_ Unimplemented) WithdrawEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId, params WithdrawEnterpriseUpdateParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2313,6 +2496,285 @@ func (siw *ServerInterfaceWrapper) ValidateDraft(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ValidateDraft(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEnterpriseUpdates operation middleware
+func (siw *ServerInterfaceWrapper) ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListEnterpriseUpdatesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEnterpriseUpdates(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateEnterpriseUpdate operation middleware
+func (siw *ServerInterfaceWrapper) CreateEnterpriseUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateEnterpriseUpdateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEnterpriseUpdate(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEnterpriseUpdate operation middleware
+func (siw *ServerInterfaceWrapper) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "enterpriseUpdateId" -------------
+	var enterpriseUpdateId EnterpriseUpdateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "enterpriseUpdateId", chi.URLParam(r, "enterpriseUpdateId"), &enterpriseUpdateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enterpriseUpdateId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEnterpriseUpdate(w, r, enterpriseUpdateId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateEnterpriseUpdate operation middleware
+func (siw *ServerInterfaceWrapper) UpdateEnterpriseUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "enterpriseUpdateId" -------------
+	var enterpriseUpdateId EnterpriseUpdateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "enterpriseUpdateId", chi.URLParam(r, "enterpriseUpdateId"), &enterpriseUpdateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enterpriseUpdateId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateEnterpriseUpdateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateEnterpriseUpdate(w, r, enterpriseUpdateId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PublishEnterpriseUpdate operation middleware
+func (siw *ServerInterfaceWrapper) PublishEnterpriseUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "enterpriseUpdateId" -------------
+	var enterpriseUpdateId EnterpriseUpdateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "enterpriseUpdateId", chi.URLParam(r, "enterpriseUpdateId"), &enterpriseUpdateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enterpriseUpdateId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PublishEnterpriseUpdateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PublishEnterpriseUpdate(w, r, enterpriseUpdateId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// WithdrawEnterpriseUpdate operation middleware
+func (siw *ServerInterfaceWrapper) WithdrawEnterpriseUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "enterpriseUpdateId" -------------
+	var enterpriseUpdateId EnterpriseUpdateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "enterpriseUpdateId", chi.URLParam(r, "enterpriseUpdateId"), &enterpriseUpdateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enterpriseUpdateId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params WithdrawEnterpriseUpdateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.WithdrawEnterpriseUpdate(w, r, enterpriseUpdateId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4043,6 +4505,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/system/health", wrapper.SystemHealth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/enterprise-updates", wrapper.ListEnterpriseUpdates)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/enterprise-updates", wrapper.CreateEnterpriseUpdate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/enterprise-updates/{enterpriseUpdateId}", wrapper.GetEnterpriseUpdate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/admin/v1/enterprise-updates/{enterpriseUpdateId}", wrapper.UpdateEnterpriseUpdate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/enterprise-updates/{enterpriseUpdateId}:publish", wrapper.PublishEnterpriseUpdate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/enterprise-updates/{enterpriseUpdateId}:withdraw", wrapper.WithdrawEnterpriseUpdate)
 	})
 
 	return r

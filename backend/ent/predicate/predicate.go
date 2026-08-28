@@ -18,6 +18,9 @@ type Device func(*sql.Selector)
 // Enrollment is the predicate function for enrollment builders.
 type Enrollment func(*sql.Selector)
 
+// EnterpriseUpdate is the predicate function for enterpriseupdate builders.
+type EnterpriseUpdate func(*sql.Selector)
+
 // IdempotencyRecord is the predicate function for idempotencyrecord builders.
 type IdempotencyRecord func(*sql.Selector)
 

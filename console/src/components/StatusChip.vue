@@ -11,10 +11,10 @@ const { t, te } = useI18n()
 
 type Tone = 'healthy' | 'pending' | 'degraded' | 'failed' | 'neutral'
 
-const HEALTHY = ['READY', 'ACTIVE', 'COMPLETED', 'KNOWN', 'EXACT', 'SUCCESS', 'SUPERSEDED', 'LIVE', 'STAGED']
-const PENDING = ['APPLYING', 'ACTIVATING', 'PENDING', 'STAGING', 'VALIDATING', 'PARTIAL', 'INACTIVE', 'ENROLLED']
+const HEALTHY = ['READY', 'ACTIVE', 'COMPLETED', 'KNOWN', 'EXACT', 'SUCCESS', 'SUPERSEDED', 'LIVE', 'STAGED', 'PUBLISHED']
+const PENDING = ['APPLYING', 'ACTIVATING', 'PENDING', 'STAGING', 'VALIDATING', 'PARTIAL', 'INACTIVE', 'ENROLLED', 'DRAFT']
 const DEGRADED = ['DEGRADED', 'UNKNOWN', 'WARNING', 'ERROR']
-const FAILED = ['FAILED', 'BLOCKED', 'REVOKED', 'DISABLED', 'ACTIVATION_FAILED', 'NOT_READY', 'EXPIRED']
+const FAILED = ['FAILED', 'BLOCKED', 'REVOKED', 'DISABLED', 'ACTIVATION_FAILED', 'NOT_READY', 'EXPIRED', 'WITHDRAWN']
 
 const tone = computed<Tone>(() => {
   const value = props.value.toUpperCase()

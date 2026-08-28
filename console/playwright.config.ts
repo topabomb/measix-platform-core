@@ -14,6 +14,11 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
+  // Exclude deprecated golden-path.spec.ts — it has been split into
+  // golden-path-authoring.spec.ts and golden-path-usage.spec.ts
+  // which are orchestrated by candidate-orchestrator.mjs / e2e-harness.mjs
+  testMatch: /.*\.spec\.ts/,
+  testIgnore: /golden-path\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -38,17 +43,20 @@ export default defineConfig({
     // on Windows when the Node.js SPA proxy closes keep-alive connections
     // during asset loading.
     navigationTimeout: 30_000,
+    launchOptions: {
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--ignore-certificate-errors',
+      ],
+    },
   },
   projects: [
     {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // Use system Chrome instead of Playwright's bundled Chromium.
-        // On Windows 11, the bundled headless Chromium has a loopback
-        // networking issue that prevents connections to local Node.js
-        // HTTP servers. System Chrome does not have this issue.
-        channel: 'chrome',
       },
     },
   ],

@@ -71,7 +71,7 @@ function loadVitestResults(artifactName) {
   if (!a) return null
   const results = new Map()
   if (a.testResults) for (const tr of a.testResults) {
-    const name = relative(join(ROOT, 'console'), tr.name).replace(/\\/g, '/')
+    const name = 'console/' + relative(join(ROOT, 'console'), tr.name).replace(/\\/g, '/')
     // For vitest, we need both file-level and per-test granularity.
     // Store individual test names too.
     const fileStatus = tr.status === 'passed' ? 'PASS' : 'FAIL'

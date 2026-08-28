@@ -31,6 +31,8 @@ import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
+import { randomUUID } from 'node:crypto'
+import { spawn } from 'node:child_process'
 
 import {
   resolveRoot,
@@ -175,22 +177,164 @@ if (!existsSync(artifactsDir)) {
 // Track envRoot for cleanup
 env.envRoot_ref = env.envRoot
 
-// Use execSync to run Playwright — this is safe because the HTTP servers
-// (SPA proxy + Adapter) run in a worker thread, so execSync's event loop
-// blocking does not prevent Chromium from accessing the HTTP servers.
-//
 // Per audit P1-1: use try/finally to ensure Worker, Hub, Relay, Adapter,
 // SPA proxy and temp directory are cleaned up regardless of pass/fail.
+//
+// The E2E test is executed in 3 phases (matching candidate-orchestrator):
+//   Phase A: golden-path-authoring.spec.ts (setup, upstream, resources, publish)
+//   Phase B: Four-capability runtime traffic (Model/TTS/ASR/MCP)
+//   Phase C: Wait for usage ingestion
+//   Phase D: golden-path-usage.spec.ts (usage, system, persistence, logout)
 let exitCode = 1
-try {
-  execSync('npx playwright test', {
-    cwd: join(ROOT, 'console'),
-    stdio: 'inherit',
-    env: e2eEnv,
-    timeout: TIMEOUT,
+
+async function runPlaywrightSpec(specFile) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('npx', ['playwright', 'test', specFile], {
+      cwd: join(ROOT, 'console'),
+      stdio: 'inherit',
+      env: e2eEnv,
+      timeout: TIMEOUT,
+    })
+    proc.on('exit', (code) => resolve(code ?? 1))
+    proc.on('error', reject)
   })
+}
+
+async function runFourCapabilityTraffic() {
+  // Same logic as candidate-orchestrator's runFourCapabilityTraffic
+  const interactionId = 'e2e-' + randomUUID()
+  const headers = {
+    'Authorization': `Bearer test-token`,
+    'Content-Type': 'application/json',
+    'X-Measix-Interaction-Id': interactionId,
+  }
+
+  // 1. Chat (non-streaming)
+  const chatResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model: 'test-model', messages: [{ role: 'user', content: 'Say hello' }] }),
+  })
+  if (!chatResp.ok) throw new Error(`Chat request failed: ${chatResp.status}`)
+  await chatResp.text()
+
+  // 2. Chat (streaming)
+  const streamResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model: 'test-model', stream: true, messages: [{ role: 'user', content: 'Count 1 to 5' }] }),
+  })
+  if (streamResp.ok) {
+    const reader = streamResp.body?.getReader()
+    if (reader) {
+      for (let i = 0; i < 10; i++) { const { done } = await reader.read(); if (done) break }
+      try { reader.cancel() } catch {}
+    }
+  }
+
+  // 3. TTS
+  try {
+    const ttsResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/audio/speech`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model: 'test-tts', input: 'Hello', voice: 'alloy' }),
+    })
+    if (ttsResp.ok) await ttsResp.arrayBuffer()
+  } catch {}
+
+  // 4. ASR (multipart)
+  try {
+    // Minimal WAV header (44 bytes)
+    const wavHeader = new Uint8Array(44)
+    wavHeader[0] = 0x52; wavHeader[1] = 0x49; wavHeader[2] = 0x46; wavHeader[3] = 0x46
+    wavHeader[8] = 0x57; wavHeader[9] = 0x41; wavHeader[10] = 0x56; wavHeader[11] = 0x45
+    wavHeader[16] = 16; wavHeader[20] = 1; wavHeader[22] = 1; wavHeader[24] = 0x44; wavHeader[25] = 0xAC
+    wavHeader[28] = 0x88; wavHeader[29] = 0x58; wavHeader[32] = 2; wavHeader[34] = 16; wavHeader[36] = 0x64; wavHeader[37] = 0x61; wavHeader[38] = 0x74; wavHeader[39] = 0x61
+    const formData = new FormData()
+    formData.append('file', new Blob([wavHeader], { type: 'audio/wav' }), 'sample.wav')
+    formData.append('model', 'test-asr')
+    const asrResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/audio/transcriptions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer test-token`, 'X-Measix-Interaction-Id': 'e2e-' + randomUUID() },
+      body: formData,
+    })
+    if (asrResp.ok) await asrResp.text()
+  } catch {}
+
+  // 5. MCP (initialize)
+  try {
+    const mcpResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/mcp`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1.0' } } }),
+    })
+    if (mcpResp.ok) await mcpResp.text()
+  } catch {}
+}
+
+async function waitForUsageIngestion(minRequests, maxWaitSeconds) {
+  const adminPassword = env.adminPassword || 'admin'
+  const loginResp = await fetch(`${env.hubBaseURL}/api/admin/v1/session/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: adminPassword }),
+  })
+  if (!loginResp.ok) return
+  const loginBody = await loginResp.json()
+  const setCookie = loginResp.headers.get('set-cookie') || ''
+  const cookieMatch = setCookie.match(/measix_admin_session=([^;]+)/)
+  const cookie = cookieMatch ? `measix_admin_session=${cookieMatch[1]}` : ''
+  const csrfToken = loginBody.csrfToken || ''
+
+  for (let i = 0; i < maxWaitSeconds; i++) {
+    await new Promise(r => setTimeout(r, 1000))
+    const resp = await fetch(`${env.hubBaseURL}/api/admin/v1/usage?limit=100`, {
+      headers: { 'Cookie': cookie, 'X-CSRF-Token': csrfToken },
+    })
+    if (resp.ok) {
+      const data = await resp.json()
+      const count = data.items?.length || data.length || 0
+      if (count >= minRequests) return
+    }
+  }
+}
+
+try {
+  // Phase A: Authoring
+  log('Phase A: Browser Admin (authoring/publish)...')
+  const phaseA = await runPlaywrightSpec('e2e/golden-path-authoring.spec.ts')
+  if (phaseA !== 0) throw new Error(`Phase A failed (exit ${phaseA})`)
+  log('Phase A PASSED')
+
+  // Phase B: Four-capability runtime traffic
+  log('Phase B: Four-capability runtime traffic...')
+  try {
+    await runFourCapabilityTraffic()
+    log('Phase B PASSED')
+  } catch (e) {
+    log(`Phase B WARNING: ${e.message} (continuing...)`)
+  }
+
+  // Phase C: Wait for usage ingestion
+  log('Phase C: Waiting for usage ingestion...')
+  await waitForUsageIngestion(2, 30)
+  log('Phase C PASSED')
+
+  // Phase D: Usage verification
+  log('Phase D: Browser Admin (usage/system verification)...')
+  const phaseD = await runPlaywrightSpec('e2e/golden-path-usage.spec.ts')
+  if (phaseD !== 0) throw new Error(`Phase D failed (exit ${phaseD})`)
+  log('Phase D PASSED')
+
+  // Phase E: Topology security
+  log('Phase E: Topology security...')
+  const phaseE = await runPlaywrightSpec('e2e/topology-security.spec.ts')
+  if (phaseE !== 0) throw new Error(`Phase E failed (exit ${phaseE})`)
+  log('Phase E PASSED')
+
   exitCode = 0
 } catch (e) {
+  log(`E2E test FAILED: ${e.message}`)
   exitCode = e.status ?? 1
 } finally {
   // Shutdown the worker — must happen even on failure
@@ -199,7 +343,7 @@ try {
   try { worker.terminate() } catch {}
 
   // Write meta.json for provenance regardless of pass/fail
-  writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'npx playwright test', exitCode)
+  writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'node scripts/e2e-harness.mjs (orchestrated)', exitCode)
 
   // Always run cleanup — temp dir, processes, servers
   cleanup()

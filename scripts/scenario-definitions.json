@@ -749,7 +749,8 @@
     "name": "Browser Golden Path (full UI workflow)",
     "artifact": "e2e-playwright.json",
     "testNames": [
-      "CAP-C6-001 Browser Golden Path — complete UI-only managed capability delivery workflow"
+      "CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish",
+      "CAP-C6-001-Usage Usage/System verification after four-capability traffic"
     ],
     "required": true
   },

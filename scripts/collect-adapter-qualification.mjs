@@ -43,15 +43,20 @@
  *
  * Dotenv mode (preferred for credential safety):
  *   node scripts/collect-adapter-qualification.mjs --dotenv
- *   Reads .env.adapter-qualification (gitignored) with:
- *     ADAPTER_ENDPOINT=https://...
- *     ADAPTER_API_KEY=sk-...
- *     ADAPTER_MODEL_ID=gpt-4o-mini
- *     ADAPTER_TTS_MODEL=tts-1 (optional, leave empty to skip TTS)
- *     ADAPTER_TTS_VOICE=alloy (optional)
- *     ADAPTER_ASR_MODEL=whisper-1 (optional, leave empty to skip ASR)
- *     ADAPTER_MCP_ENDPOINT=https://... (optional)
- *     ADAPTER_MCP_API_KEY=... (optional)
+ *   Reads .env.adapter-qualification (gitignored) with per-profile config:
+ *     MODEL_ENDPOINT=https://...
+ *     MODEL_API_KEY=sk-...
+ *     MODEL_ID=gpt-4o-mini
+ *     TTS_ENDPOINT=https://... (optional, leave empty to skip TTS)
+ *     TTS_API_KEY=sk-...
+ *     TTS_MODEL=tts-1
+ *     TTS_VOICE=alloy
+ *     ASR_ENDPOINT=https://... (optional, leave empty to skip ASR)
+ *     ASR_API_KEY=sk-...
+ *     ASR_MODEL=whisper-1
+ *     MCP_ENDPOINT=https://... (optional, leave empty to skip MCP)
+ *     MCP_API_KEY=sk-...
+ *   Each profile has its own independent endpoint/key/model.
  *
  * Per audit P0-5: multi-profile aggregation.
  *   Each --profile run can store partial results. Use --merge to accumulate:
@@ -68,6 +73,7 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
+import { createServer } from 'node:net'
 
 import {
   resolveRoot,
@@ -120,20 +126,22 @@ let relayUrl = process.env.MEASIX_RELAY_URL || null
 let adminPassword = process.env.MEASIX_ADMIN_PASSWORD || 'admin'
 let mergeMode = false  // Per audit P0-5: merge new profile results into existing artifact
 let useDotEnv = false
-let modelId = null
-let ttsModel = null
-let ttsVoice = 'alloy'
-let asrModel = null
-let mcpEndpoint = null
-let mcpApiKey = null
+
+// Per-profile configuration: each profile has its own endpoint, API key, and model
+const profileConfig = {
+  model: { endpoint: null, apiKey: null, modelId: null },
+  tts:   { endpoint: null, apiKey: null, modelId: null, voice: 'alloy' },
+  asr:   { endpoint: null, apiKey: null, modelId: null },
+  mcp:   { endpoint: null, apiKey: null },
+}
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--dotenv') {
     useDotEnv = true
   } else if (args[i] === '--endpoint' && i + 1 < args.length) {
-    endpoint = args[++i]
+    profileConfig.model.endpoint = args[++i]
   } else if (args[i] === '--key' && i + 1 < args.length) {
-    apiKey = args[++i]
+    profileConfig.model.apiKey = args[++i]
   } else if (args[i] === '--profile' && i + 1 < args.length) {
     profile = args[++i]
   } else if (args[i] === '--hub-url' && i + 1 < args.length) {
@@ -145,53 +153,78 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === '--merge') {
     mergeMode = true
   } else if (args[i] === '--model' && i + 1 < args.length) {
-    modelId = args[++i]
+    profileConfig.model.modelId = args[++i]
   } else if (args[i] === '--tts-model' && i + 1 < args.length) {
-    ttsModel = args[++i]
+    profileConfig.tts.modelId = args[++i]
   } else if (args[i] === '--tts-voice' && i + 1 < args.length) {
-    ttsVoice = args[++i]
+    profileConfig.tts.voice = args[++i]
+  } else if (args[i] === '--tts-endpoint' && i + 1 < args.length) {
+    profileConfig.tts.endpoint = args[++i]
+  } else if (args[i] === '--tts-key' && i + 1 < args.length) {
+    profileConfig.tts.apiKey = args[++i]
   } else if (args[i] === '--asr-model' && i + 1 < args.length) {
-    asrModel = args[++i]
+    profileConfig.asr.modelId = args[++i]
+  } else if (args[i] === '--asr-endpoint' && i + 1 < args.length) {
+    profileConfig.asr.endpoint = args[++i]
+  } else if (args[i] === '--asr-key' && i + 1 < args.length) {
+    profileConfig.asr.apiKey = args[++i]
   } else if (args[i] === '--mcp-endpoint' && i + 1 < args.length) {
-    mcpEndpoint = args[++i]
+    profileConfig.mcp.endpoint = args[++i]
   } else if (args[i] === '--mcp-key' && i + 1 < args.length) {
-    mcpApiKey = args[++i]
+    profileConfig.mcp.apiKey = args[++i]
   }
 }
 
 // --- Apply dotenv configuration (if --dotenv flag) ---
-// dotenv values are used as defaults; explicit CLI args override them.
+// Each profile reads its own section from the dotenv file.
+// CLI args override dotenv values.
 if (useDotEnv) {
   const dotenvPath = join(ROOT, '.env.adapter-qualification')
   const dotenv = loadDotEnv(dotenvPath)
-  if (!endpoint) endpoint = dotenv.ADAPTER_ENDPOINT || null
-  if (!apiKey) apiKey = dotenv.ADAPTER_API_KEY || null
-  if (!modelId) modelId = dotenv.ADAPTER_MODEL_ID || null
-  if (!ttsModel) ttsModel = dotenv.ADAPTER_TTS_MODEL || null
-  if (ttsVoice === 'alloy' && dotenv.ADAPTER_TTS_VOICE) ttsVoice = dotenv.ADAPTER_TTS_VOICE
-  if (!asrModel) asrModel = dotenv.ADAPTER_ASR_MODEL || null
-  if (!mcpEndpoint) mcpEndpoint = dotenv.ADAPTER_MCP_ENDPOINT || null
-  if (!mcpApiKey) mcpApiKey = dotenv.ADAPTER_MCP_API_KEY || null
+
+  // MODEL profile (REQUIRED)
+  if (!profileConfig.model.endpoint) profileConfig.model.endpoint = dotenv.MODEL_ENDPOINT || dotenv.ADAPTER_ENDPOINT || null
+  if (!profileConfig.model.apiKey) profileConfig.model.apiKey = dotenv.MODEL_API_KEY || dotenv.ADAPTER_API_KEY || null
+  if (!profileConfig.model.modelId) profileConfig.model.modelId = dotenv.MODEL_ID || dotenv.ADAPTER_MODEL_ID || null
+
+  // TTS profile (optional)
+  if (!profileConfig.tts.endpoint) profileConfig.tts.endpoint = dotenv.TTS_ENDPOINT || null
+  if (!profileConfig.tts.apiKey) profileConfig.tts.apiKey = dotenv.TTS_API_KEY || null
+  if (!profileConfig.tts.modelId) profileConfig.tts.modelId = dotenv.TTS_MODEL || dotenv.ADAPTER_TTS_MODEL || null
+  if (profileConfig.tts.voice === 'alloy' && (dotenv.TTS_VOICE || dotenv.ADAPTER_TTS_VOICE))
+    profileConfig.tts.voice = dotenv.TTS_VOICE || dotenv.ADAPTER_TTS_VOICE
+
+  // ASR profile (optional)
+  if (!profileConfig.asr.endpoint) profileConfig.asr.endpoint = dotenv.ASR_ENDPOINT || null
+  if (!profileConfig.asr.apiKey) profileConfig.asr.apiKey = dotenv.ASR_API_KEY || null
+  if (!profileConfig.asr.modelId) profileConfig.asr.modelId = dotenv.ASR_MODEL || dotenv.ADAPTER_ASR_MODEL || null
+
+  // MCP profile (optional)
+  if (!profileConfig.mcp.endpoint) profileConfig.mcp.endpoint = dotenv.MCP_ENDPOINT || dotenv.ADAPTER_MCP_ENDPOINT || null
+  if (!profileConfig.mcp.apiKey) profileConfig.mcp.apiKey = dotenv.MCP_API_KEY || dotenv.ADAPTER_MCP_API_KEY || null
+
   if (dotenv.MEASIX_ADMIN_PASSWORD) adminPassword = dotenv.MEASIX_ADMIN_PASSWORD
 }
 
+// --- Set global endpoint/apiKey for backward compatibility (NOT_EXECUTED check) ---
+endpoint = profileConfig.model.endpoint
+apiKey = profileConfig.model.apiKey
+
 // --- Determine which profiles to skip based on available config ---
-const skipTTS = !ttsModel
-const skipASR = !asrModel
-const skipMCP = !mcpEndpoint
+const skipTTS = !profileConfig.tts.endpoint || !profileConfig.tts.modelId
+const skipASR = !profileConfig.asr.endpoint || !profileConfig.asr.modelId
+const skipMCP = !profileConfig.mcp.endpoint
 
 // Adjust profile selection: if running 'all', skip profiles without config
+let profilesToQualifyOverride
 if (profile === 'all') {
   const requested = ['model', 'tts', 'asr', 'mcp']
-  // Filter out profiles that don't have config
   const available = requested.filter(p => {
     if (p === 'tts') return !skipTTS
     if (p === 'asr') return !skipASR
     if (p === 'mcp') return !skipMCP
-    return true  // model always available if endpoint + key provided
+    return true
   })
-  // For 'all' mode, we set profile to the available list but keep using
-  // the original 'all' logic for results initialization
   profilesToQualifyOverride = available
 }
 
@@ -420,10 +453,12 @@ async function main() {
     process.exit(1)
   }
   const setCookie = loginResp.headers.get('set-cookie') || ''
-  const cookieMatch = setCookie.match(/measix-admin-session=([^;]+)/)
-  const cookie = cookieMatch ? `measix-admin-session=${cookieMatch[1]}` : ''
-  const csrfMatch = setCookie.match(/measix-csrf=([^;]+)/)
-  const csrfToken = csrfMatch ? csrfMatch[1] : ''
+  // Cookie name uses underscores (measix_admin_session), not hyphens
+  const cookieMatch = setCookie.match(/measix_admin_session=([^;]+)/)
+  const cookie = cookieMatch ? `measix_admin_session=${cookieMatch[1]}` : ''
+  // CSRF token is returned in the JSON response body, not in Set-Cookie
+  const loginBody = await loginResp.json()
+  const csrfToken = loginBody.csrfToken || ''
 
   async function adminPost(path, body, extraHeaders = {}) {
     const headers = {
@@ -463,83 +498,114 @@ async function main() {
     return resp
   }
 
-  // --- 1. Create Secret ---
-  console.log('Creating secret with API key...')
-  const secretResp = await adminPost('/api/admin/v1/secrets', {
-    name: 'qual-secret',
-    value: apiKey,
-  })
-  if (!secretResp.ok) {
-    console.error('Create secret failed:', secretResp.status, await secretResp.text())
-    process.exit(1)
-  }
-  const secret = await secretResp.json()
-  console.log(`Secret: ${secret.secretId} v${secret.secretVersion}`)
+  // --- 1. Create Secrets and Upstreams per profile ---
+  // Each profile (MODEL/TTS/ASR/MCP) gets its own Secret + Upstream so that
+  // different endpoints/credentials can be used per capability.
+  const upstreams = {}  // profile -> { upstreamId, configRevision }
 
-  // --- 2. Create Upstream ---
-  console.log('Creating upstream...')
-  const upstreamResp = await adminPost('/api/admin/v1/upstreams', {
-    config: {
-      name: 'Qual Upstream',
-      baseUrl: endpoint.replace(/\/$/, ''),
-      transportCapabilities: ['HTTP_REQUEST_RESPONSE', 'HTTP_STREAMING_SSE', 'HTTP_BINARY_STREAM', 'HTTP_MULTIPART'],
-      auth: {
-        type: 'BEARER',
-        secretRef: { secretId: secret.secretId, secretVersion: secret.secretVersion },
+  async function createSecretAndUpstream(profileName, endpoint, apiKey, transportCapabilities) {
+    const safeName = profileName.charAt(0).toUpperCase() + profileName.slice(1)
+    console.log(`Creating secret for ${profileName}...`)
+    const secretResp = await adminPost('/api/admin/v1/secrets', {
+      name: `qual-secret-${profileName}`,
+      value: apiKey,
+    })
+    if (!secretResp.ok) {
+      console.error(`Create secret for ${profileName} failed:`, secretResp.status, await secretResp.text())
+      process.exit(1)
+    }
+    const secret = await secretResp.json()
+    console.log(`  ${profileName} Secret: ${secret.secretId} v${secret.secretVersion}`)
+
+    console.log(`Creating upstream for ${profileName}...`)
+    const upstreamResp = await adminPost('/api/admin/v1/upstreams', {
+      config: {
+        name: `Qual Upstream ${safeName}`,
+        baseUrl: endpoint.replace(/\/$/, ''),
+        transportCapabilities,
+        auth: {
+          type: 'BEARER',
+          secretRef: { secretId: secret.secretId, secretVersion: secret.secretVersion },
+        },
+        correlationMode: 'HEADER_ECHO',
+        usageCapabilityLevel: 'LEVEL_1',
+        timeoutDefaults: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
       },
-      // correlationMode and usageCapabilityLevel are intentionally set to the
-      // minimum supported levels here; the qualification artifact records the
-      // *observed* correlation/usage levels derived from test results, not these
-      // config values.
-      correlationMode: 'HEADER_ECHO',
-      usageCapabilityLevel: 'LEVEL_1',
-      timeoutDefaults: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
-    },
-  })
-  if (!upstreamResp.ok) {
-    console.error('Create upstream failed:', upstreamResp.status, await upstreamResp.text())
-    process.exit(1)
-  }
-  const upstream = await upstreamResp.json()
-  console.log(`Upstream: ${upstream.upstreamId}`)
+    })
+    if (!upstreamResp.ok) {
+      console.error(`Create upstream for ${profileName} failed:`, upstreamResp.status, await upstreamResp.text())
+      process.exit(1)
+    }
+    const upstream = await upstreamResp.json()
+    console.log(`  ${profileName} Upstream: ${upstream.upstreamId}`)
 
-  // --- 3. Test upstream ---
-  console.log('Testing upstream...')
-  const testResp = await adminPost(`/api/admin/v1/upstreams/${upstream.upstreamId}:test`, {})
-  if (!testResp.ok) {
-    console.error('Test upstream failed:', testResp.status, await testResp.text())
-    process.exit(1)
-  }
-  console.log('Upstream test: OK')
+    // Test upstream
+    console.log(`Testing ${profileName} upstream...`)
+    const testResp = await adminPost(`/api/admin/v1/upstreams/${upstream.upstreamId}:test`, {})
+    if (!testResp.ok) {
+      console.error(`Test ${profileName} upstream failed:`, testResp.status, await testResp.text())
+      process.exit(1)
+    }
+    console.log(`  ${profileName} upstream test: OK`)
 
-  // --- 4. Apply upstream (WITH Idempotency-Key) ---
-  console.log('Applying upstream (with Idempotency-Key)...')
-  const applyIdempotencyKey = generateStableId('idem')
-  const applyResp = await adminPost(`/api/admin/v1/upstreams/${upstream.upstreamId}:apply`, {}, {
-    'Idempotency-Key': applyIdempotencyKey,
-  })
-  if (applyResp.status !== 202 && applyResp.status !== 200) {
-    console.error('Apply upstream failed:', applyResp.status, await applyResp.text())
-    process.exit(1)
-  }
-  // Wait for upstream to be ACTIVE
-  let upstreamActive = false
-  for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 1000))
-    const upResp = await adminGet(`/api/admin/v1/upstreams/${upstream.upstreamId}`)
-    if (upResp.ok) {
-      const up = await upResp.json()
-      if (up.status === 'ACTIVE') {
-        upstreamActive = true
-        break
+    // Apply upstream with Idempotency-Key
+    console.log(`Applying ${profileName} upstream (with Idempotency-Key)...`)
+    const applyIdempotencyKey = generateStableId('idem')
+    const applyResp = await adminPost(`/api/admin/v1/upstreams/${upstream.upstreamId}:apply`, {}, {
+      'Idempotency-Key': applyIdempotencyKey,
+    })
+    if (applyResp.status !== 202 && applyResp.status !== 200) {
+      console.error(`Apply ${profileName} upstream failed:`, applyResp.status, await applyResp.text())
+      process.exit(1)
+    }
+    // Wait for upstream to be ACTIVE
+    let upstreamActive = false
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 1000))
+      const upResp = await adminGet(`/api/admin/v1/upstreams/${upstream.upstreamId}`)
+      if (upResp.ok) {
+        const up = await upResp.json()
+        if (up.status === 'ACTIVE') {
+          upstreamActive = true
+          break
+        }
       }
     }
+    if (!upstreamActive) {
+      console.error(`${profileName} upstream not ACTIVE after apply`)
+      process.exit(1)
+    }
+    console.log(`  ${profileName} upstream: ACTIVE`)
+
+    return upstream
   }
-  if (!upstreamActive) {
-    console.error('Upstream not ACTIVE after apply')
-    process.exit(1)
+
+  // Create upstreams for each configured profile
+  upstreams.model = await createSecretAndUpstream(
+    'model', profileConfig.model.endpoint, profileConfig.model.apiKey,
+    ['HTTP_REQUEST_RESPONSE', 'HTTP_STREAMING_SSE']
+  )
+
+  if (!skipTTS) {
+    upstreams.tts = await createSecretAndUpstream(
+      'tts', profileConfig.tts.endpoint, profileConfig.tts.apiKey,
+      ['HTTP_BINARY_STREAM']
+    )
   }
-  console.log('Upstream: ACTIVE')
+
+  if (!skipASR) {
+    upstreams.asr = await createSecretAndUpstream(
+      'asr', profileConfig.asr.endpoint, profileConfig.asr.apiKey,
+      ['HTTP_MULTIPART']
+    )
+  }
+
+  if (!skipMCP) {
+    upstreams.mcp = await createSecretAndUpstream(
+      'mcp', profileConfig.mcp.endpoint, profileConfig.mcp.apiKey,
+      ['HTTP_REQUEST_RESPONSE']
+    )
+  }
 
   // --- 5. Create draft with resources (using stable platform-prefixed IDs) ---
   console.log('Creating draft with resources (stable IDs)...')
@@ -562,6 +628,7 @@ async function main() {
   console.log(`  model=${modelId} tts=${ttsId} asr=${asrId} mcp=${mcpId}`)
   console.log(`  provider=${providerId} policy=${policyId}`)
 
+  // Build draft content dynamically based on which profiles are configured
   const draftContent = {
     providers: [{
       providerId: providerId, displayName: 'Qual Provider',
@@ -569,55 +636,70 @@ async function main() {
     }],
     models: [{
       modelId: modelId, providerId: providerId, displayName: 'Qual Model',
-      upstreamModelKey: modelId || 'gpt-4o-mini', runtimePath: '/v1/chat/completions',
+      upstreamModelKey: profileConfig.model.modelId || 'gpt-4o-mini', runtimePath: '/v1/chat/completions',
       inputModalities: ['TEXT'], outputModalities: ['TEXT'],
       capabilities: ['TOOL'], enabled: true,
     }],
-    tts: [{
-      ttsId: ttsId, displayName: 'Qual TTS', clientProtocol: 'OPENAI_AUDIO_SPEECH',
-      upstreamModelKey: ttsModel || 'tts-1', voice: ttsVoice, runtimePath: '/v1/audio/speech',
-      enabled: true,
+    tts: [],
+    asr: [],
+    mcp: [],
+    bindings: [{
+      runtimeRouteId: routeModel, resourceId: modelId, upstreamId: upstreams.model.upstreamId,
+      allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/chat/completions'],
+      transportPolicy: 'HTTP_STREAMING_SSE',
+      timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
     }],
-    asr: [{
-      asrId: asrId, displayName: 'Qual ASR', clientProtocol: 'OPENAI_AUDIO_TRANSCRIPTIONS',
-      upstreamModelKey: asrModel || 'whisper-1', runtimePath: '/v1/audio/transcriptions',
-      enabled: true,
-    }],
-    mcp: [{
-      mcpServerId: mcpId, displayName: 'Qual MCP', clientProtocol: 'MCP_STREAMABLE_HTTP',
-      runtimePath: '/mcp', authOwnership: 'NONE', enabled: true,
-    }],
-    bindings: [
-      {
-        runtimeRouteId: routeModel, resourceId: modelId, upstreamId: upstream.upstreamId,
-        allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/chat/completions'],
-        transportPolicy: 'HTTP_STREAMING_SSE',
-        timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
-      },
-      {
-        runtimeRouteId: routeTTS, resourceId: ttsId, upstreamId: upstream.upstreamId,
-        allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/audio/speech'],
-        transportPolicy: 'HTTP_BINARY_STREAM',
-        timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
-      },
-      {
-        runtimeRouteId: routeASR, resourceId: asrId, upstreamId: upstream.upstreamId,
-        allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/audio/transcriptions'],
-        transportPolicy: 'HTTP_MULTIPART',
-        timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
-      },
-      {
-        runtimeRouteId: routeMCP, resourceId: mcpId, upstreamId: upstream.upstreamId,
-        allowedMethods: ['POST'], allowedPathPrefixes: ['/mcp'],
-        transportPolicy: 'HTTP_REQUEST_RESPONSE',
-        timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
-      },
-    ],
     policy: {
       policyId: policyId, allowLocalProviders: false, allowLocalTts: false,
       allowLocalAsr: false, allowLocalMcp: false,
-      defaultModelId: modelId, defaultTtsId: ttsId, defaultAsrId: asrId,
+      defaultModelId: modelId,
     },
+  }
+
+  // Add TTS if configured
+  if (!skipTTS) {
+    draftContent.tts = [{
+      ttsId: ttsId, displayName: 'Qual TTS', clientProtocol: 'OPENAI_AUDIO_SPEECH',
+      upstreamModelKey: profileConfig.tts.modelId || 'tts-1', voice: profileConfig.tts.voice, runtimePath: '/v1/audio/speech',
+      enabled: true,
+    }]
+    draftContent.bindings.push({
+      runtimeRouteId: routeTTS, resourceId: ttsId, upstreamId: upstreams.tts.upstreamId,
+      allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/audio/speech'],
+      transportPolicy: 'HTTP_BINARY_STREAM',
+      timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
+    })
+    draftContent.policy.defaultTtsId = ttsId
+  }
+
+  // Add ASR if configured
+  if (!skipASR) {
+    draftContent.asr = [{
+      asrId: asrId, displayName: 'Qual ASR', clientProtocol: 'OPENAI_AUDIO_TRANSCRIPTIONS',
+      upstreamModelKey: profileConfig.asr.modelId || 'whisper-1', runtimePath: '/v1/audio/transcriptions',
+      enabled: true,
+    }]
+    draftContent.bindings.push({
+      runtimeRouteId: routeASR, resourceId: asrId, upstreamId: upstreams.asr.upstreamId,
+      allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/audio/transcriptions'],
+      transportPolicy: 'HTTP_MULTIPART',
+      timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
+    })
+    draftContent.policy.defaultAsrId = asrId
+  }
+
+  // Add MCP if configured
+  if (!skipMCP) {
+    draftContent.mcp = [{
+      mcpServerId: mcpId, displayName: 'Qual MCP', clientProtocol: 'MCP_STREAMABLE_HTTP',
+      runtimePath: '/mcp', authOwnership: 'NONE', enabled: true,
+    }]
+    draftContent.bindings.push({
+      runtimeRouteId: routeMCP, resourceId: mcpId, upstreamId: upstreams.mcp.upstreamId,
+      allowedMethods: ['POST'], allowedPathPrefixes: ['/mcp'],
+      transportPolicy: 'HTTP_REQUEST_RESPONSE',
+      timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
+    })
   }
 
   const putResp = await adminPut('/api/admin/v1/draft', {
@@ -753,7 +835,7 @@ async function main() {
   // Record the configRevision for qualification unit
   let configRevision = null
   try {
-    const upResp = await adminGet(`/api/admin/v1/upstreams/${upstream.upstreamId}`)
+    const upResp = await adminGet(`/api/admin/v1/upstreams/${upstreams.model.upstreamId}`)
     if (upResp.ok) {
       const up = await upResp.json()
       configRevision = up.activeConfigRevision || up.configRevision || null
@@ -774,7 +856,7 @@ async function main() {
           'X-Measix-Interaction-Id': generateStableId('int'),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ model: modelId || 'gpt-4o-mini', messages: [{ role: 'user', content: 'Say hello in 5 words.' }] }),
+        body: JSON.stringify({ model: profileConfig.model.modelId || 'gpt-4o-mini', messages: [{ role: 'user', content: 'Say hello in 5 words.' }] }),
       })
       if (chatResp.ok) {
         const chatResult = await chatResp.json()
@@ -790,7 +872,7 @@ async function main() {
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ model: modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Count 1 to 5.' }] }),
+          body: JSON.stringify({ model: profileConfig.model.modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Count 1 to 5.' }] }),
         })
         if (streamResp.ok) {
           const streamText = await streamResp.text()
@@ -817,7 +899,7 @@ async function main() {
               'X-Measix-Interaction-Id': generateStableId('int'),
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ model: modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a long essay about the history of computing.' }] }),
+            body: JSON.stringify({ model: profileConfig.model.modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a long essay about the history of computing.' }] }),
             signal: cancelController.signal,
           })
           let receivedChunks = false
@@ -872,7 +954,7 @@ async function main() {
               'X-Measix-Interaction-Id': generateStableId('int'),
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ model: modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a very long essay about history.' }] }),
+            body: JSON.stringify({ model: profileConfig.model.modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a very long essay about history.' }] }),
             signal: timeoutController.signal,
           })
           // Abort after 50ms — this is a client-side cancellation that mimics a timeout
@@ -913,7 +995,7 @@ async function main() {
               'X-Measix-Managed-Generation': String(generation),
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ model: modelId || 'gpt-4o-mini', messages: [] }),
+            body: JSON.stringify({ model: profileConfig.model.modelId || 'gpt-4o-mini', messages: [] }),
           })
           if (noAuthResp.status === 401 || noAuthResp.status === 403) {
             console.log('  Model authBoundary: PASS (no token → ' + noAuthResp.status + ')')
@@ -975,7 +1057,7 @@ async function main() {
           'X-Measix-Interaction-Id': generateStableId('int'),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ model: ttsModel || 'tts-1', input: 'Hello world', voice: ttsVoice }),
+        body: JSON.stringify({ model: profileConfig.tts.modelId || 'tts-1', input: 'Hello world', voice: profileConfig.tts.voice }),
       })
       if (ttsResp.ok) {
         const ttsBody = await ttsResp.arrayBuffer()
@@ -1002,7 +1084,7 @@ async function main() {
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ model: ttsModel || 'tts-1', input: 'This is a longer text to test streaming binary data delivery through the relay.', voice: ttsVoice }),
+          body: JSON.stringify({ model: profileConfig.tts.modelId || 'tts-1', input: 'This is a longer text to test streaming binary data delivery through the relay.', voice: profileConfig.tts.voice }),
         })
         if (streamResp.ok) {
           const streamBody = await streamResp.arrayBuffer()
@@ -1033,7 +1115,7 @@ async function main() {
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ model: ttsModel || 'tts-1', input: 'Generate a long audio about the history of computing.', voice: ttsVoice }),
+          body: JSON.stringify({ model: profileConfig.tts.modelId || 'tts-1', input: 'Generate a long audio about the history of computing.', voice: profileConfig.tts.voice }),
           signal: cancelController.signal,
         })
         // Abort immediately to prevent normal completion
@@ -1072,7 +1154,7 @@ async function main() {
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ model: ttsModel || 'tts-1', input: 'Generate a very long audio about history.', voice: ttsVoice }),
+          body: JSON.stringify({ model: profileConfig.tts.modelId || 'tts-1', input: 'Generate a very long audio about history.', voice: profileConfig.tts.voice }),
           signal: timeoutController.signal,
         })
         setTimeout(() => timeoutController.abort(), 50)
@@ -1141,7 +1223,7 @@ async function main() {
       const formData = new FormData()
       const wavBlob = new Blob([wavHeader], { type: 'audio/wav' })
       formData.append('file', wavBlob, 'sample.wav')
-      formData.append('model', asrModel || 'whisper-1')
+      formData.append('model', profileConfig.asr.modelId || 'whisper-1')
       const asrResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotAsrId}/v1/audio/transcriptions`, {
         method: 'POST',
         headers: {
@@ -1174,7 +1256,7 @@ async function main() {
             'X-Measix-Managed-Generation': String(generation),
             'X-Measix-Interaction-Id': generateStableId('int'),
           },
-          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', asrModel || 'whisper-1'); return fd })(),
+          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', profileConfig.asr.modelId || 'whisper-1'); return fd })(),
           signal: cancelController.signal,
         })
         // Abort immediately to prevent normal completion
@@ -1211,7 +1293,7 @@ async function main() {
             'X-Measix-Managed-Generation': String(generation),
             'X-Measix-Interaction-Id': generateStableId('int'),
           },
-          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', asrModel || 'whisper-1'); return fd })(),
+          body: (() => { const fd = new FormData(); fd.append('file', new Blob([wavHeader]), 's.wav'); fd.append('model', profileConfig.asr.modelId || 'whisper-1'); return fd })(),
           signal: timeoutController.signal,
         })
         setTimeout(() => timeoutController.abort(), 50)
@@ -1499,8 +1581,13 @@ async function main() {
     }
   }
 
-  // Compute overall status from merged profiles
-  const allMergedVerified = REQUIRED_PROFILES.every(p => mergedProfiles[p]?.status === 'VERIFIED')
+  // Compute overall status: a profile is "satisfied" if it is either
+  // VERIFIED (was configured and passed) or NOT_EXECUTED (was not configured).
+  // Only FAILED profiles cause overall FAILED status.
+  const allMergedVerified = REQUIRED_PROFILES.every(p => {
+    const s = mergedProfiles[p]?.status
+    return s === 'VERIFIED' || s === 'NOT_EXECUTED'
+  })
   const overallStatus = allMergedVerified ? 'VERIFIED' : 'FAILED'
 
 // Qualification unit: adapterName/version + upstreamId/configRevision + profile
@@ -1557,7 +1644,7 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
     adapterBuild,
     adapterIdentityDetectedVia,
     // Per architecture §14: upstreamId/configRevision
-    upstreamId: upstream.upstreamId,
+    upstreamId: upstreams.model.upstreamId,
     configRevision,
     // Per architecture §14: profile
     profile,

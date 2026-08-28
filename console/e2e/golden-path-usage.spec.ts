@@ -120,7 +120,12 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
   await test.step('logout works', async () => {
     const logoutBtn = page.locator('[data-cy="logout-btn"]')
     const logoutMobile = page.locator('[data-cy="logout-btn-mobile"]')
-    await expect(logoutBtn.or(logoutMobile)).toBeVisible({ timeout: 5_000 })
+    // Wait for either logout button to be visible (responsive: desktop vs mobile)
+    await expect(async () => {
+      const desktopVisible = await logoutBtn.isVisible().catch(() => false)
+      const mobileVisible = await logoutMobile.isVisible().catch(() => false)
+      expect(desktopVisible || mobileVisible).toBeTruthy()
+    }).toPass({ timeout: 5_000 })
 
     if (await logoutBtn.isVisible().catch(() => false)) {
       await logoutBtn.click()

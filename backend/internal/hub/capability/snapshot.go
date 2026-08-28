@@ -29,10 +29,10 @@ type snapshotDescriptor struct {
 	ReleaseID         string                                 `json:"releaseId"`
 	Providers         []clientapi.ProviderDefinition         `json:"providers"`
 	Models            []clientapi.ModelDefinition            `json:"models"`
-	TTS               []clientapi.TtsDefinition               `json:"tts"`
-	ASR               []clientapi.AsrDefinition               `json:"asr"`
-	MCP               []clientapi.McpDefinition               `json:"mcp"`
-	Policy            clientapi.ManagedPolicy                 `json:"policy"`
+	TTS               []clientapi.TtsDefinition              `json:"tts"`
+	ASR               []clientapi.AsrDefinition              `json:"asr"`
+	MCP               []clientapi.McpDefinition              `json:"mcp"`
+	Policy            clientapi.ManagedPolicy                `json:"policy"`
 	Metadata          snapshotMetadata                       `json:"metadata"`
 	Assistants        []clientapi.ManagedAssistantDefinition `json:"assistants,omitempty"`
 	Starters          []clientapi.AssistantStarterDefinition `json:"starters,omitempty"`
@@ -236,7 +236,7 @@ func projectionToAdminAssistants(src []clientapi.ManagedAssistantDefinition) []a
 		dst[i] = adminapi.ManagedAssistantDefinition{
 			AssistantDefinitionId: adminapi.AssistantDefinitionId(a.AssistantDefinitionId),
 			DisplayName:           a.DisplayName,
-			Description:            a.Description,
+			Description:           a.Description,
 			SystemPrompt:          a.SystemPrompt,
 			ModelId:               adminapi.ModelId(a.ModelId),
 			MemorySeed:            seed,

@@ -95,18 +95,18 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 			prev[m.McpServerId] = defHash(m)
 			prevKinds[m.McpServerId] = adminapi.ReleaseDiffKindMCP
 		}
-	if previous.Assistants != nil {
-		for _, a := range *previous.Assistants {
-			prev[string(a.AssistantDefinitionId)] = defHash(a)
-			prevKinds[string(a.AssistantDefinitionId)] = adminapi.ReleaseDiffKindASSISTANT
+		if previous.Assistants != nil {
+			for _, a := range *previous.Assistants {
+				prev[string(a.AssistantDefinitionId)] = defHash(a)
+				prevKinds[string(a.AssistantDefinitionId)] = adminapi.ReleaseDiffKindASSISTANT
+			}
 		}
-	}
-	if previous.Starters != nil {
-		for _, s := range *previous.Starters {
-			prev[string(s.StarterId)] = defHash(s)
-			prevKinds[string(s.StarterId)] = adminapi.ReleaseDiffKindSTARTER
+		if previous.Starters != nil {
+			for _, s := range *previous.Starters {
+				prev[string(s.StarterId)] = defHash(s)
+				prevKinds[string(s.StarterId)] = adminapi.ReleaseDiffKindSTARTER
+			}
 		}
-	}
 	}
 
 	var summary adminapi.DiffSummary

@@ -44,10 +44,10 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // Use the full Chromium binary instead of the headless shell,
-        // which has a loopback networking bug on Windows that prevents
-        // connections to local Node.js HTTP servers.
-        channel: 'chromium',
+        // Use Playwright's bundled Chromium instead of the system channel.
+        // The system 'chromium' channel may not be installed on Windows 11,
+        // and the headless shell has a known loopback networking issue.
+        // The bundled Chromium works reliably for local HTTP server testing.
       },
     },
   ],

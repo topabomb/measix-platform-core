@@ -27,8 +27,7 @@
  * Environment variables:
  *   MEASIX_E2E_TIMEOUT  — max time for the harness (default 600000ms = 10min)
  */
-import { execSync } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, unlinkSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { randomUUID } from 'node:crypto'
@@ -187,93 +186,187 @@ env.envRoot_ref = env.envRoot
 //   Phase D: golden-path-usage.spec.ts (usage, system, persistence, logout)
 let exitCode = 1
 
-async function runPlaywrightSpec(specFile) {
+async function runPlaywrightSpec(specFile, phaseName) {
+  // Each phase writes to its own temp JSON file to avoid overwriting.
+  // Results are merged into e2e-playwright.json at the end.
+  const tempOutput = join(artifactsDir, `_e2e-${phaseName}.json`)
+  const phaseEnv = {
+    ...e2eEnv,
+    PLAYWRIGHT_JSON_OUTPUT_FILE: tempOutput,
+  }
   return new Promise((resolve, reject) => {
     const proc = spawn('npx', ['playwright', 'test', specFile], {
       cwd: join(ROOT, 'console'),
       stdio: 'inherit',
-      env: e2eEnv,
-      timeout: TIMEOUT,
+      env: phaseEnv,
+      shell: true,
     })
-    proc.on('exit', (code) => resolve(code ?? 1))
-    proc.on('error', reject)
+    const timer = setTimeout(() => {
+      proc.kill('SIGTERM')
+      reject(new Error(`Playwright ${phaseName} timed out`))
+    }, TIMEOUT)
+    proc.on('exit', (code) => { clearTimeout(timer); resolve(code ?? 1) })
+    proc.on('error', (err) => { clearTimeout(timer); reject(err) })
   })
+}
+
+// Merge multiple Playwright JSON reports into a single artifact.
+function mergePlaywrightJsons(filePaths, outputPath) {
+  const merged = {
+    config: { configFile: '', forbidOnly: false, fullyParallel: false, globalSetup: null, globalTeardown: null, globalTimeout: 0, grep: {}, grepInvert: null, maxFailures: 0, metadata: { actualWorkers: 1 }, preserveOutput: 'always', projects: [], quiet: false, reporter: [], reportSlowTests: { max: 5, threshold: 300000 }, shard: null, updateSnapshots: 'missing', updateSourceMethod: 'patch', version: '1.55.0', workers: 1, webServer: null },
+    suites: [],
+    errors: [],
+    stats: { startTime: '', duration: 0, expected: 0, skipped: 0, unexpected: 0, flaky: 0 },
+  }
+  for (const fp of filePaths) {
+    if (!existsSync(fp)) continue
+    try {
+      const data = JSON.parse(readFileSync(fp, 'utf-8'))
+      if (data.suites) merged.suites.push(...data.suites)
+      if (data.errors) merged.errors.push(...data.errors)
+      if (data.stats) {
+        merged.stats.expected += data.stats.expected || 0
+        merged.stats.unexpected += data.stats.unexpected || 0
+        merged.stats.flaky += data.stats.flaky || 0
+        merged.stats.skipped += data.stats.skipped || 0
+        merged.stats.duration += data.stats.duration || 0
+        if (!merged.stats.startTime) merged.stats.startTime = data.stats.startTime || ''
+      }
+      // Use config from the first file
+      if (!merged.config.configFile && data.config) {
+        merged.config = data.config
+        // Override JSON reporter output path in config
+        if (merged.config.reporter) {
+          merged.config.reporter = merged.config.reporter.map(r => {
+            if (Array.isArray(r) && r[0] === 'json') {
+              return ['json', { outputFile: '../.artifacts/e2e-playwright.json' }]
+            }
+            return r
+          })
+        }
+      }
+    } catch {}
+  }
+  writeFileSync(outputPath, JSON.stringify(merged, null, 2))
+  // Clean up temp files
+  for (const fp of filePaths) { try { unlinkSync(fp) } catch {} }
 }
 
 async function runFourCapabilityTraffic() {
   // Same logic as candidate-orchestrator's runFourCapabilityTraffic
-  const interactionId = 'e2e-' + randomUUID()
-  const headers = {
-    'Authorization': `Bearer test-token`,
+  // Login as admin to get CSRF token + cookie
+  const loginResp = await fetch(`${env.hubBaseURL}/api/admin/v1/session/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: adminPassword }),
+  })
+  if (!loginResp.ok) throw new Error(`admin login failed: ${loginResp.status}`)
+  const loginJson = await loginResp.json()
+  const csrfToken = loginJson.csrfToken
+  const cookie = loginResp.headers.get('set-cookie')?.split(';')[0] || ''
+
+  // Create a managed user
+  const userResp = await fetch(`${env.hubBaseURL}/api/admin/v1/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'X-CSRF-Token': csrfToken },
+    body: JSON.stringify({ username: 'e2e-user-' + Date.now(), displayName: 'E2E User', role: 'MEMBER' }),
+  })
+  if (!userResp.ok) throw new Error(`create user failed: ${userResp.status}`)
+  const userJson = await userResp.json()
+  const managedUserId = userJson.userId
+
+  // Create enrollment
+  const enrollResp = await fetch(`${env.hubBaseURL}/api/admin/v1/users/${managedUserId}/enrollments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'X-CSRF-Token': csrfToken },
+    body: JSON.stringify({ expiresInSeconds: 3600 }),
+  })
+  if (!enrollResp.ok) throw new Error(`create enrollment failed: ${enrollResp.status}`)
+  const enrollJson = await enrollResp.json()
+  const enrollmentCode = enrollJson.code
+
+  // Exchange enrollment for access token
+  const exchangeResp = await fetch(`${env.hubBaseURL}/api/client/v1/enrollments/exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platform: 'ANDROID', code: enrollmentCode, installationId: `ins_${randomUUID()}`, appVersion: 'e2e-1.0' }),
+  })
+  if (!exchangeResp.ok) throw new Error(`exchange enrollment failed: ${exchangeResp.status}`)
+  const exchangeJson = await exchangeResp.json()
+  const clientToken = exchangeJson.accessToken
+
+  // Get managed state for generation + resource IDs
+  const stateResp = await fetch(`${env.hubBaseURL}/api/client/v1/managed/state`, {
+    headers: { 'Authorization': `Bearer ${clientToken}` },
+  })
+  if (!stateResp.ok) throw new Error(`get managed state failed: ${stateResp.status}`)
+  const stateJson = await stateResp.json()
+  const generation = stateJson.activeManagedGeneration
+
+  // Fetch the snapshot to get resource IDs
+  const snapResp = await fetch(`${env.hubBaseURL}/api/client/v1/managed/snapshots/${generation}`, {
+    headers: { 'Authorization': `Bearer ${clientToken}` },
+  })
+  if (!snapResp.ok) throw new Error(`get snapshot failed: ${snapResp.status}`)
+  const snapJson = await snapResp.json()
+
+  const modelId = snapJson.models?.[0]?.modelId
+  const ttsId = snapJson.tts?.[0]?.ttsId
+  const asrId = snapJson.asr?.[0]?.asrId
+  const mcpId = snapJson.mcp?.[0]?.mcpServerId
+
+  if (!modelId || !ttsId || !asrId || !mcpId) {
+    throw new Error(`snapshot missing resource IDs: model=${modelId} tts=${ttsId} asr=${asrId} mcp=${mcpId}`)
+  }
+
+  const relayUrl = env.relayPubBaseURL
+  const baseHeaders = {
+    'Authorization': `Bearer ${clientToken}`,
+    'X-Measix-Managed-Generation': String(generation),
     'Content-Type': 'application/json',
-    'X-Measix-Interaction-Id': interactionId,
   }
 
-  // 1. Chat (non-streaming)
-  const chatResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/chat/completions`, {
+  // 1. Model streaming
+  const modelResp = await fetch(`${relayUrl}/runtime/v1/resources/${modelId}/v1/chat/completions`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ model: 'test-model', messages: [{ role: 'user', content: 'Say hello' }] }),
+    headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
+    body: JSON.stringify({ model: 'gpt-test', stream: true, messages: [{ role: 'user', content: 'Say hello' }] }),
   })
-  if (!chatResp.ok) throw new Error(`Chat request failed: ${chatResp.status}`)
-  await chatResp.text()
+  if (!modelResp.ok) throw new Error(`model request failed: ${modelResp.status}`)
+  await modelResp.text()
 
-  // 2. Chat (streaming)
-  const streamResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/chat/completions`, {
+  // 2. TTS
+  const ttsResp = await fetch(`${relayUrl}/runtime/v1/resources/${ttsId}/v1/audio/speech`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ model: 'test-model', stream: true, messages: [{ role: 'user', content: 'Count 1 to 5' }] }),
+    headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
+    body: JSON.stringify({ model: 'tts-test', input: 'hello', voice: 'alloy' }),
   })
-  if (streamResp.ok) {
-    const reader = streamResp.body?.getReader()
-    if (reader) {
-      for (let i = 0; i < 10; i++) { const { done } = await reader.read(); if (done) break }
-      try { reader.cancel() } catch {}
-    }
-  }
+  if (!ttsResp.ok) throw new Error(`tts request failed: ${ttsResp.status}`)
+  await ttsResp.text()
 
-  // 3. TTS
-  try {
-    const ttsResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/audio/speech`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ model: 'test-tts', input: 'Hello', voice: 'alloy' }),
-    })
-    if (ttsResp.ok) await ttsResp.arrayBuffer()
-  } catch {}
+  // 3. ASR
+  const asrFormData = new FormData()
+  asrFormData.append('file', new Blob([Buffer.from('RIFF')]), 'sample.wav')
+  asrFormData.append('model', 'whisper-test')
+  const asrResp = await fetch(`${relayUrl}/runtime/v1/resources/${asrId}/v1/audio/transcriptions`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${clientToken}`, 'X-Measix-Managed-Generation': String(generation), 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
+    body: asrFormData,
+  })
+  if (!asrResp.ok) throw new Error(`asr request failed: ${asrResp.status}`)
+  await asrResp.text()
 
-  // 4. ASR (multipart)
-  try {
-    // Minimal WAV header (44 bytes)
-    const wavHeader = new Uint8Array(44)
-    wavHeader[0] = 0x52; wavHeader[1] = 0x49; wavHeader[2] = 0x46; wavHeader[3] = 0x46
-    wavHeader[8] = 0x57; wavHeader[9] = 0x41; wavHeader[10] = 0x56; wavHeader[11] = 0x45
-    wavHeader[16] = 16; wavHeader[20] = 1; wavHeader[22] = 1; wavHeader[24] = 0x44; wavHeader[25] = 0xAC
-    wavHeader[28] = 0x88; wavHeader[29] = 0x58; wavHeader[32] = 2; wavHeader[34] = 16; wavHeader[36] = 0x64; wavHeader[37] = 0x61; wavHeader[38] = 0x74; wavHeader[39] = 0x61
-    const formData = new FormData()
-    formData.append('file', new Blob([wavHeader], { type: 'audio/wav' }), 'sample.wav')
-    formData.append('model', 'test-asr')
-    const asrResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/audio/transcriptions`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer test-token`, 'X-Measix-Interaction-Id': 'e2e-' + randomUUID() },
-      body: formData,
-    })
-    if (asrResp.ok) await asrResp.text()
-  } catch {}
-
-  // 5. MCP (initialize)
-  try {
-    const mcpResp = await fetch(`${env.relayPubBaseURL}/runtime/v1/mcp`, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1.0' } } }),
-    })
-    if (mcpResp.ok) await mcpResp.text()
-  } catch {}
+  // 4. MCP
+  const mcpResp = await fetch(`${relayUrl}/runtime/v1/resources/${mcpId}/mcp`, {
+    method: 'POST',
+    headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e-client', version: '1.0' } } }),
+  })
+  if (!mcpResp.ok) throw new Error(`mcp request failed: ${mcpResp.status}`)
+  await mcpResp.text()
 }
 
 async function waitForUsageIngestion(minRequests, maxWaitSeconds) {
-  const adminPassword = env.adminPassword || 'admin'
   const loginResp = await fetch(`${env.hubBaseURL}/api/admin/v1/session/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -281,19 +374,17 @@ async function waitForUsageIngestion(minRequests, maxWaitSeconds) {
   })
   if (!loginResp.ok) return
   const loginBody = await loginResp.json()
-  const setCookie = loginResp.headers.get('set-cookie') || ''
-  const cookieMatch = setCookie.match(/measix_admin_session=([^;]+)/)
-  const cookie = cookieMatch ? `measix_admin_session=${cookieMatch[1]}` : ''
+  const cookie = loginResp.headers.get('set-cookie')?.split(';')[0] || ''
   const csrfToken = loginBody.csrfToken || ''
 
   for (let i = 0; i < maxWaitSeconds; i++) {
     await new Promise(r => setTimeout(r, 1000))
-    const resp = await fetch(`${env.hubBaseURL}/api/admin/v1/usage?limit=100`, {
+    const resp = await fetch(`${env.hubBaseURL}/api/admin/v1/usage/summary`, {
       headers: { 'Cookie': cookie, 'X-CSRF-Token': csrfToken },
     })
     if (resp.ok) {
       const data = await resp.json()
-      const count = data.items?.length || data.length || 0
+      const count = data.requestCount || 0
       if (count >= minRequests) return
     }
   }
@@ -302,7 +393,7 @@ async function waitForUsageIngestion(minRequests, maxWaitSeconds) {
 try {
   // Phase A: Authoring
   log('Phase A: Browser Admin (authoring/publish)...')
-  const phaseA = await runPlaywrightSpec('e2e/golden-path-authoring.spec.ts')
+  const phaseA = await runPlaywrightSpec('e2e/golden-path-authoring.spec.ts', 'authoring')
   if (phaseA !== 0) throw new Error(`Phase A failed (exit ${phaseA})`)
   log('Phase A PASSED')
 
@@ -322,13 +413,13 @@ try {
 
   // Phase D: Usage verification
   log('Phase D: Browser Admin (usage/system verification)...')
-  const phaseD = await runPlaywrightSpec('e2e/golden-path-usage.spec.ts')
+  const phaseD = await runPlaywrightSpec('e2e/golden-path-usage.spec.ts', 'usage')
   if (phaseD !== 0) throw new Error(`Phase D failed (exit ${phaseD})`)
   log('Phase D PASSED')
 
   // Phase E: Topology security
   log('Phase E: Topology security...')
-  const phaseE = await runPlaywrightSpec('e2e/topology-security.spec.ts')
+  const phaseE = await runPlaywrightSpec('e2e/topology-security.spec.ts', 'topology')
   if (phaseE !== 0) throw new Error(`Phase E failed (exit ${phaseE})`)
   log('Phase E PASSED')
 
@@ -341,6 +432,16 @@ try {
   try { worker.postMessage({ shutdown: true }) } catch {}
   await new Promise(r => setTimeout(r, 500))
   try { worker.terminate() } catch {}
+
+  // Merge per-phase Playwright JSON results into the final artifact
+  const tempFiles = [
+    join(artifactsDir, '_e2e-authoring.json'),
+    join(artifactsDir, '_e2e-usage.json'),
+    join(artifactsDir, '_e2e-topology.json'),
+  ].filter(f => existsSync(f))
+  if (tempFiles.length > 0) {
+    mergePlaywrightJsons(tempFiles, join(artifactsDir, 'e2e-playwright.json'))
+  }
 
   // Write meta.json for provenance regardless of pass/fail
   writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'node scripts/e2e-harness.mjs (orchestrated)', exitCode)

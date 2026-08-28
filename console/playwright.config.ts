@@ -44,10 +44,16 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // Use Playwright's bundled Chromium instead of the system channel.
-        // The system 'chromium' channel may not be installed on Windows 11,
-        // and the headless shell has a known loopback networking issue.
-        // The bundled Chromium works reliably for local HTTP server testing.
+        // Windows loopback fix: bundled Chromium on Windows sometimes cannot
+        // connect to local Node.js HTTP servers without these flags.
+        launchOptions: {
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--ignore-certificate-errors',
+          ],
+        },
       },
     },
   ],

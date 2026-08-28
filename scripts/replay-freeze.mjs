@@ -337,7 +337,7 @@ if (browserGoldenPathPassed) {
     }
 
     const relayUrl = env.relayPubBaseURL
-    const headers = {
+    const baseHeaders = {
       'Authorization': `Bearer ${clientToken}`,
       'X-Measix-Managed-Generation': String(generation),
       'Content-Type': 'application/json',
@@ -346,7 +346,7 @@ if (browserGoldenPathPassed) {
     // 1. Model streaming
     const modelResp = await fetch(`${relayUrl}/runtime/v1/resources/${modelId}/v1/chat/completions`, {
       method: 'POST',
-      headers,
+      headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
       body: JSON.stringify({ model: 'gpt-test', stream: true, messages: [{ role: 'user', content: 'Say hello' }] }),
     })
     if (!modelResp.ok) throw new Error(`model request failed: ${modelResp.status}`)
@@ -354,7 +354,7 @@ if (browserGoldenPathPassed) {
     // 2. TTS
     const ttsResp = await fetch(`${relayUrl}/runtime/v1/resources/${ttsId}/v1/audio/speech`, {
       method: 'POST',
-      headers,
+      headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
       body: JSON.stringify({ model: 'tts-test', input: 'hello', voice: 'alloy' }),
     })
     if (!ttsResp.ok) throw new Error(`tts request failed: ${ttsResp.status}`)
@@ -365,7 +365,7 @@ if (browserGoldenPathPassed) {
     asrFormData.append('model', 'whisper-test')
     const asrResp = await fetch(`${relayUrl}/runtime/v1/resources/${asrId}/v1/audio/transcriptions`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${clientToken}`, 'X-Measix-Managed-Generation': String(generation) },
+      headers: { 'Authorization': `Bearer ${clientToken}`, 'X-Measix-Managed-Generation': String(generation), 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
       body: asrFormData,
     })
     if (!asrResp.ok) throw new Error(`asr request failed: ${asrResp.status}`)
@@ -373,7 +373,7 @@ if (browserGoldenPathPassed) {
     // 4. MCP
     const mcpResp = await fetch(`${relayUrl}/runtime/v1/resources/${mcpId}/mcp`, {
       method: 'POST',
-      headers,
+      headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'replay-client', version: '1.0' } } }),
     })
     if (!mcpResp.ok) throw new Error(`mcp request failed: ${mcpResp.status}`)
@@ -526,9 +526,10 @@ try {
   const loginJson = await loginResp.json()
   const csrfToken = loginJson.csrfToken || ''
   // Extract session cookie from set-cookie header
+  // Hub uses underscore in cookie name: measix_admin_session
   const setCookie = loginResp.headers.get('set-cookie') || ''
-  const cookieMatch = setCookie.match(/measix-admin-session=([^;]+)/)
-  const cookie = cookieMatch ? `measix-admin-session=${cookieMatch[1]}` : ''
+  const cookieMatch = setCookie.match(/measix_admin_session=([^;]+)/)
+  const cookie = cookieMatch ? `measix_admin_session=${cookieMatch[1]}` : ''
 
   const statusResp = await fetch(`${env.hubBaseURL}/api/admin/v1/system/status`, {
     headers: { 'Cookie': cookie, 'X-CSRF-Token': csrfToken },

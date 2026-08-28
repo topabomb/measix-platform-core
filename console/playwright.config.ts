@@ -44,16 +44,11 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // Windows loopback fix: bundled Chromium on Windows sometimes cannot
-        // connect to local Node.js HTTP servers without these flags.
-        launchOptions: {
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-features=IsolateOrigins,site-per-process',
-            '--ignore-certificate-errors',
-          ],
-        },
+        // Use system Chrome instead of Playwright's bundled Chromium.
+        // On Windows 11, the bundled headless Chromium has a loopback
+        // networking issue that prevents connections to local Node.js
+        // HTTP servers. System Chrome does not have this issue.
+        channel: 'chrome',
       },
     },
   ],

@@ -16,7 +16,7 @@ import { test, expect, type Page } from '@playwright/test'
 const ADMIN_PASSWORD = process.env.MEASIX_E2E_ADMIN_PASSWORD || 'admin'
 
 async function login(page: Page): Promise<void> {
-  await page.goto('/admin/')
+  await page.goto('/admin/', { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-cy="login-username"]', { state: 'visible' })
   await page.fill('[data-cy="login-username"]', 'admin')
   await page.fill('[data-cy="login-password"]', ADMIN_PASSWORD)

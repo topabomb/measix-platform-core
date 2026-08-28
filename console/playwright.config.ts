@@ -34,6 +34,10 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    // Use 'domcontentloaded' instead of default 'load' to avoid ERR_ABORTED
+    // on Windows when the Node.js SPA proxy closes keep-alive connections
+    // during asset loading.
+    navigationTimeout: 30_000,
   },
   projects: [
     {

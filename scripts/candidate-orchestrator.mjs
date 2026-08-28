@@ -96,12 +96,14 @@ async function main() {
   servers.push(spaServer)
   const spaBaseURL = `http://127.0.0.1:${spaPort}`
 
-  const spaReady = await waitFor(spaBaseURL, 'SPA', 30000, log)
+  const spaReady = await waitFor(`${spaBaseURL}/admin/`, 'SPA', 30000, log)
   if (!spaReady) {
     log('ERROR: SPA proxy not ready')
     cleanupEnvironment(processes, servers, env.envRoot, false, log)
     process.exit(1)
   }
+  // Small delay to let keep-alive settle on Windows (prevents ERR_ABORTED)
+  await new Promise(r => setTimeout(r, 1000))
 
   // --- 5. Common environment for Playwright ---
   const e2eEnv = {

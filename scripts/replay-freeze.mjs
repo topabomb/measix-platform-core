@@ -417,17 +417,11 @@ let browserUsagePassed = false
 let browserUsageOutput = ''
 if (fourCapabilityPassed) {
   try {
-    log('Starting SPA proxy for usage/system verification phase...')
-    const usageSpaPort = await freePort()
-    // Start a second Worker for the usage phase SPA proxy
-    const usageWorker = new Worker(join(ROOT, 'scripts', '_server-worker.mjs'), {
-      workerData: { spaPort: usageSpaPort, spaDir, adapterPort, hubPort: env.hubPort },
-    })
-    await new Promise((resolve, reject) => {
-      usageWorker.on('message', (msg) => { if (msg.ready) resolve() })
-      usageWorker.on('error', reject)
-    })
-    const usageSpaBaseURL = `http://127.0.0.1:${usageSpaPort}`
+    // Reuse the existing SPA proxy from the first Worker (still running)
+    // Starting a second Worker would fail because the adapter port is already
+    // in use by the first Worker.
+    log('Reusing SPA proxy for usage/system verification phase...')
+    const usageSpaBaseURL = spaBaseURL
     const usageSpaReady = await waitFor(usageSpaBaseURL, 'usage SPA', 30000, log)
 
     if (usageSpaReady) {
@@ -449,7 +443,7 @@ if (fourCapabilityPassed) {
       browserUsageOutput = 'SPA proxy not ready for usage phase'
       log('WARNING: SPA proxy not ready — skipping Browser Usage/System verification.')
     }
-    try { await usageWorker.terminate() } catch {}
+    try { /* SPA proxy reused from first Worker, no cleanup needed */ } catch {}
   } catch (e) {
     browserUsageOutput = (e.stdout || '') + (e.stderr || '')
     log('Browser Usage/System verification FAILED')

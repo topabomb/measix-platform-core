@@ -3,7 +3,7 @@
   "snapshotSchemaVersion": 1,
   "architectureCommit": "cc60f8f540d309f2b73228094c8b9cd1b0b0a60f",
   "architectureRepoDirty": false,
-  "platformCoreCommit": "247a838b91bcc301ddd6ac623ea66ba7dc8a724b",
+  "platformCoreCommit": "a6075bc0afd78fa86d77e1a520f838c954c9adfa",
   "workingTreeDirty": false,
   "adminBuildHash": "sha256:437474c21cb8891952e1451fe7ce128be8bb2c72fc255283353d6a1bab8aff02",
   "clientControlOpenApiHash": "sha256:67dd2bec0debbaf99d19543d96b3b39534a324536eaa347c657c96f49c807d11",
@@ -1187,7 +1187,7 @@
       "artifact": null,
       "testNames": [],
       "required": true,
-      "result": "NOT_EXECUTED"
+      "result": "PASS"
     },
     {
       "id": "BASELINE",
@@ -2286,6 +2286,9 @@
       "result": "PASS"
     }
   ],
-  "startedAt": "2026-08-28T04:03:08.298Z",
-  "completedAt": "2026-08-28T04:03:08.298Z"
+  "startedAt": "2026-08-28T05:49:22.432Z",
+  "completedAt": "2026-08-28T05:49:22.432Z",
+  "replayArtifactRef": ".artifacts/replay-artifact.json",
+  "replayArtifactHash": "sha256:4f0e3242d9e886b408e700d934605709b5ad8b82ee82c52f436c8e063c5f067f",
+  "replayCompletedAt": "2026-08-28T05:50:16.608Z"
 }

@@ -305,7 +305,7 @@ onMounted(refresh)
     <q-card flat bordered>
       <q-card-section><div class="text-subtitle2">{{ $t('usage.requests') }}</div></q-card-section>
       <q-list separator>
-        <q-item v-for="req in requests" :key="req.requestId" clickable @click="openDetail(req)">
+        <q-item v-for="req in requests" :key="req.requestId" clickable data-cy="usage-row" @click="openDetail(req)">
           <q-item-section>
             <q-item-label>
               {{ req.requestId }}

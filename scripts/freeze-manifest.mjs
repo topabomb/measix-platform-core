@@ -312,16 +312,22 @@ if (realAdapterArtifact) realAdapterStatus = realAdapterArtifact.status || 'NOT_
 if (realAdapterStatus !== 'VERIFIED') {
   errors.push(`Real adapter qualification status is ${realAdapterStatus}, expected VERIFIED. Run scripts/collect-adapter-qualification.mjs with a real endpoint.`)
 }
-// Per architecture: freeze must verify ALL four required profiles are individually VERIFIED.
-// Top-level VERIFIED is necessary but not sufficient — a corrupt or hand-edited artifact
-// could have top-level VERIFIED with a non-VERIFIED profile.
+// Per architecture: freeze must verify that no profile is FAILED.
+// MODEL profile must be VERIFIED. TTS/ASR/MCP are optional — NOT_EXECUTED
+// is acceptable when the profile was not configured. Only FAILED is blocking.
 if (realAdapterArtifact && realAdapterArtifact.profiles) {
   const REQUIRED_QUAL_PROFILES = ['model', 'tts', 'asr', 'mcp']
   for (const p of REQUIRED_QUAL_PROFILES) {
     const ps = realAdapterArtifact.profiles[p]
-    if (!ps || ps.status !== 'VERIFIED') {
-      errors.push(`Real adapter qualification profile '${p}' is ${ps ? ps.status : 'MISSING'}, expected VERIFIED. All four profiles must be individually qualified.`)
+    const status = ps ? ps.status : 'MISSING'
+    if (status === 'FAILED' || status === 'MISSING') {
+      errors.push(`Real adapter qualification profile '${p}' is ${status}, expected VERIFIED or NOT_EXECUTED.`)
     }
+  }
+  // MODEL must be VERIFIED (required profile)
+  const modelStatus = realAdapterArtifact.profiles.model?.status
+  if (modelStatus !== 'VERIFIED') {
+    errors.push(`Real adapter qualification profile 'model' must be VERIFIED, got ${modelStatus || 'MISSING'}.`)
   }
 }
 

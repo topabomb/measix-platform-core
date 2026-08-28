@@ -18,13 +18,19 @@ func OpenStore(t *testing.T) *store.Store {
 		t.Fatal(err)
 	}
 	_, file, _, _ := runtime.Caller(0)
-	migrationPath := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../migrations/202608190001_initial.sql"))
-	sqlText, err := os.ReadFile(migrationPath)
-	if err != nil {
-		t.Fatal(err)
+	migrationsDir := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../migrations"))
+	migrationFiles := []string{
+		filepath.Join(migrationsDir, "202608190001_initial.sql"),
+		filepath.Join(migrationsDir, "202608280001_enterprise_updates.sql"),
 	}
-	if _, err := db.Exec(string(sqlText)); err != nil {
-		t.Fatalf("apply test migration: %v", err)
+	for _, migrationPath := range migrationFiles {
+		sqlText, err := os.ReadFile(migrationPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(string(sqlText)); err != nil {
+			t.Fatalf("apply test migration %s: %v", migrationPath, err)
+		}
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)

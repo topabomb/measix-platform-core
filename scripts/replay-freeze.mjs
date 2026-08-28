@@ -28,6 +28,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { execSync } from 'node:child_process'
+import { Worker } from 'node:worker_threads'
 
 import {
   resolveRoot,
@@ -177,17 +178,36 @@ const spaPort = await freePort()
 const adapterBaseURL = `http://127.0.0.1:${adapterPort}`
 const spaBaseURL = `http://127.0.0.1:${spaPort}`
 
-// Start deterministic adapter — remains alive through all phases
-const adapterServer = startDeterministicAdapter(adapterPort)
-const servers = [adapterServer]
+// Per e2e-harness.mjs pattern: SPA proxy + Adapter must run in a Worker thread
+// so the main thread can use execSync (for Playwright) without blocking the
+// HTTP event loop. Without a Worker thread, the SPA proxy cannot serve
+// pages while execSync is running, causing Playwright navigation timeouts.
+const spaDir = join(ROOT, 'console', 'dist', 'spa')
+const worker = new Worker(join(ROOT, 'scripts', '_server-worker.mjs'), {
+  workerData: { spaPort, spaDir, adapterPort, hubPort: env.hubPort },
+})
+await new Promise((resolve, reject) => {
+  worker.on('message', (msg) => { if (msg.ready) resolve() })
+  worker.on('error', reject)
+})
+const servers = [] // Worker-managed servers are closed via worker.terminate()
 
 // --- 9a. Run Playwright Browser Golden Path against this fresh environment ---
-// Start SPA proxy (same-origin as browser expects)
-const spaDir = join(ROOT, 'console', 'dist', 'spa')
+// SPA proxy is already running in the Worker thread (started above)
 if (existsSync(spaDir)) {
-  const spaServer = startSpaProxy(spaPort, spaDir, env.hubPort)
-  servers.push(spaServer)
   const spaReady = await waitFor(spaBaseURL, 'SPA', 30000, log)
+
+  // Per e2e-harness.mjs: verify /admin/ actually serves content
+  try {
+    const resp = await fetch(`${spaBaseURL}/admin/`)
+    const text = await resp.text()
+    log(`SPA proxy check: ${resp.status} (${text.length} bytes)`)
+    if (!resp.ok) {
+      log('ERROR: SPA proxy not serving /admin/ correctly')
+    }
+  } catch (e) {
+    log(`ERROR: SPA proxy unreachable: ${e.message}`)
+  }
 
   if (spaReady) {
     try {
@@ -216,7 +236,6 @@ if (existsSync(spaDir)) {
     log('WARNING: SPA proxy not ready — skipping Browser Golden Path.')
   }
 
-  try { spaServer.close() } catch {}
 } else {
   log('WARNING: SPA build not found at console/dist/spa — skipping Browser Golden Path.')
   log('Run "make console-build" before clean replay to include browser tests.')
@@ -400,8 +419,14 @@ if (fourCapabilityPassed) {
   try {
     log('Starting SPA proxy for usage/system verification phase...')
     const usageSpaPort = await freePort()
-    const usageSpaServer = startSpaProxy(usageSpaPort, spaDir, env.hubPort)
-    servers.push(usageSpaServer)
+    // Start a second Worker for the usage phase SPA proxy
+    const usageWorker = new Worker(join(ROOT, 'scripts', '_server-worker.mjs'), {
+      workerData: { spaPort: usageSpaPort, spaDir, adapterPort, hubPort: env.hubPort },
+    })
+    await new Promise((resolve, reject) => {
+      usageWorker.on('message', (msg) => { if (msg.ready) resolve() })
+      usageWorker.on('error', reject)
+    })
     const usageSpaBaseURL = `http://127.0.0.1:${usageSpaPort}`
     const usageSpaReady = await waitFor(usageSpaBaseURL, 'usage SPA', 30000, log)
 
@@ -424,7 +449,7 @@ if (fourCapabilityPassed) {
       browserUsageOutput = 'SPA proxy not ready for usage phase'
       log('WARNING: SPA proxy not ready — skipping Browser Usage/System verification.')
     }
-    try { usageSpaServer.close() } catch {}
+    try { await usageWorker.terminate() } catch {}
   } catch (e) {
     browserUsageOutput = (e.stdout || '') + (e.stderr || '')
     log('Browser Usage/System verification FAILED')
@@ -492,15 +517,18 @@ try {
 log('Smoke test: system status...')
 let statusOk = false
 try {
-  const setCookie = (await fetch(`${env.hubBaseURL}/api/admin/v1/session/login`, {
+  // Login first to get session cookie + CSRF token
+  const loginResp = await fetch(`${env.hubBaseURL}/api/admin/v1/session/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'admin', password: adminPassword }),
-  })).headers.get('set-cookie') || ''
+  })
+  const loginJson = await loginResp.json()
+  const csrfToken = loginJson.csrfToken || ''
+  // Extract session cookie from set-cookie header
+  const setCookie = loginResp.headers.get('set-cookie') || ''
   const cookieMatch = setCookie.match(/measix-admin-session=([^;]+)/)
   const cookie = cookieMatch ? `measix-admin-session=${cookieMatch[1]}` : ''
-  const csrfMatch = setCookie.match(/measix-csrf=([^;]+)/)
-  const csrfToken = csrfMatch ? csrfMatch[1] : ''
 
   const statusResp = await fetch(`${env.hubBaseURL}/api/admin/v1/system/status`, {
     headers: { 'Cookie': cookie, 'X-CSRF-Token': csrfToken },
@@ -509,6 +537,8 @@ try {
     const status = await statusResp.json()
     log(`System status: runtime=${status.runtimeStatus} relay=${status.relayStatus}`)
     statusOk = true
+  } else {
+    log(`System status: HTTP ${statusResp.status}`)
   }
 } catch (e) {
   log(`System status error: ${e.message}`)
@@ -516,6 +546,8 @@ try {
 
 // Cleanup
 log('Cleaning up fresh environment...')
+// Terminate the Worker that runs SPA proxy + Adapter
+try { await worker.terminate() } catch {}
 cleanupEnvironment(processes, servers, env.envRoot, false, log)
 
 if (!browserGoldenPathPassed || !fourCapabilityPassed || !browserUsagePassed || !replayTestsPassed || !loginOk || !statusOk || !topologySecurityPassed) {

@@ -119,7 +119,7 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
   // ========================================================================
   await test.step('logout works', async () => {
     // The logout button is inside a q-menu that opens when clicking the user menu button.
-    // On desktop, click the user menu button (q-btn with aria-label) to reveal logout-btn.
+    // On desktop, click the user menu button (data-cy=user-menu-btn) to reveal logout-btn.
     // On mobile, logout-btn-mobile is directly visible.
     const logoutMobile = page.locator('[data-cy="logout-btn-mobile"]')
     const mobileVisible = await logoutMobile.isVisible().catch(() => false)
@@ -127,7 +127,8 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
       await logoutMobile.click()
     } else {
       // Desktop: click the user menu button to open the dropdown
-      const userMenuBtn = page.locator('[aria-label="Sign out"]').or(page.locator('button:has(.q-avatar)')).first()
+      const userMenuBtn = page.locator('[data-cy="user-menu-btn"]')
+      await expect(userMenuBtn).toBeVisible({ timeout: 5_000 })
       await userMenuBtn.click()
       await page.waitForTimeout(300)
       const logoutBtn = page.locator('[data-cy="logout-btn"]')

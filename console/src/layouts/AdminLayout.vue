@@ -104,6 +104,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
           flat
           no-caps
           class="gt-sm"
+          data-cy="user-menu-btn"
           color="primary"
           :label="session.user?.displayName"
         >

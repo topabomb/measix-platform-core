@@ -40,7 +40,12 @@ function fixturesHash() {
 function loadJsonArtifact(name) {
   const path = join(ARTIFACTS_DIR, name)
   if (!existsSync(path)) return null
-  try { return JSON.parse(readFileSync(path, 'utf-8')) }
+  try {
+    let content = readFileSync(path, 'utf-8')
+    // Strip UTF-8 BOM if present (PowerShell Out-File -Encoding utf8 adds BOM)
+    if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1)
+    return JSON.parse(content)
+  }
   catch (err) { return { _error: `Failed to parse ${name}: ${err.message}` } }
 }
 
@@ -55,7 +60,10 @@ function loadGoTestResults(artifactName) {
   const path = join(ARTIFACTS_DIR, artifactName)
   if (!existsSync(path)) return null
   const results = new Map()
-  for (const line of readFileSync(path, 'utf-8').split('\n')) {
+  let content = readFileSync(path, 'utf-8')
+  // Strip UTF-8 BOM if present (PowerShell Out-File -Encoding utf8 adds BOM)
+  if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1)
+  for (const line of content.split('\n')) {
     if (!line.trim()) continue
     try {
       const e = JSON.parse(line)

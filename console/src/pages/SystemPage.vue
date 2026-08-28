@@ -79,7 +79,7 @@ onMounted(refresh)
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('system.relayReady') }}</div>
-              <q-badge :color="status.relayReady ? 'green' : 'red'" :label="status.relayReady ? $t('status.READY') : $t('status.NOT_CONVERGED')" />
+              <q-badge data-cy="system-relay-status" :color="status.relayReady ? 'green' : 'red'" :label="status.relayReady ? $t('status.READY') : $t('status.NOT_CONVERGED')" />
               <div class="text-caption q-mt-sm">{{ $t('overview.desiredRevision') }} {{ status.desiredControlRevision }} · {{ $t('overview.appliedRevision') }} {{ status.appliedControlRevision ?? '—' }}</div>
               <div class="text-caption">{{ $t('system.bundle').toLowerCase() }} {{ status.appliedBundleHash ? status.appliedBundleHash.slice(7, 19) : '—' }}</div>
               <div v-if="status.appliedControlRevision !== undefined && status.appliedControlRevision !== status.desiredControlRevision" class="text-caption text-warning q-mt-xs">{{ $t('status.NOT_CONVERGED') }}</div>

@@ -111,7 +111,7 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     await page.locator('[data-cy="upstream-row"]').first().click()
     await page.waitForTimeout(500)
 
-    await expect(page.locator('text=/candidate|Candidate/i').or(page.locator('text=/active|Active/i'))).toBeVisible({ timeout: 5_000 })
+    await expect(page.locator('text=/candidate|Candidate/i').or(page.locator('text=/active|Active/i')).first()).toBeVisible({ timeout: 5_000 })
   })
 
   // ========================================================================

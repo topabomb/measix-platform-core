@@ -329,8 +329,8 @@ onMounted(refresh)
       </q-list>
     </q-card>
 
-    <!-- Request Detail (Usage Admin UX §14): never shows prompt/body/Secret. -->
-    <q-dialog v-model="detailOpen">
+<!-- Request Detail (Usage Admin UX §14): never shows prompt/body/Secret. -->
+<q-dialog v-model="detailOpen" data-cy="usage-detail">
       <q-card class="responsive-modal" style="max-width: 95vw">
         <q-card-section>
           <div class="text-h6">{{ $t('usage.detail.title') }}</div>

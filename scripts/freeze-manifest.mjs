@@ -79,8 +79,17 @@ function loadVitestResults(artifactName) {
     // Also store individual test cases with their full path
     if (tr.assertionResults) {
       for (const ar of tr.assertionResults) {
-        const fullName = name + ' > ' + (ar.fullName || ar.name || 'unknown')
-        results.set(fullName, ar.status === 'passed' ? 'PASS' : 'FAIL')
+        // Vitest's fullName uses space as separator between ancestorTitles and title.
+        // We need to use ' > ' separator to match scenario-definitions.json format.
+        // ancestorTitles is an array like ["ResourcesPage"], title is the test name.
+        // ar.fullName is "ResourcesPage test name" (space-separated).
+        // We want "ResourcesPage > test name".
+        const parts = ar.ancestorTitles || []
+        const title = ar.title || ar.name || ar.fullName || 'unknown'
+        const fullNameWithArrow = parts.length > 0
+          ? name + ' > ' + [...parts, title].join(' > ')
+          : name + ' > ' + title
+        results.set(fullNameWithArrow, ar.status === 'passed' ? 'PASS' : 'FAIL')
       }
     }
   }

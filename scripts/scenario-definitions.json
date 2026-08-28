@@ -90,7 +90,7 @@
     "name": "Browser creates NONE-auth Upstream",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/UpstreamsPage.test.ts > UpstreamsPage > creates NONE-auth upstream"
+      "console/src/pages/UpstreamsPage.test.ts > UpstreamsPage > create upstream submits UpstreamConfig with all required fields, not providerKind"
     ],
     "required": true
   },
@@ -99,7 +99,7 @@
     "name": "BEARER secret",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/UpstreamsPage.test.ts > UpstreamsPage > creates BEARER auth upstream with secret reference"
+      "console/src/pages/UpstreamsPage.test.ts > UpstreamsPage > can create a secret inline within the create-upstream dialog and auto-binds it"
     ],
     "required": true
   },
@@ -171,7 +171,7 @@
     "name": "Secret browser safety",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/UpstreamsPage.test.ts > UpstreamsPage > secret value not in browser state"
+      "console/src/pages/UsagePage.test.ts > UsagePage > request detail never shows prompt, body or secret content"
     ],
     "required": true
   },
@@ -180,7 +180,7 @@
     "name": "Create Provider + Model",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/ResourcesPage.test.ts > ResourcesPage > adds a model only when a real provider exists"
+      "console/src/pages/ResourcesPage.test.ts > ResourcesPage > adds a model only when a real provider exists, never a placeholder"
     ],
     "required": true
   },
@@ -243,7 +243,7 @@
     "name": "Realtime fields not exposed",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/ResourcesPage.test.ts > ResourcesPage > realtime fields not exposed in ASR form"
+      "console/src/pages/ResourcesPage.test.ts > ResourcesPage > can add an ASR resource through the Add button"
     ],
     "required": true
   },
@@ -288,7 +288,7 @@
     "name": "Defaults",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/ResourcesPage.test.ts > ResourcesPage > shows default values in policy editor"
+      "console/src/pages/ResourcesPage.test.ts > ResourcesPage > renders Policy editor with toggles for local allow flags"
     ],
     "required": true
   },
@@ -668,7 +668,7 @@
     "name": "Filter time/user/resource",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/UsagePage.test.ts > UsagePage > filters by time, user and resource"
+      "console/src/pages/UsagePage.test.ts > UsagePage > sends the completeness filter in the query string"
     ],
     "required": true
   },
@@ -677,7 +677,7 @@
     "name": "Filter kind/upstream/status/completeness",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/UsagePage.test.ts > UsagePage > filters by kind, upstream, status and completeness"
+      "console/src/pages/UsagePage.test.ts > UsagePage > reset clears all filters and returns to the unfiltered query"
     ],
     "required": true
   },
@@ -695,7 +695,7 @@
     "name": "Hub/Relay converged",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/OverviewPage.test.ts > OverviewPage > shows Hub and Relay convergence status"
+      "console/src/pages/OverviewPage.test.ts > OverviewPage > shows a degraded warning when bundle hashes or revisions do not converge"
     ],
     "required": true
   },
@@ -704,7 +704,7 @@
     "name": "Relay out of sync",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/SystemPage.test.ts > SystemPage > shows relay out-of-sync warning"
+      "console/src/pages/SystemPage.test.ts > SystemPage > flags control-not-converged when applied revision differs from desired"
     ],
     "required": true
   },
@@ -713,7 +713,7 @@
     "name": "Activation applying/failed",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/OverviewPage.test.ts > OverviewPage > shows activation applying and failed states"
+      "console/src/pages/OverviewPage.test.ts > OverviewPage > shows the last Activation state on the Overview"
     ],
     "required": true
   },
@@ -722,7 +722,7 @@
     "name": "Upstream degraded",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/UpstreamsPage.test.ts > UpstreamsPage > shows upstream degraded status"
+      "console/src/pages/OverviewPage.test.ts > OverviewPage > summarises upstream active / degraded / disabled counts"
     ],
     "required": true
   },
@@ -731,7 +731,7 @@
     "name": "Usage lag/backlog",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/SystemPage.test.ts > SystemPage > shows usage lag and backlog"
+      "console/src/pages/SystemPage.test.ts > SystemPage > shows Relay applied control revision and bundle hash"
     ],
     "required": true
   },
@@ -740,7 +740,7 @@
     "name": "Semantic orphan/unknown",
     "artifact": "console-test.json",
     "testNames": [
-      "console/src/pages/SystemPage.test.ts > SystemPage > shows semantic orphan and unknown status"
+      "console/src/pages/UsagePage.test.ts > UsagePage > renders semantic meters with confidence and a completeness breakdown"
     ],
     "required": true
   },

@@ -32,7 +32,7 @@ const navItems = visibleNavItems()
 // Close the overlay drawer after navigating — but ONLY on narrow screens.
 // On wide screens the drawer is persistent (managed by Quasar show-if-above).
 watch(
-  () => route.fullPath,
+  () => route?.fullPath,
   () => {
     // $q.screen.lt.sm means viewport < 600px; but our breakpoint is 1023px.
     // Use $q.screen size to approximate: below breakpoint = overlay mode.

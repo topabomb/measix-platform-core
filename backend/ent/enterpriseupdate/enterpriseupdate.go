@@ -15,6 +15,12 @@ const (
 	FieldTitle = "title"
 	// FieldContent holds the string denoting the content field in the database.
 	FieldContent = "content"
+	// FieldContentFormat holds the string denoting the content_format field in the database.
+	FieldContentFormat = "content_format"
+	// FieldCategory holds the string denoting the category field in the database.
+	FieldCategory = "category"
+	// FieldSeverity holds the string denoting the severity field in the database.
+	FieldSeverity = "severity"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldPublishedAt holds the string denoting the published_at field in the database.
@@ -36,6 +42,9 @@ var Columns = []string{
 	FieldID,
 	FieldTitle,
 	FieldContent,
+	FieldContentFormat,
+	FieldCategory,
+	FieldSeverity,
 	FieldStatus,
 	FieldPublishedAt,
 	FieldFeedRevision,
@@ -54,6 +63,15 @@ func ValidColumn(column string) bool {
 	return false
 }
 
+var (
+	// DefaultContentFormat holds the default value on creation for the "content_format" field.
+	DefaultContentFormat string
+	// DefaultCategory holds the default value on creation for the "category" field.
+	DefaultCategory string
+	// DefaultSeverity holds the default value on creation for the "severity" field.
+	DefaultSeverity string
+)
+
 // OrderOption defines the ordering options for the EnterpriseUpdate queries.
 type OrderOption func(*sql.Selector)
 
@@ -70,6 +88,21 @@ func ByTitle(opts ...sql.OrderTermOption) OrderOption {
 // ByContent orders the results by the content field.
 func ByContent(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldContent, opts...).ToFunc()
+}
+
+// ByContentFormat orders the results by the content_format field.
+func ByContentFormat(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldContentFormat, opts...).ToFunc()
+}
+
+// ByCategory orders the results by the category field.
+func ByCategory(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCategory, opts...).ToFunc()
+}
+
+// BySeverity orders the results by the severity field.
+func BySeverity(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSeverity, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

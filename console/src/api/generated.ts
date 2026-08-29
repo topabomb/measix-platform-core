@@ -1040,10 +1040,19 @@ export interface components {
         };
         /** @enum {string} */
         EnterpriseUpdateStatus: "DRAFT" | "PUBLISHED" | "WITHDRAWN";
+        /** @enum {string} */
+        EnterpriseUpdateCategory: "ANNOUNCEMENT" | "MAINTENANCE" | "NOTICE";
+        /** @enum {string} */
+        EnterpriseUpdateSeverity: "INFO" | "WARNING" | "CRITICAL";
+        /** @enum {string} */
+        EnterpriseUpdateContentFormat: "MARKDOWN" | "PLAIN";
         EnterpriseUpdate: {
             enterpriseUpdateId: components["schemas"]["EnterpriseUpdateId"];
             title: string;
             content: string;
+            contentFormat: components["schemas"]["EnterpriseUpdateContentFormat"];
+            category: components["schemas"]["EnterpriseUpdateCategory"];
+            severity: components["schemas"]["EnterpriseUpdateSeverity"];
             status: components["schemas"]["EnterpriseUpdateStatus"];
             /** Format: date-time */
             publishedAt: string;
@@ -1061,10 +1070,16 @@ export interface components {
         CreateEnterpriseUpdateRequest: {
             title: string;
             content: string;
+            contentFormat: components["schemas"]["EnterpriseUpdateContentFormat"];
+            category: components["schemas"]["EnterpriseUpdateCategory"];
+            severity: components["schemas"]["EnterpriseUpdateSeverity"];
         };
         UpdateEnterpriseUpdateRequest: {
             title: string;
             content: string;
+            contentFormat: components["schemas"]["EnterpriseUpdateContentFormat"];
+            category: components["schemas"]["EnterpriseUpdateCategory"];
+            severity: components["schemas"]["EnterpriseUpdateSeverity"];
         };
     };
     responses: {

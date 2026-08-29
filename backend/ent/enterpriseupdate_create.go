@@ -32,6 +32,48 @@ func (_c *EnterpriseUpdateCreate) SetContent(v string) *EnterpriseUpdateCreate {
 	return _c
 }
 
+// SetContentFormat sets the "content_format" field.
+func (_c *EnterpriseUpdateCreate) SetContentFormat(v string) *EnterpriseUpdateCreate {
+	_c.mutation.SetContentFormat(v)
+	return _c
+}
+
+// SetNillableContentFormat sets the "content_format" field if the given value is not nil.
+func (_c *EnterpriseUpdateCreate) SetNillableContentFormat(v *string) *EnterpriseUpdateCreate {
+	if v != nil {
+		_c.SetContentFormat(*v)
+	}
+	return _c
+}
+
+// SetCategory sets the "category" field.
+func (_c *EnterpriseUpdateCreate) SetCategory(v string) *EnterpriseUpdateCreate {
+	_c.mutation.SetCategory(v)
+	return _c
+}
+
+// SetNillableCategory sets the "category" field if the given value is not nil.
+func (_c *EnterpriseUpdateCreate) SetNillableCategory(v *string) *EnterpriseUpdateCreate {
+	if v != nil {
+		_c.SetCategory(*v)
+	}
+	return _c
+}
+
+// SetSeverity sets the "severity" field.
+func (_c *EnterpriseUpdateCreate) SetSeverity(v string) *EnterpriseUpdateCreate {
+	_c.mutation.SetSeverity(v)
+	return _c
+}
+
+// SetNillableSeverity sets the "severity" field if the given value is not nil.
+func (_c *EnterpriseUpdateCreate) SetNillableSeverity(v *string) *EnterpriseUpdateCreate {
+	if v != nil {
+		_c.SetSeverity(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *EnterpriseUpdateCreate) SetStatus(v string) *EnterpriseUpdateCreate {
 	_c.mutation.SetStatus(v)
@@ -89,6 +131,7 @@ func (_c *EnterpriseUpdateCreate) Mutation() *EnterpriseUpdateMutation {
 
 // Save creates the EnterpriseUpdate in the database.
 func (_c *EnterpriseUpdateCreate) Save(ctx context.Context) (*EnterpriseUpdate, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -114,6 +157,22 @@ func (_c *EnterpriseUpdateCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *EnterpriseUpdateCreate) defaults() {
+	if _, ok := _c.mutation.ContentFormat(); !ok {
+		v := enterpriseupdate.DefaultContentFormat
+		_c.mutation.SetContentFormat(v)
+	}
+	if _, ok := _c.mutation.Category(); !ok {
+		v := enterpriseupdate.DefaultCategory
+		_c.mutation.SetCategory(v)
+	}
+	if _, ok := _c.mutation.Severity(); !ok {
+		v := enterpriseupdate.DefaultSeverity
+		_c.mutation.SetSeverity(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *EnterpriseUpdateCreate) check() error {
 	if _, ok := _c.mutation.Title(); !ok {
@@ -121,6 +180,15 @@ func (_c *EnterpriseUpdateCreate) check() error {
 	}
 	if _, ok := _c.mutation.Content(); !ok {
 		return &ValidationError{Name: "content", err: errors.New(`ent: missing required field "EnterpriseUpdate.content"`)}
+	}
+	if _, ok := _c.mutation.ContentFormat(); !ok {
+		return &ValidationError{Name: "content_format", err: errors.New(`ent: missing required field "EnterpriseUpdate.content_format"`)}
+	}
+	if _, ok := _c.mutation.Category(); !ok {
+		return &ValidationError{Name: "category", err: errors.New(`ent: missing required field "EnterpriseUpdate.category"`)}
+	}
+	if _, ok := _c.mutation.Severity(); !ok {
+		return &ValidationError{Name: "severity", err: errors.New(`ent: missing required field "EnterpriseUpdate.severity"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "EnterpriseUpdate.status"`)}
@@ -180,6 +248,18 @@ func (_c *EnterpriseUpdateCreate) createSpec() (*EnterpriseUpdate, *sqlgraph.Cre
 		_spec.SetField(enterpriseupdate.FieldContent, field.TypeString, value)
 		_node.Content = value
 	}
+	if value, ok := _c.mutation.ContentFormat(); ok {
+		_spec.SetField(enterpriseupdate.FieldContentFormat, field.TypeString, value)
+		_node.ContentFormat = value
+	}
+	if value, ok := _c.mutation.Category(); ok {
+		_spec.SetField(enterpriseupdate.FieldCategory, field.TypeString, value)
+		_node.Category = value
+	}
+	if value, ok := _c.mutation.Severity(); ok {
+		_spec.SetField(enterpriseupdate.FieldSeverity, field.TypeString, value)
+		_node.Severity = value
+	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(enterpriseupdate.FieldStatus, field.TypeString, value)
 		_node.Status = value
@@ -225,6 +305,7 @@ func (_c *EnterpriseUpdateCreateBulk) Save(ctx context.Context) ([]*EnterpriseUp
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*EnterpriseUpdateMutation)
 				if !ok {

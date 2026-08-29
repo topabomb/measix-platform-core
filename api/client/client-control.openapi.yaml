@@ -982,6 +982,23 @@ components:
           minimum: 0
         enabled:
           type: boolean
+    EnterpriseUpdateCategory:
+      type: string
+      enum:
+      - ANNOUNCEMENT
+      - MAINTENANCE
+      - NOTICE
+    EnterpriseUpdateSeverity:
+      type: string
+      enum:
+      - INFO
+      - WARNING
+      - CRITICAL
+    EnterpriseUpdateContentFormat:
+      type: string
+      enum:
+      - MARKDOWN
+      - PLAIN
     EnterpriseUpdateItem:
       type: object
       additionalProperties: false
@@ -989,6 +1006,9 @@ components:
       - updateId
       - title
       - content
+      - contentFormat
+      - category
+      - severity
       - publishedAt
       properties:
         updateId:
@@ -999,6 +1019,12 @@ components:
         content:
           type: string
           minLength: 1
+        contentFormat:
+          $ref: '#/components/schemas/EnterpriseUpdateContentFormat'
+        category:
+          $ref: '#/components/schemas/EnterpriseUpdateCategory'
+        severity:
+          $ref: '#/components/schemas/EnterpriseUpdateSeverity'
         publishedAt:
           type: string
           format: date-time

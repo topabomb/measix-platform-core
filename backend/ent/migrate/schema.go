@@ -84,6 +84,9 @@ var (
 		{Name: "id", Type: field.TypeString},
 		{Name: "title", Type: field.TypeString},
 		{Name: "content", Type: field.TypeString, Size: 2147483647},
+		{Name: "content_format", Type: field.TypeString, Default: "PLAIN"},
+		{Name: "category", Type: field.TypeString, Default: "NOTICE"},
+		{Name: "severity", Type: field.TypeString, Default: "INFO"},
 		{Name: "status", Type: field.TypeString},
 		{Name: "published_at", Type: field.TypeTime, Nullable: true},
 		{Name: "feed_revision", Type: field.TypeInt64},
@@ -100,17 +103,27 @@ var (
 			{
 				Name:    "enterpriseupdate_status",
 				Unique:  false,
-				Columns: []*schema.Column{EnterpriseUpdatesColumns[3]},
+				Columns: []*schema.Column{EnterpriseUpdatesColumns[6]},
 			},
 			{
 				Name:    "enterpriseupdate_feed_revision",
 				Unique:  false,
-				Columns: []*schema.Column{EnterpriseUpdatesColumns[5]},
+				Columns: []*schema.Column{EnterpriseUpdatesColumns[8]},
 			},
 			{
 				Name:    "enterpriseupdate_published_at",
 				Unique:  false,
+				Columns: []*schema.Column{EnterpriseUpdatesColumns[7]},
+			},
+			{
+				Name:    "enterpriseupdate_category",
+				Unique:  false,
 				Columns: []*schema.Column{EnterpriseUpdatesColumns[4]},
+			},
+			{
+				Name:    "enterpriseupdate_severity",
+				Unique:  false,
+				Columns: []*schema.Column{EnterpriseUpdatesColumns[5]},
 			},
 		},
 	}

@@ -3124,6 +3124,9 @@ type EnterpriseUpdateMutation struct {
 	id                 *string
 	title              *string
 	content            *string
+	content_format     *string
+	category           *string
+	severity           *string
 	status             *string
 	published_at       *time.Time
 	feed_revision      *int64
@@ -3311,6 +3314,114 @@ func (m *EnterpriseUpdateMutation) OldContent(ctx context.Context) (v string, er
 // ResetContent resets all changes to the "content" field.
 func (m *EnterpriseUpdateMutation) ResetContent() {
 	m.content = nil
+}
+
+// SetContentFormat sets the "content_format" field.
+func (m *EnterpriseUpdateMutation) SetContentFormat(s string) {
+	m.content_format = &s
+}
+
+// ContentFormat returns the value of the "content_format" field in the mutation.
+func (m *EnterpriseUpdateMutation) ContentFormat() (r string, exists bool) {
+	v := m.content_format
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContentFormat returns the old "content_format" field's value of the EnterpriseUpdate entity.
+// If the EnterpriseUpdate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseUpdateMutation) OldContentFormat(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContentFormat is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContentFormat requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContentFormat: %w", err)
+	}
+	return oldValue.ContentFormat, nil
+}
+
+// ResetContentFormat resets all changes to the "content_format" field.
+func (m *EnterpriseUpdateMutation) ResetContentFormat() {
+	m.content_format = nil
+}
+
+// SetCategory sets the "category" field.
+func (m *EnterpriseUpdateMutation) SetCategory(s string) {
+	m.category = &s
+}
+
+// Category returns the value of the "category" field in the mutation.
+func (m *EnterpriseUpdateMutation) Category() (r string, exists bool) {
+	v := m.category
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCategory returns the old "category" field's value of the EnterpriseUpdate entity.
+// If the EnterpriseUpdate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseUpdateMutation) OldCategory(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCategory is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCategory requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCategory: %w", err)
+	}
+	return oldValue.Category, nil
+}
+
+// ResetCategory resets all changes to the "category" field.
+func (m *EnterpriseUpdateMutation) ResetCategory() {
+	m.category = nil
+}
+
+// SetSeverity sets the "severity" field.
+func (m *EnterpriseUpdateMutation) SetSeverity(s string) {
+	m.severity = &s
+}
+
+// Severity returns the value of the "severity" field in the mutation.
+func (m *EnterpriseUpdateMutation) Severity() (r string, exists bool) {
+	v := m.severity
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeverity returns the old "severity" field's value of the EnterpriseUpdate entity.
+// If the EnterpriseUpdate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *EnterpriseUpdateMutation) OldSeverity(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeverity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeverity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeverity: %w", err)
+	}
+	return oldValue.Severity, nil
+}
+
+// ResetSeverity resets all changes to the "severity" field.
+func (m *EnterpriseUpdateMutation) ResetSeverity() {
+	m.severity = nil
 }
 
 // SetStatus sets the "status" field.
@@ -3596,12 +3707,21 @@ func (m *EnterpriseUpdateMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *EnterpriseUpdateMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 11)
 	if m.title != nil {
 		fields = append(fields, enterpriseupdate.FieldTitle)
 	}
 	if m.content != nil {
 		fields = append(fields, enterpriseupdate.FieldContent)
+	}
+	if m.content_format != nil {
+		fields = append(fields, enterpriseupdate.FieldContentFormat)
+	}
+	if m.category != nil {
+		fields = append(fields, enterpriseupdate.FieldCategory)
+	}
+	if m.severity != nil {
+		fields = append(fields, enterpriseupdate.FieldSeverity)
 	}
 	if m.status != nil {
 		fields = append(fields, enterpriseupdate.FieldStatus)
@@ -3633,6 +3753,12 @@ func (m *EnterpriseUpdateMutation) Field(name string) (ent.Value, bool) {
 		return m.Title()
 	case enterpriseupdate.FieldContent:
 		return m.Content()
+	case enterpriseupdate.FieldContentFormat:
+		return m.ContentFormat()
+	case enterpriseupdate.FieldCategory:
+		return m.Category()
+	case enterpriseupdate.FieldSeverity:
+		return m.Severity()
 	case enterpriseupdate.FieldStatus:
 		return m.Status()
 	case enterpriseupdate.FieldPublishedAt:
@@ -3658,6 +3784,12 @@ func (m *EnterpriseUpdateMutation) OldField(ctx context.Context, name string) (e
 		return m.OldTitle(ctx)
 	case enterpriseupdate.FieldContent:
 		return m.OldContent(ctx)
+	case enterpriseupdate.FieldContentFormat:
+		return m.OldContentFormat(ctx)
+	case enterpriseupdate.FieldCategory:
+		return m.OldCategory(ctx)
+	case enterpriseupdate.FieldSeverity:
+		return m.OldSeverity(ctx)
 	case enterpriseupdate.FieldStatus:
 		return m.OldStatus(ctx)
 	case enterpriseupdate.FieldPublishedAt:
@@ -3692,6 +3824,27 @@ func (m *EnterpriseUpdateMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetContent(v)
+		return nil
+	case enterpriseupdate.FieldContentFormat:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContentFormat(v)
+		return nil
+	case enterpriseupdate.FieldCategory:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCategory(v)
+		return nil
+	case enterpriseupdate.FieldSeverity:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeverity(v)
 		return nil
 	case enterpriseupdate.FieldStatus:
 		v, ok := value.(string)
@@ -3813,6 +3966,15 @@ func (m *EnterpriseUpdateMutation) ResetField(name string) error {
 		return nil
 	case enterpriseupdate.FieldContent:
 		m.ResetContent()
+		return nil
+	case enterpriseupdate.FieldContentFormat:
+		m.ResetContentFormat()
+		return nil
+	case enterpriseupdate.FieldCategory:
+		m.ResetCategory()
+		return nil
+	case enterpriseupdate.FieldSeverity:
+		m.ResetSeverity()
 		return nil
 	case enterpriseupdate.FieldStatus:
 		m.ResetStatus()

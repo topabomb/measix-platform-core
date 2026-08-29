@@ -74,6 +74,21 @@ func Content(v string) predicate.EnterpriseUpdate {
 	return predicate.EnterpriseUpdate(sql.FieldEQ(FieldContent, v))
 }
 
+// ContentFormat applies equality check predicate on the "content_format" field. It's identical to ContentFormatEQ.
+func ContentFormat(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEQ(FieldContentFormat, v))
+}
+
+// Category applies equality check predicate on the "category" field. It's identical to CategoryEQ.
+func Category(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEQ(FieldCategory, v))
+}
+
+// Severity applies equality check predicate on the "severity" field. It's identical to SeverityEQ.
+func Severity(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEQ(FieldSeverity, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.EnterpriseUpdate {
 	return predicate.EnterpriseUpdate(sql.FieldEQ(FieldStatus, v))
@@ -232,6 +247,201 @@ func ContentEqualFold(v string) predicate.EnterpriseUpdate {
 // ContentContainsFold applies the ContainsFold predicate on the "content" field.
 func ContentContainsFold(v string) predicate.EnterpriseUpdate {
 	return predicate.EnterpriseUpdate(sql.FieldContainsFold(FieldContent, v))
+}
+
+// ContentFormatEQ applies the EQ predicate on the "content_format" field.
+func ContentFormatEQ(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEQ(FieldContentFormat, v))
+}
+
+// ContentFormatNEQ applies the NEQ predicate on the "content_format" field.
+func ContentFormatNEQ(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldNEQ(FieldContentFormat, v))
+}
+
+// ContentFormatIn applies the In predicate on the "content_format" field.
+func ContentFormatIn(vs ...string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldIn(FieldContentFormat, vs...))
+}
+
+// ContentFormatNotIn applies the NotIn predicate on the "content_format" field.
+func ContentFormatNotIn(vs ...string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldNotIn(FieldContentFormat, vs...))
+}
+
+// ContentFormatGT applies the GT predicate on the "content_format" field.
+func ContentFormatGT(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldGT(FieldContentFormat, v))
+}
+
+// ContentFormatGTE applies the GTE predicate on the "content_format" field.
+func ContentFormatGTE(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldGTE(FieldContentFormat, v))
+}
+
+// ContentFormatLT applies the LT predicate on the "content_format" field.
+func ContentFormatLT(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldLT(FieldContentFormat, v))
+}
+
+// ContentFormatLTE applies the LTE predicate on the "content_format" field.
+func ContentFormatLTE(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldLTE(FieldContentFormat, v))
+}
+
+// ContentFormatContains applies the Contains predicate on the "content_format" field.
+func ContentFormatContains(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldContains(FieldContentFormat, v))
+}
+
+// ContentFormatHasPrefix applies the HasPrefix predicate on the "content_format" field.
+func ContentFormatHasPrefix(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldHasPrefix(FieldContentFormat, v))
+}
+
+// ContentFormatHasSuffix applies the HasSuffix predicate on the "content_format" field.
+func ContentFormatHasSuffix(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldHasSuffix(FieldContentFormat, v))
+}
+
+// ContentFormatEqualFold applies the EqualFold predicate on the "content_format" field.
+func ContentFormatEqualFold(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEqualFold(FieldContentFormat, v))
+}
+
+// ContentFormatContainsFold applies the ContainsFold predicate on the "content_format" field.
+func ContentFormatContainsFold(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldContainsFold(FieldContentFormat, v))
+}
+
+// CategoryEQ applies the EQ predicate on the "category" field.
+func CategoryEQ(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEQ(FieldCategory, v))
+}
+
+// CategoryNEQ applies the NEQ predicate on the "category" field.
+func CategoryNEQ(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldNEQ(FieldCategory, v))
+}
+
+// CategoryIn applies the In predicate on the "category" field.
+func CategoryIn(vs ...string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldIn(FieldCategory, vs...))
+}
+
+// CategoryNotIn applies the NotIn predicate on the "category" field.
+func CategoryNotIn(vs ...string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldNotIn(FieldCategory, vs...))
+}
+
+// CategoryGT applies the GT predicate on the "category" field.
+func CategoryGT(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldGT(FieldCategory, v))
+}
+
+// CategoryGTE applies the GTE predicate on the "category" field.
+func CategoryGTE(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldGTE(FieldCategory, v))
+}
+
+// CategoryLT applies the LT predicate on the "category" field.
+func CategoryLT(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldLT(FieldCategory, v))
+}
+
+// CategoryLTE applies the LTE predicate on the "category" field.
+func CategoryLTE(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldLTE(FieldCategory, v))
+}
+
+// CategoryContains applies the Contains predicate on the "category" field.
+func CategoryContains(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldContains(FieldCategory, v))
+}
+
+// CategoryHasPrefix applies the HasPrefix predicate on the "category" field.
+func CategoryHasPrefix(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldHasPrefix(FieldCategory, v))
+}
+
+// CategoryHasSuffix applies the HasSuffix predicate on the "category" field.
+func CategoryHasSuffix(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldHasSuffix(FieldCategory, v))
+}
+
+// CategoryEqualFold applies the EqualFold predicate on the "category" field.
+func CategoryEqualFold(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEqualFold(FieldCategory, v))
+}
+
+// CategoryContainsFold applies the ContainsFold predicate on the "category" field.
+func CategoryContainsFold(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldContainsFold(FieldCategory, v))
+}
+
+// SeverityEQ applies the EQ predicate on the "severity" field.
+func SeverityEQ(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEQ(FieldSeverity, v))
+}
+
+// SeverityNEQ applies the NEQ predicate on the "severity" field.
+func SeverityNEQ(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldNEQ(FieldSeverity, v))
+}
+
+// SeverityIn applies the In predicate on the "severity" field.
+func SeverityIn(vs ...string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldIn(FieldSeverity, vs...))
+}
+
+// SeverityNotIn applies the NotIn predicate on the "severity" field.
+func SeverityNotIn(vs ...string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldNotIn(FieldSeverity, vs...))
+}
+
+// SeverityGT applies the GT predicate on the "severity" field.
+func SeverityGT(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldGT(FieldSeverity, v))
+}
+
+// SeverityGTE applies the GTE predicate on the "severity" field.
+func SeverityGTE(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldGTE(FieldSeverity, v))
+}
+
+// SeverityLT applies the LT predicate on the "severity" field.
+func SeverityLT(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldLT(FieldSeverity, v))
+}
+
+// SeverityLTE applies the LTE predicate on the "severity" field.
+func SeverityLTE(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldLTE(FieldSeverity, v))
+}
+
+// SeverityContains applies the Contains predicate on the "severity" field.
+func SeverityContains(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldContains(FieldSeverity, v))
+}
+
+// SeverityHasPrefix applies the HasPrefix predicate on the "severity" field.
+func SeverityHasPrefix(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldHasPrefix(FieldSeverity, v))
+}
+
+// SeverityHasSuffix applies the HasSuffix predicate on the "severity" field.
+func SeverityHasSuffix(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldHasSuffix(FieldSeverity, v))
+}
+
+// SeverityEqualFold applies the EqualFold predicate on the "severity" field.
+func SeverityEqualFold(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldEqualFold(FieldSeverity, v))
+}
+
+// SeverityContainsFold applies the ContainsFold predicate on the "severity" field.
+func SeverityContainsFold(v string) predicate.EnterpriseUpdate {
+	return predicate.EnterpriseUpdate(sql.FieldContainsFold(FieldSeverity, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

@@ -31,6 +31,9 @@ type UpdateView struct {
 	ID           string
 	Title        string
 	Content      string
+	ContentFormat string
+	Category     string
+	Severity     string
 	Status       string
 	PublishedAt  *time.Time
 	FeedRevision int64
@@ -49,7 +52,7 @@ func (s *Service) nextFeedRevision(ctx context.Context) (int64, error) {
 	return row.FeedRevision + 1, nil
 }
 
-func (s *Service) Create(ctx context.Context, createdBy string, title, content string) (UpdateView, error) {
+func (s *Service) Create(ctx context.Context, createdBy, title, content, contentFormat, category, severity string) (UpdateView, error) {
 	now := s.Now().UTC()
 	rev, err := s.nextFeedRevision(ctx)
 	if err != nil {
@@ -59,6 +62,9 @@ func (s *Service) Create(ctx context.Context, createdBy string, title, content s
 		SetID(platformid.New(platformid.EntUpdate)).
 		SetTitle(title).
 		SetContent(content).
+		SetContentFormat(contentFormat).
+		SetCategory(category).
+		SetSeverity(severity).
 		SetStatus("DRAFT").
 		SetFeedRevision(rev).
 		SetCreatedByUserID(createdBy).
@@ -104,7 +110,7 @@ func (s *Service) List(ctx context.Context, limit int) ([]UpdateView, int64, err
 	return views, latestRev.FeedRevision, nil
 }
 
-func (s *Service) Update(ctx context.Context, id, title, content string) (UpdateView, error) {
+func (s *Service) Update(ctx context.Context, id, title, content, contentFormat, category, severity string) (UpdateView, error) {
 	row, err := s.Client.EnterpriseUpdate.Get(ctx, id)
 	if ent.IsNotFound(err) {
 		return UpdateView{}, ErrNotFound
@@ -119,6 +125,9 @@ func (s *Service) Update(ctx context.Context, id, title, content string) (Update
 	updated, err := s.Client.EnterpriseUpdate.UpdateOne(row).
 		SetTitle(title).
 		SetContent(content).
+		SetContentFormat(contentFormat).
+		SetCategory(category).
+		SetSeverity(severity).
 		SetUpdatedAt(now).
 		Save(ctx)
 	if err != nil {
@@ -240,6 +249,9 @@ func toView(row *ent.EnterpriseUpdate) UpdateView {
 		ID:           row.ID,
 		Title:        row.Title,
 		Content:      row.Content,
+		ContentFormat: row.ContentFormat,
+		Category:     row.Category,
+		Severity:     row.Severity,
 		Status:       row.Status,
 		PublishedAt:  row.PublishedAt,
 		FeedRevision: row.FeedRevision,
@@ -254,6 +266,9 @@ func ToAdminWire(v UpdateView) adminapi.EnterpriseUpdate {
 		EnterpriseUpdateId: adminapi.EnterpriseUpdateId(v.ID),
 		Title:              v.Title,
 		Content:            v.Content,
+		ContentFormat:      adminapi.EnterpriseUpdateContentFormat(v.ContentFormat),
+		Category:           adminapi.EnterpriseUpdateCategory(v.Category),
+		Severity:           adminapi.EnterpriseUpdateSeverity(v.Severity),
 		Status:             status,
 		FeedRevision:       int(v.FeedRevision),
 		CreatedAt:          v.CreatedAt,

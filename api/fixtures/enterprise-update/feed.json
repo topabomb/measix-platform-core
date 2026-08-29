@@ -4,13 +4,19 @@
     {
       "updateId": "eup_550e8400-e29b-41d4-a716-446655440000",
       "title": "Q3 Company Update",
-      "content": "We are excited to announce that our platform has been upgraded with new enterprise features.",
+      "content": "## Platform Upgrade\n\nWe are excited to announce that our platform has been **upgraded** with new enterprise features.\n\n- Managed assistants\n- Enterprise updates\n\nVisit the [documentation](https://docs.example.com) for details.",
+      "contentFormat": "MARKDOWN",
+      "category": "ANNOUNCEMENT",
+      "severity": "INFO",
       "publishedAt": "2026-08-28T10:00:00Z"
     },
     {
       "updateId": "eup_770e8400-e29b-41d4-a716-446655440000",
-      "title": "New Office Opening",
-      "content": "Our new Shanghai office will open in September 2026.",
+      "title": "Scheduled Maintenance",
+      "content": "The platform will undergo scheduled maintenance on September 1, 2026, from 02:00 to 04:00 UTC. Please plan accordingly.",
+      "contentFormat": "PLAIN",
+      "category": "MAINTENANCE",
+      "severity": "WARNING",
       "publishedAt": "2026-08-27T08:00:00Z"
     }
   ],

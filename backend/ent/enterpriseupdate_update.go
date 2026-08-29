@@ -56,6 +56,48 @@ func (_u *EnterpriseUpdateUpdate) SetNillableContent(v *string) *EnterpriseUpdat
 	return _u
 }
 
+// SetContentFormat sets the "content_format" field.
+func (_u *EnterpriseUpdateUpdate) SetContentFormat(v string) *EnterpriseUpdateUpdate {
+	_u.mutation.SetContentFormat(v)
+	return _u
+}
+
+// SetNillableContentFormat sets the "content_format" field if the given value is not nil.
+func (_u *EnterpriseUpdateUpdate) SetNillableContentFormat(v *string) *EnterpriseUpdateUpdate {
+	if v != nil {
+		_u.SetContentFormat(*v)
+	}
+	return _u
+}
+
+// SetCategory sets the "category" field.
+func (_u *EnterpriseUpdateUpdate) SetCategory(v string) *EnterpriseUpdateUpdate {
+	_u.mutation.SetCategory(v)
+	return _u
+}
+
+// SetNillableCategory sets the "category" field if the given value is not nil.
+func (_u *EnterpriseUpdateUpdate) SetNillableCategory(v *string) *EnterpriseUpdateUpdate {
+	if v != nil {
+		_u.SetCategory(*v)
+	}
+	return _u
+}
+
+// SetSeverity sets the "severity" field.
+func (_u *EnterpriseUpdateUpdate) SetSeverity(v string) *EnterpriseUpdateUpdate {
+	_u.mutation.SetSeverity(v)
+	return _u
+}
+
+// SetNillableSeverity sets the "severity" field if the given value is not nil.
+func (_u *EnterpriseUpdateUpdate) SetNillableSeverity(v *string) *EnterpriseUpdateUpdate {
+	if v != nil {
+		_u.SetSeverity(*v)
+	}
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *EnterpriseUpdateUpdate) SetStatus(v string) *EnterpriseUpdateUpdate {
 	_u.mutation.SetStatus(v)
@@ -200,6 +242,15 @@ func (_u *EnterpriseUpdateUpdate) sqlSave(ctx context.Context) (_node int, err e
 	if value, ok := _u.mutation.Content(); ok {
 		_spec.SetField(enterpriseupdate.FieldContent, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.ContentFormat(); ok {
+		_spec.SetField(enterpriseupdate.FieldContentFormat, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Category(); ok {
+		_spec.SetField(enterpriseupdate.FieldCategory, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Severity(); ok {
+		_spec.SetField(enterpriseupdate.FieldSeverity, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(enterpriseupdate.FieldStatus, field.TypeString, value)
 	}
@@ -268,6 +319,48 @@ func (_u *EnterpriseUpdateUpdateOne) SetContent(v string) *EnterpriseUpdateUpdat
 func (_u *EnterpriseUpdateUpdateOne) SetNillableContent(v *string) *EnterpriseUpdateUpdateOne {
 	if v != nil {
 		_u.SetContent(*v)
+	}
+	return _u
+}
+
+// SetContentFormat sets the "content_format" field.
+func (_u *EnterpriseUpdateUpdateOne) SetContentFormat(v string) *EnterpriseUpdateUpdateOne {
+	_u.mutation.SetContentFormat(v)
+	return _u
+}
+
+// SetNillableContentFormat sets the "content_format" field if the given value is not nil.
+func (_u *EnterpriseUpdateUpdateOne) SetNillableContentFormat(v *string) *EnterpriseUpdateUpdateOne {
+	if v != nil {
+		_u.SetContentFormat(*v)
+	}
+	return _u
+}
+
+// SetCategory sets the "category" field.
+func (_u *EnterpriseUpdateUpdateOne) SetCategory(v string) *EnterpriseUpdateUpdateOne {
+	_u.mutation.SetCategory(v)
+	return _u
+}
+
+// SetNillableCategory sets the "category" field if the given value is not nil.
+func (_u *EnterpriseUpdateUpdateOne) SetNillableCategory(v *string) *EnterpriseUpdateUpdateOne {
+	if v != nil {
+		_u.SetCategory(*v)
+	}
+	return _u
+}
+
+// SetSeverity sets the "severity" field.
+func (_u *EnterpriseUpdateUpdateOne) SetSeverity(v string) *EnterpriseUpdateUpdateOne {
+	_u.mutation.SetSeverity(v)
+	return _u
+}
+
+// SetNillableSeverity sets the "severity" field if the given value is not nil.
+func (_u *EnterpriseUpdateUpdateOne) SetNillableSeverity(v *string) *EnterpriseUpdateUpdateOne {
+	if v != nil {
+		_u.SetSeverity(*v)
 	}
 	return _u
 }
@@ -445,6 +538,15 @@ func (_u *EnterpriseUpdateUpdateOne) sqlSave(ctx context.Context) (_node *Enterp
 	}
 	if value, ok := _u.mutation.Content(); ok {
 		_spec.SetField(enterpriseupdate.FieldContent, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ContentFormat(); ok {
+		_spec.SetField(enterpriseupdate.FieldContentFormat, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Category(); ok {
+		_spec.SetField(enterpriseupdate.FieldCategory, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Severity(); ok {
+		_spec.SetField(enterpriseupdate.FieldSeverity, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(enterpriseupdate.FieldStatus, field.TypeString, value)

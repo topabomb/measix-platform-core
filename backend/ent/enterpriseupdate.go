@@ -21,6 +21,12 @@ type EnterpriseUpdate struct {
 	Title string `json:"title,omitempty"`
 	// Content holds the value of the "content" field.
 	Content string `json:"content,omitempty"`
+	// ContentFormat holds the value of the "content_format" field.
+	ContentFormat string `json:"content_format,omitempty"`
+	// Category holds the value of the "category" field.
+	Category string `json:"category,omitempty"`
+	// Severity holds the value of the "severity" field.
+	Severity string `json:"severity,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// PublishedAt holds the value of the "published_at" field.
@@ -43,7 +49,7 @@ func (*EnterpriseUpdate) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case enterpriseupdate.FieldFeedRevision:
 			values[i] = new(sql.NullInt64)
-		case enterpriseupdate.FieldID, enterpriseupdate.FieldTitle, enterpriseupdate.FieldContent, enterpriseupdate.FieldStatus, enterpriseupdate.FieldCreatedByUserID:
+		case enterpriseupdate.FieldID, enterpriseupdate.FieldTitle, enterpriseupdate.FieldContent, enterpriseupdate.FieldContentFormat, enterpriseupdate.FieldCategory, enterpriseupdate.FieldSeverity, enterpriseupdate.FieldStatus, enterpriseupdate.FieldCreatedByUserID:
 			values[i] = new(sql.NullString)
 		case enterpriseupdate.FieldPublishedAt, enterpriseupdate.FieldCreatedAt, enterpriseupdate.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -79,6 +85,24 @@ func (_m *EnterpriseUpdate) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field content", values[i])
 			} else if value.Valid {
 				_m.Content = value.String
+			}
+		case enterpriseupdate.FieldContentFormat:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field content_format", values[i])
+			} else if value.Valid {
+				_m.ContentFormat = value.String
+			}
+		case enterpriseupdate.FieldCategory:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field category", values[i])
+			} else if value.Valid {
+				_m.Category = value.String
+			}
+		case enterpriseupdate.FieldSeverity:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field severity", values[i])
+			} else if value.Valid {
+				_m.Severity = value.String
 			}
 		case enterpriseupdate.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -158,6 +182,15 @@ func (_m *EnterpriseUpdate) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("content=")
 	builder.WriteString(_m.Content)
+	builder.WriteString(", ")
+	builder.WriteString("content_format=")
+	builder.WriteString(_m.ContentFormat)
+	builder.WriteString(", ")
+	builder.WriteString("category=")
+	builder.WriteString(_m.Category)
+	builder.WriteString(", ")
+	builder.WriteString("severity=")
+	builder.WriteString(_m.Severity)
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

@@ -2,8 +2,27 @@
 
 package ent
 
+import (
+	"measix/platform/ent/enterpriseupdate"
+	"measix/platform/ent/schema"
+)
+
 // The init function reads all schema descriptors with runtime code
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	enterpriseupdateFields := schema.EnterpriseUpdate{}.Fields()
+	_ = enterpriseupdateFields
+	// enterpriseupdateDescContentFormat is the schema descriptor for content_format field.
+	enterpriseupdateDescContentFormat := enterpriseupdateFields[3].Descriptor()
+	// enterpriseupdate.DefaultContentFormat holds the default value on creation for the content_format field.
+	enterpriseupdate.DefaultContentFormat = enterpriseupdateDescContentFormat.Default.(string)
+	// enterpriseupdateDescCategory is the schema descriptor for category field.
+	enterpriseupdateDescCategory := enterpriseupdateFields[4].Descriptor()
+	// enterpriseupdate.DefaultCategory holds the default value on creation for the category field.
+	enterpriseupdate.DefaultCategory = enterpriseupdateDescCategory.Default.(string)
+	// enterpriseupdateDescSeverity is the schema descriptor for severity field.
+	enterpriseupdateDescSeverity := enterpriseupdateFields[5].Descriptor()
+	// enterpriseupdate.DefaultSeverity holds the default value on creation for the severity field.
+	enterpriseupdate.DefaultSeverity = enterpriseupdateDescSeverity.Default.(string)
 }

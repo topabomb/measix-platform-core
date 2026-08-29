@@ -43,7 +43,7 @@ func (h *fullAdminHandler) CreateEnterpriseUpdate(w http.ResponseWriter, r *http
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	item, err := h.services.EnterpriseUpdate.Create(r.Context(), admin.UserID, request.Title, request.Content)
+	item, err := h.services.EnterpriseUpdate.Create(r.Context(), admin.UserID, request.Title, request.Content, string(request.ContentFormat), string(request.Category), string(request.Severity))
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
@@ -78,7 +78,7 @@ func (h *fullAdminHandler) UpdateEnterpriseUpdate(w http.ResponseWriter, r *http
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	item, err := h.services.EnterpriseUpdate.Update(r.Context(), string(enterpriseUpdateID), request.Title, request.Content)
+	item, err := h.services.EnterpriseUpdate.Update(r.Context(), string(enterpriseUpdateID), request.Title, request.Content, string(request.ContentFormat), string(request.Category), string(request.Severity))
 	if errors.Is(err, enterpriseupdate.ErrNotFound) {
 		writeProblem(w, http.StatusNotFound, "not_found", "Enterprise update not found")
 		return

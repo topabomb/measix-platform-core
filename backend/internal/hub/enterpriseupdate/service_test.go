@@ -27,7 +27,7 @@ func setupService(t *testing.T) (*enterpriseupdate.Service, context.Context, str
 // ERX-UPD-001: Admin Draft→Publish makes item client-visible.
 func TestERXUPD001DraftToPublishMakesItemClientVisible(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
-	created, err := svc.Create(ctx, adminID, "Title 1", "Content 1")
+	created, err := svc.Create(ctx, adminID, "Title 1", "Content 1", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestERXUPD001DraftToPublishMakesItemClientVisible(t *testing.T) {
 // ERX-UPD-002: Withdraw removes item after successful refresh.
 func TestERXUPD002WithdrawRemovesItemFromPublished(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
-	created, err := svc.Create(ctx, adminID, "Title 1", "Content 1")
+	created, err := svc.Create(ctx, adminID, "Title 1", "Content 1", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestERXUPD002WithdrawRemovesItemFromPublished(t *testing.T) {
 func TestERXUPD003FeedRevisionChangesButIndependentFromGeneration(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
 	// Create and publish first update
-	first, err := svc.Create(ctx, adminID, "First", "Content 1")
+	first, err := svc.Create(ctx, adminID, "First", "Content 1", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestERXUPD003FeedRevisionChangesButIndependentFromGeneration(t *testing.T) 
 		t.Fatal("feed revision should be > 0 after publish")
 	}
 	// Create and publish second update
-	second, err := svc.Create(ctx, adminID, "Second", "Content 2")
+	second, err := svc.Create(ctx, adminID, "Second", "Content 2", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,12 +142,12 @@ func TestERXUPD003FeedRevisionChangesButIndependentFromGeneration(t *testing.T) 
 func TestERXUPD004OnlyPublishedOrderedNewestFirst(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
 	// Create a DRAFT that should NOT appear in published list
-	draft, err := svc.Create(ctx, adminID, "Draft", "Should not be visible")
+	draft, err := svc.Create(ctx, adminID, "Draft", "Should not be visible", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Create and publish first
-	first, err := svc.Create(ctx, adminID, "First Published", "Content 1")
+	first, err := svc.Create(ctx, adminID, "First Published", "Content 1", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestERXUPD004OnlyPublishedOrderedNewestFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Create and publish second (later)
-	second, err := svc.Create(ctx, adminID, "Second Published", "Content 2")
+	second, err := svc.Create(ctx, adminID, "Second Published", "Content 2", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestERXUPD004OnlyPublishedOrderedNewestFirst(t *testing.T) {
 func TestERXB001NoDatesDefaultLimit10(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
 	for i := 0; i < 15; i++ {
-		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		item, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -214,7 +214,7 @@ func TestERXB001NoDatesDefaultLimit10(t *testing.T) {
 func TestERXB002NoDatesLimitN(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
 	for i := 0; i < 10; i++ {
-		item, _ := svc.Create(ctx, adminID, "Title", "Content")
+		item, _ := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		svc.Publish(ctx, item.ID)
 	}
 	items, truncated, err := svc.ListPublished(ctx, nil, nil, 3)
@@ -259,7 +259,7 @@ func TestERXB007InvalidLimitRejected(t *testing.T) {
 func TestERXB009OverflowSetsTruncated(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
 	for i := 0; i < 5; i++ {
-		item, _ := svc.Create(ctx, adminID, "Title", "Content")
+		item, _ := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		svc.Publish(ctx, item.ID)
 	}
 	items, truncated, err := svc.ListPublished(ctx, nil, nil, 3)
@@ -277,7 +277,7 @@ func TestERXB009OverflowSetsTruncated(t *testing.T) {
 // Test that Create generates valid eup_ IDs.
 func TestCreateGeneratesValidIds(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
-	item, err := svc.Create(ctx, adminID, "Title", "Content")
+	item, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,24 +289,33 @@ func TestCreateGeneratesValidIds(t *testing.T) {
 // Test that Update only works on DRAFT items.
 func TestUpdateOnlyOnDraft(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
-	created, err := svc.Create(ctx, adminID, "Title", "Content")
+	created, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Update should work on DRAFT
-	updated, err := svc.Update(ctx, created.ID, "New Title", "New Content")
+	updated, err := svc.Update(ctx, created.ID, "New Title", "New Content", "MARKDOWN", "ANNOUNCEMENT", "WARNING")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if updated.Title != "New Title" {
 		t.Fatalf("expected title 'New Title', got %s", updated.Title)
 	}
+	if updated.ContentFormat != "MARKDOWN" {
+		t.Fatalf("expected contentFormat 'MARKDOWN', got %s", updated.ContentFormat)
+	}
+	if updated.Category != "ANNOUNCEMENT" {
+		t.Fatalf("expected category 'ANNOUNCEMENT', got %s", updated.Category)
+	}
+	if updated.Severity != "WARNING" {
+		t.Fatalf("expected severity 'WARNING', got %s", updated.Severity)
+	}
 	// Publish
 	if _, err := svc.Publish(ctx, created.ID); err != nil {
 		t.Fatal(err)
 	}
 	// Update should fail on PUBLISHED
-	_, err = svc.Update(ctx, created.ID, "Again", "Again")
+	_, err = svc.Update(ctx, created.ID, "Again", "Again", "PLAIN", "NOTICE", "INFO")
 	if err != enterpriseupdate.ErrInvalidStatus {
 		t.Fatalf("expected ErrInvalidStatus, got %v", err)
 	}
@@ -315,7 +324,7 @@ func TestUpdateOnlyOnDraft(t *testing.T) {
 // Test that Publish only works on DRAFT items.
 func TestPublishOnlyOnDraft(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
-	created, err := svc.Create(ctx, adminID, "Title", "Content")
+	created, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +341,7 @@ func TestPublishOnlyOnDraft(t *testing.T) {
 // Test that Withdraw only works on PUBLISHED items.
 func TestWithdrawOnlyOnPublished(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
-	created, err := svc.Create(ctx, adminID, "Title", "Content")
+	created, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +370,7 @@ func TestListPublishedDateFiltering(t *testing.T) {
 		svc.Now = func(d int) func() time.Time {
 			return func() time.Time { return time.Date(2026, 8, d, 12, 0, 0, 0, time.UTC) }
 		}(day)
-		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		item, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -405,7 +414,7 @@ func TestERXB003StartOnlyReturnsStartDateThroughToday(t *testing.T) {
 		svc.Now = func(d int) func() time.Time {
 			return func() time.Time { return time.Date(2026, 8, d, 12, 0, 0, 0, time.UTC) }
 		}(day)
-		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		item, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -435,7 +444,7 @@ func TestERXB004EndOnlyReturnsLatestUpToEndDate(t *testing.T) {
 		svc.Now = func(d int) func() time.Time {
 			return func() time.Time { return time.Date(2026, 8, d, 12, 0, 0, 0, time.UTC) }
 		}(day)
-		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		item, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -465,7 +474,7 @@ func TestERXB005BothDatesInclusiveClosedInterval(t *testing.T) {
 		svc.Now = func(d int) func() time.Time {
 			return func() time.Time { return time.Date(2026, 8, d, 12, 0, 0, 0, time.UTC) }
 		}(day)
-		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		item, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -507,7 +516,7 @@ func TestERXB008TimezoneAndNewestFirstOrdering(t *testing.T) {
 	}
 	for _, ts := range times {
 		svc.Now = func(t time.Time) func() time.Time { return func() time.Time { return t } }(ts)
-		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		item, err := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -538,13 +547,13 @@ func TestERXB008TimezoneAndNewestFirstOrdering(t *testing.T) {
 func TestERXB010OnlyPublishedContentVisible(t *testing.T) {
 	svc, ctx, adminID := setupService(t)
 	// Create a DRAFT, a PUBLISHED, and a WITHDRAWN item
-	draft, err := svc.Create(ctx, adminID, "Draft", "Draft content")
+	draft, err := svc.Create(ctx, adminID, "Draft", "Draft content", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = draft // draft remains DRAFT — should not appear in ListPublished
 
-	pub, err := svc.Create(ctx, adminID, "Published", "Published content")
+	pub, err := svc.Create(ctx, adminID, "Published", "Published content", "MARKDOWN", "ANNOUNCEMENT", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,7 +561,7 @@ func TestERXB010OnlyPublishedContentVisible(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	withdrawn, err := svc.Create(ctx, adminID, "Withdrawn", "Withdrawn content")
+	withdrawn, err := svc.Create(ctx, adminID, "Withdrawn", "Withdrawn content", "PLAIN", "MAINTENANCE", "WARNING")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -589,7 +598,7 @@ func TestLatestFeedRevision(t *testing.T) {
 		t.Fatalf("expected revision 0 for empty feed, got %d", rev)
 	}
 	// Create and publish first item
-	first, err := svc.Create(ctx, adminID, "First", "Content")
+	first, err := svc.Create(ctx, adminID, "First", "Content", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,7 +614,7 @@ func TestLatestFeedRevision(t *testing.T) {
 		t.Fatalf("expected revision %d, got %d", firstPub.FeedRevision, rev)
 	}
 	// Create a DRAFT — it should have a higher revision and LatestFeedRevision should reflect it
-	draftItem, err := svc.Create(ctx, adminID, "Draft", "Content")
+	draftItem, err := svc.Create(ctx, adminID, "Draft", "Content", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
 	}

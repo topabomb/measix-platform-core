@@ -92,6 +92,66 @@ func (e EnrollmentExchangeRequestPlatform) Valid() bool {
 	}
 }
 
+// Defines values for EnterpriseUpdateCategory.
+const (
+	ANNOUNCEMENT EnterpriseUpdateCategory = "ANNOUNCEMENT"
+	MAINTENANCE  EnterpriseUpdateCategory = "MAINTENANCE"
+	NOTICE       EnterpriseUpdateCategory = "NOTICE"
+)
+
+// Valid indicates whether the value is a known member of the EnterpriseUpdateCategory enum.
+func (e EnterpriseUpdateCategory) Valid() bool {
+	switch e {
+	case ANNOUNCEMENT:
+		return true
+	case MAINTENANCE:
+		return true
+	case NOTICE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EnterpriseUpdateContentFormat.
+const (
+	MARKDOWN EnterpriseUpdateContentFormat = "MARKDOWN"
+	PLAIN    EnterpriseUpdateContentFormat = "PLAIN"
+)
+
+// Valid indicates whether the value is a known member of the EnterpriseUpdateContentFormat enum.
+func (e EnterpriseUpdateContentFormat) Valid() bool {
+	switch e {
+	case MARKDOWN:
+		return true
+	case PLAIN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EnterpriseUpdateSeverity.
+const (
+	EnterpriseUpdateSeverityCRITICAL EnterpriseUpdateSeverity = "CRITICAL"
+	EnterpriseUpdateSeverityINFO     EnterpriseUpdateSeverity = "INFO"
+	EnterpriseUpdateSeverityWARNING  EnterpriseUpdateSeverity = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the EnterpriseUpdateSeverity enum.
+func (e EnterpriseUpdateSeverity) Valid() bool {
+	switch e {
+	case EnterpriseUpdateSeverityCRITICAL:
+		return true
+	case EnterpriseUpdateSeverityINFO:
+		return true
+	case EnterpriseUpdateSeverityWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ManagedSnapshotSchemaVersion.
 const (
 	ManagedSnapshotSchemaVersionN1 ManagedSnapshotSchemaVersion = 1
@@ -271,16 +331,16 @@ func (e TtsDefinitionClientProtocol) Valid() bool {
 
 // Defines values for ValidationIssueSeverity.
 const (
-	ERROR   ValidationIssueSeverity = "ERROR"
-	WARNING ValidationIssueSeverity = "WARNING"
+	ValidationIssueSeverityERROR   ValidationIssueSeverity = "ERROR"
+	ValidationIssueSeverityWARNING ValidationIssueSeverity = "WARNING"
 )
 
 // Valid indicates whether the value is a known member of the ValidationIssueSeverity enum.
 func (e ValidationIssueSeverity) Valid() bool {
 	switch e {
-	case ERROR:
+	case ValidationIssueSeverityERROR:
 		return true
-	case WARNING:
+	case ValidationIssueSeverityWARNING:
 		return true
 	default:
 		return false
@@ -399,6 +459,12 @@ type EnrollmentExchangeResponse struct {
 // EnrollmentId defines model for EnrollmentId.
 type EnrollmentId = string
 
+// EnterpriseUpdateCategory defines model for EnterpriseUpdateCategory.
+type EnterpriseUpdateCategory string
+
+// EnterpriseUpdateContentFormat defines model for EnterpriseUpdateContentFormat.
+type EnterpriseUpdateContentFormat string
+
 // EnterpriseUpdateFeed defines model for EnterpriseUpdateFeed.
 type EnterpriseUpdateFeed struct {
 	EnterpriseTimezone string                 `json:"enterpriseTimezone"`
@@ -411,11 +477,17 @@ type EnterpriseUpdateId = string
 
 // EnterpriseUpdateItem defines model for EnterpriseUpdateItem.
 type EnterpriseUpdateItem struct {
-	Content     string             `json:"content"`
-	PublishedAt time.Time          `json:"publishedAt"`
-	Title       string             `json:"title"`
-	UpdateId    EnterpriseUpdateId `json:"updateId"`
+	Category      EnterpriseUpdateCategory      `json:"category"`
+	Content       string                        `json:"content"`
+	ContentFormat EnterpriseUpdateContentFormat `json:"contentFormat"`
+	PublishedAt   time.Time                     `json:"publishedAt"`
+	Severity      EnterpriseUpdateSeverity      `json:"severity"`
+	Title         string                        `json:"title"`
+	UpdateId      EnterpriseUpdateId            `json:"updateId"`
 }
+
+// EnterpriseUpdateSeverity defines model for EnterpriseUpdateSeverity.
+type EnterpriseUpdateSeverity string
 
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string

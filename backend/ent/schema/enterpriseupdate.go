@@ -13,6 +13,9 @@ func (EnterpriseUpdate) Fields() []ent.Field {
 		field.String("id").Immutable(),
 		field.String("title"),
 		field.Text("content"),
+		field.String("content_format").Default("PLAIN"),
+		field.String("category").Default("NOTICE"),
+		field.String("severity").Default("INFO"),
 		field.String("status"),
 		field.Time("published_at").Optional().Nillable(),
 		field.Int64("feed_revision"),
@@ -27,5 +30,7 @@ func (EnterpriseUpdate) Indexes() []ent.Index {
 		index.Fields("status"),
 		index.Fields("feed_revision"),
 		index.Fields("published_at"),
+		index.Fields("category"),
+		index.Fields("severity"),
 	}
 }

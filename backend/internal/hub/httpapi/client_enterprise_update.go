@@ -76,9 +76,12 @@ func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http
 	feedItems := make([]clientapi.EnterpriseUpdateItem, 0, len(items))
 	for _, item := range items {
 		entry := clientapi.EnterpriseUpdateItem{
-			UpdateId: clientapi.EnterpriseUpdateId(item.ID),
-			Title:    item.Title,
-			Content:  item.Content,
+			UpdateId:      clientapi.EnterpriseUpdateId(item.ID),
+			Title:         item.Title,
+			Content:       item.Content,
+			ContentFormat: clientapi.EnterpriseUpdateContentFormat(item.ContentFormat),
+			Category:      clientapi.EnterpriseUpdateCategory(item.Category),
+			Severity:      clientapi.EnterpriseUpdateSeverity(item.Severity),
 		}
 		if item.PublishedAt != nil {
 			entry.PublishedAt = *item.PublishedAt
@@ -125,9 +128,12 @@ func (h *fullClientHandler) GetEnterpriseUpdate(w http.ResponseWriter, r *http.R
 		return
 	}
 	entry := clientapi.EnterpriseUpdateItem{
-		UpdateId: clientapi.EnterpriseUpdateId(item.ID),
-		Title:    item.Title,
-		Content:  item.Content,
+		UpdateId:      clientapi.EnterpriseUpdateId(item.ID),
+		Title:         item.Title,
+		Content:       item.Content,
+		ContentFormat: clientapi.EnterpriseUpdateContentFormat(item.ContentFormat),
+		Category:      clientapi.EnterpriseUpdateCategory(item.Category),
+		Severity:      clientapi.EnterpriseUpdateSeverity(item.Severity),
 	}
 	if item.PublishedAt != nil {
 		entry.PublishedAt = *item.PublishedAt

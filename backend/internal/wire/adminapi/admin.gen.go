@@ -151,6 +151,66 @@ func (e DeviceStatus) Valid() bool {
 	}
 }
 
+// Defines values for EnterpriseUpdateCategory.
+const (
+	ANNOUNCEMENT EnterpriseUpdateCategory = "ANNOUNCEMENT"
+	MAINTENANCE  EnterpriseUpdateCategory = "MAINTENANCE"
+	NOTICE       EnterpriseUpdateCategory = "NOTICE"
+)
+
+// Valid indicates whether the value is a known member of the EnterpriseUpdateCategory enum.
+func (e EnterpriseUpdateCategory) Valid() bool {
+	switch e {
+	case ANNOUNCEMENT:
+		return true
+	case MAINTENANCE:
+		return true
+	case NOTICE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EnterpriseUpdateContentFormat.
+const (
+	MARKDOWN EnterpriseUpdateContentFormat = "MARKDOWN"
+	PLAIN    EnterpriseUpdateContentFormat = "PLAIN"
+)
+
+// Valid indicates whether the value is a known member of the EnterpriseUpdateContentFormat enum.
+func (e EnterpriseUpdateContentFormat) Valid() bool {
+	switch e {
+	case MARKDOWN:
+		return true
+	case PLAIN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EnterpriseUpdateSeverity.
+const (
+	EnterpriseUpdateSeverityCRITICAL EnterpriseUpdateSeverity = "CRITICAL"
+	EnterpriseUpdateSeverityINFO     EnterpriseUpdateSeverity = "INFO"
+	EnterpriseUpdateSeverityWARNING  EnterpriseUpdateSeverity = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the EnterpriseUpdateSeverity enum.
+func (e EnterpriseUpdateSeverity) Valid() bool {
+	switch e {
+	case EnterpriseUpdateSeverityCRITICAL:
+		return true
+	case EnterpriseUpdateSeverityINFO:
+		return true
+	case EnterpriseUpdateSeverityWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EnterpriseUpdateStatus.
 const (
 	DRAFT     EnterpriseUpdateStatus = "DRAFT"
@@ -936,8 +996,11 @@ type CreateEnrollmentResponse struct {
 
 // CreateEnterpriseUpdateRequest defines model for CreateEnterpriseUpdateRequest.
 type CreateEnterpriseUpdateRequest struct {
-	Content string `json:"content"`
-	Title   string `json:"title"`
+	Category      EnterpriseUpdateCategory      `json:"category"`
+	Content       string                        `json:"content"`
+	ContentFormat EnterpriseUpdateContentFormat `json:"contentFormat"`
+	Severity      EnterpriseUpdateSeverity      `json:"severity"`
+	Title         string                        `json:"title"`
 }
 
 // CreateSecretRequest defines model for CreateSecretRequest.
@@ -1023,15 +1086,24 @@ type EnrollmentId = string
 
 // EnterpriseUpdate defines model for EnterpriseUpdate.
 type EnterpriseUpdate struct {
-	Content            string                 `json:"content"`
-	CreatedAt          time.Time              `json:"createdAt"`
-	EnterpriseUpdateId EnterpriseUpdateId     `json:"enterpriseUpdateId"`
-	FeedRevision       int                    `json:"feedRevision"`
-	PublishedAt        time.Time              `json:"publishedAt"`
-	Status             EnterpriseUpdateStatus `json:"status"`
-	Title              string                 `json:"title"`
-	UpdatedAt          time.Time              `json:"updatedAt"`
+	Category           EnterpriseUpdateCategory      `json:"category"`
+	Content            string                        `json:"content"`
+	ContentFormat      EnterpriseUpdateContentFormat `json:"contentFormat"`
+	CreatedAt          time.Time                     `json:"createdAt"`
+	EnterpriseUpdateId EnterpriseUpdateId            `json:"enterpriseUpdateId"`
+	FeedRevision       int                           `json:"feedRevision"`
+	PublishedAt        time.Time                     `json:"publishedAt"`
+	Severity           EnterpriseUpdateSeverity      `json:"severity"`
+	Status             EnterpriseUpdateStatus        `json:"status"`
+	Title              string                        `json:"title"`
+	UpdatedAt          time.Time                     `json:"updatedAt"`
 }
+
+// EnterpriseUpdateCategory defines model for EnterpriseUpdateCategory.
+type EnterpriseUpdateCategory string
+
+// EnterpriseUpdateContentFormat defines model for EnterpriseUpdateContentFormat.
+type EnterpriseUpdateContentFormat string
 
 // EnterpriseUpdateId defines model for EnterpriseUpdateId.
 type EnterpriseUpdateId = string
@@ -1042,6 +1114,9 @@ type EnterpriseUpdatePage struct {
 	Items        []EnterpriseUpdate `json:"items"`
 	NextCursor   *string            `json:"nextCursor,omitempty"`
 }
+
+// EnterpriseUpdateSeverity defines model for EnterpriseUpdateSeverity.
+type EnterpriseUpdateSeverity string
 
 // EnterpriseUpdateStatus defines model for EnterpriseUpdateStatus.
 type EnterpriseUpdateStatus string
@@ -1407,8 +1482,11 @@ type TtsId = string
 
 // UpdateEnterpriseUpdateRequest defines model for UpdateEnterpriseUpdateRequest.
 type UpdateEnterpriseUpdateRequest struct {
-	Content string `json:"content"`
-	Title   string `json:"title"`
+	Category      EnterpriseUpdateCategory      `json:"category"`
+	Content       string                        `json:"content"`
+	ContentFormat EnterpriseUpdateContentFormat `json:"contentFormat"`
+	Severity      EnterpriseUpdateSeverity      `json:"severity"`
+	Title         string                        `json:"title"`
 }
 
 // UpdateUpstreamRequest defines model for UpdateUpstreamRequest.

@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	ErrNotFound       = errors.New("enterprise update not found")
-	ErrInvalidStatus  = errors.New("invalid status transition")
-	ErrInvalidLimit   = errors.New("limit must be between 1 and 20")
+	ErrNotFound         = errors.New("enterprise update not found")
+	ErrInvalidStatus    = errors.New("invalid status transition")
+	ErrInvalidLimit     = errors.New("limit must be between 1 and 20")
 	ErrInvalidDateRange = errors.New("start_date must not be after end_date")
 )
 
@@ -28,17 +28,17 @@ func NewService(client *ent.Client) *Service {
 }
 
 type UpdateView struct {
-	ID           string
-	Title        string
-	Content      string
+	ID            string
+	Title         string
+	Content       string
 	ContentFormat string
-	Category     string
-	Severity     string
-	Status       string
-	PublishedAt  *time.Time
-	FeedRevision int64
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	Category      string
+	Severity      string
+	Status        string
+	PublishedAt   *time.Time
+	FeedRevision  int64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 func (s *Service) nextFeedRevision(ctx context.Context) (int64, error) {
@@ -246,17 +246,17 @@ func (s *Service) LatestFeedRevision(ctx context.Context) (int64, error) {
 
 func toView(row *ent.EnterpriseUpdate) UpdateView {
 	return UpdateView{
-		ID:           row.ID,
-		Title:        row.Title,
-		Content:      row.Content,
+		ID:            row.ID,
+		Title:         row.Title,
+		Content:       row.Content,
 		ContentFormat: row.ContentFormat,
-		Category:     row.Category,
-		Severity:     row.Severity,
-		Status:       row.Status,
-		PublishedAt:  row.PublishedAt,
-		FeedRevision: row.FeedRevision,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
+		Category:      row.Category,
+		Severity:      row.Severity,
+		Status:        row.Status,
+		PublishedAt:   row.PublishedAt,
+		FeedRevision:  row.FeedRevision,
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
 	}
 }
 

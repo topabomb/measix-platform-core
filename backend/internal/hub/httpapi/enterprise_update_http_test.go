@@ -33,7 +33,7 @@ func setupFullHandler(t *testing.T) (http.Handler, *identity.Service, *enterpris
 
 	h := httpapi.NewFull(httpapi.Services{
 		Identity:         idSvc,
-		EnterpriseUpdate:  euSvc,
+		EnterpriseUpdate: euSvc,
 		BuildVersion:     "test",
 	}, httpapi.Options{
 		PublicBaseURL:  "https://measix.test",
@@ -404,8 +404,8 @@ func TestERXUPDHTTP006ClientListPublishedOnly(t *testing.T) {
 		t.Fatalf("client list status=%d body=%s", resp.Code, resp.Body.String())
 	}
 	var feed struct {
-		Items   []map[string]any `json:"items"`
-		Truncated bool           `json:"truncated"`
+		Items     []map[string]any `json:"items"`
+		Truncated bool             `json:"truncated"`
 	}
 	decodeJSON(t, resp, &feed)
 	if len(feed.Items) != 1 {

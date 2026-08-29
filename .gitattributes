@@ -18,6 +18,9 @@ Makefile text eol=lf
 *.sql text eol=lf
 atlas.sum text eol=lf
 
+# JSON generated artifacts must use LF for deterministic CI
+*.json text eol=lf
+
 # Markdown may use platform default
 *.md text=auto
 

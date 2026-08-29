@@ -1055,7 +1055,7 @@ export interface components {
             severity: components["schemas"]["EnterpriseUpdateSeverity"];
             status: components["schemas"]["EnterpriseUpdateStatus"];
             /** Format: date-time */
-            publishedAt: string;
+            publishedAt?: string | null;
             feedRevision: number;
             /** Format: date-time */
             createdAt: string;

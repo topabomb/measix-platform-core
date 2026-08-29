@@ -261,21 +261,17 @@ func toView(row *ent.EnterpriseUpdate) UpdateView {
 }
 
 func ToAdminWire(v UpdateView) adminapi.EnterpriseUpdate {
-	status := adminapi.EnterpriseUpdateStatus(v.Status)
-	result := adminapi.EnterpriseUpdate{
+	return adminapi.EnterpriseUpdate{
 		EnterpriseUpdateId: adminapi.EnterpriseUpdateId(v.ID),
 		Title:              v.Title,
 		Content:            v.Content,
 		ContentFormat:      adminapi.EnterpriseUpdateContentFormat(v.ContentFormat),
 		Category:           adminapi.EnterpriseUpdateCategory(v.Category),
 		Severity:           adminapi.EnterpriseUpdateSeverity(v.Severity),
-		Status:             status,
+		Status:             adminapi.EnterpriseUpdateStatus(v.Status),
+		PublishedAt:        v.PublishedAt,
 		FeedRevision:       int(v.FeedRevision),
 		CreatedAt:          v.CreatedAt,
 		UpdatedAt:          v.UpdatedAt,
 	}
-	if v.PublishedAt != nil {
-		result.PublishedAt = *v.PublishedAt
-	}
-	return result
 }

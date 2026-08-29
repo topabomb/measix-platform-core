@@ -250,3 +250,63 @@ func TestCAPC0008ASRUpstreamModelKeyRequired(t *testing.T) {
 		t.Fatalf("expected an upstreamModelKey validation error for ASR, got %+v", result.Errors)
 	}
 }
+
+// CAP-C2-041: default resource reference must point to an enabled resource.
+// A disabled model referenced by defaultModelId must fail validation.
+func TestCAPC2041DefaultMustReferenceEnabled(t *testing.T) {
+	ctx := context.Background()
+	st, boot, now := bootstrapI2(t)
+	box, err := security.NewSecretBox(bytes.Repeat([]byte{0x42}, 32), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ups := upstream.NewService(st.Client, box)
+	ups.Now = func() time.Time { return now }
+	secret, err := ups.CreateSecret(ctx, boot.AdminUserID, "provider-token", "super-secret-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up, err := ups.CreateUpstream(ctx, boot.AdminUserID, testUpstreamConfig(secret.SecretID, secret.SecretVersion))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cap := capability.NewService(st.Client)
+	cap.Now = func() time.Time { return now }
+
+	draft, err := cap.GetDraft(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := validDraft(up.UpstreamID)
+	// Make the model disabled but keep it as defaultModelId — must fail validation.
+	content.Models[0].Enabled = false
+	// Remove the binding requirement by also removing the binding for the disabled model.
+	// Since the model is disabled, it doesn't need a binding, but the defaultModelId must still be valid.
+	for i, b := range content.Bindings {
+		if b.ResourceId == content.Models[0].ModelId {
+			content.Bindings = append(content.Bindings[:i], content.Bindings[i+1:]...)
+			break
+		}
+	}
+	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid {
+		t.Fatalf("validation should fail for defaultModelId pointing to disabled model, result=%+v", result)
+	}
+	found := false
+	for _, e := range result.Errors {
+		if strings.Contains(e.Code, "invalid_default_model") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected invalid_default_model error, got %+v", result.Errors)
+	}
+}

@@ -1092,7 +1092,7 @@ type EnterpriseUpdate struct {
 	CreatedAt          time.Time                     `json:"createdAt"`
 	EnterpriseUpdateId EnterpriseUpdateId            `json:"enterpriseUpdateId"`
 	FeedRevision       int                           `json:"feedRevision"`
-	PublishedAt        time.Time                     `json:"publishedAt"`
+	PublishedAt        *time.Time                    `json:"publishedAt,omitempty"`
 	Severity           EnterpriseUpdateSeverity      `json:"severity"`
 	Status             EnterpriseUpdateStatus        `json:"status"`
 	Title              string                        `json:"title"`

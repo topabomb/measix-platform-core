@@ -2541,7 +2541,6 @@ components:
       - category
       - severity
       - status
-      - publishedAt
       - feedRevision
       - createdAt
       - updatedAt
@@ -2565,6 +2564,7 @@ components:
         publishedAt:
           type: string
           format: date-time
+          nullable: true
         feedRevision:
           type: integer
           minimum: 1

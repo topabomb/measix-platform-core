@@ -758,18 +758,18 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 	}
 	if content.Policy.DefaultModelId != nil {
-		if _, ok := resources[*content.Policy.DefaultModelId]; !ok {
-			addError("invalid_default_model", "policy.defaultModelId", "default model is not defined", &kindPolicy, content.Policy.DefaultModelId, ptrStr("defaultModelId"))
+		if enabled, ok := resources[*content.Policy.DefaultModelId]; !ok || !enabled {
+			addError("invalid_default_model", "policy.defaultModelId", "default model must reference an enabled model", &kindPolicy, content.Policy.DefaultModelId, ptrStr("defaultModelId"))
 		}
 	}
 	if content.Policy.DefaultTtsId != nil {
-		if _, ok := resources[*content.Policy.DefaultTtsId]; !ok {
-			addError("invalid_default_tts", "policy.defaultTtsId", "default TTS is not defined", &kindPolicy, content.Policy.DefaultTtsId, ptrStr("defaultTtsId"))
+		if enabled, ok := resources[*content.Policy.DefaultTtsId]; !ok || !enabled {
+			addError("invalid_default_tts", "policy.defaultTtsId", "default TTS must reference an enabled TTS", &kindPolicy, content.Policy.DefaultTtsId, ptrStr("defaultTtsId"))
 		}
 	}
 	if content.Policy.DefaultAsrId != nil {
-		if _, ok := resources[*content.Policy.DefaultAsrId]; !ok {
-			addError("invalid_default_asr", "policy.defaultAsrId", "default ASR is not defined", &kindPolicy, content.Policy.DefaultAsrId, ptrStr("defaultAsrId"))
+		if enabled, ok := resources[*content.Policy.DefaultAsrId]; !ok || !enabled {
+			addError("invalid_default_asr", "policy.defaultAsrId", "default ASR must reference an enabled ASR", &kindPolicy, content.Policy.DefaultAsrId, ptrStr("defaultAsrId"))
 		}
 	}
 	sort.Slice(result.Errors, func(i, j int) bool {

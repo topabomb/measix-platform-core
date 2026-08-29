@@ -97,7 +97,7 @@ func TestToAdminWireConversion(t *testing.T) {
 	if wire.FeedRevision != 42 {
 		t.Fatalf("expected feedRevision 42, got %d", wire.FeedRevision)
 	}
-	if wire.PublishedAt != pubAt {
+	if wire.PublishedAt == nil || *wire.PublishedAt != pubAt {
 		t.Fatalf("expected publishedAt %v, got %v", pubAt, wire.PublishedAt)
 	}
 	if wire.CreatedAt != now {
@@ -126,10 +126,8 @@ func TestToAdminWireDraftWithoutPublishedAt(t *testing.T) {
 		UpdatedAt:     now,
 	}
 	wire := enterpriseupdate.ToAdminWire(view)
-	if wire.PublishedAt.IsZero() {
-		// For DRAFT, publishedAt should be zero-value when PublishedAt is nil
-		// This is acceptable per the OpenAPI schema where publishedAt is a date-time
-		// that can be the zero value for draft items.
+	if wire.PublishedAt != nil {
+		t.Fatalf("expected nil publishedAt for DRAFT, got %v", *wire.PublishedAt)
 	}
 	if wire.Status != adminapi.EnterpriseUpdateStatus("DRAFT") {
 		t.Fatalf("expected DRAFT status, got %s", wire.Status)

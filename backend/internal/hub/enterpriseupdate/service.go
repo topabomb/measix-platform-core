@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	ErrNotFound      = errors.New("enterprise update not found")
-	ErrInvalidStatus = errors.New("invalid status transition")
-	ErrInvalidLimit  = errors.New("limit must be between 1 and 20")
+	ErrNotFound       = errors.New("enterprise update not found")
+	ErrInvalidStatus  = errors.New("invalid status transition")
+	ErrInvalidLimit   = errors.New("limit must be between 1 and 20")
+	ErrInvalidDateRange = errors.New("start_date must not be after end_date")
 )
 
 type Service struct {
@@ -183,16 +184,25 @@ func (s *Service) Withdraw(ctx context.Context, id string) (UpdateView, error) {
 
 // ListPublished returns published updates ordered by publishedAt desc.
 // It supports date filtering and limit as defined by the S0.2 contract.
+// Dates are interpreted in the deployment timezone (UTC for S0.2).
+// start_date and end_date define an inclusive closed interval.
+// start_date > end_date returns ErrInvalidDateRange.
+// limit must be between 1 and 20; values outside this range return ErrInvalidLimit
+// and are never silently clamped.
 func (s *Service) ListPublished(ctx context.Context, startDate, endDate *time.Time, limit int) ([]UpdateView, bool, error) {
 	if limit < 1 || limit > 20 {
 		return nil, false, ErrInvalidLimit
 	}
+	if startDate != nil && endDate != nil && startDate.After(*endDate) {
+		return nil, false, ErrInvalidDateRange
+	}
 	query := s.Client.EnterpriseUpdate.Query().Where(enterpriseupdate.StatusEQ("PUBLISHED"))
 	if startDate != nil {
+		// start_date is inclusive: from the start of the day (00:00:00)
 		query = query.Where(enterpriseupdate.PublishedAtGTE(*startDate))
 	}
 	if endDate != nil {
-		// inclusive: end of day = endDate + 24h - 1ns
+		// end_date is inclusive: up to the end of the day (23:59:59.999999999)
 		endOfDay := endDate.Add(24*time.Hour - time.Nanosecond)
 		query = query.Where(enterpriseupdate.PublishedAtLTE(endOfDay))
 	}
@@ -209,6 +219,20 @@ func (s *Service) ListPublished(ctx context.Context, startDate, endDate *time.Ti
 		views = append(views, toView(row))
 	}
 	return views, truncated, nil
+}
+
+// LatestFeedRevision returns the highest feed revision across all enterprise
+// updates (regardless of status), or 0 if none exist. This is the authoritative
+// feed revision used for ETag computation.
+func (s *Service) LatestFeedRevision(ctx context.Context) (int64, error) {
+	row, err := s.Client.EnterpriseUpdate.Query().Order(ent.Desc(enterpriseupdate.FieldFeedRevision)).First(ctx)
+	if ent.IsNotFound(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return row.FeedRevision, nil
 }
 
 func toView(row *ent.EnterpriseUpdate) UpdateView {

@@ -41,26 +41,28 @@ func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http
 		endDate = &params.EndDate.Time
 	}
 
-	// Validate date range
-	if startDate != nil && endDate != nil && startDate.After(*endDate) {
-		writeProblem(w, http.StatusBadRequest, "invalid_argument", "start_date must not be after end_date")
-		return
-	}
-
 	items, truncated, err := h.enterpriseUpdate.ListPublished(r.Context(), startDate, endDate, limit)
 	if err != nil {
 		if errors.Is(err, enterpriseupdate.ErrInvalidLimit) {
 			writeProblem(w, http.StatusBadRequest, "invalid_argument", "limit must be between 1 and 20")
 			return
 		}
+		if errors.Is(err, enterpriseupdate.ErrInvalidDateRange) {
+			writeProblem(w, http.StatusBadRequest, "invalid_argument", "start_date must not be after end_date")
+			return
+		}
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
 
-	// Compute ETag from the latest feed revision
-	latestRev := int64(0)
-	if len(items) > 0 {
-		latestRev = items[0].FeedRevision
+	// Compute ETag from the authoritative latest feed revision (across all
+	// statuses), not from the filtered result set. This ensures the ETag
+	// changes whenever any update is published/withdrawn, even if the
+	// filtered list is empty or doesn't include the latest revision.
+	latestRev, err := h.enterpriseUpdate.LatestFeedRevision(r.Context())
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
 	}
 	etag := fmt.Sprintf(`"rev-%d"`, latestRev)
 

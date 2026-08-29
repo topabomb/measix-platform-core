@@ -396,3 +396,226 @@ func TestListPublishedDateFiltering(t *testing.T) {
 		t.Fatalf("expected 1 item in [Aug 27, Aug 27], got %d", len(result))
 	}
 }
+
+// ERX-B-003: start only returns start-date through today.
+func TestERXB003StartOnlyReturnsStartDateThroughToday(t *testing.T) {
+	svc, ctx, adminID := setupService(t)
+	// Create items on different dates
+	for _, day := range []int{25, 26, 27, 28} {
+		svc.Now = func(d int) func() time.Time {
+			return func() time.Time { return time.Date(2026, 8, d, 12, 0, 0, 0, time.UTC) }
+		}(day)
+		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := svc.Publish(ctx, item.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// start only: from Aug 27 onwards — should return Aug 27 and Aug 28
+	start := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
+	result, _, err := svc.ListPublished(ctx, &start, nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result) != 2 {
+		t.Fatalf("expected 2 items from Aug 27 onwards, got %d", len(result))
+	}
+	// Verify ordering: newest first
+	if result[0].PublishedAt.Before(*result[1].PublishedAt) {
+		t.Fatal("expected newest first ordering")
+	}
+}
+
+// ERX-B-004: end only returns latest items up to end date.
+func TestERXB004EndOnlyReturnsLatestUpToEndDate(t *testing.T) {
+	svc, ctx, adminID := setupService(t)
+	for _, day := range []int{25, 26, 27, 28} {
+		svc.Now = func(d int) func() time.Time {
+			return func() time.Time { return time.Date(2026, 8, d, 12, 0, 0, 0, time.UTC) }
+		}(day)
+		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := svc.Publish(ctx, item.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// end only: up to Aug 26 (inclusive) — should return Aug 25 and Aug 26
+	end := time.Date(2026, 8, 26, 0, 0, 0, 0, time.UTC)
+	result, _, err := svc.ListPublished(ctx, nil, &end, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result) != 2 {
+		t.Fatalf("expected 2 items up to Aug 26, got %d", len(result))
+	}
+	// Verify ordering: newest first
+	if result[0].PublishedAt.Before(*result[1].PublishedAt) {
+		t.Fatal("expected newest first ordering")
+	}
+}
+
+// ERX-B-005: both dates use inclusive closed interval.
+func TestERXB005BothDatesInclusiveClosedInterval(t *testing.T) {
+	svc, ctx, adminID := setupService(t)
+	for _, day := range []int{25, 26, 27, 28} {
+		svc.Now = func(d int) func() time.Time {
+			return func() time.Time { return time.Date(2026, 8, d, 12, 0, 0, 0, time.UTC) }
+		}(day)
+		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := svc.Publish(ctx, item.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// both dates: [Aug 26, Aug 27] inclusive — should return Aug 26 and Aug 27
+	start := time.Date(2026, 8, 26, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
+	result, _, err := svc.ListPublished(ctx, &start, &end, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result) != 2 {
+		t.Fatalf("expected 2 items in [Aug 26, Aug 27], got %d", len(result))
+	}
+}
+
+// ERX-B-006: start > end returns typed invalid argument error.
+func TestERXB006StartAfterEndReturnsInvalidArgument(t *testing.T) {
+	svc, ctx, _ := setupService(t)
+	start := time.Date(2026, 8, 28, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
+	_, _, err := svc.ListPublished(ctx, &start, &end, 10)
+	if err != enterpriseupdate.ErrInvalidDateRange {
+		t.Fatalf("expected ErrInvalidDateRange for start > end, got %v", err)
+	}
+}
+
+// ERX-B-008: Deployment timezone and newest-first ordering are explicit.
+func TestERXB008TimezoneAndNewestFirstOrdering(t *testing.T) {
+	svc, ctx, adminID := setupService(t)
+	// Create items at different times on the same day
+	times := []time.Time{
+		time.Date(2026, 8, 28, 8, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 28, 16, 0, 0, 0, time.UTC),
+	}
+	for _, ts := range times {
+		svc.Now = func(t time.Time) func() time.Time { return func() time.Time { return t } }(ts)
+		item, err := svc.Create(ctx, adminID, "Title", "Content")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := svc.Publish(ctx, item.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, _, err := svc.ListPublished(ctx, nil, nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(items))
+	}
+	// Verify newest-first ordering
+	for i := 1; i < len(items); i++ {
+		if items[i].PublishedAt.After(*items[i-1].PublishedAt) {
+			t.Fatalf("item %d is newer than item %d — not newest-first", i, i-1)
+		}
+	}
+}
+
+// ERX-B-010: tool uses Managed MCP/Relay auth and is unavailable in Personal Realm.
+// This test verifies the service-layer contract: ListPublished requires no realm
+// parameter (it returns PUBLISHED items regardless), but the realm check is
+// enforced at the Relay/auth layer. Here we verify the service correctly
+// returns only PUBLISHED content.
+func TestERXB010OnlyPublishedContentVisible(t *testing.T) {
+	svc, ctx, adminID := setupService(t)
+	// Create a DRAFT, a PUBLISHED, and a WITHDRAWN item
+	draft, err := svc.Create(ctx, adminID, "Draft", "Draft content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = draft // draft remains DRAFT — should not appear in ListPublished
+
+	pub, err := svc.Create(ctx, adminID, "Published", "Published content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Publish(ctx, pub.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	withdrawn, err := svc.Create(ctx, adminID, "Withdrawn", "Withdrawn content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Publish(ctx, withdrawn.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Withdraw(ctx, withdrawn.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// ListPublished should only return the published item
+	items, _, err := svc.ListPublished(ctx, nil, nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 published item, got %d", len(items))
+	}
+	if items[0].ID != pub.ID {
+		t.Fatalf("expected published item %s, got %s", pub.ID, items[0].ID)
+	}
+}
+
+// TestLatestFeedRevision verifies that the ETag source is authoritative
+// across all statuses, not just published items.
+func TestLatestFeedRevision(t *testing.T) {
+	svc, ctx, adminID := setupService(t)
+	// Initially no items — revision should be 0
+	rev, err := svc.LatestFeedRevision(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rev != 0 {
+		t.Fatalf("expected revision 0 for empty feed, got %d", rev)
+	}
+	// Create and publish first item
+	first, err := svc.Create(ctx, adminID, "First", "Content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstPub, err := svc.Publish(ctx, first.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err = svc.LatestFeedRevision(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rev != firstPub.FeedRevision {
+		t.Fatalf("expected revision %d, got %d", firstPub.FeedRevision, rev)
+	}
+	// Create a DRAFT — it should have a higher revision and LatestFeedRevision should reflect it
+	draftItem, err := svc.Create(ctx, adminID, "Draft", "Content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = draftItem
+	rev, err = svc.LatestFeedRevision(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The draft's feed revision should be the latest
+	if rev <= firstPub.FeedRevision {
+		t.Fatalf("expected revision > %d after creating draft, got %d", firstPub.FeedRevision, rev)
+	}
+}

@@ -48,9 +48,22 @@ async function logout() {
   await router.replace('/login')
 }
 
-/** Map nav item id to i18n key. */
+/** Map nav item id to i18n key.
+ *  Multi-word ids use camelCase in the i18n registry (e.g. enterpriseUpdates),
+ *  so we cannot just lower-case the id — we need an explicit mapping. */
+const NAV_I18N_KEYS: Record<string, string> = {
+  Overview: 'nav.overview',
+  Users: 'nav.users',
+  Resources: 'nav.resources',
+  Upstreams: 'nav.upstreams',
+  Releases: 'nav.releases',
+  EnterpriseUpdates: 'nav.enterpriseUpdates',
+  Usage: 'nav.usage',
+  System: 'nav.system',
+}
+
 function navLabel(id: string): string {
-  const key = `nav.${id.toLowerCase()}`
+  const key = NAV_I18N_KEYS[id] ?? `nav.${id.toLowerCase()}`
   const translated = $t(key)
   return typeof translated === 'string' ? translated : id
 }

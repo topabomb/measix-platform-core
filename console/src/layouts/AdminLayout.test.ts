@@ -22,6 +22,7 @@ function mountLayout() {
         { path: 'resources', name: 'Resources', component: { template: '<div>resources</div>' } },
         { path: 'upstreams', name: 'Upstreams', component: { template: '<div>upstreams</div>' } },
         { path: 'releases', name: 'Releases', component: { template: '<div>releases</div>' } },
+        { path: 'enterprise-updates', name: 'EnterpriseUpdates', component: { template: '<div>enterprise-updates</div>' } },
         { path: 'usage', name: 'Usage', component: { template: '<div>usage</div>' } },
         { path: 'system', name: 'System', component: { template: '<div>system</div>' } },
       ] },
@@ -42,11 +43,11 @@ describe('AdminLayout', () => {
     vi.spyOn(client, 'apiFetch').mockResolvedValue(undefined as never)
   })
 
-  it('renders all seven S0.1 primary navigation entries', async () => {
+  it('renders all eight S0.2 primary navigation entries', async () => {
     const { wrapper } = mountLayout()
     await flushPromises()
     const labels = wrapper.findAllComponents(QItem).map((i) => i.text())
-    for (const expected of ['Overview', 'Users', 'Resources', 'Upstreams', 'Releases', 'Usage', 'System']) {
+    for (const expected of ['Overview', 'Users', 'Resources', 'Upstreams', 'Releases', 'Enterprise Updates', 'Usage', 'System']) {
       expect(labels.some((l) => l.includes(expected))).toBe(true)
     }
   })

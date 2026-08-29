@@ -2,9 +2,9 @@
 
 This document defines executable-contract ownership in `measix-platform-core`. Semantic meaning remains authoritative in `topabomb/measix-architecture`.
 
-## 1. S0 OpenAPI surfaces
+## 1. Current and planned S0 OpenAPI surfaces
 
-The repository owns four OpenAPI 3.0.3 documents:
+The current source owns four OpenAPI 3.0.3 documents:
 
 ```text
 api/admin/admin.openapi.yaml
@@ -15,6 +15,14 @@ api/internal/usage-ingest.openapi.yaml
 
 They are separated so Admin/Android consumers do not accidentally generate or depend on Relay-internal APIs.
 
+S0.3 architecture additionally requires a private Gateway Control surface, expected at:
+
+```text
+api/internal/gateway-control.openapi.yaml
+```
+
+It does not exist at the current implementation head. Do not generate types, claim S0.3 contract coverage or add ad-hoc structs until the architecture-authorized schema is implemented through OpenAPI, fixtures, generated types and tests.
+
 ## 2. Authority boundary
 
 - architecture repository: lifecycle/state/security/error/idempotency meaning, Managed Capability profile, delivery gates and required behavior;
@@ -23,13 +31,15 @@ They are separated so Admin/Android consumers do not accidentally generate or de
 
 If an exact schema choice can change client interpretation, resolve architecture first.
 
-## 3. Current S0.1 contract state
+## 3. Versioned contract state
 
-The current target is S0.1 Managed Capability Delivery. Until C7 passes, Client Control OpenAPI and Snapshot v1 are **pre-freeze executable contracts**.
+Snapshot v1 is frozen only for the exact architecture/core candidate recorded in `docs/s0-freeze-manifest.json`. Current branch changes after that pinned candidate are not covered merely because the historical manifest remains in Git.
 
-Architecture-approved S0.1 corrections must be implemented here before Android S0.2 begins, together with fixtures, generated artifacts and executable tests. Do not duplicate the complete required field/enum list in this document; use:
+Snapshot v2 Realm/Experience additions and Snapshot v3 Gateway additions are forward profile extensions with separate product/freeze gates. Do not duplicate the complete required field/enum list in this document; use:
 
 - `measix-s0-capability-delivery-contract-spec.md`;
+- `measix-s0-enterprise-realm-experience-contract-spec.md`;
+- `measix-s0-enterprise-tool-gateway-contract-spec.md`;
 - `measix-s0-control-protocol.md`;
 - relevant component/product/testing specs.
 
@@ -61,7 +71,7 @@ architecture authority
 → fixtures
 → generated artifacts
 → component tests
-→ affected T3/T4.1/S0.2 tests
+→ affected T3/T4.1/T4.2/T4.3/T4.4 tests
 → downstream consumer when applicable
 ```
 
@@ -76,7 +86,7 @@ OpenAPI + fixture
 
 If implementation discovers that reasonable clients could interpret the detail differently, it is semantic and must return to architecture.
 
-## 7. S0.1 Client Contract Freeze
+## 7. Versioned Freeze evidence
 
 Freeze is an executable milestone, not a Markdown declaration.
 
@@ -94,7 +104,7 @@ The complete manifest evidence contract belongs to `measix-s0-capability-deliver
 
 A placeholder or stale `docs/s0-freeze-manifest.json` is invalid. The file may be generated only by a successful C7 candidate verification on the exact candidate SHA.
 
-After freeze, an incompatible Android-visible change cannot silently mutate frozen v1. Follow architecture compatibility/versioning semantics and create a new freeze candidate.
+After freeze, an incompatible Android-visible change cannot silently mutate frozen v1/v2/v3. Follow architecture compatibility/versioning semantics and create the applicable new candidate. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; it cannot reuse the v1 manifest as proof.
 
 ## 8. Compatibility rules
 

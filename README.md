@@ -1,12 +1,14 @@
 # MEASIX Platform Core
 
-S0 server-side implementation repository for **Control Hub**, **Runtime Relay** and **Admin Console**.
+S0 server-side implementation repository for **Control Hub**, **Runtime Relay**, **Enterprise Tool Gateway** and **Admin Console**.
+
+Current source contains the Hub and Relay Go binaries plus the Admin SPA. The S0.3 Gateway binary, Gateway Control OpenAPI, production service units and unified production log baseline are planned but not implemented; see `docs/s0-execution-progress.md` for the exact current status.
 
 ## Start here
 
 - Architecture stage reading list: `topabomb/measix-architecture/docs/measix-stage-document-index.md`
 - Local implementation boundaries: `ARCHITECTURE.md`
-- Current S0.1 status: `docs/s0-execution-progress.md`
+- Current implementation/stage status: `docs/s0-execution-progress.md`
 - Admin Console concrete implementation: `docs/admin-console-implementation.md`
 
 ## Repository ownership

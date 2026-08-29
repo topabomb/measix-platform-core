@@ -1,6 +1,6 @@
 # Repository Guidelines for Coding Agents
 
-This repository implements MEASIX Control Hub, Runtime Relay and Admin Console.
+This repository implements MEASIX Control Hub, Runtime Relay, Enterprise Tool Gateway and Admin Console. The Gateway is an S0.3 target; always distinguish current source from planned architecture.
 
 ## Before changing behavior
 
@@ -32,6 +32,7 @@ Docs-only changes do not require artificial Red tests.
 ## Boundaries
 
 - Runtime Relay must not import Hub domain/Ent packages or access `hub.db`.
+- Enterprise Tool Gateway must not import Hub durable domain/Ent packages, access `hub.db`, accept public Android auth directly or become a fallback for Direct Managed MCP.
 - Admin Console calls only the Control Hub Admin API; never Relay internal APIs.
 - generated wire types come from OpenAPI; do not maintain duplicate DTOs.
 - canonical cross-component fixtures live under `api/fixtures/`.
@@ -46,7 +47,7 @@ A semantic wire/state/ID/security change requires architecture authority first. 
 OpenAPI → fixtures → generated artifacts → tests → implementation
 ```
 
-Client Control/Snapshot v1 remains pre-freeze until the S0.1 C7 gate produces the required manifest. After freeze, incompatible changes require an explicit compatibility/versioning decision.
+Snapshot v1 is frozen only for the exact candidate pinned by the S0.1 manifest. Later v2/v3 additions and incompatible changes require the architecture-defined compatibility/versioning decision and their own executable evidence.
 
 ## Frontend dependencies
 

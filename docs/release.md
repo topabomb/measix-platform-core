@@ -1,6 +1,6 @@
-# Release, S0.1 Freeze and Final S0 Release-Candidate Verification
+# Release, Versioned S0 Freezes and Final Release-Candidate Verification
 
-This document defines how implementation candidates are composed and proven reproducibly. The architecture S0.1 Capability Delivery System Testing Spec and final S0 System Testing Spec remain authoritative for what must pass.
+This document defines how implementation candidates are composed and proven reproducibly. The architecture S0.1/S0.2/S0.3/S0.4 Testing Specs and final S0 System Testing Spec remain authoritative for what must pass.
 
 ## 1. Release principle
 
@@ -10,8 +10,17 @@ A candidate is a fixed, reproducible composition of source commits, generated co
 S0.1 Client Contract Freeze Candidate
   → pre-Android server-side product closure
 
+S0.2 Realm/Experience Freeze Candidate
+  → Snapshot v2 and product foundation
+
+S0.3 Gateway Freeze Candidate
+  → Snapshot v3 + three-daemon Gateway server closure
+
+S0.4 Android Integration Candidate
+  → real Android full managed runtime profile
+
 Final S0 Release Candidate
-  → pinned S0.1 contract + real Android S0.2 integration + final S0 Exit gate
+  → pinned S0.1–S0.4 composition + final S0 Exit gate
 ```
 
 GitHub Actions CI/CD provides the fast deterministic T0–T3 baseline. Browser T4.1 and real external Adapter qualification are explicit promotion gates on an exact candidate SHA.
@@ -36,7 +45,7 @@ startedAt
 completedAt
 ```
 
-It does **not** require `androidCommit`; Android S0.2 starts only after this freeze.
+It does **not** require `androidCommit`; later sub-stages consume this pinned baseline.
 
 The exact serialized manifest schema is implemented by the candidate/system harness. Markdown documents must not create a competing schema or use different field names such as a generic `adapterQualificationRef` when architecture requires `realAdapterQualificationRef`.
 
@@ -44,9 +53,17 @@ The exact serialized manifest schema is implemented by the candidate/system harn
 
 `docs/s0-freeze-manifest.json` is generated evidence, not a planning/config file. It must not exist as a stale/preliminary placeholder. Generate it only when the exact candidate has passed all required C6/C7 scenarios and real Adapter qualification. If the candidate SHA changes, rerun the required gate and generate new evidence.
 
-## 3. Final S0 release candidate
+## 3. S0.2/S0.3/S0.4 candidates
 
-Final S0 RC consumes a specific valid S0.1 freeze and adds the real Android implementation.
+Each later sub-stage pins its own architecture/core/consumer/build/contract/scenario identities and consumes the previous valid freeze; a historical earlier manifest cannot prove a later candidate.
+
+S0.3 specifically requires a real `enterprise-tool-gateway` production binary/build identity, Gateway Control OpenAPI/hash, Snapshot v3 and canonical surface/catalog fixtures, real Hub/Gateway/Relay + downstream MCP + Test Client traffic, production Admin browser evidence, and executable production supervision/graceful lifecycle/structured-log collection/redaction evidence. The current repository does not yet provide these artifacts.
+
+S0.4 adds pinned real Android implementation/device evidence against the S0.3 baseline. Exact composition fields remain owned by architecture Testing Specs and executable harness schemas.
+
+## 4. Final S0 release candidate
+
+Final S0 RC consumes specific valid S0.1/S0.2/S0.3/S0.4 baselines and their real server, Portal and Android implementations.
 
 At minimum the composition fixes:
 
@@ -59,7 +76,7 @@ S0.1 freeze manifest identity/hash
 
 The final manifest additionally records the build/qualification/scenario evidence required by `measix-s0-system-testing-spec.md`.
 
-## 4. Promotion stages
+## 5. Promotion stages
 
 ### Pull request
 
@@ -91,15 +108,17 @@ Only after this candidate passes may S0.2 treat the Client contract as frozen in
 
 ### Final S0 release candidate
 
-Final S0 verification extends the frozen S0.1 composition with Android and all applicable current-release gates, including:
+Final S0 verification composes every pinned sub-stage baseline and all applicable current-release gates, including:
 
 - valid pinned S0.1 freeze;
 - applicable Component Testing Spec MUST scenarios;
-- applicable final `AND-*` / `SYS-*` scenarios;
+- applicable final `ERX-*` / `ETG-*` / `AND-*` / `SYS-*` scenarios;
 - Android emulator/device E2E;
 - Admin real-browser E2E;
+- real Hub/Gateway/Relay service topology and Gateway downstream MCP;
 - required real Adapter qualification;
-- Hub/Relay restart/reconcile;
+- Hub/Gateway/Relay restart/reconcile and production supervisor lifecycle;
+- structured log collection/correlation/redaction proof;
 - backup/restore;
 - usage spool/replay;
 - target-resource/load validation;
@@ -107,7 +126,7 @@ Final S0 verification extends the frozen S0.1 composition with Android and all a
 
 Architecture is authoritative for exact Exit requirements.
 
-## 5. Deterministic vs real-external lanes
+## 6. Deterministic vs real-external lanes
 
 ```text
 Deterministic lane
@@ -123,7 +142,7 @@ External qualification lane
 
 A flaky public Provider must not make normal PR CI nondeterministic. Conversely, deterministic Adapter evidence cannot be reported as real Adapter qualification.
 
-## 6. Client contract identity
+## 7. Client contract identity
 
 The S0.1 freeze makes the Android handoff reproducible by pinning at least:
 
@@ -135,7 +154,7 @@ The S0.1 freeze makes the Android handoff reproducible by pinning at least:
 
 After freeze, an incompatible Android-visible change creates a new architecture-approved contract/freeze candidate; old evidence is immutable.
 
-## 7. Build identity and evidence
+## 8. Build identity and evidence
 
 Every freeze/RC binary/static build must be traceable to source commit and build configuration. Candidate evidence preserves as applicable:
 
@@ -150,7 +169,7 @@ Every freeze/RC binary/static build must be traceable to source commit and build
 
 Artifacts must not contain production credentials, real user conversations or Secret plaintext.
 
-## 8. Failed candidate
+## 9. Failed candidate
 
 When a freeze/RC scenario fails:
 
@@ -162,7 +181,7 @@ When a freeze/RC scenario fails:
 
 Do not mutate failed evidence to make it appear successful.
 
-## 9. Reproduction and versioning
+## 10. Reproduction and versioning
 
 A candidate must be reproducible by checking out pinned commits, restoring repository-controlled toolchains/lockfiles, rebuilding artifacts and rerunning the corresponding deterministic/system verification with declared inputs.
 

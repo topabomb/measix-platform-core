@@ -4,11 +4,12 @@
 
 ## 1. Repository role
 
-This repository implements three S0 logical components:
+This repository owns four S0 logical components:
 
 ```text
 Control Hub     → Go binary
 Runtime Relay   → Go binary
+Enterprise Tool Gateway → Go binary (S0.3 target; not present yet)
 Admin Console   → Quasar/Vue SPA build
 ```
 
@@ -28,11 +29,13 @@ api/
 ├── client/client-control.openapi.yaml
 ├── internal/relay-control.openapi.yaml
 ├── internal/usage-ingest.openapi.yaml
+├── internal/gateway-control.openapi.yaml   # S0.3 target; not present yet
 └── fixtures/
 
 backend/
 ├── cmd/control-hub/
 ├── cmd/runtime-relay/
+├── cmd/enterprise-tool-gateway/            # S0.3 target; not present yet
 ├── pkg/platformid/
 ├── internal/hub/
 ├── internal/relay/
@@ -68,6 +71,12 @@ Permitted shared production code between Hub and Relay is intentionally narrow:
 - generic helpers with no Hub business semantics.
 
 Test-only helpers are allowed where production dependency direction remains unchanged.
+
+### Enterprise Tool Gateway
+
+`enterprise-tool-gateway` is an S0.3 separate binary/failure domain. It consumes only Hub-compiled Gateway control, accepts runtime traffic only from Relay private service identity, owns applied catalog/search/toolRef/downstream MCP execution, and never reads Hub persistence or validates Android bearer tokens directly.
+
+Permitted shared production code remains narrow: generated direct wire types, pure identifier/canonicalization helpers and generic server/logging helpers with no Hub durable-domain semantics. The Gateway binary and `gateway-control.openapi.yaml` do not currently exist; documentation must preserve that implementation gap until source and executable contracts land.
 
 ### Admin Console
 
@@ -141,7 +150,10 @@ T1 Unit / Domain
 T2 Component Integration
 T3 Cross-component Integration
 T4.1 S0.1 pre-Android Product/System E2E
-T4 final S0 Android/System RC
+T4.2 S0.2 Realm/Experience Product
+T4.3 S0.3 Gateway Product
+T4.4 S0.4 Android Integration
+T4 final S0 System RC
 ```
 
 This repository owns Hub, Relay and Admin component tests, Adapter qualification infrastructure, the deterministic/system harness and S0.1 browser/product evidence. Android component/instrumentation tests remain in `rikkahub_mcp`; final S0 T4 combines pinned commits from both repositories.
@@ -153,7 +165,9 @@ HUB-*   Control Hub
 RLY-*   Runtime Relay
 ADM-*   Admin Console
 CAP-*   S0.1 Capability Delivery
-AND-*   S0.2 Android integration
+ERX-*   S0.2 Realm/Experience
+ETG-*   S0.3 Enterprise Tool Gateway
+AND-*   S0.4 Android integration
 SYS-*   final S0 system/RC
 ```
 
@@ -181,7 +195,7 @@ See `docs/testing.md` for executable test organization, CI design, and the TDD c
 
 A local document contains only information needed to implement, run, test or operate this repository. If a paragraph merely re-explains an architecture requirement without adding a local implementation consequence, replace it with a reference.
 
-Do not maintain the same current-state claim in multiple documents. `docs/s0-execution-progress.md` is the only living S0.1 status document; audit reports, CI runs and manifests are evidence inputs, not competing status authorities.
+Do not maintain the same current-state claim in multiple documents. `docs/s0-execution-progress.md` is the only living implementation/stage status document; audit reports, CI runs and manifests are evidence inputs, not competing status authorities.
 
 Stage-specific reading order is maintained only in `topabomb/measix-architecture/docs/measix-stage-document-index.md`.
 
@@ -214,7 +228,7 @@ Code layout, component decomposition, dependency choice, DB index, build tooling
 
 ### S0.1 Client Contract Freeze
 
-Before C7, Client OpenAPI/Snapshot v1 is pre-freeze.
+Snapshot v1 is frozen only for the exact candidate pinned by the valid S0.1 manifest. A later implementation HEAD or architecture revision does not inherit that proof.
 
 A valid C7 manifest is **generated evidence**, not a manually maintained planning file. It exists only after the exact candidate passes the architecture-defined C6/C7 gate and required real Adapter qualification.
 

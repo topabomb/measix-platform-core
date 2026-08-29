@@ -1,6 +1,6 @@
 # Testing, CI and TDD
 
-This document defines how `measix-platform-core` executes and records tests, and the TDD discipline that governs them. Required behavior and critical scenarios remain authoritative in the S0.1/S0.2/Component/System Testing Specs in `topabomb/measix-architecture`.
+This document defines how `measix-platform-core` executes and records tests, and the TDD discipline that governs them. Required behavior and critical scenarios remain authoritative in the S0.1/S0.2/S0.3/S0.4/Component/System Testing Specs in `topabomb/measix-architecture`.
 
 ## 1. Test layers
 
@@ -11,7 +11,10 @@ This document defines how `measix-platform-core` executes and records tests, and
 | T2 Component Integration | one real component + local real boundaries | real SQLite, real HTTP server, component/static-host tests |
 | T3 Cross-component Integration | multiple real MEASIX components | real Hub↔Relay, Admin↔Hub where implemented, deterministic Adapter |
 | T4.1 S0.1 Product/System E2E | pre-Android product topology | production browser + real Hub/Relay + Adapter + Test Client |
-| T4 Final S0 System / RC | frozen S0.1 + Android | cross-repository Android/system RC |
+| T4.2 S0.2 Realm/Experience Product | real Realm/Portal/product projection | pinned server + Android/Portal evidence as required |
+| T4.3 S0.3 Gateway Product | three-daemon server product | production Admin + real Hub/Gateway/Relay + downstream MCP + Test Client |
+| T4.4 S0.4 Android Integration | full managed Android profile | real emulator/device + pinned Hub/Gateway/Relay |
+| T4 Final S0 System / RC | frozen S0.1–S0.4 composition | cross-repository final system RC |
 
 Normal GitHub Actions CI is deliberately limited to deterministic T0–T3 plus required builds. Browser/System E2E is a promotion/freeze proof rather than a per-commit feedback loop. S0.1 still requires the complete T4.1 gate before C6/C7 completion.
 
@@ -37,9 +40,9 @@ Snapshot/Runtime Test Client
 
 It must prove the required `CAP-*` scenarios, including Managed Capability profiles, Snapshot preview/release equivalence, publish/runtime enforcement, usage/pricing/diagnostics, no-forward security behavior and Client Contract Freeze evidence.
 
-### S0.2 / final S0 Exit
+### S0.2–S0.4 / final S0 Exit
 
-S0.2 consumes the pinned S0.1 freeze. Final S0 RC adds real `rikkahub_mcp` Android and proves applicable `AND-*`/`SYS-*` scenarios with fixed cross-repository commits. A passing S0.1 gate must never be reported as final S0 Exit.
+S0.2 consumes the pinned S0.1 freeze for Realm/Experience. S0.3 adds the Enterprise Tool Gateway server/Admin/Test Client closure and production supervision/logging proof. S0.4 adds real `rikkahub_mcp` Android full-profile integration. Final S0 RC proves applicable `ERX-*`/`ETG-*`/`AND-*`/`SYS-*` scenarios with fixed cross-repository commits. An earlier-stage Green must never be reported as a later Freeze or final S0 Exit.
 
 ## 3. Current test locations
 
@@ -68,7 +71,7 @@ Adapter qualification/report locations may evolve as executable harness work lan
 
 ## 4. Mapping architecture requirements
 
-Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`, `CAP-*`, `AND-*` and `SYS-*`.
+Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`, `CAP-*`, `ERX-*`, `ETG-*`, `AND-*` and `SYS-*`.
 
 - a test proving a critical scenario exposes the ID in its name, metadata or nearby comment;
 - ordinary unit tests do not need artificial IDs;
@@ -87,6 +90,7 @@ Do not mock away the behavior under test:
 - migration tests execute versioned SQL;
 - Admin static-host tests use production build output;
 - T3 Hub/Relay tests run real processes/binaries;
+- S0.3 T3/T4.3 tests run real Hub/Gateway/Relay production binaries plus deterministic downstream MCP;
 - S0.1 browser/system tests use real Admin→Hub→Relay paths;
 - Test Client uses public Client Control + Runtime paths, not internal shortcuts.
 

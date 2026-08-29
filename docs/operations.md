@@ -4,13 +4,16 @@ This document owns the executable operating procedures for `measix-platform-core
 
 ## 1. Scope
 
-Production S0 server-side artifacts are:
+Architecture target production S0 server-side artifacts are:
 
 ```text
 control-hub     long-running Go process
 runtime-relay   long-running Go process
+enterprise-tool-gateway long-running Go process (S0.3; not implemented yet)
 Admin Console   static SPA build served by Control Hub/Ingress
 ```
+
+Current source contains only `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. No Gateway binary, production service units or packaging exist yet. `npm start`/`concurrently`, `go run` commands and both Node/Go system harnesses are development/test orchestration, not a production process manager.
 
 This document must not redefine product state such as Publish, Activation or Managed Generation. It documents the operational actions around the implementation.
 
@@ -40,6 +43,7 @@ At minimum operations must distinguish:
 
 - Control Hub database and its migration/backup lifecycle;
 - Runtime Relay local durable spool and its restart/replay lifecycle;
+- Enterprise Tool Gateway rebuildable applied state/index/session data once implemented;
 - static Admin build assets;
 - service credentials/configuration;
 - transient logs/temp/test data.
@@ -48,7 +52,7 @@ Concrete paths are documented here when implementation fixes them. Paths in sour
 
 ## 4. Health and readiness
 
-Both server binaries expose liveness/readiness endpoints according to their component implementation specs.
+Every production daemon exposes liveness/readiness/status according to its component implementation spec.
 
 Operational checks must distinguish:
 
@@ -66,13 +70,31 @@ The production start sequence must be reproducible from a clean deployment:
 ```text
 validate configuration
 → apply/verify required DB migrations
-→ start Control Hub / Runtime Relay
+→ start Control Hub / Enterprise Tool Gateway / Runtime Relay
 → wait for bounded readiness
 → verify desired/applied runtime state where applicable
 → expose traffic
 ```
 
-Runtime Relay restart begins fail-closed until valid control state is rehydrated, as defined by architecture. This document will record the exact commands once the binaries/tooling exist.
+Runtime Relay and Enterprise Tool Gateway restart fail closed until valid control state is rehydrated, as defined by architecture. This document records exact commands only when binaries/tooling exist.
+
+## 5.1 S0.3 production supervision target
+
+S0.3 must implement the architecture supervision contract using host-native service management. The reference package is Linux `systemd` + `journald`; an equivalent platform supervisor is acceptable only when the same executable behavior is proven.
+
+Implementation deliverables, not yet present, must include:
+
+- one unit per daemon plus one aggregate target/group for operator start/stop/status;
+- installed, immutable binaries with build identity; no `go run`, Admin dev server or `concurrently`;
+- dedicated least-privilege identity, explicit config/credential/persistence paths and private/public bind boundaries;
+- startup ordering without treating ordering as readiness; bounded readiness checks before exposing traffic;
+- `on-failure` restart with bounded delay/backoff and start-rate limiting; permanent config/migration failure classification that prevents an endless crash loop;
+- independent failure domains: one daemon crash does not automatically restart every daemon;
+- SIGTERM graceful drain, explicit stop timeout and supervisor force-kill only after timeout;
+- install/start/stop/restart/status/upgrade/uninstall and failure-recovery runbook commands;
+- executable tests for clean boot, crash restart, rate limit, config failure, graceful stop and Gateway/Relay rehydrate.
+
+Concrete unit names, `After`/`Requires` relationships, environment/config files, exit codes and timeout values are deliberately deferred until the implementation exists. Do not copy illustrative values from architecture into fake operations facts.
 
 ## 6. Graceful shutdown
 
@@ -114,17 +136,28 @@ pin release artifacts
 
 If rollback requires database restore or forward migration rather than binary downgrade, the release documentation must say so explicitly.
 
-## 9. Observability
+## 9. Observability and production log contract
 
-As implementation lands, document:
+Current Hub and Relay instantiate Go `slog.JSONHandler` on stdout, so output is line-delimited JSON with standard `time`/`level`/`msg`. This is only a partial baseline: the current mains do not consistently attach `service`, `buildVersion`, stable `event`, lifecycle transitions or correlation fields, and no production collector/retention package exists.
 
-- structured log fields and correlation IDs;
-- health/status endpoints;
-- relevant queue/spool/backlog indicators;
-- build/version identity;
-- diagnostics that are safe to collect in CI/operations.
+S0.3 implementation must use a shared logging initializer that attaches to every record:
 
-Never expose credentials, private signing material or secret plaintext through logs/status endpoints.
+```text
+time
+level
+msg
+service          control-hub | runtime-relay | enterprise-tool-gateway
+buildVersion
+event            stable machine-searchable event name
+```
+
+Add only when applicable: `requestId`, `interactionId`, `activationId`, `deploymentId`, `managedGeneration`, `controlRevision`, `gatewayControlRevision`, `resourceId`, `gatewayToolId`, `durationMs`, `outcome`, `errorCode`. Use a route template instead of raw URL/query. Stable event families cover process lifecycle, readiness transition, control apply/reconcile, degraded/recovery, request completion and security rejection. INFO is the production default; DEBUG is explicit and obeys identical redaction.
+
+All daemons write stdout/stderr only. `journald` (or equivalent supervisor collector) owns collection, rotation and retention; applications do not share or rotate log files. The package/runbook must define safe service-scoped collection, time/size retention and export commands when the units land.
+
+Never log Authorization/Cookie/Secret/credential/enrollment/session material, private signing material, private endpoint, toolRef or claims, full prompt/request/response body, tool arguments/results, or direct identity such as username/email. Status endpoints follow the same boundary. Automated tests must search normal/failure diagnostics for forbidden material.
+
+Also document health/status endpoints, queue/spool/backlog indicators and build/version identity as implementation lands. A centralized log/search/alerting stack is outside S0.3; safe host collection is required.
 
 ## 10. Incident/troubleshooting entries
 
@@ -132,6 +165,8 @@ Troubleshooting belongs here only for implementation/operations facts such as:
 
 - migration failure;
 - Relay not ready after restart;
+- Gateway not ready after restart or gatewayControl revision mismatch;
+- supervisor restart-rate limit reached or permanent configuration failure;
 - control revision mismatch;
 - usage backlog not draining;
 - Admin static asset/routing failure.
@@ -144,7 +179,9 @@ Before RC, operations are considered ready only when system tests exercise:
 
 - clean deployment/bootstrap;
 - migration replay/upgrade;
-- Hub/Relay restart;
+- independent Hub/Gateway/Relay restart plus aggregate lifecycle;
+- supervisor restart/rate-limit/graceful-stop behavior;
+- JSON log collection, correlation and forbidden-field redaction;
 - backup/restore;
 - usage replay;
 - target-resource/load checks;

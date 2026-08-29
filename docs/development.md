@@ -38,7 +38,9 @@ branch
 
 Local configuration uses synthetic/test credentials only. Development must not require production configuration or public Provider access for normal T0–T3 work.
 
-When a change affects an existing browser/system workflow, run the smallest relevant E2E slice explicitly where practical. Full T4.1 remains a candidate/freeze gate rather than a per-commit loop.
+When a change affects an existing browser/system workflow, run the smallest relevant E2E slice explicitly where practical. Full T4.x remains a stage candidate/freeze gate rather than a per-commit loop.
+
+`npm start` currently runs Hub, Relay and the Admin dev server through `concurrently`. It is a developer convenience only: it uses `go run`, omits Enterprise Tool Gateway and has no production restart/rate-limit/log-retention contract. Test harness process spawning is likewise test-only. Neither may be packaged or described as the S0.3 production supervisor.
 
 ### GitHub-only
 
@@ -78,7 +80,7 @@ Subdirectories are created when their implementation lands. The source tree, not
 
 I0 must establish reproducible tool setup for both local CI-equivalent execution and GitHub Actions. Before I1 work begins, the repository must be able to:
 
-- build `control-hub` and `runtime-relay` health skeletons;
+- build the currently implemented `control-hub` and `runtime-relay` binaries; S0.3 later adds `enterprise-tool-gateway` as a real production binary;
 - validate all four OpenAPI documents;
 - reproduce generated Go/TS/Android wire artifacts or verify their exported generation inputs;
 - replay SQLite migrations from an empty database;

@@ -27,7 +27,7 @@ GitHub Actions CI/CD provides the fast deterministic T0–T3 baseline. Browser T
 
 ## 2. S0.1 freeze candidate
 
-S0.1 is intentionally pre-Android. A freeze candidate can exist only after the architecture-defined C6/C7 requirements are Green.
+S0.1 is intentionally pre-Android. A candidate may exist while verification is incomplete; only an accepted Freeze requires the full architecture-defined C6/C7 requirements to be Green.
 
 The machine-readable manifest must include the identities required by the current architecture System Testing Spec, including:
 
@@ -49,9 +49,17 @@ It does **not** require `androidCommit`; later sub-stages consume this pinned ba
 
 The exact serialized manifest schema is implemented by the candidate/system harness. Markdown documents must not create a competing schema or use different field names such as a generic `adapterQualificationRef` when architecture requires `realAdapterQualificationRef`.
 
-### No placeholder manifest
+### Candidate draft, accepted Freeze and historical evidence
 
-`docs/s0-freeze-manifest.json` is generated evidence, not a planning/config file. It must not exist as a stale/preliminary placeholder. Generate it only when the exact candidate has passed all required C6/C7 scenarios and real Adapter qualification. If the candidate SHA changes, rerun the required gate and generate new evidence.
+`docs/s0-freeze-manifest.json` is generated evidence, not a planning/config file. Current tooling uses two phases: `freeze-manifest.mjs` writes a candidate with CAP-C7-002=NOT_EXECUTED; `replay-freeze.mjs` can update it after replay. Only the fully proven composition is an accepted Freeze. A candidate draft or historical record must never be presented as current acceptance.
+
+Both scripts can write the tracked manifest path. Run candidate generation in an isolated candidate checkout, preserve existing historical records/artifacts and do not overwrite a known baseline during ordinary development. A future packaging change should separate candidate output from immutable accepted evidence. If any pinned source/build/contract identity changes, rerun the required gate for the new composition.
+
+The retained manifest declares architecture `cc60f8f540d309f2b73228094c8b9cd1b0b0a60f`, core `a6075bc0afd78fa86d77e1a520f838c954c9adfa`, Snapshot v1. The 2026-08-31 audit did not replay/fully validate its external artifact chain; neither its presence nor declared PASS proves current HEAD or later stages.
+
+### Current tooling limitations
+
+See [the source-backed audit](architecture-alignment-audit.md), A14–A15. Collection Make recipes have working-directory/error-propagation defects; the writer hardcodes schemaVersion=1 while the current compiler emits v2; validation does not check the complete input/provenance chain. Replay creates a fresh runtime but does not establish an independent clean source checkout/rebuild of all pinned assets. Real qualification's top-level VERIFIED does not imply every required capability profile was exercised. Do not present `make freeze-gate`, `--validate` or `clean-replay` as complete proven acceptance until these gaps are repaired and tested.
 
 ## 3. S0.2/S0.3/S0.4 candidates
 

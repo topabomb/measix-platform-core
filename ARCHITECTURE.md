@@ -29,14 +29,16 @@ api/
 ├── client/client-control.openapi.yaml
 ├── internal/relay-control.openapi.yaml
 ├── internal/usage-ingest.openapi.yaml
-├── internal/gateway-control.openapi.yaml   # S0.3 target; not present yet
 └── fixtures/
 
 backend/
 ├── cmd/control-hub/
 ├── cmd/runtime-relay/
-├── cmd/enterprise-tool-gateway/            # S0.3 target; not present yet
+├── cmd/devmigrate/
+├── cmd/generate-android-wire/
 ├── pkg/platformid/
+├── internal/common/
+├── internal/wire/
 ├── internal/hub/
 ├── internal/relay/
 ├── ent/
@@ -45,12 +47,13 @@ backend/
 
 console/
 ├── src/
-└── e2e/                 # browser E2E ownership when/where executable tests land
+└── e2e/                 # existing browser E2E
 
+scripts/                # Node browser/candidate/evidence orchestration
 docs/
 ```
 
-The S0.1 architecture decision describes the logical `test/system` responsibility for deterministic Adapter, Test Client, system scenarios and reports. The current Go harness is physically under `backend/test/system/` so it can execute inside the backend Go module and reuse permitted test/internal implementation boundaries. Documentation must describe this fact rather than pretend a different directory already exists. If C6/C7 later require a physical repository-level move, make that implementation change explicitly; do not create a documentation-only layout.
+The Go harness is under `backend/test/system/` to run inside the Go module and reuse permitted internal test boundaries. Node browser/candidate orchestration also exists under `scripts/`; these are two concrete environments, not a single physical harness. Same-environment product closure and shared contract/evidence rules remain required. Planned S0.3 paths are `backend/cmd/enterprise-tool-gateway/` and `api/internal/gateway-control.openapi.yaml`; neither is current source.
 
 ## 3. Dependency direction
 
@@ -156,7 +159,7 @@ T4.4 S0.4 Android Integration
 T4 final S0 System RC
 ```
 
-This repository owns Hub, Relay and Admin component tests, Adapter qualification infrastructure, the deterministic/system harness and S0.1 browser/product evidence. Android component/instrumentation tests remain in `rikkahub_mcp`; final S0 T4 combines pinned commits from both repositories.
+This repository owns Hub/Relay/Admin tests and future Gateway tests, qualification infrastructure, deterministic/system harnesses and server-side product evidence. Android component/instrumentation tests remain in `rikkahub_mcp`; Portal has its own product implementation. Final S0 T4 combines all applicable pinned repositories and builds.
 
 Critical scenario semantics/IDs come from architecture, including:
 
@@ -190,6 +193,9 @@ See `docs/testing.md` for executable test organization, CI design, and the TDD c
 - `docs/database-migrations.md` — persistence migration workflow.
 - `docs/operations.md` — runtime operations.
 - `docs/release.md` — freeze/RC evidence composition.
+- `docs/architecture-alignment-audit.md` — dated source/evidence review and remediation plan, not a living status or semantic contract.
+- `docs/playwright-e2e-notes.md` — concrete browser entrypoints and evidence-based diagnosis.
+- `docs/s01-alignment-audit-plan.md` — retained 2026-08-27 historical audit, not a current completion claim.
 
 ### Documentation rule
 
@@ -228,16 +234,7 @@ Code layout, component decomposition, dependency choice, DB index, build tooling
 
 ### S0.1 Client Contract Freeze
 
-Snapshot v1 is frozen only for the exact candidate pinned by the valid S0.1 manifest. A later implementation HEAD or architecture revision does not inherit that proof.
-
-A valid C7 manifest is **generated evidence**, not a manually maintained planning file. It exists only after the exact candidate passes the architecture-defined C6/C7 gate and required real Adapter qualification.
-
-Therefore:
-
-- do not keep a placeholder/stale `docs/s0-freeze-manifest.json` and call it Freeze evidence;
-- if a preliminary tool needs to compute hashes, write them to temporary/report output with a different name;
-- once C7 is Green, generate the manifest with the exact architecture/core/build/contract/adapter/scenario identities required by the architecture System Testing Spec;
-- if candidate SHA changes, regenerate after rerunning the required candidate verification.
+An accepted Snapshot v1 freeze proves only its pinned source/build/contract/artifact composition. A later HEAD does not inherit it. Candidate drafts, accepted evidence and retained historical declarations are different states; exact handling, the current two-phase writer/replay and known validation limits belong to [release procedures](docs/release.md). Never hand-edit evidence to claim success or overwrite a historical manifest during ordinary development.
 
 ## 8. Change boundary
 

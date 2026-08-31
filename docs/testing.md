@@ -49,11 +49,12 @@ S0.2 consumes the pinned S0.1 freeze for Realm/Experience. S0.3 adds the Enterpr
 Concrete current paths are:
 
 ```text
-backend/**/**/*_test.go          Go unit/component tests
-console/**/*.spec.ts            frontend unit/component tests
+backend/**/*_test.go             Go tests (some system scenarios require build tags)
+console/src/**/*.test.ts         Vitest unit/component tests
 api/fixtures/                   canonical contract fixtures
 backend/test/system/            current Go-module deterministic/system harness
-console/e2e/                    browser E2E ownership when executable Playwright tests land
+console/e2e/*.spec.ts            existing Playwright browser tests
+scripts/                        Node browser/candidate/replay/qualification orchestration
 ```
 
 Within `backend/test/system/`:
@@ -108,14 +109,12 @@ Flaky critical tests are defects and must be fixed rather than permanently quara
 
 Default PR CI stops at T3 and does **not** execute Playwright/browser T4.1.
 
-Recommended logical jobs:
+Current `.github/workflows/ci-gate.yml` jobs (PR to main / push to main):
 
 ```text
 static-contract
-unit
-component-hub
-component-relay
-component-admin
+backend-test
+console-test
 system-test       # bounded deterministic T3 only
 ci-gate
 ```
@@ -123,6 +122,8 @@ ci-gate
 `ci-gate` is the merge-facing aggregate check and must always be reported for pull requests. A Green `ci-gate` means the repository's normal T0–T3 baseline is Green; it does **not** mean C6, C7, S0.1 Freeze or final S0 Exit is complete.
 
 The required gate evaluates the latest PR commit. Older Green checks are historical regression evidence only.
+
+The static job explicitly runs `make generate` before drift checks; `make ci` alone does not. A clean Git diff without regeneration does not prove generated output matches source. `make system-test` uses `-tags=smoke`; ordinary `go test ./...` excludes both smoke and candidate scenarios. Exact direct commands are in [development](development.md).
 
 ## 8. Explicit S0.1 candidate verification
 
@@ -134,7 +135,7 @@ Real external Adapter qualification is a separate explicit lane and is not repla
 
 ## 9. Freeze evidence
 
-A valid S0.1 freeze manifest is generated **only after** all required candidate scenarios and real Adapter qualification are Green. The repository must not retain a placeholder/stale manifest as current evidence.
+A **final accepted** S0.1 manifest requires all applicable candidate scenarios and real Adapter qualification, including replay. The current writer/replayer is two-phase: a candidate draft can contain CAP-C7-002=NOT_EXECUTED, then replay may finalize it. That draft is not a Freeze. Preserve historical evidence without labeling it current; see [release](release.md) for provenance and known script limitations.
 
 The architecture System Testing Spec is authoritative for the manifest fields. Current required identities include at least:
 
@@ -159,6 +160,8 @@ completedAt
 Historical audit/test mapping from older architecture baselines remains useful as regression evidence, but it is not a living status document and must never be used to infer that a newer architecture checkpoint is Green.
 
 Current checkpoint status lives only in `docs/s0-execution-progress.md`, backed by executable results for the current architecture baseline and current implementation SHA.
+
+The [2026-08-31 alignment audit](architecture-alignment-audit.md) records current source findings and bounded tests, not stage acceptance. Known gaps include collection working directories/error propagation, hardcoded manifest schemaVersion, incomplete provenance/profile validation, and Playwright trace/security flags. Until fixed and verified, script exit status or an existing PASS field alone is insufficient for Freeze acceptance.
 
 ## 11. TDD cycle
 

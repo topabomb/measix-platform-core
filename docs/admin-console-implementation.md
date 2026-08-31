@@ -1,9 +1,8 @@
 # Admin Console 实现规范
 
-> Architecture authority：`topabomb/measix-architecture@dbb56952ab1cf60fa55e4cbb8d14ee70eda43a48`  
+> Architecture authority：[阶段阅读清单](../../measix-architecture/docs/measix-stage-document-index.md)；验收时 pin exact architecture commit
 > Product/UX：`measix-s0-admin-console-product-requirements.md`  
-> Component architecture：`measix-s0-admin-console.md`  
-> Required tests：`measix-s0-admin-console-testing-spec.md` + `measix-s0-capability-delivery-system-testing-spec.md`
+> Required tests：Admin Testing Spec + 当前子阶段 CAP / ERX / ETG System Testing Specs；不再引用已移除的独立 Admin component 文档。
 
 本文只定义 `console/` 的**具体实现约束和当前落地事实**。导航、用户任务、visual authoring、Review/Publish、状态语义和 S0.1 Exit 由 architecture 仓库定义；本文不维护第二份产品/UX 权威。
 
@@ -23,7 +22,7 @@ pnpm
 ```
 
 - `console/package.json` 与 `console/pnpm-lock.yaml` 是前端依赖/版本权威；
-- production 输出为 `dist/spa`，由 Control Hub/Ingress same-origin 静态托管；
+- production 输出为 `dist/spa`；same-origin 静态托管是发布要求，当前 Hub main 尚未传入 AdminAssets，具体缺口见 `docs/operations.md`；
 - 浏览器只调用 Control Hub Admin API，不直连 Relay internal API；
 - API DTO/type 来自 generated Admin OpenAPI；不维护平行手写 wire model；
 - Secret plaintext 不进入 localStorage、持久 Pinia state、日志或测试 artifact。
@@ -43,10 +42,11 @@ layouts/      application shell
 pages/        route-level pages
 router/       routes + navigation registry
 stores/       session/draft/activation/workflow state
+i18n/         locale messages and localization
 css/          thin MEASIX semantic styling
 ```
 
-当前实现已经有稳定 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/Resources/Upstreams/Releases/Usage/System 等 route-level pages。
+当前实现已有 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/Resources/Upstreams/Releases/Usage/System/EnterpriseUpdates 等 route-level pages。
 
 **当前 `ResourcesPage.vue` / `UpstreamsPage.vue` 仍承载了偏多领域编辑逻辑。** 这不是新的设计权威；应继续按 architecture 最新 S0.1 implementation decision 和 Admin Product/Testing requirements 收敛到清晰的 collection → selected editor/detail 与 feature-level workflow 结构。实际文件名可以随重构演进，但 page 不应长期成为所有领域状态/验证/编辑逻辑的容器。
 
@@ -62,16 +62,11 @@ css/          thin MEASIX semantic styling
 - validation 以 Hub 返回为最终权威，前端可做即时提示但不能维护第二套业务规则；
 - Snapshot Preview 必须消费 Hub canonical compiler 的 projection。
 
-## 4. S0.1 当前实现重点
+## 4. 实现范围与后续验证
 
-具体“必须做什么”只引用 architecture；当前 implementation 需要补齐的事实状态见 `docs/s0-execution-progress.md`。当前最重要的前端实现工作是：
+具体“必须做什么”只引用 architecture；当前完成判断见 `docs/s0-execution-progress.md`，审查证据见 [alignment audit](architecture-alignment-audit.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。
 
-```text
-C1  existing Upstream candidate edit / Secret replace / recovery
-C2  collection → selected editor/detail + Policy defaults + validation navigation
-C3  Review → Client Snapshot Preview → Publish
-C6  production browser E2E
-```
+S0.2 wire/backend 已支持部分 Assistant/Memory Seed/Starter，但 Resources/Releases 尚无对应完整 typed authoring。EnterpriseUpdatesPage 已使用 generated DTO，仍需按 ERX gate 证明发布/撤回/Feed 的真实产品闭环。新增 Gateway profile 与运维状态不得借用现有页面截图声称已经实现。
 
 不要通过增加第二套 schema、自由 JSON editor、客户端自定义 Provider body/header DSL 或隐藏失败状态来绕过这些要求。
 
@@ -79,11 +74,12 @@ C6  production browser E2E
 
 Component/unit tests 使用 Vitest；真实产品 E2E 使用 `@playwright/test`。
 
-目标 ownership：
+当前 ownership：
 
 ```text
 console/e2e/            browser actions/assertions
 backend/test/system/    当前真实进程 system harness / deterministic Adapter / Test Client
+scripts/               Node browser/candidate process + SPA orchestration
 ```
 
 Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime Relay；禁止用 `page.route('/api/**')` mock Hub 来声明 T4.1 Green，也禁止直接写 DB 或调用 Relay internal API 完成被测业务对象。

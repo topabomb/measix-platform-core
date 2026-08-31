@@ -25,3 +25,4 @@ Product semantics, stage scope, stable IDs, cross-component behavior and require
 - `docs/database-migrations.md` — migration workflow
 - `docs/operations.md` — runtime/backup/restore
 - `docs/release.md` — S0.1 freeze and final S0 RC evidence
+- [2026-08-31 architecture/core audit](docs/architecture-alignment-audit.md) — source-backed deviation snapshot and remediation plan; not a living status or Freeze proof

@@ -16,6 +16,10 @@ Production startup must not use ORM AutoMigrate. Runtime Relay owns its separate
 
 ## 2. Source ownership
 
+当前迁移为 `202608190001_initial.sql` 与 `202608280001_enterprise_updates.sql`（完整清单始终以 `backend/migrations/` 为准）。`backend/cmd/devmigrate` 使用自己的 `devmigrate_revisions` 表，不是 Atlas history；遇到 `already exists` 的容错不能证明整份迁移完整，因此只作为隔离开发环境便利工具，不替代 release migration gate。
+
+`maintenance.Check` 目前只检查初始 17 张表及 SQLite integrity/foreign keys，未校验 Enterprise Update 表、完整列/索引和 migration history。`CurrentSchemaRevision` 与 backup metadata 仍固定初始值，不能当作运行库最新 schema 的证明。相关修复见 [alignment audit](architecture-alignment-audit.md)。
+
 The repository is authoritative for:
 
 - `backend/ent/` schema/code generation inputs;
@@ -80,6 +84,8 @@ For migrations with meaningful risk, test interrupted/failed application and ens
 ### Schema checksum
 
 Validate Atlas migration integrity/`atlas.sum` so old migrations cannot drift unnoticed.
+
+CI-compatible POSIX 环境中，`make migration-replay` 对临时空库执行 Atlas apply/status；`make migrations` 再重算并比较 checksum。空库回放不等于真实旧版数据升级，后者必须另跑对应 fixture。不要在唯一生产库上试跑开发 helper 或未经审查的 migration diff。
 
 ## 6. Test data
 

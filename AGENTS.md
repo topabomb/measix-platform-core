@@ -57,6 +57,6 @@ New dependencies must have a real feature use, avoid duplicating Quasar or busin
 
 ## Completion claims
 
-Do not claim S0.1, S0.2 or S0 Exit unless the corresponding architecture gate has executed and the required evidence exists. Historical Green runs are regression evidence only; they do not satisfy a newer head commit.
+Do not claim S0.1, S0.2, S0.3, S0.4 or final S0 Exit unless the corresponding architecture gate has executed and the required evidence exists. Historical Green runs are regression evidence only; they do not satisfy a newer head commit. A manifest's declared PASS is not a substitute for validating its exact source/build/contract/artifact chain.
 
 Implementation reports should state changed areas, architecture impact, Red/Green evidence, executed checks and remaining gaps.

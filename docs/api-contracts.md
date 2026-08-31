@@ -33,7 +33,7 @@ If an exact schema choice can change client interpretation, resolve architecture
 
 ## 3. Versioned contract state
 
-Snapshot v1 is frozen only for the exact architecture/core candidate recorded in `docs/s0-freeze-manifest.json`. Current branch changes after that pinned candidate are not covered merely because the historical manifest remains in Git.
+The historical `docs/s0-freeze-manifest.json` declares a Snapshot v1 candidate; acceptance requires validating its pinned artifact chain. Current code compiles Snapshot v2, even without Assistant entries. Retaining v1 fixtures/manifest does not make the current server a v1 freeze or validate the current branch.
 
 Snapshot v2 Realm/Experience additions and Snapshot v3 Gateway additions are forward profile extensions with separate product/freeze gates. Do not duplicate the complete required field/enum list in this document; use:
 
@@ -43,7 +43,7 @@ Snapshot v2 Realm/Experience additions and Snapshot v3 Gateway additions are for
 - `measix-s0-control-protocol.md`;
 - relevant component/product/testing specs.
 
-Current implementation gaps are recorded only in `docs/s0-execution-progress.md`.
+Current stage status is maintained only in `docs/s0-execution-progress.md`; the [alignment audit](architecture-alignment-audit.md) is a dated source/evidence snapshot.
 
 ## 4. Canonical fixtures
 
@@ -51,13 +51,15 @@ Cross-component fixtures live only under `api/fixtures/` and must cover valid re
 
 Fixtures change in the same commit as the executable contract they represent. They must never contain production credentials or user data.
 
+Distinguish fixture coverage from complete runtime validation: unmarshalling into generated Go types does not by itself enforce every OpenAPI required/format/enum/additionalProperties rule. Contract tests, HTTP decoding and domain validation must collectively prove each required constraint.
+
 ## 5. Code generation
 
 Expected consumers include:
 
 - Go server/client types for Hub/Relay surfaces;
 - TypeScript Admin API types;
-- deterministic Android Client wire generation/export from `client-control.openapi.yaml`.
+- deterministic Android Client OpenAPI export and hash manifest under `api/generated/android/`; this repository does not generate/validate the actual Kotlin consumer implementation merely by exporting that input.
 
 Generator configuration/version is repository-controlled and reproducible. Generated files are never manually edited. CI must regenerate or verify from a clean checkout and fail on drift.
 
@@ -90,7 +92,7 @@ If implementation discovers that reasonable clients could interpret the detail d
 
 Freeze is an executable milestone, not a Markdown declaration.
 
-Before S0.2 starts, the exact candidate must have:
+Before a later stage treats S0.1 as an accepted frozen dependency, the exact candidate must have:
 
 - Client/Admin/Internal OpenAPI aligned with the pinned S0.1 architecture baseline;
 - canonical fixtures for every Android-visible Snapshot resource/policy behavior;
@@ -102,13 +104,13 @@ Before S0.2 starts, the exact candidate must have:
 
 The complete manifest evidence contract belongs to `measix-s0-capability-delivery-system-testing-spec.md` and `docs/release.md`; this document intentionally does **not** maintain a second partial field list.
 
-A placeholder or stale `docs/s0-freeze-manifest.json` is invalid. The file may be generated only by a successful C7 candidate verification on the exact candidate SHA.
+A draft produced by the two-phase writer/replay flow is not an accepted Freeze. Current tooling writes to `docs/s0-freeze-manifest.json`, so run it only on an isolated candidate and preserve existing historical evidence. Final acceptance and known validation gaps are defined in [release](release.md); do not infer them from the filename.
 
 After freeze, an incompatible Android-visible change cannot silently mutate frozen v1/v2/v3. Follow architecture compatibility/versioning semantics and create the applicable new candidate. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; it cannot reuse the v1 manifest as proof.
 
 ## 8. Compatibility rules
 
-S0 contract tests preserve architecture rules including:
+S0 contract tests must prove architecture rules including (not a claim that all current tests already do):
 
 - clients tolerate added unknown optional response fields;
 - undeclared request fields are rejected where strict request decoding is required;
@@ -127,7 +129,7 @@ An OpenAPI change must identify:
 3. pre-freeze vs frozen-contract impact;
 4. fixtures changed;
 5. generated consumers changed;
-6. affected T0/T1/T2/T3/T4.1/S0.2 lanes;
+6. affected T0–T3 and stage-specific T4.1/T4.2/T4.3/T4.4/final lanes;
 7. Android synchronization impact;
 8. backward compatibility.
 

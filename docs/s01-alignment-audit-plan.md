@@ -1,7 +1,7 @@
-# S0.1 实现对齐审计与临时执行单 — ✅ 已完成
+# S0.1 实现对齐审计与临时执行单 — 历史快照
 
-> 文档性质：临时审计与执行计划，S0.1 Freeze 已完成，本文件中所有偏差已关闭。
-> S0.1 状态权威在 `docs/s0-execution-progress.md`。本文件保留作为历史记录。
+> 文档性质：2026-08-27 基线的临时审计/执行记录。下文结论和测试均指当时基线，不是当前待办或“所有偏差已关闭”的证明。
+> 当前状态权威在 `docs/s0-execution-progress.md`；2026-08-31 复核见 [alignment audit](architecture-alignment-audit.md)。历史正文保留，不用后续 manifest 覆盖当时失败/未执行记录。
 >
 > 审计日期：2026-08-27  
 > platform-core：`agent/s0-platform-core` @ `11e2b2efffac3ecb5690f08e3a03303d09d240eb`  

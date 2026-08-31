@@ -3,7 +3,6 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -41,30 +40,23 @@ func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http
 		endDate = &params.EndDate.Time
 	}
 
-	items, truncated, err := h.enterpriseUpdate.ListPublished(r.Context(), startDate, endDate, limit)
+	items, truncated, metadata, err := h.enterpriseUpdate.ListPublished(r.Context(), startDate, endDate, limit)
 	if err != nil {
 		if errors.Is(err, enterpriseupdate.ErrInvalidLimit) {
 			writeProblem(w, http.StatusBadRequest, "invalid_argument", "limit must be between 1 and 20")
 			return
 		}
 		if errors.Is(err, enterpriseupdate.ErrInvalidDateRange) {
-			writeProblem(w, http.StatusBadRequest, "invalid_argument", "start_date must not be after end_date")
+			writeProblem(w, http.StatusBadRequest, "invalid_argument", "startDate must not be after endDate")
 			return
 		}
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
 
-	// Compute ETag from the authoritative latest feed revision (across all
-	// statuses), not from the filtered result set. This ensures the ETag
-	// changes whenever any update is published/withdrawn, even if the
-	// filtered list is empty or doesn't include the latest revision.
-	latestRev, err := h.enterpriseUpdate.LatestFeedRevision(r.Context())
-	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
-		return
-	}
-	etag := fmt.Sprintf(`"rev-%d"`, latestRev)
+	etag := metadata.ETag
+	w.Header().Set("Cache-Control", "private, no-cache")
+	w.Header().Set("Vary", "Authorization")
 
 	// Check If-None-Match for conditional 304
 	if params.IfNoneMatch != nil && *params.IfNoneMatch == etag {
@@ -76,12 +68,12 @@ func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http
 	feedItems := make([]clientapi.EnterpriseUpdateItem, 0, len(items))
 	for _, item := range items {
 		entry := clientapi.EnterpriseUpdateItem{
-			UpdateId:      clientapi.EnterpriseUpdateId(item.ID),
-			Title:         item.Title,
-			Content:       item.Content,
-			ContentFormat: clientapi.EnterpriseUpdateContentFormat(item.ContentFormat),
-			Category:      clientapi.EnterpriseUpdateCategory(item.Category),
-			Severity:      clientapi.EnterpriseUpdateSeverity(item.Severity),
+			EnterpriseUpdateId: clientapi.EnterpriseUpdateId(item.ID),
+			Title:              item.Title,
+			Content:            item.Content,
+			ContentFormat:      clientapi.EnterpriseUpdateContentFormat(item.ContentFormat),
+			Category:           clientapi.EnterpriseUpdateCategory(item.Category),
+			Severity:           clientapi.EnterpriseUpdateSeverity(item.Severity),
 		}
 		if item.PublishedAt != nil {
 			entry.PublishedAt = *item.PublishedAt
@@ -89,10 +81,8 @@ func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http
 		feedItems = append(feedItems, entry)
 	}
 
-	// Use deployment timezone (UTC for S0.2)
-	tz := "UTC"
 	feed := clientapi.EnterpriseUpdateFeed{
-		EnterpriseTimezone: tz,
+		EnterpriseTimezone: metadata.Timezone,
 		Items:              feedItems,
 		Truncated:          truncated,
 	}
@@ -105,6 +95,7 @@ func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http
 }
 
 func (h *fullClientHandler) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateID clientapi.EnterpriseUpdateId) {
+	w.Header().Set("Cache-Control", "no-store")
 	token, ok := bearerToken(r)
 	if !ok {
 		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
@@ -128,12 +119,12 @@ func (h *fullClientHandler) GetEnterpriseUpdate(w http.ResponseWriter, r *http.R
 		return
 	}
 	entry := clientapi.EnterpriseUpdateItem{
-		UpdateId:      clientapi.EnterpriseUpdateId(item.ID),
-		Title:         item.Title,
-		Content:       item.Content,
-		ContentFormat: clientapi.EnterpriseUpdateContentFormat(item.ContentFormat),
-		Category:      clientapi.EnterpriseUpdateCategory(item.Category),
-		Severity:      clientapi.EnterpriseUpdateSeverity(item.Severity),
+		EnterpriseUpdateId: clientapi.EnterpriseUpdateId(item.ID),
+		Title:              item.Title,
+		Content:            item.Content,
+		ContentFormat:      clientapi.EnterpriseUpdateContentFormat(item.ContentFormat),
+		Category:           clientapi.EnterpriseUpdateCategory(item.Category),
+		Severity:           clientapi.EnterpriseUpdateSeverity(item.Severity),
 	}
 	if item.PublishedAt != nil {
 		entry.PublishedAt = *item.PublishedAt

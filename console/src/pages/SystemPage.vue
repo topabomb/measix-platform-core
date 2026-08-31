@@ -11,7 +11,7 @@ import PageHeader from '../components/PageHeader.vue'
 const { t: $t } = useI18n()
 
 type SystemStatus = components['schemas']['SystemStatus']
-type SystemHealth = components['schemas']['SystemHealth']
+type SystemHealth = components['schemas']['Health']
 
 const status = ref<SystemStatus>()
 const health = ref<SystemHealth>()
@@ -95,8 +95,11 @@ onMounted(refresh)
           <q-card flat bordered>
             <q-card-section class="text-subtitle2">{{ $t('system.meteringSpool') }}</q-card-section>
             <q-list separator>
-              <q-item><q-item-section>{{ $t('overview.ingestLag') }}</q-item-section><q-item-section side>{{ status.requestUsageIngestLagSeconds ?? 0 }}s</q-item-section></q-item>
-              <q-item><q-item-section>{{ $t('system.semanticOrphan') }}</q-item-section><q-item-section side>{{ status.semanticOrphanCount ?? 0 }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('overview.ingestLag') }}</q-item-section><q-item-section side>{{ status.requestUsageIngestLagSeconds ?? '—' }}s</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('system.spoolState') }}</q-item-section><q-item-section side>{{ status.spoolState ?? '—' }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('system.spoolPending') }}</q-item-section><q-item-section side>{{ status.spoolPendingCount ?? '—' }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('system.spoolOldest') }}</q-item-section><q-item-section side>{{ status.oldestPendingAgeSeconds ?? '—' }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('system.semanticOrphan') }}</q-item-section><q-item-section side>{{ status.semanticOrphanCount ?? '—' }}</q-item-section></q-item>
               <q-item><q-item-section>{{ $t('overview.activeGeneration') }}</q-item-section><q-item-section side>{{ status.activeManagedGeneration }}</q-item-section></q-item>
               <q-item><q-item-section>{{ $t('system.managedStateRevision') }}</q-item-section><q-item-section side>{{ status.managedStateRevision }}</q-item-section></q-item>
             </q-list>

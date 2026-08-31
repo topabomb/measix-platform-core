@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/runtimecontrol"
@@ -132,20 +133,30 @@ func (h *fullAdminHandler) ListReleases(w http.ResponseWriter, r *http.Request, 
 		writeIdentityError(w, err)
 		return
 	}
-	limit := 50
-	if params.Limit != nil {
-		limit = *params.Limit
+	limit, after, valid := pageParams(w, r, params.Limit, params.Cursor)
+	if !valid {
+		return
 	}
-	rows, err := h.services.Capability.ListReleases(r.Context(), limit)
+	before := 0
+	if after != "" {
+		var err error
+		before, err = strconv.Atoi(after)
+		if err != nil || before < 1 {
+			writeProblem(w, 400, "invalid_request", "Invalid cursor")
+			return
+		}
+	}
+	rows, err := h.services.Capability.ListReleases(r.Context(), limit+1, before)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
+	rows, next := pageResult(r, rows, limit, func(v capability.ReleaseView) string { return strconv.Itoa(v.ManagedGeneration) })
 	items := make([]adminapi.Release, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, releaseWire(row))
 	}
-	writeJSON(w, http.StatusOK, adminapi.ReleasePage{Items: items})
+	writeJSON(w, http.StatusOK, adminapi.ReleasePage{Items: items, NextCursor: next})
 }
 
 func (h *fullAdminHandler) GetRelease(w http.ResponseWriter, r *http.Request, releaseID adminapi.ReleaseId) {

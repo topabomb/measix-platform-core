@@ -175,8 +175,6 @@ func (e *HubEnv) StartHub(ctx context.Context) error {
 		"run",
 		"--listen", fmt.Sprintf("127.0.0.1:%d", e.HubPort),
 		"--internal-listen", fmt.Sprintf("127.0.0.1:%d", e.HubInternalPort),
-		"--public-base-url", e.HubBaseURL,
-		"--runtime-api-base", e.RelayPubBaseURL,
 		"--db", e.DBPath,
 		"--master-key-file", e.MasterKeyFile,
 		"--jwt-private-key-file", e.JWTKeyFile,

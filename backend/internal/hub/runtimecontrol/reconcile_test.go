@@ -153,3 +153,33 @@ func TestI3ReconcileDoesNotBlindlyOverwriteUnexpectedNewerRelay(t *testing.T) {
 		t.Fatalf("Hub authority was overwritten by Relay: %+v", managed)
 	}
 }
+func TestLogoutConvergesAndRelayRestartUsesPersistedDescriptor(t *testing.T) {
+	ctx := context.Background()
+	st, svc, _, server, _, adminID, _, draftRevision := newRuntimeControlEnv(t)
+	defer server.Close()
+	published := publishAndFinalize(t, svc, adminID, draftRevision)
+	// The durable session deny is also used after lost logout responses/re-enrollment.
+	sessionID := platformid.New(platformid.Session)
+	now := svc.Now().UTC()
+	_, err := st.Client.Session.Create().SetID(sessionID).SetUserID(adminID).SetChannel("ANDROID").SetStatus("REVOKED").SetExpiresAt(now.Add(time.Hour)).SetCreatedAt(now).Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reconciled, err := svc.Reconcile(ctx)
+	if err != nil || reconciled == nil || reconciled.Kind != "SECURITY_CHANGE" || reconciled.DesiredControlRevision <= published.DesiredControlRevision {
+		t.Fatalf("logout not converged: %+v %v", reconciled, err)
+	}
+	// Restart must rehydrate the exact committed descriptor, not today's mutable facts.
+	_, err = st.Client.Session.Create().SetID(platformid.New(platformid.Session)).SetUserID(adminID).SetChannel("ADMIN_WEB").SetStatus("REVOKED").SetExpiresAt(now.Add(time.Hour)).SetCreatedAt(now).Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	relay := &lostAckRelay{store: control.NewStore(time.Now)}
+	svc.Relay = relay
+	if _, err = svc.Reconcile(ctx); err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	if _, denied := relay.store.Current().RevokedSessions[sessionID]; !denied {
+		t.Fatal("recovered bundle lost session deny")
+	}
+}

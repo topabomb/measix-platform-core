@@ -255,13 +255,14 @@ func TestERXC007StarterRendersTitleOrderAndPrefillsPrompt(t *testing.T) {
 	if len(preview.Starters) != 2 {
 		t.Fatalf("expected 2 starters, got %d", len(preview.Starters))
 	}
-	// Starters should be sorted by (assistantDefinitionId, sortOrder)
-	if preview.Starters[0].SortOrder != 0 || preview.Starters[1].SortOrder != 1 {
-		t.Fatalf("starters not sorted by sortOrder: got %d, %d",
-			preview.Starters[0].SortOrder, preview.Starters[1].SortOrder)
+	// Preview shares the canonical wire ordering; UI applies (sortOrder, starterId).
+	if preview.Starters[0].StarterId > preview.Starters[1].StarterId {
+		t.Fatal("preview starters not ordered by stable ID")
 	}
-	if preview.Starters[0].Title != "First Starter" {
-		t.Fatalf("expected first starter title 'First Starter', got %s", preview.Starters[0].Title)
+	for _, starter := range preview.Starters {
+		if starter.SortOrder == 0 && starter.Title != "First Starter" {
+			t.Fatal("sortOrder/title association changed")
+		}
 	}
 }
 

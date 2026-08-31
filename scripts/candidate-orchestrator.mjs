@@ -269,7 +269,7 @@ async function runFourCapabilityTraffic(env, adminPassword) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        platform: 'ANDROID',
+        platform: 'ANDROID', deviceName: 'Test device',
         code: enrollmentCode,
         installationId: `ins_${randomUUID()}`,
         appVersion: 'orchestrator-1.0',

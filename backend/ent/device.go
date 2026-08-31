@@ -23,6 +23,8 @@ type Device struct {
 	InstallationID *string `json:"installation_id,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// Name holds the value of the "name" field.
+	Name string `json:"name,omitempty"`
 	// AppVersion holds the value of the "app_version" field.
 	AppVersion *string `json:"app_version,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -39,7 +41,7 @@ func (*Device) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case device.FieldID, device.FieldUserID, device.FieldInstallationID, device.FieldStatus, device.FieldAppVersion:
+		case device.FieldID, device.FieldUserID, device.FieldInstallationID, device.FieldStatus, device.FieldName, device.FieldAppVersion:
 			values[i] = new(sql.NullString)
 		case device.FieldCreatedAt, device.FieldLastSeenAt, device.FieldRevokedAt:
 			values[i] = new(sql.NullTime)
@@ -82,6 +84,12 @@ func (_m *Device) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case device.FieldName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field name", values[i])
+			} else if value.Valid {
+				_m.Name = value.String
 			}
 		case device.FieldAppVersion:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -156,6 +164,9 @@ func (_m *Device) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("name=")
+	builder.WriteString(_m.Name)
 	builder.WriteString(", ")
 	if v := _m.AppVersion; v != nil {
 		builder.WriteString("app_version=")

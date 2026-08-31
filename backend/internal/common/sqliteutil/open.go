@@ -3,6 +3,9 @@ package sqliteutil
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
+	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -16,23 +19,27 @@ func Open(path string) (*sql.DB, error) {
 	if path == "" {
 		return nil, fmt.Errorf("sqlite path is required")
 	}
-	db, err := sql.Open("sqlite", "file:"+path+"?_time_format=sqlite&_timezone=UTC")
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	uriPath := filepath.ToSlash(absolute)
+	if !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	uri := url.URL{Scheme: "file", Path: uriPath}
+	query := url.Values{"_time_format": {"sqlite"}, "_timezone": {"UTC"}, "_txlock": {"immediate"}}
+	// Apply connection-local safety settings to every replacement connection.
+	for _, pragma := range []string{"busy_timeout(5000)", "journal_mode(WAL)", "foreign_keys(ON)", "synchronous(FULL)"} {
+		query.Add("_pragma", pragma)
+	}
+	uri.RawQuery = query.Encode()
+	db, err := sql.Open("sqlite", uri.String())
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
-	for _, statement := range []string{
-		"PRAGMA journal_mode=WAL",
-		"PRAGMA foreign_keys=ON",
-		fmt.Sprintf("PRAGMA busy_timeout=%d", BusyTimeoutMillis),
-		"PRAGMA synchronous=FULL",
-	} {
-		if _, err := db.Exec(statement); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("configure sqlite (%s): %w", statement, err)
-		}
-	}
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("ping sqlite: %w", err)

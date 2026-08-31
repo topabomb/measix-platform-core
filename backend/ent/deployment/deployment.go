@@ -15,6 +15,10 @@ const (
 	FieldName = "name"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldTimezone holds the string denoting the timezone field in the database.
+	FieldTimezone = "timezone"
+	// FieldFeedRevision holds the string denoting the feed_revision field in the database.
+	FieldFeedRevision = "feed_revision"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -28,6 +32,8 @@ var Columns = []string{
 	FieldID,
 	FieldName,
 	FieldStatus,
+	FieldTimezone,
+	FieldFeedRevision,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -41,6 +47,13 @@ func ValidColumn(column string) bool {
 	}
 	return false
 }
+
+var (
+	// DefaultTimezone holds the default value on creation for the "timezone" field.
+	DefaultTimezone string
+	// DefaultFeedRevision holds the default value on creation for the "feed_revision" field.
+	DefaultFeedRevision int64
+)
 
 // OrderOption defines the ordering options for the Deployment queries.
 type OrderOption func(*sql.Selector)
@@ -58,6 +71,16 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByTimezone orders the results by the timezone field.
+func ByTimezone(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTimezone, opts...).ToFunc()
+}
+
+// ByFeedRevision orders the results by the feed_revision field.
+func ByFeedRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFeedRevision, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

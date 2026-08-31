@@ -68,7 +68,7 @@ func TestHUBID003EnrollmentExpiryAndCredentialDigestOnly(t *testing.T) {
 	now := storedEnrollment.ExpiresAt
 	s.Now = func() time.Time { return now }
 	s.Signer.Now = s.Now
-	if _, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "1.0.0"); !errors.Is(err, identity.ErrExpired) {
+	if _, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "Test device", "1.0.0"); !errors.Is(err, identity.ErrExpired) {
 		t.Fatalf("exchange at expiry err=%v, want ErrExpired", err)
 	}
 }
@@ -88,7 +88,7 @@ func TestHUBID005RefreshCredentialDigestOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	exchange, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "1.0.0")
+	exchange, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "Test device", "1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}

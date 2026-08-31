@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"measix/platform/pkg/platformid"
 	"sort"
+	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"measix/platform/ent"
 	"measix/platform/ent/predicate"
 	"measix/platform/ent/requestusage"
@@ -57,6 +60,7 @@ const (
 // Filter captures the combinable usage read-model filters (Time / User /
 // Resource / Resource Kind / Upstream / Status / Completeness).
 type Filter struct {
+	After        string
 	From         *time.Time
 	To           *time.Time
 	UserID       string
@@ -104,14 +108,25 @@ func requestView(row *ent.RequestUsage) RequestView {
 }
 
 func (s *Service) ListRequests(ctx context.Context, filter Filter, limit int) ([]RequestView, error) {
-	if limit < 1 || limit > 200 {
+	if limit < 1 || limit > 201 {
 		limit = 50
+	}
+	if err := filter.Validate(); err != nil {
+		return nil, err
 	}
 	q := s.Client.RequestUsage.Query()
 	if preds := requestFilterPreds(filter); len(preds) > 0 {
 		q = q.Where(requestusage.And(preds...))
 	}
-	rows, err := q.Order(ent.Desc(requestusage.FieldCompletedAt)).Limit(limit).All(ctx)
+	if filter.After != "" {
+		timestamp, id, ok := strings.Cut(filter.After, "|")
+		completed, err := time.Parse(time.RFC3339Nano, timestamp)
+		if !ok || err != nil || platformid.Validate(platformid.Request, id) != nil {
+			return nil, ErrInvalidBatch
+		}
+		q = q.Where(requestusage.Or(requestusage.CompletedAtLT(completed), requestusage.And(requestusage.CompletedAtEQ(completed), requestusage.RequestIDGT(id))))
+	}
+	rows, err := q.Order(ent.Desc(requestusage.FieldCompletedAt), ent.Asc(requestusage.FieldRequestID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -123,9 +138,18 @@ func (s *Service) ListRequests(ctx context.Context, filter Filter, limit int) ([
 }
 
 // requestFilterPreds returns the combinable predicates for a Filter over the
-// RequestUsage entity (excluding time which is applied separately by callers).
+// RequestUsage entity, including the same half-open time window as summaries.
 func requestFilterPreds(filter Filter) []predicate.RequestUsage {
 	preds := []predicate.RequestUsage{}
+	if filter.From != nil {
+		preds = append(preds, requestusage.CompletedAtGTE(filter.From.UTC()))
+	}
+	if filter.To != nil {
+		preds = append(preds, requestusage.CompletedAtLT(filter.To.UTC()))
+	}
+	if filter.Completeness != "" {
+		preds = append(preds, requestCompletenessPred(filter.Completeness))
+	}
 	if filter.UserID != "" {
 		preds = append(preds, requestusage.UserIDEQ(filter.UserID))
 	}
@@ -181,7 +205,7 @@ func requestStatusPred(status RequestStatus) predicate.RequestUsage {
 func (s *Service) GetRequest(ctx context.Context, requestID string) (RequestView, error) {
 	row, err := s.Client.RequestUsage.Query().Where(requestusage.RequestIDEQ(requestID)).Only(ctx)
 	if ent.IsNotFound(err) {
-		return RequestView{}, ErrInvalidBatch
+		return RequestView{}, ErrRequestNotFound
 	}
 	if err != nil {
 		return RequestView{}, err
@@ -190,7 +214,10 @@ func (s *Service) GetRequest(ctx context.Context, requestID string) (RequestView
 }
 
 func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
-	from, to := time.Unix(0, 0).UTC(), time.Now().UTC().Add(time.Nanosecond)
+	if err := filter.Validate(); err != nil {
+		return Summary{}, err
+	}
+	from, to := time.Unix(0, 0).UTC(), s.Now().UTC().Add(time.Nanosecond)
 	if filter.From != nil {
 		from = filter.From.UTC()
 	}
@@ -205,7 +232,12 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 		requestusage.CompletedAtGTE(from),
 		requestusage.CompletedAtLT(to),
 	)
-	requests, err := s.Client.RequestUsage.Query().Where(requestusage.And(preds...)).All(ctx)
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return Summary{}, err
+	}
+	defer tx.Rollback()
+	requests, err := tx.RequestUsage.Query().Where(requestusage.And(preds...)).All(ctx)
 	if err != nil {
 		return Summary{}, err
 	}
@@ -219,12 +251,39 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 		result.ResponseBytes += row.ResponseBytes
 	}
 
-	semanticQ := s.Client.SemanticUsage.Query().Where(
+	semanticQ := tx.SemanticUsage.Query().Where(
 		semanticusage.OccurredAtGTE(from),
 		semanticusage.OccurredAtLT(to),
 	)
-	if filter.Completeness != "" {
-		semanticQ = semanticQ.Where(semanticusage.CompletenessEQ(string(filter.Completeness)))
+	// Correlate in SQL: no unbounded ID parameter list, and linked meters use
+	// the same whole-request completeness as the request list.
+	semanticQ = semanticQ.Where(func(sel *sql.Selector) {
+		table := sql.Table(requestusage.Table)
+		matched := sql.Select(table.C(requestusage.FieldRequestID)).From(table)
+		for _, pred := range preds {
+			pred(matched)
+		}
+		matched.Where(sql.ColumnsEQ(table.C(requestusage.FieldRequestID), sel.C(semanticusage.FieldRequestID)))
+		condition := sql.Exists(matched)
+		if filter.UserID == "" && filter.Status == "" {
+			anyRequest := sql.Select(table.C(requestusage.FieldRequestID)).From(table).
+				Where(sql.ColumnsEQ(table.C(requestusage.FieldRequestID), sel.C(semanticusage.FieldRequestID)))
+			unlinked := sql.Not(sql.Exists(anyRequest))
+			if filter.Completeness != "" {
+				unlinked = sql.And(unlinked, sql.EQ(sel.C(semanticusage.FieldCompleteness), string(filter.Completeness)))
+			}
+			condition = sql.Or(condition, unlinked)
+		}
+		sel.Where(condition)
+	})
+	if filter.ResourceID != "" {
+		semanticQ = semanticQ.Where(semanticusage.ResourceIDEQ(filter.ResourceID))
+	}
+	if filter.UpstreamID != "" {
+		semanticQ = semanticQ.Where(semanticusage.UpstreamIDEQ(filter.UpstreamID))
+	}
+	if filter.ResourceKind != "" {
+		semanticQ = semanticQ.Where(semanticusage.ResourceIDHasPrefix(resourceKindPrefix(filter.ResourceKind)))
 	}
 	semantic, err := semanticQ.All(ctx)
 	if err != nil {
@@ -255,6 +314,9 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 			acc.completeness = CompletenessPartial
 		}
 		meters[row.Meter] = acc
+		if row.ProviderCost == nil || row.Currency == nil {
+			costState = CostPartial
+		}
 		if row.ProviderCost != nil && row.Currency != nil {
 			cost, ok := decimalRat(*row.ProviderCost)
 			if ok {
@@ -296,3 +358,58 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 }
 
 var ErrPricingRevisionConflict = errors.New("pricing revision conflict")
+
+func requestCompletenessPred(value Completeness) predicate.RequestUsage {
+	return func(sel *sql.Selector) {
+		exists := func(confidence string, negate bool) *sql.Predicate {
+			table := sql.Table(semanticusage.Table)
+			q := sql.Select(table.C(semanticusage.FieldID)).From(table).Where(sql.ColumnsEQ(table.C(semanticusage.FieldRequestID), sel.C(requestusage.FieldRequestID)))
+			if confidence != "" {
+				if negate {
+					q.Where(sql.NEQ(table.C(semanticusage.FieldCompleteness), confidence))
+				} else {
+					q.Where(sql.EQ(table.C(semanticusage.FieldCompleteness), confidence))
+				}
+			}
+			return sql.Exists(q)
+		}
+		switch value {
+		case CompletenessComplete:
+			sel.Where(sql.And(exists("", false), sql.Not(exists(string(CompletenessComplete), true))))
+		case CompletenessPartial:
+			sel.Where(sql.And(exists(string(CompletenessPartial), false), sql.Not(exists(string(CompletenessUnknown), false))))
+		default:
+			sel.Where(sql.Or(sql.Not(exists("", false)), exists(string(CompletenessUnknown), false)))
+		}
+	}
+}
+
+var ErrRequestNotFound = errors.New("usage request not found")
+
+func (f Filter) Validate() error {
+	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+		return ErrInvalidBatch
+	}
+	switch f.Status {
+	case "", RequestStatusSuccess, RequestStatusError, RequestStatusBlocked:
+	default:
+		return ErrInvalidBatch
+	}
+	switch f.Completeness {
+	case "", CompletenessComplete, CompletenessPartial, CompletenessUnknown:
+	default:
+		return ErrInvalidBatch
+	}
+	switch f.ResourceKind {
+	case "", ResourceKindProvider, ResourceKindModel, ResourceKindTTS, ResourceKindASR, ResourceKindMCP:
+	default:
+		return ErrInvalidBatch
+	}
+	if f.UserID != "" && platformid.Validate(platformid.User, f.UserID) != nil {
+		return ErrInvalidBatch
+	}
+	if f.UpstreamID != "" && platformid.Validate(platformid.Upstream, f.UpstreamID) != nil {
+		return ErrInvalidBatch
+	}
+	return nil
+}

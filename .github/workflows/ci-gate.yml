@@ -87,6 +87,9 @@ jobs:
           path: ${{ env.PNPM_STORE_PATH }}
           key: pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('console/pnpm-lock.yaml') }}
 
+      - name: 验证证据与开发工具
+        run: node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs
+
       - name: 执行 T0 静态与契约门禁
         run: make fmt-check contract migrations generated-drift
 

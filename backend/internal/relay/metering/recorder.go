@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"sync/atomic"
 	"time"
 
@@ -14,14 +15,24 @@ import (
 type Recorder struct {
 	Spool    *Spool
 	Timeout  time.Duration
+	Log      *slog.Logger
 	degraded atomic.Bool
 }
 
 func NewRecorder(spool *Spool) *Recorder {
-	return &Recorder{Spool: spool, Timeout: 2 * time.Second}
+	return &Recorder{Spool: spool, Timeout: 2 * time.Second, Log: slog.Default()}
 }
 
-func (r *Recorder) Record(event usageingestapi.RequestUsageEvent) error {
+func (r *Recorder) Record(event usageingestapi.RequestUsageEvent) (err error) {
+	defer func() {
+		if err != nil && r != nil {
+			r.degraded.Store(true)
+			if r.Log != nil {
+				r.Log.Error("request usage could not be persisted", "event", "usage_spool_append_failed", "requestId", event.RequestId)
+			}
+		}
+	}()
+	// Keep loss sticky: later successful writes cannot restore a lost fact.
 	if r == nil || r.Spool == nil || r.Timeout <= 0 || platformid.Validate(platformid.Request, event.RequestId) != nil {
 		return errors.New("invalid metering recorder configuration or event")
 	}

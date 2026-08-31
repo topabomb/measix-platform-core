@@ -2,20 +2,25 @@ package enterpriseupdate
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
+	_ "time/tzdata"
 
 	"measix/platform/ent"
 	"measix/platform/ent/enterpriseupdate"
-	"measix/platform/internal/wire/adminapi"
 	"measix/platform/pkg/platformid"
 )
 
 var (
+	ErrInvalidInput     = errors.New("invalid enterprise update")
 	ErrNotFound         = errors.New("enterprise update not found")
 	ErrInvalidStatus    = errors.New("invalid status transition")
 	ErrInvalidLimit     = errors.New("limit must be between 1 and 20")
-	ErrInvalidDateRange = errors.New("start_date must not be after end_date")
+	ErrInvalidDateRange = errors.New("startDate must not be after endDate")
 )
 
 type Service struct {
@@ -41,23 +46,21 @@ type UpdateView struct {
 	UpdatedAt     time.Time
 }
 
-func (s *Service) nextFeedRevision(ctx context.Context) (int64, error) {
-	row, err := s.Client.EnterpriseUpdate.Query().Order(ent.Desc(enterpriseupdate.FieldFeedRevision)).First(ctx)
-	if ent.IsNotFound(err) {
-		return 1, nil
+func validateInput(title, content, format, category, severity string) error {
+	if strings.TrimSpace(title) == "" || strings.TrimSpace(content) == "" ||
+		(format != "PLAIN" && format != "MARKDOWN") ||
+		(category != "NOTICE" && category != "ANNOUNCEMENT" && category != "MAINTENANCE") ||
+		(severity != "INFO" && severity != "WARNING" && severity != "CRITICAL") {
+		return ErrInvalidInput
 	}
-	if err != nil {
-		return 0, err
-	}
-	return row.FeedRevision + 1, nil
+	return nil
 }
 
 func (s *Service) Create(ctx context.Context, createdBy, title, content, contentFormat, category, severity string) (UpdateView, error) {
-	now := s.Now().UTC()
-	rev, err := s.nextFeedRevision(ctx)
-	if err != nil {
+	if err := validateInput(title, content, contentFormat, category, severity); err != nil {
 		return UpdateView{}, err
 	}
+	now := s.Now().UTC()
 	row, err := s.Client.EnterpriseUpdate.Create().
 		SetID(platformid.New(platformid.EntUpdate)).
 		SetTitle(title).
@@ -66,7 +69,7 @@ func (s *Service) Create(ctx context.Context, createdBy, title, content, content
 		SetCategory(category).
 		SetSeverity(severity).
 		SetStatus("DRAFT").
-		SetFeedRevision(rev).
+		SetFeedRevision(0).
 		SetCreatedByUserID(createdBy).
 		SetCreatedAt(now).
 		SetUpdatedAt(now).
@@ -88,11 +91,20 @@ func (s *Service) Get(ctx context.Context, id string) (UpdateView, error) {
 	return toView(row), nil
 }
 
-func (s *Service) List(ctx context.Context, limit int) ([]UpdateView, int64, error) {
-	if limit < 1 || limit > 200 {
+func (s *Service) List(ctx context.Context, limit int, after string) ([]UpdateView, int64, error) {
+	if limit < 1 || limit > 201 {
 		limit = 50
 	}
-	rows, err := s.Client.EnterpriseUpdate.Query().Order(ent.Desc(enterpriseupdate.FieldCreatedAt)).Limit(limit).All(ctx)
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
+	deployment, err := tx.Deployment.Query().Only(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := tx.EnterpriseUpdate.Query().Where(enterpriseupdate.IDGT(after)).Order(ent.Asc(enterpriseupdate.FieldID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -100,18 +112,19 @@ func (s *Service) List(ctx context.Context, limit int) ([]UpdateView, int64, err
 	for _, row := range rows {
 		views = append(views, toView(row))
 	}
-	latestRev, err := s.Client.EnterpriseUpdate.Query().Order(ent.Desc(enterpriseupdate.FieldFeedRevision)).First(ctx)
-	if ent.IsNotFound(err) {
-		return views, 0, nil
-	}
-	if err != nil {
-		return nil, 0, err
-	}
-	return views, latestRev.FeedRevision, nil
+	return views, deployment.FeedRevision, nil
 }
 
 func (s *Service) Update(ctx context.Context, id, title, content, contentFormat, category, severity string) (UpdateView, error) {
-	row, err := s.Client.EnterpriseUpdate.Get(ctx, id)
+	if err := validateInput(title, content, contentFormat, category, severity); err != nil {
+		return UpdateView{}, err
+	}
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return UpdateView{}, err
+	}
+	defer tx.Rollback()
+	row, err := tx.EnterpriseUpdate.Get(ctx, id)
 	if ent.IsNotFound(err) {
 		return UpdateView{}, ErrNotFound
 	}
@@ -122,7 +135,7 @@ func (s *Service) Update(ctx context.Context, id, title, content, contentFormat,
 		return UpdateView{}, ErrInvalidStatus
 	}
 	now := s.Now().UTC()
-	updated, err := s.Client.EnterpriseUpdate.UpdateOne(row).
+	updated, err := tx.EnterpriseUpdate.UpdateOne(row).
 		SetTitle(title).
 		SetContent(content).
 		SetContentFormat(contentFormat).
@@ -133,91 +146,113 @@ func (s *Service) Update(ctx context.Context, id, title, content, contentFormat,
 	if err != nil {
 		return UpdateView{}, err
 	}
+	if err := tx.Commit(); err != nil {
+		return UpdateView{}, err
+	}
 	return toView(updated), nil
 }
 
 func (s *Service) Publish(ctx context.Context, id string) (UpdateView, error) {
-	row, err := s.Client.EnterpriseUpdate.Get(ctx, id)
-	if ent.IsNotFound(err) {
-		return UpdateView{}, ErrNotFound
-	}
-	if err != nil {
-		return UpdateView{}, err
-	}
-	if row.Status != "DRAFT" {
-		return UpdateView{}, ErrInvalidStatus
-	}
-	now := s.Now().UTC()
-	rev, err := s.nextFeedRevision(ctx)
-	if err != nil {
-		return UpdateView{}, err
-	}
-	updated, err := s.Client.EnterpriseUpdate.UpdateOne(row).
-		SetStatus("PUBLISHED").
-		SetPublishedAt(now).
-		SetFeedRevision(rev).
-		SetUpdatedAt(now).
-		Save(ctx)
-	if err != nil {
-		return UpdateView{}, err
-	}
-	return toView(updated), nil
+	return s.transition(ctx, id, "DRAFT", "PUBLISHED")
 }
-
 func (s *Service) Withdraw(ctx context.Context, id string) (UpdateView, error) {
-	row, err := s.Client.EnterpriseUpdate.Get(ctx, id)
+	return s.transition(ctx, id, "PUBLISHED", "WITHDRAWN")
+}
+func (s *Service) transition(ctx context.Context, id, from, to string) (UpdateView, error) {
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return UpdateView{}, err
+	}
+	defer tx.Rollback()
+	row, err := tx.EnterpriseUpdate.Get(ctx, id)
 	if ent.IsNotFound(err) {
 		return UpdateView{}, ErrNotFound
 	}
 	if err != nil {
 		return UpdateView{}, err
 	}
-	if row.Status != "PUBLISHED" {
+	if row.Status != from {
 		return UpdateView{}, ErrInvalidStatus
 	}
+	if to == "PUBLISHED" {
+		if err := validateInput(row.Title, row.Content, row.ContentFormat, row.Category, row.Severity); err != nil {
+			return UpdateView{}, err
+		}
+	}
+	deployment, err := tx.Deployment.Query().Only(ctx)
+	if err != nil {
+		return UpdateView{}, err
+	}
+	deployment, err = tx.Deployment.UpdateOneID(deployment.ID).AddFeedRevision(1).Save(ctx)
+	if err != nil {
+		return UpdateView{}, err
+	}
 	now := s.Now().UTC()
-	rev, err := s.nextFeedRevision(ctx)
+	update := tx.EnterpriseUpdate.UpdateOneID(id).SetStatus(to).SetFeedRevision(deployment.FeedRevision).SetUpdatedAt(now)
+	if to == "PUBLISHED" {
+		update.SetPublishedAt(now)
+	}
+	row, err = update.Save(ctx)
 	if err != nil {
 		return UpdateView{}, err
 	}
-	updated, err := s.Client.EnterpriseUpdate.UpdateOne(row).
-		SetStatus("WITHDRAWN").
-		SetFeedRevision(rev).
-		SetUpdatedAt(now).
-		Save(ctx)
-	if err != nil {
+	if err := tx.Commit(); err != nil {
 		return UpdateView{}, err
 	}
-	return toView(updated), nil
+	return toView(row), nil
 }
 
-// ListPublished returns published updates ordered by publishedAt desc.
-// It supports date filtering and limit as defined by the S0.2 contract.
-// Dates are interpreted in the deployment timezone (UTC for S0.2).
-// start_date and end_date define an inclusive closed interval.
-// start_date > end_date returns ErrInvalidDateRange.
-// limit must be between 1 and 20; values outside this range return ErrInvalidLimit
-// and are never silently clamped.
-func (s *Service) ListPublished(ctx context.Context, startDate, endDate *time.Time, limit int) ([]UpdateView, bool, error) {
+type FeedMetadata struct {
+	Timezone string
+	Revision int64
+	ETag     string
+}
+
+// ListPublished captures the query, revision and items in one transaction.
+// Inputs denote calendar dates, not UTC instants. AddDate handles DST boundaries.
+func (s *Service) ListPublished(ctx context.Context, startDate, endDate *time.Time, limit int) ([]UpdateView, bool, FeedMetadata, error) {
 	if limit < 1 || limit > 20 {
-		return nil, false, ErrInvalidLimit
+		return nil, false, FeedMetadata{}, ErrInvalidLimit
 	}
-	if startDate != nil && endDate != nil && startDate.After(*endDate) {
-		return nil, false, ErrInvalidDateRange
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return nil, false, FeedMetadata{}, err
 	}
-	query := s.Client.EnterpriseUpdate.Query().Where(enterpriseupdate.StatusEQ("PUBLISHED"))
+	defer tx.Rollback()
+	deployment, err := tx.Deployment.Query().Only(ctx)
+	if err != nil {
+		return nil, false, FeedMetadata{}, err
+	}
+	location, err := time.LoadLocation(deployment.Timezone)
+	if err != nil {
+		return nil, false, FeedMetadata{}, err
+	}
+	day := func(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, location) }
+	var start, end *time.Time
 	if startDate != nil {
-		// start_date is inclusive: from the start of the day (00:00:00)
-		query = query.Where(enterpriseupdate.PublishedAtGTE(*startDate))
+		v := day(*startDate)
+		start = &v
 	}
 	if endDate != nil {
-		// end_date is inclusive: up to the end of the day (23:59:59.999999999)
-		endOfDay := endDate.Add(24*time.Hour - time.Nanosecond)
-		query = query.Where(enterpriseupdate.PublishedAtLTE(endOfDay))
+		v := day(*endDate)
+		end = &v
+	} else if start != nil {
+		v := day(s.Now().In(location))
+		end = &v
 	}
-	rows, err := query.Order(ent.Desc(enterpriseupdate.FieldPublishedAt)).Limit(limit + 1).All(ctx)
+	if start != nil && end != nil && start.After(*end) {
+		return nil, false, FeedMetadata{}, ErrInvalidDateRange
+	}
+	query := tx.EnterpriseUpdate.Query().Where(enterpriseupdate.StatusEQ("PUBLISHED"))
+	if start != nil {
+		query = query.Where(enterpriseupdate.PublishedAtGTE(start.UTC()))
+	}
+	if end != nil {
+		query = query.Where(enterpriseupdate.PublishedAtLT(end.AddDate(0, 0, 1).UTC()))
+	}
+	rows, err := query.Order(ent.Desc(enterpriseupdate.FieldPublishedAt), ent.Asc(enterpriseupdate.FieldID)).Limit(limit + 1).All(ctx)
 	if err != nil {
-		return nil, false, err
+		return nil, false, FeedMetadata{}, err
 	}
 	truncated := len(rows) > limit
 	if truncated {
@@ -227,21 +262,29 @@ func (s *Service) ListPublished(ctx context.Context, startDate, endDate *time.Ti
 	for _, row := range rows {
 		views = append(views, toView(row))
 	}
-	return views, truncated, nil
+	// Include normalized query and represented content, not a global revision alone.
+	payload, err := json.Marshal(struct {
+		Revision   int64
+		Timezone   string
+		Start, End *time.Time
+		Limit      int
+		Items      []UpdateView
+		Truncated  bool
+	}{deployment.FeedRevision, deployment.Timezone, start, end, limit, views, truncated})
+	if err != nil {
+		return nil, false, FeedMetadata{}, err
+	}
+	etag := fmt.Sprintf("\"feed-%x\"", sha256.Sum256(payload))
+	return views, truncated, FeedMetadata{Timezone: deployment.Timezone, Revision: deployment.FeedRevision, ETag: etag}, nil
 }
 
-// LatestFeedRevision returns the highest feed revision across all enterprise
-// updates (regardless of status), or 0 if none exist. This is the authoritative
-// feed revision used for ETag computation.
+// The deployment owns the monotonic public revision; drafts do not advance it.
 func (s *Service) LatestFeedRevision(ctx context.Context) (int64, error) {
-	row, err := s.Client.EnterpriseUpdate.Query().Order(ent.Desc(enterpriseupdate.FieldFeedRevision)).First(ctx)
-	if ent.IsNotFound(err) {
-		return 0, nil
-	}
+	deployment, err := s.Client.Deployment.Query().Only(ctx)
 	if err != nil {
 		return 0, err
 	}
-	return row.FeedRevision, nil
+	return deployment.FeedRevision, nil
 }
 
 func toView(row *ent.EnterpriseUpdate) UpdateView {
@@ -257,21 +300,5 @@ func toView(row *ent.EnterpriseUpdate) UpdateView {
 		FeedRevision:  row.FeedRevision,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
-	}
-}
-
-func ToAdminWire(v UpdateView) adminapi.EnterpriseUpdate {
-	return adminapi.EnterpriseUpdate{
-		EnterpriseUpdateId: adminapi.EnterpriseUpdateId(v.ID),
-		Title:              v.Title,
-		Content:            v.Content,
-		ContentFormat:      adminapi.EnterpriseUpdateContentFormat(v.ContentFormat),
-		Category:           adminapi.EnterpriseUpdateCategory(v.Category),
-		Severity:           adminapi.EnterpriseUpdateSeverity(v.Severity),
-		Status:             adminapi.EnterpriseUpdateStatus(v.Status),
-		PublishedAt:        v.PublishedAt,
-		FeedRevision:       int(v.FeedRevision),
-		CreatedAt:          v.CreatedAt,
-		UpdatedAt:          v.UpdatedAt,
 	}
 }

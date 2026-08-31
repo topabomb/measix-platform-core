@@ -21,6 +21,30 @@
  *   - authOwnership: MCP 认证归属标签
  */
 export default {
+ experience: {
+  "tab": "企业助手",
+  "newAssistant": "新助手",
+  "addAssistant": "添加助手",
+  "name": "显示名称",
+  "description": "说明（可选）",
+  "model": "企业模型",
+  "mcps": "Direct Managed MCP（可选）",
+  "systemPrompt": "系统提示词",
+  "enabled": "启用",
+  "memorySeed": "记忆种子（可选，保留作者顺序）",
+  "seedEntry": "记忆 {index}",
+  "moveUp": "上移",
+  "moveDown": "下移",
+  "addSeed": "添加记忆种子",
+  "starters": "常用入口",
+  "addStarter": "添加常用入口",
+  "newStarter": "新入口",
+  "title": "标题",
+  "starterPrompt": "初始用户提示词",
+  "sortOrder": "显示顺序",
+  "removeAssistant": "从草稿移除助手及其全部入口",
+  "hint": "沿用同一草稿的保存、校验、预览和发布流程。记忆种子允许为空；Direct MCP 仅绑定当前助手。"
+},
   nav: {
     overview: '概览',
     users: '用户',
@@ -33,6 +57,7 @@ export default {
     runtimeFoundation: '运行时基础',
   },
   common: {
+    loadMore: '加载更多',
     loading: '加载中…',
     noData: '暂无数据。',
     save: '保存',
@@ -591,6 +616,9 @@ export default {
     costUnknownHint: '无可靠语义计量 → 未知。未知成本不等于零。',
   },
   system: {
+    spoolState: 'Spool 状态',
+    spoolPending: '待投递事件',
+    spoolOldest: '最旧待投递时长（秒）',
     title: '系统',
     subtitle: '运行时诊断、控制状态和计量健康。',
     relay: 'Relay',

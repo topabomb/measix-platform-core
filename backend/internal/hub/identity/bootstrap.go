@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
+	_ "time/tzdata"
 
 	"measix/platform/internal/hub/security"
 	"measix/platform/pkg/platformid"
 )
 
 func (s *Service) Bootstrap(ctx context.Context, deploymentName, adminUsername, adminDisplayName, password string) (BootstrapResult, error) {
+	if _, err := time.LoadLocation(s.BootstrapTimezone); err != nil || s.BootstrapTimezone == "" {
+		return BootstrapResult{}, ErrInvalidInput
+	}
 	deploymentName = strings.TrimSpace(deploymentName)
 	adminUsername = NormalizeUsername(adminUsername)
 	adminDisplayName = strings.TrimSpace(adminDisplayName)
@@ -48,6 +53,7 @@ func (s *Service) Bootstrap(ctx context.Context, deploymentName, adminUsername, 
 	if _, err := tx.Deployment.Create().
 		SetID(deploymentID).
 		SetName(deploymentName).
+		SetTimezone(s.BootstrapTimezone).
 		SetStatus("ACTIVE").
 		SetCreatedAt(now).
 		SetUpdatedAt(now).

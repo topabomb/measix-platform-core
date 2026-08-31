@@ -778,7 +778,7 @@ paths:
         schema:
           type: string
           enum:
-          - KNOWN
+          - EXACT
           - PARTIAL
           - UNKNOWN
   /api/admin/v1/usage/requests:
@@ -1487,7 +1487,6 @@ components:
           $ref: '#/components/schemas/ModelId'
         memorySeed:
           type: array
-          minItems: 1
           items:
             type: string
             minLength: 1
@@ -2301,9 +2300,6 @@ components:
       - requestId
       - deploymentId
       - userId
-      - resourceId
-      - runtimeRouteId
-      - upstreamId
       - managedGeneration
       - controlRevision
       - startedAt
@@ -2325,10 +2321,13 @@ components:
         deviceId:
           $ref: '#/components/schemas/DeviceId'
         resourceId:
+          x-go-type-skip-optional-pointer: true
           type: string
         runtimeRouteId:
+          x-go-type-skip-optional-pointer: true
           $ref: '#/components/schemas/RuntimeRouteId'
         upstreamId:
+          x-go-type-skip-optional-pointer: true
           $ref: '#/components/schemas/UpstreamId'
         managedGeneration:
           type: integer
@@ -2490,6 +2489,16 @@ components:
           format: date-time
         latestActivation:
           $ref: '#/components/schemas/Activation'
+        spoolState:
+          type: string
+          enum: [OK, METERING_DEGRADED]
+          description: Omitted when Relay spool status is unavailable; omission does not mean OK.
+        spoolPendingCount:
+          type: integer
+          minimum: 0
+        oldestPendingAgeSeconds:
+          type: integer
+          minimum: 0
         requestUsageIngestLagSeconds:
           type: integer
           minimum: 0

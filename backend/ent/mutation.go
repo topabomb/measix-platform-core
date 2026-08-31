@@ -1266,17 +1266,20 @@ func (m *ActivationMutation) ResetEdge(name string) error {
 // DeploymentMutation represents an operation that mutates the Deployment nodes in the graph.
 type DeploymentMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *string
-	name          *string
-	status        *string
-	created_at    *time.Time
-	updated_at    *time.Time
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*Deployment, error)
-	predicates    []predicate.Deployment
+	op               Op
+	typ              string
+	id               *string
+	name             *string
+	status           *string
+	timezone         *string
+	feed_revision    *int64
+	addfeed_revision *int64
+	created_at       *time.Time
+	updated_at       *time.Time
+	clearedFields    map[string]struct{}
+	done             bool
+	oldValue         func(context.Context) (*Deployment, error)
+	predicates       []predicate.Deployment
 }
 
 var _ ent.Mutation = (*DeploymentMutation)(nil)
@@ -1455,6 +1458,98 @@ func (m *DeploymentMutation) ResetStatus() {
 	m.status = nil
 }
 
+// SetTimezone sets the "timezone" field.
+func (m *DeploymentMutation) SetTimezone(s string) {
+	m.timezone = &s
+}
+
+// Timezone returns the value of the "timezone" field in the mutation.
+func (m *DeploymentMutation) Timezone() (r string, exists bool) {
+	v := m.timezone
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTimezone returns the old "timezone" field's value of the Deployment entity.
+// If the Deployment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentMutation) OldTimezone(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTimezone is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTimezone requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTimezone: %w", err)
+	}
+	return oldValue.Timezone, nil
+}
+
+// ResetTimezone resets all changes to the "timezone" field.
+func (m *DeploymentMutation) ResetTimezone() {
+	m.timezone = nil
+}
+
+// SetFeedRevision sets the "feed_revision" field.
+func (m *DeploymentMutation) SetFeedRevision(i int64) {
+	m.feed_revision = &i
+	m.addfeed_revision = nil
+}
+
+// FeedRevision returns the value of the "feed_revision" field in the mutation.
+func (m *DeploymentMutation) FeedRevision() (r int64, exists bool) {
+	v := m.feed_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeedRevision returns the old "feed_revision" field's value of the Deployment entity.
+// If the Deployment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentMutation) OldFeedRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeedRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeedRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeedRevision: %w", err)
+	}
+	return oldValue.FeedRevision, nil
+}
+
+// AddFeedRevision adds i to the "feed_revision" field.
+func (m *DeploymentMutation) AddFeedRevision(i int64) {
+	if m.addfeed_revision != nil {
+		*m.addfeed_revision += i
+	} else {
+		m.addfeed_revision = &i
+	}
+}
+
+// AddedFeedRevision returns the value that was added to the "feed_revision" field in this mutation.
+func (m *DeploymentMutation) AddedFeedRevision() (r int64, exists bool) {
+	v := m.addfeed_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFeedRevision resets all changes to the "feed_revision" field.
+func (m *DeploymentMutation) ResetFeedRevision() {
+	m.feed_revision = nil
+	m.addfeed_revision = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *DeploymentMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -1561,12 +1656,18 @@ func (m *DeploymentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DeploymentMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 6)
 	if m.name != nil {
 		fields = append(fields, deployment.FieldName)
 	}
 	if m.status != nil {
 		fields = append(fields, deployment.FieldStatus)
+	}
+	if m.timezone != nil {
+		fields = append(fields, deployment.FieldTimezone)
+	}
+	if m.feed_revision != nil {
+		fields = append(fields, deployment.FieldFeedRevision)
 	}
 	if m.created_at != nil {
 		fields = append(fields, deployment.FieldCreatedAt)
@@ -1586,6 +1687,10 @@ func (m *DeploymentMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case deployment.FieldStatus:
 		return m.Status()
+	case deployment.FieldTimezone:
+		return m.Timezone()
+	case deployment.FieldFeedRevision:
+		return m.FeedRevision()
 	case deployment.FieldCreatedAt:
 		return m.CreatedAt()
 	case deployment.FieldUpdatedAt:
@@ -1603,6 +1708,10 @@ func (m *DeploymentMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldName(ctx)
 	case deployment.FieldStatus:
 		return m.OldStatus(ctx)
+	case deployment.FieldTimezone:
+		return m.OldTimezone(ctx)
+	case deployment.FieldFeedRevision:
+		return m.OldFeedRevision(ctx)
 	case deployment.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case deployment.FieldUpdatedAt:
@@ -1630,6 +1739,20 @@ func (m *DeploymentMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetStatus(v)
 		return nil
+	case deployment.FieldTimezone:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTimezone(v)
+		return nil
+	case deployment.FieldFeedRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeedRevision(v)
+		return nil
 	case deployment.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -1651,13 +1774,21 @@ func (m *DeploymentMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *DeploymentMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addfeed_revision != nil {
+		fields = append(fields, deployment.FieldFeedRevision)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *DeploymentMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case deployment.FieldFeedRevision:
+		return m.AddedFeedRevision()
+	}
 	return nil, false
 }
 
@@ -1666,6 +1797,13 @@ func (m *DeploymentMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *DeploymentMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case deployment.FieldFeedRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFeedRevision(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Deployment numeric field %s", name)
 }
@@ -1698,6 +1836,12 @@ func (m *DeploymentMutation) ResetField(name string) error {
 		return nil
 	case deployment.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case deployment.FieldTimezone:
+		m.ResetTimezone()
+		return nil
+	case deployment.FieldFeedRevision:
+		m.ResetFeedRevision()
 		return nil
 	case deployment.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -1766,6 +1910,7 @@ type DeviceMutation struct {
 	user_id         *string
 	installation_id *string
 	status          *string
+	name            *string
 	app_version     *string
 	created_at      *time.Time
 	last_seen_at    *time.Time
@@ -2001,6 +2146,42 @@ func (m *DeviceMutation) ResetStatus() {
 	m.status = nil
 }
 
+// SetName sets the "name" field.
+func (m *DeviceMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *DeviceMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the Device entity.
+// If the Device object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeviceMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *DeviceMutation) ResetName() {
+	m.name = nil
+}
+
 // SetAppVersion sets the "app_version" field.
 func (m *DeviceMutation) SetAppVersion(s string) {
 	m.app_version = &s
@@ -2218,7 +2399,7 @@ func (m *DeviceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DeviceMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.user_id != nil {
 		fields = append(fields, device.FieldUserID)
 	}
@@ -2227,6 +2408,9 @@ func (m *DeviceMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, device.FieldStatus)
+	}
+	if m.name != nil {
+		fields = append(fields, device.FieldName)
 	}
 	if m.app_version != nil {
 		fields = append(fields, device.FieldAppVersion)
@@ -2254,6 +2438,8 @@ func (m *DeviceMutation) Field(name string) (ent.Value, bool) {
 		return m.InstallationID()
 	case device.FieldStatus:
 		return m.Status()
+	case device.FieldName:
+		return m.Name()
 	case device.FieldAppVersion:
 		return m.AppVersion()
 	case device.FieldCreatedAt:
@@ -2277,6 +2463,8 @@ func (m *DeviceMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldInstallationID(ctx)
 	case device.FieldStatus:
 		return m.OldStatus(ctx)
+	case device.FieldName:
+		return m.OldName(ctx)
 	case device.FieldAppVersion:
 		return m.OldAppVersion(ctx)
 	case device.FieldCreatedAt:
@@ -2314,6 +2502,13 @@ func (m *DeviceMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case device.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
 		return nil
 	case device.FieldAppVersion:
 		v, ok := value.(string)
@@ -2427,6 +2622,9 @@ func (m *DeviceMutation) ResetField(name string) error {
 		return nil
 	case device.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case device.FieldName:
+		m.ResetName()
 		return nil
 	case device.FieldAppVersion:
 		m.ResetAppVersion()
@@ -8252,9 +8450,22 @@ func (m *RequestUsageMutation) OldResourceID(ctx context.Context) (v string, err
 	return oldValue.ResourceID, nil
 }
 
+// ClearResourceID clears the value of the "resource_id" field.
+func (m *RequestUsageMutation) ClearResourceID() {
+	m.resource_id = nil
+	m.clearedFields[requestusage.FieldResourceID] = struct{}{}
+}
+
+// ResourceIDCleared returns if the "resource_id" field was cleared in this mutation.
+func (m *RequestUsageMutation) ResourceIDCleared() bool {
+	_, ok := m.clearedFields[requestusage.FieldResourceID]
+	return ok
+}
+
 // ResetResourceID resets all changes to the "resource_id" field.
 func (m *RequestUsageMutation) ResetResourceID() {
 	m.resource_id = nil
+	delete(m.clearedFields, requestusage.FieldResourceID)
 }
 
 // SetRuntimeRouteID sets the "runtime_route_id" field.
@@ -8288,9 +8499,22 @@ func (m *RequestUsageMutation) OldRuntimeRouteID(ctx context.Context) (v string,
 	return oldValue.RuntimeRouteID, nil
 }
 
+// ClearRuntimeRouteID clears the value of the "runtime_route_id" field.
+func (m *RequestUsageMutation) ClearRuntimeRouteID() {
+	m.runtime_route_id = nil
+	m.clearedFields[requestusage.FieldRuntimeRouteID] = struct{}{}
+}
+
+// RuntimeRouteIDCleared returns if the "runtime_route_id" field was cleared in this mutation.
+func (m *RequestUsageMutation) RuntimeRouteIDCleared() bool {
+	_, ok := m.clearedFields[requestusage.FieldRuntimeRouteID]
+	return ok
+}
+
 // ResetRuntimeRouteID resets all changes to the "runtime_route_id" field.
 func (m *RequestUsageMutation) ResetRuntimeRouteID() {
 	m.runtime_route_id = nil
+	delete(m.clearedFields, requestusage.FieldRuntimeRouteID)
 }
 
 // SetUpstreamID sets the "upstream_id" field.
@@ -8324,9 +8548,22 @@ func (m *RequestUsageMutation) OldUpstreamID(ctx context.Context) (v string, err
 	return oldValue.UpstreamID, nil
 }
 
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (m *RequestUsageMutation) ClearUpstreamID() {
+	m.upstream_id = nil
+	m.clearedFields[requestusage.FieldUpstreamID] = struct{}{}
+}
+
+// UpstreamIDCleared returns if the "upstream_id" field was cleared in this mutation.
+func (m *RequestUsageMutation) UpstreamIDCleared() bool {
+	_, ok := m.clearedFields[requestusage.FieldUpstreamID]
+	return ok
+}
+
 // ResetUpstreamID resets all changes to the "upstream_id" field.
 func (m *RequestUsageMutation) ResetUpstreamID() {
 	m.upstream_id = nil
+	delete(m.clearedFields, requestusage.FieldUpstreamID)
 }
 
 // SetManagedGeneration sets the "managed_generation" field.
@@ -9392,6 +9629,15 @@ func (m *RequestUsageMutation) ClearedFields() []string {
 	if m.FieldCleared(requestusage.FieldDeviceID) {
 		fields = append(fields, requestusage.FieldDeviceID)
 	}
+	if m.FieldCleared(requestusage.FieldResourceID) {
+		fields = append(fields, requestusage.FieldResourceID)
+	}
+	if m.FieldCleared(requestusage.FieldRuntimeRouteID) {
+		fields = append(fields, requestusage.FieldRuntimeRouteID)
+	}
+	if m.FieldCleared(requestusage.FieldUpstreamID) {
+		fields = append(fields, requestusage.FieldUpstreamID)
+	}
 	if m.FieldCleared(requestusage.FieldUpstreamHTTPStatus) {
 		fields = append(fields, requestusage.FieldUpstreamHTTPStatus)
 	}
@@ -9417,6 +9663,15 @@ func (m *RequestUsageMutation) ClearField(name string) error {
 		return nil
 	case requestusage.FieldDeviceID:
 		m.ClearDeviceID()
+		return nil
+	case requestusage.FieldResourceID:
+		m.ClearResourceID()
+		return nil
+	case requestusage.FieldRuntimeRouteID:
+		m.ClearRuntimeRouteID()
+		return nil
+	case requestusage.FieldUpstreamID:
+		m.ClearUpstreamID()
 		return nil
 	case requestusage.FieldUpstreamHTTPStatus:
 		m.ClearUpstreamHTTPStatus()
@@ -11718,22 +11973,26 @@ func (m *SemanticUsageMutation) ResetEdge(name string) error {
 // SessionMutation represents an operation that mutates the Session nodes in the graph.
 type SessionMutation struct {
 	config
-	op             Op
-	typ            string
-	id             *string
-	user_id        *string
-	device_id      *string
-	channel        *string
-	refresh_digest *[]byte
-	expires_at     *time.Time
-	status         *string
-	created_at     *time.Time
-	last_used_at   *time.Time
-	revoked_at     *time.Time
-	clearedFields  map[string]struct{}
-	done           bool
-	oldValue       func(context.Context) (*Session, error)
-	predicates     []predicate.Session
+	op                          Op
+	typ                         string
+	id                          *string
+	user_id                     *string
+	device_id                   *string
+	channel                     *string
+	refresh_digest              *[]byte
+	previous_refresh_digest     *[]byte
+	refresh_request_key         *string
+	refresh_replay_until        *time.Time
+	refresh_response_ciphertext *[]byte
+	expires_at                  *time.Time
+	status                      *string
+	created_at                  *time.Time
+	last_used_at                *time.Time
+	revoked_at                  *time.Time
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*Session, error)
+	predicates                  []predicate.Session
 }
 
 var _ ent.Mutation = (*SessionMutation)(nil)
@@ -12010,6 +12269,202 @@ func (m *SessionMutation) ResetRefreshDigest() {
 	delete(m.clearedFields, session.FieldRefreshDigest)
 }
 
+// SetPreviousRefreshDigest sets the "previous_refresh_digest" field.
+func (m *SessionMutation) SetPreviousRefreshDigest(b []byte) {
+	m.previous_refresh_digest = &b
+}
+
+// PreviousRefreshDigest returns the value of the "previous_refresh_digest" field in the mutation.
+func (m *SessionMutation) PreviousRefreshDigest() (r []byte, exists bool) {
+	v := m.previous_refresh_digest
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreviousRefreshDigest returns the old "previous_refresh_digest" field's value of the Session entity.
+// If the Session object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SessionMutation) OldPreviousRefreshDigest(ctx context.Context) (v *[]byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreviousRefreshDigest is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreviousRefreshDigest requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreviousRefreshDigest: %w", err)
+	}
+	return oldValue.PreviousRefreshDigest, nil
+}
+
+// ClearPreviousRefreshDigest clears the value of the "previous_refresh_digest" field.
+func (m *SessionMutation) ClearPreviousRefreshDigest() {
+	m.previous_refresh_digest = nil
+	m.clearedFields[session.FieldPreviousRefreshDigest] = struct{}{}
+}
+
+// PreviousRefreshDigestCleared returns if the "previous_refresh_digest" field was cleared in this mutation.
+func (m *SessionMutation) PreviousRefreshDigestCleared() bool {
+	_, ok := m.clearedFields[session.FieldPreviousRefreshDigest]
+	return ok
+}
+
+// ResetPreviousRefreshDigest resets all changes to the "previous_refresh_digest" field.
+func (m *SessionMutation) ResetPreviousRefreshDigest() {
+	m.previous_refresh_digest = nil
+	delete(m.clearedFields, session.FieldPreviousRefreshDigest)
+}
+
+// SetRefreshRequestKey sets the "refresh_request_key" field.
+func (m *SessionMutation) SetRefreshRequestKey(s string) {
+	m.refresh_request_key = &s
+}
+
+// RefreshRequestKey returns the value of the "refresh_request_key" field in the mutation.
+func (m *SessionMutation) RefreshRequestKey() (r string, exists bool) {
+	v := m.refresh_request_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefreshRequestKey returns the old "refresh_request_key" field's value of the Session entity.
+// If the Session object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SessionMutation) OldRefreshRequestKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefreshRequestKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefreshRequestKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefreshRequestKey: %w", err)
+	}
+	return oldValue.RefreshRequestKey, nil
+}
+
+// ClearRefreshRequestKey clears the value of the "refresh_request_key" field.
+func (m *SessionMutation) ClearRefreshRequestKey() {
+	m.refresh_request_key = nil
+	m.clearedFields[session.FieldRefreshRequestKey] = struct{}{}
+}
+
+// RefreshRequestKeyCleared returns if the "refresh_request_key" field was cleared in this mutation.
+func (m *SessionMutation) RefreshRequestKeyCleared() bool {
+	_, ok := m.clearedFields[session.FieldRefreshRequestKey]
+	return ok
+}
+
+// ResetRefreshRequestKey resets all changes to the "refresh_request_key" field.
+func (m *SessionMutation) ResetRefreshRequestKey() {
+	m.refresh_request_key = nil
+	delete(m.clearedFields, session.FieldRefreshRequestKey)
+}
+
+// SetRefreshReplayUntil sets the "refresh_replay_until" field.
+func (m *SessionMutation) SetRefreshReplayUntil(t time.Time) {
+	m.refresh_replay_until = &t
+}
+
+// RefreshReplayUntil returns the value of the "refresh_replay_until" field in the mutation.
+func (m *SessionMutation) RefreshReplayUntil() (r time.Time, exists bool) {
+	v := m.refresh_replay_until
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefreshReplayUntil returns the old "refresh_replay_until" field's value of the Session entity.
+// If the Session object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SessionMutation) OldRefreshReplayUntil(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefreshReplayUntil is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefreshReplayUntil requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefreshReplayUntil: %w", err)
+	}
+	return oldValue.RefreshReplayUntil, nil
+}
+
+// ClearRefreshReplayUntil clears the value of the "refresh_replay_until" field.
+func (m *SessionMutation) ClearRefreshReplayUntil() {
+	m.refresh_replay_until = nil
+	m.clearedFields[session.FieldRefreshReplayUntil] = struct{}{}
+}
+
+// RefreshReplayUntilCleared returns if the "refresh_replay_until" field was cleared in this mutation.
+func (m *SessionMutation) RefreshReplayUntilCleared() bool {
+	_, ok := m.clearedFields[session.FieldRefreshReplayUntil]
+	return ok
+}
+
+// ResetRefreshReplayUntil resets all changes to the "refresh_replay_until" field.
+func (m *SessionMutation) ResetRefreshReplayUntil() {
+	m.refresh_replay_until = nil
+	delete(m.clearedFields, session.FieldRefreshReplayUntil)
+}
+
+// SetRefreshResponseCiphertext sets the "refresh_response_ciphertext" field.
+func (m *SessionMutation) SetRefreshResponseCiphertext(b []byte) {
+	m.refresh_response_ciphertext = &b
+}
+
+// RefreshResponseCiphertext returns the value of the "refresh_response_ciphertext" field in the mutation.
+func (m *SessionMutation) RefreshResponseCiphertext() (r []byte, exists bool) {
+	v := m.refresh_response_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefreshResponseCiphertext returns the old "refresh_response_ciphertext" field's value of the Session entity.
+// If the Session object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SessionMutation) OldRefreshResponseCiphertext(ctx context.Context) (v *[]byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefreshResponseCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefreshResponseCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefreshResponseCiphertext: %w", err)
+	}
+	return oldValue.RefreshResponseCiphertext, nil
+}
+
+// ClearRefreshResponseCiphertext clears the value of the "refresh_response_ciphertext" field.
+func (m *SessionMutation) ClearRefreshResponseCiphertext() {
+	m.refresh_response_ciphertext = nil
+	m.clearedFields[session.FieldRefreshResponseCiphertext] = struct{}{}
+}
+
+// RefreshResponseCiphertextCleared returns if the "refresh_response_ciphertext" field was cleared in this mutation.
+func (m *SessionMutation) RefreshResponseCiphertextCleared() bool {
+	_, ok := m.clearedFields[session.FieldRefreshResponseCiphertext]
+	return ok
+}
+
+// ResetRefreshResponseCiphertext resets all changes to the "refresh_response_ciphertext" field.
+func (m *SessionMutation) ResetRefreshResponseCiphertext() {
+	m.refresh_response_ciphertext = nil
+	delete(m.clearedFields, session.FieldRefreshResponseCiphertext)
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (m *SessionMutation) SetExpiresAt(t time.Time) {
 	m.expires_at = &t
@@ -12250,7 +12705,7 @@ func (m *SessionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SessionMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 13)
 	if m.user_id != nil {
 		fields = append(fields, session.FieldUserID)
 	}
@@ -12262,6 +12717,18 @@ func (m *SessionMutation) Fields() []string {
 	}
 	if m.refresh_digest != nil {
 		fields = append(fields, session.FieldRefreshDigest)
+	}
+	if m.previous_refresh_digest != nil {
+		fields = append(fields, session.FieldPreviousRefreshDigest)
+	}
+	if m.refresh_request_key != nil {
+		fields = append(fields, session.FieldRefreshRequestKey)
+	}
+	if m.refresh_replay_until != nil {
+		fields = append(fields, session.FieldRefreshReplayUntil)
+	}
+	if m.refresh_response_ciphertext != nil {
+		fields = append(fields, session.FieldRefreshResponseCiphertext)
 	}
 	if m.expires_at != nil {
 		fields = append(fields, session.FieldExpiresAt)
@@ -12294,6 +12761,14 @@ func (m *SessionMutation) Field(name string) (ent.Value, bool) {
 		return m.Channel()
 	case session.FieldRefreshDigest:
 		return m.RefreshDigest()
+	case session.FieldPreviousRefreshDigest:
+		return m.PreviousRefreshDigest()
+	case session.FieldRefreshRequestKey:
+		return m.RefreshRequestKey()
+	case session.FieldRefreshReplayUntil:
+		return m.RefreshReplayUntil()
+	case session.FieldRefreshResponseCiphertext:
+		return m.RefreshResponseCiphertext()
 	case session.FieldExpiresAt:
 		return m.ExpiresAt()
 	case session.FieldStatus:
@@ -12321,6 +12796,14 @@ func (m *SessionMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldChannel(ctx)
 	case session.FieldRefreshDigest:
 		return m.OldRefreshDigest(ctx)
+	case session.FieldPreviousRefreshDigest:
+		return m.OldPreviousRefreshDigest(ctx)
+	case session.FieldRefreshRequestKey:
+		return m.OldRefreshRequestKey(ctx)
+	case session.FieldRefreshReplayUntil:
+		return m.OldRefreshReplayUntil(ctx)
+	case session.FieldRefreshResponseCiphertext:
+		return m.OldRefreshResponseCiphertext(ctx)
 	case session.FieldExpiresAt:
 		return m.OldExpiresAt(ctx)
 	case session.FieldStatus:
@@ -12367,6 +12850,34 @@ func (m *SessionMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRefreshDigest(v)
+		return nil
+	case session.FieldPreviousRefreshDigest:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreviousRefreshDigest(v)
+		return nil
+	case session.FieldRefreshRequestKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefreshRequestKey(v)
+		return nil
+	case session.FieldRefreshReplayUntil:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefreshReplayUntil(v)
+		return nil
+	case session.FieldRefreshResponseCiphertext:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefreshResponseCiphertext(v)
 		return nil
 	case session.FieldExpiresAt:
 		v, ok := value.(time.Time)
@@ -12439,6 +12950,18 @@ func (m *SessionMutation) ClearedFields() []string {
 	if m.FieldCleared(session.FieldRefreshDigest) {
 		fields = append(fields, session.FieldRefreshDigest)
 	}
+	if m.FieldCleared(session.FieldPreviousRefreshDigest) {
+		fields = append(fields, session.FieldPreviousRefreshDigest)
+	}
+	if m.FieldCleared(session.FieldRefreshRequestKey) {
+		fields = append(fields, session.FieldRefreshRequestKey)
+	}
+	if m.FieldCleared(session.FieldRefreshReplayUntil) {
+		fields = append(fields, session.FieldRefreshReplayUntil)
+	}
+	if m.FieldCleared(session.FieldRefreshResponseCiphertext) {
+		fields = append(fields, session.FieldRefreshResponseCiphertext)
+	}
 	if m.FieldCleared(session.FieldLastUsedAt) {
 		fields = append(fields, session.FieldLastUsedAt)
 	}
@@ -12465,6 +12988,18 @@ func (m *SessionMutation) ClearField(name string) error {
 	case session.FieldRefreshDigest:
 		m.ClearRefreshDigest()
 		return nil
+	case session.FieldPreviousRefreshDigest:
+		m.ClearPreviousRefreshDigest()
+		return nil
+	case session.FieldRefreshRequestKey:
+		m.ClearRefreshRequestKey()
+		return nil
+	case session.FieldRefreshReplayUntil:
+		m.ClearRefreshReplayUntil()
+		return nil
+	case session.FieldRefreshResponseCiphertext:
+		m.ClearRefreshResponseCiphertext()
+		return nil
 	case session.FieldLastUsedAt:
 		m.ClearLastUsedAt()
 		return nil
@@ -12490,6 +13025,18 @@ func (m *SessionMutation) ResetField(name string) error {
 		return nil
 	case session.FieldRefreshDigest:
 		m.ResetRefreshDigest()
+		return nil
+	case session.FieldPreviousRefreshDigest:
+		m.ResetPreviousRefreshDigest()
+		return nil
+	case session.FieldRefreshRequestKey:
+		m.ResetRefreshRequestKey()
+		return nil
+	case session.FieldRefreshReplayUntil:
+		m.ResetRefreshReplayUntil()
+		return nil
+	case session.FieldRefreshResponseCiphertext:
+		m.ResetRefreshResponseCiphertext()
 		return nil
 	case session.FieldExpiresAt:
 		m.ResetExpiresAt()

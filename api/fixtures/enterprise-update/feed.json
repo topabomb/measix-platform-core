@@ -2,7 +2,7 @@
   "enterpriseTimezone": "UTC",
   "items": [
     {
-      "updateId": "eup_550e8400-e29b-41d4-a716-446655440000",
+      "enterpriseUpdateId": "eup_550e8400-e29b-41d4-a716-446655440000",
       "title": "Q3 Company Update",
       "content": "## Platform Upgrade\n\nWe are excited to announce that our platform has been **upgraded** with new enterprise features including:\n\n- Managed assistants\n- Enterprise updates\n- Managed memory seed\n\nVisit the [documentation](https://docs.example.com) for details.",
       "contentFormat": "MARKDOWN",
@@ -11,7 +11,7 @@
       "publishedAt": "2026-08-28T10:00:00Z"
     },
     {
-      "updateId": "eup_770e8400-e29b-41d4-a716-446655440000",
+      "enterpriseUpdateId": "eup_770e8400-e29b-41d4-a716-446655440000",
       "title": "Scheduled Maintenance Window",
       "content": "The platform will be under maintenance on 2026-08-30 from 02:00 to 04:00 UTC. Expect brief interruptions.",
       "contentFormat": "PLAIN",

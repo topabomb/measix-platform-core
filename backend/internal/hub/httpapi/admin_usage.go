@@ -14,25 +14,36 @@ func (h *fullAdminHandler) ListUsageRequests(w http.ResponseWriter, r *http.Requ
 		writeIdentityError(w, err)
 		return
 	}
-	limit := 50
-	if params.Limit != nil {
-		limit = *params.Limit
+	limit, after, valid := pageParams(w, r, params.Limit, params.Cursor)
+	if !valid {
+		return
 	}
 	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status))
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
 		return
 	}
-	rows, err := h.services.Usage.ListRequests(r.Context(), filter, limit)
+	if params.Completeness != nil {
+		filter.Completeness = usage.Completeness(*params.Completeness)
+	}
+	filter.After = after
+	rows, err := h.services.Usage.ListRequests(r.Context(), filter, limit+1)
+	if errors.Is(err, usage.ErrInvalidBatch) {
+		writeProblem(w, 400, "invalid_usage_filter", "Invalid usage filter")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
+	rows, next := pageResult(r, rows, limit, func(row usage.RequestView) string {
+		return row.CompletedAt.UTC().Format(time.RFC3339Nano) + "|" + row.RequestID
+	})
 	items := make([]adminapi.RequestUsageView, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, requestUsageWire(row))
 	}
-	writeJSON(w, http.StatusOK, adminapi.RequestUsagePage{Items: items})
+	writeJSON(w, http.StatusOK, adminapi.RequestUsagePage{Items: items, NextCursor: next})
 }
 
 func (h *fullAdminHandler) GetUsageRequest(w http.ResponseWriter, r *http.Request, requestID adminapi.RequestId) {
@@ -41,8 +52,12 @@ func (h *fullAdminHandler) GetUsageRequest(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	row, err := h.services.Usage.GetRequest(r.Context(), requestID)
-	if err != nil {
+	if errors.Is(err, usage.ErrRequestNotFound) {
 		writeProblem(w, http.StatusNotFound, "usage_request_not_found", "Usage request not found")
+		return
+	}
+	if err != nil {
+		writeProblem(w, 500, "internal_error", "Internal error")
 		return
 	}
 	writeJSON(w, http.StatusOK, requestUsageWire(row))
@@ -59,16 +74,13 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	if params.Completeness != nil {
-		switch *params.Completeness {
-		case adminapi.UsageSummaryParamsCompletenessKNOWN:
-			filter.Completeness = usage.CompletenessComplete
-		case adminapi.UsageSummaryParamsCompletenessPARTIAL:
-			filter.Completeness = usage.CompletenessPartial
-		case adminapi.UsageSummaryParamsCompletenessUNKNOWN:
-			filter.Completeness = usage.CompletenessUnknown
-		}
+		filter.Completeness = usage.Completeness(*params.Completeness)
 	}
 	summary, err := h.services.Usage.Summary(r.Context(), filter)
+	if errors.Is(err, usage.ErrInvalidBatch) {
+		writeProblem(w, 400, "invalid_usage_filter", "Invalid usage filter")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return

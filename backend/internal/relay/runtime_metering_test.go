@@ -11,11 +11,37 @@ import (
 
 	relayruntime "measix/platform/internal/relay/runtime"
 	"measix/platform/internal/wire/usageingestapi"
+	"measix/platform/pkg/platformid"
 )
 
 type captureUsageRecorder struct {
 	mu     sync.Mutex
 	events []usageingestapi.RequestUsageEvent
+}
+
+func TestAuthenticatedUnmappedResourceStillProducesUsage(t *testing.T) {
+	fixture, _ := singleRouteFixture(t, "http://127.0.0.1:1", "test-secret")
+	fixture.server.Close()
+	recorder := &captureUsageRecorder{}
+	fixture.server = httptest.NewServer(relayruntime.NewHandlerWithRecorder(fixture.store, recorder))
+	defer fixture.close()
+	unknown := platformid.New(platformid.Model)
+	req := fixture.request(t, nil, http.MethodPost, unknown, "/v1/chat/completions", strings.NewReader(`{}`), "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	events := recorder.snapshot()
+	if len(events) != 1 {
+		t.Fatalf("authenticated denial lost usage: %d events", len(events))
+	}
+	if events[0].Forwarded || events[0].ResourceId != "" || events[0].RuntimeRouteId != "" || events[0].UpstreamId != "" {
+		t.Fatalf("fabricated denial attribution: %+v", events[0])
+	}
 }
 
 func (r *captureUsageRecorder) Record(event usageingestapi.RequestUsageEvent) error {

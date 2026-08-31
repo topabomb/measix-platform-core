@@ -56,6 +56,41 @@ func (_u *DeploymentUpdate) SetNillableStatus(v *string) *DeploymentUpdate {
 	return _u
 }
 
+// SetTimezone sets the "timezone" field.
+func (_u *DeploymentUpdate) SetTimezone(v string) *DeploymentUpdate {
+	_u.mutation.SetTimezone(v)
+	return _u
+}
+
+// SetNillableTimezone sets the "timezone" field if the given value is not nil.
+func (_u *DeploymentUpdate) SetNillableTimezone(v *string) *DeploymentUpdate {
+	if v != nil {
+		_u.SetTimezone(*v)
+	}
+	return _u
+}
+
+// SetFeedRevision sets the "feed_revision" field.
+func (_u *DeploymentUpdate) SetFeedRevision(v int64) *DeploymentUpdate {
+	_u.mutation.ResetFeedRevision()
+	_u.mutation.SetFeedRevision(v)
+	return _u
+}
+
+// SetNillableFeedRevision sets the "feed_revision" field if the given value is not nil.
+func (_u *DeploymentUpdate) SetNillableFeedRevision(v *int64) *DeploymentUpdate {
+	if v != nil {
+		_u.SetFeedRevision(*v)
+	}
+	return _u
+}
+
+// AddFeedRevision adds value to the "feed_revision" field.
+func (_u *DeploymentUpdate) AddFeedRevision(v int64) *DeploymentUpdate {
+	_u.mutation.AddFeedRevision(v)
+	return _u
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_u *DeploymentUpdate) SetCreatedAt(v time.Time) *DeploymentUpdate {
 	_u.mutation.SetCreatedAt(v)
@@ -131,6 +166,15 @@ func (_u *DeploymentUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(deployment.FieldStatus, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Timezone(); ok {
+		_spec.SetField(deployment.FieldTimezone, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FeedRevision(); ok {
+		_spec.SetField(deployment.FieldFeedRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedFeedRevision(); ok {
+		_spec.AddField(deployment.FieldFeedRevision, field.TypeInt64, value)
+	}
 	if value, ok := _u.mutation.CreatedAt(); ok {
 		_spec.SetField(deployment.FieldCreatedAt, field.TypeTime, value)
 	}
@@ -182,6 +226,41 @@ func (_u *DeploymentUpdateOne) SetNillableStatus(v *string) *DeploymentUpdateOne
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetTimezone sets the "timezone" field.
+func (_u *DeploymentUpdateOne) SetTimezone(v string) *DeploymentUpdateOne {
+	_u.mutation.SetTimezone(v)
+	return _u
+}
+
+// SetNillableTimezone sets the "timezone" field if the given value is not nil.
+func (_u *DeploymentUpdateOne) SetNillableTimezone(v *string) *DeploymentUpdateOne {
+	if v != nil {
+		_u.SetTimezone(*v)
+	}
+	return _u
+}
+
+// SetFeedRevision sets the "feed_revision" field.
+func (_u *DeploymentUpdateOne) SetFeedRevision(v int64) *DeploymentUpdateOne {
+	_u.mutation.ResetFeedRevision()
+	_u.mutation.SetFeedRevision(v)
+	return _u
+}
+
+// SetNillableFeedRevision sets the "feed_revision" field if the given value is not nil.
+func (_u *DeploymentUpdateOne) SetNillableFeedRevision(v *int64) *DeploymentUpdateOne {
+	if v != nil {
+		_u.SetFeedRevision(*v)
+	}
+	return _u
+}
+
+// AddFeedRevision adds value to the "feed_revision" field.
+func (_u *DeploymentUpdateOne) AddFeedRevision(v int64) *DeploymentUpdateOne {
+	_u.mutation.AddFeedRevision(v)
 	return _u
 }
 
@@ -289,6 +368,15 @@ func (_u *DeploymentUpdateOne) sqlSave(ctx context.Context) (_node *Deployment, 
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(deployment.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Timezone(); ok {
+		_spec.SetField(deployment.FieldTimezone, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FeedRevision(); ok {
+		_spec.SetField(deployment.FieldFeedRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedFeedRevision(); ok {
+		_spec.AddField(deployment.FieldFeedRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.CreatedAt(); ok {
 		_spec.SetField(deployment.FieldCreatedAt, field.TypeTime, value)

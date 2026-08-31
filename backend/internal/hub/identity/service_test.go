@@ -57,23 +57,25 @@ func TestI1IdentityEnrollmentRefreshAndRevoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	exchange, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "1.0.0")
+	exchange, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "Test device", "1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if exchange.UserID != member.ID || exchange.DeploymentID != deploymentID || exchange.RefreshToken == "" || exchange.AccessToken == "" {
 		t.Fatalf("invalid exchange: %+v", exchange)
 	}
-	if _, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "1.0.0"); !errors.Is(err, identity.ErrAlreadyUsed) {
+	if _, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "Test device", "1.0.0"); !errors.Is(err, identity.ErrAlreadyUsed) {
 		t.Fatalf("second exchange err=%v", err)
 	}
-	if _, _, err := s.Refresh(ctx, exchange.RefreshToken); err != nil {
+	refreshed, err := s.Refresh(ctx, exchange.RefreshToken, platformid.New(platformid.Idempotency))
+	if err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
-	if err := s.RevokeDevice(ctx, exchange.DeviceID); err != nil {
+	// Seed the deny fact directly; production revocation is owned by runtimecontrol.
+	if _, err := s.Client.Device.UpdateOneID(exchange.DeviceID).SetStatus("REVOKED").Save(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.Refresh(ctx, exchange.RefreshToken); !errors.Is(err, identity.ErrRevoked) {
+	if _, err := s.Refresh(ctx, refreshed.RefreshToken, platformid.New(platformid.Idempotency)); !errors.Is(err, identity.ErrRevoked) {
 		t.Fatalf("refresh after revoke err=%v", err)
 	}
 }

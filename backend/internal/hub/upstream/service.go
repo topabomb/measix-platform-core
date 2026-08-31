@@ -11,6 +11,7 @@ import (
 
 	"measix/platform/ent"
 	"measix/platform/ent/secretversion"
+	"measix/platform/ent/upstream"
 	"measix/platform/ent/upstreamconfigrevision"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/wire/adminapi"
@@ -203,8 +204,8 @@ func (s *Service) CreateUpstream(ctx context.Context, createdBy string, config a
 	return UpstreamView{UpstreamID: id, Name: config.Name, ConfigRevision: 1, Status: "INACTIVE", Config: config}, nil
 }
 
-func (s *Service) ListUpstreams(ctx context.Context) ([]UpstreamView, error) {
-	rows, err := s.Client.Upstream.Query().All(ctx)
+func (s *Service) ListUpstreams(ctx context.Context, limit int, after string) ([]UpstreamView, error) {
+	rows, err := s.Client.Upstream.Query().Where(upstream.IDGT(after)).Order(ent.Asc(upstream.FieldID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}

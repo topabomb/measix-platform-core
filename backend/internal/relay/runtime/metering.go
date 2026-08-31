@@ -86,7 +86,7 @@ type usageAttribution struct {
 }
 
 func (h *Handler) recordUsage(observer *responseObserver, body *countingBody, attr usageAttribution, forwarded bool, upstreamStatus *int, errorClass string) {
-	if h.recorder == nil || attr.state == nil || attr.claims == nil || attr.route.ID == "" || attr.upstream.ID == "" {
+	if h.recorder == nil || attr.state == nil || attr.claims == nil {
 		return
 	}
 	completedAt := h.store.Now()

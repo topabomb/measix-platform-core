@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"measix/platform/ent"
-	"measix/platform/ent/activation"
 	"measix/platform/ent/requestusage"
+	"measix/platform/ent/semanticusage"
 	"measix/platform/internal/hub/maintenance"
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/hub/store"
@@ -32,7 +33,10 @@ type Status struct {
 	AppliedControlRevision       *int
 	AppliedBundleHash            *string
 	LastRelaySeenAt              *time.Time
-	LatestActivation             *ent.Activation
+	LatestActivation             *runtimecontrol.ActivationResult
+	SpoolState                   *string
+	SpoolPendingCount            *int
+	OldestPendingAgeSeconds      *int
 	RequestUsageIngestLagSeconds *int
 	SemanticOrphanCount          *int
 }
@@ -40,6 +44,10 @@ type Status struct {
 func New(store *store.Store, control *runtimecontrol.Service, buildVersion string) *Service {
 	return &Service{Store: store, RuntimeControl: control, BuildVersion: buildVersion, Now: time.Now}
 }
+
+// Health is a cheap local dependency probe. Full integrity/history/Relay
+// diagnostics belong to authenticated Status and the maintenance check command.
+func (s *Service) Health(ctx context.Context) error { return s.Store.DB.PingContext(ctx) }
 
 func (s *Service) Status(ctx context.Context) (Status, error) {
 	result := Status{BuildVersion: s.BuildVersion, MigrationRevision: maintenance.CurrentSchemaRevision}
@@ -64,6 +72,12 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 			now := s.Now().UTC()
 			result.LastRelaySeenAt = &now
 			result.RelayReady = status.Ready
+			result.SpoolPendingCount = status.SpoolPendingCount
+			result.OldestPendingAgeSeconds = status.OldestPendingAgeSeconds
+			if status.SpoolState != nil {
+				value := string(*status.SpoolState)
+				result.SpoolState = &value
+			}
 			appliedRevision := status.AppliedControlRevision
 			result.AppliedControlRevision = &appliedRevision
 			if status.BundleHash != "" {
@@ -72,11 +86,11 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 			}
 		}
 	}
-	latest, err := s.Store.Client.Activation.Query().Order(ent.Desc(activation.FieldCreatedAt)).First(ctx)
-	if err == nil {
-		result.LatestActivation = latest
-	} else if !ent.IsNotFound(err) {
-		return result, err
+	if s.RuntimeControl != nil {
+		result.LatestActivation, err = s.RuntimeControl.LatestActivation(ctx)
+		if err != nil {
+			return result, err
+		}
 	}
 	usageRow, err := s.Store.Client.RequestUsage.Query().Order(ent.Desc(requestusage.FieldIngestedAt)).First(ctx)
 	if err == nil {
@@ -97,22 +111,8 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 }
 
 func semanticOrphanCount(ctx context.Context, client *ent.Client) (int, error) {
-	rows, err := client.SemanticUsage.Query().All(ctx)
-	if err != nil {
-		return 0, err
-	}
-	orphan := 0
-	for _, row := range rows {
-		if row.RequestID == nil {
-			continue
-		}
-		exists, err := client.RequestUsage.Query().Where(requestusage.RequestIDEQ(*row.RequestID)).Exist(ctx)
-		if err != nil {
-			return 0, err
-		}
-		if !exists {
-			orphan++
-		}
-	}
-	return orphan, nil
+	return client.SemanticUsage.Query().Where(semanticusage.RequestIDNotNil(), func(sel *sql.Selector) {
+		request := sql.Table(requestusage.Table)
+		sel.Where(sql.Not(sql.Exists(sql.Select(request.C(requestusage.FieldID)).From(request).Where(sql.ColumnsEQ(request.C(requestusage.FieldRequestID), sel.C(semanticusage.FieldRequestID))))))
+	}).Count(ctx)
 }

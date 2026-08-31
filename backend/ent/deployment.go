@@ -21,6 +21,10 @@ type Deployment struct {
 	Name string `json:"name,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// Timezone holds the value of the "timezone" field.
+	Timezone string `json:"timezone,omitempty"`
+	// FeedRevision holds the value of the "feed_revision" field.
+	FeedRevision int64 `json:"feed_revision,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -33,7 +37,9 @@ func (*Deployment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case deployment.FieldID, deployment.FieldName, deployment.FieldStatus:
+		case deployment.FieldFeedRevision:
+			values[i] = new(sql.NullInt64)
+		case deployment.FieldID, deployment.FieldName, deployment.FieldStatus, deployment.FieldTimezone:
 			values[i] = new(sql.NullString)
 		case deployment.FieldCreatedAt, deployment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -69,6 +75,18 @@ func (_m *Deployment) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case deployment.FieldTimezone:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field timezone", values[i])
+			} else if value.Valid {
+				_m.Timezone = value.String
+			}
+		case deployment.FieldFeedRevision:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field feed_revision", values[i])
+			} else if value.Valid {
+				_m.FeedRevision = value.Int64
 			}
 		case deployment.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -123,6 +141,12 @@ func (_m *Deployment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("timezone=")
+	builder.WriteString(_m.Timezone)
+	builder.WriteString(", ")
+	builder.WriteString("feed_revision=")
+	builder.WriteString(fmt.Sprintf("%v", _m.FeedRevision))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

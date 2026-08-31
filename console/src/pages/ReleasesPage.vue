@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -22,6 +23,17 @@ const detailRelease = ref<Release>()
 const detailOpen = ref(false)
 const activation = useActivationStore()
 const releases = ref<Release[]>([])
+const nextCursor = ref<string>()
+async function loadMore() {
+  if (!nextCursor.value || loading.value) return
+  loading.value = true
+  try {
+    const page = await apiFetch<ReleasePage>(cursorPath('/api/admin/v1/releases?limit=200', nextCursor.value))
+    releases.value.push(...page.items)
+    nextCursor.value = page.nextCursor
+  } catch (cause) { error.value = cause } finally { loading.value = false }
+}
+
 const loading = ref(false)
 const error = ref<unknown>()
 
@@ -31,6 +43,7 @@ async function refresh() {
   try {
     const page = await apiFetch<ReleasePage>('/api/admin/v1/releases?limit=200')
     releases.value = page.items
+    nextCursor.value = page.nextCursor
   } catch (cause) {
     error.value = cause
   } finally {
@@ -41,8 +54,7 @@ async function refresh() {
 async function republish(release: Release) {
   if (!session.csrfToken) return
   if (!window.confirm($t('releases.republishConfirm', { id: release.releaseId, gen: release.managedGeneration }))) return
-  activation.resetCommand()
-  const key = activation.beginCommand('PUBLISH')
+  const key = activation.beginCommand('PUBLISH', 'release:' + release.releaseId)
   error.value = undefined
   try {
     const result = await apiFetch<Activation>(
@@ -162,5 +174,6 @@ onMounted(refresh)
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>

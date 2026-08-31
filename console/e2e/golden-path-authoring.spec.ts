@@ -210,6 +210,20 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
       await expect(toggle).toBeChecked()
     }
 
+    // S0.2 typed experience authoring shares this same Draft and Publish.
+    await page.click('[data-cy="tab-assistants"]')
+    await page.click('[data-cy="assistant-add"]')
+    await page.locator('[data-cy="assistant-name"]').fill('E2E Assistant')
+    await selectOption(page, 'assistant-model', 'E2E Test Model')
+    await page.locator('[data-cy="assistant-prompt"]').fill('Synthetic enterprise guidance')
+    await page.click('[data-cy="seed-add"]')
+    await page.locator('[data-cy="seed-input-0"]').fill('z authored first')
+    await page.click('[data-cy="seed-add"]')
+    await page.locator('[data-cy="seed-input-1"]').fill('a authored second')
+    await page.click('[data-cy="starter-add"]')
+    await page.locator('[data-cy="starter-title"]').fill('E2E Starter')
+    await page.locator('[data-cy="starter-prompt"]').fill('Synthetic starter question')
+
     // Save the draft
     const saveBtn = page.locator('[data-cy="draft-save-btn"]')
     await expect(saveBtn).toBeEnabled({ timeout: 5_000 })
@@ -276,7 +290,15 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.goto('/admin/resources')
     await expect(page.locator('[data-cy="resources-page"]')).toBeVisible()
 
+    const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/admin/v1/draft:preview') && r.request().method() === 'POST')
     await page.click('[data-cy="draft-preview-btn"]')
+    const previewResponse = await responsePromise
+    expect(previewResponse.status()).toBe(200)
+    const projection = await previewResponse.json()
+    expect(projection.assistants).toHaveLength(1)
+    expect(projection.assistants[0].memorySeed).toEqual(['z authored first', 'a authored second'])
+    expect(projection.starters).toHaveLength(1)
+    expect(projection.starters[0].assistantDefinitionId).toBe(projection.assistants[0].assistantDefinitionId)
 
     await expect(page.locator('text=/projection hash|Projection Hash|hash/i')).toBeVisible({ timeout: 10_000 })
 
@@ -333,7 +355,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
 
     // Click Review
     await page.click('[data-cy="draft-review-btn"]')
-    await expect(page.locator('.q-dialog').locator('text=/review|Review/i')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('.q-dialog').getByText('Review & Publish', { exact: true })).toBeVisible({ timeout: 10_000 })
 
     // Accept publish confirm dialog
     page.once('dialog', dialog => {

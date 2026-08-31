@@ -5,7 +5,7 @@
 // and bootstraps the initial administrator. All secrets land in .secrets/
 // (gitignored). Run:  npm run setup
 import { randomBytes } from "node:crypto";
-import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -27,7 +27,7 @@ function run(cmd, args, opts = {}) {
 
 function writeSecret(name, bytes) {
   const path = join(SECRETS, name);
-  writeFileSync(path, bytes, { mode: 0o600 });
+  writeFileSync(path, bytes, { mode: 0o600, flag: "wx" });
   console.log(`  generated ${name} (${bytes.length} bytes)`);
 }
 
@@ -53,12 +53,11 @@ if (!existsSync(jwtKeyPath)) {
 
 if (!existsSync(relayTokenPath)) {
   const token = randomBytes(32).toString("base64url");
-  writeFileSync(relayTokenPath, token + "\n", { mode: 0o600 });
+  writeFileSync(relayTokenPath, token + "\n", { mode: 0o600, flag: "wx" });
   console.log("  generated relay-service.token");
 } else { console.log("  relay-service.token exists, skipping"); }
 
-// 3. Apply migration SQL to local hub.db (use relative paths — modernc.org/sqlite
-//    doesn't support Windows absolute paths with spaces in file: URIs)
+// 3. Apply checked, ordered development migrations; never silently adopt an unknown schema.
 console.log("\n[2/4] Applying migration to local hub.db...");
 const hubDBRel = "../.data/hub.db";
 const masterKeyRel = "../.secrets/master.key";
@@ -71,12 +70,12 @@ console.log("\n[3/4] Bootstrapping admin user...");
 const adminPwPath = join(SECRETS, "admin-password.txt");
 if (!existsSync(adminPwPath)) {
   const pw = "measix-local-" + randomBytes(4).toString("hex");
-  writeFileSync(adminPwPath, pw + "\n", { mode: 0o600 });
+  writeFileSync(adminPwPath, pw + "\n", { mode: 0o600, flag: "wx" });
   console.log("  generated admin-password.txt");
 }
 
 const bootstrapArgs = [
-  "run", "./cmd/control-hub", "bootstrap-admin",
+  "run", "./cmd/control-hub", "bootstrap-admin", "--if-empty",
   "--db", hubDBRel,
   "--master-key-file", masterKeyRel,
   "--jwt-private-key-file", jwtKeyRel,
@@ -94,10 +93,7 @@ console.log("Data in:     .data/");
 console.log("");
 console.log("Admin credentials:");
 console.log("  username: admin");
-try {
-  const pw = readFileSync(adminPwPath, "utf8");
-  console.log(`  password: ${pw.trim()}`);
-} catch { console.log("  password: (see .secrets/admin-password.txt)"); }
+console.log("  initial password: see .secrets/admin-password.txt (not reset on repeat setup)");
 console.log("");
 console.log("Next: npm start   (starts hub + relay + console)");
 console.log("     npm run start:hub    (control-hub only)");

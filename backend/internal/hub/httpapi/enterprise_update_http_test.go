@@ -35,9 +35,6 @@ func setupFullHandler(t *testing.T) (http.Handler, *identity.Service, *enterpris
 		Identity:         idSvc,
 		EnterpriseUpdate: euSvc,
 		BuildVersion:     "test",
-	}, httpapi.Options{
-		PublicBaseURL:  "https://measix.test",
-		RuntimeAPIBase: "/runtime/v1",
 	})
 	return h, idSvc, euSvc, ctx, boot.AdminUserID
 }
@@ -100,7 +97,7 @@ func enrollClient(t *testing.T, h http.Handler, adminCookie, csrf string) string
 		"deviceName":     "test-device",
 		"appVersion":     "1.0.0",
 	})
-	if resp.Code != http.StatusOK {
+	if resp.Code != http.StatusCreated {
 		t.Fatalf("exchange status=%d body=%s", resp.Code, resp.Body.String())
 	}
 	var tokens struct {
@@ -283,8 +280,8 @@ func TestERXUPDHTTP003AdminList(t *testing.T) {
 	if len(page.Items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(page.Items))
 	}
-	if page.FeedRevision == 0 {
-		t.Fatal("expected non-zero feedRevision")
+	if page.FeedRevision != 0 {
+		t.Fatal("drafts must not advance the public feedRevision")
 	}
 	// Each item should have the new fields
 	for _, item := range page.Items {
@@ -427,7 +424,7 @@ func TestERXUPDHTTP006ClientListPublishedOnly(t *testing.T) {
 
 	// Verify draft and withdrawn are not visible
 	for _, it := range feed.Items {
-		id, _ := it["updateId"].(string)
+		id, _ := it["enterpriseUpdateId"].(string)
 		if id == draft.ID || id == wth.ID {
 			t.Fatal("draft or withdrawn item appeared in client feed")
 		}
@@ -579,7 +576,7 @@ func TestERXUPDHTTP012FeedRevisionChangesOnPublish(t *testing.T) {
 	h, _, _, _, _ := setupFullHandler(t)
 	cookie, csrf := loginAdmin(t, h)
 
-	// Create — should have feedRevision > 0
+	// Create — draft does not advance the public feed.
 	resp := doJSON(t, h, http.MethodPost, "/api/admin/v1/enterprise-updates", map[string]string{
 		"Cookie":       cookie,
 		"X-CSRF-Token": csrf,
@@ -596,8 +593,8 @@ func TestERXUPDHTTP012FeedRevisionChangesOnPublish(t *testing.T) {
 	var created map[string]any
 	decodeJSON(t, resp, &created)
 	revBefore, _ := created["feedRevision"].(float64)
-	if revBefore == 0 {
-		t.Fatal("expected non-zero feedRevision after create")
+	if revBefore != 0 {
+		t.Fatal("expected zero feedRevision for new draft")
 	}
 
 	// List — feedRevision should match

@@ -244,17 +244,22 @@ type SnapshotView struct {
 	Hash string
 }
 
-func (s *Service) ListReleases(ctx context.Context, limit int) ([]ReleaseView, error) {
-	if limit < 1 || limit > 200 {
-		limit = 50
+func (s *Service) ListReleases(ctx context.Context, limit int, before int) ([]ReleaseView, error) {
+	q := s.Client.ManagedRelease.Query()
+	if before > 0 {
+		q = q.Where(managedrelease.ManagedGenerationLT(int64(before)))
 	}
-	rows, err := s.Client.ManagedRelease.Query().Order(ent.Desc(managedrelease.FieldManagedGeneration)).Limit(limit).All(ctx)
+	rows, err := q.Order(ent.Desc(managedrelease.FieldManagedGeneration)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	views := make([]ReleaseView, 0, len(rows))
 	for i, row := range rows {
-		views = append(views, s.buildReleaseView(ctx, row, previousReleaseRow(rows, i)))
+		view, err := s.buildReleaseView(ctx, row, previousReleaseRow(rows, i))
+		if err != nil {
+			return nil, err
+		}
+		views = append(views, view)
 	}
 	return views, nil
 }
@@ -271,7 +276,7 @@ func (s *Service) GetRelease(ctx context.Context, releaseID string) (ReleaseView
 	if err != nil {
 		return ReleaseView{}, err
 	}
-	return s.buildReleaseView(ctx, row, prev), nil
+	return s.buildReleaseView(ctx, row, prev)
 }
 
 // previousReleaseRow returns the next row in the descending-generation list (the
@@ -296,22 +301,27 @@ func (s *Service) previousRelease(ctx context.Context, row *ent.ManagedRelease) 
 	return prev, nil
 }
 
-func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRelease) ReleaseView {
+func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRelease) (ReleaseView, error) {
 	var current, previous *adminapi.ManagedDraftContent
-	if len(row.ReleaseContentJSON) > 0 {
-		var c adminapi.ManagedDraftContent
-		if err := json.Unmarshal(row.ReleaseContentJSON, &c); err == nil {
-			current = &c
-		}
+	if err := json.Unmarshal(row.ReleaseContentJSON, &current); err != nil {
+		return ReleaseView{}, err
 	}
-	if prev != nil && len(prev.ReleaseContentJSON) > 0 {
-		var p adminapi.ManagedDraftContent
-		if err := json.Unmarshal(prev.ReleaseContentJSON, &p); err == nil {
-			previous = &p
+	if current == nil {
+		return ReleaseView{}, fmt.Errorf("invalid persisted release content")
+	}
+	if prev != nil {
+		if err := json.Unmarshal(prev.ReleaseContentJSON, &previous); err != nil {
+			return ReleaseView{}, err
+		}
+		if previous == nil {
+			return ReleaseView{}, fmt.Errorf("invalid previous release content")
 		}
 	}
 	diff := releaseContentDiff(current, previous)
-	history := s.activationHistory(ctx, int(row.ManagedGeneration))
+	history, err := s.activationHistory(ctx, int(row.ManagedGeneration))
+	if err != nil {
+		return ReleaseView{}, err
+	}
 	return ReleaseView{
 		ReleaseID:           row.ID,
 		ManagedGeneration:   int(row.ManagedGeneration),
@@ -322,17 +332,17 @@ func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRe
 		PublishedBy:         row.CreatedByUserID,
 		DiffSummary:         diff,
 		ActivationHistory:   history,
-	}
+	}, nil
 }
 
 // activationHistory returns the ordered activation attempts targeting the given
 // managed generation (release), newest first.
-func (s *Service) activationHistory(ctx context.Context, generation int) []adminapi.ActivationSummary {
+func (s *Service) activationHistory(ctx context.Context, generation int) ([]adminapi.ActivationSummary, error) {
 	rows, err := s.Client.Activation.Query().Where(
 		activation.TargetGenerationEQ(int64(generation)),
 	).Order(ent.Desc(activation.FieldCreatedAt)).All(ctx)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	out := make([]adminapi.ActivationSummary, 0, len(rows))
 	for _, a := range rows {
@@ -349,7 +359,7 @@ func (s *Service) activationHistory(ctx context.Context, generation int) []admin
 		}
 		out = append(out, item)
 	}
-	return out
+	return out, nil
 }
 
 func (s *Service) GetSnapshot(ctx context.Context, generation int) (SnapshotView, error) {
@@ -548,7 +558,7 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 	if err != nil {
 		return ReleaseView{}, err
 	}
-	return s.buildReleaseView(ctx, created, prev), nil
+	return s.buildReleaseView(ctx, created, prev)
 }
 
 func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedDraftContent) ValidationResult {
@@ -670,8 +680,8 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			if !enabledModels[string(a.ModelId)] {
 				addError("invalid_model_ref", path+".modelId", "assistant references an unknown or disabled model", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("modelId"))
 			}
-			if len(a.MemorySeed) == 0 {
-				addError("missing_memory_seed", path+".memorySeed", "assistant requires at least one memory seed item", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("memorySeed"))
+			if a.MemorySeed == nil {
+				addError("missing_memory_seed", path+".memorySeed", "memorySeed must be an array (empty is allowed)", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("memorySeed"))
 			}
 			for j, s := range a.MemorySeed {
 				if strings.TrimSpace(s) == "" {

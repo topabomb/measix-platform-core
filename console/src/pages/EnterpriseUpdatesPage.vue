@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -20,6 +21,17 @@ type EnterpriseUpdateContentFormat = components['schemas']['EnterpriseUpdateCont
 
 const session = useSessionStore()
 const updates = ref<EnterpriseUpdate[]>([])
+const nextCursor = ref<string>()
+async function loadMore() {
+  if (!nextCursor.value || loading.value) return
+  loading.value = true
+  try {
+    const page = await apiFetch<EnterpriseUpdatePage>(cursorPath('/api/admin/v1/enterprise-updates?limit=200', nextCursor.value))
+    updates.value.push(...page.items)
+    nextCursor.value = page.nextCursor
+  } catch (cause) { error.value = cause } finally { loading.value = false }
+}
+
 const feedRevision = ref(0)
 const loading = ref(false)
 const error = ref<unknown>()
@@ -73,6 +85,7 @@ async function refresh() {
   try {
     const page = await apiFetch<EnterpriseUpdatePage>('/api/admin/v1/enterprise-updates?limit=200')
     updates.value = page.items
+    nextCursor.value = page.nextCursor
     feedRevision.value = page.feedRevision
   } catch (cause) {
     error.value = cause
@@ -318,6 +331,7 @@ onMounted(refresh)
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>
 

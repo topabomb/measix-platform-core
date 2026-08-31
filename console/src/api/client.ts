@@ -1,4 +1,4 @@
-export type CandidatePrefix = 'prv' | 'mdl' | 'tts' | 'asr' | 'mcp' | 'rte'
+export type CandidatePrefix = 'prv' | 'mdl' | 'tts' | 'asr' | 'mcp' | 'rte' | 'asd' | 'str'
 
 type UnauthorizedHandler = (() => void | Promise<void>) | undefined
 let unauthorizedHandler: UnauthorizedHandler

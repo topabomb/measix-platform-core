@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -12,12 +13,23 @@ const { t: $t } = useI18n()
 
 type UsageSummary = components['schemas']['UsageSummary']
 type RequestUsagePage = components['schemas']['RequestUsagePage']
-type RequestUsage = components['schemas']['RequestUsage']
+type RequestUsage = components['schemas']['RequestUsageView']
 
 const activeTab = ref<'summary' | 'pricing'>('summary')
 const summary = ref<UsageSummary>()
 const requests = ref<RequestUsage[]>([])
+const nextCursor = ref<string>()
+const requestPath = ref('')
 const loading = ref(false)
+async function loadMore() {
+  if (!nextCursor.value || loading.value) return
+  loading.value = true
+  try {
+    const page = await apiFetch<RequestUsagePage>(cursorPath(requestPath.value, nextCursor.value))
+    requests.value.push(...page.items)
+    nextCursor.value = page.nextCursor
+  } catch (cause) { error.value = cause } finally { loading.value = false }
+}
 const error = ref<unknown>()
 const selectedRequest = ref<RequestUsage>()
 const detailOpen = ref(false)
@@ -116,6 +128,8 @@ async function refresh() {
     ])
     summary.value = s
     requests.value = r.items
+    nextCursor.value = r.nextCursor
+    requestPath.value = `/api/admin/v1/usage/requests?limit=200${qs ? `&${qs}` : ''}`
   } catch (cause) {
     error.value = cause
   } finally {
@@ -142,7 +156,8 @@ const costLabel = computed(() => {
 const costStatus = computed(() => summary.value?.cost.status ?? 'UNKNOWN')
 
 /** Classify a resource id into its capability kind from the stable id prefix. */
-function kindOf(resourceId: string): string | undefined {
+function kindOf(resourceId: string | undefined): string | undefined {
+  if (!resourceId) return undefined
   if (resourceId.startsWith('mdl_')) return 'MODEL'
   if (resourceId.startsWith('tts_')) return 'TTS'
   if (resourceId.startsWith('asr_')) return 'ASR'
@@ -369,5 +384,6 @@ onMounted(refresh)
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-btn v-if="nextCursor && activeTab === 'summary'" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>

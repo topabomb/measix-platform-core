@@ -25,6 +25,14 @@ type Session struct {
 	Channel string `json:"channel,omitempty"`
 	// RefreshDigest holds the value of the "refresh_digest" field.
 	RefreshDigest *[]byte `json:"refresh_digest,omitempty"`
+	// PreviousRefreshDigest holds the value of the "previous_refresh_digest" field.
+	PreviousRefreshDigest *[]byte `json:"previous_refresh_digest,omitempty"`
+	// RefreshRequestKey holds the value of the "refresh_request_key" field.
+	RefreshRequestKey *string `json:"refresh_request_key,omitempty"`
+	// RefreshReplayUntil holds the value of the "refresh_replay_until" field.
+	RefreshReplayUntil *time.Time `json:"refresh_replay_until,omitempty"`
+	// RefreshResponseCiphertext holds the value of the "refresh_response_ciphertext" field.
+	RefreshResponseCiphertext *[]byte `json:"refresh_response_ciphertext,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt time.Time `json:"expires_at,omitempty"`
 	// Status holds the value of the "status" field.
@@ -43,11 +51,11 @@ func (*Session) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case session.FieldRefreshDigest:
+		case session.FieldRefreshDigest, session.FieldPreviousRefreshDigest, session.FieldRefreshResponseCiphertext:
 			values[i] = new([]byte)
-		case session.FieldID, session.FieldUserID, session.FieldDeviceID, session.FieldChannel, session.FieldStatus:
+		case session.FieldID, session.FieldUserID, session.FieldDeviceID, session.FieldChannel, session.FieldRefreshRequestKey, session.FieldStatus:
 			values[i] = new(sql.NullString)
-		case session.FieldExpiresAt, session.FieldCreatedAt, session.FieldLastUsedAt, session.FieldRevokedAt:
+		case session.FieldRefreshReplayUntil, session.FieldExpiresAt, session.FieldCreatedAt, session.FieldLastUsedAt, session.FieldRevokedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -94,6 +102,32 @@ func (_m *Session) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field refresh_digest", values[i])
 			} else if value != nil {
 				_m.RefreshDigest = value
+			}
+		case session.FieldPreviousRefreshDigest:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field previous_refresh_digest", values[i])
+			} else if value != nil {
+				_m.PreviousRefreshDigest = value
+			}
+		case session.FieldRefreshRequestKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field refresh_request_key", values[i])
+			} else if value.Valid {
+				_m.RefreshRequestKey = new(string)
+				*_m.RefreshRequestKey = value.String
+			}
+		case session.FieldRefreshReplayUntil:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field refresh_replay_until", values[i])
+			} else if value.Valid {
+				_m.RefreshReplayUntil = new(time.Time)
+				*_m.RefreshReplayUntil = value.Time
+			}
+		case session.FieldRefreshResponseCiphertext:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field refresh_response_ciphertext", values[i])
+			} else if value != nil {
+				_m.RefreshResponseCiphertext = value
 			}
 		case session.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -176,6 +210,26 @@ func (_m *Session) String() string {
 	builder.WriteString(", ")
 	if v := _m.RefreshDigest; v != nil {
 		builder.WriteString("refresh_digest=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.PreviousRefreshDigest; v != nil {
+		builder.WriteString("previous_refresh_digest=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RefreshRequestKey; v != nil {
+		builder.WriteString("refresh_request_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.RefreshReplayUntil; v != nil {
+		builder.WriteString("refresh_replay_until=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.RefreshResponseCiphertext; v != nil {
+		builder.WriteString("refresh_response_ciphertext=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

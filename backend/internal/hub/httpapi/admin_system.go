@@ -3,7 +3,6 @@ package httpapi
 import (
 	"net/http"
 
-	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/wire/adminapi"
 )
 
@@ -12,8 +11,7 @@ func (h *fullAdminHandler) SystemHealth(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusServiceUnavailable, adminapi.Health{Live: true, Ready: false})
 		return
 	}
-	status, err := h.services.System.Status(r.Context())
-	ready := err == nil && status.DBHealth == "OK"
+	ready := h.services.System.Health(r.Context()) == nil
 	code := http.StatusOK
 	if !ready {
 		code = http.StatusServiceUnavailable
@@ -42,6 +40,11 @@ func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) 
 		DesiredControlRevision: status.DesiredControlRevision, RelayReady: status.RelayReady,
 		AppliedControlRevision: status.AppliedControlRevision, LastRelaySeenAt: status.LastRelaySeenAt,
 		RequestUsageIngestLagSeconds: status.RequestUsageIngestLagSeconds, SemanticOrphanCount: status.SemanticOrphanCount,
+		SpoolPendingCount: status.SpoolPendingCount, OldestPendingAgeSeconds: status.OldestPendingAgeSeconds,
+	}
+	if status.SpoolState != nil {
+		value := adminapi.SystemStatusSpoolState(*status.SpoolState)
+		wire.SpoolState = &value
 	}
 	if status.DesiredBundleHash != nil {
 		value := adminapi.Sha256Hash(*status.DesiredBundleHash)
@@ -52,18 +55,7 @@ func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) 
 		wire.AppliedBundleHash = &value
 	}
 	if status.LatestActivation != nil {
-		row := status.LatestActivation
-		result := runtimecontrol.ActivationResult{
-			ActivationID: row.ID, Kind: row.Kind, State: row.State, DesiredControlRevision: int(row.ControlRevision),
-			BundleHash: row.BundleHash, CreatedAt: row.CreatedAt, CompletedAt: row.CompletedAt, ErrorCode: row.ErrorCode,
-		}
-		if row.SubjectID != nil {
-			result.ReleaseID = *row.SubjectID
-		}
-		if row.TargetGeneration != nil {
-			result.TargetManagedGeneration = int(*row.TargetGeneration)
-		}
-		activation := activationWire(result)
+		activation := activationWire(*status.LatestActivation)
 		wire.LatestActivation = &activation
 	}
 	writeJSON(w, http.StatusOK, wire)

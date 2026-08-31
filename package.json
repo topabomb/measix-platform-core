@@ -6,8 +6,8 @@
   "scripts": {
     "setup": "node scripts/dev-setup.mjs",
     "start": "concurrently -n hub,relay,console -c blue,magenta,green \"npm run start:hub\" \"npm run start:relay\" \"npm run start:console\"",
-    "start:hub": "cd backend && go run ./cmd/control-hub run --listen :8080 --db ../.data/hub.db --master-key-file ../.secrets/master.key --jwt-private-key-file ../.secrets/jwt-ed25519.seed --public-base-url http://localhost:8080 --runtime-api-base http://localhost:8090 --relay-internal-url http://127.0.0.1:8091 --relay-service-token-file ../.secrets/relay-service.token",
-    "start:relay": "cd backend && go run ./cmd/runtime-relay --public-listen :8090 --internal-listen 127.0.0.1:8091 --spool ../.data/relay-spool.db --hub-usage-url http://127.0.0.1:8080/internal/v1/usage/request-events:batch --hub-service-token-file ../.secrets/relay-service.token",
+    "start:hub": "cd backend && go run ./cmd/control-hub run --listen :8080 --db ../.data/hub.db --master-key-file ../.secrets/master.key --jwt-private-key-file ../.secrets/jwt-ed25519.seed --relay-internal-url http://127.0.0.1:8091 --relay-service-token-file ../.secrets/relay-service.token",
+    "start:relay": "cd backend && go run ./cmd/runtime-relay --public-listen :8090 --internal-listen 127.0.0.1:8091 --spool ../.data/relay-spool.db --hub-usage-url http://127.0.0.1:8081/internal/v1/usage/request-events:batch --hub-service-token-file ../.secrets/relay-service.token",
     "start:console": "pnpm -C console dev",
     "install:console": "pnpm -C console install",
     "dev": "npm run start",
@@ -19,10 +19,10 @@
     "generate:go-client": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/client.yaml api/client/client-control.openapi.yaml",
     "generate:go-relay": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/relay.yaml api/internal/relay-control.openapi.yaml",
     "generate:go-usage": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/usage.yaml api/internal/usage-ingest.openapi.yaml",
-    "generate": "make generate",
-    "drift": "git diff --exit-code -- backend/internal/wire console/src/api/generated.ts console/pnpm-lock.yaml backend/migrations/atlas.sum",
+    "generate": "node scripts/checks.mjs generate",
+    "drift": "node scripts/checks.mjs drift",
     "fmt": "cd backend && gofmt -w .",
-    "fmt:check": "make fmt-check",
+    "fmt:check": "node scripts/checks.mjs fmt",
     "vet": "cd backend && go vet ./...",
     "contract": "cd backend && go test ./internal/contract -count=1",
     "test": "npm run test:backend && npm run test:console",
@@ -31,10 +31,11 @@
     "test:console": "pnpm -C console test",
     "test:relay": "cd backend && go test ./internal/relay/... -count=1",
     "test:hub": "cd backend && go test ./internal/hub/... -count=1",
-    "migrate:hash": "atlas migrate hash --dir file://backend/migrations",
+    "migrate:hash": "cd backend && go run ./cmd/migration-checksum",
     "migrate:replay": "make migration-replay",
     "migrate:status": "atlas migrate status --dir file://backend/migrations",
-    "ci": "make ci"
+    "ci": "make ci",
+    "test:tooling": "node --test scripts/*.test.mjs"
   },
   "packageManager": "pnpm@11.0.0",
   "engines": {

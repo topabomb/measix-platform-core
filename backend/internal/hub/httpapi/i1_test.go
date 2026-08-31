@@ -38,10 +38,17 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h := httpapi.New(svc, httpapi.Options{
-		PublicBaseURL:  "https://measix.test",
-		RuntimeAPIBase: "/runtime/v1",
-	})
+	h := httpapi.New(svc)
+
+	discovery := doJSON(t, h, http.MethodGet, "/.well-known/measix", nil, nil)
+	var bases struct {
+		Client  string `json:"clientApiBase"`
+		Runtime string `json:"runtimeApiBase"`
+	}
+	decodeJSON(t, discovery, &bases)
+	if bases.Client != "/api/client/v1" || bases.Runtime != "/runtime/v1" {
+		t.Fatalf("discovery must expose same-origin paths: %+v", bases)
+	}
 
 	login := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", nil, map[string]any{
 		"username": "admin",
@@ -78,6 +85,28 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 		t.Fatalf("user id: %v", err)
 	}
 
+	page := doJSON(t, h, http.MethodGet, "/api/admin/v1/users?limit=1", map[string]string{"Cookie": adminCookie.Name + "=" + adminCookie.Value}, nil)
+	var firstPage struct {
+		Items []struct {
+			ID string `json:"userId"`
+		} `json:"items"`
+		NextCursor *string `json:"nextCursor"`
+	}
+	decodeJSON(t, page, &firstPage)
+	if len(firstPage.Items) != 1 || firstPage.NextCursor == nil {
+		t.Fatalf("missing next cursor: %s", page.Body.String())
+	}
+	page = doJSON(t, h, http.MethodGet, "/api/admin/v1/users?limit=1&cursor="+*firstPage.NextCursor, map[string]string{"Cookie": adminCookie.Name + "=" + adminCookie.Value}, nil)
+	var secondPage struct {
+		Items []struct {
+			ID string `json:"userId"`
+		} `json:"items"`
+	}
+	decodeJSON(t, page, &secondPage)
+	if len(secondPage.Items) != 1 || secondPage.Items[0].ID == firstPage.Items[0].ID {
+		t.Fatal("cursor repeated first page")
+	}
+
 	enrollment := doJSON(t, h, http.MethodPost, "/api/admin/v1/users/"+user.UserID+"/enrollments", map[string]string{
 		"Cookie":       adminCookie.Name + "=" + adminCookie.Value,
 		"X-CSRF-Token": session.CSRFToken,
@@ -98,7 +127,7 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 		"deviceName":     "test-device",
 		"appVersion":     "1.0.0",
 	})
-	if exchange.Code != http.StatusOK {
+	if exchange.Code != http.StatusCreated {
 		t.Fatalf("exchange status=%d body=%s", exchange.Code, exchange.Body.String())
 	}
 	var tokens struct {
@@ -115,20 +144,21 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 		t.Fatalf("bootstrap status=%d body=%s", bootstrap.Code, bootstrap.Body.String())
 	}
 
-	refresh := doJSON(t, h, http.MethodPost, "/api/client/v1/sessions/refresh", nil, map[string]any{
+	refresh := doJSON(t, h, http.MethodPost, "/api/client/v1/sessions/refresh", map[string]string{"Idempotency-Key": platformid.New(platformid.Idempotency)}, map[string]any{
 		"refreshToken": tokens.RefreshToken,
 	})
 	if refresh.Code != http.StatusOK {
 		t.Fatalf("refresh status=%d body=%s", refresh.Code, refresh.Body.String())
 	}
 
-	if err := svc.RevokeDevice(ctx, tokens.DeviceID); err != nil {
+	// I1 fixture seeds a deny; runtimecontrol tests own the full revocation transaction.
+	if _, err := svc.Client.Device.UpdateOneID(tokens.DeviceID).SetStatus("REVOKED").Save(ctx); err != nil {
 		t.Fatal(err)
 	}
 	denied := doJSON(t, h, http.MethodGet, "/api/client/v1/bootstrap", map[string]string{
 		"Authorization": "Bearer " + tokens.AccessToken,
 	}, nil)
-	if denied.Code != http.StatusUnauthorized {
+	if denied.Code != http.StatusForbidden {
 		t.Fatalf("revoked access status=%d body=%s", denied.Code, denied.Body.String())
 	}
 }

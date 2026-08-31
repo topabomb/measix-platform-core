@@ -10,6 +10,7 @@ export const useActivationStore = defineStore('activation', () => {
   const activation = ref<Activation>()
   const retryKey = ref<string>()
   const commandKind = ref<ActivationKind>()
+  const commandScope = ref<string>()
   const polling = ref(false)
   const lastPollAt = ref<string>()
 
@@ -50,8 +51,9 @@ export const useActivationStore = defineStore('activation', () => {
     }))
   })
 
-  function beginCommand(kind: ActivationKind): string {
-    if (commandKind.value !== kind || !retryKey.value) {
+  function beginCommand(kind: ActivationKind, scope: string = kind): string {
+    if (commandKind.value !== kind || commandScope.value !== scope || !retryKey.value || succeeded.value || failed.value) {
+      commandScope.value = scope
       commandKind.value = kind
       retryKey.value = createIdempotencyKey()
       activation.value = undefined
@@ -95,6 +97,7 @@ export const useActivationStore = defineStore('activation', () => {
     activation.value = undefined
     retryKey.value = undefined
     commandKind.value = undefined
+    commandScope.value = undefined
     lastPollAt.value = undefined
   }
 

@@ -72,15 +72,39 @@ func (_c *RequestUsageCreate) SetResourceID(v string) *RequestUsageCreate {
 	return _c
 }
 
+// SetNillableResourceID sets the "resource_id" field if the given value is not nil.
+func (_c *RequestUsageCreate) SetNillableResourceID(v *string) *RequestUsageCreate {
+	if v != nil {
+		_c.SetResourceID(*v)
+	}
+	return _c
+}
+
 // SetRuntimeRouteID sets the "runtime_route_id" field.
 func (_c *RequestUsageCreate) SetRuntimeRouteID(v string) *RequestUsageCreate {
 	_c.mutation.SetRuntimeRouteID(v)
 	return _c
 }
 
+// SetNillableRuntimeRouteID sets the "runtime_route_id" field if the given value is not nil.
+func (_c *RequestUsageCreate) SetNillableRuntimeRouteID(v *string) *RequestUsageCreate {
+	if v != nil {
+		_c.SetRuntimeRouteID(*v)
+	}
+	return _c
+}
+
 // SetUpstreamID sets the "upstream_id" field.
 func (_c *RequestUsageCreate) SetUpstreamID(v string) *RequestUsageCreate {
 	_c.mutation.SetUpstreamID(v)
+	return _c
+}
+
+// SetNillableUpstreamID sets the "upstream_id" field if the given value is not nil.
+func (_c *RequestUsageCreate) SetNillableUpstreamID(v *string) *RequestUsageCreate {
+	if v != nil {
+		_c.SetUpstreamID(*v)
+	}
 	return _c
 }
 
@@ -220,15 +244,6 @@ func (_c *RequestUsageCreate) check() error {
 	}
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "RequestUsage.user_id"`)}
-	}
-	if _, ok := _c.mutation.ResourceID(); !ok {
-		return &ValidationError{Name: "resource_id", err: errors.New(`ent: missing required field "RequestUsage.resource_id"`)}
-	}
-	if _, ok := _c.mutation.RuntimeRouteID(); !ok {
-		return &ValidationError{Name: "runtime_route_id", err: errors.New(`ent: missing required field "RequestUsage.runtime_route_id"`)}
-	}
-	if _, ok := _c.mutation.UpstreamID(); !ok {
-		return &ValidationError{Name: "upstream_id", err: errors.New(`ent: missing required field "RequestUsage.upstream_id"`)}
 	}
 	if _, ok := _c.mutation.ManagedGeneration(); !ok {
 		return &ValidationError{Name: "managed_generation", err: errors.New(`ent: missing required field "RequestUsage.managed_generation"`)}

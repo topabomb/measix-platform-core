@@ -82,13 +82,18 @@ func bootstrapAdmin(args []string) error {
 	dbPath := fs.String("db", os.Getenv("HUB_DB_PATH"), "SQLite database path")
 	masterKeyFile := fs.String("master-key-file", os.Getenv("HUB_MASTER_KEY_FILE"), "master key file")
 	jwtKeyFile := fs.String("jwt-private-key-file", os.Getenv("HUB_JWT_PRIVATE_KEY_FILE"), "Ed25519 private key file")
+	timezone := fs.String("timezone", "UTC", "IANA enterprise timezone for initial deployment")
 	deploymentName := fs.String("deployment-name", "MEASIX", "deployment name")
 	username := fs.String("username", "admin", "admin username")
 	displayName := fs.String("display-name", "Administrator", "admin display name")
 	addAdmin := fs.Bool("add-admin", false, "add an administrator to an existing deployment")
+	ifEmpty := fs.Bool("if-empty", false, "skip an already initialized deployment without changing credentials")
 	passwordFile := fs.String("password-file", "", "read password from a protected file")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *addAdmin && *ifEmpty {
+		return fmt.Errorf("--if-empty and --add-admin are mutually exclusive")
 	}
 	if *dbPath == "" || *masterKeyFile == "" || *jwtKeyFile == "" {
 		return fmt.Errorf("db, master key and JWT key files are required")
@@ -109,11 +114,15 @@ func bootstrapAdmin(args []string) error {
 	if _, err := maintenance.Check(context.Background(), st.DB); err != nil {
 		return err
 	}
-	password, err := readPassword(*passwordFile)
+	deployments, err := st.Client.Deployment.Query().All(context.Background())
 	if err != nil {
 		return err
 	}
-	deployments, err := st.Client.Deployment.Query().All(context.Background())
+	if len(deployments) == 1 && *ifEmpty {
+		fmt.Printf("deployment=%s already initialized; credentials unchanged\n", deployments[0].ID)
+		return nil
+	}
+	password, err := readPassword(*passwordFile)
 	if err != nil {
 		return err
 	}
@@ -134,6 +143,7 @@ func bootstrapAdmin(args []string) error {
 	csrfMaterial := append([]byte("measix:admin-csrf:"), masterKey...)
 	csrf := sha256.Sum256(csrfMaterial)
 	service := identity.New(st.Client, signer, csrf[:])
+	service.BootstrapTimezone = *timezone
 	if len(deployments) == 0 {
 		result, err := service.Bootstrap(context.Background(), *deploymentName, *username, *displayName, password)
 		if err != nil {
@@ -142,11 +152,8 @@ func bootstrapAdmin(args []string) error {
 		fmt.Printf("deployment=%s admin=%s draft=%s\n", result.DeploymentID, result.AdminUserID, result.DraftID)
 		return nil
 	}
-	admin, err := service.CreateUser(context.Background(), *username, *displayName, "ADMIN")
+	admin, err := service.CreateAdmin(context.Background(), *username, *displayName, password)
 	if err != nil {
-		return err
-	}
-	if err := service.SetPassword(context.Background(), admin.ID, password); err != nil {
 		return err
 	}
 	fmt.Printf("admin=%s\n", admin.ID)

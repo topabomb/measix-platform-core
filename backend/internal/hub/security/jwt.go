@@ -76,6 +76,8 @@ func (s *AccessSigner) Verify(value string) (*AccessClaims, error) {
 			}
 			return s.PrivateKey.Public().(ed25519.PublicKey), nil
 		},
+		jwt.WithExpirationRequired(),
+		jwt.WithIssuedAt(),
 		jwt.WithValidMethods([]string{jwt.SigningMethodEdDSA.Alg()}),
 		jwt.WithIssuer(s.DeploymentID),
 		jwt.WithAudience("client"),

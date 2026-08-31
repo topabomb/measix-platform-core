@@ -36,21 +36,11 @@ export default defineConfig({
   },
   use: {
     baseURL: process.env.MEASIX_E2E_BASE_URL || 'http://127.0.0.1:8080',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    // Use 'domcontentloaded' instead of default 'load' to avoid ERR_ABORTED
-    // on Windows when the Node.js SPA proxy closes keep-alive connections
-    // during asset loading.
     navigationTimeout: 30_000,
-    launchOptions: {
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--ignore-certificate-errors',
-      ],
-    },
+
   },
   projects: [
     {

@@ -63,3 +63,23 @@ func TestSpoolRejectsDuplicateRequestID(t *testing.T) {
 		t.Fatal("duplicate request id unexpectedly accepted")
 	}
 }
+
+func TestSpoolDueUsesChronologicalTimestampOrder(t *testing.T) {
+	ctx := context.Background()
+	spool, err := metering.OpenSpool(filepath.Join(t.TempDir(), "spool.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer spool.Close()
+	instant := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
+	if err := spool.Append(ctx, "req_test", json.RawMessage("{}"), instant); err != nil {
+		t.Fatal(err)
+	}
+	if err := spool.MarkFailed(ctx, []string{"req_test"}, instant, "retry"); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := spool.Due(ctx, instant.Add(500*time.Millisecond), 10)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("due retry lost at fractional second: rows=%v err=%v", rows, err)
+	}
+}

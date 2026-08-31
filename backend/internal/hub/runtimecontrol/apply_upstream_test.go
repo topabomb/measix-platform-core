@@ -7,7 +7,9 @@ import (
 
 	"measix/platform/ent/activation"
 	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/relay/control"
 	"measix/platform/pkg/platformid"
+	"time"
 )
 
 // HUB-APLY-001: ApplyUpstream produces a new active upstream revision, applies
@@ -26,6 +28,9 @@ func TestHUBAPLY001ApplyUpstreamClosedLoop(t *testing.T) {
 	result, err := svc.ApplyUpstream(ctx, adminID, platformid.New(platformid.Idempotency), upstreamID)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if result.ReleaseID != "" {
+		t.Fatal("upstream ID leaked into releaseId")
 	}
 	if result.State != "COMPLETED" {
 		t.Fatalf("apply upstream not completed: %+v", result)
@@ -101,5 +106,21 @@ func TestHUBAPLY003ApplyUpstreamUnknownUpstream(t *testing.T) {
 	}
 	if errors.Is(err, runtimecontrol.ErrActivationInProgress) {
 		t.Fatalf("unexpected activation-in-progress: %v", err)
+	}
+}
+func TestApplyUpstreamLostAckReconcilesPinnedRevision(t *testing.T) {
+	ctx := context.Background()
+	_, svc, _, server, _, adminID, upstreamID, draftRevision := newRuntimeControlEnv(t)
+	defer server.Close()
+	publishAndFinalize(t, svc, adminID, draftRevision)
+	relay := &lostAckRelay{store: control.NewStore(time.Now), loseNext: true}
+	svc.Relay = relay
+	result, err := svc.ApplyUpstream(ctx, adminID, platformid.New(platformid.Idempotency), upstreamID)
+	if err != nil || result.State != "UNKNOWN" {
+		t.Fatalf("apply: %+v %v", result, err)
+	}
+	completed, err := svc.Reconcile(ctx)
+	if err != nil || completed == nil || completed.State != "COMPLETED" {
+		t.Fatalf("reconcile: %+v %v", completed, err)
 	}
 }

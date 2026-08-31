@@ -43,6 +43,8 @@ Snapshot v2 Realm/Experience additions and Snapshot v3 Gateway additions are for
 - `measix-s0-control-protocol.md`;
 - relevant component/product/testing specs.
 
+The current Client API requires refresh Idempotency-Key, rotating credentials and sessionIdleExpiresAt; enrollment is 201 and requires deviceName. Feed HTTP fields/queries are camelCase; snake_case belongs only to the planned Gateway platform-tool schema. Ingest allows missing resource/route/upstream for authenticated unforwarded denials, never for forwarded requests. Generated Android export carries these changes; actual Android consumers must explicitly adopt and verify them before compatibility/Freeze claims.
+
 Current stage status is maintained only in `docs/s0-execution-progress.md`; the [alignment audit](architecture-alignment-audit.md) is a dated source/evidence snapshot.
 
 ## 4. Canonical fixtures
@@ -104,7 +106,7 @@ Before a later stage treats S0.1 as an accepted frozen dependency, the exact can
 
 The complete manifest evidence contract belongs to `measix-s0-capability-delivery-system-testing-spec.md` and `docs/release.md`; this document intentionally does **not** maintain a second partial field list.
 
-A draft produced by the two-phase writer/replay flow is not an accepted Freeze. Current tooling writes to `docs/s0-freeze-manifest.json`, so run it only on an isolated candidate and preserve existing historical evidence. Final acceptance and known validation gaps are defined in [release](release.md); do not infer them from the filename.
+New draft evidence writes exclusively to `.artifacts/s0-freeze-candidate.json` (or an explicit new output), never the historical tracked manifest. Current S0.1 tooling rejects Snapshot v2 and runtime-only replay cannot finalize C7. Final acceptance and unimplemented later-stage gates are defined in [release](release.md); do not infer them from the filename.
 
 After freeze, an incompatible Android-visible change cannot silently mutate frozen v1/v2/v3. Follow architecture compatibility/versioning semantics and create the applicable new candidate. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; it cannot reuse the v1 manifest as proof.
 

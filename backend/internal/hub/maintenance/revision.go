@@ -1,3 +1,5 @@
 package maintenance
 
-const CurrentSchemaRevision = "202608190001_initial"
+import "measix/platform/migrations"
+
+var CurrentSchemaRevision = migrations.CurrentRevision()

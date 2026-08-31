@@ -13,21 +13,27 @@ func (h *fullAdminHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http.
 		writeIdentityError(w, err)
 		return
 	}
-	limit := 50
-	if params.Limit != nil {
-		limit = *params.Limit
+	limit, after, valid := pageParams(w, r, params.Limit, params.Cursor)
+	if !valid {
+		return
 	}
-	items, feedRevision, err := h.services.EnterpriseUpdate.List(r.Context(), limit)
+	items, feedRevision, err := h.services.EnterpriseUpdate.List(r.Context(), limit+1, after)
+	if errors.Is(err, enterpriseupdate.ErrInvalidInput) {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid enterprise update")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
+	items, next := pageResult(r, items, limit, func(v enterpriseupdate.UpdateView) string { return v.ID })
 	updates := make([]adminapi.EnterpriseUpdate, 0, len(items))
 	for _, item := range items {
-		updates = append(updates, enterpriseupdate.ToAdminWire(item))
+		updates = append(updates, enterpriseUpdateWire(item))
 	}
 	writeJSON(w, http.StatusOK, adminapi.EnterpriseUpdatePage{
 		Items:        updates,
+		NextCursor:   next,
 		FeedRevision: int(feedRevision),
 	})
 }
@@ -44,11 +50,15 @@ func (h *fullAdminHandler) CreateEnterpriseUpdate(w http.ResponseWriter, r *http
 		return
 	}
 	item, err := h.services.EnterpriseUpdate.Create(r.Context(), admin.UserID, request.Title, request.Content, string(request.ContentFormat), string(request.Category), string(request.Severity))
+	if errors.Is(err, enterpriseupdate.ErrInvalidInput) {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid enterprise update")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
-	writeJSON(w, http.StatusCreated, enterpriseupdate.ToAdminWire(item))
+	writeJSON(w, http.StatusCreated, enterpriseUpdateWire(item))
 }
 
 func (h *fullAdminHandler) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateID adminapi.EnterpriseUpdateId) {
@@ -61,11 +71,15 @@ func (h *fullAdminHandler) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Re
 		writeProblem(w, http.StatusNotFound, "not_found", "Enterprise update not found")
 		return
 	}
+	if errors.Is(err, enterpriseupdate.ErrInvalidInput) {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid enterprise update")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, enterpriseupdate.ToAdminWire(item))
+	writeJSON(w, http.StatusOK, enterpriseUpdateWire(item))
 }
 
 func (h *fullAdminHandler) UpdateEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateID adminapi.EnterpriseUpdateId, params adminapi.UpdateEnterpriseUpdateParams) {
@@ -87,11 +101,15 @@ func (h *fullAdminHandler) UpdateEnterpriseUpdate(w http.ResponseWriter, r *http
 		writeProblem(w, http.StatusConflict, "invalid_status", "Cannot update a non-draft enterprise update")
 		return
 	}
+	if errors.Is(err, enterpriseupdate.ErrInvalidInput) {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid enterprise update")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, enterpriseupdate.ToAdminWire(item))
+	writeJSON(w, http.StatusOK, enterpriseUpdateWire(item))
 }
 
 func (h *fullAdminHandler) PublishEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateID adminapi.EnterpriseUpdateId, params adminapi.PublishEnterpriseUpdateParams) {
@@ -108,11 +126,15 @@ func (h *fullAdminHandler) PublishEnterpriseUpdate(w http.ResponseWriter, r *htt
 		writeProblem(w, http.StatusConflict, "invalid_status", "Cannot publish a non-draft enterprise update")
 		return
 	}
+	if errors.Is(err, enterpriseupdate.ErrInvalidInput) {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid enterprise update")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, enterpriseupdate.ToAdminWire(item))
+	writeJSON(w, http.StatusOK, enterpriseUpdateWire(item))
 }
 
 func (h *fullAdminHandler) WithdrawEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateID adminapi.EnterpriseUpdateId, params adminapi.WithdrawEnterpriseUpdateParams) {
@@ -129,9 +151,23 @@ func (h *fullAdminHandler) WithdrawEnterpriseUpdate(w http.ResponseWriter, r *ht
 		writeProblem(w, http.StatusConflict, "invalid_status", "Cannot withdraw a non-published enterprise update")
 		return
 	}
+	if errors.Is(err, enterpriseupdate.ErrInvalidInput) {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid enterprise update")
+		return
+	}
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, enterpriseupdate.ToAdminWire(item))
+	writeJSON(w, http.StatusOK, enterpriseUpdateWire(item))
+}
+
+func enterpriseUpdateWire(v enterpriseupdate.UpdateView) adminapi.EnterpriseUpdate {
+	return adminapi.EnterpriseUpdate{
+		EnterpriseUpdateId: v.ID, Title: v.Title, Content: v.Content,
+		ContentFormat: adminapi.EnterpriseUpdateContentFormat(v.ContentFormat),
+		Category:      adminapi.EnterpriseUpdateCategory(v.Category), Severity: adminapi.EnterpriseUpdateSeverity(v.Severity),
+		Status: adminapi.EnterpriseUpdateStatus(v.Status), PublishedAt: v.PublishedAt,
+		FeedRevision: int(v.FeedRevision), CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
+	}
 }

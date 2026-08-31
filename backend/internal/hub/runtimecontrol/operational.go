@@ -68,6 +68,12 @@ func (s *Service) ApplyUpstream(ctx context.Context, adminUserID, idempotencyKey
 		return ActivationResult{}, err
 	}
 	state.BundleHash = hash
+	pendingOperation, err := json.Marshal(struct {
+		TargetRevision int `json:"targetRevision"`
+	}{targetRevision})
+	if err != nil {
+		return ActivationResult{}, err
+	}
 	activationID := platformid.New(platformid.Activation)
 	now := s.Now().UTC()
 
@@ -98,7 +104,7 @@ func (s *Service) ApplyUpstream(ctx context.Context, adminUserID, idempotencyKey
 		SetID(activationID).SetKind("RUNTIME_CONFIG").SetState("APPLYING").
 		SetIdempotencyKey(idempotencyKey).SetRequestHash(requestHash).
 		SetControlRevision(int64(controlRevision)).SetBundleHash(string(hash)).
-		SetTargetDescriptorJSON(descriptor).SetSubjectID(upstreamID).
+		SetTargetDescriptorJSON(descriptor).SetSubjectID(upstreamID).SetPendingOperationJSON(pendingOperation).
 		SetCreatedByUserID(adminUserID).SetCreatedAt(now).Save(ctx); err != nil {
 		return rollback(err)
 	}
@@ -320,3 +326,15 @@ func hashOperation(value any) string {
 var _ = upstream.ErrInvalidConfig
 var _ = time.Now
 var _ = errors.Is
+
+func (s *Service) LatestActivation(ctx context.Context) (*ActivationResult, error) {
+	row, err := s.Client.Activation.Query().Order(ent.Desc(activation.FieldCreatedAt), ent.Desc(activation.FieldID)).First(ctx)
+	if ent.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	view := activationView(row)
+	return &view, nil
+}

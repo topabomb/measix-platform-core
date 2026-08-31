@@ -46,6 +46,20 @@ func (_c *DeviceCreate) SetStatus(v string) *DeviceCreate {
 	return _c
 }
 
+// SetName sets the "name" field.
+func (_c *DeviceCreate) SetName(v string) *DeviceCreate {
+	_c.mutation.SetName(v)
+	return _c
+}
+
+// SetNillableName sets the "name" field if the given value is not nil.
+func (_c *DeviceCreate) SetNillableName(v *string) *DeviceCreate {
+	if v != nil {
+		_c.SetName(*v)
+	}
+	return _c
+}
+
 // SetAppVersion sets the "app_version" field.
 func (_c *DeviceCreate) SetAppVersion(v string) *DeviceCreate {
 	_c.mutation.SetAppVersion(v)
@@ -107,6 +121,7 @@ func (_c *DeviceCreate) Mutation() *DeviceMutation {
 
 // Save creates the Device in the database.
 func (_c *DeviceCreate) Save(ctx context.Context) (*Device, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -132,6 +147,14 @@ func (_c *DeviceCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *DeviceCreate) defaults() {
+	if _, ok := _c.mutation.Name(); !ok {
+		v := device.DefaultName
+		_c.mutation.SetName(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *DeviceCreate) check() error {
 	if _, ok := _c.mutation.UserID(); !ok {
@@ -139,6 +162,9 @@ func (_c *DeviceCreate) check() error {
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Device.status"`)}
+	}
+	if _, ok := _c.mutation.Name(); !ok {
+		return &ValidationError{Name: "name", err: errors.New(`ent: missing required field "Device.name"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Device.created_at"`)}
@@ -190,6 +216,10 @@ func (_c *DeviceCreate) createSpec() (*Device, *sqlgraph.CreateSpec) {
 		_spec.SetField(device.FieldStatus, field.TypeString, value)
 		_node.Status = value
 	}
+	if value, ok := _c.mutation.Name(); ok {
+		_spec.SetField(device.FieldName, field.TypeString, value)
+		_node.Name = value
+	}
 	if value, ok := _c.mutation.AppVersion(); ok {
 		_spec.SetField(device.FieldAppVersion, field.TypeString, value)
 		_node.AppVersion = &value
@@ -227,6 +257,7 @@ func (_c *DeviceCreateBulk) Save(ctx context.Context) ([]*Device, error) {
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*DeviceMutation)
 				if !ok {

@@ -18,19 +18,11 @@ import (
 	"measix/platform/internal/common/sqliteutil"
 	"measix/platform/internal/hub/maintenance"
 	"measix/platform/internal/hub/security"
+	"measix/platform/migrations"
 )
 
 // migrationSQL reads the canonical migration file used in production.
-func migrationSQL(t *testing.T) string {
-	t.Helper()
-	_, file, _, _ := runtime.Caller(0)
-	migrationPath := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../migrations/202608190001_initial.sql"))
-	sqlText, err := os.ReadFile(migrationPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(sqlText)
-}
+func migrationSQL(t *testing.T) string { t.Helper(); return migrations.SQLAfter("") }
 
 // applyMigration applies the migration SQL to the given database.
 func applyMigration(t *testing.T, db *sql.DB) {
@@ -249,21 +241,12 @@ func TestHUBDB002PreviousSchemaUpgrade(t *testing.T) {
 	ctx := context.Background()
 	dataHashBefore := dbDataHash(t, db, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
 
-	// Apply the current migration on top of the previous schema.
-	// The current migration uses CREATE TABLE (without IF NOT EXISTS), so it
-	// will fail on tables that already exist from the previous schema.
-	// This is the expected behavior: Atlas would apply a proper upgrade
-	// migration (ALTER TABLE / CREATE TABLE IF NOT EXISTS) in production.
-	// For S0, since there's only one schema version, we verify that the
-	// upgrade path preserves data by:
-	// 1. Checking that the previous schema tables are still intact
-	// 2. Checking that seeded data is still present and unchanged
-	// 3. Verifying the schema matches current requirements
+	// Replay every published upgrade after the initial baseline, and require success.
+	if _, err := db.Exec(migrations.SQLAfter("202608190001_initial")); err != nil {
+		t.Fatalf("apply real upgrade migrations: %v", err)
+	}
 
-	// The migration SQL will error on duplicate tables, but data must be preserved
-	_, _ = db.Exec(migrationSQL(t)) // expected to error on CREATE TABLE duplicates
-
-	// Verify data is unchanged after the "upgrade" attempt
+	// Verify data is unchanged after the successful upgrade
 	dataHashAfter := dbDataHash(t, db, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
 	if dataHashBefore != dataHashAfter {
 		t.Fatal("data hash changed after migration upgrade attempt (data was modified)")
@@ -399,8 +382,8 @@ func TestHUBDB003MigrationHistoryNotRewrittenOnRestart(t *testing.T) {
 	}
 
 	// Verify the migration revision constant is stable
-	if maintenance.CurrentSchemaRevision != "202608190001_initial" {
-		t.Fatalf("CurrentSchemaRevision changed: expected 202608190001_initial, got %s", maintenance.CurrentSchemaRevision)
+	if maintenance.CurrentSchemaRevision != migrations.CurrentRevision() {
+		t.Fatalf("CurrentSchemaRevision does not match embedded latest migration: %s", maintenance.CurrentSchemaRevision)
 	}
 
 	// Verify the atlas.sum file exists and is not empty (migration integrity file)
@@ -531,13 +514,12 @@ func TestHUBDB006MigrationPreservesCriticalIDs(t *testing.T) {
 	// Record data hashes before the upgrade
 	dataHashBefore := dbDataHash(t, db, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
 
-	// Apply the current migration on top of the previous schema.
-	// The migration uses CREATE TABLE (without IF NOT EXISTS), so it will
-	// error on existing tables. This is the expected behavior — the upgrade
-	// migration in production would use ALTER TABLE / IF NOT EXISTS.
-	_, _ = db.Exec(migrationSQL(t)) // expected to error on CREATE TABLE
+	// Replay every published upgrade after the initial baseline, and require success.
+	if _, err := db.Exec(migrations.SQLAfter("202608190001_initial")); err != nil {
+		t.Fatalf("apply real upgrade migrations: %v", err)
+	}
 
-	// Data must be unchanged after the "upgrade" attempt
+	// Data must be unchanged after the successful upgrade
 	dataHashAfter := dbDataHash(t, db, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
 	if dataHashBefore != dataHashAfter {
 		t.Fatal("data hash changed after migration upgrade attempt (data was modified)")

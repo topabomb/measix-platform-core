@@ -19,28 +19,32 @@ import (
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	cfg, err := config.Load(os.Args[1:])
+	if err := run(os.Args[1:], log); err != nil {
+		log.Error("runtime relay stopped", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(args []string, log *slog.Logger) error {
+	cfg, err := config.Load(args)
 	if err != nil {
-		log.Error("configuration invalid", "error", err)
-		os.Exit(2)
+		return err
 	}
 	credential, err := os.ReadFile(cfg.HubServiceTokenFile)
 	if err != nil {
-		log.Error("service credential unavailable", "error", err)
-		os.Exit(2)
+		return err
 	}
 	serviceToken := strings.TrimSpace(string(credential))
 	if serviceToken == "" {
-		log.Error("service credential unavailable", "error", "empty credential")
-		os.Exit(2)
+		return errors.New("empty service credential")
 	}
 	spool, err := metering.OpenSpool(cfg.SpoolPath)
 	if err != nil {
-		log.Error("usage spool unavailable", "error", err)
-		os.Exit(2)
+		return err
 	}
 	defer spool.Close()
 	recorder := metering.NewRecorder(spool)
+	recorder.Log = log
 	sender := metering.NewSender(spool, cfg.HubUsageURL, serviceToken)
 	sender.BatchSize = cfg.UsageBatchSize
 	a := app.NewWithMetering(serviceToken, spool, recorder)
@@ -61,15 +65,13 @@ func main() {
 		}
 		return err
 	})
-	if err := g.Wait(); err != nil {
-		log.Error("runtime relay stopped", "error", err)
-		os.Exit(1)
-	}
+	runErr := g.Wait()
 	flushCtx, flushCancel := context.WithTimeout(context.Background(), minDuration(cfg.ShutdownGrace, 2*time.Second))
 	defer flushCancel()
 	if err := sender.FlushOnce(flushCtx); err != nil {
 		log.Warn("final usage flush incomplete; durable spool retained", "error", err)
 	}
+	return runErr
 }
 
 func minDuration(a, b time.Duration) time.Duration {

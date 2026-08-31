@@ -111,6 +111,40 @@ export const useDraftStore = defineStore('draft', () => {
     return mcpServerId
   }
 
+
+  function addAssistant(displayName: string): string {
+    const content = requireContent()
+    const assistantDefinitionId = createCandidateId('asd')
+    ;(content.assistants ??= []).push({
+      assistantDefinitionId, displayName, systemPrompt: '', modelId: '',
+      memorySeed: [], mcpServerIds: [], enabled: true,
+    })
+    markDirty()
+    return assistantDefinitionId
+  }
+
+  function removeAssistant(id: string) {
+    const content = requireContent()
+    content.assistants = (content.assistants ?? []).filter(a => a.assistantDefinitionId !== id)
+    content.starters = (content.starters ?? []).filter(s => s.assistantDefinitionId !== id)
+    markDirty()
+  }
+
+  function addStarter(assistantDefinitionId: string, title: string): string {
+    const content = requireContent()
+    if (!content.assistants?.some(a => a.assistantDefinitionId === assistantDefinitionId)) throw new Error('assistant not found')
+    const starterId = createCandidateId('str')
+    ;(content.starters ??= []).push({ starterId, assistantDefinitionId, title, prompt: '', sortOrder: 0, enabled: true })
+    markDirty()
+    return starterId
+  }
+
+  function removeStarter(id: string) {
+    const content = requireContent()
+    content.starters = (content.starters ?? []).filter(s => s.starterId !== id)
+    markDirty()
+  }
+
   /** Existing binding for a resource, if any. */
   function bindingFor(resourceId: string): RuntimeBindingDefinition | undefined {
     return requireContent().bindings.find((b) => b.resourceId === resourceId)
@@ -183,7 +217,7 @@ export const useDraftStore = defineStore('draft', () => {
 
   return {
     baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
-    load, save, validate, addModel, addTts, addAsr, addMcp, markDirty,
+    load, save, validate, addModel, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, markDirty,
     bindingFor, setBinding, removeBinding,
   }
 })

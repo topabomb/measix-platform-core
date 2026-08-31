@@ -3,6 +3,8 @@
 package ent
 
 import (
+	"measix/platform/ent/deployment"
+	"measix/platform/ent/device"
 	"measix/platform/ent/enterpriseupdate"
 	"measix/platform/ent/schema"
 )
@@ -11,6 +13,22 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	deploymentFields := schema.Deployment{}.Fields()
+	_ = deploymentFields
+	// deploymentDescTimezone is the schema descriptor for timezone field.
+	deploymentDescTimezone := deploymentFields[3].Descriptor()
+	// deployment.DefaultTimezone holds the default value on creation for the timezone field.
+	deployment.DefaultTimezone = deploymentDescTimezone.Default.(string)
+	// deploymentDescFeedRevision is the schema descriptor for feed_revision field.
+	deploymentDescFeedRevision := deploymentFields[4].Descriptor()
+	// deployment.DefaultFeedRevision holds the default value on creation for the feed_revision field.
+	deployment.DefaultFeedRevision = deploymentDescFeedRevision.Default.(int64)
+	deviceFields := schema.Device{}.Fields()
+	_ = deviceFields
+	// deviceDescName is the schema descriptor for name field.
+	deviceDescName := deviceFields[4].Descriptor()
+	// device.DefaultName holds the default value on creation for the name field.
+	device.DefaultName = deviceDescName.Default.(string)
 	enterpriseupdateFields := schema.EnterpriseUpdate{}.Fields()
 	_ = enterpriseupdateFields
 	// enterpriseupdateDescContentFormat is the schema descriptor for content_format field.

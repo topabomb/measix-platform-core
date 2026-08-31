@@ -289,7 +289,7 @@ async function runFourCapabilityTraffic() {
   const exchangeResp = await fetch(`${env.hubBaseURL}/api/client/v1/enrollments/exchange`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ platform: 'ANDROID', code: enrollmentCode, installationId: `ins_${randomUUID()}`, appVersion: 'e2e-1.0' }),
+    body: JSON.stringify({ platform: 'ANDROID', deviceName: 'Test device', code: enrollmentCode, installationId: `ins_${randomUUID()}`, appVersion: 'e2e-1.0' }),
   })
   if (!exchangeResp.ok) throw new Error(`exchange enrollment failed: ${exchangeResp.status}`)
   const exchangeJson = await exchangeResp.json()

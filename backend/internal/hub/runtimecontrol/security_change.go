@@ -3,12 +3,12 @@ package runtimecontrol
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 
-	"measix/platform/ent"
 	"measix/platform/ent/activation"
+	"measix/platform/ent/predicate"
+	"measix/platform/ent/session"
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/internal/wire/relaystate"
 	"measix/platform/pkg/platformid"
@@ -17,9 +17,10 @@ import (
 type securitySubject string
 
 const (
-	securityUserDisable  securitySubject = "USER_DISABLE"
-	securityUserEnable   securitySubject = "USER_ENABLE"
-	securityDeviceRevoke securitySubject = "DEVICE_REVOKE"
+	securityUserDisable   securitySubject = "USER_DISABLE"
+	securityUserEnable    securitySubject = "USER_ENABLE"
+	securityDeviceRevoke  securitySubject = "DEVICE_REVOKE"
+	securitySessionRevoke securitySubject = "SESSION_REVOKE"
 )
 
 func (s *Service) DisableUser(ctx context.Context, adminUserID, idempotencyKey, userID string) (ActivationResult, error) {
@@ -52,12 +53,8 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 		if platformid.Validate(platformid.User, subjectID) != nil {
 			return ActivationResult{}, fmt.Errorf("invalid user id")
 		}
-		row, err := s.Client.User.Get(ctx, subjectID)
-		if err != nil {
+		if _, err := s.Client.User.Get(ctx, subjectID); err != nil {
 			return ActivationResult{}, err
-		}
-		if row.Status != "DISABLED" {
-			return ActivationResult{}, fmt.Errorf("user is not disabled")
 		}
 		path = "/api/admin/v1/users/" + subjectID + ":enable"
 	case securityDeviceRevoke:
@@ -68,6 +65,18 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 			return ActivationResult{}, err
 		}
 		path = "/api/admin/v1/devices/" + subjectID + ":revoke"
+	case securitySessionRevoke:
+		if platformid.Validate(platformid.Session, subjectID) != nil {
+			return ActivationResult{}, fmt.Errorf("invalid session id")
+		}
+		row, err := s.Client.Session.Get(ctx, subjectID)
+		if err != nil {
+			return ActivationResult{}, err
+		}
+		if row.Status != "REVOKED" || row.UserID != adminUserID || row.Channel != "ANDROID" {
+			return ActivationResult{}, fmt.Errorf("session revoke is not durable")
+		}
+		path = "internal:session-revoke/" + subjectID
 	default:
 		return ActivationResult{}, fmt.Errorf("unknown security change")
 	}
@@ -80,6 +89,15 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 		return existing, err
 	}
 
+	if securitySubject(operation) == securityUserEnable {
+		row, err := s.Client.User.Get(ctx, subjectID)
+		if err != nil {
+			return ActivationResult{}, err
+		}
+		if row.Status != "DISABLED" {
+			return ActivationResult{}, fmt.Errorf("user is not disabled")
+		}
+	}
 	managed, err := s.Client.ManagedState.Get(ctx, "current")
 	if err != nil {
 		return ActivationResult{}, err
@@ -95,15 +113,6 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 		return ActivationResult{}, err
 	}
 	applySecurityPrincipal(&state.PrincipalState, securitySubject(operation), subjectID)
-	descriptor, err := relaystate.DescriptorJSON(state)
-	if err != nil {
-		return ActivationResult{}, err
-	}
-	hash, err := relaystate.HashDescriptor(state)
-	if err != nil {
-		return ActivationResult{}, err
-	}
-	state.BundleHash = hash
 	activationID := platformid.New(platformid.Activation)
 	now := s.Now().UTC()
 	pendingJSON, _ := json.Marshal(map[string]string{"operation": operation, "subjectId": subjectID})
@@ -135,6 +144,33 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 			return ActivationResult{}, err
 		}
 	}
+
+	if securitySubject(operation) == securityUserDisable || securitySubject(operation) == securityDeviceRevoke {
+		var subject predicate.Session = session.UserIDEQ(subjectID)
+		if securitySubject(operation) == securityDeviceRevoke {
+			subject = session.DeviceIDEQ(subjectID)
+		}
+		sessions, err := tx.Session.Query().Where(subject).All(ctx)
+		if err != nil {
+			return ActivationResult{}, err
+		}
+		for _, se := range sessions {
+			state.PrincipalState.RevokedSessionIds = addSorted(state.PrincipalState.RevokedSessionIds, se.ID)
+		}
+		if _, err := tx.Session.Update().Where(subject, session.StatusEQ("ACTIVE")).SetStatus("REVOKED").SetRevokedAt(now).
+			ClearPreviousRefreshDigest().ClearRefreshReplayUntil().ClearRefreshResponseCiphertext().Save(ctx); err != nil {
+			return ActivationResult{}, err
+		}
+	}
+	descriptor, err := relaystate.DescriptorJSON(state)
+	if err != nil {
+		return ActivationResult{}, err
+	}
+	hash, err := relaystate.HashDescriptor(state)
+	if err != nil {
+		return ActivationResult{}, err
+	}
+	state.BundleHash = hash
 	if _, err := tx.Activation.Create().
 		SetID(activationID).SetKind("SECURITY_CHANGE").SetState("APPLYING").
 		SetIdempotencyKey(idempotencyKey).SetRequestHash(requestHash).SetControlRevision(int64(revision)).
@@ -175,6 +211,8 @@ func applySecurityPrincipal(principal *relaycontrolapi.PrincipalState, operation
 		principal.DisabledUserIds = addSorted(principal.DisabledUserIds, subjectID)
 	case securityUserEnable:
 		principal.DisabledUserIds = removeSorted(principal.DisabledUserIds, subjectID)
+	case securitySessionRevoke:
+		principal.RevokedSessionIds = addSorted(principal.RevokedSessionIds, subjectID)
 	case securityDeviceRevoke:
 		principal.RevokedDeviceIds = addSorted(principal.RevokedDeviceIds, subjectID)
 	}
@@ -226,6 +264,3 @@ func (s *Service) finalizeSecurityChange(ctx context.Context, activationID strin
 	}
 	return tx.Commit()
 }
-
-var _ = errors.Is
-var _ = ent.IsNotFound

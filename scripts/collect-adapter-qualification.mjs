@@ -38,7 +38,7 @@
  *   node scripts/collect-adapter-qualification.mjs --dotenv
  *   node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <api-key>
  *   [--hub-url <url>] [--relay-url <url>] [--admin-password <pw>]
- *   [--profile all|model|tts|asr|mcp] [--merge] [--model <id>]
+ *   [--profile all|model|tts|asr|mcp] [--model <id>]
  *   [--tts-model <id> --tts-voice <voice>] [--asr-model <id>]
  *
  * Dotenv mode (preferred for credential safety):
@@ -59,12 +59,9 @@
  *   Each profile has its own independent endpoint/key/model.
  *
  * Per audit P0-5: multi-profile aggregation.
- *   Each --profile run can store partial results. Use --merge to accumulate:
- *     node scripts/collect-adapter-qualification.mjs --dotenv --profile model --merge
- *     node scripts/collect-adapter-qualification.mjs --dotenv --profile tts --merge
- *     node scripts/collect-adapter-qualification.mjs --dotenv --profile asr --merge
- *     node scripts/collect-adapter-qualification.mjs --dotenv --profile mcp --merge
- *   After all four are VERIFIED individually, top-level status becomes VERIFIED.
+ *   Each --profile run is partial diagnostic evidence only:
+ *   --profile is diagnostic only. A final qualification needs one full four-profile run.
+ *   --merge is rejected; prior runs cannot fill missing profiles.
  *
  * Or to mark as NOT_EXECUTED (default when no args):
  *   node scripts/collect-adapter-qualification.mjs
@@ -74,6 +71,7 @@ import { join, resolve } from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:net'
+import { qualificationVerified } from './freeze-manifest.mjs'
 
 import {
   resolveRoot,
@@ -124,7 +122,6 @@ let profile = 'all'
 let hubUrl = process.env.MEASIX_HUB_URL || null
 let relayUrl = process.env.MEASIX_RELAY_URL || null
 let adminPassword = process.env.MEASIX_ADMIN_PASSWORD || 'admin'
-let mergeMode = false  // Per audit P0-5: merge new profile results into existing artifact
 let useDotEnv = false
 
 // Per-profile configuration: each profile has its own endpoint, API key, and model
@@ -151,7 +148,7 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === '--admin-password' && i + 1 < args.length) {
     adminPassword = args[++i]
   } else if (args[i] === '--merge') {
-    mergeMode = true
+    throw new Error('--merge is not supported: qualify all four profiles in one source/environment run')
   } else if (args[i] === '--model' && i + 1 < args.length) {
     profileConfig.model.modelId = args[++i]
   } else if (args[i] === '--tts-model' && i + 1 < args.length) {
@@ -319,7 +316,7 @@ if (!endpoint || !apiKey) {
   writeFileSync(OUT_PATH, JSON.stringify(artifact, null, 2) + '\n')
   // Write meta.json for provenance even in NOT_EXECUTED state
   const { writeMetaJson } = await import('./lib/harness.mjs')
-  writeMetaJson(ARTIFACTS_DIR, 'real-adapter-qualification.json', ROOT, ARCH_REPO, 'node scripts/collect-adapter-qualification.mjs', 0)
+  writeMetaJson(ARTIFACTS_DIR, 'real-adapter-qualification.json', ROOT, ARCH_REPO, 'node scripts/collect-adapter-qualification.mjs', 1)
   console.log(`Wrote ${OUT_PATH} (NOT_EXECUTED)`)
   console.log('To execute real adapter qualification:')
   console.log('  Option A (dotenv — preferred):')
@@ -330,7 +327,7 @@ if (!endpoint || !apiKey) {
   console.log('    1. Start Hub + Relay (scripts/e2e-harness.mjs or manually)')
   console.log('    2. Run: node scripts/collect-adapter-qualification.mjs --endpoint <url> --key <api-key>')
   console.log('    3. Or use --hub-url and --relay-url to connect to running instances')
-  process.exit(0)
+  process.exit(1)
 }
 
 // --- Qualification flow ---
@@ -396,6 +393,7 @@ process.on('SIGTERM', () => { cleanup(); process.exit(1) })
 process.on('exit', () => cleanup())
 
 async function main() {
+  const startedAt = new Date().toISOString()
   if (!hubUrl || !relayUrl) {
     // Start our own Hub + Relay
     console.log('Starting Hub + Relay for qualification...')
@@ -511,7 +509,7 @@ async function main() {
       value: apiKey,
     })
     if (!secretResp.ok) {
-      console.error(`Create secret for ${profileName} failed:`, secretResp.status, await secretResp.text())
+      console.error(`Create secret for ${profileName} failed:`, secretResp.status)
       process.exit(1)
     }
     const secret = await secretResp.json()
@@ -527,13 +525,13 @@ async function main() {
           type: 'BEARER',
           secretRef: { secretId: secret.secretId, secretVersion: secret.secretVersion },
         },
-        correlationMode: 'HEADER_ECHO',
-        usageCapabilityLevel: 'LEVEL_1',
+        correlationMode: 'NONE',
+        usageCapabilityLevel: 'LEVEL_0',
         timeoutDefaults: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
       },
     })
     if (!upstreamResp.ok) {
-      console.error(`Create upstream for ${profileName} failed:`, upstreamResp.status, await upstreamResp.text())
+      console.error(`Create upstream for ${profileName} failed:`, upstreamResp.status)
       process.exit(1)
     }
     const upstream = await upstreamResp.json()
@@ -543,7 +541,7 @@ async function main() {
     console.log(`Testing ${profileName} upstream...`)
     const testResp = await adminPost(`/api/admin/v1/upstreams/${upstream.upstreamId}:test`, {})
     if (!testResp.ok) {
-      console.error(`Test ${profileName} upstream failed:`, testResp.status, await testResp.text())
+      console.error(`Test ${profileName} upstream failed:`, testResp.status)
       process.exit(1)
     }
     console.log(`  ${profileName} upstream test: OK`)
@@ -555,7 +553,7 @@ async function main() {
       'Idempotency-Key': applyIdempotencyKey,
     })
     if (applyResp.status !== 202 && applyResp.status !== 200) {
-      console.error(`Apply ${profileName} upstream failed:`, applyResp.status, await applyResp.text())
+      console.error(`Apply ${profileName} upstream failed:`, applyResp.status)
       process.exit(1)
     }
     // Wait for upstream to be ACTIVE
@@ -706,7 +704,7 @@ async function main() {
     expectedDraftRevision: draftRev, content: draftContent,
   })
   if (!putResp.ok) {
-    console.error('Put draft failed:', putResp.status, await putResp.text())
+    console.error('Put draft failed:', putResp.status)
     process.exit(1)
   }
   const newDraft = await putResp.json()
@@ -732,7 +730,7 @@ async function main() {
     'Idempotency-Key': publishIdempotencyKey,
   })
   if (publishResp.status !== 202) {
-    console.error('Publish failed:', publishResp.status, await publishResp.text())
+    console.error('Publish failed:', publishResp.status)
     process.exit(1)
   }
   const publishResult = await publishResp.json()
@@ -775,7 +773,7 @@ async function main() {
     role: 'MEMBER',
   })
   if (!userResp.ok) {
-    console.error('Create user failed:', userResp.status, await userResp.text())
+    console.error('Create user failed:', userResp.status)
     process.exit(1)
   }
   const user = await userResp.json()
@@ -791,7 +789,7 @@ async function main() {
     expiresInSeconds: 3600,
   })
   if (!enrollResp.ok) {
-    console.error('Create enrollment failed:', enrollResp.status, await enrollResp.text())
+    console.error('Create enrollment failed:', enrollResp.status)
     process.exit(1)
   }
   const enrollResult = await enrollResp.json()
@@ -802,14 +800,14 @@ async function main() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      platform: 'ANDROID',
+      platform: 'ANDROID', deviceName: 'Test device',
       code: enrollmentCode,
       installationId: generateStableId('ins'),
       appVersion: 'qual-1.0',
     }),
   })
   if (!exchangeResp.ok) {
-    console.error('Exchange enrollment failed:', exchangeResp.status, await exchangeResp.text())
+    console.error('Exchange enrollment failed:', exchangeResp.status)
     process.exit(1)
   }
   const exchange = await exchangeResp.json()
@@ -1551,44 +1549,24 @@ async function main() {
   // (e.g., --profile model) produces profile-level evidence but CANNOT
   // produce top-level VERIFIED — untested profiles remain NOT_EXECUTED.
   //
-  // Per audit P0-5: multi-profile aggregation via --merge. When --merge is set,
-  // the script reads the existing artifact and merges newly qualified profiles
-  // into it, preserving previously VERIFIED profiles.
-  const REQUIRED_PROFILES = ['model', 'tts', 'asr', 'mcp']
-
-  // Attempt to load existing artifact for merge
-  let existingArtifact = null
-  if (mergeMode && existsSync(OUT_PATH)) {
-    try {
-      existingArtifact = JSON.parse(readFileSync(OUT_PATH, 'utf-8'))
-      console.log('Merge mode: loaded existing artifact, preserving verified profiles...')
-    } catch {
-      console.warn('WARNING: could not parse existing artifact, starting fresh')
-    }
-  }
-
-  // Merge newly qualified profiles into existing data
-  const mergedProfiles = existingArtifact?.profiles || {}
-  for (const p of profilesToQualify) {
-    if (results[p]?.status !== 'NOT_EXECUTED') {
-      mergedProfiles[p] = results[p]
-    }
-  }
-  // For profiles NOT in either existing or current run, keep existing or default
+  // Do not merge stale runs or pretend unexecuted profiles were verified.
+  const REQUIRED_PROFILES = ['model','tts','asr','mcp']
+  const resourceIDs = { model:modelId, tts:ttsId, asr:asrId, mcp:mcpId }
+  const profileTransports = { model:['HTTP_REQUEST_RESPONSE','HTTP_STREAMING_SSE'], tts:['HTTP_BINARY_STREAM'], asr:['HTTP_MULTIPART'], mcp:['HTTP_REQUEST_RESPONSE','HTTP_STREAMING_SSE'] }
+  const qualifiedProfiles = {}
   for (const p of REQUIRED_PROFILES) {
-    if (!mergedProfiles[p]) {
-      mergedProfiles[p] = existingArtifact?.profiles?.[p] || { status: 'NOT_EXECUTED' }
+    const row = { ...results[p], upstreamId:upstreams[p]?.upstreamId, configRevision:upstreams[p]?.configRevision }
+    if (row.status === 'VERIFIED') {
+      Object.assign(row, await probeAdapterIdentity(profileConfig[p].endpoint, profileConfig[p].apiKey))
+      const response = await adminGet('/api/admin/v1/usage/summary?resourceId=' + encodeURIComponent(resourceIDs[p]))
+      row.usageRecordsCount = response.ok ? (await response.json()).forwardedRequestCount ?? 0 : 0
+      row.transport = profileTransports[p]
+      row.correlationMode = 'NONE'
+      row.usageLevel = row.usageRecordsCount > 0 ? 'LEVEL_0' : 'UNKNOWN'
     }
+    qualifiedProfiles[p] = row
   }
-
-  // Compute overall status: a profile is "satisfied" if it is either
-  // VERIFIED (was configured and passed) or NOT_EXECUTED (was not configured).
-  // Only FAILED profiles cause overall FAILED status.
-  const allMergedVerified = REQUIRED_PROFILES.every(p => {
-    const s = mergedProfiles[p]?.status
-    return s === 'VERIFIED' || s === 'NOT_EXECUTED'
-  })
-  const overallStatus = allMergedVerified ? 'VERIFIED' : 'FAILED'
+  const overallStatus = qualificationVerified({status:'VERIFIED',profiles:qualifiedProfiles}) ? 'VERIFIED' : 'FAILED'
 
 // Qualification unit: adapterName/version + upstreamId/configRevision + profile
 // Per architecture §1: qualification unit must be adapterName/version +
@@ -1598,28 +1576,13 @@ async function main() {
 // tested configuration revision.
 const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityDetectedVia } = await probeAdapterIdentity(endpoint, apiKey)
 
-  // Derive correlation level from test observations:
-  // If all model streaming tests passed with proper SSE, correlation is at least HEADER_ECHO.
-  // If MCP session tests passed, correlation supports session-level.
-  let correlationLevel = 'UNKNOWN'
-  if (results.model.normal === 'PASS' && results.model.streaming === 'PASS') {
-    correlationLevel = 'HEADER_ECHO' // Minimum observable correlation
-  }
-  if (results.mcp.initialize === 'PASS' && results.mcp.toolsList === 'PASS') {
-    correlationLevel = 'HEADER_ECHO' // MCP session confirms header-level correlation
-  }
-
-  // Derive usage capability level from usage records count.
-  // LEVEL_1: usage records present for all profiles.
-  // LEVEL_2: would require cost/meter fields (not checked here).
-  let usageCapabilityLevel = 'UNKNOWN'
-  if (usageCount > 0) {
-    usageCapabilityLevel = 'LEVEL_1'
-  }
+  // Relay success is not evidence of provider header echo or semantic usage.
+  const correlationLevel = 'NONE'
+  const usageCapabilityLevel = usageCount > 0 ? 'LEVEL_0' : 'UNKNOWN'
 
   // Derive transport from upstream config (declared transport capabilities).
   // The artifact records the verified transport per architecture §14.
-  const transports = ['HTTP_REQUEST_RESPONSE', 'HTTP_STREAMING_SSE', 'HTTP_BINARY_STREAM', 'HTTP_MULTIPART']
+  const transports = [...new Set(Object.values(qualifiedProfiles).flatMap(p => p.transport ?? []))]
 
   // Collect findings from test results.
   const findings = []
@@ -1654,14 +1617,14 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
     correlationMode: correlationLevel,
     // Per architecture §14: usageLevel
     usageLevel: usageCapabilityLevel,
-    // Per architecture §14: scenario results (merged if --merge used)
-    profiles: mergedProfiles,
+    // Per-profile results from this one run.
+    profiles: qualifiedProfiles,
     usageRecordsCount: usageCount,
     // Per architecture §14: findings
     findings,
     knownDeviations: [],
     // Per architecture §14: timestamps
-    startedAt: completedAt,
+    startedAt,
     completedAt,
     qualifiedAt: completedAt,
     endpoint: endpoint.replace(/\/$/, ''),
@@ -1693,15 +1656,17 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
   writeFileSync(OUT_PATH + '.meta.json', JSON.stringify({
     platformCoreCommit: commit,
     architectureCommit: archCommit,
+    workingTreeDirty: execFileSync('git',['status','--porcelain'],{cwd:ROOT,encoding:'utf8'}).trim().length>0,
+    architectureRepoDirty: execFileSync('git',['status','--porcelain'],{cwd:ARCH_REPO,encoding:'utf8'}).trim().length>0,
     command: 'node scripts/collect-adapter-qualification.mjs',
     artifactSha256: finalArtifactSha,
-    startedAt: completedAt,
+    startedAt,
     completedAt,
     exitCode: overallStatus === 'VERIFIED' ? 0 : 1,
   }, null, 2) + '\n')
   console.log(`\nWrote ${OUT_PATH}`)
-  console.log(`Overall status: ${overallStatus}${mergeMode ? ' (merged)' : ''}`)
-  for (const [p, r] of Object.entries(mergedProfiles)) {
+  console.log(`Overall status: ${overallStatus}`)
+  for (const [p, r] of Object.entries(qualifiedProfiles)) {
     console.log(`  ${p}: ${r.status}`)
     for (const [c, v] of Object.entries(r)) {
       if (c !== 'status') console.log(`    ${c}: ${v}`)
@@ -1709,6 +1674,7 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
   }
 
   cleanup()
+  process.exitCode = overallStatus === 'VERIFIED' ? 0 : 1
 }
 
 main().catch(e => {

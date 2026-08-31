@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, ApiProblem } from '../api/client'
+import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -22,6 +23,17 @@ type Secret = components['schemas']['Secret']
 const session = useSessionStore()
 const activation = useActivationStore()
 const upstreams = ref<Upstream[]>([])
+const nextCursor = ref<string>()
+async function loadMore() {
+  if (!nextCursor.value || loading.value) return
+  loading.value = true
+  try {
+    const page = await apiFetch<UpstreamPage>(cursorPath('/api/admin/v1/upstreams?limit=200', nextCursor.value))
+    upstreams.value.push(...page.items)
+    nextCursor.value = page.nextCursor
+  } catch (cause) { error.value = cause } finally { loading.value = false }
+}
+
 const selected = ref<Upstream>()
 const loading = ref(false)
 const error = ref<unknown>()
@@ -83,6 +95,7 @@ async function refresh() {
   try {
     const page = await apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=200')
     upstreams.value = page.items
+    nextCursor.value = page.nextCursor
   } catch (cause) {
     error.value = cause
   } finally {
@@ -294,8 +307,7 @@ async function testUpstream() {
 async function applyUpstream() {
   if (!selected.value || !session.csrfToken) return
   if (!window.confirm($t('upstreams.applyConfirm', { name: selected.value.name, rev: selected.value.configRevision }))) return
-  activation.resetCommand()
-  const key = activation.beginCommand('RUNTIME_CONFIG')
+  const key = activation.beginCommand('RUNTIME_CONFIG', `${selected.value.upstreamId}:${selected.value.configRevision}`)
   error.value = undefined
   try {
     const result = await apiFetch<Activation>(
@@ -578,5 +590,6 @@ onMounted(refresh)
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>

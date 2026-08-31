@@ -62,23 +62,21 @@ func (h *fullAdminHandler) ListUpstreams(w http.ResponseWriter, r *http.Request,
 		writeIdentityError(w, err)
 		return
 	}
-	limit := 50
-	if params.Limit != nil {
-		limit = *params.Limit
+	limit, after, valid := pageParams(w, r, params.Limit, params.Cursor)
+	if !valid {
+		return
 	}
-	if limit < 1 || limit > 200 {
-		limit = 50
-	}
-	rows, err := h.services.Upstream.ListUpstreams(r.Context())
+	rows, err := h.services.Upstream.ListUpstreams(r.Context(), limit+1, after)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
+	rows, next := pageResult(r, rows, limit, func(v upstream.UpstreamView) string { return v.UpstreamID })
 	items := make([]adminapi.Upstream, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, upstreamWire(row))
 	}
-	writeJSON(w, http.StatusOK, adminapi.UpstreamPage{Items: items})
+	writeJSON(w, http.StatusOK, adminapi.UpstreamPage{Items: items, NextCursor: next})
 }
 
 func (h *fullAdminHandler) CreateUpstream(w http.ResponseWriter, r *http.Request, params adminapi.CreateUpstreamParams) {

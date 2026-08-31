@@ -269,7 +269,7 @@ func TestERXUPDC0EnterpriseUpdateFeedFixtureFields(t *testing.T) {
 		t.Fatal("feed must have at least one item")
 	}
 	for i, item := range feed.Items {
-		if item.UpdateId == "" {
+		if item.EnterpriseUpdateId == "" {
 			t.Fatalf("item[%d] has empty updateId", i)
 		}
 		if item.Title == "" {

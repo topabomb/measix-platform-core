@@ -38,6 +38,12 @@ paths:
   /api/client/v1/sessions/refresh:
     post:
       operationId: refreshSession
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          $ref: '#/components/schemas/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -56,6 +62,8 @@ paths:
         '401':
           $ref: '#/components/responses/Problem'
         '403':
+          $ref: '#/components/responses/Problem'
+        '409':
           $ref: '#/components/responses/Problem'
   /api/client/v1/sessions/logout:
     post:
@@ -158,13 +166,13 @@ paths:
       security:
       - bearerAuth: []
       parameters:
-      - name: start_date
+      - name: startDate
         in: query
         required: false
         schema:
           type: string
           format: date
-      - name: end_date
+      - name: endDate
         in: query
         required: false
         schema:
@@ -711,6 +719,7 @@ components:
       - accessTokenExpiresAt
       - refreshToken
       - refreshExpiresAt
+      - sessionIdleExpiresAt
       properties:
         deploymentId:
           $ref: '#/components/schemas/DeploymentId'
@@ -730,6 +739,9 @@ components:
         refreshExpiresAt:
           type: string
           format: date-time
+        sessionIdleExpiresAt:
+          type: string
+          format: date-time
     RefreshRequest:
       type: object
       additionalProperties: false
@@ -744,10 +756,21 @@ components:
       required:
       - accessToken
       - accessTokenExpiresAt
+      - refreshToken
+      - refreshExpiresAt
+      - sessionIdleExpiresAt
       properties:
         accessToken:
           type: string
         accessTokenExpiresAt:
+          type: string
+          format: date-time
+        refreshToken:
+          type: string
+        refreshExpiresAt:
+          type: string
+          format: date-time
+        sessionIdleExpiresAt:
           type: string
           format: date-time
     ManagedState:
@@ -832,10 +855,14 @@ components:
           required:
           - sessionId
           - expiresAt
+          - sessionIdleExpiresAt
           properties:
             sessionId:
               $ref: '#/components/schemas/SessionId'
             expiresAt:
+              type: string
+              format: date-time
+            sessionIdleExpiresAt:
               type: string
               format: date-time
         supportedSnapshotSchemaVersions:
@@ -944,7 +971,6 @@ components:
           $ref: '#/components/schemas/ModelId'
         memorySeed:
           type: array
-          minItems: 1
           items:
             type: string
             minLength: 1
@@ -1003,7 +1029,7 @@ components:
       type: object
       additionalProperties: false
       required:
-      - updateId
+      - enterpriseUpdateId
       - title
       - content
       - contentFormat
@@ -1011,7 +1037,7 @@ components:
       - severity
       - publishedAt
       properties:
-        updateId:
+        enterpriseUpdateId:
           $ref: '#/components/schemas/EnterpriseUpdateId'
         title:
           type: string

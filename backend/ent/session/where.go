@@ -84,6 +84,26 @@ func RefreshDigest(v []byte) predicate.Session {
 	return predicate.Session(sql.FieldEQ(FieldRefreshDigest, v))
 }
 
+// PreviousRefreshDigest applies equality check predicate on the "previous_refresh_digest" field. It's identical to PreviousRefreshDigestEQ.
+func PreviousRefreshDigest(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldPreviousRefreshDigest, v))
+}
+
+// RefreshRequestKey applies equality check predicate on the "refresh_request_key" field. It's identical to RefreshRequestKeyEQ.
+func RefreshRequestKey(v string) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldRefreshRequestKey, v))
+}
+
+// RefreshReplayUntil applies equality check predicate on the "refresh_replay_until" field. It's identical to RefreshReplayUntilEQ.
+func RefreshReplayUntil(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldRefreshReplayUntil, v))
+}
+
+// RefreshResponseCiphertext applies equality check predicate on the "refresh_response_ciphertext" field. It's identical to RefreshResponseCiphertextEQ.
+func RefreshResponseCiphertext(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldRefreshResponseCiphertext, v))
+}
+
 // ExpiresAt applies equality check predicate on the "expires_at" field. It's identical to ExpiresAtEQ.
 func ExpiresAt(v time.Time) predicate.Session {
 	return predicate.Session(sql.FieldEQ(FieldExpiresAt, v))
@@ -362,6 +382,231 @@ func RefreshDigestIsNil() predicate.Session {
 // RefreshDigestNotNil applies the NotNil predicate on the "refresh_digest" field.
 func RefreshDigestNotNil() predicate.Session {
 	return predicate.Session(sql.FieldNotNull(FieldRefreshDigest))
+}
+
+// PreviousRefreshDigestEQ applies the EQ predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestEQ(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldPreviousRefreshDigest, v))
+}
+
+// PreviousRefreshDigestNEQ applies the NEQ predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestNEQ(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldNEQ(FieldPreviousRefreshDigest, v))
+}
+
+// PreviousRefreshDigestIn applies the In predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestIn(vs ...[]byte) predicate.Session {
+	return predicate.Session(sql.FieldIn(FieldPreviousRefreshDigest, vs...))
+}
+
+// PreviousRefreshDigestNotIn applies the NotIn predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestNotIn(vs ...[]byte) predicate.Session {
+	return predicate.Session(sql.FieldNotIn(FieldPreviousRefreshDigest, vs...))
+}
+
+// PreviousRefreshDigestGT applies the GT predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestGT(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldGT(FieldPreviousRefreshDigest, v))
+}
+
+// PreviousRefreshDigestGTE applies the GTE predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestGTE(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldGTE(FieldPreviousRefreshDigest, v))
+}
+
+// PreviousRefreshDigestLT applies the LT predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestLT(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldLT(FieldPreviousRefreshDigest, v))
+}
+
+// PreviousRefreshDigestLTE applies the LTE predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestLTE(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldLTE(FieldPreviousRefreshDigest, v))
+}
+
+// PreviousRefreshDigestIsNil applies the IsNil predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestIsNil() predicate.Session {
+	return predicate.Session(sql.FieldIsNull(FieldPreviousRefreshDigest))
+}
+
+// PreviousRefreshDigestNotNil applies the NotNil predicate on the "previous_refresh_digest" field.
+func PreviousRefreshDigestNotNil() predicate.Session {
+	return predicate.Session(sql.FieldNotNull(FieldPreviousRefreshDigest))
+}
+
+// RefreshRequestKeyEQ applies the EQ predicate on the "refresh_request_key" field.
+func RefreshRequestKeyEQ(v string) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyNEQ applies the NEQ predicate on the "refresh_request_key" field.
+func RefreshRequestKeyNEQ(v string) predicate.Session {
+	return predicate.Session(sql.FieldNEQ(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyIn applies the In predicate on the "refresh_request_key" field.
+func RefreshRequestKeyIn(vs ...string) predicate.Session {
+	return predicate.Session(sql.FieldIn(FieldRefreshRequestKey, vs...))
+}
+
+// RefreshRequestKeyNotIn applies the NotIn predicate on the "refresh_request_key" field.
+func RefreshRequestKeyNotIn(vs ...string) predicate.Session {
+	return predicate.Session(sql.FieldNotIn(FieldRefreshRequestKey, vs...))
+}
+
+// RefreshRequestKeyGT applies the GT predicate on the "refresh_request_key" field.
+func RefreshRequestKeyGT(v string) predicate.Session {
+	return predicate.Session(sql.FieldGT(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyGTE applies the GTE predicate on the "refresh_request_key" field.
+func RefreshRequestKeyGTE(v string) predicate.Session {
+	return predicate.Session(sql.FieldGTE(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyLT applies the LT predicate on the "refresh_request_key" field.
+func RefreshRequestKeyLT(v string) predicate.Session {
+	return predicate.Session(sql.FieldLT(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyLTE applies the LTE predicate on the "refresh_request_key" field.
+func RefreshRequestKeyLTE(v string) predicate.Session {
+	return predicate.Session(sql.FieldLTE(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyContains applies the Contains predicate on the "refresh_request_key" field.
+func RefreshRequestKeyContains(v string) predicate.Session {
+	return predicate.Session(sql.FieldContains(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyHasPrefix applies the HasPrefix predicate on the "refresh_request_key" field.
+func RefreshRequestKeyHasPrefix(v string) predicate.Session {
+	return predicate.Session(sql.FieldHasPrefix(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyHasSuffix applies the HasSuffix predicate on the "refresh_request_key" field.
+func RefreshRequestKeyHasSuffix(v string) predicate.Session {
+	return predicate.Session(sql.FieldHasSuffix(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyIsNil applies the IsNil predicate on the "refresh_request_key" field.
+func RefreshRequestKeyIsNil() predicate.Session {
+	return predicate.Session(sql.FieldIsNull(FieldRefreshRequestKey))
+}
+
+// RefreshRequestKeyNotNil applies the NotNil predicate on the "refresh_request_key" field.
+func RefreshRequestKeyNotNil() predicate.Session {
+	return predicate.Session(sql.FieldNotNull(FieldRefreshRequestKey))
+}
+
+// RefreshRequestKeyEqualFold applies the EqualFold predicate on the "refresh_request_key" field.
+func RefreshRequestKeyEqualFold(v string) predicate.Session {
+	return predicate.Session(sql.FieldEqualFold(FieldRefreshRequestKey, v))
+}
+
+// RefreshRequestKeyContainsFold applies the ContainsFold predicate on the "refresh_request_key" field.
+func RefreshRequestKeyContainsFold(v string) predicate.Session {
+	return predicate.Session(sql.FieldContainsFold(FieldRefreshRequestKey, v))
+}
+
+// RefreshReplayUntilEQ applies the EQ predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilEQ(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldRefreshReplayUntil, v))
+}
+
+// RefreshReplayUntilNEQ applies the NEQ predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilNEQ(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldNEQ(FieldRefreshReplayUntil, v))
+}
+
+// RefreshReplayUntilIn applies the In predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilIn(vs ...time.Time) predicate.Session {
+	return predicate.Session(sql.FieldIn(FieldRefreshReplayUntil, vs...))
+}
+
+// RefreshReplayUntilNotIn applies the NotIn predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilNotIn(vs ...time.Time) predicate.Session {
+	return predicate.Session(sql.FieldNotIn(FieldRefreshReplayUntil, vs...))
+}
+
+// RefreshReplayUntilGT applies the GT predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilGT(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldGT(FieldRefreshReplayUntil, v))
+}
+
+// RefreshReplayUntilGTE applies the GTE predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilGTE(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldGTE(FieldRefreshReplayUntil, v))
+}
+
+// RefreshReplayUntilLT applies the LT predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilLT(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldLT(FieldRefreshReplayUntil, v))
+}
+
+// RefreshReplayUntilLTE applies the LTE predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilLTE(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldLTE(FieldRefreshReplayUntil, v))
+}
+
+// RefreshReplayUntilIsNil applies the IsNil predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilIsNil() predicate.Session {
+	return predicate.Session(sql.FieldIsNull(FieldRefreshReplayUntil))
+}
+
+// RefreshReplayUntilNotNil applies the NotNil predicate on the "refresh_replay_until" field.
+func RefreshReplayUntilNotNil() predicate.Session {
+	return predicate.Session(sql.FieldNotNull(FieldRefreshReplayUntil))
+}
+
+// RefreshResponseCiphertextEQ applies the EQ predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextEQ(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldRefreshResponseCiphertext, v))
+}
+
+// RefreshResponseCiphertextNEQ applies the NEQ predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextNEQ(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldNEQ(FieldRefreshResponseCiphertext, v))
+}
+
+// RefreshResponseCiphertextIn applies the In predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextIn(vs ...[]byte) predicate.Session {
+	return predicate.Session(sql.FieldIn(FieldRefreshResponseCiphertext, vs...))
+}
+
+// RefreshResponseCiphertextNotIn applies the NotIn predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextNotIn(vs ...[]byte) predicate.Session {
+	return predicate.Session(sql.FieldNotIn(FieldRefreshResponseCiphertext, vs...))
+}
+
+// RefreshResponseCiphertextGT applies the GT predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextGT(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldGT(FieldRefreshResponseCiphertext, v))
+}
+
+// RefreshResponseCiphertextGTE applies the GTE predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextGTE(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldGTE(FieldRefreshResponseCiphertext, v))
+}
+
+// RefreshResponseCiphertextLT applies the LT predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextLT(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldLT(FieldRefreshResponseCiphertext, v))
+}
+
+// RefreshResponseCiphertextLTE applies the LTE predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextLTE(v []byte) predicate.Session {
+	return predicate.Session(sql.FieldLTE(FieldRefreshResponseCiphertext, v))
+}
+
+// RefreshResponseCiphertextIsNil applies the IsNil predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextIsNil() predicate.Session {
+	return predicate.Session(sql.FieldIsNull(FieldRefreshResponseCiphertext))
+}
+
+// RefreshResponseCiphertextNotNil applies the NotNil predicate on the "refresh_response_ciphertext" field.
+func RefreshResponseCiphertextNotNil() predicate.Session {
+	return predicate.Session(sql.FieldNotNull(FieldRefreshResponseCiphertext))
 }
 
 // ExpiresAtEQ applies the EQ predicate on the "expires_at" field.

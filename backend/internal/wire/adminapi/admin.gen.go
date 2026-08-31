@@ -466,6 +466,24 @@ func (e SystemStatusRuntimeStatus) Valid() bool {
 	}
 }
 
+// Defines values for SystemStatusSpoolState.
+const (
+	METERINGDEGRADED SystemStatusSpoolState = "METERING_DEGRADED"
+	OK               SystemStatusSpoolState = "OK"
+)
+
+// Valid indicates whether the value is a known member of the SystemStatusSpoolState enum.
+func (e SystemStatusSpoolState) Valid() bool {
+	switch e {
+	case METERINGDEGRADED:
+		return true
+	case OK:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TtsDefinitionClientProtocol.
 const (
 	OPENAIAUDIOSPEECH TtsDefinitionClientProtocol = "OPENAI_AUDIO_SPEECH"
@@ -810,7 +828,7 @@ func (e ListUsageRequestsParamsStatus) Valid() bool {
 
 // Defines values for ListUsageRequestsParamsCompleteness.
 const (
-	ListUsageRequestsParamsCompletenessKNOWN   ListUsageRequestsParamsCompleteness = "KNOWN"
+	ListUsageRequestsParamsCompletenessEXACT   ListUsageRequestsParamsCompleteness = "EXACT"
 	ListUsageRequestsParamsCompletenessPARTIAL ListUsageRequestsParamsCompleteness = "PARTIAL"
 	ListUsageRequestsParamsCompletenessUNKNOWN ListUsageRequestsParamsCompleteness = "UNKNOWN"
 )
@@ -818,7 +836,7 @@ const (
 // Valid indicates whether the value is a known member of the ListUsageRequestsParamsCompleteness enum.
 func (e ListUsageRequestsParamsCompleteness) Valid() bool {
 	switch e {
-	case ListUsageRequestsParamsCompletenessKNOWN:
+	case ListUsageRequestsParamsCompletenessEXACT:
 		return true
 	case ListUsageRequestsParamsCompletenessPARTIAL:
 		return true
@@ -879,7 +897,7 @@ func (e UsageSummaryParamsStatus) Valid() bool {
 
 // Defines values for UsageSummaryParamsCompleteness.
 const (
-	UsageSummaryParamsCompletenessKNOWN   UsageSummaryParamsCompleteness = "KNOWN"
+	UsageSummaryParamsCompletenessEXACT   UsageSummaryParamsCompleteness = "EXACT"
 	UsageSummaryParamsCompletenessPARTIAL UsageSummaryParamsCompleteness = "PARTIAL"
 	UsageSummaryParamsCompletenessUNKNOWN UsageSummaryParamsCompleteness = "UNKNOWN"
 )
@@ -887,7 +905,7 @@ const (
 // Valid indicates whether the value is a known member of the UsageSummaryParamsCompleteness enum.
 func (e UsageSummaryParamsCompleteness) Valid() bool {
 	switch e {
-	case UsageSummaryParamsCompletenessKNOWN:
+	case UsageSummaryParamsCompletenessEXACT:
 		return true
 	case UsageSummaryParamsCompletenessPARTIAL:
 		return true
@@ -1369,12 +1387,12 @@ type RequestUsageView struct {
 	ManagedGeneration  int            `json:"managedGeneration"`
 	RequestBytes       int            `json:"requestBytes"`
 	RequestId          RequestId      `json:"requestId"`
-	ResourceId         string         `json:"resourceId"`
+	ResourceId         string         `json:"resourceId,omitempty"`
 	ResponseBytes      int            `json:"responseBytes"`
-	RuntimeRouteId     RuntimeRouteId `json:"runtimeRouteId"`
+	RuntimeRouteId     RuntimeRouteId `json:"runtimeRouteId,omitempty"`
 	StartedAt          time.Time      `json:"startedAt"`
 	UpstreamHttpStatus *int           `json:"upstreamHttpStatus,omitempty"`
-	UpstreamId         UpstreamId     `json:"upstreamId"`
+	UpstreamId         UpstreamId     `json:"upstreamId,omitempty"`
 	UserId             UserId         `json:"userId"`
 }
 
@@ -1446,14 +1464,22 @@ type SystemStatus struct {
 	LatestActivation             *Activation               `json:"latestActivation,omitempty"`
 	ManagedStateRevision         int                       `json:"managedStateRevision"`
 	MigrationRevision            string                    `json:"migrationRevision"`
+	OldestPendingAgeSeconds      *int                      `json:"oldestPendingAgeSeconds,omitempty"`
 	RelayReady                   bool                      `json:"relayReady"`
 	RequestUsageIngestLagSeconds *int                      `json:"requestUsageIngestLagSeconds,omitempty"`
 	RuntimeStatus                SystemStatusRuntimeStatus `json:"runtimeStatus"`
 	SemanticOrphanCount          *int                      `json:"semanticOrphanCount,omitempty"`
+	SpoolPendingCount            *int                      `json:"spoolPendingCount,omitempty"`
+
+	// SpoolState Omitted when Relay spool status is unavailable; omission does not mean OK.
+	SpoolState *SystemStatusSpoolState `json:"spoolState,omitempty"`
 }
 
 // SystemStatusRuntimeStatus defines model for SystemStatus.RuntimeStatus.
 type SystemStatusRuntimeStatus string
+
+// SystemStatusSpoolState Omitted when Relay spool status is unavailable; omission does not mean OK.
+type SystemStatusSpoolState string
 
 // TimeoutPolicy defines model for TimeoutPolicy.
 type TimeoutPolicy struct {

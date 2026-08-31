@@ -278,8 +278,6 @@ export function startHubAndRelay(env, opts = {}) {
     'run',
     '--listen', `127.0.0.1:${env.hubPort}`,
     '--internal-listen', `127.0.0.1:${env.hubInternalPort}`,
-    '--public-base-url', env.hubBaseURL,
-    '--runtime-api-base', env.relayPubBaseURL,
     '--db', env.hubDB,
     '--master-key-file', env.masterKeyFile,
     '--jwt-private-key-file', env.jwtKeyFile,
@@ -574,6 +572,8 @@ export function writeMetaJson(artifactsDir, artifactName, root, archRepo, comman
   const meta = {
     platformCoreCommit: gitCommit(root),
     architectureCommit: gitCommit(archRepo),
+    workingTreeDirty: gitDirty(root),
+    architectureRepoDirty: gitDirty(archRepo),
     command,
     artifactSha256: artifactSha,
     startedAt: now,

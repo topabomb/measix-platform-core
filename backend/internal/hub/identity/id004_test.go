@@ -30,7 +30,7 @@ func TestHUBID004DeviceInstallationDoesNotDuplicateAuthorizationIdentity(t *test
 	}
 
 	installationID := platformid.New(platformid.Installation)
-	exchange, err := s.ExchangeEnrollment(ctx, grant.Code, installationID, "1.0.0")
+	exchange, err := s.ExchangeEnrollment(ctx, grant.Code, installationID, "Test device", "1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}

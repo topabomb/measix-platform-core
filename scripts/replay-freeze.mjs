@@ -1,32 +1,14 @@
 #!/usr/bin/env node
 /**
- * CAP-C7-002 — Clean-environment replay from freeze manifest.
- *
- * Per architecture §14 CAP-C7-002:
- *   "clean-environment replay from manifest"
- *
- * Two-phase freeze flow:
- *   1. freeze-manifest.mjs generates a candidate manifest with CAP-C7-002=NOT_EXECUTED
- *   2. This script (replay-freeze.mjs) performs a real clean-environment replay:
- *      a. Verify exact current checkout matches manifest
- *      b. Verify production admin build hash matches manifest (using same algorithm as freeze-manifest)
- *      c. Verify deterministic adapter version matches manifest
- *      d. Spin up a fresh temp environment (fresh DB, Hub, Relay, Adapter)
- *      e. Apply migrations to fresh DB
- *      f. Bootstrap admin
- *      g. Start Hub + Relay + deterministic Adapter
- *      h. Verify Hub/Relay health
- *      i. Run a real smoke test: admin login + system status
- *      j. Run the deterministic T4.1 Golden Path + Test Client four capabilities + Usage closure
- *      k. Generate a replay artifact with the result
- *      l. Update the manifest: CAP-C7-002=PASS + replay artifact hash
- *
- * Usage:
- *   node scripts/replay-freeze.mjs
+ * Fresh-runtime diagnostics against pinned candidate inputs.
+ * This does NOT create an independent clean-source checkout/rebuild, cannot
+ * finalize CAP-C7-002 and never overwrites the candidate/historical manifest.
+ * Usage: node scripts/replay-freeze.mjs --runtime-only --manifest <candidate>
  */
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, resolve } from 'node:path'
+import { validateCandidate } from './freeze-manifest.mjs'
 import { execSync } from 'node:child_process'
 import { Worker } from 'node:worker_threads'
 
@@ -53,14 +35,19 @@ function log(msg) {
 }
 
 // --- Read manifest ---
-const manifestPath = join(ROOT, 'docs', 's0-freeze-manifest.json')
+if (!process.argv.includes('--runtime-only')) {
+  console.error('This runner provides fresh-runtime regression only, not independent clean-source rebuild. Use --runtime-only; it cannot finalize CAP-C7-002.')
+  process.exit(1)
+}
+const manifestIndex = process.argv.indexOf('--manifest')
+const manifestPath = manifestIndex < 0 ? join(ARTIFACTS_DIR,'s0-freeze-candidate.json') : resolve(process.argv[manifestIndex+1] ?? '')
 if (!existsSync(manifestPath)) {
-  console.error('ERROR: docs/s0-freeze-manifest.json does not exist. Generate it first.')
+  console.error('ERROR: Candidate manifest is missing.')
   process.exit(1)
 }
 
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'))
-const errors = []
+const errors = validateCandidate(manifest,{allowPendingReplay:true})
 
 log(`manifest: ${manifest.manifest}`)
 log(`platform core commit: ${manifest.platformCoreCommit}`)
@@ -303,7 +290,7 @@ if (browserGoldenPathPassed) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        platform: 'ANDROID',
+        platform: 'ANDROID', deviceName: 'Test device',
         code: enrollmentCode,
         installationId: `ins_${randomUUID()}`,
         appVersion: 'replay-1.0',
@@ -560,6 +547,7 @@ if (!browserGoldenPathPassed || !fourCapabilityPassed || !browserUsagePassed || 
 // --- 10. Generate replay artifact ---
 const replayArtifact = {
   status: 'PASS',
+  replayKind: 'RUNTIME_ONLY',
   replayedAt: new Date().toISOString(),
   platformCoreCommit: currentCommit,
   architectureCommit: archCommit,
@@ -615,25 +603,9 @@ const replayArtifact = {
 }
 
 mkdirSync(ARTIFACTS_DIR, { recursive: true })
-const replayPath = join(ARTIFACTS_DIR, 'replay-artifact.json')
+const replayPath = join(ARTIFACTS_DIR, 'runtime-replay-artifact.json')
 writeFileSync(replayPath, JSON.stringify(replayArtifact, null, 2) + '\n')
 log(`wrote ${replayPath}`)
 
-// --- 11. Update manifest: set CAP-C7-002=PASS and record replay artifact hash ---
-const replayArtifactHash = 'sha256:' + createHash('sha256').update(readFileSync(replayPath)).digest('hex')
-
-manifest.scenarioResults = manifest.scenarioResults.map(s => {
-  if (s.id === 'CAP-C7-002') {
-    return { ...s, result: 'PASS' }
-  }
-  return s
-})
-manifest.replayArtifactRef = '.artifacts/replay-artifact.json'
-manifest.replayArtifactHash = replayArtifactHash
-manifest.replayCompletedAt = new Date().toISOString()
-
-writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
-log(`updated ${relative(ROOT, manifestPath)}: CAP-C7-002=PASS`)
-
-log('Clean replay: PASS')
-log('CAP-C7-002: PASS')
+// A fresh process/database run is not independent clean-source replay.
+log('Fresh runtime regression: PASS. Candidate and CAP-C7-002 are unchanged.')

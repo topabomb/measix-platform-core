@@ -554,6 +554,16 @@ func ResourceIDHasSuffix(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldHasSuffix(FieldResourceID, v))
 }
 
+// ResourceIDIsNil applies the IsNil predicate on the "resource_id" field.
+func ResourceIDIsNil() predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIsNull(FieldResourceID))
+}
+
+// ResourceIDNotNil applies the NotNil predicate on the "resource_id" field.
+func ResourceIDNotNil() predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotNull(FieldResourceID))
+}
+
 // ResourceIDEqualFold applies the EqualFold predicate on the "resource_id" field.
 func ResourceIDEqualFold(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldEqualFold(FieldResourceID, v))
@@ -619,6 +629,16 @@ func RuntimeRouteIDHasSuffix(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldHasSuffix(FieldRuntimeRouteID, v))
 }
 
+// RuntimeRouteIDIsNil applies the IsNil predicate on the "runtime_route_id" field.
+func RuntimeRouteIDIsNil() predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIsNull(FieldRuntimeRouteID))
+}
+
+// RuntimeRouteIDNotNil applies the NotNil predicate on the "runtime_route_id" field.
+func RuntimeRouteIDNotNil() predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotNull(FieldRuntimeRouteID))
+}
+
 // RuntimeRouteIDEqualFold applies the EqualFold predicate on the "runtime_route_id" field.
 func RuntimeRouteIDEqualFold(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldEqualFold(FieldRuntimeRouteID, v))
@@ -682,6 +702,16 @@ func UpstreamIDHasPrefix(v string) predicate.RequestUsage {
 // UpstreamIDHasSuffix applies the HasSuffix predicate on the "upstream_id" field.
 func UpstreamIDHasSuffix(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldHasSuffix(FieldUpstreamID, v))
+}
+
+// UpstreamIDIsNil applies the IsNil predicate on the "upstream_id" field.
+func UpstreamIDIsNil() predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIsNull(FieldUpstreamID))
+}
+
+// UpstreamIDNotNil applies the NotNil predicate on the "upstream_id" field.
+func UpstreamIDNotNil() predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotNull(FieldUpstreamID))
 }
 
 // UpstreamIDEqualFold applies the EqualFold predicate on the "upstream_id" field.

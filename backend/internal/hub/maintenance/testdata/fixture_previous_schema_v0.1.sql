@@ -1,6 +1,6 @@
 -- MEASIX S0 previous-supported schema (v0.1 baseline).
 -- This fixture represents the previous supported schema version.
--- The upgrade migration (202608190001_initial.sql) is applied on top of it.
+-- Tests apply all real migrations after 202608190001_initial on top of it.
 -- Tables that already exist in this fixture must be preserved by the upgrade.
 -- The upgrade should add new tables/columns without dropping existing data.
 PRAGMA foreign_keys = ON;

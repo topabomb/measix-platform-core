@@ -21,6 +21,30 @@
  *   - authOwnership: MCP auth ownership labels
  */
 export default {
+ experience: {
+  "tab": "Assistants",
+  "newAssistant": "New assistant",
+  "addAssistant": "Add assistant",
+  "name": "Display name",
+  "description": "Description (optional)",
+  "model": "Managed model",
+  "mcps": "Direct Managed MCP (optional)",
+  "systemPrompt": "System prompt",
+  "enabled": "Enabled",
+  "memorySeed": "Memory seeds (optional, in author order)",
+  "seedEntry": "Memory {index}",
+  "moveUp": "Move up",
+  "moveDown": "Move down",
+  "addSeed": "Add memory seed",
+  "starters": "Starters",
+  "addStarter": "Add starter",
+  "newStarter": "New starter",
+  "title": "Title",
+  "starterPrompt": "Initial user prompt",
+  "sortOrder": "Display order",
+  "removeAssistant": "Remove assistant and its starters from draft",
+  "hint": "These definitions use the same Draft → Validate → Preview → Publish workflow. Empty memory seeds are allowed; direct MCP is bound to this assistant."
+},
   nav: {
     overview: 'Overview',
     users: 'Users',
@@ -33,6 +57,7 @@ export default {
     runtimeFoundation: 'Runtime Foundation',
   },
   common: {
+    loadMore: 'Load more',
     loading: 'Loading…',
     noData: 'No data.',
     save: 'Save',
@@ -591,6 +616,9 @@ export default {
     costUnknownHint: 'No reliable semantic meter → Unknown. Unknown cost is not zero.',
   },
   system: {
+    spoolState: 'Spool status',
+    spoolPending: 'Pending events',
+    spoolOldest: 'Oldest pending (seconds)',
     title: 'System',
     subtitle: 'Runtime diagnostics, control state and metering health.',
     relay: 'Relay',

@@ -6,6 +6,7 @@ import { apiFetch } from '../api/client'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import { fetchAllPages } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 
 const { t: $t } = useI18n()
@@ -13,7 +14,6 @@ const { t: $t } = useI18n()
 type SystemStatus = components['schemas']['SystemStatus']
 type UsageSummary = components['schemas']['UsageSummary']
 type Upstream = components['schemas']['Upstream']
-type UpstreamPage = components['schemas']['UpstreamPage']
 type Draft = components['schemas']['Draft']
 
 const system = ref<SystemStatus>()
@@ -67,12 +67,12 @@ async function refresh() {
     const [systemStatus, usageSummary, upstreamPage, draftData] = await Promise.all([
       apiFetch<SystemStatus>('/api/admin/v1/system/status'),
       apiFetch<UsageSummary>('/api/admin/v1/usage/summary'),
-      apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=200'),
+      fetchAllPages<Upstream>('/api/admin/v1/upstreams?limit=200'),
       apiFetch<Draft>('/api/admin/v1/draft').catch(() => undefined as Draft | undefined),
     ])
     system.value = systemStatus
     usage.value = usageSummary
-    upstreams.value = upstreamPage.items
+    upstreams.value = upstreamPage
     draft.value = draftData
   } catch (cause) {
     error.value = cause

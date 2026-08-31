@@ -59,9 +59,9 @@ func (s *Service) Ingest(ctx context.Context, batch usageingestapi.UsageBatch) (
 			SetDeploymentID(event.DeploymentId).
 			SetUserID(event.UserId).
 			SetNillableDeviceID(event.DeviceId).
-			SetResourceID(event.ResourceId).
-			SetRuntimeRouteID(event.RuntimeRouteId).
-			SetUpstreamID(event.UpstreamId).
+			SetNillableResourceID(resolvedID(event.ResourceId)).
+			SetNillableRuntimeRouteID(resolvedID(event.RuntimeRouteId)).
+			SetNillableUpstreamID(resolvedID(event.UpstreamId)).
 			SetManagedGeneration(int64(event.ManagedGeneration)).
 			SetControlRevision(int64(event.ControlRevision)).
 			SetStartedAt(event.StartedAt.UTC()).
@@ -94,12 +94,21 @@ func validateRequestUsage(event usageingestapi.RequestUsageEvent) error {
 		{platformid.Request, event.RequestId},
 		{platformid.Deployment, event.DeploymentId},
 		{platformid.User, event.UserId},
-		{platformid.Route, event.RuntimeRouteId},
-		{platformid.Upstream, event.UpstreamId},
 	}
 	for _, check := range checks {
 		if err := platformid.Validate(check.kind, check.value); err != nil {
 			return err
+		}
+	}
+	if event.Forwarded && (event.ResourceId == "" || event.RuntimeRouteId == "" || event.UpstreamId == "") {
+		return fmt.Errorf("forwarded request lacks resolved attribution")
+	}
+	for _, check := range []struct {
+		kind  platformid.Kind
+		value string
+	}{{platformid.Route, event.RuntimeRouteId}, {platformid.Upstream, event.UpstreamId}} {
+		if check.value != "" && platformid.Validate(check.kind, check.value) != nil {
+			return fmt.Errorf("invalid resolved attribution")
 		}
 	}
 	if event.InteractionId != nil && platformid.Validate(platformid.Interaction, *event.InteractionId) != nil {
@@ -109,7 +118,7 @@ func validateRequestUsage(event usageingestapi.RequestUsageEvent) error {
 		return fmt.Errorf("invalid deviceId")
 	}
 	kind, err := platformid.KindOf(event.ResourceId)
-	if err != nil || (kind != platformid.Model && kind != platformid.TTS && kind != platformid.ASR && kind != platformid.MCP) {
+	if event.ResourceId != "" && (err != nil || (kind != platformid.Model && kind != platformid.TTS && kind != platformid.ASR && kind != platformid.MCP)) {
 		return fmt.Errorf("invalid resourceId")
 	}
 	if event.ManagedGeneration < 0 || event.ControlRevision < 0 || event.HttpStatus < 100 || event.HttpStatus > 599 || event.RequestBytes < 0 || event.ResponseBytes < 0 || event.DurationMs < 0 {
@@ -125,4 +134,11 @@ func validateRequestUsage(event usageingestapi.RequestUsageEvent) error {
 		return fmt.Errorf("unforwarded request cannot have upstream status")
 	}
 	return nil
+}
+
+func resolvedID(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }

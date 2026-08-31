@@ -33,6 +33,8 @@ func (h *Handler) authenticate(state *control.State, value string) (*accessClaim
 			}
 			return key, nil
 		},
+		jwt.WithExpirationRequired(),
+		jwt.WithIssuedAt(),
 		jwt.WithValidMethods([]string{jwt.SigningMethodEdDSA.Alg()}),
 		jwt.WithIssuer(state.DeploymentID),
 		jwt.WithAudience("runtime"),

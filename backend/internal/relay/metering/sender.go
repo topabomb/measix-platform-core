@@ -111,16 +111,16 @@ func (s *Sender) sendRows(ctx context.Context, rows []Row) error {
 		return nil
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		body, _ := io.ReadAll(io.LimitReader(response.Body, 1024))
 		authFailure := response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden
 		code := fmt.Sprintf("hub_http_%d", response.StatusCode)
 		_ = s.failRows(ctx, rows, code, authFailure)
-		return fmt.Errorf("Hub usage ingest status %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
+		return fmt.Errorf("Hub usage ingest status %d", response.StatusCode)
 	}
 
 	var ack usageingestapi.UsageBatchAck
 	decoder := json.NewDecoder(io.LimitReader(response.Body, 1<<20))
-	if err := decoder.Decode(&ack); err != nil || ack.AcceptedCount+ack.DuplicateCount != len(rows) {
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&ack); err != nil || ack.AcceptedCount < 0 || ack.DuplicateCount < 0 || ack.AcceptedCount+ack.DuplicateCount != len(rows) || decoder.Decode(&struct{}{}) != io.EOF {
 		_ = s.failRows(ctx, rows, "invalid_hub_ack", false)
 		if err != nil {
 			return err

@@ -109,6 +109,15 @@ describe('DraftStore', () => {
 })
 
 describe('ActivationStore', () => {
+  it('scopes retry keys to the exact command target and payload', () => {
+    const store = useActivationStore()
+    const first = store.beginCommand('PUBLISH', 'draft:7:[]')
+    expect(store.beginCommand('PUBLISH', 'draft:7:[]')).toBe(first)
+    expect(store.beginCommand('PUBLISH', 'draft:8:[]')).not.toBe(first)
+    const second = store.retryKey
+    expect(store.beginCommand('PUBLISH', 'release:other')).not.toBe(second)
+  })
+
   it('reuses one idempotency key for retry and reports success only after COMPLETED', async () => {
     const store = useActivationStore()
     const key = store.beginCommand('PUBLISH')

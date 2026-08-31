@@ -31,18 +31,18 @@ type fullAdminHandler struct {
 	services Services
 }
 
-func RegisterFull(router chi.Router, services Services, options Options) {
+func RegisterFull(router chi.Router, services Services) {
 	admin := &fullAdminHandler{
 		adminHandler: &adminHandler{identity: services.Identity},
 		services:     services,
 	}
-	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity, options: options}, capability: services.Capability, enterpriseUpdate: services.EnterpriseUpdate}
+	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity}, capability: services.Capability, enterpriseUpdate: services.EnterpriseUpdate}
 	adminapi.HandlerFromMux(admin, router)
 	clientapi.HandlerFromMux(client, router)
 }
 
-func NewFull(services Services, options Options) http.Handler {
+func NewFull(services Services) http.Handler {
 	router := chi.NewRouter()
-	RegisterFull(router, services, options)
+	RegisterFull(router, services)
 	return router
 }

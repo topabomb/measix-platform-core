@@ -6,6 +6,8 @@ import { apiFetch, createCandidateId } from '../api/client'
 import { useDraftStore } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
 import { useActivationStore } from '../stores/activation'
+import ManagedExperienceEditor from '../components/ManagedExperienceEditor.vue'
+import { fetchAllPages } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -21,7 +23,6 @@ type McpDefinition = components['schemas']['McpDefinition']
 type ProviderDefinition = components['schemas']['ProviderDefinition']
 type ManagedPolicy = components['schemas']['ManagedPolicy']
 type Upstream = components['schemas']['Upstream']
-type UpstreamPage = components['schemas']['UpstreamPage']
 type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
 type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
 type DraftPreviewResponse = components['schemas']['DraftPreviewResponse']
@@ -39,7 +40,7 @@ const previewOpen = ref(false)
 const reviewOpen = ref(false)
 const reviewing = ref(false)
 const upstreams = ref<Upstream[]>([])
-const activeTab = ref<'overview' | 'models' | 'tts' | 'asr' | 'mcp' | 'policy'>('overview')
+const activeTab = ref<'overview' | 'models' | 'tts' | 'asr' | 'mcp' | 'assistants' | 'policy'>('overview')
 const canMutate = computed(() => Boolean(session.csrfToken))
 
 // Selected resource for editor/detail mode
@@ -170,8 +171,7 @@ async function refresh() {
 
 async function loadUpstreams() {
   try {
-    const page = await apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=200')
-    upstreams.value = page.items
+    upstreams.value = await fetchAllPages<Upstream>('/api/admin/v1/upstreams?limit=200')
   } catch {
     // Upstream list is a convenience for binding; failure does not block draft editing.
   }
@@ -221,17 +221,17 @@ async function publish() {
   if (draft.baselineRevision === undefined) return
   const warnings = draft.validationResult?.warnings ?? []
   publishing.value = true
-  activation.resetCommand()
-  const key = activation.beginCommand('PUBLISH')
+  const payload = JSON.stringify({
+    expectedDraftRevision: draft.baselineRevision,
+    acknowledgedWarningCodes: warnings.map((w) => w.code).sort(),
+  })
+  const key = activation.beginCommand('PUBLISH', 'draft:' + payload)
   error.value = undefined
   try {
     const result = await apiFetch<Activation>('/api/admin/v1/draft:publish', {
       method: 'POST',
       headers: { 'Idempotency-Key': key },
-      body: JSON.stringify({
-        expectedDraftRevision: draft.baselineRevision,
-        acknowledgedWarningCodes: warnings.map((w) => w.code),
-      }),
+      body: payload,
     }, session.csrfToken)
     activation.accept(result)
     if (result.state === 'APPLYING' || result.state === 'UNKNOWN') {
@@ -352,8 +352,8 @@ onMounted(refresh)
     <PageHeader :title="$t('nav.resources')" :subtitle="$t('resources.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :loading="draft.loading" @click="refresh" />
-        <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate" :loading="previewing" @click="previewSnapshot" data-cy="draft-preview-btn" />
-        <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || draft.loading" @click="validate" data-cy="draft-validate-btn" />
+        <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate || draft.dirty" :loading="previewing" @click="previewSnapshot" data-cy="draft-preview-btn" />
+        <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || draft.loading || draft.dirty" @click="validate" data-cy="draft-validate-btn" />
         <q-btn outline color="primary" :label="$t('common.save')" :disable="!canMutate || !draft.dirty" :loading="draft.saving" @click="save" data-cy="draft-save-btn" />
         <q-btn color="positive" icon="rocket_launch" :label="$t('resources.draft.review')" :disable="!canMutate || draft.dirty" :loading="reviewing" @click="openReview" data-cy="draft-review-btn" />
       </template>
@@ -426,6 +426,7 @@ onMounted(refresh)
         <q-tab name="mcp" :label="$t('resources.tabs.mcp')" icon="link" data-cy="tab-mcp">
           <q-badge v-if="draft.localContent.mcp.length" color="deep-purple" rounded floating :label="draft.localContent.mcp.length" />
         </q-tab>
+        <q-tab name="assistants" :label="$t('experience.tab')" icon="assistant" data-cy="tab-assistants" />
         <q-tab name="policy" :label="$t('resources.tabs.policy')" icon="policy" data-cy="tab-policy" />
       </q-tabs>
 
@@ -959,6 +960,7 @@ onMounted(refresh)
       </template>
 
       <!-- ===== Policy Editor ===== -->
+      <ManagedExperienceEditor v-if="activeTab === 'assistants'" :disabled="!canMutate || draft.saving || publishing" />
       <template v-if="activeTab === 'policy'">
         <q-card flat bordered>
           <q-card-section class="row items-center justify-between">
@@ -1075,6 +1077,9 @@ onMounted(refresh)
                   { kind: 'TTS', d: reviewDiff.tts },
                   { kind: 'ASR', d: reviewDiff.asr },
                   { kind: 'MCP', d: reviewDiff.mcp },
+                  { kind: $t('experience.tab'), d: reviewDiff.assistants },
+                  { kind: $t('experience.starters'), d: reviewDiff.starters },
+                  { kind: $t('resources.review.runtimeImpact'), d: reviewDiff.bindings },
                 ]" :key="row.kind">
                   <td>{{ row.kind }}</td>
                   <td class="text-right text-positive">{{ row.d.added.length > 0 ? '+' + row.d.added.length : '—' }}</td>
@@ -1264,6 +1269,26 @@ onMounted(refresh)
               </q-markup-table>
             </q-expansion-item>
 
+
+            <q-expansion-item dense group="preview" :label="$t('experience.tab')" icon="assistant">
+              <q-list>
+                <q-item v-for="a in preview.assistants ?? []" :key="a.assistantDefinitionId">
+                  <q-item-section>
+                    <q-item-label>{{ a.displayName }} · {{ a.assistantDefinitionId }}</q-item-label>
+                    <q-item-label caption>{{ a.modelId }} · {{ a.mcpServerIds.join(', ') }}</q-item-label>
+                    <p style="white-space: pre-wrap">{{ a.systemPrompt }}</p>
+                    <ol><li v-for="(seed, i) in a.memorySeed" :key="i" style="white-space: pre-wrap">{{ seed }}</li></ol>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-expansion-item>
+            <q-expansion-item dense group="preview" :label="$t('experience.starters')" icon="forum">
+              <q-list>
+                <q-item v-for="s in (preview.starters ?? []).toSorted((a, b) => a.sortOrder - b.sortOrder || a.starterId.localeCompare(b.starterId))" :key="s.starterId">
+                  <q-item-section><q-item-label>{{ s.title }} · {{ s.assistantDefinitionId }} · {{ s.sortOrder }}</q-item-label><p style="white-space: pre-wrap">{{ s.prompt }}</p></q-item-section>
+                </q-item>
+              </q-list>
+            </q-expansion-item>
             <q-expansion-item dense group="preview" :label="$t('resources.preview.policy')" icon="policy">
               <q-markup-table flat dense>
                 <tbody>

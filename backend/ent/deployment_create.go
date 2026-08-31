@@ -32,6 +32,34 @@ func (_c *DeploymentCreate) SetStatus(v string) *DeploymentCreate {
 	return _c
 }
 
+// SetTimezone sets the "timezone" field.
+func (_c *DeploymentCreate) SetTimezone(v string) *DeploymentCreate {
+	_c.mutation.SetTimezone(v)
+	return _c
+}
+
+// SetNillableTimezone sets the "timezone" field if the given value is not nil.
+func (_c *DeploymentCreate) SetNillableTimezone(v *string) *DeploymentCreate {
+	if v != nil {
+		_c.SetTimezone(*v)
+	}
+	return _c
+}
+
+// SetFeedRevision sets the "feed_revision" field.
+func (_c *DeploymentCreate) SetFeedRevision(v int64) *DeploymentCreate {
+	_c.mutation.SetFeedRevision(v)
+	return _c
+}
+
+// SetNillableFeedRevision sets the "feed_revision" field if the given value is not nil.
+func (_c *DeploymentCreate) SetNillableFeedRevision(v *int64) *DeploymentCreate {
+	if v != nil {
+		_c.SetFeedRevision(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *DeploymentCreate) SetCreatedAt(v time.Time) *DeploymentCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -57,6 +85,7 @@ func (_c *DeploymentCreate) Mutation() *DeploymentMutation {
 
 // Save creates the Deployment in the database.
 func (_c *DeploymentCreate) Save(ctx context.Context) (*Deployment, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -82,6 +111,18 @@ func (_c *DeploymentCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *DeploymentCreate) defaults() {
+	if _, ok := _c.mutation.Timezone(); !ok {
+		v := deployment.DefaultTimezone
+		_c.mutation.SetTimezone(v)
+	}
+	if _, ok := _c.mutation.FeedRevision(); !ok {
+		v := deployment.DefaultFeedRevision
+		_c.mutation.SetFeedRevision(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *DeploymentCreate) check() error {
 	if _, ok := _c.mutation.Name(); !ok {
@@ -89,6 +130,12 @@ func (_c *DeploymentCreate) check() error {
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Deployment.status"`)}
+	}
+	if _, ok := _c.mutation.Timezone(); !ok {
+		return &ValidationError{Name: "timezone", err: errors.New(`ent: missing required field "Deployment.timezone"`)}
+	}
+	if _, ok := _c.mutation.FeedRevision(); !ok {
+		return &ValidationError{Name: "feed_revision", err: errors.New(`ent: missing required field "Deployment.feed_revision"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Deployment.created_at"`)}
@@ -139,6 +186,14 @@ func (_c *DeploymentCreate) createSpec() (*Deployment, *sqlgraph.CreateSpec) {
 		_spec.SetField(deployment.FieldStatus, field.TypeString, value)
 		_node.Status = value
 	}
+	if value, ok := _c.mutation.Timezone(); ok {
+		_spec.SetField(deployment.FieldTimezone, field.TypeString, value)
+		_node.Timezone = value
+	}
+	if value, ok := _c.mutation.FeedRevision(); ok {
+		_spec.SetField(deployment.FieldFeedRevision, field.TypeInt64, value)
+		_node.FeedRevision = value
+	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(deployment.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
@@ -168,6 +223,7 @@ func (_c *DeploymentCreateBulk) Save(ctx context.Context) ([]*Deployment, error)
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*DeploymentMutation)
 				if !ok {

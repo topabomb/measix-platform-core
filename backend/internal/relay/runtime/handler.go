@@ -42,9 +42,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resourceID, runtimePath, ok := runtimeTarget(r.URL.Path)
-	if !ok || !isRuntimeResourceID(resourceID) || !safeRuntimePath(runtimePath) {
-		writeProblem(observer, http.StatusNotFound, "route_not_found", "Route not found", requestID, nil, false)
-		return
+	validTarget := ok && isRuntimeResourceID(resourceID) && safeRuntimePath(runtimePath)
+	if !isRuntimeResourceID(resourceID) {
+		resourceID = ""
 	}
 
 	claims, err := h.authenticate(state, bearer(r))
@@ -58,14 +58,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		interactionID = &interactionValue
 	}
 	meterFailure := func(status int, code, title, errorClass string, target *int) {
-		route, upstream, found := usageRoute(state, resourceID)
-		writeProblem(observer, status, code, title, requestID, target, false)
-		if found {
-			h.recordUsage(observer, nil, usageAttribution{
-				state: state, claims: claims, resourceID: resourceID, interactionID: interactionID,
-				route: route, upstream: upstream, startedAt: startedAt, requestID: requestID,
-			}, false, nil, errorClass)
+		route, upstream, resolved := usageRoute(state, resourceID)
+		resolvedResourceID := resourceID
+		if !resolved {
+			resolvedResourceID = ""
 		}
+		writeProblem(observer, status, code, title, requestID, target, false)
+		h.recordUsage(observer, nil, usageAttribution{
+			state: state, claims: claims, resourceID: resolvedResourceID, interactionID: interactionID,
+			route: route, upstream: upstream, startedAt: startedAt, requestID: requestID,
+		}, false, nil, errorClass)
+	}
+
+	if !validTarget {
+		meterFailure(http.StatusNotFound, "route_not_found", "Route not found", "ROUTE_NOT_FOUND", nil)
+		return
 	}
 
 	if _, disabled := state.DisabledUsers[claims.Subject]; disabled {
@@ -102,17 +109,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	routeID, exists := state.ResourceRoutes[resourceID]
 	if !exists {
-		writeProblem(observer, http.StatusForbidden, "resource_not_allowed", "Resource not allowed", requestID, nil, false)
+		meterFailure(http.StatusForbidden, "resource_not_allowed", "Resource not allowed", "RESOURCE_NOT_ALLOWED", nil)
 		return
 	}
 	route, exists := state.Routes[routeID]
 	if !exists {
-		writeProblem(observer, http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime route unavailable", requestID, nil, false)
+		meterFailure(http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime route unavailable", "ROUTE_UNAVAILABLE", nil)
 		return
 	}
 	upstream, exists := state.Upstreams[route.UpstreamID]
 	if !exists {
-		writeProblem(observer, http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime upstream unavailable", requestID, nil, false)
+		meterFailure(http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime upstream unavailable", "UPSTREAM_UNAVAILABLE", nil)
 		return
 	}
 	attr := usageAttribution{

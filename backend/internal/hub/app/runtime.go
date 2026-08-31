@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -49,6 +50,15 @@ type RuntimeOptions struct {
 
 func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) {
 	cfg := options.Config
+	if options.AdminAssets == nil && cfg.AdminAssetsDir != "" {
+		options.AdminAssets = os.DirFS(cfg.AdminAssetsDir)
+	}
+	if options.AdminAssets != nil {
+		info, err := fs.Stat(options.AdminAssets, "index.html")
+		if err != nil || info.IsDir() {
+			return nil, fmt.Errorf("admin assets require index.html: %v", err)
+		}
+	}
 	masterKey, err := security.LoadMasterKey(cfg.MasterKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("load master key: %w", err)
@@ -114,7 +124,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	h := &health.State{}
 	router.Get("/live", h.Live)
 	router.Get("/ready", h.Ready)
-	httpapi.RegisterFull(router, services, httpapi.Options{PublicBaseURL: cfg.PublicBaseURL, RuntimeAPIBase: cfg.RuntimeAPIBase})
+	httpapi.RegisterFull(router, services)
 	if options.AdminAssets != nil {
 		static := adminstatic.New(options.AdminAssets)
 		router.Handle("/admin", static)
@@ -157,6 +167,9 @@ func (r *Runtime) RunReconciler(ctx context.Context) error {
 			return ctx.Err()
 		case <-ticker.C:
 			_, _ = r.RuntimeControl.Reconcile(ctx)
+			if err := r.Services.Identity.SweepRefreshRecovery(ctx); err != nil {
+				slog.Error("refresh recovery cleanup failed; will retry", "event", "refresh_cleanup_failed", "error", err)
+			}
 		}
 	}
 }

@@ -340,7 +340,7 @@ func TestCAPSEC006InvalidEnrollmentRejected(t *testing.T) {
 
 	// Attempt to exchange a bogus enrollment code (with valid installationId format)
 	validInstallationID := platformid.New(platformid.Installation)
-	body := fmt.Sprintf(`{"code":"bogus-code-12345","installationId":%q,"platform":"ANDROID","appVersion":"1.0"}`, validInstallationID)
+	body := fmt.Sprintf(`{"code":"bogus-code-12345","installationId":%q,"platform":"ANDROID","deviceName":"Test device","appVersion":"1.0"}`, validInstallationID)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, env.HubBaseURL+"/api/client/v1/enrollments/exchange",
 		strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -355,7 +355,7 @@ func TestCAPSEC006InvalidEnrollmentRejected(t *testing.T) {
 	}
 
 	// Attempt to exchange with a non-ANDROID platform (should be rejected)
-	body2 := `{"code":"any-code","installationId":"inst-1","platform":"IOS","appVersion":"1.0"}`
+	body2 := `{"code":"any-code","installationId":"inst-1","platform":"IOS","deviceName":"Test device","appVersion":"1.0"}`
 	req2, _ := http.NewRequestWithContext(ctx, http.MethodPost, env.HubBaseURL+"/api/client/v1/enrollments/exchange",
 		strings.NewReader(body2))
 	req2.Header.Set("Content-Type", "application/json")

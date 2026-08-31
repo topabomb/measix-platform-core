@@ -52,6 +52,46 @@ func (_c *SessionCreate) SetRefreshDigest(v []byte) *SessionCreate {
 	return _c
 }
 
+// SetPreviousRefreshDigest sets the "previous_refresh_digest" field.
+func (_c *SessionCreate) SetPreviousRefreshDigest(v []byte) *SessionCreate {
+	_c.mutation.SetPreviousRefreshDigest(v)
+	return _c
+}
+
+// SetRefreshRequestKey sets the "refresh_request_key" field.
+func (_c *SessionCreate) SetRefreshRequestKey(v string) *SessionCreate {
+	_c.mutation.SetRefreshRequestKey(v)
+	return _c
+}
+
+// SetNillableRefreshRequestKey sets the "refresh_request_key" field if the given value is not nil.
+func (_c *SessionCreate) SetNillableRefreshRequestKey(v *string) *SessionCreate {
+	if v != nil {
+		_c.SetRefreshRequestKey(*v)
+	}
+	return _c
+}
+
+// SetRefreshReplayUntil sets the "refresh_replay_until" field.
+func (_c *SessionCreate) SetRefreshReplayUntil(v time.Time) *SessionCreate {
+	_c.mutation.SetRefreshReplayUntil(v)
+	return _c
+}
+
+// SetNillableRefreshReplayUntil sets the "refresh_replay_until" field if the given value is not nil.
+func (_c *SessionCreate) SetNillableRefreshReplayUntil(v *time.Time) *SessionCreate {
+	if v != nil {
+		_c.SetRefreshReplayUntil(*v)
+	}
+	return _c
+}
+
+// SetRefreshResponseCiphertext sets the "refresh_response_ciphertext" field.
+func (_c *SessionCreate) SetRefreshResponseCiphertext(v []byte) *SessionCreate {
+	_c.mutation.SetRefreshResponseCiphertext(v)
+	return _c
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_c *SessionCreate) SetExpiresAt(v time.Time) *SessionCreate {
 	_c.mutation.SetExpiresAt(v)
@@ -203,6 +243,22 @@ func (_c *SessionCreate) createSpec() (*Session, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.RefreshDigest(); ok {
 		_spec.SetField(session.FieldRefreshDigest, field.TypeBytes, value)
 		_node.RefreshDigest = &value
+	}
+	if value, ok := _c.mutation.PreviousRefreshDigest(); ok {
+		_spec.SetField(session.FieldPreviousRefreshDigest, field.TypeBytes, value)
+		_node.PreviousRefreshDigest = &value
+	}
+	if value, ok := _c.mutation.RefreshRequestKey(); ok {
+		_spec.SetField(session.FieldRefreshRequestKey, field.TypeString, value)
+		_node.RefreshRequestKey = &value
+	}
+	if value, ok := _c.mutation.RefreshReplayUntil(); ok {
+		_spec.SetField(session.FieldRefreshReplayUntil, field.TypeTime, value)
+		_node.RefreshReplayUntil = &value
+	}
+	if value, ok := _c.mutation.RefreshResponseCiphertext(); ok {
+		_spec.SetField(session.FieldRefreshResponseCiphertext, field.TypeBytes, value)
+		_node.RefreshResponseCiphertext = &value
 	}
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(session.FieldExpiresAt, field.TypeTime, value)

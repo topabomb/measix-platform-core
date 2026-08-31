@@ -13,6 +13,7 @@ func (Device) Fields() []ent.Field {
 		field.String("user_id"),
 		field.String("installation_id").Optional().Nillable().Unique(),
 		field.String("status"),
+		field.String("name").Default(""),
 		field.String("app_version").Optional().Nillable(),
 		field.Time("created_at"),
 		field.Time("last_seen_at").Optional().Nillable(),

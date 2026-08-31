@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -17,11 +18,6 @@ import (
 
 const adminSessionCookie = "measix_admin_session"
 
-type Options struct {
-	PublicBaseURL  string
-	RuntimeAPIBase string
-}
-
 type adminHandler struct {
 	adminapi.Unimplemented
 	identity *identity.Service
@@ -30,13 +26,12 @@ type adminHandler struct {
 type clientHandler struct {
 	clientapi.Unimplemented
 	identity *identity.Service
-	options  Options
 }
 
-func New(identityService *identity.Service, options Options) http.Handler {
+func New(identityService *identity.Service) http.Handler {
 	router := chi.NewRouter()
 	adminapi.HandlerFromMux(&adminHandler{identity: identityService}, router)
-	clientapi.HandlerFromMux(&clientHandler{identity: identityService, options: options}, router)
+	clientapi.HandlerFromMux(&clientHandler{identity: identityService}, router)
 	return router
 }
 
@@ -109,20 +104,21 @@ func (h *adminHandler) ListUsers(w http.ResponseWriter, r *http.Request, params 
 		writeIdentityError(w, err)
 		return
 	}
-	limit := 50
-	if params.Limit != nil {
-		limit = *params.Limit
+	limit, after, valid := pageParams(w, r, params.Limit, params.Cursor)
+	if !valid {
+		return
 	}
-	users, err := h.identity.ListUserViews(r.Context(), limit)
+	users, err := h.identity.ListUserViews(r.Context(), limit+1, after)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
+	users, next := pageResult(r, users, limit, func(v identity.UserView) string { return v.ID })
 	items := make([]adminapi.User, 0, len(users))
 	for _, u := range users {
 		items = append(items, userWire(u))
 	}
-	writeJSON(w, http.StatusOK, adminapi.UserPage{Items: items})
+	writeJSON(w, http.StatusOK, adminapi.UserPage{Items: items, NextCursor: next})
 }
 
 func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request, params adminapi.CreateUserParams) {
@@ -219,15 +215,16 @@ func (h *adminHandler) ListDevices(w http.ResponseWriter, r *http.Request, userI
 		writeIdentityError(w, err)
 		return
 	}
-	limit := 50
-	if params.Limit != nil {
-		limit = *params.Limit
+	limit, after, valid := pageParams(w, r, params.Limit, params.Cursor)
+	if !valid {
+		return
 	}
-	devices, err := h.identity.ListDeviceViews(r.Context(), userID, limit)
+	devices, err := h.identity.ListDeviceViews(r.Context(), userID, limit+1, after)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
+	devices, next := pageResult(r, devices, limit, func(v identity.DeviceView) string { return v.ID })
 	items := make([]adminapi.Device, 0, len(devices))
 	for _, d := range devices {
 		items = append(items, adminapi.Device{
@@ -239,7 +236,7 @@ func (h *adminHandler) ListDevices(w http.ResponseWriter, r *http.Request, userI
 			Status:         adminapi.DeviceStatus(d.Status),
 		})
 	}
-	writeJSON(w, http.StatusOK, adminapi.DevicePage{Items: items})
+	writeJSON(w, http.StatusOK, adminapi.DevicePage{Items: items, NextCursor: next})
 }
 
 func (h *adminHandler) authenticateAdmin(r *http.Request, csrf string, requireCSRF bool) (identity.AdminPrincipalView, error) {
@@ -256,18 +253,13 @@ func (h *clientHandler) Discover(w http.ResponseWriter, r *http.Request) {
 		writeIdentityError(w, err)
 		return
 	}
-	base := strings.TrimRight(h.options.PublicBaseURL, "/")
-	runtimeBase := h.options.RuntimeAPIBase
-	if strings.HasPrefix(runtimeBase, "/") {
-		runtimeBase = base + runtimeBase
-	}
 	writeJSON(w, http.StatusOK, clientapi.Discovery{
 		Product:                         clientapi.MEASIXAGENTPLATFORM,
 		ProtocolVersion:                 clientapi.DiscoveryProtocolVersionN1,
 		DeploymentId:                    view.DeploymentID,
 		DeploymentName:                  view.DeploymentName,
-		ClientApiBase:                   base + "/api/client/v1",
-		RuntimeApiBase:                  runtimeBase,
+		ClientApiBase:                   "/api/client/v1",
+		RuntimeApiBase:                  "/runtime/v1",
 		SupportedSnapshotSchemaVersions: []int{1, 2},
 	})
 }
@@ -278,12 +270,12 @@ func (h *clientHandler) ExchangeEnrollment(w http.ResponseWriter, r *http.Reques
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	result, err := h.identity.ExchangeEnrollment(r.Context(), request.Code, request.InstallationId, request.AppVersion)
+	result, err := h.identity.ExchangeEnrollment(r.Context(), request.Code, request.InstallationId, request.DeviceName, request.AppVersion)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, clientapi.EnrollmentExchangeResponse{
+	writeJSON(w, http.StatusCreated, clientapi.EnrollmentExchangeResponse{
 		DeploymentId:         result.DeploymentID,
 		UserId:               result.UserID,
 		DeviceId:             result.DeviceID,
@@ -292,21 +284,22 @@ func (h *clientHandler) ExchangeEnrollment(w http.ResponseWriter, r *http.Reques
 		AccessTokenExpiresAt: result.AccessTokenExpiresAt,
 		RefreshToken:         result.RefreshToken,
 		RefreshExpiresAt:     result.RefreshExpiresAt,
+		SessionIdleExpiresAt: result.RefreshExpiresAt,
 	})
 }
 
-func (h *clientHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
+func (h *clientHandler) RefreshSession(w http.ResponseWriter, r *http.Request, params clientapi.RefreshSessionParams) {
 	var request clientapi.RefreshRequest
 	if err := decodeStrictJSON(r, &request); err != nil {
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	accessToken, expiresAt, err := h.identity.Refresh(r.Context(), request.RefreshToken)
+	result, err := h.identity.Refresh(r.Context(), request.RefreshToken, params.IdempotencyKey)
 	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, clientapi.RefreshResponse{AccessToken: accessToken, AccessTokenExpiresAt: expiresAt})
+	writeJSON(w, http.StatusOK, clientapi.RefreshResponse{AccessToken: result.AccessToken, AccessTokenExpiresAt: result.AccessTokenExpiresAt, RefreshToken: result.RefreshToken, RefreshExpiresAt: result.RefreshExpiresAt, SessionIdleExpiresAt: result.SessionIdleExpiresAt})
 }
 
 func (h *clientHandler) LogoutSession(w http.ResponseWriter, r *http.Request) {
@@ -342,6 +335,7 @@ func (h *clientHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 	response.Device.Status = clientapi.BootstrapDeviceStatus(view.DeviceStatus)
 	response.Session.SessionId = view.Principal.SessionID
 	response.Session.ExpiresAt = view.SessionExpiresAt
+	response.Session.SessionIdleExpiresAt = view.SessionExpiresAt
 	response.ManagedState = managedStateWire(view.ManagedState, nil)
 	response.SupportedSnapshotSchemaVersions = []int{1, 2}
 	writeJSON(w, http.StatusOK, response)
@@ -369,7 +363,7 @@ func managedStateWire(state identity.ManagedStateView, applied *int) clientapi.M
 	syncRequired := applied == nil || *applied != state.ActiveManagedGeneration
 	blocked := state.RuntimeStatus != "READY" || syncRequired
 	var target *int
-	if syncRequired {
+	if syncRequired && state.ActiveManagedGeneration > 0 {
 		value := state.ActiveManagedGeneration
 		target = &value
 	}
@@ -406,7 +400,14 @@ func bearerToken(r *http.Request) (string, bool) {
 }
 
 func decodeStrictJSON(r *http.Request, target any) error {
-	decoder := json.NewDecoder(io.LimitReader(r.Body, (1<<20)+1))
+	payload, err := io.ReadAll(io.LimitReader(r.Body, (1<<20)+1))
+	if err != nil {
+		return err
+	}
+	if len(payload) > 1<<20 {
+		return errors.New("request body too large")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		return err
@@ -419,19 +420,32 @@ func decodeStrictJSON(r *http.Request, target any) error {
 
 func writeIdentityError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, identity.ErrNotAuthorized), errors.Is(err, identity.ErrCredential), errors.Is(err, identity.ErrRevoked), errors.Is(err, identity.ErrExpired):
+	case errors.Is(err, identity.ErrExpired):
+		writeProblem(w, http.StatusUnauthorized, "session_expired", "Session expired")
+	case errors.Is(err, identity.ErrRevoked):
+		writeProblem(w, http.StatusForbidden, "session_revoked", "Session revoked")
+	case errors.Is(err, identity.ErrRefreshConflict):
+		writeProblem(w, http.StatusConflict, "refresh_conflict", "Refresh conflict")
+	case errors.Is(err, identity.ErrCredential):
+		writeProblem(w, http.StatusUnauthorized, "invalid_credential", "Invalid credential")
+	case errors.Is(err, identity.ErrNotAuthorized):
 		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
 	case errors.Is(err, identity.ErrNotFound):
 		writeProblem(w, http.StatusNotFound, "not_found", "Not found")
 	case errors.Is(err, identity.ErrConflict), errors.Is(err, identity.ErrAlreadyUsed):
 		writeProblem(w, http.StatusConflict, "conflict", "Conflict")
-	default:
+	case errors.Is(err, identity.ErrInvalidInput):
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
+	default:
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 	}
 }
 
 func writeProblem(w http.ResponseWriter, status int, code, title string) {
-	writeJSON(w, status, map[string]any{
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"type":   "about:blank",
 		"title":  title,
 		"status": status,
@@ -441,6 +455,9 @@ func writeProblem(w http.ResponseWriter, status int, code, title string) {
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
+	if w.Header().Get("Cache-Control") == "" {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }

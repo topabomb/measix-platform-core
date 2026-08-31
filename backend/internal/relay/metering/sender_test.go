@@ -148,3 +148,31 @@ func usageEvent(now time.Time) usageingestapi.RequestUsageEvent {
 		Forwarded: true, HttpStatus: 200, RequestBytes: 1, ResponseBytes: 1, DurationMs: 0,
 	}
 }
+func TestSenderRejectsMalformedAck(t *testing.T) {
+	for _, body := range []string{`{"acceptedCount":-1,"duplicateCount":2}`, `{"acceptedCount":1,"duplicateCount":0}{}`} {
+		t.Run(body, func(t *testing.T) {
+			ctx := context.Background()
+			spool, err := metering.OpenSpool(filepath.Join(t.TempDir(), "spool.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer spool.Close()
+			now := time.Now().UTC()
+			e := usageEvent(now)
+			payload, _ := json.Marshal(e)
+			if err := spool.Append(ctx, e.RequestId, payload, now); err != nil {
+				t.Fatal(err)
+			}
+			hub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(body)) }))
+			defer hub.Close()
+			sender := metering.NewSender(spool, hub.URL, "private-token")
+			if err := sender.FlushOnce(ctx); err == nil {
+				t.Fatal("invalid ACK accepted")
+			}
+			rows, err := spool.Pending(ctx, 100)
+			if err != nil || len(rows) != 1 {
+				t.Fatalf("unacknowledged row lost: %d %v", len(rows), err)
+			}
+		})
+	}
+}

@@ -17,6 +17,8 @@ const (
 	FieldInstallationID = "installation_id"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldName holds the string denoting the name field in the database.
+	FieldName = "name"
 	// FieldAppVersion holds the string denoting the app_version field in the database.
 	FieldAppVersion = "app_version"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -35,6 +37,7 @@ var Columns = []string{
 	FieldUserID,
 	FieldInstallationID,
 	FieldStatus,
+	FieldName,
 	FieldAppVersion,
 	FieldCreatedAt,
 	FieldLastSeenAt,
@@ -50,6 +53,11 @@ func ValidColumn(column string) bool {
 	}
 	return false
 }
+
+var (
+	// DefaultName holds the default value on creation for the "name" field.
+	DefaultName string
+)
 
 // OrderOption defines the ordering options for the Device queries.
 type OrderOption func(*sql.Selector)
@@ -72,6 +80,11 @@ func ByInstallationID(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByName orders the results by the name field.
+func ByName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldName, opts...).ToFunc()
 }
 
 // ByAppVersion orders the results by the app_version field.

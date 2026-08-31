@@ -19,6 +19,14 @@ const (
 	FieldChannel = "channel"
 	// FieldRefreshDigest holds the string denoting the refresh_digest field in the database.
 	FieldRefreshDigest = "refresh_digest"
+	// FieldPreviousRefreshDigest holds the string denoting the previous_refresh_digest field in the database.
+	FieldPreviousRefreshDigest = "previous_refresh_digest"
+	// FieldRefreshRequestKey holds the string denoting the refresh_request_key field in the database.
+	FieldRefreshRequestKey = "refresh_request_key"
+	// FieldRefreshReplayUntil holds the string denoting the refresh_replay_until field in the database.
+	FieldRefreshReplayUntil = "refresh_replay_until"
+	// FieldRefreshResponseCiphertext holds the string denoting the refresh_response_ciphertext field in the database.
+	FieldRefreshResponseCiphertext = "refresh_response_ciphertext"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -40,6 +48,10 @@ var Columns = []string{
 	FieldDeviceID,
 	FieldChannel,
 	FieldRefreshDigest,
+	FieldPreviousRefreshDigest,
+	FieldRefreshRequestKey,
+	FieldRefreshReplayUntil,
+	FieldRefreshResponseCiphertext,
 	FieldExpiresAt,
 	FieldStatus,
 	FieldCreatedAt,
@@ -78,6 +90,16 @@ func ByDeviceID(opts ...sql.OrderTermOption) OrderOption {
 // ByChannel orders the results by the channel field.
 func ByChannel(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldChannel, opts...).ToFunc()
+}
+
+// ByRefreshRequestKey orders the results by the refresh_request_key field.
+func ByRefreshRequestKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRefreshRequestKey, opts...).ToFunc()
+}
+
+// ByRefreshReplayUntil orders the results by the refresh_replay_until field.
+func ByRefreshReplayUntil(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRefreshReplayUntil, opts...).ToFunc()
 }
 
 // ByExpiresAt orders the results by the expires_at field.

@@ -9,7 +9,7 @@ import (
 )
 
 func TestHealthEndpoints(t *testing.T) {
-	a := app.New(config.Config{ListenAddr: ":0", PublicBaseURL: "https://example.test", DBPath: "test.db"})
+	a := app.New(config.Config{ListenAddr: ":0", DBPath: "test.db"})
 	for _, p := range []string{"/live", "/ready"} {
 		rr := httptest.NewRecorder()
 		a.Router.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, p, nil))

@@ -123,7 +123,7 @@ ci-gate
 
 The required gate evaluates the latest PR commit. Older Green checks are historical regression evidence only.
 
-The static job explicitly runs `make generate` before drift checks; `make ci` alone does not. A clean Git diff without regeneration does not prove generated output matches source. `make system-test` uses `-tags=smoke`; ordinary `go test ./...` excludes both smoke and candidate scenarios. Exact direct commands are in [development](development.md).
+The static job and `make ci` regenerate before drift checks through `scripts/checks.mjs`. The static job also runs Node evidence/tooling regression tests; console typecheck uses vue-tsc for Vue templates. A clean Git diff without regeneration does not prove generated output matches source. `make system-test` uses `-tags=smoke`; ordinary `go test ./...` excludes both smoke and candidate scenarios. Exact direct commands are in [development](development.md).
 
 ## 8. Explicit S0.1 candidate verification
 
@@ -135,7 +135,7 @@ Real external Adapter qualification is a separate explicit lane and is not repla
 
 ## 9. Freeze evidence
 
-A **final accepted** S0.1 manifest requires all applicable candidate scenarios and real Adapter qualification, including replay. The current writer/replayer is two-phase: a candidate draft can contain CAP-C7-002=NOT_EXECUTED, then replay may finalize it. That draft is not a Freeze. Preserve historical evidence without labeling it current; see [release](release.md) for provenance and known script limitations.
+A **final accepted** S0.1 manifest requires all applicable candidate scenarios and real Adapter qualification, including replay. The current writer can produce only an S0.1 candidate draft with CAP-C7-002=NOT_EXECUTED. It rejects Snapshot v2; the runtime-only replayer cannot finalize C7 and independent clean-source replay is not implemented. That draft is not a Freeze. Preserve historical evidence without labeling it current; see [release](release.md) for provenance and known script limitations.
 
 The architecture System Testing Spec is authoritative for the manifest fields. Current required identities include at least:
 
@@ -161,7 +161,7 @@ Historical audit/test mapping from older architecture baselines remains useful a
 
 Current checkpoint status lives only in `docs/s0-execution-progress.md`, backed by executable results for the current architecture baseline and current implementation SHA.
 
-The [2026-08-31 alignment audit](architecture-alignment-audit.md) records current source findings and bounded tests, not stage acceptance. Known gaps include collection working directories/error propagation, hardcoded manifest schemaVersion, incomplete provenance/profile validation, and Playwright trace/security flags. Until fixed and verified, script exit status or an existing PASS field alone is insufficient for Freeze acceptance.
+The [2026-08-31 alignment audit](architecture-alignment-audit.md) records the pre-fix source baseline, not living status. Subsequent fixes and exact executed/unexecuted lanes are recorded only in execution progress. A script exit status or stored PASS field alone remains insufficient for Freeze acceptance.
 
 ## 11. TDD cycle
 

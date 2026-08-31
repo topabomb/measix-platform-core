@@ -14,6 +14,7 @@ import { h } from 'vue'
 import ResourcesPage from './ResourcesPage.vue'
 import { useSessionStore } from '../stores/session'
 import { useDraftStore } from '../stores/draft'
+import { useResourceDiff } from '../composables/useResourceDiff'
 import * as client from '../api/client'
 
 function mountResourcesPage() {
@@ -99,15 +100,40 @@ describe('ResourcesPage', () => {
     })
   })
 
-  it('renders five resource tabs: Models, TTS, ASR, MCP, Policy', async () => {
+  it('renders all resource and experience tabs', async () => {
     const { wrapper, pinia } = mountResourcesPage()
     setupSession(pinia)
     await flushPromises()
 
     const tabs = wrapper.findAllComponents(QTab).map((t) => String(t.props('name')))
-    for (const expected of ['overview', 'models', 'tts', 'asr', 'mcp', 'policy']) {
+    for (const expected of ['overview', 'models', 'tts', 'asr', 'mcp', 'assistants', 'policy']) {
       expect(tabs).toContain(expected)
     }
+  })
+
+  it('authors assistant seeds and starters in the shared draft workflow', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+    await switchTab(wrapper, 'assistants')
+    await wrapper.get('[data-cy="assistant-add"]').trigger('click')
+    const assistant = draft.localContent!.assistants![0]!
+    expect(assistant.assistantDefinitionId).toMatch(/^asd_/)
+    expect(assistant.memorySeed).toEqual([])
+    await wrapper.get('[data-cy="assistant-name"]').setValue('Inspector')
+    await wrapper.get('[data-cy="seed-add"]').trigger('click')
+    await wrapper.get('[data-cy="seed-input-0"]').setValue('first memory')
+    await wrapper.get('[data-cy="seed-add"]').trigger('click')
+    await wrapper.get('[data-cy="seed-input-1"]').setValue('second memory')
+    await wrapper.get('[data-cy="seed-up-1"]').trigger('click')
+    expect(assistant.memorySeed).toEqual(['second memory', 'first memory'])
+    await wrapper.get('[data-cy="starter-add"]').trigger('click')
+    expect(draft.localContent!.starters![0]!.starterId).toMatch(/^str_/)
+    expect(draft.localContent!.starters![0]!.assistantDefinitionId).toBe(assistant.assistantDefinitionId)
+    expect(useResourceDiff(draft).reviewTotalChanges.value).toBe(2)
+    expect(draft.dirty).toBe(true)
+    wrapper.unmount()
   })
 
   it('can add a TTS resource through the Add button', async () => {

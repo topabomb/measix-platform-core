@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"measix/platform/ent/session"
+	"measix/platform/pkg/platformid"
+	"strings"
 
 	"measix/platform/ent"
 	"measix/platform/ent/activation"
@@ -72,7 +75,7 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 				return nil, err
 			}
 		}
-		return nil, nil
+		return s.reconcileSessionDenies(ctx, managed.DesiredControlRevision)
 	}
 	if !status.Ready || status.AppliedControlRevision < int(managed.DesiredControlRevision) {
 		if err := s.rehydrateActive(ctx, int(managed.ActiveManagedGeneration), int(managed.DesiredControlRevision), stringPointer(managed.DesiredBundleHash)); err != nil {
@@ -226,16 +229,16 @@ func (s *Service) rehydrateActive(ctx context.Context, generation, revision int,
 	if expectedHash == "" {
 		return fmt.Errorf("desired runtime state cannot be reconstructed")
 	}
-	content, err := s.activeReleaseContent(ctx)
+	row, err := s.Client.Activation.Query().Where(activation.ControlRevisionEQ(int64(revision)), activation.BundleHashEQ(expectedHash), activation.StateEQ("COMPLETED")).Only(ctx)
 	if err != nil {
 		return err
 	}
-	state, err := s.compileOperationalState(ctx, content, generation, revision, nil)
+	state, err := s.stateFromActivationDescriptor(ctx, row)
 	if err != nil {
 		return err
 	}
 	hash, err := relaystate.HashDescriptor(state)
-	if err != nil || string(hash) != expectedHash {
+	if err != nil || string(hash) != expectedHash || state.ActiveManagedGeneration != generation {
 		return ErrRelayDiverged
 	}
 	state.BundleHash = hash
@@ -270,4 +273,37 @@ func stringPointer(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+// The Session row is the durable revoke intent. Never mutate a committed bundle
+// in place; project missing denies through the normal single-activation barrier.
+func (s *Service) reconcileSessionDenies(ctx context.Context, revision int64) (*ActivationResult, error) {
+	row, err := s.Client.Activation.Query().Where(activation.ControlRevisionEQ(revision), activation.StateEQ("COMPLETED")).Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var descriptor relaycontrolapi.RuntimeControlState
+	if err := json.Unmarshal(row.TargetDescriptorJSON, &descriptor); err != nil {
+		return nil, err
+	}
+	q := s.Client.Session.Query().Where(session.ChannelEQ("ANDROID"), session.StatusEQ("REVOKED"))
+	if len(descriptor.PrincipalState.RevokedSessionIds) > 0 {
+		q = q.Where(session.IDNotIn(descriptor.PrincipalState.RevokedSessionIds...))
+	}
+	pending, err := q.Order(ent.Asc(session.FieldID)).First(ctx)
+	if ent.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	key := "idem_" + strings.TrimPrefix(pending.ID, "ses_")
+	if platformid.Validate(platformid.Idempotency, key) != nil {
+		return nil, fmt.Errorf("invalid persisted session id")
+	}
+	result, err := s.securityChange(ctx, pending.UserID, key, string(securitySessionRevoke), pending.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }

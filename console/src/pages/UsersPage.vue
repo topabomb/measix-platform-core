@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import { cursorPath, fetchAllPages } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -16,13 +17,23 @@ const { t: $t } = useI18n()
 type User = components['schemas']['User']
 type UserPage = components['schemas']['UserPage']
 type Device = components['schemas']['Device']
-type DevicePage = components['schemas']['DevicePage']
 type Enrollment = components['schemas']['CreateEnrollmentResponse']
 type Activation = components['schemas']['Activation']
 
 const session = useSessionStore()
 const activation = useActivationStore()
 const users = ref<User[]>([])
+const nextCursor = ref<string>()
+async function loadMore() {
+  if (!nextCursor.value || loading.value) return
+  loading.value = true
+  try {
+    const page = await apiFetch<UserPage>(cursorPath('/api/admin/v1/users?limit=200', nextCursor.value))
+    users.value.push(...page.items)
+    nextCursor.value = page.nextCursor
+  } catch (cause) { error.value = cause } finally { loading.value = false }
+}
+
 const devices = ref<Device[]>([])
 const selected = ref<User>()
 const loading = ref(false)
@@ -38,7 +49,9 @@ async function refresh() {
   loading.value = true
   error.value = undefined
   try {
-    users.value = (await apiFetch<UserPage>('/api/admin/v1/users?limit=200')).items
+    const page = await apiFetch<UserPage>('/api/admin/v1/users?limit=200')
+    users.value = page.items
+    nextCursor.value = page.nextCursor
   } catch (cause) {
     error.value = cause
   } finally {
@@ -64,7 +77,7 @@ async function openUser(user: User) {
   detailOpen.value = true
   error.value = undefined
   try {
-    devices.value = (await apiFetch<DevicePage>(`/api/admin/v1/users/${encodeURIComponent(user.userId)}/devices?limit=200`)).items
+    devices.value = await fetchAllPages<Device>(`/api/admin/v1/users/${encodeURIComponent(user.userId)}/devices?limit=200`)
   } catch (cause) {
     error.value = cause
   }
@@ -102,7 +115,7 @@ async function createEnrollment() {
 
 async function runSecurity(path: string) {
   if (!session.csrfToken) return
-  const key = activation.beginCommand('SECURITY_CHANGE')
+  const key = activation.beginCommand('SECURITY_CHANGE', path)
   error.value = undefined
   try {
     const result = await apiFetch<Activation>(path, { method: 'POST', headers: { 'Idempotency-Key': key } }, session.csrfToken)
@@ -122,14 +135,17 @@ async function toggleUser() {
   if (!selected.value) return
   const action = selected.value.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')
   if (!window.confirm($t('users.disableConfirm', { action, name: selected.value.displayName }))) return
-  activation.resetCommand()
   await runSecurity(`/api/admin/v1/users/${encodeURIComponent(selected.value.userId)}:${action === $t('common.disable') ? 'disable' : 'enable'}`)
 }
 
 async function revokeDevice(device: Device) {
   if (!window.confirm($t('users.revokeConfirm', { device: device.deviceId }))) return
-  activation.resetCommand()
   await runSecurity(`/api/admin/v1/devices/${encodeURIComponent(device.deviceId)}:revoke`)
+}
+
+async function copyEnrollment() {
+  if (!enrollment.value) return
+  try { await navigator.clipboard.writeText(enrollment.value.code) } catch (cause) { error.value = cause }
 }
 
 onMounted(refresh)
@@ -190,10 +206,11 @@ onMounted(refresh)
     <q-dialog v-model="enrollmentOpen" @hide="clearEnrollment">
       <q-card v-if="enrollment" class="responsive-modal" style="max-width: 95vw"><q-card-section class="text-h6">{{ $t('users.enrollmentCode') }}</q-card-section><q-card-section>
         <q-banner class="bg-amber-1 q-mb-md rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
-        <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field"><template #append><q-btn flat dense icon="content_copy" @click="navigator.clipboard.writeText(enrollment!.code)" /></template></q-input>
+        <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field"><template #append><q-btn flat dense icon="content_copy" @click="copyEnrollment()" /></template></q-input>
         <div class="row justify-center q-mt-md"><div class="text-center"><div class="text-caption q-mb-xs">{{ $t('users.enrollmentQr') }}</div><canvas ref="qrCanvas" data-cy="enrollment-qr" /></div></div>
         <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ enrollment.expiresAt }}</div>
       </q-card-section><q-card-actions align="right"><q-btn color="primary" :label="$t('common.done')" v-close-popup /></q-card-actions></q-card>
     </q-dialog>
+    <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>

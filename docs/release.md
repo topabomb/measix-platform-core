@@ -51,15 +51,17 @@ The exact serialized manifest schema is implemented by the candidate/system harn
 
 ### Candidate draft, accepted Freeze and historical evidence
 
-`docs/s0-freeze-manifest.json` is generated evidence, not a planning/config file. Current tooling uses two phases: `freeze-manifest.mjs` writes a candidate with CAP-C7-002=NOT_EXECUTED; `replay-freeze.mjs` can update it after replay. Only the fully proven composition is an accepted Freeze. A candidate draft or historical record must never be presented as current acceptance.
+`docs/s0-freeze-manifest.json` is retained historical evidence, not a planning/config file. New candidates default to `.artifacts/s0-freeze-candidate.json`; writing is exclusive and refuses the historical tracked path. Existing candidate files require a different explicitly selected output path, not overwrite. A draft with CAP-C7-002=NOT_EXECUTED is never a Freeze.
 
-Both scripts can write the tracked manifest path. Run candidate generation in an isolated candidate checkout, preserve existing historical records/artifacts and do not overwrite a known baseline during ordinary development. A future packaging change should separate candidate output from immutable accepted evidence. If any pinned source/build/contract identity changes, rerun the required gate for the new composition.
+`freeze-manifest.mjs --validate --candidate --manifest <path>` validates candidate pins without accepting pending replay as final. Final validation additionally requires independent clean-source/runtime replay evidence. `replay-freeze.mjs --runtime-only --manifest <path>` records only fresh-runtime diagnostics and never mutates the manifest; invocation as full clean replay fails closed. If source/build/contract changes, rerun the required gate on the new composition.
 
 The retained manifest declares architecture `cc60f8f540d309f2b73228094c8b9cd1b0b0a60f`, core `a6075bc0afd78fa86d77e1a520f838c954c9adfa`, Snapshot v1. The 2026-08-31 audit did not replay/fully validate its external artifact chain; neither its presence nor declared PASS proves current HEAD or later stages.
 
 ### Current tooling limitations
 
-See [the source-backed audit](architecture-alignment-audit.md), A14–A15. Collection Make recipes have working-directory/error-propagation defects; the writer hardcodes schemaVersion=1 while the current compiler emits v2; validation does not check the complete input/provenance chain. Replay creates a fresh runtime but does not establish an independent clean source checkout/rebuild of all pinned assets. Real qualification's top-level VERIFIED does not imply every required capability profile was exercised. Do not present `make freeze-gate`, `--validate` or `clean-replay` as complete proven acceptance until these gaps are repaired and tested.
+The writer validates current source/architecture cleanliness and identity, production build, four OpenAPI hashes, fixture/schema/Adapter pins, complete required scenario results, and every artifact plus metadata hash/exit/source. Qualification requires all four profiles in one run, each with observed adapter version, upstream/config revision, transport and forwarded usage evidence; unknown identity or an unexecuted profile fails. Partial diagnostic runs cannot be merged into qualification. Declared NONE/LEVEL_0 is not semantic Usage/header-echo qualification.
+
+Two deliberate boundaries remain: this CAP manifest compiler is S0.1-only and rejects current Snapshot v2 instead of relabeling it v1; independent clean-source checkout/rebuild/replay is not implemented. Runtime-only evidence cannot finalize CAP-C7-002. S0.2 needs its own ERX/consumer evidence schema and gate. Therefore `make freeze-gate` is not a working current S0.2 promotion path. The audit is historical; living completion/verification status is in [execution progress](s0-execution-progress.md).
 
 ## 3. S0.2/S0.3/S0.4 candidates
 

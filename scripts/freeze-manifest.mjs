@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   resolveRoot,
@@ -20,8 +21,7 @@ const ADMIN_OPENAPI = join(ROOT, 'api', 'admin', 'admin.openapi.yaml')
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
 const ARCH_REPO = resolve(ROOT, '..', 'measix-architecture')
 const SCENARIO_DEFS = JSON.parse(readFileSync(join(ROOT, 'scripts', 'scenario-definitions.json'), 'utf-8'))
-const isCleanReplay = process.argv.includes('--clean-replay')
-const isValidate = process.argv.includes('--validate')
+
 
 // Local-only: fixtures hash (not shared with harness.mjs)
 function fixturesHash() {
@@ -182,8 +182,8 @@ function compileScenarioResults() {
     } else if (s.id === 'CAP-C7-002') {
       // Two-phase freeze: candidate manifest writes NOT_EXECUTED.
       // After clean replay passes, the final manifest writes PASS.
-      // The replay-freeze.mjs script updates the manifest after successful replay.
-      result = isCleanReplay ? 'PASS' : 'NOT_EXECUTED'
+      // Current runtime-only replay cannot finalize this scenario.
+      result = 'NOT_EXECUTED'
     } else if (s.artifact && s.testNames.length > 0) {
       const artifact = artifacts[s.artifact]
       if (artifact instanceof Map) {
@@ -207,201 +207,119 @@ function compileScenarioResults() {
 
 // --- Provenance validation ---
 
-function validateArtifactProvenance(artifactName, currentCommit) {
+
+export function qualificationVerified(artifact) {
+  return artifact?.status === 'VERIFIED' && ['model','tts','asr','mcp'].every(p => {
+    const row = artifact.profiles?.[p]
+    return row?.status === 'VERIFIED' && row.adapterName && row.adapterVersion && row.adapterVersion !== 'unknown'
+      && row.upstreamId && Number.isInteger(row.configRevision) && row.configRevision > 0
+      && row.usageRecordsCount > 0 && Array.isArray(row.transport) && row.transport.length > 0
+  })
+}
+
+export function validatePins(manifest, facts, definitions = SCENARIO_DEFS, allowPendingReplay = false) {
   const errors = []
-  const metaPath = join(ARTIFACTS_DIR, artifactName + '.meta.json')
-
-  // Try meta.json first (the new provenance envelope)
-  const meta = loadMetaArtifact(artifactName)
-  if (meta) {
-    // Verify meta commit matches current commit
-    if (meta.platformCoreCommit && meta.platformCoreCommit !== currentCommit) {
-      errors.push(`Artifact ${artifactName} meta commit mismatch: meta=${meta.platformCoreCommit} current=${currentCommit}`)
-    }
-
-    // Verify SHA-256 of the artifact matches meta's artifactSha256
-    const artifactPath = join(ARTIFACTS_DIR, artifactName)
-    if (existsSync(artifactPath) && meta.artifactSha256) {
-      const actualSha = 'sha256:' + createHash('sha256').update(readFileSync(artifactPath)).digest('hex')
-      if (actualSha !== meta.artifactSha256) {
-        errors.push(`Artifact ${artifactName} SHA mismatch: meta=${meta.artifactSha256} actual=${actualSha}`)
-      }
-    }
-
-    // Verify exit code — a non-zero exit code means the test command failed
-    // but the artifact file was still written (partial output). This must
-    // be treated as a failure.
-    if (meta.exitCode !== undefined && meta.exitCode !== 0) {
-      errors.push(`Artifact ${artifactName} was generated with non-zero exit code ${meta.exitCode}. Test command failed.`)
-    }
-  } else {
-    // Fall back to legacy: check if artifact is JSON with embedded commit field
-    const artifact = loadJsonArtifact(artifactName)
-    if (artifact && !artifact._error) {
-      if (artifact.commit && artifact.commit !== currentCommit) {
-        errors.push(`Artifact ${artifactName} was generated for commit ${artifact.commit} but current commit is ${currentCommit}`)
-      }
-    }
-    // For NDJSON artifacts (Go test -json), there's no commit field;
-    // meta.json is the only way to provenance them. Warn if missing.
-    if (artifactName.endsWith('.json') && !artifactName.includes('static-contract') &&
-        !artifactName.includes('resource-baseline') && !artifactName.includes('real-adapter') &&
-        !artifactName.includes('e2e-playwright')) {
-      // Go NDJSON artifacts need meta.json
-      const artifactPath = join(ARTIFACTS_DIR, artifactName)
-      if (existsSync(artifactPath) && !meta) {
-        errors.push(`Artifact ${artifactName} has no meta.json provenance envelope. Run collect-artifacts with meta generation.`)
-      }
-    }
+  for (const [field, expected] of Object.entries(facts)) {
+    if (manifest[field] !== expected) errors.push(field + ' mismatch')
   }
-
+  if (manifest.workingTreeDirty !== false || manifest.architectureRepoDirty !== false) errors.push('Manifest source was dirty or unknown')
+  const rows = manifest.scenarioResults
+  if (!Array.isArray(rows)) return [...errors, 'Missing scenarioResults']
+  if (rows.length !== definitions.length || new Set(rows.map(s => s.id)).size !== rows.length) errors.push('Scenario set mismatch')
+  for (const definition of definitions) {
+    const row = rows.find(s => s.id === definition.id)
+    if (!row || row.required !== definition.required) { errors.push('Missing/altered scenario ' + definition.id); continue }
+    if (definition.required && row.result !== 'PASS' && !(allowPendingReplay && row.id === 'CAP-C7-002' && row.result === 'NOT_EXECUTED')) errors.push('Scenario not PASS: ' + definition.id)
+  }
   return errors
 }
 
-// --- Validate mode ---
-if (isValidate) {
-  const manifestPath = join(ROOT, 'docs', 's0-freeze-manifest.json')
-  if (!existsSync(manifestPath)) { console.error('ERROR: docs/s0-freeze-manifest.json does not exist'); process.exit(1) }
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'))
-  const errors = []
-  const currentCommit = gitCommit(ROOT)
-  const archCommit = gitCommit(ARCH_REPO)
-  if (manifest.platformCoreCommit !== currentCommit) errors.push(`platformCoreCommit mismatch: manifest=${manifest.platformCoreCommit} current=${currentCommit}`)
-  if (manifest.architectureCommit !== archCommit) errors.push(`architectureCommit mismatch: manifest=${manifest.architectureCommit} current=${archCommit}`)
-  if (manifest.adminBuildHash !== adminBuildHash(ROOT)) errors.push('adminBuildHash mismatch — rebuild required')
-  const notPass = manifest.scenarioResults.filter(s => s.required && s.result !== 'PASS')
-  if (notPass.length > 0) { errors.push(`${notPass.length} required scenarios are not PASS:`); for (const s of notPass) errors.push(`  ${s.id} ${s.name}: ${s.result}`) }
-  if (errors.length > 0) { console.error('ERROR: Manifest validation failed:'); for (const e of errors) console.error(`  ${e}`); process.exit(1) }
-  console.log('Manifest validation: PASS')
-  process.exit(0)
-}
-
-// --- Clean replay mode ---
-// This is now a manifest validation only. For real clean-environment replay,
-// use scripts/replay-freeze.mjs (via `make clean-replay`).
-if (isCleanReplay) {
-  const manifestPath = join(ROOT, 'docs', 's0-freeze-manifest.json')
-  if (!existsSync(manifestPath)) { console.error('ERROR: docs/s0-freeze-manifest.json does not exist. Generate it first.'); process.exit(1) }
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'))
-  const errors = []
-  const currentCommit = gitCommit(ROOT)
-  const archCommit = gitCommit(ARCH_REPO)
-  if (manifest.platformCoreCommit !== currentCommit) errors.push(`platformCoreCommit mismatch: manifest=${manifest.platformCoreCommit} current=${currentCommit}`)
-  if (manifest.architectureCommit !== archCommit) errors.push(`architectureCommit mismatch: manifest=${manifest.architectureCommit} current=${archCommit}`)
-  if (manifest.adminBuildHash !== adminBuildHash(ROOT)) errors.push('adminBuildHash mismatch — rebuild required')
-  for (const s of manifest.scenarioResults) { if (s.required && s.result !== 'PASS') errors.push(`  ${s.id} ${s.name}: ${s.result}`) }
-  if (manifest.realAdapterQualificationStatus !== 'VERIFIED') errors.push(`realAdapterQualificationStatus is ${manifest.realAdapterQualificationStatus}, expected VERIFIED`)
-  if (manifest.resourceBaselineStatus !== 'GREEN') errors.push(`resourceBaselineStatus is ${manifest.resourceBaselineStatus}, expected GREEN`)
-  if (errors.length > 0) { console.error('ERROR: Clean replay manifest validation failed:'); for (const e of errors) console.error(`  ${e}`); process.exit(1) }
-  console.log('Clean replay manifest validation: PASS')
-  console.log('NOTE: For full clean-environment replay, run: make clean-replay')
-  process.exit(0)
-}
-
-// --- Pre-flight checks ---
-const errors = []
-const warnings = []
-
-if (gitDirty(ROOT)) errors.push('Working tree is dirty. Commit or stash changes before generating freeze manifest.')
-if (gitDirty(ARCH_REPO)) errors.push('Architecture repo is dirty. This may cause SHA mismatch.')
-
-const archCommit = gitCommit(ARCH_REPO)
-// Per audit P2-1: do not hardcode an architecture commit. Instead, record the
-// architecture commit in the manifest so that freeze-validate can verify the
-// correct architecture commit is checked out at validation time. The expected
-// architecture commit is implicitly the one shipped with this platform-core
-// commit (they are version-coupled).
-
-const buildHash = adminBuildHash(ROOT)
-if (buildHash === 'not-built') errors.push('Admin production build not found. Run "make console-build" before generating freeze manifest.')
-
-const scenarioResults = compileScenarioResults()
-
-const notPassRequired = scenarioResults.filter(s => s.required && s.result !== 'PASS' && !s.id.startsWith('CAP-C7-'))
-if (notPassRequired.length > 0) {
-  errors.push(`${notPassRequired.length} required scenarios are not PASS:`)
-  for (const s of notPassRequired) errors.push(`  ${s.id} ${s.name}: ${s.result}`)
-}
-
-const realAdapterArtifact = loadJsonArtifact('real-adapter-qualification.json')
-let realAdapterStatus = 'NOT_EXECUTED'
-if (realAdapterArtifact) realAdapterStatus = realAdapterArtifact.status || 'NOT_EXECUTED'
-if (realAdapterStatus !== 'VERIFIED') {
-  errors.push(`Real adapter qualification status is ${realAdapterStatus}, expected VERIFIED. Run scripts/collect-adapter-qualification.mjs with a real endpoint.`)
-}
-// Per architecture: freeze must verify that no profile is FAILED.
-// MODEL profile must be VERIFIED. TTS/ASR/MCP are optional — NOT_EXECUTED
-// is acceptable when the profile was not configured. Only FAILED is blocking.
-if (realAdapterArtifact && realAdapterArtifact.profiles) {
-  const REQUIRED_QUAL_PROFILES = ['model', 'tts', 'asr', 'mcp']
-  for (const p of REQUIRED_QUAL_PROFILES) {
-    const ps = realAdapterArtifact.profiles[p]
-    const status = ps ? ps.status : 'MISSING'
-    if (status === 'FAILED' || status === 'MISSING') {
-      errors.push(`Real adapter qualification profile '${p}' is ${status}, expected VERIFIED or NOT_EXECUTED.`)
-    }
-  }
-  // MODEL must be VERIFIED (required profile)
-  const modelStatus = realAdapterArtifact.profiles.model?.status
-  if (modelStatus !== 'VERIFIED') {
-    errors.push(`Real adapter qualification profile 'model' must be VERIFIED, got ${modelStatus || 'MISSING'}.`)
+const artifactNames = ['backend-test.json','system-test.json','console-test.json','candidate-test.json','e2e-playwright.json','static-contract.json','resource-baseline.json','real-adapter-qualification.json']
+function byteHash(path) { return 'sha256:' + createHash('sha256').update(readFileSync(path)).digest('hex') }
+function sourceFacts() {
+  const source = readFileSync(join(ROOT,'backend/internal/hub/capability/snapshot.go'),'utf8')
+  const version = source.match(/const CurrentSnapshotSchemaVersion = (\d+)/)?.[1]
+  if (!version) throw new Error('Cannot determine live Snapshot compiler schema')
+  return {
+    platformCoreCommit: gitCommit(ROOT), architectureCommit: gitCommit(ARCH_REPO),
+    snapshotSchemaVersion: Number(version), adminBuildHash: adminBuildHash(ROOT),
+    clientControlOpenApiHash: sha256File(CLIENT_OPENAPI), adminOpenApiHash: sha256File(ADMIN_OPENAPI),
+    relayControlOpenApiHash: sha256File(join(ROOT,'api/internal/relay-control.openapi.yaml')),
+    usageIngestOpenApiHash: sha256File(join(ROOT,'api/internal/usage-ingest.openapi.yaml')),
+    canonicalFixtureHash: fixturesHash(), deterministicAdapterVersion: deterministicAdapterVersion(ROOT),
   }
 }
 
-const baselineArtifact = loadJsonArtifact('resource-baseline.json')
-let resourceBaselineStatus = 'NOT_GREEN'
-if (baselineArtifact) resourceBaselineStatus = baselineArtifact.status || 'NOT_GREEN'
-if (resourceBaselineStatus !== 'GREEN') {
-  errors.push(`Resource baseline is ${resourceBaselineStatus}. Run scripts/collect-baseline.mjs to measure.`)
+function evidenceChecks(facts) {
+  const errors = [], pins = {}
+  for (const name of artifactNames) {
+    const path = join(ARTIFACTS_DIR,name)
+    const meta = loadMetaArtifact(name)
+    if (!existsSync(path) || !meta) { errors.push(name + ': missing artifact/meta'); continue }
+    if (meta.platformCoreCommit !== facts.platformCoreCommit || meta.architectureCommit !== facts.architectureCommit) errors.push(name + ': source mismatch')
+    if (meta.workingTreeDirty !== false || meta.architectureRepoDirty !== false) errors.push(name + ': dirty/unknown source')
+    if (meta.exitCode !== 0) errors.push(name + ': command did not succeed')
+    if (meta.artifactSha256 !== byteHash(path)) errors.push(name + ': artifact hash mismatch')
+    pins[name] = { artifactSha256: byteHash(path), metaSha256: byteHash(path + '.meta.json') }
+  }
+  if (!qualificationVerified(loadJsonArtifact('real-adapter-qualification.json'))) errors.push('All four real adapter profiles must be VERIFIED')
+  if (loadJsonArtifact('resource-baseline.json')?.status !== 'GREEN') errors.push('Resource baseline must be GREEN')
+  return { errors, pins }
 }
 
-// Browser T4.1 Playwright evidence is REQUIRED
-const playwrightArtifact = loadJsonArtifact('e2e-playwright.json')
-if (!playwrightArtifact) {
-  errors.push('Browser T4.1 Playwright evidence (e2e-playwright.json) is missing. Run "make console-e2e" to generate it.')
+export function validateCandidate(manifest, { allowPendingReplay = false } = {}) {
+  const facts = sourceFacts()
+  const evidence = evidenceChecks(facts)
+  const errors = [...validatePins(manifest,facts,SCENARIO_DEFS,allowPendingReplay), ...evidence.errors]
+  if (gitDirty(ROOT) || gitDirty(ARCH_REPO)) errors.push('Current source checkout is dirty')
+  if (facts.adminBuildHash === 'not-built') errors.push('Admin production build missing')
+  if (facts.snapshotSchemaVersion !== 1) errors.push('This CAP runner is S0.1-only; live Snapshot v2 requires the ERX/S0.2 gate and cannot be relabeled v1')
+  for (const name of artifactNames) {
+    const pin = manifest.artifactPins?.[name], current = evidence.pins[name]
+    if (!pin || !current || pin.artifactSha256 !== current.artifactSha256 || pin.metaSha256 !== current.metaSha256) errors.push(name + ': manifest evidence pin mismatch')
+  }
+  const actual = compileScenarioResults()
+  for (const row of actual) {
+    if (row.required && !row.id.startsWith('CAP-C7-') && row.result !== 'PASS') errors.push('Artifact scenario not PASS: ' + row.id)
+  }
+  if (!allowPendingReplay) {
+    // Runtime-only replay is deliberately not accepted as clean-source C7 proof.
+    if (manifest.replayKind !== 'CLEAN_SOURCE_AND_RUNTIME') errors.push('Missing independently rebuilt clean-source replay')
+    const path = join(ARTIFACTS_DIR,'replay-artifact.json')
+    if (!existsSync(path) || manifest.replayArtifactHash !== byteHash(path)) errors.push('Missing/changed replay artifact')
+    const replay = loadJsonArtifact('replay-artifact.json')
+    if (replay?.status !== 'PASS' || replay?.replayKind !== 'CLEAN_SOURCE_AND_RUNTIME' || replay?.platformCoreCommit !== facts.platformCoreCommit || replay?.architectureCommit !== facts.architectureCommit) errors.push('Replay provenance mismatch')
+  }
+  return errors
 }
 
-const currentCommit = gitCommit(ROOT)
-
-// Validate provenance for all artifacts
-const artifactNames = ['backend-test.json', 'system-test.json', 'console-test.json', 'candidate-test.json', 'e2e-playwright.json', 'resource-baseline.json', 'real-adapter-qualification.json']
-for (const name of artifactNames) {
-  const provenanceErrors = validateArtifactProvenance(name, currentCommit)
-  errors.push(...provenanceErrors)
+function main() {
+  const startedAt = new Date().toISOString()
+  if (process.argv.includes('--clean-replay')) throw new Error('--clean-replay is not validation. An independent clean-source rebuild/replay is required; runtime replay alone cannot finalize C7.')
+  const index = process.argv.indexOf('--manifest')
+  const path = index < 0 ? join(ARTIFACTS_DIR,'s0-freeze-candidate.json') : resolve(process.argv[index + 1] ?? '')
+  if (path === join(ROOT,'docs','s0-freeze-manifest.json')) throw new Error('Historical tracked manifest is immutable; use an artifact candidate path')
+  if (process.argv.includes('--validate')) {
+    const manifest = JSON.parse(readFileSync(path,'utf8'))
+    const errors = validateCandidate(manifest,{allowPendingReplay:process.argv.includes('--candidate')})
+    if (errors.length) throw new Error(errors.join('\n'))
+    console.log('Manifest ' + (process.argv.includes('--candidate') ? 'candidate' : 'final') + ' validation: PASS')
+    return
+  }
+  const facts = sourceFacts(), evidence = evidenceChecks(facts)
+  const manifest = {
+    manifest:'measix-s0-client-contract-freeze', stage:'S0.1', ...facts,
+    workingTreeDirty:gitDirty(ROOT), architectureRepoDirty:gitDirty(ARCH_REPO),
+    realAdapterQualificationRef:'.artifacts/real-adapter-qualification.json', realAdapterQualificationStatus:loadJsonArtifact('real-adapter-qualification.json')?.status,
+    resourceBaselineRef:'.artifacts/resource-baseline.json', resourceBaselineStatus:loadJsonArtifact('resource-baseline.json')?.status,
+    artifactPins:evidence.pins, scenarioResults:compileScenarioResults(), startedAt, completedAt:new Date().toISOString(),
+  }
+  const errors = validateCandidate(manifest,{allowPendingReplay:true})
+  if (errors.length) throw new Error(errors.join('\n'))
+  mkdirSync(ARTIFACTS_DIR,{recursive:true})
+  writeFileSync(path,JSON.stringify(manifest,null,2)+'\n',{flag:'wx'})
+  console.log('Wrote candidate (not a Freeze): ' + relative(ROOT,path))
 }
-
-if (errors.length > 0) {
-  console.error('ERROR: Freeze manifest cannot be generated:')
-  for (const e of errors) console.error(`  ${e}`)
-  console.error('')
-  console.error('Fix the above issues before running this script.')
-  process.exit(1)
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try { main() } catch (error) { console.error(error.message); process.exitCode = 1 }
 }
-
-// --- Generate manifest ---
-const now = new Date().toISOString()
-const manifest = {
-  manifest: 'measix-s0-client-contract-freeze',
-  snapshotSchemaVersion: 1,
-  architectureCommit: archCommit,
-  architectureRepoDirty: gitDirty(ARCH_REPO),
-  platformCoreCommit: currentCommit,
-  workingTreeDirty: gitDirty(ROOT),
-  adminBuildHash: buildHash,
-  clientControlOpenApiHash: sha256File(CLIENT_OPENAPI),
-  adminOpenApiHash: sha256File(ADMIN_OPENAPI),
-  canonicalFixtureHash: fixturesHash(),
-  deterministicAdapterVersion: deterministicAdapterVersion(ROOT),
-  realAdapterQualificationRef: '.artifacts/real-adapter-qualification.json',
-  realAdapterQualificationStatus: realAdapterStatus,
-  resourceBaselineRef: '.artifacts/resource-baseline.json',
-  resourceBaselineStatus,
-  scenarioResults,
-  startedAt: now,
-  completedAt: now,
-}
-
-const outPath = join(ROOT, 'docs', 's0-freeze-manifest.json')
-writeFileSync(outPath, JSON.stringify(manifest, null, 2) + '\n')
-process.stdout.write(`wrote ${relative(ROOT, outPath)}\n`)
-process.stdout.write(JSON.stringify(manifest, null, 2) + '\n')

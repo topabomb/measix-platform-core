@@ -393,8 +393,9 @@ type Bootstrap struct {
 	} `json:"device"`
 	ManagedState ManagedState `json:"managedState"`
 	Session      struct {
-		ExpiresAt time.Time `json:"expiresAt"`
-		SessionId SessionId `json:"sessionId"`
+		ExpiresAt            time.Time `json:"expiresAt"`
+		SessionId            SessionId `json:"sessionId"`
+		SessionIdleExpiresAt time.Time `json:"sessionIdleExpiresAt"`
 	} `json:"session"`
 	SupportedSnapshotSchemaVersions []int `json:"supportedSnapshotSchemaVersions"`
 	User                            struct {
@@ -453,6 +454,7 @@ type EnrollmentExchangeResponse struct {
 	RefreshExpiresAt     time.Time    `json:"refreshExpiresAt"`
 	RefreshToken         string       `json:"refreshToken"`
 	SessionId            SessionId    `json:"sessionId"`
+	SessionIdleExpiresAt time.Time    `json:"sessionIdleExpiresAt"`
 	UserId               UserId       `json:"userId"`
 }
 
@@ -477,13 +479,13 @@ type EnterpriseUpdateId = string
 
 // EnterpriseUpdateItem defines model for EnterpriseUpdateItem.
 type EnterpriseUpdateItem struct {
-	Category      EnterpriseUpdateCategory      `json:"category"`
-	Content       string                        `json:"content"`
-	ContentFormat EnterpriseUpdateContentFormat `json:"contentFormat"`
-	PublishedAt   time.Time                     `json:"publishedAt"`
-	Severity      EnterpriseUpdateSeverity      `json:"severity"`
-	Title         string                        `json:"title"`
-	UpdateId      EnterpriseUpdateId            `json:"updateId"`
+	Category           EnterpriseUpdateCategory      `json:"category"`
+	Content            string                        `json:"content"`
+	ContentFormat      EnterpriseUpdateContentFormat `json:"contentFormat"`
+	EnterpriseUpdateId EnterpriseUpdateId            `json:"enterpriseUpdateId"`
+	PublishedAt        time.Time                     `json:"publishedAt"`
+	Severity           EnterpriseUpdateSeverity      `json:"severity"`
+	Title              string                        `json:"title"`
 }
 
 // EnterpriseUpdateSeverity defines model for EnterpriseUpdateSeverity.
@@ -659,6 +661,9 @@ type RefreshRequest struct {
 type RefreshResponse struct {
 	AccessToken          string    `json:"accessToken"`
 	AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+	RefreshExpiresAt     time.Time `json:"refreshExpiresAt"`
+	RefreshToken         string    `json:"refreshToken"`
+	SessionIdleExpiresAt time.Time `json:"sessionIdleExpiresAt"`
 }
 
 // ReleaseId defines model for ReleaseId.
@@ -740,8 +745,8 @@ type ValidationIssueSeverity string
 
 // ListEnterpriseUpdatesParams defines parameters for ListEnterpriseUpdates.
 type ListEnterpriseUpdatesParams struct {
-	StartDate   *openapi_types.Date `form:"start_date,omitempty" json:"start_date,omitempty"`
-	EndDate     *openapi_types.Date `form:"end_date,omitempty" json:"end_date,omitempty"`
+	StartDate   *openapi_types.Date `form:"startDate,omitempty" json:"startDate,omitempty"`
+	EndDate     *openapi_types.Date `form:"endDate,omitempty" json:"endDate,omitempty"`
 	Limit       *int                `form:"limit,omitempty" json:"limit,omitempty"`
 	IfNoneMatch *string             `json:"If-None-Match,omitempty"`
 }
@@ -754,6 +759,11 @@ type GetManagedSnapshotParams struct {
 // GetManagedStateParams defines parameters for GetManagedState.
 type GetManagedStateParams struct {
 	XMeasixAppliedManagedGeneration *int `json:"X-Measix-Applied-Managed-Generation,omitempty"`
+}
+
+// RefreshSessionParams defines parameters for RefreshSession.
+type RefreshSessionParams struct {
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
 // ExchangeEnrollmentJSONRequestBody defines body for ExchangeEnrollment for application/json ContentType.
@@ -793,7 +803,7 @@ type ServerInterface interface {
 	LogoutSession(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/client/v1/sessions/refresh)
-	RefreshSession(w http.ResponseWriter, r *http.Request)
+	RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -841,7 +851,7 @@ func (_ Unimplemented) LogoutSession(w http.ResponseWriter, r *http.Request) {
 }
 
 // (POST /api/client/v1/sessions/refresh)
-func (_ Unimplemented) RefreshSession(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -905,28 +915,28 @@ func (siw *ServerInterfaceWrapper) ListEnterpriseUpdates(w http.ResponseWriter, 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListEnterpriseUpdatesParams
 
-	// ------------- Optional query parameter "start_date" -------------
+	// ------------- Optional query parameter "startDate" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "start_date", r.URL.Query(), &params.StartDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "startDate", r.URL.Query(), &params.StartDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "start_date"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "startDate"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "start_date", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "startDate", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "end_date" -------------
+	// ------------- Optional query parameter "endDate" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "end_date", r.URL.Query(), &params.EndDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "endDate", r.URL.Query(), &params.EndDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "end_date"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "endDate"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "end_date", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "endDate", Err: err})
 		}
 		return
 	}
@@ -1110,8 +1120,39 @@ func (siw *ServerInterfaceWrapper) LogoutSession(w http.ResponseWriter, r *http.
 // RefreshSession operation middleware
 func (siw *ServerInterfaceWrapper) RefreshSession(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RefreshSessionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RefreshSession(w, r)
+		siw.Handler.RefreshSession(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

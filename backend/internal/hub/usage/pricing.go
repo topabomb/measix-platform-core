@@ -20,7 +20,7 @@ type Completeness string
 const (
 	CompletenessUnknown  Completeness = "UNKNOWN"
 	CompletenessPartial  Completeness = "PARTIAL"
-	CompletenessComplete Completeness = "COMPLETE"
+	CompletenessComplete Completeness = "EXACT"
 )
 
 type CostState string

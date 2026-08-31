@@ -35,7 +35,7 @@ func TestERXUPD001DraftToPublishMakesItemClientVisible(t *testing.T) {
 		t.Fatalf("expected DRAFT, got %s", created.Status)
 	}
 	// Before publish, ListPublished should return nothing
-	items, _, err := svc.ListPublished(ctx, nil, nil, 10)
+	items, _, _, err := svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestERXUPD001DraftToPublishMakesItemClientVisible(t *testing.T) {
 		t.Fatal("publishedAt should be set after publish")
 	}
 	// After publish, ListPublished should return 1 item
-	items, _, err = svc.ListPublished(ctx, nil, nil, 10)
+	items, _, _, err = svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestERXUPD002WithdrawRemovesItemFromPublished(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Verify it's visible
-	items, _, err := svc.ListPublished(ctx, nil, nil, 10)
+	items, _, _, err := svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil || len(items) != 1 {
 		t.Fatalf("expected 1 published item, got %d, err=%v", len(items), err)
 	}
@@ -87,7 +87,7 @@ func TestERXUPD002WithdrawRemovesItemFromPublished(t *testing.T) {
 		t.Fatalf("expected WITHDRAWN, got %s", withdrawn.Status)
 	}
 	// After withdraw, ListPublished should return 0 items
-	items, _, err = svc.ListPublished(ctx, nil, nil, 10)
+	items, _, _, err = svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestERXUPD003FeedRevisionChangesButIndependentFromGeneration(t *testing.T) 
 		t.Fatalf("feed revision should increase: rev1=%d rev2=%d", rev1, rev2)
 	}
 	// List should return both items
-	items, latestRev, err := svc.List(ctx, 100)
+	items, latestRev, err := svc.List(ctx, 100, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestERXUPD004OnlyPublishedOrderedNewestFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	// ListPublished should return 2 items, newest first
-	items, _, err := svc.ListPublished(ctx, nil, nil, 10)
+	items, _, _, err := svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestERXB001NoDatesDefaultLimit10(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	items, truncated, err := svc.ListPublished(ctx, nil, nil, 10)
+	items, truncated, _, err := svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestERXB002NoDatesLimitN(t *testing.T) {
 		item, _ := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		svc.Publish(ctx, item.ID)
 	}
-	items, truncated, err := svc.ListPublished(ctx, nil, nil, 3)
+	items, truncated, _, err := svc.ListPublished(ctx, nil, nil, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestERXB002NoDatesLimitN(t *testing.T) {
 		t.Fatal("expected truncated=true")
 	}
 	// limit 10 with exactly 10 items should not be truncated
-	items, truncated, err = svc.ListPublished(ctx, nil, nil, 10)
+	items, truncated, _, err = svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,12 +244,12 @@ func TestERXB002NoDatesLimitN(t *testing.T) {
 func TestERXB007InvalidLimitRejected(t *testing.T) {
 	svc, ctx, _ := setupService(t)
 	// limit 0
-	_, _, err := svc.ListPublished(ctx, nil, nil, 0)
+	_, _, _, err := svc.ListPublished(ctx, nil, nil, 0)
 	if err != enterpriseupdate.ErrInvalidLimit {
 		t.Fatalf("expected ErrInvalidLimit for limit=0, got %v", err)
 	}
 	// limit > 20
-	_, _, err = svc.ListPublished(ctx, nil, nil, 21)
+	_, _, _, err = svc.ListPublished(ctx, nil, nil, 21)
 	if err != enterpriseupdate.ErrInvalidLimit {
 		t.Fatalf("expected ErrInvalidLimit for limit=21, got %v", err)
 	}
@@ -262,7 +262,7 @@ func TestERXB009OverflowSetsTruncated(t *testing.T) {
 		item, _ := svc.Create(ctx, adminID, "Title", "Content", "PLAIN", "NOTICE", "INFO")
 		svc.Publish(ctx, item.ID)
 	}
-	items, truncated, err := svc.ListPublished(ctx, nil, nil, 3)
+	items, truncated, _, err := svc.ListPublished(ctx, nil, nil, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +380,7 @@ func TestListPublishedDateFiltering(t *testing.T) {
 	}
 	// start only: from Aug 27 onwards
 	start := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
-	result, _, err := svc.ListPublished(ctx, &start, nil, 10)
+	result, _, _, err := svc.ListPublished(ctx, &start, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +389,7 @@ func TestListPublishedDateFiltering(t *testing.T) {
 	}
 	// end only: up to Aug 27
 	end := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
-	result, _, err = svc.ListPublished(ctx, nil, &end, 10)
+	result, _, _, err = svc.ListPublished(ctx, nil, &end, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +397,7 @@ func TestListPublishedDateFiltering(t *testing.T) {
 		t.Fatalf("expected 2 items up to Aug 27, got %d", len(result))
 	}
 	// both dates: Aug 27 only (inclusive range)
-	result, _, err = svc.ListPublished(ctx, &start, &end, 10)
+	result, _, _, err = svc.ListPublished(ctx, &start, &end, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +424,7 @@ func TestERXB003StartOnlyReturnsStartDateThroughToday(t *testing.T) {
 	}
 	// start only: from Aug 27 onwards — should return Aug 27 and Aug 28
 	start := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
-	result, _, err := svc.ListPublished(ctx, &start, nil, 10)
+	result, _, _, err := svc.ListPublished(ctx, &start, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func TestERXB004EndOnlyReturnsLatestUpToEndDate(t *testing.T) {
 	}
 	// end only: up to Aug 26 (inclusive) — should return Aug 25 and Aug 26
 	end := time.Date(2026, 8, 26, 0, 0, 0, 0, time.UTC)
-	result, _, err := svc.ListPublished(ctx, nil, &end, 10)
+	result, _, _, err := svc.ListPublished(ctx, nil, &end, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -485,7 +485,7 @@ func TestERXB005BothDatesInclusiveClosedInterval(t *testing.T) {
 	// both dates: [Aug 26, Aug 27] inclusive — should return Aug 26 and Aug 27
 	start := time.Date(2026, 8, 26, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
-	result, _, err := svc.ListPublished(ctx, &start, &end, 10)
+	result, _, _, err := svc.ListPublished(ctx, &start, &end, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +499,7 @@ func TestERXB006StartAfterEndReturnsInvalidArgument(t *testing.T) {
 	svc, ctx, _ := setupService(t)
 	start := time.Date(2026, 8, 28, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
-	_, _, err := svc.ListPublished(ctx, &start, &end, 10)
+	_, _, _, err := svc.ListPublished(ctx, &start, &end, 10)
 	if err != enterpriseupdate.ErrInvalidDateRange {
 		t.Fatalf("expected ErrInvalidDateRange for start > end, got %v", err)
 	}
@@ -524,7 +524,7 @@ func TestERXB008TimezoneAndNewestFirstOrdering(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	items, _, err := svc.ListPublished(ctx, nil, nil, 10)
+	items, _, _, err := svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -573,7 +573,7 @@ func TestERXB010OnlyPublishedContentVisible(t *testing.T) {
 	}
 
 	// ListPublished should only return the published item
-	items, _, err := svc.ListPublished(ctx, nil, nil, 10)
+	items, _, _, err := svc.ListPublished(ctx, nil, nil, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,7 +613,7 @@ func TestLatestFeedRevision(t *testing.T) {
 	if rev != firstPub.FeedRevision {
 		t.Fatalf("expected revision %d, got %d", firstPub.FeedRevision, rev)
 	}
-	// Create a DRAFT — it should have a higher revision and LatestFeedRevision should reflect it
+	// A private draft must not advance the public feed revision.
 	draftItem, err := svc.Create(ctx, adminID, "Draft", "Content", "PLAIN", "NOTICE", "INFO")
 	if err != nil {
 		t.Fatal(err)
@@ -623,8 +623,8 @@ func TestLatestFeedRevision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The draft's feed revision should be the latest
-	if rev <= firstPub.FeedRevision {
-		t.Fatalf("expected revision > %d after creating draft, got %d", firstPub.FeedRevision, rev)
+	// Only a publish/withdraw advances the public revision.
+	if rev != firstPub.FeedRevision {
+		t.Fatalf("expected unchanged revision %d after creating draft, got %d", firstPub.FeedRevision, rev)
 	}
 }

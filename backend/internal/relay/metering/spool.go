@@ -71,7 +71,7 @@ func (s *Spool) Due(ctx context.Context, now time.Time, limit int) ([]Row, error
 		return nil, fmt.Errorf("invalid spool limit")
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT seq,request_id,payload_json,attempt_count FROM request_usage_spool WHERE next_attempt_at IS NULL OR next_attempt_at<=? ORDER BY seq LIMIT ?`,
+		`SELECT seq,request_id,payload_json,attempt_count FROM request_usage_spool WHERE next_attempt_at IS NULL OR julianday(next_attempt_at)<=julianday(?) ORDER BY seq LIMIT ?`,
 		now.UTC().Format(time.RFC3339Nano), limit,
 	)
 	if err != nil {
@@ -148,7 +148,7 @@ func (s *Spool) Stats(ctx context.Context, now time.Time) (Stats, error) {
 	var oldest sql.NullString
 	var failed int
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*),MIN(created_at),COALESCE(SUM(CASE WHEN last_error_code IS NOT NULL THEN 1 ELSE 0 END),0) FROM request_usage_spool`,
+		`SELECT COUNT(*),(SELECT created_at FROM request_usage_spool ORDER BY julianday(created_at),seq LIMIT 1),COALESCE(SUM(CASE WHEN last_error_code IS NOT NULL THEN 1 ELSE 0 END),0) FROM request_usage_spool`,
 	).Scan(&count, &oldest, &failed); err != nil {
 		return Stats{}, err
 	}

@@ -455,12 +455,12 @@ func (g *goldenPathTest) exchangeEnrollmentAndBootstrap(ctx context.Context, hub
 	// Exchange enrollment to get a client access token
 	installationID := platformid.New(platformid.Installation)
 	resp, err := http.Post(hubBaseURL+"/api/client/v1/enrollments/exchange", "application/json",
-		strings.NewReader(fmt.Sprintf(`{"platform":"ANDROID","code":%q,"installationId":%q,"appVersion":"test-1.0"}`, enrollmentCode, installationID)))
+		strings.NewReader(fmt.Sprintf(`{"platform":"ANDROID","code":%q,"installationId":%q,"deviceName":"Test device","appVersion":"test-1.0"}`, enrollmentCode, installationID)))
 	if err != nil {
 		g.t.Fatalf("exchange enrollment: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusCreated {
 		body := harness.ReadBody(resp)
 		g.t.Fatalf("exchange enrollment status: %d body: %s", resp.StatusCode, body)
 	}

@@ -966,9 +966,9 @@ export interface components {
             deploymentId: components["schemas"]["DeploymentId"];
             userId: components["schemas"]["UserId"];
             deviceId?: components["schemas"]["DeviceId"];
-            resourceId: string;
-            runtimeRouteId: components["schemas"]["RuntimeRouteId"];
-            upstreamId: components["schemas"]["UpstreamId"];
+            resourceId?: string;
+            runtimeRouteId?: components["schemas"]["RuntimeRouteId"];
+            upstreamId?: components["schemas"]["UpstreamId"];
             managedGeneration: number;
             controlRevision: number;
             /** Format: date-time */
@@ -1031,6 +1031,13 @@ export interface components {
             /** Format: date-time */
             lastRelaySeenAt?: string;
             latestActivation?: components["schemas"]["Activation"];
+            /**
+             * @description Omitted when Relay spool status is unavailable; omission does not mean OK.
+             * @enum {string}
+             */
+            spoolState?: "OK" | "METERING_DEGRADED";
+            spoolPendingCount?: number;
+            oldestPendingAgeSeconds?: number;
             requestUsageIngestLagSeconds?: number;
             semanticOrphanCount?: number;
         };
@@ -1955,7 +1962,7 @@ export interface operations {
                 resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
-                completeness?: "KNOWN" | "PARTIAL" | "UNKNOWN";
+                completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
             };
             header?: never;
             path?: never;
@@ -1989,7 +1996,7 @@ export interface operations {
                 resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
-                completeness?: "KNOWN" | "PARTIAL" | "UNKNOWN";
+                completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
             };
             header?: never;
             path?: never;

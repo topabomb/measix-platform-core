@@ -88,6 +88,70 @@ func (_u *SessionUpdate) ClearRefreshDigest() *SessionUpdate {
 	return _u
 }
 
+// SetPreviousRefreshDigest sets the "previous_refresh_digest" field.
+func (_u *SessionUpdate) SetPreviousRefreshDigest(v []byte) *SessionUpdate {
+	_u.mutation.SetPreviousRefreshDigest(v)
+	return _u
+}
+
+// ClearPreviousRefreshDigest clears the value of the "previous_refresh_digest" field.
+func (_u *SessionUpdate) ClearPreviousRefreshDigest() *SessionUpdate {
+	_u.mutation.ClearPreviousRefreshDigest()
+	return _u
+}
+
+// SetRefreshRequestKey sets the "refresh_request_key" field.
+func (_u *SessionUpdate) SetRefreshRequestKey(v string) *SessionUpdate {
+	_u.mutation.SetRefreshRequestKey(v)
+	return _u
+}
+
+// SetNillableRefreshRequestKey sets the "refresh_request_key" field if the given value is not nil.
+func (_u *SessionUpdate) SetNillableRefreshRequestKey(v *string) *SessionUpdate {
+	if v != nil {
+		_u.SetRefreshRequestKey(*v)
+	}
+	return _u
+}
+
+// ClearRefreshRequestKey clears the value of the "refresh_request_key" field.
+func (_u *SessionUpdate) ClearRefreshRequestKey() *SessionUpdate {
+	_u.mutation.ClearRefreshRequestKey()
+	return _u
+}
+
+// SetRefreshReplayUntil sets the "refresh_replay_until" field.
+func (_u *SessionUpdate) SetRefreshReplayUntil(v time.Time) *SessionUpdate {
+	_u.mutation.SetRefreshReplayUntil(v)
+	return _u
+}
+
+// SetNillableRefreshReplayUntil sets the "refresh_replay_until" field if the given value is not nil.
+func (_u *SessionUpdate) SetNillableRefreshReplayUntil(v *time.Time) *SessionUpdate {
+	if v != nil {
+		_u.SetRefreshReplayUntil(*v)
+	}
+	return _u
+}
+
+// ClearRefreshReplayUntil clears the value of the "refresh_replay_until" field.
+func (_u *SessionUpdate) ClearRefreshReplayUntil() *SessionUpdate {
+	_u.mutation.ClearRefreshReplayUntil()
+	return _u
+}
+
+// SetRefreshResponseCiphertext sets the "refresh_response_ciphertext" field.
+func (_u *SessionUpdate) SetRefreshResponseCiphertext(v []byte) *SessionUpdate {
+	_u.mutation.SetRefreshResponseCiphertext(v)
+	return _u
+}
+
+// ClearRefreshResponseCiphertext clears the value of the "refresh_response_ciphertext" field.
+func (_u *SessionUpdate) ClearRefreshResponseCiphertext() *SessionUpdate {
+	_u.mutation.ClearRefreshResponseCiphertext()
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *SessionUpdate) SetExpiresAt(v time.Time) *SessionUpdate {
 	_u.mutation.SetExpiresAt(v)
@@ -229,6 +293,30 @@ func (_u *SessionUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.RefreshDigestCleared() {
 		_spec.ClearField(session.FieldRefreshDigest, field.TypeBytes)
 	}
+	if value, ok := _u.mutation.PreviousRefreshDigest(); ok {
+		_spec.SetField(session.FieldPreviousRefreshDigest, field.TypeBytes, value)
+	}
+	if _u.mutation.PreviousRefreshDigestCleared() {
+		_spec.ClearField(session.FieldPreviousRefreshDigest, field.TypeBytes)
+	}
+	if value, ok := _u.mutation.RefreshRequestKey(); ok {
+		_spec.SetField(session.FieldRefreshRequestKey, field.TypeString, value)
+	}
+	if _u.mutation.RefreshRequestKeyCleared() {
+		_spec.ClearField(session.FieldRefreshRequestKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.RefreshReplayUntil(); ok {
+		_spec.SetField(session.FieldRefreshReplayUntil, field.TypeTime, value)
+	}
+	if _u.mutation.RefreshReplayUntilCleared() {
+		_spec.ClearField(session.FieldRefreshReplayUntil, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RefreshResponseCiphertext(); ok {
+		_spec.SetField(session.FieldRefreshResponseCiphertext, field.TypeBytes, value)
+	}
+	if _u.mutation.RefreshResponseCiphertextCleared() {
+		_spec.ClearField(session.FieldRefreshResponseCiphertext, field.TypeBytes)
+	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(session.FieldExpiresAt, field.TypeTime, value)
 	}
@@ -327,6 +415,70 @@ func (_u *SessionUpdateOne) SetRefreshDigest(v []byte) *SessionUpdateOne {
 // ClearRefreshDigest clears the value of the "refresh_digest" field.
 func (_u *SessionUpdateOne) ClearRefreshDigest() *SessionUpdateOne {
 	_u.mutation.ClearRefreshDigest()
+	return _u
+}
+
+// SetPreviousRefreshDigest sets the "previous_refresh_digest" field.
+func (_u *SessionUpdateOne) SetPreviousRefreshDigest(v []byte) *SessionUpdateOne {
+	_u.mutation.SetPreviousRefreshDigest(v)
+	return _u
+}
+
+// ClearPreviousRefreshDigest clears the value of the "previous_refresh_digest" field.
+func (_u *SessionUpdateOne) ClearPreviousRefreshDigest() *SessionUpdateOne {
+	_u.mutation.ClearPreviousRefreshDigest()
+	return _u
+}
+
+// SetRefreshRequestKey sets the "refresh_request_key" field.
+func (_u *SessionUpdateOne) SetRefreshRequestKey(v string) *SessionUpdateOne {
+	_u.mutation.SetRefreshRequestKey(v)
+	return _u
+}
+
+// SetNillableRefreshRequestKey sets the "refresh_request_key" field if the given value is not nil.
+func (_u *SessionUpdateOne) SetNillableRefreshRequestKey(v *string) *SessionUpdateOne {
+	if v != nil {
+		_u.SetRefreshRequestKey(*v)
+	}
+	return _u
+}
+
+// ClearRefreshRequestKey clears the value of the "refresh_request_key" field.
+func (_u *SessionUpdateOne) ClearRefreshRequestKey() *SessionUpdateOne {
+	_u.mutation.ClearRefreshRequestKey()
+	return _u
+}
+
+// SetRefreshReplayUntil sets the "refresh_replay_until" field.
+func (_u *SessionUpdateOne) SetRefreshReplayUntil(v time.Time) *SessionUpdateOne {
+	_u.mutation.SetRefreshReplayUntil(v)
+	return _u
+}
+
+// SetNillableRefreshReplayUntil sets the "refresh_replay_until" field if the given value is not nil.
+func (_u *SessionUpdateOne) SetNillableRefreshReplayUntil(v *time.Time) *SessionUpdateOne {
+	if v != nil {
+		_u.SetRefreshReplayUntil(*v)
+	}
+	return _u
+}
+
+// ClearRefreshReplayUntil clears the value of the "refresh_replay_until" field.
+func (_u *SessionUpdateOne) ClearRefreshReplayUntil() *SessionUpdateOne {
+	_u.mutation.ClearRefreshReplayUntil()
+	return _u
+}
+
+// SetRefreshResponseCiphertext sets the "refresh_response_ciphertext" field.
+func (_u *SessionUpdateOne) SetRefreshResponseCiphertext(v []byte) *SessionUpdateOne {
+	_u.mutation.SetRefreshResponseCiphertext(v)
+	return _u
+}
+
+// ClearRefreshResponseCiphertext clears the value of the "refresh_response_ciphertext" field.
+func (_u *SessionUpdateOne) ClearRefreshResponseCiphertext() *SessionUpdateOne {
+	_u.mutation.ClearRefreshResponseCiphertext()
 	return _u
 }
 
@@ -500,6 +652,30 @@ func (_u *SessionUpdateOne) sqlSave(ctx context.Context) (_node *Session, err er
 	}
 	if _u.mutation.RefreshDigestCleared() {
 		_spec.ClearField(session.FieldRefreshDigest, field.TypeBytes)
+	}
+	if value, ok := _u.mutation.PreviousRefreshDigest(); ok {
+		_spec.SetField(session.FieldPreviousRefreshDigest, field.TypeBytes, value)
+	}
+	if _u.mutation.PreviousRefreshDigestCleared() {
+		_spec.ClearField(session.FieldPreviousRefreshDigest, field.TypeBytes)
+	}
+	if value, ok := _u.mutation.RefreshRequestKey(); ok {
+		_spec.SetField(session.FieldRefreshRequestKey, field.TypeString, value)
+	}
+	if _u.mutation.RefreshRequestKeyCleared() {
+		_spec.ClearField(session.FieldRefreshRequestKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.RefreshReplayUntil(); ok {
+		_spec.SetField(session.FieldRefreshReplayUntil, field.TypeTime, value)
+	}
+	if _u.mutation.RefreshReplayUntilCleared() {
+		_spec.ClearField(session.FieldRefreshReplayUntil, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RefreshResponseCiphertext(); ok {
+		_spec.SetField(session.FieldRefreshResponseCiphertext, field.TypeBytes, value)
+	}
+	if _u.mutation.RefreshResponseCiphertextCleared() {
+		_spec.ClearField(session.FieldRefreshResponseCiphertext, field.TypeBytes)
 	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(session.FieldExpiresAt, field.TypeTime, value)

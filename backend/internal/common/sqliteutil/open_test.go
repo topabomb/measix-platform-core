@@ -14,6 +14,8 @@ func TestOpenAppliesProductionPragmas(t *testing.T) {
 	}
 	defer db.Close()
 
+	// Force a replacement connection; security pragmas are connection-local.
+	db.SetMaxIdleConns(0)
 	checks := map[string]string{
 		"journal_mode": "wal",
 		"foreign_keys": "1",

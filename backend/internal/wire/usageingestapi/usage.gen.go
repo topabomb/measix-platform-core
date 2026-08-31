@@ -105,12 +105,12 @@ type RequestUsageEvent struct {
 	ManagedGeneration  int            `json:"managedGeneration"`
 	RequestBytes       int            `json:"requestBytes"`
 	RequestId          RequestId      `json:"requestId"`
-	ResourceId         string         `json:"resourceId"`
+	ResourceId         string         `json:"resourceId,omitempty"`
 	ResponseBytes      int            `json:"responseBytes"`
-	RuntimeRouteId     RuntimeRouteId `json:"runtimeRouteId"`
+	RuntimeRouteId     RuntimeRouteId `json:"runtimeRouteId,omitempty"`
 	StartedAt          time.Time      `json:"startedAt"`
 	UpstreamHttpStatus *int           `json:"upstreamHttpStatus,omitempty"`
-	UpstreamId         UpstreamId     `json:"upstreamId"`
+	UpstreamId         UpstreamId     `json:"upstreamId,omitempty"`
 	UserId             UserId         `json:"userId"`
 }
 

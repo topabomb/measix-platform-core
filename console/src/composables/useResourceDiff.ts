@@ -7,6 +7,8 @@ type ValidationIssue = components['schemas']['ValidationIssue']
 
 /** Resource-like shape: any object that carries one of the known ID fields. */
 interface ResourceLike {
+  assistantDefinitionId?: string
+  starterId?: string
   modelId?: string
   ttsId?: string
   asrId?: string
@@ -28,6 +30,8 @@ export type ReviewDiff = {
   asr: DiffResult<ManagedDraftContent['asr'][number]>
   mcp: DiffResult<ManagedDraftContent['mcp'][number]>
   bindings: DiffResult<ManagedDraftContent['bindings'][number]>
+  assistants: DiffResult<NonNullable<ManagedDraftContent['assistants']>[number]>
+  starters: DiffResult<NonNullable<ManagedDraftContent['starters']>[number]>
   policyChanged: boolean
 }
 
@@ -36,7 +40,7 @@ export type ReviewDiff = {
  * Checks all known ID fields in order.
  */
 export function resourceIdOf(item: ResourceLike): string {
-  return item.modelId ?? item.ttsId ?? item.asrId ?? item.mcpServerId ?? item.providerId ?? item.resourceId ?? ''
+  return item.starterId ?? item.assistantDefinitionId ?? item.modelId ?? item.ttsId ?? item.asrId ?? item.mcpServerId ?? item.providerId ?? item.resourceId ?? ''
 }
 
 /**
@@ -90,6 +94,8 @@ export function useResourceDiff(draft: ReturnType<typeof useDraftStore>) {
       tts: diffList(base.tts, local.tts, (t) => t.ttsId),
       asr: diffList(base.asr, local.asr, (a) => a.asrId),
       mcp: diffList(base.mcp, local.mcp, (m) => m.mcpServerId),
+      assistants: diffList(base.assistants ?? [], local.assistants ?? [], a => a.assistantDefinitionId),
+      starters: diffList(base.starters ?? [], local.starters ?? [], s => s.starterId),
       bindings: diffList(base.bindings, local.bindings, (b) => b.resourceId),
       policyChanged: JSON.stringify(base.policy) !== JSON.stringify(local.policy),
     }
@@ -114,6 +120,9 @@ export function useResourceDiff(draft: ReturnType<typeof useDraftStore>) {
       + d.tts.added.length + d.tts.changed.length + d.tts.removed.length
       + d.asr.added.length + d.asr.changed.length + d.asr.removed.length
       + d.mcp.added.length + d.mcp.changed.length + d.mcp.removed.length
+      + d.assistants.added.length + d.assistants.changed.length + d.assistants.removed.length
+      + d.starters.added.length + d.starters.changed.length + d.starters.removed.length
+      + d.bindings.added.length + d.bindings.changed.length + d.bindings.removed.length
       + (d.policyChanged ? 1 : 0)
   })
 

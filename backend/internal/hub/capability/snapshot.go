@@ -13,6 +13,9 @@ import (
 	"measix/platform/pkg/platformid"
 )
 
+// CurrentSnapshotSchemaVersion is the only live compiler schema selection.
+const CurrentSnapshotSchemaVersion = 2
+
 type SnapshotInput struct {
 	DeploymentID      string
 	ReleaseID         string
@@ -105,7 +108,6 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 			for i, m := range a.McpServerIds {
 				mcpIds[i] = clientapi.McpServerId(m)
 			}
-			sort.Strings(seed)
 			sort.Slice(mcpIds, func(i, j int) bool { return mcpIds[i] < mcpIds[j] })
 			assistants = append(assistants, clientapi.ManagedAssistantDefinition{
 				AssistantDefinitionId: a.AssistantDefinitionId,
@@ -136,12 +138,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 		}
 	}
 	sort.Slice(assistants, func(i, j int) bool { return assistants[i].AssistantDefinitionId < assistants[j].AssistantDefinitionId })
-	sort.Slice(starters, func(i, j int) bool {
-		if starters[i].AssistantDefinitionId == starters[j].AssistantDefinitionId {
-			return starters[i].SortOrder < starters[j].SortOrder
-		}
-		return starters[i].AssistantDefinitionId < starters[j].AssistantDefinitionId
-	})
+	sort.Slice(starters, func(i, j int) bool { return starters[i].StarterId < starters[j].StarterId })
 	sort.Slice(providers, func(i, j int) bool { return providers[i].ProviderId < providers[j].ProviderId })
 	sort.Slice(models, func(i, j int) bool { return models[i].ModelId < models[j].ModelId })
 	sort.Slice(tts, func(i, j int) bool { return tts[i].TtsId < tts[j].TtsId })
@@ -165,7 +162,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	}
 	metadata := snapshotMetadata{PublishedAt: input.PublishedAt.UTC(), PublishedByUserID: publishedBy}
 	descriptor := snapshotDescriptor{
-		DeploymentID: input.DeploymentID, SchemaVersion: 2, ManagedGeneration: input.ManagedGeneration,
+		DeploymentID: input.DeploymentID, SchemaVersion: CurrentSnapshotSchemaVersion, ManagedGeneration: input.ManagedGeneration,
 		ReleaseID: input.ReleaseID, Providers: providers, Models: models, TTS: tts, ASR: asr, MCP: mcp, Policy: policy, Metadata: metadata,
 		Assistants: assistants, Starters: starters,
 	}
@@ -177,7 +174,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	hash := "sha256:" + hex.EncodeToString(sum[:])
 	var snapshot clientapi.ManagedSnapshot
 	snapshot.DeploymentId = input.DeploymentID
-	snapshot.SchemaVersion = clientapi.ManagedSnapshotSchemaVersionN2
+	snapshot.SchemaVersion = clientapi.ManagedSnapshotSchemaVersion(CurrentSnapshotSchemaVersion)
 	snapshot.ManagedGeneration = input.ManagedGeneration
 	snapshot.ReleaseId = input.ReleaseID
 	snapshot.SnapshotHash = hash

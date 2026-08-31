@@ -6,9 +6,9 @@ This document owns concrete operating procedures, configuration and current limi
 
 Current daemons are `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. `devmigrate` and `generate-android-wire` are utilities, not services. Enterprise Tool Gateway, service units and a production installation package do not exist yet.
 
-Admin is a static Quasar SPA. Hub's runtime library accepts optional `AdminAssets`, but the production main supplies no assets and exposes no assets flag. A working test harness/static handler does not prove the shipped daemon serves `/admin`. Production integration still needs explicit static hosting/ingress packaging and same-origin routing verification.
+Admin is a static Quasar SPA. Supply `--admin-assets-dir <console/dist/spa>` (or `HUB_ADMIN_ASSETS_DIR`) to the Hub daemon; startup rejects a missing `index.html`, and the existing static handler owns `/admin` and deep links. Omitting the option leaves static hosting disabled. Production ingress must route `/api/client/v1`, `/api/admin/v1`, `/admin` to Hub and `/runtime/v1` to Relay under one origin; test-library hosting does not qualify production TLS/ingress.
 
-`npm start`, `concurrently`, `go run`, and Node/Go harness process orchestration are development/test tools, not a production supervisor. See [development](development.md) for local startup and the root-script usage URL defect.
+`npm start`, `concurrently`, `go run`, and Node/Go harness process orchestration are development/test tools, not a production supervisor. See [development](development.md) for local startup; Relay usage delivery uses the private Hub listener.
 
 ## 2. Configuration actually implemented
 
@@ -19,19 +19,19 @@ Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/
 | Flag | Environment | Default / requirement |
 | --- | --- | --- |
 | `--listen` | `HUB_LISTEN_ADDR` | `:8080` |
-| `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `:8081`; explicitly bind a private address |
-| `--public-base-url` | `HUB_PUBLIC_BASE_URL` | Required absolute HTTP(S) URL |
-| `--runtime-api-base` | `HUB_RUNTIME_API_BASE` | Required absolute HTTP(S) URL |
+| `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8081`; keep private |
+| `--admin-assets-dir` | `HUB_ADMIN_ASSETS_DIR` | Optional production SPA directory |
 | `--db` | `HUB_DB_PATH` | Required SQLite path |
 | `--master-key-file` | `HUB_MASTER_KEY_FILE` | Required AES-256 key file; secret |
 | `--jwt-private-key-file` | `HUB_JWT_PRIVATE_KEY_FILE` | Required Ed25519 key file; secret |
 | `--relay-internal-url` | `RELAY_INTERNAL_URL` | Required absolute HTTP(S) URL; private |
 | `--relay-service-token-file` | `HUB_RELAY_SERVICE_TOKEN_FILE` | Required token file; secret |
 | `--access-token-ttl` | `HUB_ACCESS_TOKEN_TTL` | `10m`; positive, at most `10m` |
-| `--refresh-token-ttl` | `HUB_REFRESH_TOKEN_TTL` | `720h`; validated positive, but **not wired into identity service** |
 | `--reconcile-interval` | `HUB_RECONCILE_INTERVAL` | `10s`; positive |
 
-Refresh credentials currently expire at a fixed 30-day deadline; refresh does not rotate them or extend an idle deadline. Do not use the refresh TTL option as an operational control until fixed. Absolute discovery URLs also differ from the architecture's same-origin path-only contract. These are gaps, not alternative supported semantics.
+Android sessions have a seven-day rolling idle deadline, renewed only by refresh. Refresh rotates credentials and requires a stable per-command `Idempotency-Key`; the same old credential/key recovers the identical encrypted response for two minutes without extending the lease twice. Rotation recovery survives Hub restart using master-key-derived encryption. Persist client pending refresh input/key before sending; a different key conflicts, and an expired recovery window requires re-enrollment. Old fixed-TTL and absolute Discovery URL flags were removed; Discovery returns same-origin paths.
+
+Logout revokes the durable Android session and clears rotation recovery. The existing Hub reconciler projects pending session denies through a SECURITY_CHANGE Activation; HTTP 204 is not Relay acknowledgement. Previously issued access may remain usable until the deny applies or its short expiry. Disable/revoke also invalidate sessions; enabling a user does not resurrect credentials. A new administrator-issued enrollment may replace sessions on the same ACTIVE installation/user, but cannot revive a revoked device or transfer another user's installation.
 
 ### Runtime Relay
 
@@ -46,13 +46,13 @@ Refresh credentials currently expire at a fixed 30-day deadline; refresh does no
 | `--usage-flush-interval` | `RELAY_USAGE_FLUSH_INTERVAL` | `1s`; positive |
 | `--shutdown-grace` | `RELAY_SHUTDOWN_GRACE` | `30s`; positive |
 
-Hub's default private listener is not loopback-only. Isolate both internal listeners; never publish them through public ingress. The servers use HTTP listeners, not built-in TLS termination. Current wiring reuses one token for Hub→Relay control and Relay→Hub usage: separate configuration names do not establish separate trust scopes.
+Both default private listeners are loopback-only. Isolate both internal listeners; never publish them through public ingress. The servers use HTTP listeners, not built-in TLS termination. Current wiring reuses one token for Hub→Relay control and Relay→Hub usage: separate configuration names do not establish separate trust scopes.
 
 Use restricted secret files and persistent, explicitly resolved DB/spool paths. Key decoding/accepted formats belong to `backend/internal/hub/security`; verify against it when provisioning. Never place secret values in command history, Git, logs or support bundles.
 
 ## 3. Bootstrap and startup
 
-`control-hub` has `run`, `bootstrap-admin`, `check` and `backup` subcommands. Inspect each subcommand's flags with `--help`; maintenance commands do not use the full run configuration. Default bootstrap refuses an existing deployment; `--add-admin` is an explicit separate operation, not idempotent setup. Use its password-file input, not a password printed into shared logs.
+`control-hub` has `run`, `bootstrap-admin`, `check` and `backup` subcommands. Inspect each subcommand's flags with `--help`; maintenance commands do not use the full run configuration. Default bootstrap refuses an existing deployment; `--if-empty` skips an initialized deployment without resetting credentials, while `--add-admin` explicitly adds an administrator. They are mutually exclusive. Initial bootstrap accepts `--timezone <IANA zone>` (default UTC) for Enterprise Update date boundaries. Use its password-file input, not a password printed into shared logs.
 
 Apply/review migrations before startup; `run` does not auto-migrate. Startup opens/checks the database, requires the deployment invariant and initializes runtime services. See [database migrations](database-migrations.md) for limits of the check and development helper.
 
@@ -65,11 +65,11 @@ Start Hub/Relay, wait for explicit readiness, verify desired/applied control sta
 | Hub | `/live`, `/ready` | Authenticated Admin System API | Ready after initialization; Relay runtime can still be `DEGRADED` |
 | Relay | `/live`, `/ready` | Private `/internal/v1/control/status`, service authentication | Ready once control state exists; spool degradation is separate |
 
-OpenAPI/router registrations own exact responses. Hub System's schema revision is a hardcoded initial revision, not queried applied Atlas history. Ingest lag is not a complete pending-backlog monitor. Hub build identity defaults to `dev` unless supplied at build time; release provenance must pin binaries and static assets.
+OpenAPI/router registrations own exact responses. The unauthenticated System health endpoint only probes the local DB connection; full schema/Relay/usage diagnostics stay in authenticated System status and the maintenance command. Hub System reports the current schema revision expected by the binary (derived from embedded migrations), not an attestation of applied Atlas history. It forwards Relay spool state, pending count and oldest age; absent observations remain unknown, not zero. Ingest lag is separate from backlog. Hub build identity defaults to `dev` unless supplied at build time; release provenance must pin binaries and static assets.
 
 ## 5. Shutdown and durability
 
-Shared HTTP serving handles SIGINT/SIGTERM and invokes bounded shutdown: Hub uses 30 seconds, Relay its configured grace. The helper does not explicitly force-close/cancel surviving handlers after timeout. Relay's server-error `os.Exit` path bypasses deferred cleanup. These gaps must be fixed/tested before claiming the architecture's complete drain/cancel guarantee.
+Shared HTTP serving handles SIGINT/SIGTERM and invokes bounded drain: Hub uses 30 seconds, Relay its configured grace. After drain/deadline it cancels request contexts, closes connections, rejects new admission and waits up to five seconds for handler cleanup before returning. Relay returns server errors through its owner so final flush and deferred spool close still run. Handlers must honor cancellation; production supervisor hard-stop qualification remains S0.3.
 
 Normal Relay shutdown attempts one final usage flush, capped at two seconds, and preserves the durable spool. It does not guarantee the entire backlog reaches Hub before exit. Sender retry/backoff and poison-batch splitting exist; the recorder degraded flag remains latched until restart. Diagnose failures before restart; never delete the spool as routine recovery.
 
@@ -84,9 +84,9 @@ control-hub check --db <hub.db>
 control-hub backup --db <hub.db> --output <new-backup.db>
 ```
 
-Backup uses SQLite `VACUUM INTO` and writes an adjacent `.metadata.json`. Use a destination where neither file exists: the database overwrite check does not protect orphan metadata. Metadata records a fixed initial schema label. Reopening a backup is not an integrity check or restore test.
+Backup uses SQLite `VACUUM INTO` and writes an adjacent `.metadata.json`. Both targets are exclusively reserved; existing database or orphan metadata is not overwritten. Source and copied database pass integrity/foreign-key/current-column checks before metadata is synced. Metadata records the binary's expected migration revision. These checks do not replace an isolated restore/business replay.
 
-`check` runs SQLite integrity/foreign-key checks and checks a fixed initial table set; it does not verify every current column, Enterprise Update table, or complete migration history. Success is necessary but insufficient for release/upgrade.
+`check` derives required tables/columns from current Ent schema, including Enterprise Update and session recovery; it checks SQLite integrity/foreign keys. It does not attest indexes, column type equivalence or complete applied Atlas history. Success is necessary but insufficient for release/upgrade.
 
 There is no restore CLI or fully packaged production restore runbook. Before replacing any deployment database, restore a copy in an isolated environment with matching binaries, required keys and migrations; check integrity, identities, releases/generations and usage, then run recovery scenarios. Never experiment on the only production copy; keep the original recoverable until acceptance.
 
@@ -109,8 +109,8 @@ Never emit tokens, cookies, credentials, enrollment/session/signing material, pr
 | Usage never arrives | URL must use Hub private port (default `8081`, not `8080`); inspect token, spool status and ingest errors |
 | Relay not ready after restart | Inspect Hub reconcile and Relay applied revision; do not bypass authentication/inject state |
 | Hub ready but runtime degraded | Compare desired/applied revision and activation; readiness is not convergence |
-| `/admin` missing or deep links fail | Check actual static host/ingress; main supplies no `AdminAssets` |
-| Migration/check disagreement | Inspect reviewed migration history/schema; the table check is incomplete |
+| `/admin` missing or deep links fail | Check actual static host/ingress; verify `--admin-assets-dir`, `index.html` and same-origin ingress |
+| Migration/check disagreement | Inspect reviewed migration history/schema; column presence is not a migration-history proof |
 | Repeated process crash | Preserve diagnostics/persistent data; no production restart-rate-limit package exists yet |
 
 Upgrade must pin artifacts, verify applicable evidence, back up, apply reviewed migrations, deploy, validate readiness/control/static routing and run smoke/recovery checks. Binary downgrade is not assumed safe after schema changes. RC also needs isolated restore, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).

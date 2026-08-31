@@ -549,17 +549,21 @@ func (s *Service) loadActivation(ctx context.Context, activationID string) (Acti
 	if err != nil {
 		return ActivationResult{}, err
 	}
+	return activationView(row), nil
+}
+
+func activationView(row *ent.Activation) ActivationResult {
 	result := ActivationResult{
-		ActivationID: activationID, Kind: row.Kind, State: row.State, DesiredControlRevision: int(row.ControlRevision),
+		ActivationID: row.ID, Kind: row.Kind, State: row.State, DesiredControlRevision: int(row.ControlRevision),
 		BundleHash: row.BundleHash, CreatedAt: row.CreatedAt, CompletedAt: row.CompletedAt, ErrorCode: row.ErrorCode,
 	}
-	if row.SubjectID != nil {
+	if row.Kind == "PUBLISH" && row.SubjectID != nil {
 		result.ReleaseID = *row.SubjectID
 	}
 	if row.TargetGeneration != nil {
 		result.TargetManagedGeneration = int(*row.TargetGeneration)
 	}
-	return result, nil
+	return result
 }
 
 func (s *Service) nextGeneration(ctx context.Context) (int, error) {

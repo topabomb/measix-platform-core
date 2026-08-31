@@ -124,6 +124,12 @@ func (_u *RequestUsageUpdate) SetNillableResourceID(v *string) *RequestUsageUpda
 	return _u
 }
 
+// ClearResourceID clears the value of the "resource_id" field.
+func (_u *RequestUsageUpdate) ClearResourceID() *RequestUsageUpdate {
+	_u.mutation.ClearResourceID()
+	return _u
+}
+
 // SetRuntimeRouteID sets the "runtime_route_id" field.
 func (_u *RequestUsageUpdate) SetRuntimeRouteID(v string) *RequestUsageUpdate {
 	_u.mutation.SetRuntimeRouteID(v)
@@ -138,6 +144,12 @@ func (_u *RequestUsageUpdate) SetNillableRuntimeRouteID(v *string) *RequestUsage
 	return _u
 }
 
+// ClearRuntimeRouteID clears the value of the "runtime_route_id" field.
+func (_u *RequestUsageUpdate) ClearRuntimeRouteID() *RequestUsageUpdate {
+	_u.mutation.ClearRuntimeRouteID()
+	return _u
+}
+
 // SetUpstreamID sets the "upstream_id" field.
 func (_u *RequestUsageUpdate) SetUpstreamID(v string) *RequestUsageUpdate {
 	_u.mutation.SetUpstreamID(v)
@@ -149,6 +161,12 @@ func (_u *RequestUsageUpdate) SetNillableUpstreamID(v *string) *RequestUsageUpda
 	if v != nil {
 		_u.SetUpstreamID(*v)
 	}
+	return _u
+}
+
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (_u *RequestUsageUpdate) ClearUpstreamID() *RequestUsageUpdate {
+	_u.mutation.ClearUpstreamID()
 	return _u
 }
 
@@ -446,11 +464,20 @@ func (_u *RequestUsageUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.ResourceID(); ok {
 		_spec.SetField(requestusage.FieldResourceID, field.TypeString, value)
 	}
+	if _u.mutation.ResourceIDCleared() {
+		_spec.ClearField(requestusage.FieldResourceID, field.TypeString)
+	}
 	if value, ok := _u.mutation.RuntimeRouteID(); ok {
 		_spec.SetField(requestusage.FieldRuntimeRouteID, field.TypeString, value)
 	}
+	if _u.mutation.RuntimeRouteIDCleared() {
+		_spec.ClearField(requestusage.FieldRuntimeRouteID, field.TypeString)
+	}
 	if value, ok := _u.mutation.UpstreamID(); ok {
 		_spec.SetField(requestusage.FieldUpstreamID, field.TypeString, value)
+	}
+	if _u.mutation.UpstreamIDCleared() {
+		_spec.ClearField(requestusage.FieldUpstreamID, field.TypeString)
 	}
 	if value, ok := _u.mutation.ManagedGeneration(); ok {
 		_spec.SetField(requestusage.FieldManagedGeneration, field.TypeInt64, value)
@@ -631,6 +658,12 @@ func (_u *RequestUsageUpdateOne) SetNillableResourceID(v *string) *RequestUsageU
 	return _u
 }
 
+// ClearResourceID clears the value of the "resource_id" field.
+func (_u *RequestUsageUpdateOne) ClearResourceID() *RequestUsageUpdateOne {
+	_u.mutation.ClearResourceID()
+	return _u
+}
+
 // SetRuntimeRouteID sets the "runtime_route_id" field.
 func (_u *RequestUsageUpdateOne) SetRuntimeRouteID(v string) *RequestUsageUpdateOne {
 	_u.mutation.SetRuntimeRouteID(v)
@@ -645,6 +678,12 @@ func (_u *RequestUsageUpdateOne) SetNillableRuntimeRouteID(v *string) *RequestUs
 	return _u
 }
 
+// ClearRuntimeRouteID clears the value of the "runtime_route_id" field.
+func (_u *RequestUsageUpdateOne) ClearRuntimeRouteID() *RequestUsageUpdateOne {
+	_u.mutation.ClearRuntimeRouteID()
+	return _u
+}
+
 // SetUpstreamID sets the "upstream_id" field.
 func (_u *RequestUsageUpdateOne) SetUpstreamID(v string) *RequestUsageUpdateOne {
 	_u.mutation.SetUpstreamID(v)
@@ -656,6 +695,12 @@ func (_u *RequestUsageUpdateOne) SetNillableUpstreamID(v *string) *RequestUsageU
 	if v != nil {
 		_u.SetUpstreamID(*v)
 	}
+	return _u
+}
+
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (_u *RequestUsageUpdateOne) ClearUpstreamID() *RequestUsageUpdateOne {
+	_u.mutation.ClearUpstreamID()
 	return _u
 }
 
@@ -983,11 +1028,20 @@ func (_u *RequestUsageUpdateOne) sqlSave(ctx context.Context) (_node *RequestUsa
 	if value, ok := _u.mutation.ResourceID(); ok {
 		_spec.SetField(requestusage.FieldResourceID, field.TypeString, value)
 	}
+	if _u.mutation.ResourceIDCleared() {
+		_spec.ClearField(requestusage.FieldResourceID, field.TypeString)
+	}
 	if value, ok := _u.mutation.RuntimeRouteID(); ok {
 		_spec.SetField(requestusage.FieldRuntimeRouteID, field.TypeString, value)
 	}
+	if _u.mutation.RuntimeRouteIDCleared() {
+		_spec.ClearField(requestusage.FieldRuntimeRouteID, field.TypeString)
+	}
 	if value, ok := _u.mutation.UpstreamID(); ok {
 		_spec.SetField(requestusage.FieldUpstreamID, field.TypeString, value)
+	}
+	if _u.mutation.UpstreamIDCleared() {
+		_spec.ClearField(requestusage.FieldUpstreamID, field.TypeString)
 	}
 	if value, ok := _u.mutation.ManagedGeneration(); ok {
 		_spec.SetField(requestusage.FieldManagedGeneration, field.TypeInt64, value)

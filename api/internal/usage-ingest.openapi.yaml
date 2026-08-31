@@ -159,9 +159,6 @@ components:
       - requestId
       - deploymentId
       - userId
-      - resourceId
-      - runtimeRouteId
-      - upstreamId
       - managedGeneration
       - controlRevision
       - startedAt
@@ -183,10 +180,13 @@ components:
         deviceId:
           $ref: '#/components/schemas/DeviceId'
         resourceId:
+          x-go-type-skip-optional-pointer: true
           type: string
         runtimeRouteId:
+          x-go-type-skip-optional-pointer: true
           $ref: '#/components/schemas/RuntimeRouteId'
         upstreamId:
+          x-go-type-skip-optional-pointer: true
           $ref: '#/components/schemas/UpstreamId'
         managedGeneration:
           type: integer

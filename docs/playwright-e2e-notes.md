@@ -20,9 +20,9 @@ Node harness 使用临时 DB/keys/ports、真实 Hub/Relay、deterministic Adapt
 
 `console/playwright.config.ts` 当前固定一个 worker、零 retry，使用 list/HTML/JSON reporters，HTML `open: never`。JSON 默认写 `.artifacts/e2e-playwright.json`，可由 `PLAYWRIGHT_JSON_OUTPUT_FILE` 指定；harness 会管理分阶段证据。
 
-当前 trace=`on-first-retry` 与 retries=0 意味着不能保证失败时产生 trace；若需要默认失败 trace，须显式修复配置并验证。保留截图/视频也不能替代响应/状态/来源证据。
+当前 trace=`retain-on-failure`，零 retry 时也保留失败 trace。保留截图/视频不能替代响应/状态/来源证据。
 
-当前 launch args 含禁用 sandbox、部分 isolation 和忽略证书错误的选项。故这些运行不证明生产 TLS、浏览器 sandbox 或 origin isolation 的安全性。后续应收紧默认参数，并把确有必要的诊断例外与安全验收 lane 分开。本轮未修改配置。
+配置已移除显式禁用 sandbox/isolation 和忽略证书错误的 launch args；采用框架默认启动行为，不声称已验证 OS sandbox。HTTP loopback harness 仍不证明生产 TLS/ingress。确需诊断例外时必须与安全验收 lane 分开。
 
 ## 3. 定位失败，不猜根因
 

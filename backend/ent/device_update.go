@@ -76,6 +76,20 @@ func (_u *DeviceUpdate) SetNillableStatus(v *string) *DeviceUpdate {
 	return _u
 }
 
+// SetName sets the "name" field.
+func (_u *DeviceUpdate) SetName(v string) *DeviceUpdate {
+	_u.mutation.SetName(v)
+	return _u
+}
+
+// SetNillableName sets the "name" field if the given value is not nil.
+func (_u *DeviceUpdate) SetNillableName(v *string) *DeviceUpdate {
+	if v != nil {
+		_u.SetName(*v)
+	}
+	return _u
+}
+
 // SetAppVersion sets the "app_version" field.
 func (_u *DeviceUpdate) SetAppVersion(v string) *DeviceUpdate {
 	_u.mutation.SetAppVersion(v)
@@ -203,6 +217,9 @@ func (_u *DeviceUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(device.FieldStatus, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Name(); ok {
+		_spec.SetField(device.FieldName, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.AppVersion(); ok {
 		_spec.SetField(device.FieldAppVersion, field.TypeString, value)
 	}
@@ -288,6 +305,20 @@ func (_u *DeviceUpdateOne) SetStatus(v string) *DeviceUpdateOne {
 func (_u *DeviceUpdateOne) SetNillableStatus(v *string) *DeviceUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
+	}
+	return _u
+}
+
+// SetName sets the "name" field.
+func (_u *DeviceUpdateOne) SetName(v string) *DeviceUpdateOne {
+	_u.mutation.SetName(v)
+	return _u
+}
+
+// SetNillableName sets the "name" field if the given value is not nil.
+func (_u *DeviceUpdateOne) SetNillableName(v *string) *DeviceUpdateOne {
+	if v != nil {
+		_u.SetName(*v)
 	}
 	return _u
 }
@@ -448,6 +479,9 @@ func (_u *DeviceUpdateOne) sqlSave(ctx context.Context) (_node *Device, err erro
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(device.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Name(); ok {
+		_spec.SetField(device.FieldName, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.AppVersion(); ok {
 		_spec.SetField(device.FieldAppVersion, field.TypeString, value)

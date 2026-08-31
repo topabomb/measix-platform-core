@@ -39,6 +39,14 @@ func TestI5SecurityDisableIsDenyFirstAndEnableIsAllowLast(t *testing.T) {
 	service := runtimecontrol.NewService(st.Client, capabilities, upstreams, identity.Signer, relayClient)
 	service.Now = func() time.Time { return now }
 
+	grant, err := identity.CreateEnrollment(ctx, member.ID, boot.AdminUserID, 10*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	credential, err := identity.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "Device", "1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
 	disable, err := service.DisableUser(ctx, boot.AdminUserID, platformid.New(platformid.Idempotency), member.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +62,8 @@ func TestI5SecurityDisableIsDenyFirstAndEnableIsAllowLast(t *testing.T) {
 		t.Fatal("Relay did not receive disabled user")
 	}
 
-	enable, err := service.EnableUser(ctx, boot.AdminUserID, platformid.New(platformid.Idempotency), member.ID)
+	key := platformid.New(platformid.Idempotency)
+	enable, err := service.EnableUser(ctx, boot.AdminUserID, key, member.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,6 +73,16 @@ func TestI5SecurityDisableIsDenyFirstAndEnableIsAllowLast(t *testing.T) {
 	user, _ = st.Client.User.Get(ctx, member.ID)
 	if user.Status != "ACTIVE" {
 		t.Fatalf("user not enabled after Relay ACK: %s", user.Status)
+	}
+	if _, err := identity.Refresh(ctx, credential.RefreshToken, platformid.New(platformid.Idempotency)); err == nil {
+		t.Fatal("enable resurrected pre-disable refresh credential")
+	}
+	if _, denied := relayStore.Current().RevokedSessions[credential.SessionID]; !denied {
+		t.Fatal("pre-disable session not denied by Relay")
+	}
+	replay, err := service.EnableUser(ctx, boot.AdminUserID, key, member.ID)
+	if err != nil || replay.ActivationID != enable.ActivationID {
+		t.Fatalf("enable idempotency replay: %+v %v", replay, err)
 	}
 	if _, denied := relayStore.Current().DisabledUsers[member.ID]; denied {
 		t.Fatal("Relay retained user deny after enable")
@@ -81,7 +100,7 @@ func TestI5DeviceRevokeIsAppliedToRelay(t *testing.T) {
 	}
 	member, _ := identity.CreateUser(ctx, "member2", "Member 2", "MEMBER")
 	enrollment, _ := identity.CreateEnrollment(ctx, member.ID, boot.AdminUserID, 10*time.Minute)
-	exchange, err := identity.ExchangeEnrollment(ctx, enrollment.Code, platformid.New(platformid.Installation), "1.0")
+	exchange, err := identity.ExchangeEnrollment(ctx, enrollment.Code, platformid.New(platformid.Installation), "Test device", "1.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,6 +123,10 @@ func TestI5DeviceRevokeIsAppliedToRelay(t *testing.T) {
 	device, _ := st.Client.Device.Get(ctx, exchange.DeviceID)
 	if device.Status != "REVOKED" {
 		t.Fatalf("device not revoked: %s", device.Status)
+	}
+	sessionRow, err := st.Client.Session.Get(ctx, exchange.SessionID)
+	if err != nil || sessionRow.Status != "REVOKED" {
+		t.Fatalf("session not revoked: %+v %v", sessionRow, err)
 	}
 	if _, denied := relayStore.Current().RevokedDevices[exchange.DeviceID]; !denied {
 		t.Fatal("Relay did not receive revoked device")

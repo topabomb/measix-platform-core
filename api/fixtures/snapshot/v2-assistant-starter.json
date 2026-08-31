@@ -1,0 +1,84 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 2,
+  "managedGeneration": 1,
+  "releaseId": "rel_550e8400-e29b-41d4-a716-446655440000",
+  "snapshotHash": "sha256:60d5202cd020ed2841094413ae2f8ca5ab953f15197ea254f33a1688ae511b2d",
+  "providers": [
+    {
+      "providerId": "prv_550e8400-e29b-41d4-a716-446655440000",
+      "displayName": "OpenAI Provider",
+      "clientProtocol": "OPENAI_CHAT_COMPLETIONS",
+      "enabled": true
+    }
+  ],
+  "models": [
+    {
+      "modelId": "mdl_550e8400-e29b-41d4-a716-446655440000",
+      "providerId": "prv_550e8400-e29b-41d4-a716-446655440000",
+      "displayName": "GPT-4o",
+      "upstreamModelKey": "gpt-4o",
+      "runtimePath": "/v1/chat/completions",
+      "inputModalities": ["TEXT", "IMAGE"],
+      "outputModalities": ["TEXT"],
+      "capabilities": ["TOOL", "REASONING"],
+      "enabled": true
+    }
+  ],
+  "tts": [],
+  "asr": [],
+  "mcp": [
+    {
+      "mcpServerId": "mcp_550e8400-e29b-41d4-a716-446655440000",
+      "displayName": "Enterprise Updates MCP",
+      "clientProtocol": "MCP_STREAMABLE_HTTP",
+      "runtimePath": "/v1/enterprise-updates",
+      "authOwnership": "ENTERPRISE_MANAGED",
+      "enabled": true
+    }
+  ],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": false,
+    "allowLocalTts": false,
+    "allowLocalAsr": false,
+    "allowLocalMcp": false
+  },
+  "metadata": {
+    "publishedAt": "2026-08-28T00:00:00Z"
+  },
+  "assistants": [
+    {
+      "assistantDefinitionId": "asd_550e8400-e29b-41d4-a716-446655440000",
+      "displayName": "Enterprise Assistant",
+      "description": "Managed enterprise assistant with updates capability",
+      "systemPrompt": "You are a helpful enterprise assistant. Use get_enterprise_updates to fetch the latest company news when asked.",
+      "modelId": "mdl_550e8400-e29b-41d4-a716-446655440000",
+      "memorySeed": [
+        "The company name is Measix Corp.",
+        "All employees must check enterprise updates daily."
+      ],
+      "mcpServerIds": ["mcp_550e8400-e29b-41d4-a716-446655440000"],
+      "enabled": true
+    }
+  ],
+  "starters": [
+    {
+      "starterId": "str_550e8400-e29b-41d4-a716-446655440000",
+      "assistantDefinitionId": "asd_550e8400-e29b-41d4-a716-446655440000",
+      "title": "Recent Enterprise Updates",
+      "prompt": "What are the latest enterprise updates?",
+      "description": "Fetch and summarize the most recent company news",
+      "sortOrder": 0,
+      "enabled": true
+    },
+    {
+      "starterId": "str_660e8400-e29b-41d4-a716-446655440000",
+      "assistantDefinitionId": "asd_550e8400-e29b-41d4-a716-446655440000",
+      "title": "Help me with my work",
+      "prompt": "Can you help me with my daily tasks?",
+      "sortOrder": 1,
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,259 @@
+openapi: 3.0.3
+info:
+  title: MEASIX Usage Ingest API
+  version: 1.0.0
+paths:
+  /internal/v1/usage/request-events:batch:
+    post:
+      operationId: ingestRequestUsageBatch
+      security:
+      - serviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsageBatch'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageBatchAck'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+components:
+  schemas:
+    DeploymentId:
+      type: string
+      pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    UserId:
+      type: string
+      pattern: ^usr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DeviceId:
+      type: string
+      pattern: ^dev_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    EnrollmentId:
+      type: string
+      pattern: ^enr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    SessionId:
+      type: string
+      pattern: ^ses_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    InstallationId:
+      type: string
+      pattern: ^ins_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ProviderId:
+      type: string
+      pattern: ^prv_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ModelId:
+      type: string
+      pattern: ^mdl_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    TtsId:
+      type: string
+      pattern: ^tts_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AsrId:
+      type: string
+      pattern: ^asr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    McpServerId:
+      type: string
+      pattern: ^mcp_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    PolicyId:
+      type: string
+      pattern: ^pol_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DraftId:
+      type: string
+      pattern: ^drf_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ReleaseId:
+      type: string
+      pattern: ^rel_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    UpstreamId:
+      type: string
+      pattern: ^ups_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    SecretId:
+      type: string
+      pattern: ^sec_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    RuntimeRouteId:
+      type: string
+      pattern: ^rte_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ActivationId:
+      type: string
+      pattern: ^act_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    RequestId:
+      type: string
+      pattern: ^req_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    InteractionId:
+      type: string
+      pattern: ^int_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    PricingRuleId:
+      type: string
+      pattern: ^prc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    IdempotencyKey:
+      type: string
+      pattern: ^idem_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    Sha256Hash:
+      type: string
+      pattern: ^sha256:[0-9a-f]{64}$
+    Problem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+        detail:
+          type: string
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        activationId:
+          $ref: '#/components/schemas/ActivationId'
+        targetManagedGeneration:
+          type: integer
+          minimum: 0
+        currentDraftRevision:
+          type: integer
+          minimum: 0
+        forwarded:
+          type: boolean
+    ValidationIssue:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - severity
+      - path
+      - message
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+          enum:
+          - ERROR
+          - WARNING
+        path:
+          type: string
+        message:
+          type: string
+    RequestUsageEvent:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - deploymentId
+      - userId
+      - managedGeneration
+      - controlRevision
+      - startedAt
+      - completedAt
+      - forwarded
+      - httpStatus
+      - requestBytes
+      - responseBytes
+      - durationMs
+      properties:
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        interactionId:
+          $ref: '#/components/schemas/InteractionId'
+        deploymentId:
+          $ref: '#/components/schemas/DeploymentId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        deviceId:
+          $ref: '#/components/schemas/DeviceId'
+        resourceId:
+          x-go-type-skip-optional-pointer: true
+          type: string
+        runtimeRouteId:
+          x-go-type-skip-optional-pointer: true
+          $ref: '#/components/schemas/RuntimeRouteId'
+        upstreamId:
+          x-go-type-skip-optional-pointer: true
+          $ref: '#/components/schemas/UpstreamId'
+        managedGeneration:
+          type: integer
+          minimum: 0
+        controlRevision:
+          type: integer
+          minimum: 0
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        forwarded:
+          type: boolean
+        httpStatus:
+          type: integer
+          minimum: 100
+          maximum: 599
+        upstreamHttpStatus:
+          type: integer
+          minimum: 100
+          maximum: 599
+        requestBytes:
+          type: integer
+          minimum: 0
+        responseBytes:
+          type: integer
+          minimum: 0
+        durationMs:
+          type: integer
+          minimum: 0
+        errorClass:
+          type: string
+    UsageBatch:
+      type: object
+      additionalProperties: false
+      required:
+      - events
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/RequestUsageEvent'
+    UsageBatchAck:
+      type: object
+      additionalProperties: false
+      required:
+      - acceptedCount
+      - duplicateCount
+      properties:
+        acceptedCount:
+          type: integer
+          minimum: 0
+        duplicateCount:
+          type: integer
+          minimum: 0
+  responses:
+    Problem:
+      description: Problem response
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  securitySchemes:
+    serviceAuth:
+      type: http
+      scheme: bearer

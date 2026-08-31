@@ -1,153 +1,116 @@
 # Operations
 
-This document owns the executable operating procedures for `measix-platform-core`. Architecture defines operational invariants and component semantics; this document records how the built software is configured, started, observed, backed up, restored and upgraded.
+This document owns concrete operating procedures, configuration and current limitations. Architecture owns required behavior; [the alignment audit](architecture-alignment-audit.md) records the 2026-08-31 source baseline and remediation plan. A documented target is not an implemented production package.
 
-## 1. Scope
+## 1. Implemented topology
 
-Production S0 server-side artifacts are:
+Current daemons are `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. `devmigrate` and `generate-android-wire` are utilities, not services. Enterprise Tool Gateway, service units and a production installation package do not exist yet.
 
-```text
-control-hub     long-running Go process
-runtime-relay   long-running Go process
-Admin Console   static SPA build served by Control Hub/Ingress
-```
+Admin is a static Quasar SPA. Supply `--admin-assets-dir <console/dist/spa>` (or `HUB_ADMIN_ASSETS_DIR`) to the Hub daemon; startup rejects a missing `index.html`, and the existing static handler owns `/admin` and deep links. Omitting the option leaves static hosting disabled. Production ingress must route `/api/client/v1`, `/api/admin/v1`, `/admin` to Hub and `/runtime/v1` to Relay under one origin; test-library hosting does not qualify production TLS/ingress.
 
-This document must not redefine product state such as Publish, Activation or Managed Generation. It documents the operational actions around the implementation.
+`npm start`, `concurrently`, `go run`, and Node/Go harness process orchestration are development/test tools, not a production supervisor. See [development](development.md) for local startup; Relay usage delivery uses the private Hub listener.
 
-## 2. Configuration ownership
+## 2. Configuration actually implemented
 
-The complete implemented configuration surface belongs to source/config definitions plus this document. Architecture documents may require specific categories of configuration but should not maintain a duplicate exhaustive environment-variable list.
+Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/config.go`. CLI flags override environment defaults; duration environment values are parsed before flags, so an invalid environment duration can fail loading even with a valid flag. All options are startup configuration; there is no hot reload.
 
-When configuration code lands, document each production option here with:
+### Control Hub
 
-```text
-name
-component
-required/default
-format/range
-secret? yes/no
-restart required?
-operational effect
-```
+| Flag | Environment | Default / requirement |
+| --- | --- | --- |
+| `--listen` | `HUB_LISTEN_ADDR` | `:8080` |
+| `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8081`; keep private |
+| `--admin-assets-dir` | `HUB_ADMIN_ASSETS_DIR` | Optional production SPA directory |
+| `--db` | `HUB_DB_PATH` | Required SQLite path |
+| `--master-key-file` | `HUB_MASTER_KEY_FILE` | Required AES-256 key file; secret |
+| `--jwt-private-key-file` | `HUB_JWT_PRIVATE_KEY_FILE` | Required Ed25519 key file; secret |
+| `--relay-internal-url` | `RELAY_INTERNAL_URL` | Required absolute HTTP(S) URL; private |
+| `--relay-service-token-file` | `HUB_RELAY_SERVICE_TOKEN_FILE` | Required token file; secret |
+| `--access-token-ttl` | `HUB_ACCESS_TOKEN_TTL` | `10m`; positive, at most `10m` |
+| `--reconcile-interval` | `HUB_RECONCILE_INTERVAL` | `10s`; positive |
 
-Do not document an environment variable until it actually exists in code.
+Android sessions have a seven-day rolling idle deadline, renewed only by refresh. Refresh rotates credentials and requires a stable per-command `Idempotency-Key`; the same old credential/key recovers the identical encrypted response for two minutes without extending the lease twice. Rotation recovery survives Hub restart using master-key-derived encryption. Persist client pending refresh input/key before sending; a different key conflicts, and an expired recovery window requires re-enrollment. Old fixed-TTL and absolute Discovery URL flags were removed; Discovery returns same-origin paths.
 
-Production secrets are referenced through configured secret material/files/services as implemented; plaintext values never belong in Git, docs, CI logs or test artifacts.
+Logout revokes the durable Android session and clears rotation recovery. The existing Hub reconciler projects pending session denies through a SECURITY_CHANGE Activation; HTTP 204 is not Relay acknowledgement. Previously issued access may remain usable until the deny applies or its short expiry. Disable/revoke also invalidate sessions; enabling a user does not resurrect credentials. A new administrator-issued enrollment may replace sessions on the same ACTIVE installation/user, but cannot revive a revoked device or transfer another user's installation.
 
-## 3. Filesystem/persistence ownership
+### Runtime Relay
 
-At minimum operations must distinguish:
+| Flag | Environment | Default / requirement |
+| --- | --- | --- |
+| `--public-listen` | `RELAY_PUBLIC_LISTEN_ADDR` | `:8090` |
+| `--internal-listen` | `RELAY_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8091`; must differ from public listen string |
+| `--spool` | `RELAY_SPOOL_PATH` | `relay-spool.db`; nonempty |
+| `--hub-usage-url` | `HUB_USAGE_URL` | Required; Hub **private** usage-ingest endpoint |
+| `--hub-service-token-file` | `RELAY_HUB_SERVICE_TOKEN_FILE` | Required token file; secret |
+| `--usage-batch-size` | `RELAY_USAGE_BATCH_SIZE` | `100`; range `1..200` |
+| `--usage-flush-interval` | `RELAY_USAGE_FLUSH_INTERVAL` | `1s`; positive |
+| `--shutdown-grace` | `RELAY_SHUTDOWN_GRACE` | `30s`; positive |
 
-- Control Hub database and its migration/backup lifecycle;
-- Runtime Relay local durable spool and its restart/replay lifecycle;
-- static Admin build assets;
-- service credentials/configuration;
-- transient logs/temp/test data.
+Both default private listeners are loopback-only. Isolate both internal listeners; never publish them through public ingress. The servers use HTTP listeners, not built-in TLS termination. Current wiring reuses one token for Hub→Relay control and Relay→Hub usage: separate configuration names do not establish separate trust scopes.
 
-Concrete paths are documented here when implementation fixes them. Paths in source/config are the final implementation truth.
+Use restricted secret files and persistent, explicitly resolved DB/spool paths. Key decoding/accepted formats belong to `backend/internal/hub/security`; verify against it when provisioning. Never place secret values in command history, Git, logs or support bundles.
 
-## 4. Health and readiness
+## 3. Bootstrap and startup
 
-Both server binaries expose liveness/readiness endpoints according to their component implementation specs.
+`control-hub` has `run`, `bootstrap-admin`, `check` and `backup` subcommands. Inspect each subcommand's flags with `--help`; maintenance commands do not use the full run configuration. Default bootstrap refuses an existing deployment; `--if-empty` skips an initialized deployment without resetting credentials, while `--add-admin` explicitly adds an administrator. They are mutually exclusive. Initial bootstrap accepts `--timezone <IANA zone>` (default UTC) for Enterprise Update date boundaries. Use its password-file input, not a password printed into shared logs.
 
-Operational checks must distinguish:
+Apply/review migrations before startup; `run` does not auto-migrate. Startup opens/checks the database, requires the deployment invariant and initializes runtime services. See [database migrations](database-migrations.md) for limits of the check and development helper.
 
-- process alive;
-- component ready to serve its public/internal responsibility;
-- degraded subsystems such as control synchronization or usage spool;
-- version/build identity.
+Start Hub/Relay, wait for explicit readiness, verify desired/applied control state, then expose traffic. Relay cannot serve authorized runtime traffic before valid control state is applied. Process liveness does not prove activation, usage delivery or static hosting.
 
-A load balancer/readiness probe must not convert a meaningful degraded state into a false “healthy” interpretation.
+## 4. Health and status
 
-## 5. Startup
+| Component | Public probes | Status | Interpretation |
+| --- | --- | --- | --- |
+| Hub | `/live`, `/ready` | Authenticated Admin System API | Ready after initialization; Relay runtime can still be `DEGRADED` |
+| Relay | `/live`, `/ready` | Private `/internal/v1/control/status`, service authentication | Ready once control state exists; spool degradation is separate |
 
-The production start sequence must be reproducible from a clean deployment:
+OpenAPI/router registrations own exact responses. The unauthenticated System health endpoint only probes the local DB connection; full schema/Relay/usage diagnostics stay in authenticated System status and the maintenance command. Hub System reports the current schema revision expected by the binary (derived from embedded migrations), not an attestation of applied Atlas history. It forwards Relay spool state, pending count and oldest age; absent observations remain unknown, not zero. Ingest lag is separate from backlog. Hub build identity defaults to `dev` unless supplied at build time; release provenance must pin binaries and static assets.
 
-```text
-validate configuration
-→ apply/verify required DB migrations
-→ start Control Hub / Runtime Relay
-→ wait for bounded readiness
-→ verify desired/applied runtime state where applicable
-→ expose traffic
-```
+## 5. Shutdown and durability
 
-Runtime Relay restart begins fail-closed until valid control state is rehydrated, as defined by architecture. This document will record the exact commands once the binaries/tooling exist.
+Shared HTTP serving handles SIGINT/SIGTERM and invokes bounded drain: Hub uses 30 seconds, Relay its configured grace. After drain/deadline it cancels request contexts, closes connections, rejects new admission and waits up to five seconds for handler cleanup before returning. Relay returns server errors through its owner so final flush and deferred spool close still run. Handlers must honor cancellation; production supervisor hard-stop qualification remains S0.3.
 
-## 6. Graceful shutdown
+Normal Relay shutdown attempts one final usage flush, capped at two seconds, and preserves the durable spool. It does not guarantee the entire backlog reaches Hub before exit. Sender retry/backoff and poison-batch splitting exist; the recorder degraded flag remains latched until restart. Diagnose failures before restart; never delete the spool as routine recovery.
 
-Operational stop/restart uses the binaries' graceful shutdown behavior rather than process killing as the normal path.
+## 6. Persistence, backup and restore
 
-Tests and runbooks must cover:
+Hub owns its control/identity/usage SQLite database. Relay owns its local durable usage spool. Neither reads the other's database. Keep both outside replaceable binary directories; handle SQLite auxiliary files correctly when moving a stopped database.
 
-- stop accepting new work;
-- bounded drain;
-- cancellation after grace timeout;
-- durable data/spool preservation;
-- restart and readiness recovery.
-
-Exact signals/timeouts are documented here when implemented/configurable.
-
-## 7. Backup and restore
-
-Before S0 RC, repository tooling and this document must provide a tested Control Hub backup/restore procedure.
-
-The procedure must prove that after restore the facts required by the S0 System Testing Spec remain correct, including stable IDs, releases/generations and usage state where applicable.
-
-A backup is not considered valid merely because a database file exists; restore must be exercised in automated/system testing.
-
-Relay spool backup is not a substitute for its own durable replay semantics. Operational handling should avoid silently discarding pending usage.
-
-## 8. Upgrade
-
-Upgrade procedure includes:
+Current commands, with paths supplied by the operator:
 
 ```text
-pin release artifacts
-→ verify architecture/release manifest
-→ backup as required
-→ apply migrations
-→ deploy binaries/static assets
-→ readiness/control-state verification
-→ smoke/system checks
+control-hub check --db <hub.db>
+control-hub backup --db <hub.db> --output <new-backup.db>
 ```
 
-If rollback requires database restore or forward migration rather than binary downgrade, the release documentation must say so explicitly.
+Backup uses SQLite `VACUUM INTO` and writes an adjacent `.metadata.json`. Both targets are exclusively reserved; existing database or orphan metadata is not overwritten. Source and copied database pass integrity/foreign-key/current-column checks before metadata is synced. Metadata records the binary's expected migration revision. These checks do not replace an isolated restore/business replay.
 
-## 9. Observability
+`check` derives required tables/columns from current Ent schema, including Enterprise Update and session recovery; it checks SQLite integrity/foreign keys. It does not attest indexes, column type equivalence or complete applied Atlas history. Success is necessary but insufficient for release/upgrade.
 
-As implementation lands, document:
+There is no restore CLI or fully packaged production restore runbook. Before replacing any deployment database, restore a copy in an isolated environment with matching binaries, required keys and migrations; check integrity, identities, releases/generations and usage, then run recovery scenarios. Never experiment on the only production copy; keep the original recoverable until acceptance.
 
-- structured log fields and correlation IDs;
-- health/status endpoints;
-- relevant queue/spool/backlog indicators;
-- build/version identity;
-- diagnostics that are safe to collect in CI/operations.
+## 7. S0.3 supervision and logging deliverables
 
-Never expose credentials, private signing material or secret plaintext through logs/status endpoints.
+Implement supervision **within S0.3**, using host-native service management, not a fourth custom orchestration daemon. The reference is Linux `systemd` + `journald`; other platforms must prove equivalent behavior. Architecture owns the [Gateway operational contract](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-enterprise-tool-gateway-contract-spec.md); unit names, concrete timeouts, paths and commands belong here once implemented.
 
-## 10. Incident/troubleshooting entries
+Required package: one unit per Hub/Relay/Gateway, one aggregate target/group, independent failure domains, least privilege, immutable builds, private/public binding, readiness separate from ordering, bounded restart delay/rate limiting, permanent configuration-failure handling, graceful stop followed by supervisor termination after timeout, install/upgrade/recovery commands and failure-injection tests. None is production-qualified merely by being listed here.
 
-Troubleshooting belongs here only for implementation/operations facts such as:
+Hub/Relay currently use `slog.JSONHandler` on stdout (`time`, `level`, `msg`). They do not consistently attach `service`, `buildVersion`, stable `event` or correlations. Raw error logging does not establish redaction.
 
-- migration failure;
-- Relay not ready after restart;
-- control revision mismatch;
-- usage backlog not draining;
-- Admin static asset/routing failure.
+The S0.3 shared initializer must attach `time`, `level`, `msg`, `service`, `buildVersion`, `event`; add request/interaction/activation/deployment/generation/control/resource/tool IDs, duration/outcome/errorCode only when applicable. Log route templates, not raw query strings. Supervisor collection owns rotation, bounded size/time retention and safe export; services do not share/rotate log files. No centralized log-search platform is required.
 
-If troubleshooting requires explaining what a platform state *means*, link to `measix-architecture` instead of creating a local alternate semantic description.
+Never emit tokens, cookies, credentials, enrollment/session/signing material, private endpoints, toolRef/claims, raw prompts/bodies/tool arguments/results or direct personal identity. Test normal and failure diagnostics for forbidden material. References: [systemd service lifecycle](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [journald retention](https://www.freedesktop.org/software/systemd/man/252/journald.conf.html); documentation is not runtime qualification.
 
-## 11. RC operational proof
+## 8. Troubleshooting and release gate
 
-Before RC, operations are considered ready only when system tests exercise:
+| Symptom | Safe first checks |
+| --- | --- |
+| Usage never arrives | URL must use Hub private port (default `8081`, not `8080`); inspect token, spool status and ingest errors |
+| Relay not ready after restart | Inspect Hub reconcile and Relay applied revision; do not bypass authentication/inject state |
+| Hub ready but runtime degraded | Compare desired/applied revision and activation; readiness is not convergence |
+| `/admin` missing or deep links fail | Check actual static host/ingress; verify `--admin-assets-dir`, `index.html` and same-origin ingress |
+| Migration/check disagreement | Inspect reviewed migration history/schema; column presence is not a migration-history proof |
+| Repeated process crash | Preserve diagnostics/persistent data; no production restart-rate-limit package exists yet |
 
-- clean deployment/bootstrap;
-- migration replay/upgrade;
-- Hub/Relay restart;
-- backup/restore;
-- usage replay;
-- target-resource/load checks;
-- version/build/manifest traceability.
-
-See `docs/release.md` and `docs/testing.md`.
+Upgrade must pin artifacts, verify applicable evidence, back up, apply reviewed migrations, deploy, validate readiness/control/static routing and run smoke/recovery checks. Binary downgrade is not assumed safe after schema changes. RC also needs isolated restore, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).

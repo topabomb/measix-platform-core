@@ -1,0 +1,7 @@
+package: clientapi
+output: backend/internal/wire/clientapi/client.gen.go
+generate:
+  models: true
+  chi-server: true
+output-options:
+  skip-prune: true

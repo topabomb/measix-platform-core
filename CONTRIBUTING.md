@@ -41,7 +41,7 @@ Refactor: improve structure without weakening the test
 
 The Red test should preferably fail on a behavioral assertion rather than because of an unrelated compile/configuration error. The failing test remains in the final change.
 
-See `docs/tdd.md` for local and GitHub-only workflows.
+See `docs/testing.md` (§11–18) for local and GitHub-only TDD workflows.
 
 ## 4. Commit discipline
 

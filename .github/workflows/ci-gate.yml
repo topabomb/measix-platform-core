@@ -9,21 +9,167 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-gate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.26.5'
+  NODE_VERSION: '22.17.0'
+  PNPM_VERSION: '11.0.0'
+
 jobs:
-  ci-gate:
-    runs-on: ubuntu-latest
+  static-contract:
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+
+      - name: 设置 Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: 恢复 Go dependency/build cache
+        id: go-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ env.GO_VERSION }}-
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: 固定 pnpm 版本
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+          echo "PNPM_STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: 恢复 pnpm store cache
+        id: pnpm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('console/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-
+
+      - uses: ariga/setup-atlas@v0
+        with:
+          version: 'v1.2.0'
+
+      - name: 验证确定性生成链
+        id: generate
+        run: make generate
+
+      - name: 保存 Go cache
+        if: ${{ steps.generate.outcome == 'success' && steps.go-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('backend/go.sum') }}
+
+      - name: 保存 pnpm store cache
+        if: ${{ steps.generate.outcome == 'success' && steps.pnpm-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('console/pnpm-lock.yaml') }}
+
+      - name: 验证证据与开发工具
+        run: node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs
+
+      - name: 执行 T0 静态与契约门禁
+        run: make fmt-check contract migrations generated-drift
+
+  backend-test:
+    needs: static-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.26.5'
-      - name: Run repository gate
-        shell: bash
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: 恢复 Go dependency/build cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ env.GO_VERSION }}-
+      - name: 执行 Backend T1/T2 门禁
+        run: make backend-test
+
+  system-test:
+    needs: static-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: 恢复 Go dependency/build cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ env.GO_VERSION }}-
+      - name: 执行 S0.1 T3 系统 harness 门禁
+        run: make system-test
+
+  console-test:
+    needs: static-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - name: 固定 pnpm 版本
         run: |
-          if [ -f Makefile ]; then
-            make ci
-          else
-            cd backend
-            go test ./pkg/platformid -run TestCanonicalKindsGenerateAndValidateUUIDv4 -count=1
-          fi
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+          echo "PNPM_STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+      - name: 恢复 pnpm store cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('console/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-
+      - name: 执行 Admin Console T1/T2 门禁
+        run: make console-test
+
+  ci-gate:
+    if: ${{ always() }}
+    needs: [static-contract, backend-test, system-test, console-test]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 汇总 required gate
+        run: |
+          test "${{ needs.static-contract.result }}" = "success"
+          test "${{ needs.backend-test.result }}" = "success"
+          test "${{ needs.system-test.result }}" = "success"
+          test "${{ needs.console-test.result }}" = "success"

@@ -1,0 +1,10 @@
+{
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "userId": "usr_550e8400-e29b-41d4-a716-446655440000",
+  "deviceId": "dev_550e8400-e29b-41d4-a716-446655440000",
+  "sessionId": "ses_550e8400-e29b-41d4-a716-446655440000",
+  "accessToken": "synthetic.jwt.token",
+  "accessTokenExpiresAt": "2026-08-19T03:00:00Z",
+  "refreshToken": "synthetic-refresh-token",
+  "refreshExpiresAt": "2026-09-18T03:00:00Z"
+}

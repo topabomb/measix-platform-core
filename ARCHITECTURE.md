@@ -1,22 +1,27 @@
 # Implementation Architecture
 
-> Authority boundary: this document defines the implementation structure and dependency rules of `measix-platform-core`. Product semantics and S0 architecture remain authoritative in `topabomb/measix-architecture`.
+> Authority boundary: this document defines the implementation structure, dependency rules, and documentation governance of `measix-platform-core`. Product semantics and S0 architecture remain authoritative in `topabomb/measix-architecture`.
 
 ## 1. Repository role
 
-This repository implements three S0 logical components:
+This repository owns four S0 logical components:
 
 ```text
 Control Hub     → Go binary
 Runtime Relay   → Go binary
+Enterprise Tool Gateway → Go binary (S0.3 target; not present yet)
 Admin Console   → Quasar/Vue SPA build
 ```
 
-It also owns the executable API contracts, database migrations, test/qualification infrastructure, CI and operational procedures needed to prove those components satisfy the architecture.
+It also owns executable API contracts, database migrations, qualification/system-test infrastructure, CI and operational procedures needed to prove those components satisfy architecture.
 
-This document must not restate Publish semantics, Managed State semantics, stable ID meaning, Runtime admission rules, or S0 Exit requirements. Those belong to `measix-architecture`.
+This document must not restate Publish semantics, Managed State semantics, stable ID meaning, Runtime admission rules or S0 Exit requirements. Those belong to `measix-architecture`.
 
-## 2. Target source layout
+## 2. Source ownership and current layout
+
+The architecture implementation decisions define logical repository responsibilities. The **actual source tree is authoritative for concrete physical file locations** once implementation exists.
+
+Current implementation is organized as:
 
 ```text
 api/
@@ -29,26 +34,32 @@ api/
 backend/
 ├── cmd/control-hub/
 ├── cmd/runtime-relay/
+├── cmd/devmigrate/
+├── cmd/generate-android-wire/
 ├── pkg/platformid/
+├── internal/common/
+├── internal/wire/
 ├── internal/hub/
 ├── internal/relay/
 ├── ent/
-└── migrations/
+├── migrations/
+└── test/system/          # current Go-module system harness
 
 console/
+├── src/
+└── e2e/                 # existing browser E2E
 
-test/
-├── qualification/
-└── system/
+scripts/                # Node browser/candidate/evidence orchestration
+docs/
 ```
 
-The architecture repository may prescribe important boundaries, but the actual source tree in this repository is the authority for concrete package/file locations once implementation exists.
+The Go harness is under `backend/test/system/` to run inside the Go module and reuse permitted internal test boundaries. Node browser/candidate orchestration also exists under `scripts/`; these are two concrete environments, not a single physical harness. Same-environment product closure and shared contract/evidence rules remain required. Planned S0.3 paths are `backend/cmd/enterprise-tool-gateway/` and `api/internal/gateway-control.openapi.yaml`; neither is current source.
 
 ## 3. Dependency direction
 
 ### Control Hub
 
-`control-hub` owns identity, capability draft/release state, desired runtime control, Admin/Client control APIs, usage ledger and persistence.
+`control-hub` owns identity, capability draft/release state, desired runtime control, Admin/Client control APIs, usage ledger and Hub persistence.
 
 Its internal packages may depend on generated Admin/Client/Internal wire types and Hub persistence packages.
 
@@ -56,32 +67,59 @@ Its internal packages may depend on generated Admin/Client/Internal wire types a
 
 `runtime-relay` is a separate binary and failure domain. It must not import Hub domain/service/Ent packages or access `hub.db`.
 
-Permitted shared code between Hub and Relay is intentionally narrow:
+Permitted shared production code between Hub and Relay is intentionally narrow:
 
 - `backend/pkg/platformid` or equivalent pure identifier utility;
 - generated wire types required by their direct protocol;
-- generic helpers with no Hub business semantics;
-- test-only helpers where production dependency direction is unchanged.
+- generic helpers with no Hub business semantics.
+
+Test-only helpers are allowed where production dependency direction remains unchanged.
+
+### Enterprise Tool Gateway
+
+`enterprise-tool-gateway` is an S0.3 separate binary/failure domain. It consumes only Hub-compiled Gateway control, accepts runtime traffic only from Relay private service identity, owns applied catalog/search/toolRef/downstream MCP execution, and never reads Hub persistence or validates Android bearer tokens directly.
+
+Permitted shared production code remains narrow: generated direct wire types, pure identifier/canonicalization helpers and generic server/logging helpers with no Hub durable-domain semantics. The Gateway binary and `gateway-control.openapi.yaml` do not currently exist; documentation must preserve that implementation gap until source and executable contracts land.
 
 ### Admin Console
 
-The Admin Console consumes only the Admin OpenAPI surface and same-origin public paths. It does not call Relay internal APIs and does not define a second business-validation model.
+Admin consumes only the Admin OpenAPI surface and same-origin public paths. It does not call Relay internal APIs and does not define a second business-validation model.
 
 ## 4. Executable contract ownership
-
-Architecture semantics flow into executable contracts as follows:
 
 ```text
 measix-architecture
   semantic / state / error / security requirements
         ↓
 api/*.openapi.yaml
-  executable HTTP/wire shape
+  exact executable HTTP/wire shape
         ↓
 code generation + canonical fixtures
         ↓
 Go / TypeScript / Android consumers
 ```
+
+### Ownership table
+
+| Subject | Authority |
+|---|---|
+| Phase/Stage/sub-stage scope | `measix-architecture` |
+| Product/UX requirements | `measix-architecture` |
+| Terminology / stable IDs | `measix-architecture` |
+| Cross-component state/wire/error/security semantics | `measix-architecture` |
+| Required component/system scenarios | `measix-architecture` |
+| Stage reading lists | `measix-architecture/docs/measix-stage-document-index.md` |
+| Exact executable HTTP schema | `api/*.openapi.yaml` |
+| Canonical fixtures | `api/fixtures/` |
+| Source/package/UI structure | source tree + local implementation docs |
+| Concrete frontend/Go dependencies | package manifests/lockfiles |
+| Ent schema / Atlas migrations | repository source |
+| Build/test/CI/operations | repository tooling + local docs |
+| Freeze/RC evidence | exact candidate artifacts generated by repository tooling |
+
+Do not create local copies of architecture contracts, stage reading lists, protocol documents or identifier tables.
+
+### Contract-change workflow
 
 Rules:
 
@@ -89,52 +127,126 @@ Rules:
 2. `api/*.openapi.yaml` is authoritative for exact executable HTTP schema in this repository.
 3. generated code is never manually edited.
 4. canonical cross-component fixtures live only under `api/fixtures/`.
-5. a wire-semantic change starts in the architecture repository; a non-semantic schema completion may be made here if it does not contradict architecture.
+5. a semantic wire change starts in architecture; a non-semantic schema completion may be implemented locally only when it cannot change client interpretation.
 
-See `docs/api-contracts.md`.
+A semantic wire/state/ID/security change requires architecture authority first. Then update, as applicable:
+
+```text
+OpenAPI → fixtures → generated artifacts → tests → implementation
+```
+
+See `docs/api-contracts.md` for the full contract/codegen/freeze workflow.
 
 ## 5. Persistence ownership
 
-Control Hub persistent application state uses SQLite + Ent with Atlas versioned migrations. Runtime Relay persists only its own durable runtime data such as the usage spool and does not share Hub ORM state.
+Control Hub persistent application state uses SQLite + Ent with Atlas versioned migrations. Runtime Relay persists only its own durable runtime data such as usage spool and does not share Hub ORM state.
 
-The repository is authoritative for:
-
-- actual Ent schemas;
-- migration SQL and `atlas.sum`;
-- database bootstrap/upgrade commands;
-- migration tests and operational procedures.
-
-The architecture repository remains authoritative for persistence invariants such as durability, ownership, atomicity and recovery semantics.
+This repository is authoritative for actual Ent schemas, migration SQL/`atlas.sum`, bootstrap/upgrade commands and migration tests. Architecture remains authoritative for durability, ownership, atomicity and recovery invariants.
 
 ## 6. Test architecture
 
-Tests mirror the S0 Testing Specs rather than duplicating them:
+Executable tests mirror architecture gates rather than duplicate their semantics:
 
 ```text
 T0 Static / Contract
 T1 Unit / Domain
 T2 Component Integration
 T3 Cross-component Integration
-T4 S0 System / E2E
+T4.1 S0.1 pre-Android Product/System E2E
+T4.2 S0.2 Realm/Experience Product
+T4.3 S0.3 Gateway Product
+T4.4 S0.4 Android Integration
+T4 final S0 System RC
 ```
 
-This repository owns Hub, Relay and Admin component tests, Adapter qualification infrastructure, and the S0 system harness. Android component/instrumentation tests remain in `rikkahub_mcp`; T4 combines fixed commits from both repositories.
+This repository owns Hub/Relay/Admin tests and future Gateway tests, qualification infrastructure, deterministic/system harnesses and server-side product evidence. Android component/instrumentation tests remain in `rikkahub_mcp`; Portal has its own product implementation. Final S0 T4 combines all applicable pinned repositories and builds.
 
-Required scenario semantics and IDs (`HUB-*`, `RLY-*`, `ADM-*`, `SYS-*`) come from `measix-architecture`. Test code here must reference those IDs where applicable.
+Critical scenario semantics/IDs come from architecture, including:
 
-See `docs/testing.md` and `docs/tdd.md`.
+```text
+HUB-*   Control Hub
+RLY-*   Runtime Relay
+ADM-*   Admin Console
+CAP-*   S0.1 Capability Delivery
+ERX-*   S0.2 Realm/Experience
+ETG-*   S0.3 Enterprise Tool Gateway
+AND-*   S0.4 Android integration
+SYS-*   final S0 system/RC
+```
 
-## 7. Change boundary
+Tests here reference those IDs where applicable; this repository must not invent new cross-component product semantics locally.
 
-A change must first update `measix-architecture` when it alters any of these:
+Default GitHub Actions CI deliberately proves deterministic T0–T3 only. T4.1 real-browser candidate verification and real external Adapter qualification are explicit S0.1 promotion gates; a Green `ci-gate` is not C6/C7/S0.1 Freeze evidence.
+
+See `docs/testing.md` for executable test organization, CI design, and the TDD cycle.
+
+## 7. Documentation governance
+
+### Local documents
+
+- `ARCHITECTURE.md` (this file) — implementation dependency/source ownership boundaries and documentation governance.
+- `docs/s0-execution-progress.md` — **living current implementation status and gaps only**.
+- `docs/admin-console-implementation.md` — concrete Admin implementation decisions/facts; does not restate Product/UX requirements.
+- `docs/api-contracts.md` — executable contract/codegen/freeze workflow.
+- `docs/development.md` — engineering workflow and actual local/system harness commands.
+- `docs/testing.md` — executable test organization, CI design, and TDD.
+- `docs/database-migrations.md` — persistence migration workflow.
+- `docs/operations.md` — runtime operations.
+- `docs/release.md` — freeze/RC evidence composition.
+- `docs/architecture-alignment-audit.md` — dated source/evidence review and remediation plan, not a living status or semantic contract.
+- `docs/playwright-e2e-notes.md` — concrete browser entrypoints and evidence-based diagnosis.
+- `docs/s01-alignment-audit-plan.md` — retained 2026-08-27 historical audit, not a current completion claim.
+
+### Documentation rule
+
+A local document contains only information needed to implement, run, test or operate this repository. If a paragraph merely re-explains an architecture requirement without adding a local implementation consequence, replace it with a reference.
+
+Do not maintain the same current-state claim in multiple documents. `docs/s0-execution-progress.md` is the only living implementation/stage status document; audit reports, CI runs and manifests are evidence inputs, not competing status authorities.
+
+Stage-specific reading order is maintained only in `topabomb/measix-architecture/docs/measix-stage-document-index.md`.
+
+### Active implementation candidate vs default branch
+
+During active development, architecture may reference local implementation documents that exist on the current S0.1 implementation candidate before they are merged to `main`. In that situation:
+
+- architecture semantics still come only from `measix-architecture@main`;
+- concrete implementation/docs are read from the active core candidate branch/commit identified by the current PR/status;
+- completion claims always cite an exact implementation SHA;
+- Freeze/RC never uses a moving branch head — the manifest pins exact commits/builds.
+
+### Synchronization
+
+**Architecture semantic change:**
+
+```text
+architecture authority
+→ OpenAPI/fixtures/tests
+→ implementation
+→ downstream consumers when affected
+→ current progress re-evaluation
+```
+
+An architecture change that adds or strengthens a required scenario automatically reopens any previously Green checkpoint whose evidence did not prove the new requirement. Historical Green remains regression evidence only.
+
+**Pure implementation change:**
+
+Code layout, component decomposition, dependency choice, DB index, build tooling and UI internals stay in this repository unless they change an architectural boundary.
+
+### S0.1 Client Contract Freeze
+
+An accepted Snapshot v1 freeze proves only its pinned source/build/contract/artifact composition. A later HEAD does not inherit it. Candidate drafts, accepted evidence and retained historical declarations are different states; exact handling, the current two-phase writer/replay and known validation limits belong to [release procedures](docs/release.md). Never hand-edit evidence to claim success or overwrite a historical manifest during ordinary development.
+
+## 8. Change boundary
+
+Update `measix-architecture` first when a change alters:
 
 - platform terminology or stable identifier meaning;
 - S0 scope or component ownership;
-- cross-component state or lifecycle semantics;
+- cross-component state/lifecycle semantics;
 - HTTP/wire/error/idempotency semantics;
 - security/admission invariants;
 - required Component/System Testing Spec behavior.
 
-A change stays in this repository when it only changes implementation without changing those meanings, for example package refactoring, DB indexing, HTTP implementation details, CI optimization, test helpers, local tooling or UI component decomposition.
+Keep the change in this repository when it only changes implementation while preserving those meanings, such as package refactoring, DB indexing, HTTP implementation details, CI optimization, test helpers, local tooling or UI component decomposition.
 
-When implementation reveals an architectural ambiguity, do not choose a new semantic locally. Resolve the authority document first, then implement it here.
+When implementation reveals architectural ambiguity, do not choose a new semantic locally. Resolve the owning architecture authority first, then implement it here.

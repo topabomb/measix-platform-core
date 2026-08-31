@@ -1,0 +1,39 @@
+{
+  "providers": [],
+  "models": [
+    {
+      "modelId": "mdl_550e8400-e29b-41d4-a716-446655440000",
+      "providerId": "prv_550e8400-e29b-41d4-a716-446655440000",
+      "displayName": "GPT-4o",
+      "upstreamModelKey": "gpt-4o",
+      "runtimePath": "/v1/chat/completions",
+      "inputModalities": ["TEXT"],
+      "outputModalities": ["TEXT"],
+      "capabilities": ["TOOL"],
+      "enabled": false
+    }
+  ],
+  "tts": [],
+  "asr": [],
+  "mcp": [],
+  "bindings": [],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": false,
+    "allowLocalTts": false,
+    "allowLocalAsr": false,
+    "allowLocalMcp": false
+  },
+  "assistants": [
+    {
+      "assistantDefinitionId": "asd_550e8400-e29b-41d4-a716-446655440000",
+      "displayName": "Invalid Assistant",
+      "systemPrompt": "Test",
+      "modelId": "mdl_550e8400-e29b-41d4-a716-446655440000",
+      "memorySeed": ["seed1"],
+      "mcpServerIds": [],
+      "enabled": true
+    }
+  ],
+  "starters": []
+}

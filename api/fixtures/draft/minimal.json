@@ -1,0 +1,21 @@
+{
+  "draftId": "drf_550e8400-e29b-41d4-a716-446655440000",
+  "draftRevision": 1,
+  "content": {
+    "providers": [],
+    "models": [],
+    "tts": [],
+    "asr": [],
+    "mcp": [],
+    "bindings": [],
+    "policy": {
+      "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+      "allowLocalProviders": true,
+      "allowLocalTts": true,
+      "allowLocalAsr": true,
+      "allowLocalMcp": true
+    },
+    "assistants": [],
+    "starters": []
+  }
+}

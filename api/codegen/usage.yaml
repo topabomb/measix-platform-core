@@ -1,0 +1,7 @@
+package: usageingestapi
+output: backend/internal/wire/usageingestapi/usage.gen.go
+generate:
+  models: true
+  chi-server: true
+output-options:
+  skip-prune: true

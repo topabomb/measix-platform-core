@@ -1,172 +1,347 @@
-# Testing and CI
+# Testing, CI and TDD
 
-This document defines how `measix-platform-core` executes and records tests. Required behavior and critical scenarios remain authoritative in the S0 Component/System Testing Specs in `topabomb/measix-architecture`.
+This document defines how `measix-platform-core` executes and records tests, and the TDD discipline that governs them. Required behavior and critical scenarios remain authoritative in the S0.1/S0.2/S0.3/S0.4/Component/System Testing Specs in `topabomb/measix-architecture`.
 
 ## 1. Test layers
-
-The repository implements the S0 five-layer model:
 
 | Layer | Purpose | Repository implementation |
 |---|---|---|
 | T0 Static / Contract | schema, codegen, migration, fixture, build consistency | API validation, generated drift, migration replay, production build |
 | T1 Unit / Domain | pure validation/state/mapping | Go unit tests, Vitest unit/store helpers |
 | T2 Component Integration | one real component + local real boundaries | real SQLite, real HTTP server, component/static-host tests |
-| T3 Cross-component Integration | multiple real MEASIX components | real Hub↔Relay, Admin↔Hub, deterministic Adapter |
-| T4 S0 System / E2E | client-facing topology and full S0 flows | system harness + fixed Android repository commit |
+| T3 Cross-component Integration | multiple real MEASIX components | real Hub↔Relay, Admin↔Hub where implemented, deterministic Adapter |
+| T4.1 S0.1 Product/System E2E | pre-Android product topology | production browser + real Hub/Relay + Adapter + Test Client |
+| T4.2 S0.2 Realm/Experience Product | real Realm/Portal/product projection | pinned server + Android/Portal evidence as required |
+| T4.3 S0.3 Gateway Product | three-daemon server product | production Admin + real Hub/Gateway/Relay + downstream MCP + Test Client |
+| T4.4 S0.4 Android Integration | full managed Android profile | real emulator/device + pinned Hub/Gateway/Relay |
+| T4 Final S0 System / RC | frozen S0.1–S0.4 composition | cross-repository final system RC |
 
-Normal PR CI is dominated by T0/T1/T2. Main/integration adds required T3. RC adds complete T4 and real Adapter/Android/browser requirements from the architecture System Testing Spec.
+Normal GitHub Actions CI is deliberately limited to deterministic T0–T3 plus required builds. Browser/System E2E is a promotion/freeze proof rather than a per-commit feedback loop. S0.1 still requires the complete T4.1 gate before C6/C7 completion.
 
-## 2. Test locations
+## 2. Delivery-gate mapping
 
-Target conventions:
+### S0 Core
+
+Existing I0–I5 tests remain regression evidence for identity, Draft/Snapshot foundations, Relay admission/transport, metering, persistence and Admin infrastructure. They do **not** by themselves prove S0.1 or final S0 Exit.
+
+### S0.1 Managed Capability Delivery
+
+S0.1 is a pre-Android product/system gate owned semantically by `measix-s0-capability-delivery-system-testing-spec.md`.
 
 ```text
-backend/**/**/*_test.go          Go unit/component tests
-console/**/*.spec.ts            frontend unit/component tests
-api/fixtures/                   canonical contract fixtures
-test/qualification/             Adapter qualification harness
-test/system/harness/            real-process system harness
-test/system/scenarios/          SYS scenario orchestration
-test/system/reports/            generated local output; CI publishes artifacts
+real Admin browser
+  → real Control Hub
+  → real Runtime Relay
+  → deterministic Test Adapter / qualified real Adapter
+
+Snapshot/Runtime Test Client
+  → real Client Control API + Runtime API
 ```
 
-Tests should live near the code they prove unless they are explicitly cross-component/system infrastructure.
+It must prove the required `CAP-*` scenarios, including Managed Capability profiles, Snapshot preview/release equivalence, publish/runtime enforcement, usage/pricing/diagnostics, no-forward security behavior and Client Contract Freeze evidence.
 
-## 3. Mapping architecture requirements
+### S0.2–S0.4 / final S0 Exit
 
-Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`, `SYS-*`.
+S0.2 consumes the pinned S0.1 freeze for Realm/Experience. S0.3 adds the Enterprise Tool Gateway server/Admin/Test Client closure and production supervision/logging proof. S0.4 adds real `rikkahub_mcp` Android full-profile integration. Final S0 RC proves applicable `ERX-*`/`ETG-*`/`AND-*`/`SYS-*` scenarios with fixed cross-repository commits. An earlier-stage Green must never be reported as a later Freeze or final S0 Exit.
 
-Rules:
+## 3. Current test locations
 
-- a test proving a critical scenario must expose the ID in its test name, metadata or nearby comment so reports can map it;
+Concrete current paths are:
+
+```text
+backend/**/*_test.go             Go tests (some system scenarios require build tags)
+console/src/**/*.test.ts         Vitest unit/component tests
+api/fixtures/                   canonical contract fixtures
+backend/test/system/            current Go-module deterministic/system harness
+console/e2e/*.spec.ts            existing Playwright browser tests
+scripts/                        Node browser/candidate/replay/qualification orchestration
+```
+
+Within `backend/test/system/`:
+
+```text
+harness/       process/environment/readiness/cleanup
+adapter/       deterministic upstream adapter
+client/        client-facing Test Client
+scenarios/     cross-component/system scenarios
+```
+
+Architecture documents may describe the logical repository-wide `test/system` responsibility. The current physical Go implementation is `backend/test/system/`; source tree is the concrete implementation truth. Do not document an unimplemented directory as if it already exists.
+
+Adapter qualification/report locations may evolve as executable harness work lands; the source tree and release tooling are authoritative for the physical path, while architecture Qualification Spec remains authoritative for what evidence is required.
+
+## 4. Mapping architecture requirements
+
+Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`, `CAP-*`, `ERX-*`, `ETG-*`, `AND-*` and `SYS-*`.
+
+- a test proving a critical scenario exposes the ID in its name, metadata or nearby comment;
 - ordinary unit tests do not need artificial IDs;
-- this repository must not invent a new `SYS-*` semantic; add it to the architecture Testing Spec first;
-- one critical scenario may require several executable tests, and one well-structured system test may prove several explicitly listed IDs.
+- this repository must not invent new `CAP-*`/`SYS-*` semantics;
+- one critical scenario may require multiple executable tests, and one well-structured system test may prove several explicitly mapped IDs.
 
-## 4. Determinism and isolation
+## 5. Determinism and real boundaries
 
-Every automated test must:
-
-- use its own temp directory/database/ports/identity;
-- avoid dependency on test order;
-- default to no public-network access;
-- use synthetic credentials and content;
-- control clock/randomness when behavior depends on them;
-- use bounded eventually assertions rather than fixed long sleeps;
-- clean up processes/files or preserve them only as explicit failure artifacts.
-
-Critical tests cannot depend on a flaky external Provider. Real Adapter qualification is a separate RC lane.
-
-## 5. Real-boundary rules
+Every automated deterministic test must use isolated temp data/ports, avoid order dependency, default to no public-network access, use synthetic credentials, bound asynchronous waits and clean up processes/files.
 
 Do not mock away the behavior under test:
 
-- Hub persistence tests use real SQLite files;
-- Relay spool tests use real SQLite files;
+- Hub persistence tests use real SQLite;
+- Relay spool tests use real SQLite;
 - Relay streaming/cancellation tests use real HTTP/TCP boundaries;
 - migration tests execute versioned SQL;
-- Admin static-host tests use real production build output;
+- Admin static-host tests use production build output;
 - T3 Hub/Relay tests run real processes/binaries;
-- T4 uses the client-facing URL topology, not internal shortcuts.
+- S0.3 T3/T4.3 tests run real Hub/Gateway/Relay production binaries plus deterministic downstream MCP;
+- S0.1 browser/system tests use real Admin→Hub→Relay paths;
+- Test Client uses public Client Control + Runtime paths, not internal shortcuts.
 
-Mocks/fakes are appropriate for uncontrollable third-party services, clocks/randomness, and targeted failure injection.
+Mocks/fakes are appropriate for uncontrollable third-party services, clocks/randomness and targeted failure injection. The deterministic Adapter is an intentional external-boundary test service, not a substitute for Hub/Relay.
 
-## 6. Coverage policy
+## 6. Coverage, failures and flakiness
 
-There is no global percentage that substitutes for the architecture Testing Specs.
+There is no global percentage that substitutes for architecture Testing Specs. Coverage reports are diagnostics only; missing required scenarios, failure/security cases or regression tests block completion regardless of line coverage.
 
-Coverage reports may be generated as diagnostics and trend signals. A PR fails for missing required scenarios, contract/failure/security coverage or regression tests even when line coverage is high.
+A product/test assertion failure remains a failure. Do not retry tests until Green to mask defects. A whole CI job may be rerun once for a clearly identified runner/infrastructure failure, with the rerun remaining visible evidence.
 
-Do not add a repository-wide percentage gate without a specific engineering reason and review; if introduced, it remains secondary to required scenarios.
+Flaky critical tests are defects and must be fixed rather than permanently quarantined.
 
-## 7. Failure, retry and flakiness
+## 7. PR CI design
 
-A product/test assertion failure must remain a failure. Tests do not retry until green.
+Default PR CI stops at T3 and does **not** execute Playwright/browser T4.1.
 
-A whole CI job may be rerun once for a clearly identified runner/infrastructure failure, but the rerun is visible evidence and must not mask reproducible product failures.
-
-Flaky critical tests are defects. Fix them; do not permanently quarantine/skip them.
-
-## 8. PR CI design
-
-Once I0 CI is implemented, GitHub Actions should expose stable, understandable checks. Recommended logical jobs are:
+Current `.github/workflows/ci-gate.yml` jobs (PR to main / push to main):
 
 ```text
 static-contract
-unit
-component-hub
-component-relay
-component-admin
+backend-test
+console-test
+system-test       # bounded deterministic T3 only
 ci-gate
 ```
 
-`ci-gate` is the merge-facing aggregate check and **must always be reported for pull requests**. Do not put workflow-level path filters on a required check: a required workflow that never runs can leave a PR waiting for a status indefinitely. Component jobs may skip work internally when unaffected, but the aggregate result remains explicit.
+`ci-gate` is the merge-facing aggregate check and must always be reported for pull requests. A Green `ci-gate` means the repository's normal T0–T3 baseline is Green; it does **not** mean C6, C7, S0.1 Freeze or final S0 Exit is complete.
 
-The required gate evaluates the latest PR commit. Older Green checks do not satisfy a new head commit.
+The required gate evaluates the latest PR commit. Older Green checks are historical regression evidence only.
 
-## 9. Main/integration CI
+The static job and `make ci` regenerate before drift checks through `scripts/checks.mjs`. The static job also runs Node evidence/tooling regression tests; console typecheck uses vue-tsc for Vue templates. A clean Git diff without regeneration does not prove generated output matches source. `make system-test` uses `-tags=smoke`; ordinary `go test ./...` excludes both smoke and candidate scenarios. Exact direct commands are in [development](development.md).
 
-After merge or on an integration candidate, run at least:
+## 8. Explicit S0.1 candidate verification
 
-- all PR gates;
-- Hub↔Relay T3;
-- Admin↔Hub T3;
-- migration replay/upgrade;
-- Admin production static host;
-- deterministic Adapter transport suite;
-- core backend/system-harness scenarios.
+Promotion to an S0.1 C6/C7 candidate is a separate explicit verification run on the exact candidate SHA. It must execute the architecture-defined T4.1 `CAP-*` gate with production Admin, real Hub/Relay, deterministic Adapter/Test Client and required recovery/security scenarios.
 
-A failure blocks promotion to RC even if `main` itself is not technically reverted automatically.
+The runner may be developer-controlled/local or a dedicated controlled environment, but it must be reproducible and record exact source/build identity, timestamps, scenario results and safe diagnostics. Historical E2E evidence cannot be reused after the candidate SHA changes unless architecture explicitly allows it.
 
-## 10. System/RC evidence
+Real external Adapter qualification is a separate explicit lane and is not replaced by deterministic Adapter tests.
 
-T3/T4 and RC runs publish machine-readable evidence and useful diagnostics as GitHub Actions artifacts. At minimum, retain the manifest required by architecture plus test reports/log summaries that contain no secrets.
+## 9. Freeze evidence
 
-The manifest includes fixed source identities such as:
+A **final accepted** S0.1 manifest requires all applicable candidate scenarios and real Adapter qualification, including replay. The current writer can produce only an S0.1 candidate draft with CAP-C7-002=NOT_EXECUTED. It rejects Snapshot v2; the runtime-only replayer cannot finalize C7 and independent clean-source replay is not implemented. That draft is not a Freeze. Preserve historical evidence without labeling it current; see [release](release.md) for provenance and known script limitations.
+
+The architecture System Testing Spec is authoritative for the manifest fields. Current required identities include at least:
 
 ```text
-platformCoreCommit
-androidCommit
 architectureCommit
+platformCoreCommit
 adminBuildHash
-openApiFixtureHash
-hubBuild
-relayBuild
-adapterName/version/configRevision
-androidAppVersion
+clientControlOpenApiHash
+canonicalFixtureHash
+snapshotSchemaVersion
+deterministicAdapterVersion
+realAdapterQualificationRef
 scenarioResults
-startedAt/completedAt
+startedAt
+completedAt
 ```
 
-The `architectureCommit` is implementation-governance metadata; it complements, not replaces, the System Testing Spec's required fixed source commits.
+`docs/release.md` defines how the implementation packages this evidence; the harness owns the exact serialized schema. Do not create competing hand-maintained manifest schemas in multiple Markdown files.
 
-## 11. Local test loop
+## 10. Historical evidence
 
-Local development uses the narrowest test that demonstrates Red/Green, then expands to the affected component suite before push. CI repeats the required gate independently.
+Historical audit/test mapping from older architecture baselines remains useful as regression evidence, but it is not a living status document and must never be used to infer that a newer architecture checkpoint is Green.
 
-Exact commands are documented here only when their actual scripts/package targets exist. Do not invent documentation-only commands that CI cannot execute.
+Current checkpoint status lives only in `docs/s0-execution-progress.md`, backed by executable results for the current architecture baseline and current implementation SHA.
 
-## 12. GitHub-only test loop
+The [2026-08-31 alignment audit](architecture-alignment-audit.md) records the pre-fix source baseline, not living status. Subsequent fixes and exact executed/unexecuted lanes are recorded only in execution progress. A script exit status or stored PASS field alone remains insufficient for Freeze acceptance.
 
-When no local runtime is available:
+## 11. TDD cycle
 
-1. open a Draft PR;
-2. push the Red test commit;
-3. wait for/inspect the Actions check;
-4. confirm the intended test failed for the expected reason;
-5. push the Green implementation commit;
-6. inspect checks on the **latest commit SHA**;
-7. inspect job logs/artifacts for the affected lane;
-8. refactor and repeat if needed.
+This repository uses TDD for new behavior and regression fixes. Architecture defines the required behavior; executable tests in this repository prove it.
 
-This is a valid TDD loop because execution is delegated to CI rather than skipped. See `docs/tdd.md`.
+```text
+Requirement
+  ↓
+Red      — write/enable the smallest executable test that fails for the intended reason
+  ↓
+Green    — implement the minimum behavior that satisfies the test
+  ↓
+Refactor — improve design while all relevant tests remain Green
+  ↓
+Gate     — run the complete affected CI/component/system layer
+```
 
-## 13. Secrets and test data
+TDD is not "write tests eventually." The failure must be observed before the implementation is considered proven by that test.
 
-No production token, secret, enrollment code, refresh credential, real conversation or sensitive prompt is allowed in fixtures, logs or artifacts.
+### What counts as valid Red
 
-Security scenarios additionally assert that protected material does not appear in responses, logs, reports, Admin storage/DOM, managed Snapshot or usage events.
+A useful Red test:
 
-## 14. Test-change review
+- describes a real architecture requirement, regression or implementation invariant;
+- fails before the production change;
+- fails for the expected behavioral reason;
+- is deterministic;
+- remains in the final codebase.
 
-Deleting or weakening a test requires a reason. A critical test may be removed only when the architecture capability/scenario is removed or another test demonstrably covers the same requirement. “Hard to test” is not sufficient.
+Prefer an assertion failure that demonstrates missing/wrong behavior. A compile failure can be a transient Red signal when introducing a new interface, but it is weaker evidence if it does not demonstrate the behavior being built.
+
+Do not create meaningless tests solely to manufacture a Red commit.
+
+### Feature TDD
+
+For a new capability already authorized by architecture:
+
+1. identify the architecture requirement and applicable critical scenario ID;
+2. choose the lowest test layer that can prove the next behavior slice;
+3. add the failing test/fixture;
+4. observe Red;
+5. implement the smallest slice;
+6. observe Green;
+7. refactor;
+8. add higher-layer integration/system proof only when the slice crosses real boundaries.
+
+Do not start with a huge T4 test when a T1/T2 test can drive the internal behavior. Build outward.
+
+### Regression TDD
+
+For a bug:
+
+```text
+reproduce with a test
+→ confirm Red on the buggy implementation
+→ fix
+→ confirm Green
+→ run affected regression/component/system gate
+```
+
+If the bug exposes a missing architecture scenario, update the relevant Testing Spec and reference its stable ID. The local test does not become a new semantic authority by itself.
+
+### Cross-component TDD
+
+Cross-component work should use two loops:
+
+**Inner loop** — Drive component behavior with T1/T2 tests using controlled peers/fakes.
+
+**Contract/system loop** — Then prove the real boundary with T3/T4:
+
+```text
+contract/fixture Red
+→ component implementation Green
+→ real Hub/Relay/Admin integration
+→ mapped SYS scenario Green
+```
+
+Do not require the full system harness for every tiny domain edit, and do not stop at mocks when architecture requires real-process integration.
+
+## 12. Local TDD
+
+With a local checkout:
+
+1. add test;
+2. run the narrow test and observe Red;
+3. implement;
+4. rerun and observe Green;
+5. refactor;
+6. run affected component suite;
+7. push and let GitHub CI independently reproduce the result.
+
+Local execution optimizes feedback time; GitHub CI provides merge evidence. Neither replaces the other when both are available.
+
+## 13. GitHub-only TDD
+
+A fully GitHub-based Red/Green loop is valid when GitHub Actions is the execution environment.
+
+### Required sequence
+
+1. Create a feature/fix branch.
+2. Open a **Draft PR before the Red commit is evaluated** so `pull_request` workflows run and evidence is attached to the PR.
+3. Add the failing test in a Red commit.
+4. Let GitHub Actions execute the relevant job.
+5. Inspect the failed check/job log and verify that the intended test failed for the expected reason.
+6. Record the Red commit SHA/check in the PR description when the change is non-trivial.
+7. Add the minimum production implementation in a later commit.
+8. Let Actions run on the new head SHA.
+9. Verify the affected checks are Green on the latest commit.
+10. Refactor in additional commits as needed; Actions must remain Green.
+11. Merge only after the complete required aggregate gate passes.
+
+### Why this is verifiable
+
+GitHub Actions creates check runs for workflow jobs. Protected branches can require those checks to pass before merge, and required checks apply to the current PR head rather than an older successful commit. Test reports/logs can be retained as workflow artifacts.
+
+Therefore a developer/agent without a local runtime can still produce auditable evidence:
+
+```text
+PR
+├── Red commit SHA → failing Actions check/log
+├── Green commit SHA → successful Actions check
+└── final SHA → required ci-gate success + artifacts
+```
+
+### Remote-only agent rule
+
+An agent that can edit GitHub but cannot execute locally must never say "tests pass" based only on reading code. It must inspect the GitHub Actions run/check for the relevant commit. If the repository lacks CI for the required test, the result is **not verified** and the missing CI capability should be implemented or reported.
+
+A T4.1/browser requirement cannot be declared Green from default GitHub Actions; it requires the explicit candidate run described in §8.
+
+## 14. PR evidence format
+
+For non-trivial behavior changes, include:
+
+```text
+Architecture: <document/section/scenario ID>
+Red: <commit SHA> / <test name> / expected failure
+Green: <commit SHA or latest> / <checks passed>
+Additional gates: <T0/T1/T2/T3/T4 lanes>
+```
+
+A screenshot is optional and weaker than a check/run link + commit SHA.
+
+## 15. Refactoring
+
+Refactoring begins from Green. It should not require changing expected behavior. If a refactor forces behavior expectations to change, it is no longer a pure refactor and must be reclassified.
+
+Use characterization tests first when refactoring poorly understood legacy behavior.
+
+## 16. TDD exceptions
+
+Do not force artificial Red/Green commits for:
+
+- documentation-only edits;
+- formatting-only changes;
+- deterministic regeneration where source semantics did not change;
+- dependency lockfile refresh with no intended behavior change.
+
+These changes still run applicable static/build/contract gates.
+
+Migration/schema changes are not exempt: use repository/migration tests that fail before the schema/migration behavior exists.
+
+## 17. TDD anti-patterns
+
+Forbidden TDD shortcuts:
+
+- writing implementation and test together, then claiming an unobserved theoretical Red;
+- disabling the test during implementation;
+- adding retries to hide product failures;
+- asserting internal implementation details when the requirement is observable behavior;
+- using only mocks for a required real-boundary scenario;
+- deleting a regression test once the fix is Green;
+- changing architecture semantics inside the test to make implementation convenient.
+
+## 18. Merge policy target
+
+After I0 CI is live, configure `main` so changes merge through PRs and the stable aggregate CI check is required. The required check should run for every PR rather than being suppressed by workflow-level path filters.
+
+This turns TDD from a convention into an enforceable development loop: Red may exist on the branch, but Green is required before merge.
+
+## 19. Secrets and artifacts
+
+No production token, Secret, enrollment code, refresh credential, real conversation or sensitive prompt may appear in fixtures, logs or artifacts. Security scenarios additionally assert that protected material does not appear in responses, DOM/persistent browser state, managed Snapshot or usage events.

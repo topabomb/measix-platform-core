@@ -44,7 +44,7 @@ type HubEnv struct {
 	relayProc          *Process
 }
 
-// NewHubEnv allocates directories, generates crypto material, applies migrations
+// NewHubEnv allocates directories, generates crypto material, initializes the current schema
 // via devmigrate, and bootstraps the initial admin user. It does not start the
 // Hub or Relay processes (call StartHub/StartRelay to do that).
 func NewHubEnv(ctx context.Context) (*HubEnv, error) {
@@ -121,7 +121,7 @@ func NewHubEnv(ctx context.Context) (*HubEnv, error) {
 	_, file, _, _ := runtime.Caller(0)
 	backendRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 
-	// Apply migrations via devmigrate.
+	// Initialize the current schema via devmigrate.
 	migrateCmd := exec.CommandContext(ctx, "go", "run", "./cmd/devmigrate", "--db", env.DBPath)
 	migrateCmd.Dir = backendRoot
 	if out, err := migrateCmd.CombinedOutput(); err != nil {

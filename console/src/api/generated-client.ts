@@ -364,8 +364,8 @@ export interface components {
             mcp: components["schemas"]["McpDefinition"][];
             bindings: components["schemas"]["RuntimeBindingDefinition"][];
             policy: components["schemas"]["ManagedPolicy"];
-            assistants?: components["schemas"]["ManagedAssistantDefinition"][];
-            starters?: components["schemas"]["AssistantStarterDefinition"][];
+            assistants: components["schemas"]["ManagedAssistantDefinition"][];
+            starters: components["schemas"]["AssistantStarterDefinition"][];
         };
         Discovery: {
             /** @enum {string} */

@@ -106,7 +106,7 @@ OpenAPI + fixture
 
 If implementation discovers that reasonable clients could interpret the detail differently, it is semantic and must return to architecture.
 
-## 7. Versioned Freeze evidence
+## 7. Freeze candidate evidence
 
 Freeze is an executable milestone, not a Markdown declaration.
 
@@ -124,9 +124,9 @@ The complete manifest evidence contract belongs to `measix-s0-capability-deliver
 
 New draft evidence writes exclusively to `.artifacts/s0-freeze-candidate.json` (or an explicit new output), without overwriting an existing candidate. Current CAP tooling validates the current v4 resource baseline; runtime-only replay cannot finalize C7. Final acceptance and unimplemented later-stage gates are defined in [release](release.md); do not infer them from the filename.
 
-After freeze, an incompatible Android-visible change cannot silently mutate frozen v1/v2/v3. Follow architecture compatibility/versioning semantics and create the applicable new candidate. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; it cannot reuse the v1 manifest as proof.
+MEASIX has not been released, so the current Snapshot v4, Bridge v3 and local-read v2 profile is the only supported profile. Contract changes replace the current candidate and regenerate every consumer/export; they do not add old-version branches. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; current S0.2 evidence cannot prove those later capabilities.
 
-## 8. Compatibility rules
+## 8. Current contract strictness and extensibility
 
 S0 contract tests must prove architecture rules including (not a claim that all current tests already do):
 
@@ -149,7 +149,7 @@ An OpenAPI change must identify:
 5. generated consumers changed;
 6. affected T0–T3 and stage-specific T4.1/T4.2/T4.3/T4.4/final lanes;
 7. Android synchronization impact;
-8. backward compatibility.
+8. impact on every current consumer and generated export.
 
 ## 10. T0 contract gate
 
@@ -163,7 +163,7 @@ canonical fixture validation
 invalid fixture rejection
 Snapshot/RuntimeControl hash golden verification
 Admin production typecheck against generated API types
-Android export/generation compatibility for client-control contract
+Android export/generation consistency for the client-control contract
 ```
 
 Freeze identity generation is a candidate/C7 concern and must not be confused with ordinary pre-freeze contract drift checks.

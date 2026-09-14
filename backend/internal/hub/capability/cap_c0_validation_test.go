@@ -251,6 +251,58 @@ func TestCAPC0008ASRUpstreamModelKeyRequired(t *testing.T) {
 	}
 }
 
+func TestCurrentResourceTextAndModalitiesAreStrictlyValidated(t *testing.T) {
+	ctx := context.Background()
+	st, boot, now := bootstrapI2(t)
+	cap := capability.NewService(st.Client)
+	cap.Now = func() time.Time { return now }
+	draft, err := cap.GetDraft(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := validDraft("ups_00000000-0000-4000-8000-000000000001")
+	content.Models[0].DisplayName = "  "
+	content.Models[0].UpstreamModelKey = ""
+	content.Models[0].InputModalities = nil
+	content.Models[0].OutputModalities = []adminapi.ModelDefinitionOutputModalities{}
+	content.Tts = []adminapi.TtsDefinition{{TtsId: platformid.New(platformid.TTS), DisplayName: " ", ClientProtocol: adminapi.OPENAIAUDIOSPEECH, UpstreamModelKey: "tts", Voice: "alloy", RuntimePath: "/tts"}}
+	language := " "
+	content.Asr = []adminapi.AsrDefinition{{AsrId: platformid.New(platformid.ASR), DisplayName: " ", ClientProtocol: adminapi.OPENAIAUDIOTRANSCRIPTIONS, UpstreamModelKey: "asr", Language: &language, RuntimePath: "/asr"}}
+	content.Mcp = []adminapi.McpDefinition{{McpServerId: platformid.New(platformid.MCP), DisplayName: " ", ClientProtocol: adminapi.MCPSTREAMABLEHTTP, AuthOwnership: adminapi.McpDefinitionAuthOwnershipNONE, RuntimePath: "/mcp"}}
+	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{
+		"missing_display_name:MODEL":      false,
+		"missing_model_key:MODEL":         false,
+		"missing_input_modalities:MODEL":  false,
+		"missing_output_modalities:MODEL": false,
+		"missing_display_name:TTS":        false,
+		"missing_display_name:ASR":        false,
+		"empty_language:ASR":              false,
+		"missing_display_name:MCP":        false,
+	}
+	for _, issue := range result.Errors {
+		if issue.ResourceKind == nil || issue.Field == nil || issue.ResourceId == nil {
+			continue
+		}
+		key := issue.Code + ":" + string(*issue.ResourceKind)
+		if _, ok := want[key]; ok {
+			want[key] = true
+		}
+	}
+	for key, found := range want {
+		if !found {
+			t.Errorf("missing structured issue %s in %+v", key, result.Errors)
+		}
+	}
+}
+
 // CAP-C2-041: default resource reference must point to an enabled resource.
 // A disabled model referenced by defaultModelId must fail validation.
 func TestCAPC2041DefaultMustReferenceEnabled(t *testing.T) {

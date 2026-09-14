@@ -13,7 +13,7 @@
 S0.2 必须证明：
 
 ```text
-S0.1 v1 baseline remains reproducible
+Current S0.1 capability baseline remains reproducible
 + Snapshot v4 Realm/experience content is deterministic and client-safe
 + Android Personal/Enterprise Realm is isolated
 + Managed Assistant + seed + Starter works
@@ -25,7 +25,7 @@ S0.1 v1 baseline remains reproducible
 
 | Layer | Required evidence |
 |---|---|
-| T0 Contract | OpenAPI/fixture/codegen/hash/schema v1/v2 compatibility |
+| T0 Contract | current OpenAPI/fixture/codegen/hash/schema strictness |
 | T1 Domain | Definition/reference/date-window/session/realm rules |
 | T2 Component | Hub/Admin/Feed/Portal/Android stores and projection |
 | T3 Cross-component | Android↔Hub/Relay、Portal↔Hub；no Hub MCP projection |
@@ -34,13 +34,13 @@ S0.1 v1 baseline remains reproducible
 ## 3. Contract scenarios
 
 - `ERX-C0-001` 当前唯一 Snapshot v4 fixtures 可复算；旧版本明确拒绝；
-- `ERX-C0-002` Snapshot v4 retains v1 A/B/Policy and adds assistants/starters；
+- `ERX-C0-002` Snapshot v4 完整包含 A/B/C、Policy、assistants/starters；
 - `ERX-C0-003` assistant/model/MCP/starter refs are typed and complete；
 - `ERX-C0-004` invalid/missing/disabled refs block publish；
 - `ERX-C0-005` seed/starter normalization and deterministic hash/order；
 - `ERX-C0-006` Snapshot contains no Enterprise Update body, Secret, Upstream or runtime route；
 - `ERX-C0-007` Android generated artifact pins exact v4 OpenAPI/fixture manifest。
-- `ERX-C0-008` seed may be empty; non-empty item validation and authored order are preserved; canonical Assistant/Starter arrays use stable IDs while equal display sortOrder uses starterId tie-break, with frozen-version compatibility evidence。
+- `ERX-C0-008` seed may be empty; non-empty item validation and authored order are preserved; canonical Assistant/Starter arrays use stable IDs while equal display sortOrder uses starterId tie-break, with current-version deterministic evidence。
 
 ## 4. Managed Assistant / Memory / Starter
 
@@ -115,11 +115,11 @@ S0.1 v1 baseline remains reproducible
 ### 9.1 新版配置与手机能力必需证据
 
 - `ERX-POL-001` v4 显式五项 Boolean，新建默认 false；缺字段/null 拒绝；旧原型版本拒绝，不存在旧策略采用或升级路径。
-- `ERX-POL-002` 旧客户端拒绝新 schema，新客户端不将旧 true 重解释为用户资源授权；个人域不被企业升级错误阻断。
+- `ERX-POL-002` 客户端拒绝非当前 schema，不把任何单项授权重解释为其他用户资源授权；个人域不被企业配置错误阻断。
 - `ERX-POL-003` 五项开关允许/禁止/收紧/恢复直接作用于用户原定义，无副本、无全局删除/锁定；用户凭据用于用户资源且不会发送到企业平台。
 - `ERX-POL-004` 用户助手与受管助手共存，受管定义不可改；本域使用参数/扩展偏好不复制个人助手、不覆盖企业固定字段，不以提示词/Header/Body 绕过路由认证或准入；引用逐项授权，禁止引用阻止执行并有原因；Direct Managed MCP 强制启用与助手绑定过滤同时成立。
-- `ERX-MIG-001` 迁移保全用户值/ID/凭据/引用/文件，旧选择仅归 PERSONAL，中断恢复不发布半新半旧状态，成功后无旧双读双写入口。
-- `ERX-MIG-002` 既有运行数据归 PERSONAL；同用户助手跨域数据隔离，个人备份恢复不覆盖企业数据/认证/下发配置。
+- `ERX-INIT-001` 仅从当前完整配置初始化；非当前开发配置/数据库直接清理，不提供转换、双读或双写入口。
+- `ERX-DATA-001` 新建运行数据必须带明确 Realm/主体；同用户助手跨域数据隔离，个人备份恢复不覆盖企业数据/认证/下发配置。
 - `ERX-SIM-001` Debug/Release 正式企业入口与持续本地来源标识覆盖同一域/解析/命令/运行/持久化；内置企业示例使用确定性 I/O，用户主动选择的获准资源使用用户执行链。隔离测试传输证明凭据/端点正确且没有意外真实请求，失败不在示例/真实服务间回退，退出/重启不覆盖真实绑定。
 - `ERX-PHONE-001` 当前受信顶层网页相机/麦克风调用经过权限与用户操作，取消/切域/页面替换/失效不会交付迟到结果或留下录制；结果不进入个人数据，无任意文件系统访问。
 - `ERX-PHONE-002` 切回个人保留企业登录，断网不退出，主动退出本地完成且明确远端撤销结果；Portal 故障时原生状态和退出可用。真实平台设备证据与浏览器/本地示例分别报告。

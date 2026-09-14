@@ -34,7 +34,7 @@ func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	wire := adminapi.SystemStatus{
-		BuildVersion: status.BuildVersion, DbHealth: status.DBHealth, MigrationRevision: status.MigrationRevision,
+		BuildVersion: status.BuildVersion, DbHealth: status.DBHealth, SchemaIdentity: status.SchemaIdentity,
 		RuntimeStatus:           adminapi.SystemStatusRuntimeStatus(status.RuntimeStatus),
 		ActiveManagedGeneration: status.ActiveManagedGeneration, ManagedStateRevision: status.ManagedStateRevision,
 		DesiredControlRevision: status.DesiredControlRevision, RelayReady: status.RelayReady,

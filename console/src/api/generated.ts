@@ -688,8 +688,8 @@ export interface components {
             mcp: components["schemas"]["McpDefinition"][];
             bindings: components["schemas"]["RuntimeBindingDefinition"][];
             policy: components["schemas"]["ManagedPolicy"];
-            assistants?: components["schemas"]["ManagedAssistantDefinition"][];
-            starters?: components["schemas"]["AssistantStarterDefinition"][];
+            assistants: components["schemas"]["ManagedAssistantDefinition"][];
+            starters: components["schemas"]["AssistantStarterDefinition"][];
         };
         ManagedAssistantDefinition: {
             assistantDefinitionId: components["schemas"]["AssistantDefinitionId"];
@@ -895,11 +895,14 @@ export interface components {
             asr: components["schemas"]["AsrDefinition"][];
             mcp: components["schemas"]["McpDefinition"][];
             policy: components["schemas"]["ManagedPolicy"];
-            assistants?: components["schemas"]["ManagedAssistantDefinition"][];
-            starters?: components["schemas"]["AssistantStarterDefinition"][];
+            assistants: components["schemas"]["ManagedAssistantDefinition"][];
+            starters: components["schemas"]["AssistantStarterDefinition"][];
+            /** @description Latest immutable release generation used as the comparison baseline. Absent when no release exists. */
+            publishedGeneration?: number;
+            diffSummary: components["schemas"]["DiffSummary"];
         };
         /** @enum {string} */
-        ReleaseDiffKind: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY" | "ASSISTANT" | "STARTER";
+        ReleaseDiffKind: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY" | "ASSISTANT" | "STARTER" | "BINDING";
         ResourceDiff: {
             kind: components["schemas"]["ReleaseDiffKind"];
             added: number;
@@ -1021,7 +1024,7 @@ export interface components {
         SystemStatus: {
             buildVersion: string;
             dbHealth: string;
-            migrationRevision: string;
+            schemaIdentity: string;
             /** @enum {string} */
             runtimeStatus: "READY" | "ACTIVATING" | "DEGRADED";
             activeManagedGeneration: number;

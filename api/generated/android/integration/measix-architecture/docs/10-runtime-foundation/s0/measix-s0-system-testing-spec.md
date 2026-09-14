@@ -458,8 +458,8 @@ old request
 - `SYS-OPS-002` process active 与 application ready 可区分，单 daemon crash 只触发自身有界 on-failure restart/rate-limit，永久配置错误不形成无限 crash loop；
 - `SYS-OPS-003` aggregate stop/restart 走 SIGTERM + bounded drain，超时后才 force kill；Gateway/Relay 重启在 Hub rehydrate 前 fail closed；
 - `SYS-OPS-004` supervisor collector 可按 service/build/event/correlation 安全收集、轮转、保留 JSON logs，normal/failure evidence 不含 architecture 禁止字段；
-- clean DB migration replay；
-- upgrade migration from supported dev/RC baseline；
+- clean DB current-schema initialization；
+- non-current or tampered schema identity fails fast；
 - Hub backup/restore；
 - Relay spool recovery；
 - Gateway applied control/catalog rehydrate；

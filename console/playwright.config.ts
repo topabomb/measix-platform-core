@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test'
  * Playwright E2E configuration for the S0.1 Admin Console browser gate.
  *
  * Browser E2E is NOT part of default GitHub Actions CI/CD. It must be
- * executed explicitly on the exact candidate SHA via `make console-e2e`.
+ * executed explicitly on the exact candidate SHA via `make s01-browser-candidate`.
  *
  * The tests use production `dist/spa` + real Control Hub + real Runtime Relay.
  * Mocking `page.route('/api/**')` is forbidden as T4.1 Green evidence.
@@ -14,11 +14,7 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
-  // Exclude deprecated golden-path.spec.ts — it has been split into
-  // golden-path-authoring.spec.ts and golden-path-usage.spec.ts
-  // which are orchestrated by candidate-orchestrator.mjs / e2e-harness.mjs
   testMatch: /.*\.spec\.ts/,
-  testIgnore: /golden-path\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,

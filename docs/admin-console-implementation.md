@@ -31,7 +31,7 @@ Root repository 的 npm orchestration、实际开发命令与 system harness 生
 
 ## 2. 当前源码组织
 
-`ResourcesPage` 的 Policy 编辑器直接编辑当前五项必填用户配置准入开关并预览，沿用保存/验证/发布链。新草稿五项默认 false；不存在旧策略采用按钮或缺字段补齐逻辑，非当前旧草稿随旧开发数据库清理。服务端在 HTTP 边界独立校验五项必填 Boolean。
+`ResourcesPage` 使用统一配置工作台组织 Overview、Models、TTS、ASR、MCP、Assistants 和 Policy。桌面显示固定分区导航，窄屏使用同一 section state 的选择器；Policy 直接编辑当前五项必填用户配置准入开关。新草稿五项默认 false；不存在旧策略采用按钮或缺字段补齐逻辑，非当前旧草稿随旧开发数据库清理。服务端在 HTTP 边界独立校验五项必填 Boolean 与 Assistants/Starters 数组。
 
 `UsersPage` 的二维码和复制按钮共用 `api/enrollment.ts` 生成的完整接入资料，包含当前公共 origin 和短期凭据；裸注册码仅供显示排查。资料只在当前对话框内存中保存，关闭清理，不能放入 URL、日志或持久缓存。Client OpenAPI 定义原生消费的资料，`generated-client.ts` 仅提供其生成类型；Admin 仍只请求 Admin HTTP API。生产 origin 必须 HTTPS；隔离本机开发/测试仅接受 localhost/127.0.0.1/::1 的 HTTP，不放宽至私网地址。
 
@@ -54,7 +54,7 @@ css/          thin MEASIX semantic styling
 
 当前实现已有 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/Resources/Upstreams/Releases/Usage/System/EnterpriseUpdates 等 route-level pages。
 
-**当前 `ResourcesPage.vue` / `UpstreamsPage.vue` 仍承载了偏多领域编辑逻辑。** 这不是新的设计权威；应继续按 architecture 最新 S0.1 implementation decision 和 Admin Product/Testing requirements 收敛到清晰的 collection → selected editor/detail 与 feature-level workflow 结构。实际文件名可以随重构演进，但 page 不应长期成为所有领域状态/验证/编辑逻辑的容器。
+`ConfigurationSectionNav.vue` 只负责响应式分区导航；`ManagedExperienceEditor.vue` 负责 Assistant/Seed/Starter collection → selected settings。Draft 状态、引用删除、Validation、Preview/Publish 仍由既有 store/workflow owner 处理。`ResourcesPage.vue` 负责组合这些 owner，不创建平行状态或自由 JSON 编辑器。
 
 ## 3. 状态与 mutation 实现原则
 
@@ -66,13 +66,13 @@ css/          thin MEASIX semantic styling
 - Apply/Publish retry/recovery 在现有 ActivationStore 中按 kind + target/payload scope 重用同一 command Idempotency-Key；响应未确定时重试不清空 key，终态后的新命令另建 key。当前内存状态不提供跨浏览器重启的 pending-command journal；
 - 409 stale revision 必须保留可恢复的 local edits，而不是静默覆盖；
 - validation 以 Hub 返回为最终权威，前端可做即时提示但不能维护第二套业务规则；
-- Snapshot Preview 必须消费 Hub canonical compiler 的 projection。
+- Snapshot Preview 必须消费 Hub canonical compiler 的 projection；Review 的变更计数由 Hub 将保存的 Draft 与最新 immutable Release 比较后返回，浏览器不得把当前 Draft 克隆成所谓发布基线。
 
 ## 4. 实现范围与后续验证
 
 具体“必须做什么”只引用 architecture；当前实现与验证结果见 [当前状态](s0-execution-progress.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。
 
-S0.2 Assistant/Memory Seed/Starter 由 Resources 内的 `ManagedExperienceEditor.vue` 编辑，复用唯一 DraftStore/generated DTO/Save/Validate/Preview/Publish 流程；Seed 支持空数组及作者顺序，Starter 绑定 Assistant，删除 Assistant 同时移除其 local Draft Starters。Review diff 与 canonical Preview 覆盖这些对象；有未保存编辑时不运行 saved-Draft Preview/Validate。不存在第二套 API/store/schema。EnterpriseUpdatesPage 继续使用独立 Feed API；两者仍需按 ERX gate 证明真实 consumer 产品闭环。新增 Gateway profile 与运维状态不得借用现有页面截图声称已经实现。
+S0.2 Assistant/Memory Seed/Starter 由 Resources 内的 `ManagedExperienceEditor.vue` 编辑，复用唯一 DraftStore/generated DTO/Save/Validate/Preview/Publish 流程；Seed 支持空数组及作者顺序，Starter 绑定 Assistant，删除 Assistant 同时移除其 local Draft Starters。删除资源先检查 defaults、Assistant 和 binding 引用，不通过数组名猜测类型；Validation issue 携带 resourceKind/resourceId/field 并导航到对应分区。Review diff 与 canonical Preview 覆盖资源、Binding、Policy、Assistant 和 Starter；有未保存编辑时不运行 saved-Draft Preview/Validate。不存在第二套 API/store/schema。EnterpriseUpdatesPage 继续使用独立 Feed API；两者仍需按 ERX gate 证明真实 consumer 产品闭环。新增 Gateway profile 与运维状态不得借用现有页面截图声称已经实现。
 
 不要通过增加第二套 schema、自由 JSON editor、客户端自定义 Provider body/header DSL 或隐藏失败状态来绕过这些要求。
 

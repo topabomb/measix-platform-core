@@ -1,8 +1,8 @@
-.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test console-test console-e2e e2e-harness contract migrations migration-replay freeze-manifest freeze-validate clean-replay collect-artifacts collect-static-contract freeze-gate collect-baseline collect-adapter-qualification
+.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test s01-browser-candidate console-test contract schema schema-replay freeze-manifest freeze-validate clean-replay collect-artifacts collect-static-contract collect-baseline collect-adapter-qualification
 
 .NOTPARALLEL:
 
-ci: generate fmt-check contract backend-test system-test console-test migrations generated-drift
+ci: generate fmt-check contract backend-test system-test console-test schema generated-drift
 
 fmt-check:
 	node scripts/checks.mjs fmt
@@ -39,10 +39,6 @@ s01-candidate-test: console-build
 # It uses the Playwright config reporters (list + JSON) without override.
 s01-browser-candidate: console-build
 	node scripts/e2e-harness.mjs
-
-# Backwards-compatible aliases for s01-browser-candidate
-console-e2e: s01-browser-candidate
-e2e-harness: s01-browser-candidate
 
 console-build:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm build
@@ -99,29 +95,15 @@ collect-artifacts:
 collect-static-contract:
 	node scripts/checks.mjs static
 
-# Legacy S0.1 evidence collection entry. NOT a completed C7 gate:
-# the compiler rejects current Snapshot v2 and full clean-source replay is
-# unimplemented. Preserve historical manifests; do not call this S0.2 Freeze.
-# Real adapter qualification must be collected separately in one four-profile run.
-freeze-gate: collect-artifacts collect-static-contract s01-candidate-test s01-browser-candidate collect-baseline
-	@echo "Collecting candidate test artifacts..."
-	@(cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json); exit_code=$$?; \
-	node scripts/write-meta.mjs candidate-test.json 'go test -tags=candidate -json' $$exit_code; \
-	if [ $$exit_code -ne 0 ]; then echo "ERROR: candidate tests failed (exit $$exit_code)"; exit $$exit_code; fi
-	@echo "Generating freeze manifest..."
-	node scripts/freeze-manifest.mjs
-	@echo "Running clean replay verification (CAP-C7-002)..."
-	node scripts/replay-freeze.mjs
-
 console-test:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build
 
-migrations: migration-replay
+schema: schema-replay
 	cd backend && go run ./cmd/migration-checksum
 	git diff --exit-code -- backend/migrations/atlas.sum
 
-migration-replay:
-	node scripts/checks.mjs migration-replay
+schema-replay:
+	node scripts/checks.mjs schema-replay
 
 generated-drift:
 	node scripts/checks.mjs drift

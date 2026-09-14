@@ -5,6 +5,23 @@ import { useDraftStore } from './draft'
 import { useActivationStore } from './activation'
 import { useOperationalApplyStore } from './operationalApply'
 import { setUnauthorizedHandler } from '../api/client'
+import type { components } from '../api/generated'
+
+type Draft = components['schemas']['Draft']
+
+function emptyDraft(): Draft {
+  return {
+    draftId: 'dft_00000000-0000-4000-8000-000000000001',
+    draftRevision: 1,
+    content: {
+      providers: [], models: [], tts: [], asr: [], mcp: [], bindings: [], assistants: [], starters: [],
+      policy: {
+        policyId: 'pol_00000000-0000-4000-8000-000000000001',
+        allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true,
+      },
+    },
+  }
+}
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -44,10 +61,7 @@ describe('SessionStore', () => {
 
 describe('DraftStore', () => {
   it('upserts a runtime binding for a resource and reuses its stable runtimeRouteId', async () => {
-    const initial = {
-      draftId: 'dft_00000000-0000-4000-8000-000000000001', draftRevision: 1,
-      content: { providers: [], models: [], tts: [], asr: [], mcp: [], bindings: [], policy: { policyId: 'pol_00000000-0000-4000-8000-000000000001', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true } },
-    }
+    const initial = emptyDraft()
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))
 
     const store = useDraftStore()
@@ -71,10 +85,7 @@ describe('DraftStore', () => {
   })
 
   it('removes a binding when the resource is unbound (empty upstream)', async () => {
-    const initial = {
-      draftId: 'dft_00000000-0000-4000-8000-000000000001', draftRevision: 1,
-      content: { providers: [], models: [], tts: [], asr: [], mcp: [], bindings: [], policy: { policyId: 'pol_00000000-0000-4000-8000-000000000001', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true } },
-    }
+    const initial = emptyDraft()
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))
 
     const store = useDraftStore()
@@ -88,10 +99,8 @@ describe('DraftStore', () => {
   })
 
   it('keeps local dirty content and stable candidate ids after stale revision conflict', async () => {
-    const initial = {
-      draftId: 'dft_00000000-0000-4000-8000-000000000001', draftRevision: 7,
-      content: { providers: [], models: [], tts: [], asr: [], mcp: [], bindings: [], policy: { policyId: 'pol_00000000-0000-4000-8000-000000000001', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true } },
-    }
+    const initial = emptyDraft()
+    initial.draftRevision = 7
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, code: 'stale_draft_revision', currentDraftRevision: 8 }), { status: 409, headers: { 'Content-Type': 'application/problem+json' } }))
@@ -105,6 +114,28 @@ describe('DraftStore', () => {
     expect(store.dirty).toBe(true)
     expect(store.localContent?.models.some((model) => model.modelId === modelId)).toBe(true)
     expect(store.conflictRevision).toBe(8)
+  })
+
+  it('marks an unbound resource deletion dirty and blocks referenced resources', async () => {
+    const initial = emptyDraft()
+    initial.content.models.push({
+      modelId: 'mdl_00000000-0000-4000-8000-000000000001',
+      providerId: 'prv_00000000-0000-4000-8000-000000000001', displayName: 'Model', upstreamModelKey: 'model',
+      runtimePath: '/v1/chat/completions', inputModalities: ['TEXT'], outputModalities: ['TEXT'], capabilities: [], enabled: true,
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const store = useDraftStore()
+    await store.load()
+
+    expect(store.removeResource('MODEL', initial.content.models[0]!.modelId)).toEqual({ removed: true, references: [] })
+    expect(store.dirty).toBe(true)
+
+    initial.content.policy.defaultModelId = initial.content.models[0]!.modelId
+    await store.load()
+    const blocked = store.removeResource('MODEL', initial.content.models[0]!.modelId)
+    expect(blocked.removed).toBe(false)
+    expect(blocked.references).toEqual(['policy.defaultModelId'])
+    expect(store.localContent!.models).toHaveLength(1)
   })
 })
 

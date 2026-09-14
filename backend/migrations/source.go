@@ -3,9 +3,10 @@
 package migrations
 
 import (
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"io/fs"
-	"strings"
 )
 
 //go:embed *.sql
@@ -19,9 +20,8 @@ func Names() []string {
 	return names
 }
 
-func CurrentRevision() string {
-	names := Names()
-	return strings.TrimSuffix(names[len(names)-1], ".sql")
+func CurrentIdentity() string {
+	return fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(CurrentSQL())))
 }
 
 func CurrentSQL() string {

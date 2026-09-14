@@ -1216,13 +1216,16 @@ components:
           $ref: '#/components/schemas/ProviderId'
         displayName:
           type: string
+          minLength: 1
         upstreamModelKey:
           type: string
+          minLength: 1
         runtimePath:
           type: string
           pattern: ^/[^?#]*$
         inputModalities:
           type: array
+          minItems: 1
           items:
             type: string
             enum:
@@ -1230,6 +1233,7 @@ components:
             - IMAGE
         outputModalities:
           type: array
+          minItems: 1
           items:
             type: string
             enum:
@@ -1259,6 +1263,7 @@ components:
           $ref: '#/components/schemas/TtsId'
         displayName:
           type: string
+          minLength: 1
         clientProtocol:
           type: string
           enum:
@@ -1289,6 +1294,7 @@ components:
           $ref: '#/components/schemas/AsrId'
         displayName:
           type: string
+          minLength: 1
         clientProtocol:
           type: string
           enum:
@@ -1298,6 +1304,7 @@ components:
           minLength: 1
         language:
           type: string
+          minLength: 1
         runtimePath:
           type: string
           pattern: ^/[^?#]*$
@@ -1318,6 +1325,7 @@ components:
           $ref: '#/components/schemas/McpServerId'
         displayName:
           type: string
+          minLength: 1
         clientProtocol:
           type: string
           enum:
@@ -1431,6 +1439,8 @@ components:
       - mcp
       - bindings
       - policy
+      - assistants
+      - starters
       properties:
         providers:
           type: array
@@ -2060,6 +2070,9 @@ components:
       - asr
       - mcp
       - policy
+      - assistants
+      - starters
+      - diffSummary
       properties:
         draftRevision:
           type: integer
@@ -2096,6 +2109,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AssistantStarterDefinition'
+        publishedGeneration:
+          type: integer
+          minimum: 1
+          description: Latest immutable release generation used as the comparison baseline. Absent when no release exists.
+        diffSummary:
+          $ref: '#/components/schemas/DiffSummary'
     ReleaseDiffKind:
       type: string
       enum:
@@ -2107,6 +2126,7 @@ components:
       - POLICY
       - ASSISTANT
       - STARTER
+      - BINDING
     ResourceDiff:
       type: object
       additionalProperties: false
@@ -2452,7 +2472,7 @@ components:
       required:
       - buildVersion
       - dbHealth
-      - migrationRevision
+      - schemaIdentity
       - runtimeStatus
       - activeManagedGeneration
       - managedStateRevision
@@ -2463,8 +2483,9 @@ components:
           type: string
         dbHealth:
           type: string
-        migrationRevision:
+        schemaIdentity:
           type: string
+          pattern: ^sha256:[0-9a-f]{64}$
         runtimeStatus:
           type: string
           enum:

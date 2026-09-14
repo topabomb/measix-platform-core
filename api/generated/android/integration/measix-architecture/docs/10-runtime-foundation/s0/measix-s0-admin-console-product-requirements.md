@@ -1,7 +1,7 @@
 # S0 Admin Console 产品、交互与浏览器边界
 
 > 状态：S0 Product / UX Requirements Authority
-> 版本：2026-08-31
+> 版本：2026-09-14
 > 上位交付契约：`measix-s0-capability-delivery-contract-spec.md`、`measix-s0-enterprise-realm-experience-contract-spec.md`、`measix-s0-enterprise-tool-gateway-contract-spec.md`
 > Wire 权威：`measix-s0-control-protocol.md`  
 > 测试规格：`measix-s0-admin-console-testing-spec.md`  
@@ -93,6 +93,12 @@ Publish、Apply、Revoke 等不能只靠 toast。页面持续展示 operation st
 - Usage/request detail 不展示 prompt/body/credential headers；
 - UI logic 依赖 stable HTTP status + Problem code，不解析自由文本决定行为；
 - retry/recovery 使用同一 command idempotency identity。
+
+### 3.7 与 Android 一致的配置心智
+
+Admin Console 与 Android 管理同一批企业资源时，沿用一致的概念分组和交互语法：设置入口先显示图标、名称、当前摘要和状态，再进入明确的详情分区；Boolean 策略以整行标题、影响说明和尾部 Switch 呈现；Model/MCP 等引用通过带可用状态的 picker 选择。不可用的当前引用必须保留并就近说明原因，不能静默换成第一个可用项。
+
+PC 宽屏使用分区导航 + collection + selected detail；窄屏将同一状态和动作收敛为单列分区选择与详情。两种布局共享同一 Draft、validation 和 publish owner，不维护桌面/移动两套业务状态。Android 的本地用户设置、辅助模型槽位、用户凭据和设备偏好不因此成为 Managed Snapshot 字段；Admin 只呈现平台合同拥有的资源、默认项和准入策略。
 
 ## 4. 一级信息架构
 
@@ -334,6 +340,7 @@ Allow Local Models
 Allow Local TTS
 Allow Local ASR
 Allow Local MCP
+Allow Local Assistants
 ```
 
 Default Model/TTS/ASR 使用对应 resource picker，只允许有效且 enabled 的同 kind resource。无效 default 必须形成可导航 validation error。
@@ -425,6 +432,8 @@ Resource → Upstream → candidate/active state → runtime path/transport
 
 ### Review
 
+Review 的 Published→Candidate 差异由 Hub 将当前已保存 Draft 与最新不可变 Release 比较后返回；浏览器不得把保存后的本地 baseline 当成 Published，也不得自行重建权威差异。没有 Release 时明确显示“无已发布基线”，并把当前候选计为新增内容。
+
 正式审查面至少展示：
 
 ```text
@@ -444,9 +453,9 @@ Warnings
 
 ```text
 Client receives:
-  v1 Providers / Models / TTS / ASR / Direct MCP / Policy
-  v2 adds Assistants / Memory Seed / Starters
-  v3 adds Tool Gateway logical resource / surfaceHash
+  current Snapshot v4: Providers / Models / TTS / ASR / Direct MCP / Policy
+                       Assistants / Memory Seed / Starters
+  future Snapshot v5: Gateway logical resource / surfaceHash
 
 Client never receives:
   Upstream/base URL / Secret / runtimeRouteId / Binding / Pricing

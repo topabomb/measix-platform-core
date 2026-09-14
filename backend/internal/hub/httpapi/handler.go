@@ -431,6 +431,16 @@ func decodeStrictJSON(r *http.Request, target any) error {
 		if err := json.Unmarshal(content["policy"], &policy); err != nil {
 			return err
 		}
+		for _, name := range []string{"providers", "models", "tts", "asr", "mcp", "bindings", "assistants", "starters"} {
+			value, present := content[name]
+			if !present || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+				return errors.New("draft content requires an explicit array for " + name)
+			}
+			var items []json.RawMessage
+			if err := json.Unmarshal(value, &items); err != nil {
+				return errors.New("draft content requires an array for " + name)
+			}
+		}
 		for _, name := range []string{"allowLocalProviders", "allowLocalTts", "allowLocalAsr", "allowLocalMcp", "allowLocalAssistants"} {
 			value := string(bytes.TrimSpace(policy[name]))
 			if value != "true" && value != "false" {

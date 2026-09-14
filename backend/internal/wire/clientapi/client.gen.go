@@ -541,17 +541,17 @@ type ManagedAssistantDefinition struct {
 
 // ManagedDraftContent defines model for ManagedDraftContent.
 type ManagedDraftContent struct {
-	Asr        []AsrDefinition               `json:"asr"`
-	Assistants *[]ManagedAssistantDefinition `json:"assistants,omitempty"`
-	Bindings   []RuntimeBindingDefinition    `json:"bindings"`
-	Mcp        []McpDefinition               `json:"mcp"`
-	Models     []ModelDefinition             `json:"models"`
+	Asr        []AsrDefinition              `json:"asr"`
+	Assistants []ManagedAssistantDefinition `json:"assistants"`
+	Bindings   []RuntimeBindingDefinition   `json:"bindings"`
+	Mcp        []McpDefinition              `json:"mcp"`
+	Models     []ModelDefinition            `json:"models"`
 
 	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
-	Policy    ManagedPolicy                 `json:"policy"`
-	Providers []ProviderDefinition          `json:"providers"`
-	Starters  *[]AssistantStarterDefinition `json:"starters,omitempty"`
-	Tts       []TtsDefinition               `json:"tts"`
+	Policy    ManagedPolicy                `json:"policy"`
+	Providers []ProviderDefinition         `json:"providers"`
+	Starters  []AssistantStarterDefinition `json:"starters"`
+	Tts       []TtsDefinition              `json:"tts"`
 }
 
 // ManagedPolicy Current policy. All five admission flags are required; new policies initialize all five to false.

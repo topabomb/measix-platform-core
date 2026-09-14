@@ -24,8 +24,8 @@ func TestSnapshotWireVersionRequirements(t *testing.T) {
 		draft := decodeFixture[adminapi.Draft](t, "draft/minimal.json", true)
 		allow := false
 		draft.Content.Policy.AllowLocalAssistants = allow
-		draft.Content.Assistants = nil
-		draft.Content.Starters = nil
+		draft.Content.Assistants = []adminapi.ManagedAssistantDefinition{}
+		draft.Content.Starters = []adminapi.AssistantStarterDefinition{}
 		snapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{
 			DeploymentID: "dep_550e8400-e29b-41d4-a716-446655440000", ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000",
 			ManagedGeneration: 1, PublishedAt: time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC), Content: draft.Content,

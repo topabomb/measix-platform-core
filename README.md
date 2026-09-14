@@ -13,7 +13,7 @@ Current source contains the Hub and Relay Go binaries plus the Admin SPA. The S0
 
 ## Repository ownership
 
-This repository owns executable OpenAPI/fixtures, generated artifacts, Go services, Admin Console code, SQLite/Ent/Atlas migrations, tests, CI and operations.
+This repository owns executable OpenAPI/fixtures, generated artifacts, Go services, Admin Console code, the SQLite/Ent/Atlas current schema, tests, CI and operations.
 
 Product semantics, stage scope, stable IDs, cross-component behavior and required stage scenarios are owned by `topabomb/measix-architecture`.
 
@@ -22,6 +22,6 @@ Product semantics, stage scope, stable IDs, cross-component behavior and require
 - `docs/development.md` — local/build/codegen workflow
 - `docs/api-contracts.md` — OpenAPI/fixtures/codegen/freeze
 - `docs/testing.md` — executable test/CI organization and TDD
-- `docs/database-migrations.md` — migration workflow
+- `docs/database-migrations.md` — current database initialization workflow
 - `docs/operations.md` — runtime/backup/restore
 - `docs/release.md` — S0.1 freeze and final S0 RC evidence

@@ -60,3 +60,26 @@ func TestReleaseContentDiffIdenticalContentIsNoop(t *testing.T) {
 		t.Fatalf("identical content should not emit details, got %+v", *diff.Details)
 	}
 }
+
+func TestReleaseContentDiffIncludesPolicyAndRuntimeBindings(t *testing.T) {
+	prev := &adminapi.ManagedDraftContent{
+		Bindings: []adminapi.RuntimeBindingDefinition{{RuntimeRouteId: "rte_a", ResourceId: "mdl_a", UpstreamId: "ups_a"}},
+		Policy:   adminapi.ManagedPolicy{PolicyId: "pol_a", AllowLocalProviders: false},
+	}
+	cur := &adminapi.ManagedDraftContent{
+		Bindings: []adminapi.RuntimeBindingDefinition{{RuntimeRouteId: "rte_a", ResourceId: "mdl_a", UpstreamId: "ups_b"}},
+		Policy:   adminapi.ManagedPolicy{PolicyId: "pol_a", AllowLocalProviders: true},
+	}
+
+	diff := releaseContentDiff(cur, prev)
+	if diff.Changed != 2 {
+		t.Fatalf("changed=%d want policy + binding", diff.Changed)
+	}
+	seen := map[adminapi.ReleaseDiffKind]bool{}
+	for _, detail := range *diff.Details {
+		seen[detail.Kind] = true
+	}
+	if !seen[adminapi.ReleaseDiffKindPOLICY] || !seen[adminapi.ReleaseDiffKindBINDING] {
+		t.Fatalf("details=%+v want POLICY and BINDING", *diff.Details)
+	}
+}

@@ -4,7 +4,7 @@
  *
  * Per measix-s0-capability-delivery-system-testing-spec.md §3:
  *   "独立 temp directory/SQLite/ports/identity"
- *   "真实 SQLite + migrations"
+ *   "真实 SQLite + current schema initialization"
  *   "真实 TCP/HTTP streaming/binary/multipart"
  *   "Hub/Relay T3/T4.1 使用真实 process/binary"
  *   "Admin T4.1 使用 production dist/spa"
@@ -12,7 +12,7 @@
  * This script:
  *   1. Creates a clean temp directory with unique ports and identity
  *   2. Generates crypto material (master key, Ed25519 seed, relay service token)
- *   3. Applies migrations to a fresh SQLite DB via devmigrate
+ *   3. Initializes a fresh SQLite DB with the current schema via devmigrate
  *   4. Bootstraps an admin user via control-hub bootstrap-admin
  *   5. Builds and starts the Control Hub process
  *   6. Builds and starts the Runtime Relay process

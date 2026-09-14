@@ -85,7 +85,7 @@ func Check(ctx context.Context, db *sql.DB) (CheckResult, error) {
 		}
 		for _, col := range expected.Columns {
 			if !present[col.Name] {
-				return CheckResult{}, fmt.Errorf("required column %s.%s is missing; apply migrations", table, col.Name)
+				return CheckResult{}, fmt.Errorf("required column %s.%s is missing; initialize the current schema", table, col.Name)
 			}
 		}
 	}
@@ -159,7 +159,7 @@ func Backup(ctx context.Context, db *sql.DB, outputPath, build string, now time.
 	if closeErr != nil {
 		return "", closeErr
 	}
-	metadata := BackupMetadata{CreatedAt: now.UTC(), Build: build, Schema: CurrentSchemaRevision}
+	metadata := BackupMetadata{CreatedAt: now.UTC(), Build: build, Schema: CurrentSchemaIdentity}
 	if err := json.NewEncoder(metadataFile).Encode(metadata); err != nil {
 		return "", err
 	}

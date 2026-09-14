@@ -17,7 +17,7 @@ func OpenStore(t *testing.T) *store.Store {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(migrations.CurrentSQL()); err != nil {
-		t.Fatalf("apply real test migrations: %v", err)
+		t.Fatalf("initialize real current test schema: %v", err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)

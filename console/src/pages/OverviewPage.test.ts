@@ -45,7 +45,7 @@ function mountOverview() {
 const STATUS = {
   buildVersion: 'v0.1.0',
   dbHealth: 'HEALTHY',
-  migrationRevision: '1',
+  schemaIdentity: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   runtimeStatus: 'READY',
   activeManagedGeneration: 3,
   managedStateRevision: 2,

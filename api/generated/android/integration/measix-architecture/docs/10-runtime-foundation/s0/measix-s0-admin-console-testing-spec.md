@@ -187,7 +187,7 @@ Resource → Upstream → candidate/active state → runtime path/transport
 - Errors block Publish；
 - Warnings require explicit review；
 - stable code/severity drives UI；
-- Review 显示 Added/Changed/Removed + Policy/runtime impact；
+- Review 显示 Hub 基于最新不可变 Release 返回的 Added/Changed/Removed + Policy/runtime impact；保存 Draft 后差异不能归零，无 Release 时明确显示空基线；
 - issue 可跳转到具体 resource/field；
 - Snapshot Preview 来自 Hub canonical compiler；
 - Preview 无 Release/generation/runtime side effect；

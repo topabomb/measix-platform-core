@@ -173,7 +173,7 @@ onMounted(refresh)
             <q-card-section class="text-subtitle1 text-weight-medium">{{ $t('system.title') }}</q-card-section>
             <q-list separator>
               <q-item><q-item-section>{{ $t('system.dbHealth') }}</q-item-section><q-item-section side>{{ system.dbHealth }}</q-item-section></q-item>
-              <q-item><q-item-section>{{ $t('system.managedStateRevision') }}</q-item-section><q-item-section side>{{ system.migrationRevision }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('system.schemaIdentity') }}</q-item-section><q-item-section side><code>{{ system.schemaIdentity }}</code></q-item-section></q-item>
               <q-item><q-item-section>{{ $t('overview.ingestLag') }}</q-item-section><q-item-section side>{{ system.requestUsageIngestLagSeconds ?? 0 }}s</q-item-section></q-item>
               <q-item><q-item-section>{{ $t('system.semanticOrphan') }}</q-item-section><q-item-section side>{{ system.semanticOrphanCount ?? 0 }}</q-item-section></q-item>
             </q-list>

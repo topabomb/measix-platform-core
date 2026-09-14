@@ -69,9 +69,9 @@ From either PowerShell or POSIX, `node scripts/checks.mjs generate` owns regener
 
 ## 4. API and database changes
 
-Semantic changes start in the owning architecture contract, then OpenAPI → canonical fixtures → generated artifacts → tests → implementation. `make generate` delegates to that same Node owner and installs locked console dependencies before generation. It covers four Go wire surfaces, Android Client OpenAPI export/manifest, Ent, Admin TypeScript and migration checksum. Android export is not Kotlin consumer implementation. See [API contracts](api-contracts.md).
+Semantic changes start in the owning architecture contract, then OpenAPI → canonical fixtures → generated artifacts → tests → implementation. `make generate` delegates to that same Node owner and installs locked console dependencies before generation. It covers four Go wire surfaces, Android Client OpenAPI export/manifest, Ent, Admin TypeScript and current-schema checksum. Android export is not Kotlin consumer implementation. See [API contracts](api-contracts.md).
 
-Schema changes update the reviewed current initialization SQL and checksum, with empty initialization, atomic failure and current-version integrity/recovery tests. No historical upgrade fixtures are maintained. `devmigrate` is a development convenience with different revision bookkeeping from Atlas; it is not an equivalent release migration gate. See [database migrations](database-migrations.md).
+Schema changes update the reviewed current initialization SQL and checksum, with empty initialization, atomic failure and current-version integrity/recovery tests. No historical upgrade fixtures are maintained. `devmigrate` is a development convenience that records the one accepted SQL checksum; it is not an upgrade mechanism or an equivalent release schema gate. See [database initialization](database-migrations.md).
 
 ## 5. System and browser ownership
 
@@ -93,4 +93,4 @@ Use a meaningful observed Red → Green → Refactor loop for behavior/regressio
 
 GitHub-only work uses a Draft PR and actual check/log inspection; current CI triggers on PRs to `main` and pushes to `main`, not arbitrary branch pushes. CI's four work jobs are static-contract, backend-test, system-test and console-test, aggregated by ci-gate. It excludes browser T4.1 and real external qualification.
 
-Evidence tooling rejects failed commands, dirty/mismatched source/build/contract/artifact pins and incomplete one-run Adapter profiles. It creates new candidate artifacts without overwriting existing files. The CAP runner verifies the resource baseline of current v4 and does not replace S0.2 ERX; independent clean-source replay is not implemented (runtime-only diagnostics cannot finalize C7). Therefore `make freeze-gate` is not a working S0.2 release path. See [testing](testing.md) and [release](release.md); never infer acceptance from script names or a historical manifest.
+Evidence tooling rejects failed commands, dirty/mismatched source/build/contract/artifact pins and incomplete one-run Adapter profiles. It creates new candidate artifacts without overwriting existing files. The CAP runner verifies the resource baseline of current v4 and does not replace S0.2 ERX; independent clean-source replay is not implemented (runtime-only diagnostics cannot finalize C7). See [testing](testing.md) and [release](release.md); candidate acceptance requires each named gate rather than a wrapper target.

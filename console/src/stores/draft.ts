@@ -8,6 +8,7 @@ type ManagedDraftContent = components['schemas']['ManagedDraftContent']
 type ValidateDraftResponse = components['schemas']['ValidateDraftResponse']
 type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
 type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
+export type ManagedResourceKind = 'MODEL' | 'TTS' | 'ASR' | 'MCP'
 
 export const useDraftStore = defineStore('draft', () => {
   const baselineContent = ref<ManagedDraftContent>()
@@ -89,7 +90,6 @@ export const useDraftStore = defineStore('draft', () => {
       displayName: 'New ASR',
       clientProtocol: 'OPENAI_AUDIO_TRANSCRIPTIONS',
       upstreamModelKey: '',
-      language: '',
       runtimePath: '/v1/audio/transcriptions',
       enabled: true,
     })
@@ -115,7 +115,7 @@ export const useDraftStore = defineStore('draft', () => {
   function addAssistant(displayName: string): string {
     const content = requireContent()
     const assistantDefinitionId = createCandidateId('asd')
-    ;(content.assistants ??= []).push({
+    content.assistants.push({
       assistantDefinitionId, displayName, systemPrompt: '', modelId: '',
       memorySeed: [], mcpServerIds: [], enabled: true,
     })
@@ -125,23 +125,23 @@ export const useDraftStore = defineStore('draft', () => {
 
   function removeAssistant(id: string) {
     const content = requireContent()
-    content.assistants = (content.assistants ?? []).filter(a => a.assistantDefinitionId !== id)
-    content.starters = (content.starters ?? []).filter(s => s.assistantDefinitionId !== id)
+    content.assistants = content.assistants.filter(a => a.assistantDefinitionId !== id)
+    content.starters = content.starters.filter(s => s.assistantDefinitionId !== id)
     markDirty()
   }
 
   function addStarter(assistantDefinitionId: string, title: string): string {
     const content = requireContent()
-    if (!content.assistants?.some(a => a.assistantDefinitionId === assistantDefinitionId)) throw new Error('assistant not found')
+    if (!content.assistants.some(a => a.assistantDefinitionId === assistantDefinitionId)) throw new Error('assistant not found')
     const starterId = createCandidateId('str')
-    ;(content.starters ??= []).push({ starterId, assistantDefinitionId, title, prompt: '', sortOrder: 0, enabled: true })
+    content.starters.push({ starterId, assistantDefinitionId, title, prompt: '', sortOrder: 0, enabled: true })
     markDirty()
     return starterId
   }
 
   function removeStarter(id: string) {
     const content = requireContent()
-    content.starters = (content.starters ?? []).filter(s => s.starterId !== id)
+    content.starters = content.starters.filter(s => s.starterId !== id)
     markDirty()
   }
 
@@ -188,6 +188,55 @@ export const useDraftStore = defineStore('draft', () => {
     if (content.bindings.length !== before) markDirty()
   }
 
+  function resourceReferences(kind: ManagedResourceKind, resourceId: string): string[] {
+    const content = requireContent()
+    const references: string[] = []
+    if (kind === 'MODEL') {
+      if (content.policy.defaultModelId === resourceId) references.push('policy.defaultModelId')
+      for (const assistant of content.assistants) {
+        if (assistant.modelId === resourceId) references.push(`assistant:${assistant.assistantDefinitionId}.modelId`)
+      }
+    } else if (kind === 'TTS' && content.policy.defaultTtsId === resourceId) {
+      references.push('policy.defaultTtsId')
+    } else if (kind === 'ASR' && content.policy.defaultAsrId === resourceId) {
+      references.push('policy.defaultAsrId')
+    } else if (kind === 'MCP') {
+      for (const assistant of content.assistants) {
+        if (assistant.mcpServerIds.includes(resourceId)) references.push(`assistant:${assistant.assistantDefinitionId}.mcpServerIds`)
+      }
+    }
+    return references
+  }
+
+  function removeResource(kind: ManagedResourceKind, resourceId: string): { removed: boolean; references: string[] } {
+    const references = resourceReferences(kind, resourceId)
+    if (references.length) return { removed: false, references }
+    const content = requireContent()
+    let removed = false
+    if (kind === 'MODEL') {
+      const before = content.models.length
+      content.models = content.models.filter(item => item.modelId !== resourceId)
+      removed = content.models.length !== before
+    } else if (kind === 'TTS') {
+      const before = content.tts.length
+      content.tts = content.tts.filter(item => item.ttsId !== resourceId)
+      removed = content.tts.length !== before
+    } else if (kind === 'ASR') {
+      const before = content.asr.length
+      content.asr = content.asr.filter(item => item.asrId !== resourceId)
+      removed = content.asr.length !== before
+    } else {
+      const before = content.mcp.length
+      content.mcp = content.mcp.filter(item => item.mcpServerId !== resourceId)
+      removed = content.mcp.length !== before
+    }
+    if (removed) {
+      removeBinding(resourceId)
+      markDirty()
+    }
+    return { removed, references: [] }
+  }
+
   async function save(csrfToken: string) {
     if (baselineRevision.value === undefined) throw new Error('draft is not loaded')
     saving.value = true
@@ -218,6 +267,6 @@ export const useDraftStore = defineStore('draft', () => {
   return {
     baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
     load, save, validate, addModel, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, markDirty,
-    bindingFor, setBinding, removeBinding,
+    bindingFor, setBinding, removeBinding, resourceReferences, removeResource,
   }
 })

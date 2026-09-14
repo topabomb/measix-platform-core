@@ -1333,37 +1333,37 @@
   },
   {
     "id": "HUB-DB-001",
-    "name": "Empty DB replay all migrations",
+    "name": "Empty DB initializes current schema",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBDB001EmptyDBReplayAllMigrations"
+      "TestHUBDB001EmptyDBInitializesCurrentSchema"
     ],
     "required": true
   },
   {
     "id": "HUB-DB-003",
-    "name": "Migration history not rewritten on restart",
+    "name": "Current schema not rewritten on restart",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBDB003MigrationHistoryNotRewrittenOnRestart"
+      "TestHUBDB003CurrentSchemaNotRewrittenOnRestart"
     ],
     "required": true
   },
   {
     "id": "HUB-DB-004",
-    "name": "Incompatible schema fail-fast",
+    "name": "Non-current schema fail-fast",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBDB004IncompatibleSchemaRevisionFailFast"
+      "TestHUBDB004NonCurrentSchemaFailFast"
     ],
     "required": true
   },
   {
     "id": "HUB-DB-005",
-    "name": "Migration checksum not tampered",
+    "name": "Current schema checksum not tampered",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBDB005MigrationChecksumNotTampered"
+      "TestHUBDB005CurrentSchemaChecksumNotTampered"
     ],
     "required": true
   },
@@ -1381,7 +1381,7 @@
     "name": "Restore integrity + revision",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBDB008RestorePassesIntegrityAndRevision"
+      "TestHUBDB008RestorePassesIntegrityAndSchemaIdentity"
     ],
     "required": true
   },

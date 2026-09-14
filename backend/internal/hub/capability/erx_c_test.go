@@ -38,7 +38,7 @@ func TestERXC0004InvalidRefsBlockPublish(t *testing.T) {
 		MemorySeed:            []string{"seed 1"},
 		Enabled:               true,
 	}
-	content.Assistants = &[]adminapi.ManagedAssistantDefinition{assistantContent}
+	content.Assistants = []adminapi.ManagedAssistantDefinition{assistantContent}
 	content.Bindings = []adminapi.RuntimeBindingDefinition{} // remove bindings to simplify
 
 	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
@@ -111,10 +111,10 @@ func TestERXC001CreateAndPublishManagedAssistant(t *testing.T) {
 		McpServerIds:          []adminapi.McpServerId{adminapi.McpServerId(mcpID)},
 		Enabled:               true,
 	}
-	content.Assistants = &[]adminapi.ManagedAssistantDefinition{assistantDef}
+	content.Assistants = []adminapi.ManagedAssistantDefinition{assistantDef}
 	// Add a starter
 	starterID := platformid.New(platformid.Starter)
-	content.Starters = &[]adminapi.AssistantStarterDefinition{{
+	content.Starters = []adminapi.AssistantStarterDefinition{{
 		StarterId:             adminapi.StarterId(starterID),
 		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 		Title:                 "Recent Updates",
@@ -173,7 +173,7 @@ func TestERXC003MultipleMemorySeedItemsProjectReadOnly(t *testing.T) {
 	assistantID := platformid.New(platformid.Assistant)
 	modelID := string(content.Models[0].ModelId)
 	seeds := []string{"Seed one", "Seed two", "Seed three"}
-	content.Assistants = &[]adminapi.ManagedAssistantDefinition{{
+	content.Assistants = []adminapi.ManagedAssistantDefinition{{
 		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 		DisplayName:           "Multi Seed Assistant",
 		SystemPrompt:          "You are helpful.",
@@ -216,7 +216,7 @@ func TestERXC007StarterRendersTitleOrderAndPrefillsPrompt(t *testing.T) {
 	content := validDraft(up.UpstreamID)
 	assistantID := platformid.New(platformid.Assistant)
 	modelID := string(content.Models[0].ModelId)
-	content.Assistants = &[]adminapi.ManagedAssistantDefinition{{
+	content.Assistants = []adminapi.ManagedAssistantDefinition{{
 		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 		DisplayName:           "Test Assistant",
 		SystemPrompt:          "You are helpful.",
@@ -227,7 +227,7 @@ func TestERXC007StarterRendersTitleOrderAndPrefillsPrompt(t *testing.T) {
 	// Add two starters with different sort orders
 	starter1ID := platformid.New(platformid.Starter)
 	starter2ID := platformid.New(platformid.Starter)
-	content.Starters = &[]adminapi.AssistantStarterDefinition{
+	content.Starters = []adminapi.AssistantStarterDefinition{
 		{
 			StarterId:             adminapi.StarterId(starter2ID),
 			AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
@@ -283,7 +283,7 @@ func TestERXC009DisabledModelRefBlocksValidation(t *testing.T) {
 	})
 	// Assistant referencing the disabled model
 	assistantID := platformid.New(platformid.Assistant)
-	content.Assistants = &[]adminapi.ManagedAssistantDefinition{{
+	content.Assistants = []adminapi.ManagedAssistantDefinition{{
 		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 		DisplayName:           "Test Assistant",
 		SystemPrompt:          "You are helpful.",
@@ -312,7 +312,7 @@ func TestERXC009DisabledModelRefBlocksValidation(t *testing.T) {
 	}
 }
 
-// Empty experience arrays must not make a new policy compile as a legacy schema.
+// Empty experience arrays still compile against the one current schema.
 // Current wire validation is covered by the shared contract fixtures.
 func TestCurrentSnapshotWithoutExperienceHasDeterministicHash(t *testing.T) {
 	ctx := context.Background()

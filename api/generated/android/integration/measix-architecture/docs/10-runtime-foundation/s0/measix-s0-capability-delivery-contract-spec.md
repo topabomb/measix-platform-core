@@ -50,7 +50,7 @@ Usage Ledger / Pricing / Cost / Diagnostics
 - RuntimeControlState full apply/status foundations；
 - Relay auth/generation/resource/route/credential/stream/cancel foundations；
 - request-level Usage spool/ingest foundations；
-- SQLite/Ent/Atlas/versioned migrations；
+- SQLite/Ent/Atlas current-schema initialization；
 - Admin Quasar shell 与 generated Admin types；
 - OpenAPI/fixture/codegen/CI foundations。
 

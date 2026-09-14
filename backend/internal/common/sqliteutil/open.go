@@ -12,8 +12,8 @@ import (
 
 const BusyTimeoutMillis = 5000
 
-// Open opens a production-style MEASIX SQLite database. Schema migration is
-// intentionally external: production applies versioned Atlas migrations before
+// Open opens a production-style MEASIX SQLite database. Schema initialization is
+// intentionally external: production applies the current Atlas schema before
 // the owning process starts.
 func Open(path string) (*sql.DB, error) {
 	if path == "" {

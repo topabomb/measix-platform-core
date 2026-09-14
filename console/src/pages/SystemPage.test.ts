@@ -46,7 +46,7 @@ function mountSystem() {
 const BASE = {
   buildVersion: 'v0.1.0',
   dbHealth: 'HEALTHY',
-  migrationRevision: '1',
+  schemaIdentity: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   runtimeStatus: 'READY',
   activeManagedGeneration: 2,
   managedStateRevision: 2,

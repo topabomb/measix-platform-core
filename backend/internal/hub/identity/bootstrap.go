@@ -77,12 +77,14 @@ func (s *Service) Bootstrap(ctx context.Context, deploymentName, adminUsername, 
 
 	policyID := platformid.New(platformid.Policy)
 	content := map[string]any{
-		"providers": []any{},
-		"models":    []any{},
-		"tts":       []any{},
-		"asr":       []any{},
-		"mcp":       []any{},
-		"bindings":  []any{},
+		"providers":  []any{},
+		"models":     []any{},
+		"tts":        []any{},
+		"asr":        []any{},
+		"mcp":        []any{},
+		"bindings":   []any{},
+		"assistants": []any{},
+		"starters":   []any{},
 		"policy": map[string]any{
 			"policyId":             policyID,
 			"allowLocalProviders":  false,

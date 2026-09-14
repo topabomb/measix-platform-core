@@ -54,11 +54,11 @@ func run(args []string) error {
 		return err
 	}
 	defer db.Close()
-	return applyMigrations(db, files)
+	return initializeSchema(db, files)
 }
 
-// applyMigrations initializes or verifies one current schema; it never upgrades data.
-func applyMigrations(db *sql.DB, files []migrate.File) error {
+// initializeSchema initializes or verifies one current schema; it never upgrades data.
+func initializeSchema(db *sql.DB, files []migrate.File) error {
 	if len(files) != 1 {
 		return errors.New("exactly one current initialization SQL file is required")
 	}

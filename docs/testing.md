@@ -6,7 +6,7 @@ This document defines how `measix-platform-core` executes and records tests, and
 
 | Layer | Purpose | Repository implementation |
 |---|---|---|
-| T0 Static / Contract | schema, codegen, migration, fixture, build consistency | API validation, generated drift, migration replay, production build |
+| T0 Static / Contract | current schema, codegen, fixture, build consistency | API validation, generated drift, fresh schema replay, production build |
 | T1 Unit / Domain | pure validation/state/mapping | Go unit tests, Vitest unit/store helpers |
 | T2 Component Integration | one real component + local real boundaries | real SQLite, real HTTP server, component/static-host tests |
 | T3 Cross-component Integration | multiple real MEASIX components | real Hub↔Relay, Admin↔Hub where implemented, deterministic Adapter |
@@ -88,7 +88,7 @@ Do not mock away the behavior under test:
 - Hub persistence tests use real SQLite;
 - Relay spool tests use real SQLite;
 - Relay streaming/cancellation tests use real HTTP/TCP boundaries;
-- migration tests execute versioned SQL;
+- schema tests execute the single current initialization SQL;
 - Admin static-host tests use production build output;
 - T3 Hub/Relay tests run real processes/binaries;
 - S0.3 T3/T4.3 tests run real Hub/Gateway/Relay production binaries plus deterministic downstream MCP;
@@ -309,7 +309,7 @@ A screenshot is optional and weaker than a check/run link + commit SHA.
 
 Refactoring begins from Green. It should not require changing expected behavior. If a refactor forces behavior expectations to change, it is no longer a pure refactor and must be reclassified.
 
-Use characterization tests first when refactoring poorly understood legacy behavior.
+Use characterization tests first when refactoring poorly understood existing behavior.
 
 ## 16. TDD exceptions
 
@@ -322,7 +322,7 @@ Do not force artificial Red/Green commits for:
 
 These changes still run applicable static/build/contract gates.
 
-Migration/schema changes are not exempt: use repository/migration tests that fail before the schema/migration behavior exists.
+Schema changes are not exempt: use repository schema tests that fail before the current initialization behavior exists.
 
 ## 17. TDD anti-patterns
 

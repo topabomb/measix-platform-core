@@ -134,13 +134,11 @@ Conversation、运行 Memory、Attachment 和 Workspace 必须保留可确定的
 
 UI、命令和执行使用同一规则，写入与执行入口重新校验。用户助手允许使用不等于引用资源全部可用；不合规引用必须显示原因并阻止执行，不能回退到首项或替换为其他来源。运行开始捕获完整执行配置和域/主体，后续选择变化、切域或配置更新不能改写已捕获运行。
 
-### 5.2 既有个人配置与数据迁移
+### 5.2 当前配置初始化与数据归属
 
-Android 必须显式迁移既有个人配置到三类逻辑归属，保留资源 ID、凭据、引用、所有用户值及关联文件。旧模型/助手/语音等选择只进入个人域偏好，不复制为企业域选择。公用显示操作偏好保持公用；按域选择与允许调整的开关独立保存。
+MEASIX 尚未发布，Android 只实现当前完整配置与数据结构。非当前开发配置或数据库直接清理后重新初始化，不提供字段转换、版本回填、双读、双写或第二配置真源。物理存储布局由 Android 仓库决定，但不能改变三类配置 owner 和派生生效配置边界。
 
-Settings/DataStore、SharedPreferences、备份恢复及所有相关消费者必须一起迁移。迁移需可恢复，提交前不得发布半新半旧状态；成功后移除旧读写入口，不双读、双写或保留第二配置真源。物理存储、迁移日志与数据库布局由 Android 仓库决定。
-
-既有运行数据明确迁为 PERSONAL；新增企业数据必须有域和主体归属后才能写入。个人备份/恢复只处理个人范围，不能用整库或整目录替换覆盖企业数据、企业凭据与下发配置。验证须覆盖迁移中断后恢复、ID/凭据/引用/文件保全、个人恢复保全企业数据及旧入口移除。
+新增运行数据必须有域和主体归属后才能写入。个人备份/恢复只处理个人范围，不能用整库或整目录替换覆盖企业数据、企业凭据与下发配置。验证覆盖 clean initialization、Realm/主体必填、个人恢复保全企业数据，以及不存在旧格式读取入口。
 
 ## 6. 三个独立状态维度
 
@@ -488,7 +486,7 @@ Android S0.4 可以进入 Final S0 System/RC Gate，仅当 `measix-s0-android-cl
 
 1. valid frozen S0.3 Snapshot v5/Gateway contract 被 pin/reproducibly consumed，S0.1–S0.3 baseline 保持 Green；
 2. Enrollment/Binding/Credential/Managed State crash-safe；
-3. Personal/Enterprise 运行数据隔离、获准用户原配置与 Managed 共存、五项准入及引用校验正确，配置迁移与个人恢复不破坏企业数据；
+3. Personal/Enterprise 运行数据隔离、获准用户原配置与 Managed 共存、五项准入及引用校验正确，当前结构初始化与个人恢复不破坏企业数据；
 4. every new Managed top-level interaction 通过 authoritative correctness guard；
 5. required Model/TTS/HTTP-ASR/Direct MCP/Gateway 全部映射现有 runtime boundary，surfaceHash/真实工具 UI 正确；
 6. 428/revoke/control outage/cancel/auth uncertainty 不产生 unsafe replay；

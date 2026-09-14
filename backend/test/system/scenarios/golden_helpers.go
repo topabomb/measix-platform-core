@@ -298,6 +298,8 @@ func (g *goldenPathTest) buildDraftContent(
 				"timeoutPolicy":   map[string]interface{}{"connectMs": 1000, "responseHeaderMs": 5000, "idleMs": 30000},
 			},
 		},
+		"assistants": []map[string]interface{}{},
+		"starters":   []map[string]interface{}{},
 		"policy": map[string]interface{}{
 			"policyId": policyID, "allowLocalProviders": false, "allowLocalTts": false,
 			"allowLocalAsr": false, "allowLocalMcp": false, "allowLocalAssistants": false,

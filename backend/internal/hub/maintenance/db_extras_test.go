@@ -21,23 +21,23 @@ import (
 	"measix/platform/migrations"
 )
 
-// migrationSQL reads the canonical migration file used in production.
-func migrationSQL(t *testing.T) string { t.Helper(); return migrations.CurrentSQL() }
+// currentSchemaSQL reads the canonical initialization SQL used in production.
+func currentSchemaSQL(t *testing.T) string { t.Helper(); return migrations.CurrentSQL() }
 
-// applyMigration applies the migration SQL to the given database.
-func applyMigration(t *testing.T, db *sql.DB) {
+// initializeCurrentSchema applies the current initialization SQL to a clean database.
+func initializeCurrentSchema(t *testing.T, db *sql.DB) {
 	t.Helper()
-	sqlText := migrationSQL(t)
+	sqlText := currentSchemaSQL(t)
 	if _, err := db.Exec(sqlText); err != nil {
-		t.Fatalf("apply migration: %v", err)
+		t.Fatalf("initialize current schema: %v", err)
 	}
 }
 
-// schemaHash returns a SHA-256 hash of the migration SQL, used to detect
+// schemaHash returns a SHA-256 hash of the current initialization SQL, used to detect
 // tampering or drift.
 func schemaHash(t *testing.T) string {
 	t.Helper()
-	h := sha256.Sum256([]byte(migrationSQL(t)))
+	h := sha256.Sum256([]byte(currentSchemaSQL(t)))
 	return hex.EncodeToString(h[:])
 }
 
@@ -74,7 +74,7 @@ func dbSchemaHash(t *testing.T, db *sql.DB) string {
 }
 
 // dbDataHash returns a SHA-256 hash of the row content of the specified tables.
-// This detects data changes (not just schema changes) across migration/backup cycles.
+// This detects data changes (not just schema changes) across backup/restore cycles.
 func dbDataHash(t *testing.T, db *sql.DB, tableList string) string {
 	t.Helper()
 	ctx := context.Background()
@@ -120,17 +120,16 @@ func openEmptyDB(t *testing.T) (*sql.DB, string) {
 	return db, path
 }
 
-// openMigratedDB opens a database and applies the migration.
-func openMigratedDB(t *testing.T) (*sql.DB, string) {
+// openCurrentDB opens a database initialized with the current schema.
+func openCurrentDB(t *testing.T) (*sql.DB, string) {
 	t.Helper()
 	db, path := openEmptyDB(t)
-	applyMigration(t, db)
+	initializeCurrentSchema(t, db)
 	return db, path
 }
 
 // seedUserData inserts a user, upstream (with secret), and a managed release
-// into the database so we can verify data preservation across migration and
-// backup/restore cycles.
+// into the database so we can verify data preservation across backup/restore cycles.
 func seedUserData(t *testing.T, db *sql.DB) (userID, upstreamID, releaseID string) {
 	t.Helper()
 	ctx := context.Background()
@@ -213,12 +212,12 @@ func seedUserData(t *testing.T, db *sql.DB) (userID, upstreamID, releaseID strin
 }
 
 // HUB-DB-003: current initialization SQL must not be rewritten by an ordinary
-// restart. We apply the migration, close and reopen the DB, then verify the
+// restart. We initialize the current schema, close and reopen the DB, then verify the
 // schema content hash (not just the SQL file hash) is unchanged.
 // This verifies the actual DB schema content, not just the source SQL file.
-func TestHUBDB003MigrationHistoryNotRewrittenOnRestart(t *testing.T) {
+func TestHUBDB003CurrentSchemaNotRewrittenOnRestart(t *testing.T) {
 	ctx := context.Background()
-	db, path := openMigratedDB(t)
+	db, path := openCurrentDB(t)
 	defer db.Close()
 
 	// Record the schema content hash and table count before restart.
@@ -253,12 +252,12 @@ func TestHUBDB003MigrationHistoryNotRewrittenOnRestart(t *testing.T) {
 		t.Fatalf("table count changed on restart: before=%d after=%d", checkBefore.Tables, checkAfter.Tables)
 	}
 
-	// Verify the migration revision constant is stable
-	if maintenance.CurrentSchemaRevision != migrations.CurrentRevision() {
-		t.Fatalf("CurrentSchemaRevision does not match embedded latest migration: %s", maintenance.CurrentSchemaRevision)
+	// Verify the current schema identity is stable.
+	if maintenance.CurrentSchemaIdentity != migrations.CurrentIdentity() {
+		t.Fatalf("CurrentSchemaIdentity does not match embedded current schema: %s", maintenance.CurrentSchemaIdentity)
 	}
 
-	// Verify the atlas.sum file exists and is not empty (migration integrity file)
+	// Verify the Atlas checksum file exists and is not empty.
 	_, file, _, _ := runtime.Caller(0)
 	atlasSumPath := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../migrations/atlas.sum"))
 	atlasSumData, err := os.ReadFile(atlasSumPath)
@@ -270,16 +269,16 @@ func TestHUBDB003MigrationHistoryNotRewrittenOnRestart(t *testing.T) {
 	}
 }
 
-// HUB-DB-004: incompatible schema revision must fail-fast at startup. An empty
+// HUB-DB-004: a non-current schema must fail-fast at startup. An empty
 // DB (no required tables) must fail the check immediately.
-func TestHUBDB004IncompatibleSchemaRevisionFailFast(t *testing.T) {
+func TestHUBDB004NonCurrentSchemaFailFast(t *testing.T) {
 	db, _ := openEmptyDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
 	_, err := maintenance.Check(ctx, db)
 	if err == nil {
-		t.Fatal("empty database should fail schema check (incompatible revision)")
+		t.Fatal("empty database should fail the current schema check")
 	}
 	if !strings.Contains(err.Error(), "missing") && !strings.Contains(err.Error(), "required") {
 		t.Fatalf("error should mention missing/required table, got: %v", err)
@@ -289,9 +288,9 @@ func TestHUBDB004IncompatibleSchemaRevisionFailFast(t *testing.T) {
 // HUB-DB-005: current initialization schema/checksum must not be silently modified.
 // We compute the hash of the actual DB schema content (not the SQL file),
 // back up the DB, and verify the schema content hash is stable across backup.
-func TestHUBDB005MigrationChecksumNotTampered(t *testing.T) {
+func TestHUBDB005CurrentSchemaChecksumNotTampered(t *testing.T) {
 	ctx := context.Background()
-	db, _ := openMigratedDB(t)
+	db, _ := openCurrentDB(t)
 	defer db.Close()
 
 	// Seed real data to make the test meaningful
@@ -360,7 +359,7 @@ func TestHUBDB005MigrationChecksumNotTampered(t *testing.T) {
 // back up, and verify the backup passes integrity_check and foreign_key_check.
 func TestHUBDB007BackupIsConsistentDurableImage(t *testing.T) {
 	ctx := context.Background()
-	db, _ := openMigratedDB(t)
+	db, _ := openCurrentDB(t)
 	defer db.Close()
 
 	// Seed real data
@@ -420,11 +419,10 @@ func TestHUBDB007BackupIsConsistentDurableImage(t *testing.T) {
 	}
 }
 
-// HUB-DB-008: restore must pass integrity_check + migration revision. After
-// restoring from backup, the schema revision must match the current expected value.
-func TestHUBDB008RestorePassesIntegrityAndRevision(t *testing.T) {
+// HUB-DB-008: restore must pass integrity_check and match the current schema identity.
+func TestHUBDB008RestorePassesIntegrityAndSchemaIdentity(t *testing.T) {
 	ctx := context.Background()
-	db, _ := openMigratedDB(t)
+	db, _ := openCurrentDB(t)
 	defer db.Close()
 
 	seedUserData(t, db)
@@ -452,23 +450,9 @@ func TestHUBDB008RestorePassesIntegrityAndRevision(t *testing.T) {
 		t.Fatalf("restore integrity not ok: %s", check.Integrity)
 	}
 
-	// Verify schema revision is the current expected value
-	if maintenance.CurrentSchemaRevision == "" {
-		t.Fatal("empty schema revision constant")
-	}
-
-	// Verify the schema_revision table (if it exists) has the right value
-	// SQLite doesn't have a native schema_version table, but our migration
-	// sets a PRAGMA user_version. Let's check.
-	var userVersion int
-	err = backupDB.QueryRowContext(ctx, "PRAGMA user_version").Scan(&userVersion)
-	if err != nil {
-		t.Fatalf("read user_version: %v", err)
-	}
-	// The migration should set user_version to 1 (or at least non-zero)
-	if userVersion == 0 {
-		// Not all migrations set user_version; this is acceptable as long as
-		// the required tables exist (already verified by Check)
+	// Verify the binary exposes a current schema identity.
+	if maintenance.CurrentSchemaIdentity == "" {
+		t.Fatal("empty schema identity")
 	}
 }
 
@@ -477,7 +461,7 @@ func TestHUBDB008RestorePassesIntegrityAndRevision(t *testing.T) {
 // keys, and other credential material live in separate key files, not in hub.db.
 func TestHUBDB009NoCredentialsInBackup(t *testing.T) {
 	ctx := context.Background()
-	db, _ := openMigratedDB(t)
+	db, _ := openCurrentDB(t)
 	defer db.Close()
 
 	seedUserData(t, db)
@@ -555,7 +539,7 @@ func TestHUBDB009NoCredentialsInBackup(t *testing.T) {
 // closed (error) rather than treating secrets as null/empty and continuing.
 func TestHUBDB010WrongKeyFailsClosed(t *testing.T) {
 	ctx := context.Background()
-	db, _ := openMigratedDB(t)
+	db, _ := openCurrentDB(t)
 	defer db.Close()
 
 	// Seed real data with a known key
@@ -637,20 +621,20 @@ func TestHUBDB010WrongKeyFailsClosed(t *testing.T) {
 	}
 }
 
-// HUB-DB-001 (bonus): empty DB applies the current initialization SQL must produce
+// HUB-DB-001: applying the current initialization SQL to an empty DB must produce
 // the current schema with all required tables.
-func TestHUBDB001EmptyDBReplayAllMigrations(t *testing.T) {
+func TestHUBDB001EmptyDBInitializesCurrentSchema(t *testing.T) {
 	ctx := context.Background()
 	db, _ := openEmptyDB(t)
 	defer db.Close()
 
-	// Apply the migration
-	applyMigration(t, db)
+	// Apply the current initialization SQL.
+	initializeCurrentSchema(t, db)
 
 	// All required tables must exist
 	check, err := maintenance.Check(ctx, db)
 	if err != nil {
-		t.Fatalf("after migration: %v", err)
+		t.Fatalf("after initialization: %v", err)
 	}
 	if check.Integrity != "ok" {
 		t.Fatalf("integrity: %s", check.Integrity)
@@ -664,7 +648,7 @@ func TestHUBDB001EmptyDBReplayAllMigrations(t *testing.T) {
 			t.Fatalf("check table %s: %v", table, err)
 		}
 		if count != 1 {
-			t.Fatalf("required table %s is missing after migration", table)
+			t.Fatalf("required table %s is missing after initialization", table)
 		}
 	}
 }

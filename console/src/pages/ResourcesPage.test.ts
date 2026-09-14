@@ -9,27 +9,28 @@ import {
   ClosePopup,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
-import { createRouter, createMemoryHistory } from 'vue-router'
+import { createRouter, createMemoryHistory, RouterView } from 'vue-router'
 import { h } from 'vue'
 import ResourcesPage from './ResourcesPage.vue'
 import { useSessionStore } from '../stores/session'
 import { useDraftStore } from '../stores/draft'
-import { useResourceDiff } from '../composables/useResourceDiff'
 import * as client from '../api/client'
+import type { components } from '../api/generated'
+
+type Draft = components['schemas']['Draft']
 
 function mountResourcesPage() {
   const pinia = createPinia()
   setActivePinia(pinia)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/', component: { template: '<div/>' } }],
+    routes: [{ path: '/', component: ResourcesPage }],
   })
   const wrapper = mount(
     {
-      components: { ResourcesPage },
       render() {
         return h(QLayout, {}, () => [
-          h(QPageContainer, {}, () => [h(ResourcesPage)]),
+          h(QPageContainer, {}, () => [h(RouterView)]),
         ])
       },
     },
@@ -61,7 +62,8 @@ function setupSession(pinia: ReturnType<typeof createPinia>) {
   return session
 }
 
-const EMPTY_DRAFT = {
+const EMPTY_DRAFT: Draft = {
+  draftId: 'dft_00000000-0000-4000-8000-000000000001',
   draftRevision: 1,
   content: {
     providers: [],
@@ -70,12 +72,15 @@ const EMPTY_DRAFT = {
     asr: [],
     mcp: [],
     bindings: [],
+    assistants: [],
+    starters: [],
     policy: {
       policyId: 'pol_draft',
       allowLocalProviders: true,
       allowLocalTts: true,
       allowLocalAsr: true,
       allowLocalMcp: true,
+      allowLocalAssistants: true,
     },
   },
 }
@@ -85,9 +90,9 @@ function findAddBtn(wrapper: ReturnType<typeof mount>, label: string) {
 }
 
 async function switchTab(wrapper: ReturnType<typeof mount>, name: string) {
-  const tab = wrapper.findAllComponents(QTab).find((t) => t.props('name') === name)
-  expect(tab).toBeTruthy()
-  await tab!.trigger('click')
+  const tab = wrapper.find(`[data-cy="config-section-${name}"]`)
+  expect(tab.exists()).toBe(true)
+  await tab.trigger('click')
   await flushPromises()
 }
 
@@ -105,10 +110,47 @@ describe('ResourcesPage', () => {
     setupSession(pinia)
     await flushPromises()
 
-    const tabs = wrapper.findAllComponents(QTab).map((t) => String(t.props('name')))
     for (const expected of ['overview', 'models', 'tts', 'asr', 'mcp', 'assistants', 'policy']) {
-      expect(tabs).toContain(expected)
+      expect(wrapper.find(`[data-cy="config-section-${expected}"]`).exists()).toBe(true)
     }
+  })
+
+  it('presents Android-familiar configuration sections with current summaries', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    expect(wrapper.find('[data-cy="configuration-section-nav"]').exists()).toBe(true)
+    for (const section of ['overview', 'models', 'tts', 'asr', 'mcp', 'assistants', 'policy']) {
+      expect(wrapper.find(`[data-cy="config-section-${section}"]`).exists()).toBe(true)
+    }
+    expect(wrapper.get('[data-cy="config-section-models"]').text()).toContain('0')
+  })
+
+  it('keeps draft editing available and retries when upstream discovery fails', async () => {
+    let upstreamAttempts = 0
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/draft') return structuredClone(EMPTY_DRAFT)
+      if (path.startsWith('/api/admin/v1/upstreams')) {
+        upstreamAttempts++
+        if (upstreamAttempts === 1) throw new Error('upstream discovery unavailable')
+        return { items: [], nextCursor: undefined }
+      }
+      return {}
+    })
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    const banner = wrapper.get('[data-cy="upstream-load-error"]')
+    expect(banner.text()).toContain('Upstream')
+    expect(wrapper.find('[data-cy="configuration-section-nav"]').exists()).toBe(true)
+
+    const retry = banner.findComponent(QBtn)
+    await retry.trigger('click')
+    await flushPromises()
+    expect(upstreamAttempts).toBe(2)
+    expect(wrapper.find('[data-cy="upstream-load-error"]').exists()).toBe(false)
   })
 
   it('authors assistant seeds and starters in the shared draft workflow', async () => {
@@ -118,22 +160,39 @@ describe('ResourcesPage', () => {
     const draft = useDraftStore(pinia)
     await switchTab(wrapper, 'assistants')
     await wrapper.get('[data-cy="assistant-add"]').trigger('click')
-    const assistant = draft.localContent!.assistants![0]!
+    const assistant = draft.localContent!.assistants[0]!
     expect(assistant.assistantDefinitionId).toMatch(/^asd_/)
     expect(assistant.memorySeed).toEqual([])
     await wrapper.get('[data-cy="assistant-name"]').setValue('Inspector')
+    await wrapper.get('[data-cy="assistant-section-memory"]').trigger('click')
     await wrapper.get('[data-cy="seed-add"]').trigger('click')
     await wrapper.get('[data-cy="seed-input-0"]').setValue('first memory')
     await wrapper.get('[data-cy="seed-add"]').trigger('click')
     await wrapper.get('[data-cy="seed-input-1"]').setValue('second memory')
     await wrapper.get('[data-cy="seed-up-1"]').trigger('click')
     expect(assistant.memorySeed).toEqual(['second memory', 'first memory'])
+    await wrapper.get('[data-cy="assistant-section-starters"]').trigger('click')
     await wrapper.get('[data-cy="starter-add"]').trigger('click')
-    expect(draft.localContent!.starters![0]!.starterId).toMatch(/^str_/)
-    expect(draft.localContent!.starters![0]!.assistantDefinitionId).toBe(assistant.assistantDefinitionId)
-    expect(useResourceDiff(draft).reviewTotalChanges.value).toBe(2)
+    expect(draft.localContent!.starters[0]!.starterId).toMatch(/^str_/)
+    expect(draft.localContent!.starters[0]!.assistantDefinitionId).toBe(assistant.assistantDefinitionId)
     expect(draft.dirty).toBe(true)
     wrapper.unmount()
+  })
+
+  it('organizes assistant settings into Android-familiar detail sections', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    await switchTab(wrapper, 'assistants')
+    await wrapper.get('[data-cy="assistant-add"]').trigger('click')
+
+    for (const section of ['basic', 'prompt', 'memory', 'connections', 'starters']) {
+      expect(wrapper.find(`[data-cy="assistant-section-${section}"]`).exists()).toBe(true)
+    }
+    expect(wrapper.find('[data-cy="assistant-name"]').exists()).toBe(true)
+    expect(wrapper.find('[data-cy="assistant-prompt"]').exists()).toBe(false)
+    await wrapper.get('[data-cy="assistant-section-prompt"]').trigger('click')
+    expect(wrapper.find('[data-cy="assistant-prompt"]').exists()).toBe(true)
   })
 
   it('can add a TTS resource through the Add button', async () => {
@@ -207,6 +266,8 @@ describe('ResourcesPage', () => {
 
     const draft = useDraftStore(pinia)
     expect(draft.localContent?.policy?.allowLocalProviders).toBe(true)
+    expect(wrapper.findAll('[data-cy="policy-setting-row"]').length).toBe(5)
+    expect(wrapper.get('[data-cy="policy-setting-row"]').text()).toContain('enterprise')
   })
 
   it('shows relationship rows in the Overview tab for each resource to its upstream', async () => {
@@ -280,14 +341,7 @@ describe('ResourcesPage', () => {
 
   it('publishes with expectedDraftRevision and acknowledged warning codes', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
-    const draftWithWarnings = structuredClone(EMPTY_DRAFT) as {
-      draftRevision: number
-      content: {
-        providers: { providerId: string; displayName: string; clientProtocol: string; enabled: boolean }[]
-        models: unknown[]; tts: unknown[]; asr: unknown[]; mcp: unknown[]; bindings: unknown[]
-        policy: Record<string, unknown>
-      }
-    }
+    const draftWithWarnings = structuredClone(EMPTY_DRAFT)
     draftWithWarnings.content.providers = [{
       providerId: 'prv_openai', displayName: 'OpenAI', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', enabled: true,
     }]
@@ -310,7 +364,11 @@ describe('ResourcesPage', () => {
           tts: [],
           asr: [],
           mcp: [],
-          policy: { policyId: 'pol_draft', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true },
+          policy: { policyId: 'pol_draft', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true },
+          assistants: [],
+          starters: [],
+          publishedGeneration: 3,
+          diffSummary: { added: 1, changed: 0, removed: 0, details: [{ kind: 'PROVIDER', added: 1, changed: 0, removed: 0 }] },
         }
       }
       if (path === '/api/admin/v1/draft:publish') {
@@ -339,6 +397,8 @@ describe('ResourcesPage', () => {
     expect(reviewBtn).toBeTruthy()
     await reviewBtn!.trigger('click')
     await flushPromises()
+
+    expect(document.querySelector('[data-cy="review-change-count"]')?.textContent).toContain('1')
 
     // The review dialog opens; find the actual Publish button inside
     const publishBtn = wrapper.findAllComponents(QBtn).find(
@@ -369,7 +429,10 @@ describe('ResourcesPage', () => {
           tts: [],
           asr: [],
           mcp: [],
-          policy: { policyId: 'pol_draft', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true },
+          policy: { policyId: 'pol_draft', allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true },
+          assistants: [],
+          starters: [],
+          diffSummary: { added: 0, changed: 0, removed: 0 },
         }
       }
       return {}

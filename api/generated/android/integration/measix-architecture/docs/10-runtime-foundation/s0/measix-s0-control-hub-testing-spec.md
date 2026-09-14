@@ -157,11 +157,11 @@ E. finalize 后 / Admin response 前
 - foreign-key/integrity validation；
 - immutable history 不被 update path 修改。
 
-### Migration
+### Current schema initialization
 
 - `HUB-DB-001` empty DB applies the single current initialization schema；
 - `HUB-DB-003` 当前数据库与初始化记录不被普通 restart 改写；
-- `HUB-DB-004` incompatible schema revision startup fail-fast；
+- `HUB-DB-004` non-current schema startup fail-fast；
 - `HUB-DB-005` 当前 schema 和数据在备份后保持完整；
 
 ### Backup / Restore

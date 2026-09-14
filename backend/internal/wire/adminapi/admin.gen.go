@@ -389,6 +389,7 @@ func (e ReleaseStatus) Valid() bool {
 const (
 	ReleaseDiffKindASR       ReleaseDiffKind = "ASR"
 	ReleaseDiffKindASSISTANT ReleaseDiffKind = "ASSISTANT"
+	ReleaseDiffKindBINDING   ReleaseDiffKind = "BINDING"
 	ReleaseDiffKindMCP       ReleaseDiffKind = "MCP"
 	ReleaseDiffKindMODEL     ReleaseDiffKind = "MODEL"
 	ReleaseDiffKindPOLICY    ReleaseDiffKind = "POLICY"
@@ -403,6 +404,8 @@ func (e ReleaseDiffKind) Valid() bool {
 	case ReleaseDiffKindASR:
 		return true
 	case ReleaseDiffKindASSISTANT:
+		return true
+	case ReleaseDiffKindBINDING:
 		return true
 	case ReleaseDiffKindMCP:
 		return true
@@ -1087,18 +1090,22 @@ type DraftId = string
 
 // DraftPreviewResponse defines model for DraftPreviewResponse.
 type DraftPreviewResponse struct {
-	Asr           []AsrDefinition               `json:"asr"`
-	Assistants    *[]ManagedAssistantDefinition `json:"assistants,omitempty"`
-	DraftRevision int                           `json:"draftRevision"`
-	Mcp           []McpDefinition               `json:"mcp"`
-	Models        []ModelDefinition             `json:"models"`
+	Asr           []AsrDefinition              `json:"asr"`
+	Assistants    []ManagedAssistantDefinition `json:"assistants"`
+	DiffSummary   DiffSummary                  `json:"diffSummary"`
+	DraftRevision int                          `json:"draftRevision"`
+	Mcp           []McpDefinition              `json:"mcp"`
+	Models        []ModelDefinition            `json:"models"`
 
 	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
-	Policy         ManagedPolicy                 `json:"policy"`
-	ProjectionHash Sha256Hash                    `json:"projectionHash"`
-	Providers      []ProviderDefinition          `json:"providers"`
-	Starters       *[]AssistantStarterDefinition `json:"starters,omitempty"`
-	Tts            []TtsDefinition               `json:"tts"`
+	Policy         ManagedPolicy        `json:"policy"`
+	ProjectionHash Sha256Hash           `json:"projectionHash"`
+	Providers      []ProviderDefinition `json:"providers"`
+
+	// PublishedGeneration Latest immutable release generation used as the comparison baseline. Absent when no release exists.
+	PublishedGeneration *int                         `json:"publishedGeneration,omitempty"`
+	Starters            []AssistantStarterDefinition `json:"starters"`
+	Tts                 []TtsDefinition              `json:"tts"`
 }
 
 // EnrollmentId defines model for EnrollmentId.
@@ -1176,17 +1183,17 @@ type ManagedAssistantDefinition struct {
 
 // ManagedDraftContent defines model for ManagedDraftContent.
 type ManagedDraftContent struct {
-	Asr        []AsrDefinition               `json:"asr"`
-	Assistants *[]ManagedAssistantDefinition `json:"assistants,omitempty"`
-	Bindings   []RuntimeBindingDefinition    `json:"bindings"`
-	Mcp        []McpDefinition               `json:"mcp"`
-	Models     []ModelDefinition             `json:"models"`
+	Asr        []AsrDefinition              `json:"asr"`
+	Assistants []ManagedAssistantDefinition `json:"assistants"`
+	Bindings   []RuntimeBindingDefinition   `json:"bindings"`
+	Mcp        []McpDefinition              `json:"mcp"`
+	Models     []ModelDefinition            `json:"models"`
 
 	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
-	Policy    ManagedPolicy                 `json:"policy"`
-	Providers []ProviderDefinition          `json:"providers"`
-	Starters  *[]AssistantStarterDefinition `json:"starters,omitempty"`
-	Tts       []TtsDefinition               `json:"tts"`
+	Policy    ManagedPolicy                `json:"policy"`
+	Providers []ProviderDefinition         `json:"providers"`
+	Starters  []AssistantStarterDefinition `json:"starters"`
+	Tts       []TtsDefinition              `json:"tts"`
 }
 
 // ManagedPolicy Current policy. All five admission flags are required; new policies initialize all five to false.
@@ -1470,11 +1477,11 @@ type SystemStatus struct {
 	LastRelaySeenAt              *time.Time                `json:"lastRelaySeenAt,omitempty"`
 	LatestActivation             *Activation               `json:"latestActivation,omitempty"`
 	ManagedStateRevision         int                       `json:"managedStateRevision"`
-	MigrationRevision            string                    `json:"migrationRevision"`
 	OldestPendingAgeSeconds      *int                      `json:"oldestPendingAgeSeconds,omitempty"`
 	RelayReady                   bool                      `json:"relayReady"`
 	RequestUsageIngestLagSeconds *int                      `json:"requestUsageIngestLagSeconds,omitempty"`
 	RuntimeStatus                SystemStatusRuntimeStatus `json:"runtimeStatus"`
+	SchemaIdentity               string                    `json:"schemaIdentity"`
 	SemanticOrphanCount          *int                      `json:"semanticOrphanCount,omitempty"`
 	SpoolPendingCount            *int                      `json:"spoolPendingCount,omitempty"`
 

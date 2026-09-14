@@ -16,7 +16,7 @@ MEASIX 尚未发布，当前结构是唯一支持的数据库版本。旧开发�
 
 执行 `go run ./cmd/migration-checksum`；空库应用真实 SQL，验证当前业务读写、重复初始化和失败事务回滚。当前版本备份/恢复、完整性检查仍需保留，旧版本升级测试删除。
 
-`node scripts/checks.mjs migration-replay` 使用独立临时数据库执行 Atlas apply/status，结束后清理。无 Atlas CLI 时 Go SQL 测试不能冒充 Atlas CLI gate。SQLite 连接配置由 `common/sqliteutil` 统一维护。
+`node scripts/checks.mjs schema-replay` 使用独立临时数据库执行 Atlas apply/status，结束后清理。无 Atlas CLI 时 Go SQL 测试不能冒充 Atlas CLI gate。SQLite 连接配置由 `common/sqliteutil` 统一维护。
 
 ## 旧开发文件处理
 

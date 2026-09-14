@@ -4,7 +4,7 @@
 
 ## 1. 当前执行入口
 
-在 CI-compatible POSIX 环境从仓库根执行 `make s01-browser-candidate`（`make console-e2e` 是 alias）。等价的主要步骤是先 `pnpm -C console build`，再 `node scripts/e2e-harness.mjs`。先安装仓库锁定版本的依赖及匹配 Playwright 浏览器；直接运行 Playwright 默认 URL 不会自动创建 Hub/Relay 测试环境。
+在 CI-compatible POSIX 环境从仓库根执行 `make s01-browser-candidate`。等价的主要步骤是先 `pnpm -C console build`，再 `node scripts/e2e-harness.mjs`。先安装仓库锁定版本的依赖及匹配 Playwright 浏览器；直接运行 Playwright 默认 URL 不会自动创建 Hub/Relay 测试环境。
 
 Node harness 使用临时 DB/keys/ports、真实 Hub/Relay、deterministic Adapter 和 production SPA proxy；Go `backend/test/system/` 是另一套测试 orchestration。两者应共享合同和证据规则，不声称物理上是一套环境。
 
@@ -14,7 +14,7 @@ Node harness 使用临时 DB/keys/ports、真实 Hub/Relay、deterministic Adapt
 2. orchestrator/Test Client：在同一环境产生真实 runtime traffic。
 3. `golden-path-usage.spec.ts`：浏览器确认 Usage/System 结果。
 
-`topology-security.spec.ts` 执行额外拓扑场景；旧 `golden-path.spec.ts` 在配置中被忽略，不是当前主入口。不要把三步拆到互不相关的数据库后合并成一次闭环证据。
+`topology-security.spec.ts` 执行额外拓扑场景。不要把三步拆到互不相关的数据库后合并成一次闭环证据。
 
 ## 2. 浏览器配置事实与限制
 

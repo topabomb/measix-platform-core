@@ -14,7 +14,7 @@ Makefile text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
 
-# SQL migration files and atlas.sum must use LF to prevent hash mismatches
+# Current schema SQL and atlas.sum must use LF to prevent hash mismatches
 *.sql text eol=lf
 atlas.sum text eol=lf
 

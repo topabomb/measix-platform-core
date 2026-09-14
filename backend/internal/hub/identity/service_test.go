@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -42,6 +43,19 @@ func TestI1IdentityEnrollmentRefreshAndRevoke(t *testing.T) {
 	}
 	if boot.DeploymentID != deploymentID || boot.AdminUserID == "" || boot.DraftID == "" {
 		t.Fatalf("invalid bootstrap result: %+v", boot)
+	}
+	row, err := s.Client.ManagedDraft.Get(ctx, boot.DraftID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var content map[string]json.RawMessage
+	if err := json.Unmarshal(row.ContentJSON, &content); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"assistants", "starters"} {
+		if value, present := content[field]; !present || string(value) != "[]" {
+			t.Fatalf("bootstrap draft must contain explicit empty %s array, got %s", field, value)
+		}
 	}
 	member, err := s.CreateUser(ctx, " Alice ", "Alice", "MEMBER")
 	if err != nil {

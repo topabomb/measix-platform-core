@@ -55,7 +55,7 @@ measix-platform-core/api/
 - OpenAPI 3.0.x（具体版本由 core pin）；JSON UTF-8；平台 HTTP 字段 `camelCase`；时间 UTC RFC3339；外部协议及明确冻结的业务 tool schema 字段不改名，例外见 §10.16；
 - response consumer 忽略未知 optional field；
 - request 未声明 field 默认 `400 invalid_request`；
-- 同一 API `/v1` 允许新增 backward-compatible optional field/endpoint；
+- 同一当前 API `/v1` 允许新增客户端可忽略的 optional response field/endpoint；
 - 删除 field、改义、optional→required 属于 breaking change；
 - enum extension 只有 consumer 已有 unknown-value compatibility strategy 时才可原地增加，否则视为 breaking；
 - Secret/token/prompt/body 不进入 Problem、普通日志或 Usage。
@@ -1390,7 +1390,7 @@ Admin `/system/status` at least exposes：
 ```text
 buildVersion
 dbHealth
-migrationRevision
+schemaIdentity
 runtimeStatus
 activeManagedGeneration
 managedStateRevision
@@ -1411,7 +1411,7 @@ requestUsageIngestLagSeconds?
 semanticOrphanCount
 ```
 
-S0.1 may add backward-compatible fields such as spool/backlog/unknown summaries when needed by executable Admin UI, but Secret/credential cannot appear.
+S0.1 may add optional response fields such as spool/backlog/unknown summaries when needed by the executable Admin UI; current consumers ignore unknown optional fields, and Secret/credential cannot appear.
 
 ## 22. Auth boundary
 

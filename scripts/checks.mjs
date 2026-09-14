@@ -26,8 +26,8 @@ function checked(command, args, cwd) {
   if (result.output) process.stdout.write(result.output)
   return result
 }
-export function replayMigrations({ temporaryRoot = tmpdir(), run: execute = checked } = {}) {
-  const directory = mkdtempSync(join(resolve(temporaryRoot), 'measix-migrations-'))
+export function replayCurrentSchema({ temporaryRoot = tmpdir(), run: execute = checked } = {}) {
+  const directory = mkdtempSync(join(resolve(temporaryRoot), 'measix-current-schema-'))
   const databaseUrl = 'sqlite://' + join(directory, 'hub.db').replaceAll('\\', '/')
   try {
     for (const operation of ['apply', 'status']) {
@@ -86,8 +86,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       case 'fmt': requireSuccess(formatCheck()); break
       case 'drift': requireSuccess(driftCheck()); break
       case 'static': collectStatic(); break
-      case 'migration-replay': replayMigrations(); break
-      default: throw new Error('Usage: node scripts/checks.mjs generate|fmt|drift|static|migration-replay')
+      case 'schema-replay': replayCurrentSchema(); break
+      default: throw new Error('Usage: node scripts/checks.mjs generate|fmt|drift|static|schema-replay')
     }
   } catch (error) { console.error(error.message); process.exitCode = 1 }
 }

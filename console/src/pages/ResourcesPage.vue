@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, createCandidateId } from '../api/client'
-import { useDraftStore } from '../stores/draft'
+import { useDraftStore, type ManagedResourceKind } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
 import { useActivationStore } from '../stores/activation'
 import ManagedExperienceEditor from '../components/ManagedExperienceEditor.vue'
@@ -12,26 +13,30 @@ import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import ConfigurationSectionNav, { type ConfigurationSection } from '../components/ConfigurationSectionNav.vue'
 import { useResourceDiff } from '../composables/useResourceDiff'
 
 type Activation = components['schemas']['Activation']
-type ManagedDraftContent = components['schemas']['ManagedDraftContent']
 type ModelDefinition = components['schemas']['ModelDefinition']
 type TtsDefinition = components['schemas']['TtsDefinition']
 type AsrDefinition = components['schemas']['AsrDefinition']
 type McpDefinition = components['schemas']['McpDefinition']
 type ProviderDefinition = components['schemas']['ProviderDefinition']
 type ManagedPolicy = components['schemas']['ManagedPolicy']
+type PolicyFlagKey = 'allowLocalProviders' | 'allowLocalTts' | 'allowLocalAsr' | 'allowLocalMcp' | 'allowLocalAssistants'
 type Upstream = components['schemas']['Upstream']
 type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
 type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
 type DraftPreviewResponse = components['schemas']['DraftPreviewResponse']
+type ReleaseDiffKind = components['schemas']['ReleaseDiffKind']
+type ResourceDiff = components['schemas']['ResourceDiff']
+type ValidationIssue = components['schemas']['ValidationIssue']
 
 const { t: $t } = useI18n()
 const draft = useDraftStore()
 const session = useSessionStore()
 const activation = useActivationStore()
-const { reviewDiff, routingImpact, reviewWarnings, reviewTotalChanges, hasBlockingErrors, validationIssuesFor } = useResourceDiff(draft)
+const { reviewWarnings, hasBlockingErrors, validationIssuesFor } = useResourceDiff(draft)
 const error = ref<unknown>()
 const publishing = ref(false)
 const previewing = ref(false)
@@ -40,8 +45,55 @@ const previewOpen = ref(false)
 const reviewOpen = ref(false)
 const reviewing = ref(false)
 const upstreams = ref<Upstream[]>([])
+const upstreamsLoading = ref(false)
+const upstreamError = ref<unknown>()
 const activeTab = ref<'overview' | 'models' | 'tts' | 'asr' | 'mcp' | 'assistants' | 'policy'>('overview')
 const canMutate = computed(() => Boolean(session.csrfToken))
+const reviewTotalChanges = computed(() => {
+  const summary = preview.value?.diffSummary
+  return summary ? summary.added + summary.changed + summary.removed : 0
+})
+function reviewDiffFor(kind: ReleaseDiffKind): ResourceDiff {
+  return preview.value?.diffSummary.details?.find(detail => detail.kind === kind)
+    ?? { kind, added: 0, changed: 0, removed: 0 }
+}
+const routingImpact = computed(() => reviewDiffFor('BINDING'))
+const policyChanged = computed(() => {
+  const value = reviewDiffFor('POLICY')
+  return value.added + value.changed + value.removed > 0
+})
+
+const configurationSections = computed<ConfigurationSection[]>(() => {
+  const content = draft.localContent
+  const totalResources = (content?.models.length ?? 0) + (content?.tts.length ?? 0)
+    + (content?.asr.length ?? 0) + (content?.mcp.length ?? 0)
+  const enabledLocal = content?.policy
+    ? [content.policy.allowLocalProviders, content.policy.allowLocalTts, content.policy.allowLocalAsr,
+      content.policy.allowLocalMcp, content.policy.allowLocalAssistants].filter(Boolean).length
+    : 0
+  return [
+    { id: 'overview', label: $t('resources.navigation.overview'), description: $t('resources.navigation.overviewHint'), icon: 'account_tree', badge: totalResources },
+    { id: 'models', label: $t('resources.tabs.models'), description: $t('resources.navigation.modelsHint'), icon: 'smart_toy', badge: content?.models.length ?? 0 },
+    { id: 'tts', label: $t('resources.tabs.tts'), description: $t('resources.navigation.ttsHint'), icon: 'record_voice_over', badge: content?.tts.length ?? 0 },
+    { id: 'asr', label: $t('resources.tabs.asr'), description: $t('resources.navigation.asrHint'), icon: 'hearing', badge: content?.asr.length ?? 0 },
+    { id: 'mcp', label: $t('resources.tabs.mcp'), description: $t('resources.navigation.mcpHint'), icon: 'hub', badge: content?.mcp.length ?? 0 },
+    { id: 'assistants', label: $t('experience.tab'), description: $t('resources.navigation.assistantsHint'), icon: 'assistant', badge: content?.assistants.length ?? 0 },
+    { id: 'policy', label: $t('resources.tabs.policy'), description: $t('resources.navigation.policyHint'), icon: 'policy', badge: `${enabledLocal}/5` },
+  ]
+})
+const policySettings = computed((): { key: PolicyFlagKey; label: string; hint: string; cy: string }[] => [
+  { key: 'allowLocalProviders', label: $t('resources.policy.allowLocalModels'), hint: $t('resources.policy.allowLocalModelsHint'), cy: 'policy-allow-local-models' },
+  { key: 'allowLocalTts', label: $t('resources.policy.allowLocalTts'), hint: $t('resources.policy.allowLocalTtsHint'), cy: 'policy-allow-local-tts' },
+  { key: 'allowLocalAsr', label: $t('resources.policy.allowLocalAsr'), hint: $t('resources.policy.allowLocalAsrHint'), cy: 'policy-allow-local-asr' },
+  { key: 'allowLocalMcp', label: $t('resources.policy.allowLocalMcp'), hint: $t('resources.policy.allowLocalMcpHint'), cy: 'policy-allow-local-mcp' },
+  { key: 'allowLocalAssistants', label: $t('resources.policy.allowLocalAssistants'), hint: $t('resources.policy.allowLocalAssistantsHint'), cy: 'policy-allow-local-assistants' },
+])
+
+function setPolicyFlag(key: PolicyFlagKey, value: boolean) {
+  if (!draft.localContent) return
+  draft.localContent.policy[key] = value
+  draft.markDirty()
+}
 
 // Selected resource for editor/detail mode
 const selectedResourceId = ref<string>()
@@ -160,7 +212,12 @@ const enabledAsr = computed(() =>
   })) ?? [],
 )
 
-async function refresh() {
+function confirmDiscard(): boolean {
+  return !draft.dirty || window.confirm($t('resources.discardChanges'))
+}
+
+async function refresh(force = false) {
+  if (!force && !confirmDiscard()) return
   error.value = undefined
   try {
     await Promise.all([draft.load(), loadUpstreams()])
@@ -170,10 +227,14 @@ async function refresh() {
 }
 
 async function loadUpstreams() {
+  upstreamsLoading.value = true
+  upstreamError.value = undefined
   try {
     upstreams.value = await fetchAllPages<Upstream>('/api/admin/v1/upstreams?limit=200')
-  } catch {
-    // Upstream list is a convenience for binding; failure does not block draft editing.
+  } catch (cause) {
+    upstreamError.value = cause
+  } finally {
+    upstreamsLoading.value = false
   }
 }
 
@@ -238,7 +299,7 @@ async function publish() {
       await activation.pollUntilSettled(result.activationId, { timeoutMs: 60_000 })
     }
     reviewOpen.value = false
-    await refresh()
+    await refresh(true)
   } catch (cause) {
     error.value = cause
   } finally {
@@ -303,15 +364,19 @@ function removeProvider(providerId: string) {
     error.value = new Error($t('resources.providerReferenced', { id: providerId }))
     return
   }
+  const provider = content.providers.find(item => item.providerId === providerId)
+  if (!window.confirm($t('resources.removeConfirm', { name: provider?.displayName ?? providerId }))) return
   content.providers = content.providers.filter((p) => p.providerId !== providerId)
   draft.markDirty()
 }
 
-function removeResource(list: string, index: number, resourceId: string) {
-  const content = draft.localContent
-  if (!content) return
-  content[list as keyof ManagedDraftContent] = (content[list as keyof ManagedDraftContent] as unknown[]).filter((_, i) => i !== index) as never
-  draft.removeBinding(resourceId)
+function removeResource(kind: ManagedResourceKind, resourceId: string, displayName: string) {
+  if (!window.confirm($t('resources.removeConfirm', { name: displayName }))) return
+  const result = draft.removeResource(kind, resourceId)
+  if (!result.removed) {
+    error.value = new Error($t('resources.resourceReferenced', { references: result.references.join(', ') }))
+    return
+  }
   if (selectedResourceId.value === resourceId) selectedResourceId.value = undefined
 }
 
@@ -319,12 +384,10 @@ function removeResource(list: string, index: number, resourceId: string) {
 function toggleEnabled(kind: string, resourceId: string, enabled: boolean) {
   const content = draft.localContent
   if (!content) return
-  const list = ({ Model: 'models', TTS: 'tts', ASR: 'asr', MCP: 'mcp' } as Record<string, string>)[kind]
-  const arr = content[list as keyof ManagedDraftContent] as { enabled: boolean }[]
-  const item = arr.find((r) => (r as unknown as { [k: string]: string }).modelId === resourceId
-    || (r as unknown as { [k: string]: string }).ttsId === resourceId
-    || (r as unknown as { [k: string]: string }).asrId === resourceId
-    || (r as unknown as { [k: string]: string }).mcpServerId === resourceId)
+  const item = kind === 'Model' ? content.models.find(value => value.modelId === resourceId)
+    : kind === 'TTS' ? content.tts.find(value => value.ttsId === resourceId)
+      : kind === 'ASR' ? content.asr.find(value => value.asrId === resourceId)
+        : content.mcp.find(value => value.mcpServerId === resourceId)
   if (item) {
     item.enabled = enabled
     draft.markDirty()
@@ -344,14 +407,46 @@ function selectTts(id: string) { selectedResourceId.value = id }
 function selectAsr(id: string) { selectedResourceId.value = id }
 function selectMcp(id: string) { selectedResourceId.value = id }
 
-onMounted(refresh)
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (!draft.dirty) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+async function goToValidationIssue(issue: ValidationIssue) {
+  const section = issue.resourceKind === 'MODEL' ? 'models'
+    : issue.resourceKind === 'TTS' ? 'tts'
+      : issue.resourceKind === 'ASR' ? 'asr'
+        : issue.resourceKind === 'MCP' ? 'mcp'
+          : issue.resourceKind === 'ASSISTANT' || issue.resourceKind === 'STARTER' ? 'assistants'
+            : issue.resourceKind === 'POLICY' ? 'policy'
+              : issue.resourceKind === 'PROVIDER' ? 'overview' : undefined
+  if (!section) return
+  activeTab.value = section
+  if (issue.resourceId && ['MODEL', 'TTS', 'ASR', 'MCP'].includes(issue.resourceKind ?? '')) {
+    selectedResourceId.value = issue.resourceId
+  }
+  await nextTick()
+  if (issue.field) {
+    const element = document.querySelector<HTMLElement>(`[data-field="${issue.field}"]`)
+    element?.scrollIntoView({ block: 'center' })
+    element?.querySelector<HTMLElement>('input, textarea, [tabindex]')?.focus()
+  }
+}
+
+onBeforeRouteLeave(() => confirmDiscard())
+onMounted(() => {
+  window.addEventListener('beforeunload', beforeUnload)
+  void refresh(true)
+})
+onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 
 <template>
   <q-page padding data-cy="resources-page">
     <PageHeader :title="$t('nav.resources')" :subtitle="$t('resources.subtitle')">
       <template #actions>
-        <q-btn flat icon="refresh" :loading="draft.loading" @click="refresh" />
+        <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="draft.loading" @click="refresh()" />
         <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate || draft.dirty" :loading="previewing" @click="previewSnapshot" data-cy="draft-preview-btn" />
         <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || draft.loading || draft.dirty" @click="validate" data-cy="draft-validate-btn" />
         <q-btn outline color="primary" :label="$t('common.save')" :disable="!canMutate || !draft.dirty" :loading="draft.saving" @click="save" data-cy="draft-save-btn" />
@@ -360,10 +455,15 @@ onMounted(refresh)
     </PageHeader>
 
     <ProblemBanner :error="error" class="q-mb-md" />
+    <q-banner v-if="upstreamError" class="bg-orange-1 q-mb-md rounded-borders" data-cy="upstream-load-error">
+      <div class="text-weight-medium">{{ $t('resources.upstreamLoadFailed') }}</div>
+      <div class="text-body2">{{ $t('resources.upstreamLoadFailedHint') }}</div>
+      <template #action><q-btn flat :label="$t('common.retry')" :loading="upstreamsLoading" @click="loadUpstreams" /></template>
+    </q-banner>
     <q-banner v-if="draft.conflictRevision !== undefined" class="bg-orange-1 q-mb-md rounded-borders">
       <div class="text-weight-medium">{{ $t('resources.staleDraft', { rev: draft.baselineRevision }) }}</div>
       <div class="text-body2">{{ $t('resources.staleHint', { rev: draft.conflictRevision }) }}</div>
-      <template #action><q-btn flat :label="$t('resources.reload')" @click="refresh" /></template>
+      <template #action><q-btn flat :label="$t('resources.reload')" @click="refresh()" /></template>
     </q-banner>
     <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-md rounded-borders">
       <div class="row items-center justify-between">
@@ -411,24 +511,14 @@ onMounted(refresh)
         </q-card-section>
       </q-card>
 
-      <!-- Tabbed resource editors -->
-      <q-tabs v-model="activeTab" class="q-mb-md" dense align="left">
-        <q-tab name="overview" :label="$t('resources.overview.providers')" icon="account_tree" />
-        <q-tab name="models" :label="$t('resources.tabs.models')" icon="smart_toy" data-cy="tab-models">
-          <q-badge v-if="draft.localContent.models.length" color="primary" rounded floating :label="draft.localContent.models.length" />
-        </q-tab>
-        <q-tab name="tts" :label="$t('resources.tabs.tts')" icon="record_voice_over" data-cy="tab-tts">
-          <q-badge v-if="draft.localContent.tts.length" color="teal" rounded floating :label="draft.localContent.tts.length" />
-        </q-tab>
-        <q-tab name="asr" :label="$t('resources.tabs.asr')" icon="hearing" data-cy="tab-asr">
-          <q-badge v-if="draft.localContent.asr.length" color="indigo" rounded floating :label="draft.localContent.asr.length" />
-        </q-tab>
-        <q-tab name="mcp" :label="$t('resources.tabs.mcp')" icon="link" data-cy="tab-mcp">
-          <q-badge v-if="draft.localContent.mcp.length" color="deep-purple" rounded floating :label="draft.localContent.mcp.length" />
-        </q-tab>
-        <q-tab name="assistants" :label="$t('experience.tab')" icon="assistant" data-cy="tab-assistants" />
-        <q-tab name="policy" :label="$t('resources.tabs.policy')" icon="policy" data-cy="tab-policy" />
-      </q-tabs>
+      <div class="configuration-workbench">
+        <ConfigurationSectionNav
+          v-model="activeTab"
+          :title="$t('resources.navigation.title')"
+          :subtitle="$t('resources.navigation.subtitle')"
+          :items="configurationSections"
+        />
+        <section class="configuration-workbench__detail">
 
       <!-- ===== Overview: relationship view + providers ===== -->
       <template v-if="activeTab === 'overview'">
@@ -447,7 +537,7 @@ onMounted(refresh)
                 </q-item-section>
                 <q-item-section side>
                   <q-toggle v-model="provider.enabled" @update:model-value="draft.markDirty()" />
-                  <q-btn flat dense color="negative" icon="delete" size="sm" :disable="modelCountForProvider(provider.providerId) > 0" @click="removeProvider(provider.providerId)" />
+                  <q-btn flat dense color="negative" icon="delete" size="sm" :aria-label="$t('resources.removeNamed', { name: provider.displayName })" :disable="modelCountForProvider(provider.providerId) > 0" @click="removeProvider(provider.providerId)" />
                 </q-item-section>
               </q-item>
               <q-item v-if="!draft.localContent.providers.length"><q-item-section class="text-grey-7">{{ $t('resources.overview.noProviders') }}</q-item-section></q-item>
@@ -531,7 +621,7 @@ onMounted(refresh)
                 <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-model-btn" :disable="!draft.localContent.providers.length" @click="addModel()" />
               </q-card-section>
               <q-list separator>
-                <q-item v-for="(model, idx) in draft.localContent.models" :key="model.modelId"
+                <q-item v-for="model in draft.localContent.models" :key="model.modelId"
                   :active="selectedResourceId === model.modelId" clickable @click="selectModel(model.modelId)">
                   <q-item-section>
                     <q-item-label>{{ model.displayName }}</q-item-label>
@@ -545,7 +635,7 @@ onMounted(refresh)
                     <div class="row items-center q-gutter-xs">
                       <q-badge v-if="!draft.bindingFor(model.modelId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
                       <q-badge v-if="!model.enabled" color="grey" :label="$t('resources.overview.off')" />
-                      <q-btn flat dense color="negative" icon="delete" size="sm" @click.stop="removeResource('models', idx, model.modelId)" />
+                      <q-btn flat dense color="negative" icon="delete" size="sm" :aria-label="$t('resources.removeNamed', { name: model.displayName })" @click.stop="removeResource('MODEL', model.modelId, model.displayName)" />
                     </div>
                   </q-item-section>
                 </q-item>
@@ -574,7 +664,7 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.model.identity') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-input v-model="selectedModel.displayName" dense outlined :label="$t('resources.model.displayName')" class="col" data-cy="model-display-name" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedModel.displayName" dense outlined :label="$t('resources.model.displayName')" class="col" data-cy="model-display-name" data-field="displayName" @update:model-value="draft.markDirty()" />
                   <q-select v-model="selectedModel.providerId" dense outlined :label="$t('resources.model.provider')" :options="draft.localContent.providers.map((p) => ({ label: p.displayName, value: p.providerId }))" emit-value map-options class="col" data-cy="model-provider-select" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ selectedModel.modelId }} ({{ $t('resources.model.logicalIdentity') }})</div>
@@ -591,12 +681,12 @@ onMounted(refresh)
                   </div>
                   <div class="col">
                     <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.model.upstreamModelKey') }}</div>
-                    <q-input v-model="selectedModel.upstreamModelKey" dense outlined :label="$t('resources.model.upstreamModelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" data-cy="model-upstream-key" @update:model-value="draft.markDirty()" />
+                    <q-input v-model="selectedModel.upstreamModelKey" dense outlined :label="$t('resources.model.upstreamModelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" data-cy="model-upstream-key" data-field="upstreamModelKey" @update:model-value="draft.markDirty()" />
                   </div>
                 </div>
                 <div class="row q-gutter-sm">
-                  <q-select v-model="selectedModel.inputModalities" dense outlined :label="$t('resources.model.inputModalities')" multiple :options="[...INPUT_MODS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
-                  <q-select v-model="selectedModel.outputModalities" dense outlined :label="$t('resources.model.outputModalities')" multiple :options="[...OUTPUT_MODS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.inputModalities" dense outlined :label="$t('resources.model.inputModalities')" multiple :options="[...INPUT_MODS]" class="col" data-field="inputModalities" emit-value map-options @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.outputModalities" dense outlined :label="$t('resources.model.outputModalities')" multiple :options="[...OUTPUT_MODS]" class="col" data-field="outputModalities" emit-value map-options @update:model-value="draft.markDirty()" />
                   <q-select v-model="selectedModel.capabilities" dense outlined :label="$t('resources.model.capabilities')" multiple :options="[...MODEL_CAPS]" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.model.capabilityHint') }}</div>
@@ -607,7 +697,7 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.model.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" data-cy="model-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
+                  <q-select :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" :disable="upstreamsLoading || !!upstreamError" emit-value map-options class="col" data-cy="model-upstream-select" data-field="upstreamId" @update:model-value="(v: string) => draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
                   <q-input v-model="selectedModel.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="model-runtime-path" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">
@@ -657,7 +747,7 @@ onMounted(refresh)
                 <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-tts-btn" @click="draft.addTts(); selectedResourceId = draft.localContent?.tts[draft.localContent.tts.length - 1]?.ttsId" />
               </q-card-section>
               <q-list separator>
-                <q-item v-for="(tts, idx) in draft.localContent.tts" :key="tts.ttsId"
+                <q-item v-for="tts in draft.localContent.tts" :key="tts.ttsId"
                   :active="selectedResourceId === tts.ttsId" clickable @click="selectTts(tts.ttsId)">
                   <q-item-section>
                     <q-item-label>{{ tts.displayName }}</q-item-label>
@@ -667,7 +757,7 @@ onMounted(refresh)
                     <div class="row items-center q-gutter-xs">
                       <q-badge v-if="!draft.bindingFor(tts.ttsId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
                       <q-badge v-if="!tts.voice" color="red" :label="$t('resources.tts.noVoice')" />
-                      <q-btn flat dense color="negative" icon="delete" size="sm" @click.stop="removeResource('tts', idx, tts.ttsId)" />
+                      <q-btn flat dense color="negative" icon="delete" size="sm" :aria-label="$t('resources.removeNamed', { name: tts.displayName })" @click.stop="removeResource('TTS', tts.ttsId, tts.displayName)" />
                     </div>
                   </q-item-section>
                 </q-item>
@@ -689,7 +779,7 @@ onMounted(refresh)
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.identity') }}</div>
-                <q-input v-model="selectedTts.displayName" dense outlined :label="$t('resources.tts.displayName')" data-cy="tts-display-name" @update:model-value="draft.markDirty()" />
+                <q-input v-model="selectedTts.displayName" dense outlined :label="$t('resources.tts.displayName')" data-cy="tts-display-name" data-field="displayName" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
@@ -720,7 +810,7 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.tts.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId ?? ''" dense outlined :label="$t('resources.tts.transport')" :options="upstreamOptions" emit-value map-options class="col" data-cy="tts-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedTts!.ttsId, v, 'HTTP_BINARY_STREAM')" />
+                  <q-select :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId ?? ''" dense outlined :label="$t('resources.tts.transport')" :options="upstreamOptions" :disable="upstreamsLoading || !!upstreamError" emit-value map-options class="col" data-cy="tts-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedTts!.ttsId, v, 'HTTP_BINARY_STREAM')" />
                   <q-input v-model="selectedTts.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="tts-runtime-path" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.tts.transportSummary') }}</div>
@@ -764,7 +854,7 @@ onMounted(refresh)
                 <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-asr-btn" @click="draft.addAsr(); selectedResourceId = draft.localContent?.asr[draft.localContent.asr.length - 1]?.asrId" />
               </q-card-section>
               <q-list separator>
-                <q-item v-for="(asr, idx) in draft.localContent.asr" :key="asr.asrId"
+                <q-item v-for="asr in draft.localContent.asr" :key="asr.asrId"
                   :active="selectedResourceId === asr.asrId" clickable @click="selectAsr(asr.asrId)">
                   <q-item-section>
                     <q-item-label>{{ asr.displayName }}</q-item-label>
@@ -773,7 +863,7 @@ onMounted(refresh)
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
                       <q-badge v-if="!draft.bindingFor(asr.asrId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
-                      <q-btn flat dense color="negative" icon="delete" size="sm" @click.stop="removeResource('asr', idx, asr.asrId)" />
+                      <q-btn flat dense color="negative" icon="delete" size="sm" :aria-label="$t('resources.removeNamed', { name: asr.displayName })" @click.stop="removeResource('ASR', asr.asrId, asr.displayName)" />
                     </div>
                   </q-item-section>
                 </q-item>
@@ -795,7 +885,7 @@ onMounted(refresh)
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.identity') }}</div>
-                <q-input v-model="selectedAsr.displayName" dense outlined :label="$t('resources.asr.displayName')" data-cy="asr-display-name" @update:model-value="draft.markDirty()" />
+                <q-input v-model="selectedAsr.displayName" dense outlined :label="$t('resources.asr.displayName')" data-cy="asr-display-name" data-field="displayName" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
@@ -822,7 +912,7 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.asr.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" data-cy="asr-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedAsr!.asrId, v, 'HTTP_MULTIPART')" />
+                  <q-select :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" :disable="upstreamsLoading || !!upstreamError" emit-value map-options class="col" data-cy="asr-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedAsr!.asrId, v, 'HTTP_MULTIPART')" />
                   <q-input v-model="selectedAsr.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="asr-runtime-path" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.asr.transportSummary') }}</div>
@@ -866,7 +956,7 @@ onMounted(refresh)
                 <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-mcp-btn" @click="draft.addMcp(); selectedResourceId = draft.localContent?.mcp[draft.localContent.mcp.length - 1]?.mcpServerId" />
               </q-card-section>
               <q-list separator>
-                <q-item v-for="(mcp, idx) in draft.localContent.mcp" :key="mcp.mcpServerId"
+                <q-item v-for="mcp in draft.localContent.mcp" :key="mcp.mcpServerId"
                   :active="selectedResourceId === mcp.mcpServerId" clickable @click="selectMcp(mcp.mcpServerId)">
                   <q-item-section>
                     <q-item-label>{{ mcp.displayName }}</q-item-label>
@@ -875,7 +965,7 @@ onMounted(refresh)
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
                       <q-badge v-if="!draft.bindingFor(mcp.mcpServerId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
-                      <q-btn flat dense color="negative" icon="delete" size="sm" @click.stop="removeResource('mcp', idx, mcp.mcpServerId)" />
+                      <q-btn flat dense color="negative" icon="delete" size="sm" :aria-label="$t('resources.removeNamed', { name: mcp.displayName })" @click.stop="removeResource('MCP', mcp.mcpServerId, mcp.displayName)" />
                     </div>
                   </q-item-section>
                 </q-item>
@@ -897,7 +987,7 @@ onMounted(refresh)
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.mcp.identity') }}</div>
-                <q-input v-model="selectedMcp.displayName" dense outlined :label="$t('resources.mcp.displayName')" data-cy="mcp-display-name" @update:model-value="draft.markDirty()" />
+                <q-input v-model="selectedMcp.displayName" dense outlined :label="$t('resources.mcp.displayName')" data-cy="mcp-display-name" data-field="displayName" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
@@ -925,7 +1015,7 @@ onMounted(refresh)
               <q-card-section>
                 <div class="text-subtitle2 q-mb-sm">{{ $t('resources.mcp.execution') }}</div>
                 <div class="row q-gutter-sm">
-                  <q-select :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" emit-value map-options class="col" data-cy="mcp-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
+                  <q-select :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" :disable="upstreamsLoading || !!upstreamError" emit-value map-options class="col" data-cy="mcp-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
                   <q-input v-model="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="mcp-runtime-path" @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.mcp.transportSummary') }}</div>
@@ -975,13 +1065,22 @@ onMounted(refresh)
           <q-card-section>
             <div class="text-subtitle2 q-mb-sm">{{ $t('resources.policy.localCoexistence') }}</div>
             <div class="text-body2 text-grey-7 q-mb-md">{{ $t('resources.policy.coexistenceHint') }}</div>
-            <div class="row q-gutter-md">
-              <q-toggle v-model="draft.localContent.policy.allowLocalProviders" :label="$t('resources.policy.allowLocalModels')" data-cy="policy-allow-local-models" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalTts" :label="$t('resources.policy.allowLocalTts')" data-cy="policy-allow-local-tts" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalAsr" :label="$t('resources.policy.allowLocalAsr')" data-cy="policy-allow-local-asr" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalMcp" :label="$t('resources.policy.allowLocalMcp')" data-cy="policy-allow-local-mcp" @update:model-value="draft.markDirty()" />
-              <q-toggle v-model="draft.localContent.policy.allowLocalAssistants" :label="$t('resources.policy.allowLocalAssistants')" data-cy="policy-allow-local-assistants" @update:model-value="draft.markDirty()" />
-            </div>
+            <q-list bordered separator class="settings-list">
+              <q-item v-for="setting in policySettings" :key="setting.key" tag="label" data-cy="policy-setting-row">
+                <q-item-section>
+                  <q-item-label>{{ setting.label }}</q-item-label>
+                  <q-item-label caption>{{ setting.hint }}</q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <q-toggle
+                    :model-value="draft.localContent.policy[setting.key]"
+                    :aria-label="setting.label"
+                    :data-cy="setting.cy"
+                    @update:model-value="(value: boolean) => setPolicyFlag(setting.key, value)"
+                  />
+                </q-item-section>
+              </q-item>
+            </q-list>
           </q-card-section>
           <q-separator />
 
@@ -1019,11 +1118,11 @@ onMounted(refresh)
               <div>{{ $t('resources.errorsWarnings', { errors: draft.validationResult.errors.length, warnings: draft.validationResult.warnings.length }) }}</div>
             </q-banner>
             <q-list dense class="q-mt-sm">
-              <q-item v-for="e in draft.validationResult.errors" :key="e.path + e.code">
+              <q-item v-for="e in draft.validationResult.errors" :key="e.path + e.code" :clickable="!!e.resourceKind" @click="goToValidationIssue(e)">
                 <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
                 <q-item-section>{{ e.path }}: {{ e.code }} — {{ e.message }}</q-item-section>
               </q-item>
-              <q-item v-for="w in draft.validationResult.warnings" :key="w.path + w.code">
+              <q-item v-for="w in draft.validationResult.warnings" :key="w.path + w.code" :clickable="!!w.resourceKind" @click="goToValidationIssue(w)">
                 <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
                 <q-item-section>{{ w.path }}: {{ w.code }} — {{ w.message }}</q-item-section>
               </q-item>
@@ -1031,6 +1130,8 @@ onMounted(refresh)
           </div>
         </q-card-section>
       </q-card>
+        </section>
+      </div>
 
       <!-- Review & Publish Dialog (structured diff, not a simple confirm) -->
       <q-dialog v-model="reviewOpen" persistent>
@@ -1038,19 +1139,21 @@ onMounted(refresh)
           <q-card-section class="row items-center justify-between">
             <div>
               <div class="text-h6">{{ $t('resources.review.title') }}</div>
-              <div class="text-caption text-grey-7">{{ $t('resources.draft.revision') }} {{ draft.baselineRevision }} → {{ $t('releases.subtitle') }}</div>
+              <div class="text-caption text-grey-7">
+                {{ $t('resources.review.baseline', { generation: preview?.publishedGeneration ?? $t('resources.review.noPublishedRelease'), revision: draft.baselineRevision }) }}
+              </div>
             </div>
-            <q-badge v-if="reviewTotalChanges === 0" color="grey" :label="$t('resources.review.noChanges')" />
-            <q-badge v-else color="primary" :label="$t('resources.review.changes', { count: reviewTotalChanges })" />
+            <q-badge v-if="reviewTotalChanges === 0" color="grey" :label="$t('resources.review.noChanges')" data-cy="review-change-count" />
+            <q-badge v-else color="primary" :label="$t('resources.review.changes', { count: reviewTotalChanges })" data-cy="review-change-count" />
           </q-card-section>
           <q-separator />
 
-          <q-card-section v-if="reviewDiff" style="max-height: 60vh; overflow-y: auto">
+          <q-card-section v-if="preview" style="max-height: 60vh; overflow-y: auto">
             <!-- Blocking errors -->
             <q-banner v-if="hasBlockingErrors" class="bg-red-1 q-mb-md rounded-borders">
               <div class="text-weight-medium text-negative">{{ $t('resources.review.blockingErrors', { count: draft.validationResult!.errors.length }) }}</div>
               <q-list dense class="q-mt-sm">
-                <q-item v-for="e in draft.validationResult!.errors" :key="e.path + e.code">
+                <q-item v-for="e in draft.validationResult!.errors" :key="e.path + e.code" :clickable="!!e.resourceKind" @click="goToValidationIssue(e)">
                   <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
                   <q-item-section>
                     <span class="text-negative">{{ e.code }} — {{ e.message }}</span>
@@ -1073,86 +1176,31 @@ onMounted(refresh)
               </thead>
               <tbody>
                 <tr v-for="row in [
-                  { kind: 'Providers', d: reviewDiff.providers },
-                  { kind: 'Models', d: reviewDiff.models },
-                  { kind: 'TTS', d: reviewDiff.tts },
-                  { kind: 'ASR', d: reviewDiff.asr },
-                  { kind: 'MCP', d: reviewDiff.mcp },
-                  { kind: $t('experience.tab'), d: reviewDiff.assistants },
-                  { kind: $t('experience.starters'), d: reviewDiff.starters },
-                  { kind: $t('resources.review.runtimeImpact'), d: reviewDiff.bindings },
+                  { kind: $t('resources.preview.providers'), d: reviewDiffFor('PROVIDER') },
+                  { kind: $t('resources.tabs.models'), d: reviewDiffFor('MODEL') },
+                  { kind: 'TTS', d: reviewDiffFor('TTS') },
+                  { kind: 'ASR', d: reviewDiffFor('ASR') },
+                  { kind: 'MCP', d: reviewDiffFor('MCP') },
+                  { kind: $t('experience.tab'), d: reviewDiffFor('ASSISTANT') },
+                  { kind: $t('experience.starters'), d: reviewDiffFor('STARTER') },
                 ]" :key="row.kind">
                   <td>{{ row.kind }}</td>
-                  <td class="text-right text-positive">{{ row.d.added.length > 0 ? '+' + row.d.added.length : '—' }}</td>
-                  <td class="text-right text-warning">{{ row.d.changed.length > 0 ? '~' + row.d.changed.length : '—' }}</td>
-                  <td class="text-right text-negative">{{ row.d.removed.length > 0 ? '-' + row.d.removed.length : '—' }}</td>
+                  <td class="text-right text-positive">{{ row.d.added > 0 ? '+' + row.d.added : '—' }}</td>
+                  <td class="text-right text-warning">{{ row.d.changed > 0 ? '~' + row.d.changed : '—' }}</td>
+                  <td class="text-right text-negative">{{ row.d.removed > 0 ? '-' + row.d.removed : '—' }}</td>
                 </tr>
-                <tr v-if="reviewDiff.policyChanged">
+                <tr v-if="policyChanged">
                   <td>{{ $t('resources.tabs.policy') }}</td>
-                  <td class="text-right">—</td>
-                  <td class="text-right text-warning">~1</td>
-                  <td class="text-right">—</td>
+                  <td class="text-right text-positive">{{ reviewDiffFor('POLICY').added || '—' }}</td>
+                  <td class="text-right text-warning">{{ reviewDiffFor('POLICY').changed || '—' }}</td>
+                  <td class="text-right text-negative">{{ reviewDiffFor('POLICY').removed || '—' }}</td>
                 </tr>
               </tbody>
             </q-markup-table>
 
-            <!-- Added resource details -->
-            <template v-if="reviewDiff.providers.added.length || reviewDiff.models.added.length || reviewDiff.tts.added.length || reviewDiff.asr.added.length || reviewDiff.mcp.added.length">
-              <div class="text-subtitle2 q-mb-sm text-positive">{{ $t('resources.review.addedResources') }}</div>
-              <q-list dense class="q-mb-md">
-                <q-item v-for="p in reviewDiff.providers.added" :key="p.providerId">
-                  <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>{{ $t('resources.preview.providers') }}: {{ p.displayName }} ({{ p.providerId }})</q-item-section>
-                </q-item>
-                <q-item v-for="m in reviewDiff.models.added" :key="m.modelId">
-                  <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>{{ $t('resources.tabs.models') }}: {{ m.displayName }} ({{ m.modelId }})</q-item-section>
-                </q-item>
-                <q-item v-for="t in reviewDiff.tts.added" :key="t.ttsId">
-                  <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>{{ $t('resources.tabs.tts') }}: {{ t.displayName }} ({{ t.ttsId }})</q-item-section>
-                </q-item>
-                <q-item v-for="a in reviewDiff.asr.added" :key="a.asrId">
-                  <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>{{ $t('resources.tabs.asr') }}: {{ a.displayName }} ({{ a.asrId }})</q-item-section>
-                </q-item>
-                <q-item v-for="m in reviewDiff.mcp.added" :key="m.mcpServerId">
-                  <q-item-section avatar><q-icon name="add_circle" color="positive" /></q-item-section>
-                  <q-item-section>{{ $t('resources.tabs.mcp') }}: {{ m.displayName }} ({{ m.mcpServerId }})</q-item-section>
-                </q-item>
-              </q-list>
-            </template>
-
-            <!-- Removed resource details -->
-            <template v-if="reviewDiff.providers.removed.length || reviewDiff.models.removed.length || reviewDiff.tts.removed.length || reviewDiff.asr.removed.length || reviewDiff.mcp.removed.length">
-              <div class="text-subtitle2 q-mb-sm text-negative">{{ $t('resources.review.removedResources') }}</div>
-              <q-list dense class="q-mb-md">
-                <q-item v-for="p in reviewDiff.providers.removed" :key="p.providerId">
-                  <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>{{ $t('resources.preview.providers') }}: {{ p.displayName }} ({{ p.providerId }})</q-item-section>
-                </q-item>
-                <q-item v-for="m in reviewDiff.models.removed" :key="m.modelId">
-                  <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>{{ $t('resources.tabs.models') }}: {{ m.displayName }} ({{ m.modelId }})</q-item-section>
-                </q-item>
-                <q-item v-for="t in reviewDiff.tts.removed" :key="t.ttsId">
-                  <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>{{ $t('resources.tabs.tts') }}: {{ t.displayName }} ({{ t.ttsId }})</q-item-section>
-                </q-item>
-                <q-item v-for="a in reviewDiff.asr.removed" :key="a.asrId">
-                  <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>{{ $t('resources.tabs.asr') }}: {{ a.displayName }} ({{ a.asrId }})</q-item-section>
-                </q-item>
-                <q-item v-for="m in reviewDiff.mcp.removed" :key="m.mcpServerId">
-                  <q-item-section avatar><q-icon name="remove_circle" color="negative" /></q-item-section>
-                  <q-item-section>{{ $t('resources.tabs.mcp') }}: {{ m.displayName }} ({{ m.mcpServerId }})</q-item-section>
-                </q-item>
-              </q-list>
-            </template>
-
             <!-- Policy changes -->
-            <div v-if="reviewDiff.policyChanged" class="text-subtitle2 q-mb-sm">{{ $t('resources.review.policyChanges') }}</div>
-            <q-banner v-if="reviewDiff.policyChanged" class="bg-blue-1 q-mb-md rounded-borders">
+            <div v-if="policyChanged" class="text-subtitle2 q-mb-sm">{{ $t('resources.review.policyChanges') }}</div>
+            <q-banner v-if="policyChanged" class="bg-blue-1 q-mb-md rounded-borders">
               <div class="text-body2">{{ $t('resources.review.policyChangedHint') }}</div>
             </q-banner>
 
@@ -1273,7 +1321,7 @@ onMounted(refresh)
 
             <q-expansion-item dense group="preview" :label="$t('experience.tab')" icon="assistant">
               <q-list>
-                <q-item v-for="a in preview.assistants ?? []" :key="a.assistantDefinitionId">
+                <q-item v-for="a in preview.assistants" :key="a.assistantDefinitionId">
                   <q-item-section>
                     <q-item-label>{{ a.displayName }} · {{ a.assistantDefinitionId }}</q-item-label>
                     <q-item-label caption>{{ a.modelId }} · {{ a.mcpServerIds.join(', ') }}</q-item-label>
@@ -1285,7 +1333,7 @@ onMounted(refresh)
             </q-expansion-item>
             <q-expansion-item dense group="preview" :label="$t('experience.starters')" icon="forum">
               <q-list>
-                <q-item v-for="s in (preview.starters ?? []).toSorted((a, b) => a.sortOrder - b.sortOrder || a.starterId.localeCompare(b.starterId))" :key="s.starterId">
+                <q-item v-for="s in preview.starters.toSorted((a, b) => a.sortOrder - b.sortOrder || a.starterId.localeCompare(b.starterId))" :key="s.starterId">
                   <q-item-section><q-item-label>{{ s.title }} · {{ s.assistantDefinitionId }} · {{ s.sortOrder }}</q-item-label><p style="white-space: pre-wrap">{{ s.prompt }}</p></q-item-section>
                 </q-item>
               </q-list>
@@ -1298,7 +1346,7 @@ onMounted(refresh)
                   <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalTts') }}</td><td>{{ preview.policy.allowLocalTts }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalAsr') }}</td><td>{{ preview.policy.allowLocalAsr }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalMcp') }}</td><td>{{ preview.policy.allowLocalMcp }}</td></tr>
-                  <tr><td class="text-grey-7">{{ $t('resources.policy.allowLocalAssistants') }}</td><td>{{ preview.policy.allowLocalAssistants ?? '—' }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.policy.allowLocalAssistants') }}</td><td>{{ preview.policy.allowLocalAssistants }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultModel') }}</td><td>{{ preview.policy.defaultModelId ?? '—' }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultTts') }}</td><td>{{ preview.policy.defaultTtsId ?? '—' }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultAsr') }}</td><td>{{ preview.policy.defaultAsrId ?? '—' }}</td></tr>
@@ -1315,3 +1363,51 @@ onMounted(refresh)
     <div v-else class="text-body2 text-grey-7">{{ $t('resources.noDraft') }}</div>
   </q-page>
 </template>
+
+<style scoped>
+.configuration-workbench {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.configuration-workbench__detail {
+  min-width: 0;
+}
+
+.settings-list {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.settings-list .q-item {
+  min-height: 68px;
+}
+
+@media (max-width: 899px) {
+  .configuration-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 599px) {
+  :deep(.q-page) {
+    padding: 12px;
+  }
+
+  .configuration-workbench {
+    gap: 12px;
+  }
+
+  .configuration-workbench__detail :deep(.row.q-gutter-sm),
+  .configuration-workbench__detail :deep(.row.q-gutter-md) {
+    align-items: stretch;
+  }
+
+  .configuration-workbench__detail :deep(.row.q-gutter-sm > .col),
+  .configuration-workbench__detail :deep(.row.q-gutter-md > .col) {
+    flex: 1 0 100%;
+  }
+}
+</style>

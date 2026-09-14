@@ -31,16 +31,18 @@ type DraftView struct {
 }
 
 type DraftPreview struct {
-	DraftRevision  int
-	ProjectionHash string
-	Providers      []adminapi.ProviderDefinition
-	Models         []adminapi.ModelDefinition
-	TTS            []adminapi.TtsDefinition
-	ASR            []adminapi.AsrDefinition
-	MCP            []adminapi.McpDefinition
-	Policy         adminapi.ManagedPolicy
-	Assistants     []adminapi.ManagedAssistantDefinition
-	Starters       []adminapi.AssistantStarterDefinition
+	DraftRevision       int
+	ProjectionHash      string
+	PublishedGeneration *int
+	DiffSummary         adminapi.DiffSummary
+	Providers           []adminapi.ProviderDefinition
+	Models              []adminapi.ModelDefinition
+	TTS                 []adminapi.TtsDefinition
+	ASR                 []adminapi.AsrDefinition
+	MCP                 []adminapi.McpDefinition
+	Policy              adminapi.ManagedPolicy
+	Assistants          []adminapi.ManagedAssistantDefinition
+	Starters            []adminapi.AssistantStarterDefinition
 }
 
 type ValidationResult struct {
@@ -95,17 +97,23 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 			prev[m.McpServerId] = defHash(m)
 			prevKinds[m.McpServerId] = adminapi.ReleaseDiffKindMCP
 		}
-		if previous.Assistants != nil {
-			for _, a := range *previous.Assistants {
-				prev[string(a.AssistantDefinitionId)] = defHash(a)
-				prevKinds[string(a.AssistantDefinitionId)] = adminapi.ReleaseDiffKindASSISTANT
+		for _, a := range previous.Assistants {
+			prev[string(a.AssistantDefinitionId)] = defHash(a)
+			prevKinds[string(a.AssistantDefinitionId)] = adminapi.ReleaseDiffKindASSISTANT
+		}
+		for _, s := range previous.Starters {
+			prev[string(s.StarterId)] = defHash(s)
+			prevKinds[string(s.StarterId)] = adminapi.ReleaseDiffKindSTARTER
+		}
+		for _, binding := range previous.Bindings {
+			if binding.RuntimeRouteId != "" {
+				prev[binding.RuntimeRouteId] = defHash(binding)
+				prevKinds[binding.RuntimeRouteId] = adminapi.ReleaseDiffKindBINDING
 			}
 		}
-		if previous.Starters != nil {
-			for _, s := range *previous.Starters {
-				prev[string(s.StarterId)] = defHash(s)
-				prevKinds[string(s.StarterId)] = adminapi.ReleaseDiffKindSTARTER
-			}
+		if previous.Policy.PolicyId != "" {
+			prev[previous.Policy.PolicyId] = defHash(previous.Policy)
+			prevKinds[previous.Policy.PolicyId] = adminapi.ReleaseDiffKindPOLICY
 		}
 	}
 
@@ -144,15 +152,19 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 	for _, m := range current.Mcp {
 		process(adminapi.ReleaseDiffKindMCP, m.McpServerId)
 	}
-	if current.Assistants != nil {
-		for _, a := range *current.Assistants {
-			process(adminapi.ReleaseDiffKindASSISTANT, string(a.AssistantDefinitionId))
+	for _, a := range current.Assistants {
+		process(adminapi.ReleaseDiffKindASSISTANT, string(a.AssistantDefinitionId))
+	}
+	for _, s := range current.Starters {
+		process(adminapi.ReleaseDiffKindSTARTER, string(s.StarterId))
+	}
+	for _, binding := range current.Bindings {
+		if binding.RuntimeRouteId != "" {
+			process(adminapi.ReleaseDiffKindBINDING, binding.RuntimeRouteId)
 		}
 	}
-	if current.Starters != nil {
-		for _, s := range *current.Starters {
-			process(adminapi.ReleaseDiffKindSTARTER, string(s.StarterId))
-		}
+	if current.Policy.PolicyId != "" {
+		process(adminapi.ReleaseDiffKindPOLICY, current.Policy.PolicyId)
 	}
 	for _, kind := range prevKinds {
 		ensure(kind).Removed++
@@ -167,6 +179,7 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 		adminapi.ReleaseDiffKindPOLICY,
 		adminapi.ReleaseDiffKindASSISTANT,
 		adminapi.ReleaseDiffKindSTARTER,
+		adminapi.ReleaseDiffKindBINDING,
 	}
 	var details []adminapi.ResourceDiff
 	for _, kind := range kinds {
@@ -213,19 +226,23 @@ func currentHash(content *adminapi.ManagedDraftContent, id string) string {
 			return defHash(m)
 		}
 	}
-	if content.Assistants != nil {
-		for _, a := range *content.Assistants {
-			if string(a.AssistantDefinitionId) == id {
-				return defHash(a)
-			}
+	for _, a := range content.Assistants {
+		if string(a.AssistantDefinitionId) == id {
+			return defHash(a)
 		}
 	}
-	if content.Starters != nil {
-		for _, s := range *content.Starters {
-			if string(s.StarterId) == id {
-				return defHash(s)
-			}
+	for _, s := range content.Starters {
+		if string(s.StarterId) == id {
+			return defHash(s)
 		}
+	}
+	for _, binding := range content.Bindings {
+		if binding.RuntimeRouteId == id {
+			return defHash(binding)
+		}
+	}
+	if content.Policy.PolicyId == id {
+		return defHash(content.Policy)
 	}
 	return ""
 }
@@ -450,6 +467,20 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	if err != nil {
 		return DraftPreview{}, err
 	}
+	var previous *adminapi.ManagedDraftContent
+	var publishedGeneration *int
+	latest, err := s.Client.ManagedRelease.Query().Order(ent.Desc(managedrelease.FieldManagedGeneration)).First(ctx)
+	if err == nil {
+		var content adminapi.ManagedDraftContent
+		if err := json.Unmarshal(latest.ReleaseContentJSON, &content); err != nil {
+			return DraftPreview{}, fmt.Errorf("decode latest release content: %w", err)
+		}
+		previous = &content
+		generation := int(latest.ManagedGeneration)
+		publishedGeneration = &generation
+	} else if !ent.IsNotFound(err) {
+		return DraftPreview{}, err
+	}
 	if draft.DraftRevision != expectedRevision {
 		return DraftPreview{}, ErrRevisionConflict
 	}
@@ -473,13 +504,15 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	// Return the canonical projection (sorted arrays from compiler output),
 	// not the raw Draft arrays. This ensures Preview == actual Snapshot shape.
 	return DraftPreview{
-		DraftRevision:  draft.DraftRevision,
-		ProjectionHash: hash,
-		Providers:      projectionToAdminProviders(snapshot.Providers),
-		Models:         projectionToAdminModels(snapshot.Models),
-		TTS:            projectionToAdminTts(snapshot.Tts),
-		ASR:            projectionToAdminAsr(snapshot.Asr),
-		MCP:            projectionToAdminMcp(snapshot.Mcp),
+		DraftRevision:       draft.DraftRevision,
+		ProjectionHash:      hash,
+		PublishedGeneration: publishedGeneration,
+		DiffSummary:         releaseContentDiff(&draft.Content, previous),
+		Providers:           projectionToAdminProviders(snapshot.Providers),
+		Models:              projectionToAdminModels(snapshot.Models),
+		TTS:                 projectionToAdminTts(snapshot.Tts),
+		ASR:                 projectionToAdminAsr(snapshot.Asr),
+		MCP:                 projectionToAdminMcp(snapshot.Mcp),
 		Policy: adminapi.ManagedPolicy{
 			PolicyId:             snapshot.Policy.PolicyId,
 			AllowLocalProviders:  snapshot.Policy.AllowLocalProviders,
@@ -589,13 +622,30 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	providers := make(map[string]adminapi.ProviderDefinition, len(content.Providers))
 	for i, provider := range content.Providers {
 		providers[provider.ProviderId] = provider
+		if strings.TrimSpace(provider.DisplayName) == "" {
+			addError("missing_display_name", fmt.Sprintf("providers[%d].displayName", i), "provider displayName is required", &kindProvider, ptrStr(provider.ProviderId), ptrStr("displayName"))
+		}
 		if !provider.ClientProtocol.Valid() {
 			addError("invalid_client_protocol", fmt.Sprintf("providers[%d].clientProtocol", i), "unsupported provider client protocol", &kindProvider, ptrStr(provider.ProviderId), ptrStr("clientProtocol"))
 		}
 	}
 	resources := map[string]bool{}
+	resourceKinds := map[string]adminapi.ValidationIssueResourceKind{}
 	for i, model := range content.Models {
 		resources[model.ModelId] = model.Enabled
+		resourceKinds[model.ModelId] = kindModel
+		if strings.TrimSpace(model.DisplayName) == "" {
+			addError("missing_display_name", fmt.Sprintf("models[%d].displayName", i), "model displayName is required", &kindModel, ptrStr(model.ModelId), ptrStr("displayName"))
+		}
+		if strings.TrimSpace(model.UpstreamModelKey) == "" {
+			addError("missing_model_key", fmt.Sprintf("models[%d].upstreamModelKey", i), "model upstreamModelKey is required", &kindModel, ptrStr(model.ModelId), ptrStr("upstreamModelKey"))
+		}
+		if len(model.InputModalities) == 0 {
+			addError("missing_input_modalities", fmt.Sprintf("models[%d].inputModalities", i), "model requires at least one input modality", &kindModel, ptrStr(model.ModelId), ptrStr("inputModalities"))
+		}
+		if len(model.OutputModalities) == 0 {
+			addError("missing_output_modalities", fmt.Sprintf("models[%d].outputModalities", i), "model requires at least one output modality", &kindModel, ptrStr(model.ModelId), ptrStr("outputModalities"))
+		}
 		if _, ok := providers[model.ProviderId]; !ok {
 			addError("missing_provider", fmt.Sprintf("models[%d].providerId", i), "model references an unknown provider", &kindModel, ptrStr(model.ModelId), ptrStr("providerId"))
 		}
@@ -620,6 +670,10 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for i, value := range content.Tts {
 		resources[value.TtsId] = value.Enabled
+		resourceKinds[value.TtsId] = kindTTS
+		if strings.TrimSpace(value.DisplayName) == "" {
+			addError("missing_display_name", fmt.Sprintf("tts[%d].displayName", i), "TTS displayName is required", &kindTTS, ptrStr(value.TtsId), ptrStr("displayName"))
+		}
 		if !value.ClientProtocol.Valid() {
 			addError("invalid_client_protocol", fmt.Sprintf("tts[%d].clientProtocol", i), "unsupported TTS client protocol", &kindTTS, ptrStr(value.TtsId), ptrStr("clientProtocol"))
 		}
@@ -635,6 +689,13 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for i, value := range content.Asr {
 		resources[value.AsrId] = value.Enabled
+		resourceKinds[value.AsrId] = kindASR
+		if strings.TrimSpace(value.DisplayName) == "" {
+			addError("missing_display_name", fmt.Sprintf("asr[%d].displayName", i), "ASR displayName is required", &kindASR, ptrStr(value.AsrId), ptrStr("displayName"))
+		}
+		if value.Language != nil && strings.TrimSpace(*value.Language) == "" {
+			addError("empty_language", fmt.Sprintf("asr[%d].language", i), "ASR language must be omitted or non-empty", &kindASR, ptrStr(value.AsrId), ptrStr("language"))
+		}
 		if !value.ClientProtocol.Valid() {
 			addError("invalid_client_protocol", fmt.Sprintf("asr[%d].clientProtocol", i), "unsupported ASR client protocol", &kindASR, ptrStr(value.AsrId), ptrStr("clientProtocol"))
 		}
@@ -647,6 +708,10 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for i, value := range content.Mcp {
 		resources[value.McpServerId] = value.Enabled
+		resourceKinds[value.McpServerId] = kindMCP
+		if strings.TrimSpace(value.DisplayName) == "" {
+			addError("missing_display_name", fmt.Sprintf("mcp[%d].displayName", i), "MCP displayName is required", &kindMCP, ptrStr(value.McpServerId), ptrStr("displayName"))
+		}
 		if !value.ClientProtocol.Valid() {
 			addError("invalid_client_protocol", fmt.Sprintf("mcp[%d].clientProtocol", i), "unsupported MCP client protocol", &kindMCP, ptrStr(value.McpServerId), ptrStr("clientProtocol"))
 		}
@@ -668,48 +733,44 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		enabledMcp[m.McpServerId] = m.Enabled
 	}
 	assistantIds := map[string]bool{}
-	if content.Assistants != nil {
-		for i, a := range *content.Assistants {
-			path := fmt.Sprintf("assistants[%d]", i)
-			if strings.TrimSpace(a.DisplayName) == "" {
-				addError("missing_display_name", path+".displayName", "assistant displayName is required", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("displayName"))
-			}
-			if strings.TrimSpace(a.SystemPrompt) == "" {
-				addError("missing_system_prompt", path+".systemPrompt", "assistant systemPrompt is required", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("systemPrompt"))
-			}
-			if !enabledModels[string(a.ModelId)] {
-				addError("invalid_model_ref", path+".modelId", "assistant references an unknown or disabled model", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("modelId"))
-			}
-			if a.MemorySeed == nil {
-				addError("missing_memory_seed", path+".memorySeed", "memorySeed must be an array (empty is allowed)", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("memorySeed"))
-			}
-			for j, s := range a.MemorySeed {
-				if strings.TrimSpace(s) == "" {
-					addError("empty_memory_seed", fmt.Sprintf("%s.memorySeed[%d]", path, j), "memory seed item must be non-empty", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("memorySeed"))
-				}
-			}
-			for j, m := range a.McpServerIds {
-				if !enabledMcp[string(m)] {
-					addError("invalid_mcp_ref", fmt.Sprintf("%s.mcpServerIds[%d]", path, j), "assistant references an unknown or disabled MCP server", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("mcpServerIds"))
-				}
-			}
-			assistantIds[string(a.AssistantDefinitionId)] = a.Enabled
+	for i, a := range content.Assistants {
+		path := fmt.Sprintf("assistants[%d]", i)
+		if strings.TrimSpace(a.DisplayName) == "" {
+			addError("missing_display_name", path+".displayName", "assistant displayName is required", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("displayName"))
 		}
+		if strings.TrimSpace(a.SystemPrompt) == "" {
+			addError("missing_system_prompt", path+".systemPrompt", "assistant systemPrompt is required", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("systemPrompt"))
+		}
+		if !enabledModels[string(a.ModelId)] {
+			addError("invalid_model_ref", path+".modelId", "assistant references an unknown or disabled model", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("modelId"))
+		}
+		if a.MemorySeed == nil {
+			addError("missing_memory_seed", path+".memorySeed", "memorySeed must be an array (empty is allowed)", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("memorySeed"))
+		}
+		for j, s := range a.MemorySeed {
+			if strings.TrimSpace(s) == "" {
+				addError("empty_memory_seed", fmt.Sprintf("%s.memorySeed[%d]", path, j), "memory seed item must be non-empty", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("memorySeed"))
+			}
+		}
+		for j, m := range a.McpServerIds {
+			if !enabledMcp[string(m)] {
+				addError("invalid_mcp_ref", fmt.Sprintf("%s.mcpServerIds[%d]", path, j), "assistant references an unknown or disabled MCP server", &kindAssistant, ptrStr(string(a.AssistantDefinitionId)), ptrStr("mcpServerIds"))
+			}
+		}
+		assistantIds[string(a.AssistantDefinitionId)] = a.Enabled
 	}
 
 	// Validate starters
-	if content.Starters != nil {
-		for i, s := range *content.Starters {
-			path := fmt.Sprintf("starters[%d]", i)
-			if strings.TrimSpace(s.Title) == "" {
-				addError("missing_title", path+".title", "starter title is required", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("title"))
-			}
-			if strings.TrimSpace(s.Prompt) == "" {
-				addError("missing_prompt", path+".prompt", "starter prompt is required", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("prompt"))
-			}
-			if !assistantIds[string(s.AssistantDefinitionId)] {
-				addError("invalid_assistant_ref", path+".assistantDefinitionId", "starter references an unknown or disabled assistant", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("assistantDefinitionId"))
-			}
+	for i, s := range content.Starters {
+		path := fmt.Sprintf("starters[%d]", i)
+		if strings.TrimSpace(s.Title) == "" {
+			addError("missing_title", path+".title", "starter title is required", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("title"))
+		}
+		if strings.TrimSpace(s.Prompt) == "" {
+			addError("missing_prompt", path+".prompt", "starter prompt is required", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("prompt"))
+		}
+		if !assistantIds[string(s.AssistantDefinitionId)] {
+			addError("invalid_assistant_ref", path+".assistantDefinitionId", "starter references an unknown or disabled assistant", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("assistantDefinitionId"))
 		}
 	}
 
@@ -764,7 +825,8 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for resourceID, enabled := range resources {
 		if enabled && !bound[resourceID] {
-			addError("missing_binding", "bindings", "enabled resource has no runtime binding", nil, ptrStr(resourceID), nil)
+			kind := resourceKinds[resourceID]
+			addError("missing_binding", "bindings", "enabled resource has no runtime binding", &kind, ptrStr(resourceID), ptrStr("upstreamId"))
 		}
 	}
 	if content.Policy.DefaultModelId != nil {
@@ -846,18 +908,14 @@ func validateCandidateIDs(content adminapi.ManagedDraftContent) error {
 			return fmt.Errorf("bindings[%d] has invalid upstream id", i)
 		}
 	}
-	if content.Assistants != nil {
-		for i, value := range *content.Assistants {
-			if err := check(platformid.Assistant, string(value.AssistantDefinitionId), fmt.Sprintf("assistants[%d]", i)); err != nil {
-				return err
-			}
+	for i, value := range content.Assistants {
+		if err := check(platformid.Assistant, string(value.AssistantDefinitionId), fmt.Sprintf("assistants[%d]", i)); err != nil {
+			return err
 		}
 	}
-	if content.Starters != nil {
-		for i, value := range *content.Starters {
-			if err := check(platformid.Starter, string(value.StarterId), fmt.Sprintf("starters[%d]", i)); err != nil {
-				return err
-			}
+	for i, value := range content.Starters {
+		if err := check(platformid.Starter, string(value.StarterId), fmt.Sprintf("starters[%d]", i)); err != nil {
+			return err
 		}
 	}
 	return nil

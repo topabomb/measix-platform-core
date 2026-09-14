@@ -37,8 +37,8 @@ type snapshotDescriptor struct {
 	MCP               []clientapi.McpDefinition              `json:"mcp"`
 	Policy            clientapi.ManagedPolicy                `json:"policy"`
 	Metadata          snapshotMetadata                       `json:"metadata"`
-	Assistants        []clientapi.ManagedAssistantDefinition `json:"assistants,omitempty"`
-	Starters          []clientapi.AssistantStarterDefinition `json:"starters,omitempty"`
+	Assistants        []clientapi.ManagedAssistantDefinition `json:"assistants"`
+	Starters          []clientapi.AssistantStarterDefinition `json:"starters"`
 }
 
 type snapshotMetadata struct {
@@ -96,46 +96,40 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 		mcp = append(mcp, clientapi.McpDefinition{McpServerId: value.McpServerId, DisplayName: value.DisplayName, ClientProtocol: clientapi.McpDefinitionClientProtocol(value.ClientProtocol), AuthOwnership: clientapi.McpDefinitionAuthOwnership(value.AuthOwnership), RuntimePath: value.RuntimePath, Enabled: value.Enabled})
 	}
 	// Compile assistants
-	assistants := make([]clientapi.ManagedAssistantDefinition, 0)
-	if input.Content.Assistants != nil {
-		assistants = make([]clientapi.ManagedAssistantDefinition, 0, len(*input.Content.Assistants))
-		for _, a := range *input.Content.Assistants {
-			seed := make([]string, len(a.MemorySeed))
-			for i, s := range a.MemorySeed {
-				seed[i] = strings.TrimSpace(s)
-			}
-			mcpIds := make([]clientapi.McpServerId, len(a.McpServerIds))
-			for i, m := range a.McpServerIds {
-				mcpIds[i] = clientapi.McpServerId(m)
-			}
-			sort.Slice(mcpIds, func(i, j int) bool { return mcpIds[i] < mcpIds[j] })
-			assistants = append(assistants, clientapi.ManagedAssistantDefinition{
-				AssistantDefinitionId: a.AssistantDefinitionId,
-				DisplayName:           a.DisplayName,
-				Description:           a.Description,
-				SystemPrompt:          a.SystemPrompt,
-				ModelId:               a.ModelId,
-				MemorySeed:            seed,
-				McpServerIds:          mcpIds,
-				Enabled:               a.Enabled,
-			})
+	assistants := make([]clientapi.ManagedAssistantDefinition, 0, len(input.Content.Assistants))
+	for _, a := range input.Content.Assistants {
+		seed := make([]string, len(a.MemorySeed))
+		for i, s := range a.MemorySeed {
+			seed[i] = strings.TrimSpace(s)
 		}
+		mcpIds := make([]clientapi.McpServerId, len(a.McpServerIds))
+		for i, m := range a.McpServerIds {
+			mcpIds[i] = clientapi.McpServerId(m)
+		}
+		sort.Slice(mcpIds, func(i, j int) bool { return mcpIds[i] < mcpIds[j] })
+		assistants = append(assistants, clientapi.ManagedAssistantDefinition{
+			AssistantDefinitionId: a.AssistantDefinitionId,
+			DisplayName:           a.DisplayName,
+			Description:           a.Description,
+			SystemPrompt:          a.SystemPrompt,
+			ModelId:               a.ModelId,
+			MemorySeed:            seed,
+			McpServerIds:          mcpIds,
+			Enabled:               a.Enabled,
+		})
 	}
 	// Compile starters
-	starters := make([]clientapi.AssistantStarterDefinition, 0)
-	if input.Content.Starters != nil {
-		starters = make([]clientapi.AssistantStarterDefinition, 0, len(*input.Content.Starters))
-		for _, s := range *input.Content.Starters {
-			starters = append(starters, clientapi.AssistantStarterDefinition{
-				StarterId:             s.StarterId,
-				AssistantDefinitionId: s.AssistantDefinitionId,
-				Title:                 s.Title,
-				Prompt:                s.Prompt,
-				Description:           s.Description,
-				SortOrder:             s.SortOrder,
-				Enabled:               s.Enabled,
-			})
-		}
+	starters := make([]clientapi.AssistantStarterDefinition, 0, len(input.Content.Starters))
+	for _, s := range input.Content.Starters {
+		starters = append(starters, clientapi.AssistantStarterDefinition{
+			StarterId:             s.StarterId,
+			AssistantDefinitionId: s.AssistantDefinitionId,
+			Title:                 s.Title,
+			Prompt:                s.Prompt,
+			Description:           s.Description,
+			SortOrder:             s.SortOrder,
+			Enabled:               s.Enabled,
+		})
 	}
 	sort.Slice(assistants, func(i, j int) bool { return assistants[i].AssistantDefinitionId < assistants[j].AssistantDefinitionId })
 	sort.Slice(starters, func(i, j int) bool { return starters[i].StarterId < starters[j].StarterId })

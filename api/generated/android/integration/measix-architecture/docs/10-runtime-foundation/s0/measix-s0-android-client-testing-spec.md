@@ -285,7 +285,7 @@ Android S0.4 可以进入 Final S0 System/RC Gate，仅当：
 
 1. S0.3 Freeze pin/Snapshot v5/Gateway wire/surface/catalog compatibility 与 S0.1–S0.3 regression Green；
 2. Binding/Credential/Snapshot persistence + failure/restart Green；
-3. Personal/Enterprise 运行数据隔离、五项用户配置准入及完整迁移/个人恢复保全企业数据 Green；
+3. Personal/Enterprise 运行数据隔离、五项用户配置准入、当前结构初始化及个人恢复保全企业数据 Green；
 4. interaction guard/context/concurrency Green；
 5. Model/TTS/ASR/Direct MCP/Gateway required profile + resolved tool UI Green；
 6. 428/revoke/auth/network/cancel no-unsafe-replay Green；

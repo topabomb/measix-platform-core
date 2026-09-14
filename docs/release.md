@@ -60,7 +60,7 @@ Candidates default to `.artifacts/s0-freeze-candidate.json`; writes are exclusiv
 
 The writer validates current source/architecture cleanliness and identity, production build, four OpenAPI hashes, fixture/schema/Adapter pins, complete required scenario results, and every artifact plus metadata hash/exit/source. Qualification requires all four profiles in one run, each with observed adapter version, upstream/config revision, transport and forwarded usage evidence; unknown identity or an unexecuted profile fails. Partial diagnostic runs cannot be merged into qualification. Declared NONE/LEVEL_0 is not semantic Usage/header-echo qualification.
 
-Two deliberate boundaries remain: this CAP manifest compiler verifies the resource baseline of the current Snapshot v4 but does not replace the S0.2 ERX gate; independent clean-source checkout/rebuild/replay is not implemented. Runtime-only evidence cannot finalize CAP-C7-002. S0.2 needs its own ERX/consumer evidence schema and gate. Therefore `make freeze-gate` is not a working current S0.2 promotion path. The audit is historical; living completion/verification status is in [execution progress](s0-execution-progress.md).
+Two deliberate boundaries remain: this CAP manifest compiler verifies the resource baseline of the current Snapshot v4 but does not replace the S0.2 ERX gate; independent clean-source checkout/rebuild/replay is not implemented. Runtime-only evidence cannot finalize CAP-C7-002. S0.2 needs its own ERX/consumer evidence schema and gate. Candidate promotion therefore executes and records each required gate explicitly. Living completion/verification status is in [execution progress](s0-execution-progress.md).
 
 ## 3. S0.2/S0.3/S0.4 candidates
 
@@ -93,7 +93,7 @@ Run affected T0/T1/T2 plus bounded deterministic T3 where required. Behavior cha
 
 ### Main / integration candidate
 
-Adds required T3 lanes, migration/static-host checks and deterministic backend/system-harness scenarios. GitHub Actions still does not imply S0.1 C6/C7 completion.
+Adds required T3 lanes, current-schema/static-host checks and deterministic backend/system-harness scenarios. GitHub Actions still does not imply S0.1 C6/C7 completion.
 
 ### S0.1 freeze candidate
 

@@ -56,7 +56,7 @@ Use restricted secret files and persistent, explicitly resolved DB/spool paths. 
 
 `control-hub` has `run`, `bootstrap-admin`, `check` and `backup` subcommands. Inspect each subcommand's flags with `--help`; maintenance commands do not use the full run configuration. Default bootstrap refuses an existing deployment; `--if-empty` skips an initialized deployment without resetting credentials, while `--add-admin` explicitly adds an administrator. They are mutually exclusive. Initial bootstrap accepts `--timezone <IANA zone>` (default UTC) for Enterprise Update date boundaries. Use its password-file input, not a password printed into shared logs.
 
-Apply/review migrations before startup; `run` does not auto-migrate. Startup opens/checks the database, requires the deployment invariant and initializes runtime services. See [database migrations](database-migrations.md) for limits of the check and development helper.
+Initialize a clean database from the reviewed current SQL before startup; `run` does not create or alter schema. Startup opens/checks the database, requires the deployment invariant and initializes runtime services. See [database initialization](database-migrations.md) for limits of the check and development helper.
 
 Start Hub/Relay, wait for explicit readiness, verify desired/applied control state, then expose traffic. Relay cannot serve authorized runtime traffic before valid control state is applied. Process liveness does not prove activation, usage delivery or static hosting.
 
@@ -67,7 +67,7 @@ Start Hub/Relay, wait for explicit readiness, verify desired/applied control sta
 | Hub | `/live`, `/ready` | Authenticated Admin System API | Ready after initialization; Relay runtime can still be `DEGRADED` |
 | Relay | `/live`, `/ready` | Private `/internal/v1/control/status`, service authentication | Ready once control state exists; spool degradation is separate |
 
-OpenAPI/router registrations own exact responses. The unauthenticated System health endpoint only probes the local DB connection; full schema/Relay/usage diagnostics stay in authenticated System status and the maintenance command. Hub System reports the current schema revision expected by the binary (derived from embedded migrations), not an attestation of applied Atlas history. It forwards Relay spool state, pending count and oldest age; absent observations remain unknown, not zero. Ingest lag is separate from backlog. Hub build identity defaults to `dev` unless supplied at build time; release provenance must pin binaries and static assets.
+OpenAPI/router registrations own exact responses. The unauthenticated System health endpoint only probes the local DB connection; full schema/Relay/usage diagnostics stay in authenticated System status and the maintenance command. Hub System reports the current schema identity expected by the binary, computed from the embedded initialization SQL. It forwards Relay spool state, pending count and oldest age; absent observations remain unknown, not zero. Ingest lag is separate from backlog. Hub build identity defaults to `dev` unless supplied at build time; release provenance must pin binaries and static assets.
 
 ## 5. Shutdown and durability
 
@@ -88,17 +88,17 @@ control-hub check --db <hub.db>
 control-hub backup --db <hub.db> --output <new-backup.db>
 ```
 
-Backup uses SQLite `VACUUM INTO` and writes an adjacent `.metadata.json`. Both targets are exclusively reserved; existing database or orphan metadata is not overwritten. Source and copied database pass integrity/foreign-key/current-column checks before metadata is synced. Metadata records the binary's expected migration revision. These checks do not replace an isolated restore/business replay.
+Backup uses SQLite `VACUUM INTO` and writes an adjacent `.metadata.json`. Both targets are exclusively reserved; existing database or orphan metadata is not overwritten. Source and copied database pass integrity/foreign-key/current-column checks before metadata is synced. Metadata records the binary's current SQL content identity. These checks do not replace an isolated restore/business replay.
 
-`check` derives required tables/columns from current Ent schema, including Enterprise Update and session recovery; it checks SQLite integrity/foreign keys. It does not attest indexes, column type equivalence or complete applied Atlas history. Success is necessary but insufficient for release/upgrade.
+`check` derives required tables/columns from current Ent schema, including Enterprise Update and session recovery; it checks SQLite integrity/foreign keys. It does not attest every index or column type equivalence. Success is necessary but insufficient for release.
 
-There is no restore CLI or fully packaged production restore runbook. Before replacing any deployment database, restore a copy in an isolated environment with matching binaries, required keys and migrations; check integrity, identities, releases/generations and usage, then run recovery scenarios. Never experiment on the only production copy; keep the original recoverable until acceptance.
+There is no restore CLI or fully packaged production restore runbook. Before replacing any deployment database, restore a copy in an isolated environment with matching binaries, required keys and the same current schema identity; check integrity, identities, releases/generations and usage, then run recovery scenarios. Never experiment on the only production copy; keep the original recoverable until acceptance.
 
 ## 7. S0.3 supervision and logging deliverables
 
 Implement supervision **within S0.3**, using host-native service management, not a fourth custom orchestration daemon. The reference is Linux `systemd` + `journald`; other platforms must prove equivalent behavior. Architecture owns the [Gateway operational contract](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-enterprise-tool-gateway-contract-spec.md); unit names, concrete timeouts, paths and commands belong here once implemented.
 
-Required package: one unit per Hub/Relay/Gateway, one aggregate target/group, independent failure domains, least privilege, immutable builds, private/public binding, readiness separate from ordering, bounded restart delay/rate limiting, permanent configuration-failure handling, graceful stop followed by supervisor termination after timeout, install/upgrade/recovery commands and failure-injection tests. None is production-qualified merely by being listed here.
+Required package: one unit per Hub/Relay/Gateway, one aggregate target/group, independent failure domains, least privilege, immutable builds, private/public binding, readiness separate from ordering, bounded restart delay/rate limiting, permanent configuration-failure handling, graceful stop followed by supervisor termination after timeout, clean install/recovery commands and failure-injection tests. None is production-qualified merely by being listed here.
 
 Hub/Relay currently use `slog.JSONHandler` on stdout (`time`, `level`, `msg`). They do not consistently attach `service`, `buildVersion`, stable `event` or correlations. Raw error logging does not establish redaction.
 
@@ -114,9 +114,7 @@ Never emit tokens, cookies, credentials, enrollment/session/signing material, pr
 | Relay not ready after restart | Inspect Hub reconcile and Relay applied revision; do not bypass authentication/inject state |
 | Hub ready but runtime degraded | Compare desired/applied revision and activation; readiness is not convergence |
 | `/admin` missing or deep links fail | Check actual static host/ingress; verify `--admin-assets-dir`, `index.html` and same-origin ingress |
-| Migration/check disagreement | Inspect reviewed migration history/schema; column presence is not a migration-history proof |
+| Schema/check disagreement | Delete a non-current database or inspect the reviewed current initialization SQL; do not convert it in place |
 | Repeated process crash | Preserve diagnostics/persistent data; no production restart-rate-limit package exists yet |
 
-Upgrade must pin artifacts, verify applicable evidence, back up, apply reviewed migrations, deploy, validate readiness/control/static routing and run smoke/recovery checks. Binary downgrade is not assumed safe after schema changes. RC also needs isolated restore, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).
-
-For the 2026-09-07 repair, apply the release metadata migration described in [database migrations](database-migrations.md). The new common runtime compiler excludes disabled resources and models under disabled Providers and preserves the complete timeout policy. Existing committed descriptors remain immutable during restart recovery: after upgrading an existing deployment, explicitly Republish the intended Release through Admin to establish a new generation/descriptor, then verify disabled resources are denied. Do not rewrite an old descriptor/hash or claim that a binary restart alone has applied the new routing projection.
+Deployment must pin artifacts, verify applicable evidence, initialize the reviewed current schema on a clean database, validate readiness/control/static routing and run smoke/recovery checks. A database with another schema identity is deleted and recreated; there is no binary/database upgrade or downgrade path before the first release. RC also needs isolated restore of the same current schema, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).

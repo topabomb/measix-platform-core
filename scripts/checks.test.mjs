@@ -16,11 +16,11 @@ test('collector fails closed for spawn errors and nonzero command exits', () => 
   assert.equal(commandResult({status: 0, stdout: ''}).status, 'PASS')
 })
 
-test('migration replay applies and inspects the same isolated database, then cleans it', () => {
+test('current schema replay applies and inspects the same isolated database, then cleans it', () => {
   const parent = mkdtempSync(join(tmpdir(), 'measix replay test '))
   const calls = []
   try {
-    checks.replayMigrations({ temporaryRoot: parent, run: (command, args) => {
+    checks.replayCurrentSchema({ temporaryRoot: parent, run: (command, args) => {
       assert.equal(command, 'atlas')
       const url = args[args.indexOf('--url') + 1]
       const path = url.slice('sqlite://'.length)
@@ -34,10 +34,10 @@ test('migration replay applies and inspects the same isolated database, then cle
   } finally { rmSync(parent, { recursive: true, force: true }) }
 })
 
-test('migration replay stops at an apply failure and still cleans its temp directory', () => {
+test('current schema replay stops at an apply failure and still cleans its temp directory', () => {
   let directory
   let calls = 0
-  assert.throws(() => checks.replayMigrations({ run: (_command, args) => {
+  assert.throws(() => checks.replayCurrentSchema({ run: (_command, args) => {
     calls++
     directory = dirname(args[args.indexOf('--url') + 1].slice('sqlite://'.length))
     throw new Error('apply rejected')

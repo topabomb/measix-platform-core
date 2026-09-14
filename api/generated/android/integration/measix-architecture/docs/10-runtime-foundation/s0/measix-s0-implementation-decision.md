@@ -40,7 +40,7 @@ S0 采用轻量、可审计、可本地部署的技术基线：
 Backend/runtime        Go
 HTTP                    net/http + lightweight routing
 Executable API          OpenAPI 3.0.x + generated wire types
-Control Hub persistence SQLite + versioned migrations + ORM/schema tooling
+Control Hub persistence SQLite + one current initialization schema + ORM/schema tooling
 Relay usage spool       SQLite + explicit narrow persistence boundary
 Admin                   Vue 3 + TypeScript + Quasar static SPA
 Android                 existing Kotlin/Compose/OkHttp/kotlinx.serialization/DI/persistence stack
@@ -58,7 +58,7 @@ S0.3 增加第三个 daemon 后，生产部署必须把三个 daemon 交给宿�
 
 - 每个 daemon 一个独立 service/failure domain，并提供一个 aggregate target/group 统一 start/stop/status；单个服务失败不得无条件级联重启全部服务；
 - 生产安装使用已构建、可追溯 build identity 的 binary，不使用 `go run`、前端 dev server 或 `concurrently`；
-- supervisor 负责开机启动、`on-failure` restart、有限 restart delay/backoff 与 start-rate limiting；永久配置/迁移错误必须可诊断且不能形成无界 crash loop；
+- supervisor 负责开机启动、`on-failure` restart、有限 restart delay/backoff 与 start-rate limiting；永久配置/当前 schema identity 错误必须可诊断且不能形成无界 crash loop；
 - 正常 stop/restart 发送终止信号，daemon 停止接收新工作、在有界 grace 内 drain，再由 supervisor 在超时后强制终止；
 - process `active` 只证明进程存活，不等于应用 `ready`。流量与发布判断仍以组件 readiness、desired/applied revision/hash 和产品状态为准；
 - Gateway/Relay 重启后没有 Hub rehydrate 的有效 applied state 时保持 fail closed；Hub 恢复后重放完整 desired state。
@@ -108,8 +108,8 @@ Architecture authority
 - durable entity/revision 必须在 crash/restart 后可恢复；
 - network call 不包在长 DB transaction 内；
 - Release/Snapshot/SecretVersion 等被定义为 immutable 的历史不得原地重写；
-- schema change 使用 versioned migration，生产不依赖 runtime AutoMigrate；
-- backup/restore 必须可验证 schema revision、integrity 和关键 stable IDs。
+- schema change 直接更新唯一当前初始化 SQL，生产不依赖 runtime AutoMigrate，非当前数据库清理重建；
+- backup/restore 必须可验证当前 schema identity、integrity 和关键 stable IDs。
 
 具体 table/entity/column/index/DDL 由 `measix-platform-core` 维护，只要满足这些 invariants 与 executable contract。
 
@@ -280,11 +280,11 @@ S0 明确不提前引入：
 
 任何新增 abstraction 必须对应当前 Stage 的真实 requirement、failure mode 或可验证 maintenance benefit。
 
-## 11. Freeze 与后续兼容
+## 11. 当前候选与变更控制
 
-S0.1 候选固定当前资源协议；S0.2 Freeze 固定 Snapshot v4、Android/Portal product projection；S0.3 Freeze 固定 Snapshot v5、Gateway surface/Catalog/control 与 exact server executable baseline。Freeze 后：
+S0.1 候选固定当前资源协议；S0.2 Freeze 固定 Snapshot v4、Android/Portal product projection；S0.3 Freeze 固定 Snapshot v5、Gateway surface/Catalog/control 与 exact server executable baseline。候选固定后：
 
-- backward-compatible optional extension 可按 Control Protocol 兼容规则演进；
-- breaking client-visible semantic 必须走显式 schema/API compatibility decision；
+- 同一当前 API 可以增加客户端可忽略的 optional response field/endpoint；
+- client-visible semantic 改变时，先更新唯一当前 schema/API、可执行 fixture 与受影响消费者，不维护旧协议分支；
 - S0.4 Android integration 使用 pinned S0.3 baseline，不追随 moving platform-core head；
 - architecture/core/android candidate 发生相关变化时，受影响 gate 必须重新执行。

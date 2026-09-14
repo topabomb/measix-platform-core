@@ -288,18 +288,18 @@ Pricing 只对可靠 meter 计算。缺失/部分 semantic source 时 cost 必�
 
 具体 ledger/table/index/query implementation 由 core 仓库维护。
 
-## 10. Persistence / migration / recovery invariants
+## 10. Persistence / initialization / recovery invariants
 
 Hub 的 durable store 必须满足：
 
-- stable lifecycle identity 在 restart/migration/backup/restore 后不变；
+- stable lifecycle identity 在 restart/backup/restore 后不变；
 - Draft revision、Release generation、desired control revision、idempotency identity 等关键唯一/单调约束可由 durable layer 强制或可靠验证；
 - immutable Release/Snapshot/SecretVersion/历史 usage 不原地重写；
-- schema change 使用 versioned migration；生产 startup 对 incompatible schema fail-fast；
-- backup/restore 能验证 database integrity、migration revision 和 critical identity/history；
+- 当前完整 schema 使用唯一初始化 SQL；非当前数据库 startup fail-fast 并要求清理重建，不执行增量升级；
+- backup/restore 能验证 database integrity、当前 schema identity 和 critical identity/history；
 - Secret/master signing material 与普通 DB backup 的安全边界明确，credential 不因为 restore 缺失而静默当空值运行。
 
-具体 Ent table/column/index、SQLite pragma、migration SQL、backup CLI command 属于 core implementation/operations 文档。
+具体 Ent table/column/index、SQLite pragma、初始化 SQL、backup CLI command 属于 core implementation/operations 文档。
 
 ## 11. Reconciliation 与可观测性
 

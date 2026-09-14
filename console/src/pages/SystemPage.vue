@@ -62,7 +62,7 @@ onMounted(refresh)
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('system.dbHealth') }}</div>
               <div class="text-h6">{{ status.dbHealth }}</div>
-              <div class="text-caption">{{ $t('system.managedStateRevision') }} {{ status.migrationRevision }}</div>
+              <div class="text-caption">{{ $t('system.schemaIdentity') }} <code>{{ status.schemaIdentity }}</code></div>
             </q-card-section>
           </q-card>
         </div>

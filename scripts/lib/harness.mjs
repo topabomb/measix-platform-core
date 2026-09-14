@@ -234,12 +234,12 @@ export async function createFreshEnvironment(root, opts = {}) {
     throw new Error(`Build failed: ${e.message}`)
   }
 
-  // Apply migrations
+  // Initialize the current schema on a fresh database.
   try {
     execSync(`go run ./cmd/devmigrate --db "${hubDB}"`, { cwd: backendDir, stdio: migrateStdio })
   } catch (e) {
     rmSync(envRoot, { recursive: true, force: true })
-    throw new Error(`Migration failed: ${e.message}`)
+    throw new Error(`Current schema initialization failed: ${e.message}`)
   }
 
   // Bootstrap admin

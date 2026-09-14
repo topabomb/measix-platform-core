@@ -190,7 +190,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
   await test.step('create resources: Provider, Model, TTS, ASR, MCP, Policy, Pricing', async () => {
     await page.goto('/admin/resources')
     await expect(page.locator('[data-cy="resources-page"]')).toBeVisible()
-    await expect(page.locator('[data-cy="tab-models"]')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('[data-cy="config-section-models"]')).toBeVisible({ timeout: 10_000 })
 
     // --- 4a: Create a Provider ---
     await page.click('text=Providers')
@@ -202,7 +202,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.waitForTimeout(200)
 
     // --- 4b: Create a Model ---
-    await page.click('[data-cy="tab-models"]')
+    await page.click('[data-cy="config-section-models"]')
     await page.waitForTimeout(500)
     await page.click('[data-cy="add-model-btn"]')
     await page.waitForTimeout(500)
@@ -213,7 +213,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.fill('[data-cy="model-runtime-path"]', '/v1/chat/completions')
 
     // --- 4c: Create a TTS ---
-    await page.click('[data-cy="tab-tts"]')
+    await page.click('[data-cy="config-section-tts"]')
     await page.waitForTimeout(500)
     await page.click('[data-cy="add-tts-btn"]')
     await page.waitForTimeout(500)
@@ -224,7 +224,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.fill('[data-cy="tts-runtime-path"]', '/v1/audio/speech')
 
     // --- 4d: Create an ASR ---
-    await page.click('[data-cy="tab-asr"]')
+    await page.click('[data-cy="config-section-asr"]')
     await page.waitForTimeout(500)
     await page.click('[data-cy="add-asr-btn"]')
     await page.waitForTimeout(500)
@@ -234,7 +234,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.fill('[data-cy="asr-runtime-path"]', '/v1/audio/transcriptions')
 
     // --- 4e: Create an MCP ---
-    await page.click('[data-cy="tab-mcp"]')
+    await page.click('[data-cy="config-section-mcp"]')
     await page.waitForTimeout(500)
     await page.click('[data-cy="add-mcp-btn"]')
     await page.waitForTimeout(500)
@@ -243,7 +243,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.fill('[data-cy="mcp-runtime-path"]', '/mcp')
 
     // --- 4f: Configure Policy ---
-    await page.click('[data-cy="tab-policy"]')
+    await page.click('[data-cy="config-section-policy"]')
     await page.waitForTimeout(500)
 
     const policyFlags = [
@@ -256,21 +256,25 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     for (const flag of policyFlags) {
       const toggle = page.getByRole('switch', { name: flag.label })
       await expect(toggle).toBeVisible({ timeout: 5_000 })
-      await toggle.check({ force: true })
+      await toggle.click({ force: true })
       await page.waitForTimeout(300)
-      await expect(toggle).toBeChecked()
+      await expect(toggle).toHaveAttribute('aria-checked', 'true')
     }
 
     // S0.2 typed experience authoring shares this same Draft and Publish.
-    await page.click('[data-cy="tab-assistants"]')
+    await page.click('[data-cy="config-section-assistants"]')
     await page.click('[data-cy="assistant-add"]')
     await page.locator('[data-cy="assistant-name"]').fill('E2E Assistant')
+    await page.click('[data-cy="assistant-section-connections"]')
     await selectOption(page, 'assistant-model', 'E2E Test Model')
+    await page.click('[data-cy="assistant-section-prompt"]')
     await page.locator('[data-cy="assistant-prompt"]').fill('Synthetic enterprise guidance')
+    await page.click('[data-cy="assistant-section-memory"]')
     await page.click('[data-cy="seed-add"]')
     await page.locator('[data-cy="seed-input-0"]').fill('z authored first')
     await page.click('[data-cy="seed-add"]')
     await page.locator('[data-cy="seed-input-1"]').fill('a authored second')
+    await page.click('[data-cy="assistant-section-starters"]')
     await page.click('[data-cy="starter-add"]')
     await page.locator('[data-cy="starter-title"]').fill('E2E Starter')
     await page.locator('[data-cy="starter-prompt"]').fill('Synthetic starter question')
@@ -314,7 +318,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     // Navigate back to resources
     await page.goto('/admin/resources')
     await expect(page.locator('[data-cy="resources-page"]')).toBeVisible()
-    await expect(page.locator('[data-cy="tab-models"]')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('[data-cy="config-section-models"]')).toBeVisible({ timeout: 10_000 })
   })
 
   // ========================================================================
@@ -455,16 +459,16 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await expect(page).toHaveURL(/\/admin\/resources/)
     await expect(page.locator('[data-cy="resources-page"]')).toBeVisible()
 
-    await expect(page.locator('[data-cy="tab-models"]')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('[data-cy="config-section-models"]')).toBeVisible({ timeout: 10_000 })
 
-    await page.click('[data-cy="tab-models"]')
+    await page.click('[data-cy="config-section-models"]')
     await page.waitForTimeout(500)
 
     const modelItems = page.locator('.q-card:has-text("Models") .q-item')
     await expect(modelItems.first()).toBeVisible({ timeout: 5_000 })
 
     // Verify Policy flags are still ON
-    await page.click('[data-cy="tab-policy"]')
+    await page.click('[data-cy="config-section-policy"]')
     await page.waitForTimeout(500)
     const policyFlagsAfter = [
       'Allow user Providers/models',
@@ -476,7 +480,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     for (const flagLabel of policyFlagsAfter) {
       const toggle = page.getByRole('switch', { name: flagLabel })
       await expect(toggle).toBeVisible({ timeout: 5_000 })
-      await expect(toggle).toBeChecked()
+      await expect(toggle).toHaveAttribute('aria-checked', 'true')
     }
   })
 })

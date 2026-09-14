@@ -23,7 +23,7 @@ type Service struct {
 type Status struct {
 	BuildVersion                 string
 	DBHealth                     string
-	MigrationRevision            string
+	SchemaIdentity               string
 	RuntimeStatus                string
 	ActiveManagedGeneration      int
 	ManagedStateRevision         int
@@ -50,7 +50,7 @@ func New(store *store.Store, control *runtimecontrol.Service, buildVersion strin
 func (s *Service) Health(ctx context.Context) error { return s.Store.DB.PingContext(ctx) }
 
 func (s *Service) Status(ctx context.Context) (Status, error) {
-	result := Status{BuildVersion: s.BuildVersion, MigrationRevision: maintenance.CurrentSchemaRevision}
+	result := Status{BuildVersion: s.BuildVersion, SchemaIdentity: maintenance.CurrentSchemaIdentity}
 	if _, err := maintenance.Check(ctx, s.Store.DB); err != nil {
 		result.DBHealth = "DEGRADED"
 	} else {

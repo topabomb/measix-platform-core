@@ -38,12 +38,6 @@ func (_c *ManagedReleaseCreate) SetReleaseContentJSON(v []byte) *ManagedReleaseC
 	return _c
 }
 
-// SetSnapshotSchemaVersion sets the "snapshot_schema_version" field.
-func (_c *ManagedReleaseCreate) SetSnapshotSchemaVersion(v int) *ManagedReleaseCreate {
-	_c.mutation.SetSnapshotSchemaVersion(v)
-	return _c
-}
-
 // SetSnapshotJSON sets the "snapshot_json" field.
 func (_c *ManagedReleaseCreate) SetSnapshotJSON(v []byte) *ManagedReleaseCreate {
 	_c.mutation.SetSnapshotJSON(v)
@@ -123,9 +117,6 @@ func (_c *ManagedReleaseCreate) check() error {
 	if _, ok := _c.mutation.ReleaseContentJSON(); !ok {
 		return &ValidationError{Name: "release_content_json", err: errors.New(`ent: missing required field "ManagedRelease.release_content_json"`)}
 	}
-	if _, ok := _c.mutation.SnapshotSchemaVersion(); !ok {
-		return &ValidationError{Name: "snapshot_schema_version", err: errors.New(`ent: missing required field "ManagedRelease.snapshot_schema_version"`)}
-	}
 	if _, ok := _c.mutation.SnapshotJSON(); !ok {
 		return &ValidationError{Name: "snapshot_json", err: errors.New(`ent: missing required field "ManagedRelease.snapshot_json"`)}
 	}
@@ -187,10 +178,6 @@ func (_c *ManagedReleaseCreate) createSpec() (*ManagedRelease, *sqlgraph.CreateS
 	if value, ok := _c.mutation.ReleaseContentJSON(); ok {
 		_spec.SetField(managedrelease.FieldReleaseContentJSON, field.TypeBytes, value)
 		_node.ReleaseContentJSON = value
-	}
-	if value, ok := _c.mutation.SnapshotSchemaVersion(); ok {
-		_spec.SetField(managedrelease.FieldSnapshotSchemaVersion, field.TypeInt, value)
-		_node.SnapshotSchemaVersion = value
 	}
 	if value, ok := _c.mutation.SnapshotJSON(); ok {
 		_spec.SetField(managedrelease.FieldSnapshotJSON, field.TypeBytes, value)

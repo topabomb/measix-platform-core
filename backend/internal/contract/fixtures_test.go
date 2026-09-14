@@ -45,22 +45,19 @@ func decodeFixture[T any](t *testing.T, rel string, strict bool) T {
 
 func TestSYSI0001CanonicalFixturesDecodeWithGeneratedWire(t *testing.T) {
 	// SYS-I0-001: canonical fixtures and generated Go wire must remain compatible.
-	_ = decodeFixture[clientapi.Discovery](t, "identity/discovery.json", true)
-	_ = decodeFixture[clientapi.EnrollmentExchangeRequest](t, "identity/enrollment-exchange-request.json", true)
-	_ = decodeFixture[clientapi.EnrollmentExchangeResponse](t, "identity/enrollment-exchange-response.json", true)
-	_ = decodeFixture[clientapi.ManagedState](t, "managed-state/ready-generation-42.json", true)
-	_ = decodeFixture[clientapi.ManagedState](t, "managed-state/sync-required.json", true)
+	_ = decodeFixture[clientapi.Discovery](t, "client-integration/discovery.json", true)
+	_ = decodeFixture[clientapi.PlatformEnrollmentMaterial](t, "enrollment/platform-v1.json", true)
+	_ = decodeFixture[clientapi.EnrollmentExchangeRequest](t, "client-integration/enrollment-request.json", true)
+	_ = decodeFixture[clientapi.EnrollmentExchangeResponse](t, "client-integration/enrollment-response.json", true)
+	_ = decodeFixture[clientapi.ManagedState](t, "client-integration/managed-ready.json", true)
+	_ = decodeFixture[clientapi.ManagedState](t, "client-integration/managed-sync-required.json", true)
 	_ = decodeFixture[adminapi.Draft](t, "draft/minimal.json", true)
 	_ = decodeFixture[clientapi.Problem](t, "problem/managed-snapshot-required.json", true)
 	_ = decodeFixture[adminapi.Problem](t, "problem/stale-draft-revision.json", true)
 	_ = decodeFixture[usageingestapi.UsageBatch](t, "usage/request-batch.json", true)
 
 	// C0 canonical full-profile snapshot fixtures must decode with strict wire types.
-	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/full-required-profile.json", true)
-	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/model-openai-chat.json", true)
-	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/tts-openai-speech.json", true)
-	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/asr-openai-transcription.json", true)
-	_ = decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/mcp-streamable-http.json", true)
+	_ = decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
 
 	// S0.2 Enterprise Update fixtures must decode with strict wire types.
 	_ = decodeFixture[clientapi.EnterpriseUpdateFeed](t, "enterprise-update/feed.json", true)
@@ -123,7 +120,7 @@ func TestNegativeSnapshotFixturesRejectedByEnumValidation(t *testing.T) {
 }
 
 func TestSnapshotAndRuntimeControlGoldenHashes(t *testing.T) {
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/generation-42.json", true)
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
 	hash, err := capability.HashSnapshot(snapshot)
 	if err != nil {
 		t.Fatal(err)
@@ -142,21 +139,47 @@ func TestSnapshotAndRuntimeControlGoldenHashes(t *testing.T) {
 	}
 }
 
-func TestERXC0002SnapshotV2RetainsV1AndAddsAssistantsStarters(t *testing.T) {
-	// ERX-C0-002: Snapshot v2 retains v1 A/B/Policy and adds assistants/starters.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v2-assistant-starter.json", true)
-	if snapshot.SchemaVersion != 2 {
-		t.Fatalf("expected schemaVersion=2, got %d", snapshot.SchemaVersion)
+func TestSnapshotV4PolicyGoldenHash(t *testing.T) {
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v4-user-configuration-policy.json", true)
+	if snapshot.SchemaVersion != 4 || !snapshot.Policy.AllowLocalAssistants {
+		t.Fatal("v4 fixture must carry explicit assistant permission")
+	}
+	hash, err := capability.HashSnapshot(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hash != snapshot.SnapshotHash {
+		t.Fatalf("v4 golden hash=%s want=%s", hash, snapshot.SnapshotHash)
+	}
+	snapshot.Policy.AllowLocalAssistants = false
+	deniedHash, err := capability.HashSnapshot(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deniedHash == hash {
+		t.Fatal("assistant permission was omitted from canonical hash")
+	}
+	snapshot.SchemaVersion = 1
+	if _, err := capability.HashSnapshot(snapshot); err == nil {
+		t.Fatal("unsupported snapshot version accepted")
+	}
+}
+
+func TestERXC0002CurrentSnapshotContainsResourceAndExperienceProfile(t *testing.T) {
+	// Current profile contains both runtime resources and enterprise experience.
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
+	if snapshot.SchemaVersion != 4 {
+		t.Fatalf("expected schemaVersion=4, got %d", snapshot.SchemaVersion)
 	}
 	if len(snapshot.Assistants) == 0 {
-		t.Fatal("v2 snapshot must contain at least one assistant")
+		t.Fatal("current snapshot must contain at least one assistant")
 	}
 	if len(snapshot.Starters) == 0 {
-		t.Fatal("v2 snapshot must contain at least one starter")
+		t.Fatal("current snapshot must contain at least one starter")
 	}
-	// v1 fields must be present
+	// Required runtime resource fields must be present
 	if len(snapshot.Providers) == 0 || len(snapshot.Models) == 0 || len(snapshot.Mcp) == 0 {
-		t.Fatal("v2 snapshot must retain v1 providers/models/mcp")
+		t.Fatal("current snapshot must contain providers/models/mcp")
 	}
 	// Golden hash must match
 	hash, err := capability.HashSnapshot(snapshot)
@@ -164,13 +187,13 @@ func TestERXC0002SnapshotV2RetainsV1AndAddsAssistantsStarters(t *testing.T) {
 		t.Fatal(err)
 	}
 	if hash != string(snapshot.SnapshotHash) {
-		t.Fatalf("v2 snapshot golden hash=%s want=%s", hash, snapshot.SnapshotHash)
+		t.Fatalf("current snapshot golden hash=%s want=%s", hash, snapshot.SnapshotHash)
 	}
 }
 
 func TestERXC0003AssistantRefsAreTypedAndComplete(t *testing.T) {
 	// ERX-C0-003: assistant/model/MCP/starter refs are typed and complete.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v2-assistant-starter.json", true)
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
 	modelIds := map[string]bool{}
 	for _, m := range snapshot.Models {
 		if m.Enabled {
@@ -194,9 +217,6 @@ func TestERXC0003AssistantRefsAreTypedAndComplete(t *testing.T) {
 			if !mcpIds[string(mcpId)] {
 				t.Fatalf("assistant %s references unknown or disabled MCP %s", a.AssistantDefinitionId, mcpId)
 			}
-		}
-		if len(a.MemorySeed) == 0 {
-			t.Fatalf("assistant %s has empty memorySeed", a.AssistantDefinitionId)
 		}
 		for _, seed := range a.MemorySeed {
 			if seed == "" {
@@ -222,16 +242,11 @@ func TestERXC0003AssistantRefsAreTypedAndComplete(t *testing.T) {
 
 func TestERXC0005SeedStarterNormalizationAndOrder(t *testing.T) {
 	// ERX-C0-005: seed/starter normalization and deterministic hash/order.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v2-assistant-starter.json", true)
-	// Starters must be sorted by (assistantDefinitionId, sortOrder)
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
+	// Canonical order is stable ID, independently of display order.
 	for i := 1; i < len(snapshot.Starters); i++ {
-		prev := snapshot.Starters[i-1]
-		curr := snapshot.Starters[i]
-		if string(prev.AssistantDefinitionId) > string(curr.AssistantDefinitionId) {
-			t.Fatal("starters not sorted by assistantDefinitionId")
-		}
-		if string(prev.AssistantDefinitionId) == string(curr.AssistantDefinitionId) && prev.SortOrder > curr.SortOrder {
-			t.Fatal("starters not sorted by sortOrder within same assistant")
+		if snapshot.Starters[i-1].StarterId > snapshot.Starters[i].StarterId {
+			t.Fatal("canonical Starter order changed")
 		}
 	}
 	// Assistants must be sorted by assistantDefinitionId
@@ -250,7 +265,7 @@ func TestERXC0005SeedStarterNormalizationAndOrder(t *testing.T) {
 
 func TestERXC0006SnapshotContainsNoEnterpriseUpdateBody(t *testing.T) {
 	// ERX-C0-006: Snapshot contains no Enterprise Update body, Secret, Upstream or runtime route.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/v2-assistant-starter.json", true)
+	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
 	// Verify that no assistant or starter fields contain enterprise update content
 	for _, a := range snapshot.Assistants {
 		if a.SystemPrompt == "" {
@@ -334,8 +349,8 @@ func TestCAPC0007SnapshotUnknownOptionalFieldTolerated(t *testing.T) {
 	// CAP-C0-007: consumer test ignores unknown optional response field in Snapshot.
 	// The fixture contains a "futureOptionalField" in a model that the consumer must tolerate.
 	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/unknown-optional-field.json", false)
-	if snapshot.SchemaVersion != 1 {
-		t.Fatalf("expected schemaVersion=1, got %d", snapshot.SchemaVersion)
+	if snapshot.SchemaVersion != 4 {
+		t.Fatalf("expected schemaVersion=4, got %d", snapshot.SchemaVersion)
 	}
 	if len(snapshot.Models) != 1 {
 		t.Fatalf("expected 1 model, got %d", len(snapshot.Models))

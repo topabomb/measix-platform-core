@@ -14,7 +14,6 @@ func (ManagedRelease) Fields() []ent.Field {
 		field.Int64("managed_generation"),
 		field.String("status"),
 		field.Bytes("release_content_json"),
-		field.Int("snapshot_schema_version"),
 		field.Bytes("snapshot_json"),
 		field.String("snapshot_hash"),
 		field.Int64("source_draft_revision"),

@@ -1,6 +1,6 @@
 {
   "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
-  "schemaVersion": 1,
+  "schemaVersion": 4,
   "managedGeneration": 99,
   "releaseId": "rel_invalid000-0000-4000-8000-000000000000",
   "providers": [
@@ -20,10 +20,13 @@
     "allowLocalProviders": true,
     "allowLocalTts": true,
     "allowLocalAsr": true,
-    "allowLocalMcp": true
+    "allowLocalMcp": true,
+    "allowLocalAssistants": false
   },
   "metadata": {
     "publishedAt": "2026-08-19T03:00:00Z"
   },
-  "snapshotHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  "snapshotHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "assistants": [],
+  "starters": []
 }

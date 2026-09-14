@@ -22,6 +22,7 @@ import (
 	"measix/platform/internal/hub/httpapi"
 	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/maintenance"
+	"measix/platform/internal/hub/portalstatic"
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/hub/store"
@@ -50,6 +51,18 @@ type RuntimeOptions struct {
 
 func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) {
 	cfg := options.Config
+	if cfg.PortalOrigin != "" && identity.ValidatePortalOrigin(cfg.PortalOrigin) != nil {
+		return nil, fmt.Errorf("invalid Portal origin")
+	}
+	if cfg.PortalAssetsDir != "" {
+		if cfg.PortalOrigin == "" {
+			return nil, fmt.Errorf("Portal assets require approved origin")
+		}
+		info, err := fs.Stat(os.DirFS(cfg.PortalAssetsDir), "index.html")
+		if err != nil || info.IsDir() {
+			return nil, fmt.Errorf("Portal assets require index.html")
+		}
+	}
 	if options.AdminAssets == nil && cfg.AdminAssetsDir != "" {
 		options.AdminAssets = os.DirFS(cfg.AdminAssetsDir)
 	}
@@ -99,6 +112,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	csrfMaterial := append([]byte("measix:admin-csrf:"), masterKey...)
 	csrfDigest := sha256.Sum256(csrfMaterial)
 	identityService := identity.New(st.Client, signer, csrfDigest[:])
+	identityService.PortalOrigin = cfg.PortalOrigin
 	box, err := security.NewSecretBox(masterKey, 1)
 	if err != nil {
 		return closeOnError(err)
@@ -125,6 +139,11 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	router.Get("/live", h.Live)
 	router.Get("/ready", h.Ready)
 	httpapi.RegisterFull(router, services)
+	if cfg.PortalAssetsDir != "" {
+		static := portalstatic.New(os.DirFS(cfg.PortalAssetsDir))
+		router.Handle("/portal", static)
+		router.Handle("/portal/*", static)
+	}
 	if options.AdminAssets != nil {
 		static := adminstatic.New(options.AdminAssets)
 		router.Handle("/admin", static)

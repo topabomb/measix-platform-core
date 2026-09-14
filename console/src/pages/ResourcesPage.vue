@@ -980,6 +980,7 @@ onMounted(refresh)
               <q-toggle v-model="draft.localContent.policy.allowLocalTts" :label="$t('resources.policy.allowLocalTts')" data-cy="policy-allow-local-tts" @update:model-value="draft.markDirty()" />
               <q-toggle v-model="draft.localContent.policy.allowLocalAsr" :label="$t('resources.policy.allowLocalAsr')" data-cy="policy-allow-local-asr" @update:model-value="draft.markDirty()" />
               <q-toggle v-model="draft.localContent.policy.allowLocalMcp" :label="$t('resources.policy.allowLocalMcp')" data-cy="policy-allow-local-mcp" @update:model-value="draft.markDirty()" />
+              <q-toggle v-model="draft.localContent.policy.allowLocalAssistants" :label="$t('resources.policy.allowLocalAssistants')" data-cy="policy-allow-local-assistants" @update:model-value="draft.markDirty()" />
             </div>
           </q-card-section>
           <q-separator />
@@ -1297,6 +1298,7 @@ onMounted(refresh)
                   <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalTts') }}</td><td>{{ preview.policy.allowLocalTts }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalAsr') }}</td><td>{{ preview.policy.allowLocalAsr }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.allowLocalMcp') }}</td><td>{{ preview.policy.allowLocalMcp }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.policy.allowLocalAssistants') }}</td><td>{{ preview.policy.allowLocalAssistants ?? '—' }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultModel') }}</td><td>{{ preview.policy.defaultModelId ?? '—' }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultTts') }}</td><td>{{ preview.policy.defaultTtsId ?? '—' }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultAsr') }}</td><td>{{ preview.policy.defaultAsrId ?? '—' }}</td></tr>

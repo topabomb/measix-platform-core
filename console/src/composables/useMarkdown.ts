@@ -1,9 +1,17 @@
-import { marked } from 'marked'
+import { Marked } from 'marked'
 import DOMPurify from 'dompurify'
 
-marked.setOptions({
-  breaks: true,
-  gfm: true,
+function escapeText(content: string): string {
+  return content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// A private parser keeps the Enterprise Update subset independent of other views.
+const markdown = new Marked({
+  gfm: false,
+  renderer: {
+    html: ({ text }) => escapeText(text),
+    image: ({ text }) => escapeText(text),
+  },
 })
 
 /**
@@ -12,9 +20,14 @@ marked.setOptions({
  */
 export function renderContent(content: string, contentFormat: string): string {
   if (contentFormat === 'MARKDOWN') {
-    const raw = marked.parse(content, { async: false }) as string
-    return DOMPurify.sanitize(raw)
+    const raw = markdown.parse(content, { async: false }) as string
+    return DOMPurify.sanitize(raw, {
+      ALLOWED_TAGS: ['h1', 'h2', 'h3', 'p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'pre', 'code', 'a', 'blockquote', 'hr'],
+      ALLOWED_ATTR: ['href', 'title', 'start'],
+      ALLOW_DATA_ATTR: false,
+      ALLOW_ARIA_ATTR: false,
+    })
   }
   // PLAIN: escape HTML to prevent XSS
-  return DOMPurify.sanitize(content)
+  return escapeText(content)
 }

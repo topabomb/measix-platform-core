@@ -82,7 +82,7 @@ if (manifest.deterministicAdapterVersion && manifest.deterministicAdapterVersion
 
 // --- 5. Verify all required scenarios are PASS, EXCEPT CAP-C7-002 ---
 // CAP-C7-002 is allowed to be NOT_EXECUTED in the candidate manifest.
-// This replay script will set it to PASS after successful replay.
+// Runtime-only replay cannot set it to PASS; independent source replay is required.
 const notPass = manifest.scenarioResults.filter(s => s.required && s.result !== 'PASS' && s.id !== 'CAP-C7-002')
 if (notPass.length > 0) {
   errors.push(`${notPass.length} required scenarios are not PASS (excluding CAP-C7-002):`)

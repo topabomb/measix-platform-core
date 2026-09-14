@@ -1087,11 +1087,13 @@ type DraftId = string
 
 // DraftPreviewResponse defines model for DraftPreviewResponse.
 type DraftPreviewResponse struct {
-	Asr            []AsrDefinition               `json:"asr"`
-	Assistants     *[]ManagedAssistantDefinition `json:"assistants,omitempty"`
-	DraftRevision  int                           `json:"draftRevision"`
-	Mcp            []McpDefinition               `json:"mcp"`
-	Models         []ModelDefinition             `json:"models"`
+	Asr           []AsrDefinition               `json:"asr"`
+	Assistants    *[]ManagedAssistantDefinition `json:"assistants,omitempty"`
+	DraftRevision int                           `json:"draftRevision"`
+	Mcp           []McpDefinition               `json:"mcp"`
+	Models        []ModelDefinition             `json:"models"`
+
+	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
 	Policy         ManagedPolicy                 `json:"policy"`
 	ProjectionHash Sha256Hash                    `json:"projectionHash"`
 	Providers      []ProviderDefinition          `json:"providers"`
@@ -1179,22 +1181,27 @@ type ManagedDraftContent struct {
 	Bindings   []RuntimeBindingDefinition    `json:"bindings"`
 	Mcp        []McpDefinition               `json:"mcp"`
 	Models     []ModelDefinition             `json:"models"`
-	Policy     ManagedPolicy                 `json:"policy"`
-	Providers  []ProviderDefinition          `json:"providers"`
-	Starters   *[]AssistantStarterDefinition `json:"starters,omitempty"`
-	Tts        []TtsDefinition               `json:"tts"`
+
+	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
+	Policy    ManagedPolicy                 `json:"policy"`
+	Providers []ProviderDefinition          `json:"providers"`
+	Starters  *[]AssistantStarterDefinition `json:"starters,omitempty"`
+	Tts       []TtsDefinition               `json:"tts"`
 }
 
-// ManagedPolicy defines model for ManagedPolicy.
+// ManagedPolicy Current policy. All five admission flags are required; new policies initialize all five to false.
 type ManagedPolicy struct {
-	AllowLocalAsr       bool     `json:"allowLocalAsr"`
-	AllowLocalMcp       bool     `json:"allowLocalMcp"`
-	AllowLocalProviders bool     `json:"allowLocalProviders"`
-	AllowLocalTts       bool     `json:"allowLocalTts"`
-	DefaultAsrId        *AsrId   `json:"defaultAsrId,omitempty"`
-	DefaultModelId      *ModelId `json:"defaultModelId,omitempty"`
-	DefaultTtsId        *TtsId   `json:"defaultTtsId,omitempty"`
-	PolicyId            PolicyId `json:"policyId"`
+	AllowLocalAsr bool `json:"allowLocalAsr"`
+
+	// AllowLocalAssistants Allows user assistants; referenced resources remain independently governed.
+	AllowLocalAssistants bool     `json:"allowLocalAssistants"`
+	AllowLocalMcp        bool     `json:"allowLocalMcp"`
+	AllowLocalProviders  bool     `json:"allowLocalProviders"`
+	AllowLocalTts        bool     `json:"allowLocalTts"`
+	DefaultAsrId         *AsrId   `json:"defaultAsrId,omitempty"`
+	DefaultModelId       *ModelId `json:"defaultModelId,omitempty"`
+	DefaultTtsId         *TtsId   `json:"defaultTtsId,omitempty"`
+	PolicyId             PolicyId `json:"policyId"`
 }
 
 // McpDefinition defines model for McpDefinition.

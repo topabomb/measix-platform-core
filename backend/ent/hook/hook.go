@@ -116,6 +116,18 @@ func (f ManagedStateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ManagedStateMutation", m)
 }
 
+// The PortalSessionFunc type is an adapter to allow the use of ordinary
+// function as PortalSession mutator.
+type PortalSessionFunc func(context.Context, *ent.PortalSessionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PortalSessionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PortalSessionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PortalSessionMutation", m)
+}
+
 // The PricingRuleFunc type is an adapter to allow the use of ordinary
 // function as PricingRule mutator.
 type PricingRuleFunc func(context.Context, *ent.PricingRuleMutation) (ent.Value, error)

@@ -135,7 +135,7 @@ Real external Adapter qualification is a separate explicit lane and is not repla
 
 ## 9. Freeze evidence
 
-A **final accepted** S0.1 manifest requires all applicable candidate scenarios and real Adapter qualification, including replay. The current writer can produce only an S0.1 candidate draft with CAP-C7-002=NOT_EXECUTED. It rejects Snapshot v2; the runtime-only replayer cannot finalize C7 and independent clean-source replay is not implemented. That draft is not a Freeze. Preserve historical evidence without labeling it current; see [release](release.md) for provenance and known script limitations.
+A **final accepted** S0.1 manifest requires all applicable candidate scenarios and real Adapter qualification, including replay. The current writer can produce only an S0.1 candidate draft with CAP-C7-002=NOT_EXECUTED. It accepts only the current Snapshot v4 resource baseline; the runtime-only replayer cannot finalize C7 and independent clean-source replay is not implemented. That draft is not a Freeze. Preserve historical evidence without labeling it current; see [release](release.md) for provenance and known script limitations.
 
 The architecture System Testing Spec is authoritative for the manifest fields. Current required identities include at least:
 
@@ -161,7 +161,7 @@ Historical audit/test mapping from older architecture baselines remains useful a
 
 Current checkpoint status lives only in `docs/s0-execution-progress.md`, backed by executable results for the current architecture baseline and current implementation SHA.
 
-The [2026-08-31 alignment audit](architecture-alignment-audit.md) records the pre-fix source baseline, not living status. Subsequent fixes and exact executed/unexecuted lanes are recorded only in execution progress. A script exit status or stored PASS field alone remains insufficient for Freeze acceptance.
+The [current status](s0-execution-progress.md) records implemented fixes and exact executed/unexecuted lanes. A script exit status or stored PASS field alone remains insufficient for Freeze acceptance.
 
 ## 11. TDD cycle
 

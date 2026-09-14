@@ -15,6 +15,7 @@ import (
 	"measix/platform/ent/manageddraft"
 	"measix/platform/ent/managedrelease"
 	"measix/platform/ent/managedstate"
+	"measix/platform/ent/portalsession"
 	"measix/platform/ent/predicate"
 	"measix/platform/ent/pricingrule"
 	"measix/platform/ent/requestusage"
@@ -50,6 +51,7 @@ const (
 	TypeManagedDraft           = "ManagedDraft"
 	TypeManagedRelease         = "ManagedRelease"
 	TypeManagedState           = "ManagedState"
+	TypePortalSession          = "PortalSession"
 	TypePricingRule            = "PricingRule"
 	TypeRequestUsage           = "RequestUsage"
 	TypeSecret                 = "Secret"
@@ -5638,25 +5640,23 @@ func (m *ManagedDraftMutation) ResetEdge(name string) error {
 // ManagedReleaseMutation represents an operation that mutates the ManagedRelease nodes in the graph.
 type ManagedReleaseMutation struct {
 	config
-	op                         Op
-	typ                        string
-	id                         *string
-	managed_generation         *int64
-	addmanaged_generation      *int64
-	status                     *string
-	release_content_json       *[]byte
-	snapshot_schema_version    *int
-	addsnapshot_schema_version *int
-	snapshot_json              *[]byte
-	snapshot_hash              *string
-	source_draft_revision      *int64
-	addsource_draft_revision   *int64
-	created_by_user_id         *string
-	created_at                 *time.Time
-	clearedFields              map[string]struct{}
-	done                       bool
-	oldValue                   func(context.Context) (*ManagedRelease, error)
-	predicates                 []predicate.ManagedRelease
+	op                       Op
+	typ                      string
+	id                       *string
+	managed_generation       *int64
+	addmanaged_generation    *int64
+	status                   *string
+	release_content_json     *[]byte
+	snapshot_json            *[]byte
+	snapshot_hash            *string
+	source_draft_revision    *int64
+	addsource_draft_revision *int64
+	created_by_user_id       *string
+	created_at               *time.Time
+	clearedFields            map[string]struct{}
+	done                     bool
+	oldValue                 func(context.Context) (*ManagedRelease, error)
+	predicates               []predicate.ManagedRelease
 }
 
 var _ ent.Mutation = (*ManagedReleaseMutation)(nil)
@@ -5889,62 +5889,6 @@ func (m *ManagedReleaseMutation) OldReleaseContentJSON(ctx context.Context) (v [
 // ResetReleaseContentJSON resets all changes to the "release_content_json" field.
 func (m *ManagedReleaseMutation) ResetReleaseContentJSON() {
 	m.release_content_json = nil
-}
-
-// SetSnapshotSchemaVersion sets the "snapshot_schema_version" field.
-func (m *ManagedReleaseMutation) SetSnapshotSchemaVersion(i int) {
-	m.snapshot_schema_version = &i
-	m.addsnapshot_schema_version = nil
-}
-
-// SnapshotSchemaVersion returns the value of the "snapshot_schema_version" field in the mutation.
-func (m *ManagedReleaseMutation) SnapshotSchemaVersion() (r int, exists bool) {
-	v := m.snapshot_schema_version
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldSnapshotSchemaVersion returns the old "snapshot_schema_version" field's value of the ManagedRelease entity.
-// If the ManagedRelease object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ManagedReleaseMutation) OldSnapshotSchemaVersion(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSnapshotSchemaVersion is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSnapshotSchemaVersion requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSnapshotSchemaVersion: %w", err)
-	}
-	return oldValue.SnapshotSchemaVersion, nil
-}
-
-// AddSnapshotSchemaVersion adds i to the "snapshot_schema_version" field.
-func (m *ManagedReleaseMutation) AddSnapshotSchemaVersion(i int) {
-	if m.addsnapshot_schema_version != nil {
-		*m.addsnapshot_schema_version += i
-	} else {
-		m.addsnapshot_schema_version = &i
-	}
-}
-
-// AddedSnapshotSchemaVersion returns the value that was added to the "snapshot_schema_version" field in this mutation.
-func (m *ManagedReleaseMutation) AddedSnapshotSchemaVersion() (r int, exists bool) {
-	v := m.addsnapshot_schema_version
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetSnapshotSchemaVersion resets all changes to the "snapshot_schema_version" field.
-func (m *ManagedReleaseMutation) ResetSnapshotSchemaVersion() {
-	m.snapshot_schema_version = nil
-	m.addsnapshot_schema_version = nil
 }
 
 // SetSnapshotJSON sets the "snapshot_json" field.
@@ -6181,7 +6125,7 @@ func (m *ManagedReleaseMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ManagedReleaseMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 8)
 	if m.managed_generation != nil {
 		fields = append(fields, managedrelease.FieldManagedGeneration)
 	}
@@ -6190,9 +6134,6 @@ func (m *ManagedReleaseMutation) Fields() []string {
 	}
 	if m.release_content_json != nil {
 		fields = append(fields, managedrelease.FieldReleaseContentJSON)
-	}
-	if m.snapshot_schema_version != nil {
-		fields = append(fields, managedrelease.FieldSnapshotSchemaVersion)
 	}
 	if m.snapshot_json != nil {
 		fields = append(fields, managedrelease.FieldSnapshotJSON)
@@ -6223,8 +6164,6 @@ func (m *ManagedReleaseMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case managedrelease.FieldReleaseContentJSON:
 		return m.ReleaseContentJSON()
-	case managedrelease.FieldSnapshotSchemaVersion:
-		return m.SnapshotSchemaVersion()
 	case managedrelease.FieldSnapshotJSON:
 		return m.SnapshotJSON()
 	case managedrelease.FieldSnapshotHash:
@@ -6250,8 +6189,6 @@ func (m *ManagedReleaseMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldStatus(ctx)
 	case managedrelease.FieldReleaseContentJSON:
 		return m.OldReleaseContentJSON(ctx)
-	case managedrelease.FieldSnapshotSchemaVersion:
-		return m.OldSnapshotSchemaVersion(ctx)
 	case managedrelease.FieldSnapshotJSON:
 		return m.OldSnapshotJSON(ctx)
 	case managedrelease.FieldSnapshotHash:
@@ -6291,13 +6228,6 @@ func (m *ManagedReleaseMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetReleaseContentJSON(v)
-		return nil
-	case managedrelease.FieldSnapshotSchemaVersion:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetSnapshotSchemaVersion(v)
 		return nil
 	case managedrelease.FieldSnapshotJSON:
 		v, ok := value.([]byte)
@@ -6345,9 +6275,6 @@ func (m *ManagedReleaseMutation) AddedFields() []string {
 	if m.addmanaged_generation != nil {
 		fields = append(fields, managedrelease.FieldManagedGeneration)
 	}
-	if m.addsnapshot_schema_version != nil {
-		fields = append(fields, managedrelease.FieldSnapshotSchemaVersion)
-	}
 	if m.addsource_draft_revision != nil {
 		fields = append(fields, managedrelease.FieldSourceDraftRevision)
 	}
@@ -6361,8 +6288,6 @@ func (m *ManagedReleaseMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case managedrelease.FieldManagedGeneration:
 		return m.AddedManagedGeneration()
-	case managedrelease.FieldSnapshotSchemaVersion:
-		return m.AddedSnapshotSchemaVersion()
 	case managedrelease.FieldSourceDraftRevision:
 		return m.AddedSourceDraftRevision()
 	}
@@ -6380,13 +6305,6 @@ func (m *ManagedReleaseMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddManagedGeneration(v)
-		return nil
-	case managedrelease.FieldSnapshotSchemaVersion:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddSnapshotSchemaVersion(v)
 		return nil
 	case managedrelease.FieldSourceDraftRevision:
 		v, ok := value.(int64)
@@ -6430,9 +6348,6 @@ func (m *ManagedReleaseMutation) ResetField(name string) error {
 		return nil
 	case managedrelease.FieldReleaseContentJSON:
 		m.ResetReleaseContentJSON()
-		return nil
-	case managedrelease.FieldSnapshotSchemaVersion:
-		m.ResetSnapshotSchemaVersion()
 		return nil
 	case managedrelease.FieldSnapshotJSON:
 		m.ResetSnapshotJSON()
@@ -7298,6 +7213,738 @@ func (m *ManagedStateMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ManagedStateMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ManagedState edge %s", name)
+}
+
+// PortalSessionMutation represents an operation that mutates the PortalSession nodes in the graph.
+type PortalSessionMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *string
+	session_id       *string
+	origin           *string
+	ticket_digest    *[]byte
+	cookie_digest    *[]byte
+	grant_expires_at *time.Time
+	expires_at       *time.Time
+	consumed         *bool
+	revoked          *bool
+	clearedFields    map[string]struct{}
+	done             bool
+	oldValue         func(context.Context) (*PortalSession, error)
+	predicates       []predicate.PortalSession
+}
+
+var _ ent.Mutation = (*PortalSessionMutation)(nil)
+
+// portalsessionOption allows management of the mutation configuration using functional options.
+type portalsessionOption func(*PortalSessionMutation)
+
+// newPortalSessionMutation creates new mutation for the PortalSession entity.
+func newPortalSessionMutation(c config, op Op, opts ...portalsessionOption) *PortalSessionMutation {
+	m := &PortalSessionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePortalSession,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPortalSessionID sets the ID field of the mutation.
+func withPortalSessionID(id string) portalsessionOption {
+	return func(m *PortalSessionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PortalSession
+		)
+		m.oldValue = func(ctx context.Context) (*PortalSession, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PortalSession.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPortalSession sets the old PortalSession of the mutation.
+func withPortalSession(node *PortalSession) portalsessionOption {
+	return func(m *PortalSessionMutation) {
+		m.oldValue = func(context.Context) (*PortalSession, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PortalSessionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PortalSessionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PortalSession entities.
+func (m *PortalSessionMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PortalSessionMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PortalSessionMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PortalSession.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetSessionID sets the "session_id" field.
+func (m *PortalSessionMutation) SetSessionID(s string) {
+	m.session_id = &s
+}
+
+// SessionID returns the value of the "session_id" field in the mutation.
+func (m *PortalSessionMutation) SessionID() (r string, exists bool) {
+	v := m.session_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSessionID returns the old "session_id" field's value of the PortalSession entity.
+// If the PortalSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortalSessionMutation) OldSessionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSessionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSessionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSessionID: %w", err)
+	}
+	return oldValue.SessionID, nil
+}
+
+// ResetSessionID resets all changes to the "session_id" field.
+func (m *PortalSessionMutation) ResetSessionID() {
+	m.session_id = nil
+}
+
+// SetOrigin sets the "origin" field.
+func (m *PortalSessionMutation) SetOrigin(s string) {
+	m.origin = &s
+}
+
+// Origin returns the value of the "origin" field in the mutation.
+func (m *PortalSessionMutation) Origin() (r string, exists bool) {
+	v := m.origin
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrigin returns the old "origin" field's value of the PortalSession entity.
+// If the PortalSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortalSessionMutation) OldOrigin(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrigin is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrigin requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrigin: %w", err)
+	}
+	return oldValue.Origin, nil
+}
+
+// ResetOrigin resets all changes to the "origin" field.
+func (m *PortalSessionMutation) ResetOrigin() {
+	m.origin = nil
+}
+
+// SetTicketDigest sets the "ticket_digest" field.
+func (m *PortalSessionMutation) SetTicketDigest(b []byte) {
+	m.ticket_digest = &b
+}
+
+// TicketDigest returns the value of the "ticket_digest" field in the mutation.
+func (m *PortalSessionMutation) TicketDigest() (r []byte, exists bool) {
+	v := m.ticket_digest
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTicketDigest returns the old "ticket_digest" field's value of the PortalSession entity.
+// If the PortalSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortalSessionMutation) OldTicketDigest(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTicketDigest is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTicketDigest requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTicketDigest: %w", err)
+	}
+	return oldValue.TicketDigest, nil
+}
+
+// ResetTicketDigest resets all changes to the "ticket_digest" field.
+func (m *PortalSessionMutation) ResetTicketDigest() {
+	m.ticket_digest = nil
+}
+
+// SetCookieDigest sets the "cookie_digest" field.
+func (m *PortalSessionMutation) SetCookieDigest(b []byte) {
+	m.cookie_digest = &b
+}
+
+// CookieDigest returns the value of the "cookie_digest" field in the mutation.
+func (m *PortalSessionMutation) CookieDigest() (r []byte, exists bool) {
+	v := m.cookie_digest
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCookieDigest returns the old "cookie_digest" field's value of the PortalSession entity.
+// If the PortalSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortalSessionMutation) OldCookieDigest(ctx context.Context) (v *[]byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCookieDigest is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCookieDigest requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCookieDigest: %w", err)
+	}
+	return oldValue.CookieDigest, nil
+}
+
+// ClearCookieDigest clears the value of the "cookie_digest" field.
+func (m *PortalSessionMutation) ClearCookieDigest() {
+	m.cookie_digest = nil
+	m.clearedFields[portalsession.FieldCookieDigest] = struct{}{}
+}
+
+// CookieDigestCleared returns if the "cookie_digest" field was cleared in this mutation.
+func (m *PortalSessionMutation) CookieDigestCleared() bool {
+	_, ok := m.clearedFields[portalsession.FieldCookieDigest]
+	return ok
+}
+
+// ResetCookieDigest resets all changes to the "cookie_digest" field.
+func (m *PortalSessionMutation) ResetCookieDigest() {
+	m.cookie_digest = nil
+	delete(m.clearedFields, portalsession.FieldCookieDigest)
+}
+
+// SetGrantExpiresAt sets the "grant_expires_at" field.
+func (m *PortalSessionMutation) SetGrantExpiresAt(t time.Time) {
+	m.grant_expires_at = &t
+}
+
+// GrantExpiresAt returns the value of the "grant_expires_at" field in the mutation.
+func (m *PortalSessionMutation) GrantExpiresAt() (r time.Time, exists bool) {
+	v := m.grant_expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGrantExpiresAt returns the old "grant_expires_at" field's value of the PortalSession entity.
+// If the PortalSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortalSessionMutation) OldGrantExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGrantExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGrantExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGrantExpiresAt: %w", err)
+	}
+	return oldValue.GrantExpiresAt, nil
+}
+
+// ResetGrantExpiresAt resets all changes to the "grant_expires_at" field.
+func (m *PortalSessionMutation) ResetGrantExpiresAt() {
+	m.grant_expires_at = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *PortalSessionMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *PortalSessionMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the PortalSession entity.
+// If the PortalSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortalSessionMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *PortalSessionMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// SetConsumed sets the "consumed" field.
+func (m *PortalSessionMutation) SetConsumed(b bool) {
+	m.consumed = &b
+}
+
+// Consumed returns the value of the "consumed" field in the mutation.
+func (m *PortalSessionMutation) Consumed() (r bool, exists bool) {
+	v := m.consumed
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConsumed returns the old "consumed" field's value of the PortalSession entity.
+// If the PortalSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortalSessionMutation) OldConsumed(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConsumed is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConsumed requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConsumed: %w", err)
+	}
+	return oldValue.Consumed, nil
+}
+
+// ResetConsumed resets all changes to the "consumed" field.
+func (m *PortalSessionMutation) ResetConsumed() {
+	m.consumed = nil
+}
+
+// SetRevoked sets the "revoked" field.
+func (m *PortalSessionMutation) SetRevoked(b bool) {
+	m.revoked = &b
+}
+
+// Revoked returns the value of the "revoked" field in the mutation.
+func (m *PortalSessionMutation) Revoked() (r bool, exists bool) {
+	v := m.revoked
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevoked returns the old "revoked" field's value of the PortalSession entity.
+// If the PortalSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PortalSessionMutation) OldRevoked(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevoked is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevoked requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevoked: %w", err)
+	}
+	return oldValue.Revoked, nil
+}
+
+// ResetRevoked resets all changes to the "revoked" field.
+func (m *PortalSessionMutation) ResetRevoked() {
+	m.revoked = nil
+}
+
+// Where appends a list predicates to the PortalSessionMutation builder.
+func (m *PortalSessionMutation) Where(ps ...predicate.PortalSession) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PortalSessionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PortalSessionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PortalSession, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PortalSessionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PortalSessionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PortalSession).
+func (m *PortalSessionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PortalSessionMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.session_id != nil {
+		fields = append(fields, portalsession.FieldSessionID)
+	}
+	if m.origin != nil {
+		fields = append(fields, portalsession.FieldOrigin)
+	}
+	if m.ticket_digest != nil {
+		fields = append(fields, portalsession.FieldTicketDigest)
+	}
+	if m.cookie_digest != nil {
+		fields = append(fields, portalsession.FieldCookieDigest)
+	}
+	if m.grant_expires_at != nil {
+		fields = append(fields, portalsession.FieldGrantExpiresAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, portalsession.FieldExpiresAt)
+	}
+	if m.consumed != nil {
+		fields = append(fields, portalsession.FieldConsumed)
+	}
+	if m.revoked != nil {
+		fields = append(fields, portalsession.FieldRevoked)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PortalSessionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case portalsession.FieldSessionID:
+		return m.SessionID()
+	case portalsession.FieldOrigin:
+		return m.Origin()
+	case portalsession.FieldTicketDigest:
+		return m.TicketDigest()
+	case portalsession.FieldCookieDigest:
+		return m.CookieDigest()
+	case portalsession.FieldGrantExpiresAt:
+		return m.GrantExpiresAt()
+	case portalsession.FieldExpiresAt:
+		return m.ExpiresAt()
+	case portalsession.FieldConsumed:
+		return m.Consumed()
+	case portalsession.FieldRevoked:
+		return m.Revoked()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PortalSessionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case portalsession.FieldSessionID:
+		return m.OldSessionID(ctx)
+	case portalsession.FieldOrigin:
+		return m.OldOrigin(ctx)
+	case portalsession.FieldTicketDigest:
+		return m.OldTicketDigest(ctx)
+	case portalsession.FieldCookieDigest:
+		return m.OldCookieDigest(ctx)
+	case portalsession.FieldGrantExpiresAt:
+		return m.OldGrantExpiresAt(ctx)
+	case portalsession.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case portalsession.FieldConsumed:
+		return m.OldConsumed(ctx)
+	case portalsession.FieldRevoked:
+		return m.OldRevoked(ctx)
+	}
+	return nil, fmt.Errorf("unknown PortalSession field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PortalSessionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case portalsession.FieldSessionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSessionID(v)
+		return nil
+	case portalsession.FieldOrigin:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrigin(v)
+		return nil
+	case portalsession.FieldTicketDigest:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTicketDigest(v)
+		return nil
+	case portalsession.FieldCookieDigest:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCookieDigest(v)
+		return nil
+	case portalsession.FieldGrantExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGrantExpiresAt(v)
+		return nil
+	case portalsession.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case portalsession.FieldConsumed:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConsumed(v)
+		return nil
+	case portalsession.FieldRevoked:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevoked(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PortalSession field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PortalSessionMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PortalSessionMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PortalSessionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PortalSession numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PortalSessionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(portalsession.FieldCookieDigest) {
+		fields = append(fields, portalsession.FieldCookieDigest)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PortalSessionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PortalSessionMutation) ClearField(name string) error {
+	switch name {
+	case portalsession.FieldCookieDigest:
+		m.ClearCookieDigest()
+		return nil
+	}
+	return fmt.Errorf("unknown PortalSession nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PortalSessionMutation) ResetField(name string) error {
+	switch name {
+	case portalsession.FieldSessionID:
+		m.ResetSessionID()
+		return nil
+	case portalsession.FieldOrigin:
+		m.ResetOrigin()
+		return nil
+	case portalsession.FieldTicketDigest:
+		m.ResetTicketDigest()
+		return nil
+	case portalsession.FieldCookieDigest:
+		m.ResetCookieDigest()
+		return nil
+	case portalsession.FieldGrantExpiresAt:
+		m.ResetGrantExpiresAt()
+		return nil
+	case portalsession.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case portalsession.FieldConsumed:
+		m.ResetConsumed()
+		return nil
+	case portalsession.FieldRevoked:
+		m.ResetRevoked()
+		return nil
+	}
+	return fmt.Errorf("unknown PortalSession field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PortalSessionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PortalSessionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PortalSessionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PortalSessionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PortalSessionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PortalSessionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PortalSessionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PortalSession unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PortalSessionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PortalSession edge %s", name)
 }
 
 // PricingRuleMutation represents an operation that mutates the PricingRule nodes in the graph.

@@ -108,7 +108,7 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 	}
 	revision := int(managed.DesiredControlRevision) + 1
 	generation := int(managed.ActiveManagedGeneration)
-	state, err := s.compileOperationalState(ctx, content, generation, revision, nil)
+	state, err := s.compileState(ctx, content, generation, revision, nil)
 	if err != nil {
 		return ActivationResult{}, err
 	}

@@ -1,6 +1,5 @@
-// Command devmigrate replays checksummed Atlas SQL for local development only.
-// It owns a separate dev ledger, never adopts an Atlas-managed production DB,
-// never ignores SQL errors, and commits each migration with its checksum.
+// Command devmigrate initializes the single current schema for local development.
+// SQL and its checksum record commit atomically; Atlas-managed databases are excluded.
 package main
 
 import (
@@ -58,7 +57,11 @@ func run(args []string) error {
 	return applyMigrations(db, files)
 }
 
+// applyMigrations initializes or verifies one current schema; it never upgrades data.
 func applyMigrations(db *sql.DB, files []migrate.File) error {
+	if len(files) != 1 {
+		return errors.New("exactly one current initialization SQL file is required")
+	}
 	var atlasOwned int
 	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE name='atlas_schema_revisions'").Scan(&atlasOwned); err != nil {
 		return err
@@ -66,58 +69,35 @@ func applyMigrations(db *sql.DB, files []migrate.File) error {
 	if atlasOwned != 0 {
 		return errors.New("Atlas-managed database: use Atlas, not devmigrate")
 	}
-	if _, err := db.Exec("CREATE TABLE IF NOT EXISTS devmigrate_revisions(filename TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)"); err != nil {
+	var initialized int
+	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE name='devmigrate_revisions'").Scan(&initialized); err != nil {
 		return err
 	}
-	// A legacy no-checksum ledger is not proof that SQL completed. Never adopt it
-	// implicitly; preserve the database for an explicit verified history repair.
-	rows, err := db.Query("SELECT filename, checksum FROM devmigrate_revisions ORDER BY filename")
-	if err != nil {
-		return fmt.Errorf("legacy/unreadable development history; back up and verify history before adoption: %w", err)
-	}
-	applied := map[string]string{}
-	for rows.Next() {
+	if initialized != 0 {
+		var count int
 		var name, checksum string
-		if err := rows.Scan(&name, &checksum); err != nil {
-			rows.Close()
+		if err := db.QueryRow("SELECT COUNT(*) FROM devmigrate_revisions").Scan(&count); err != nil {
 			return err
 		}
-		applied[name] = checksum
+		if count != 1 {
+			return errors.New("non-current database; delete the obsolete development database and initialize again")
+		}
+		if err := db.QueryRow("SELECT filename, checksum FROM devmigrate_revisions").Scan(&name, &checksum); err != nil {
+			return fmt.Errorf("non-current initialization record; recreate development database: %w", err)
+		}
+		if name != files[0].Name() || checksum != fmt.Sprintf("%x", sha256.Sum256(files[0].Bytes())) {
+			return errors.New("non-current schema/checksum; delete the obsolete development database and initialize again")
+		}
+		return nil
 	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
+	var tables int
+	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").Scan(&tables); err != nil {
 		return err
 	}
-	known := map[string]bool{}
-	missing := false
-	for _, file := range files {
-		known[file.Name()] = true
-		if previous, ok := applied[file.Name()]; ok {
-			if missing {
-				return errors.New("non-contiguous development migration history")
-			}
-			if previous != fmt.Sprintf("%x", sha256.Sum256(file.Bytes())) {
-				return fmt.Errorf("applied migration checksum changed: %s", file.Name())
-			}
-		} else {
-			missing = true
-		}
+	if tables != 0 {
+		return errors.New("unrecognized non-empty database; recreate the obsolete development database")
 	}
-	for name := range applied {
-		if !known[name] {
-			return fmt.Errorf("applied migration absent from source: %s", name)
-		}
-	}
-	for _, file := range files {
-		if _, ok := applied[file.Name()]; ok {
-			continue
-		}
-		if err := applyOne(db, file); err != nil {
-			return err
-		}
-	}
-	return nil
+	return applyOne(db, files[0])
 }
 
 func applyOne(db *sql.DB, file migrate.File) error {
@@ -126,6 +106,9 @@ func applyOne(db *sql.DB, file migrate.File) error {
 		return err
 	}
 	defer tx.Rollback()
+	if _, err := tx.Exec("CREATE TABLE devmigrate_revisions(filename TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)"); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(string(file.Bytes())); err != nil {
 		return fmt.Errorf("apply %s (rolled back): %w", file.Name(), err)
 	}

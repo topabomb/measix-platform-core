@@ -32,7 +32,7 @@
     "test:relay": "cd backend && go test ./internal/relay/... -count=1",
     "test:hub": "cd backend && go test ./internal/hub/... -count=1",
     "migrate:hash": "cd backend && go run ./cmd/migration-checksum",
-    "migrate:replay": "make migration-replay",
+    "migrate:replay": "node scripts/checks.mjs migration-replay",
     "migrate:status": "atlas migrate status --dir file://backend/migrations",
     "ci": "make ci",
     "test:tooling": "node --test scripts/*.test.mjs"

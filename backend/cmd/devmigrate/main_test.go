@@ -61,3 +61,22 @@ func TestDevelopmentMigrationAtomicityAndChecksum(t *testing.T) {
 		t.Fatal("changed applied migration accepted")
 	}
 }
+
+func TestInitializationRejectsIncrementalHistory(t *testing.T) {
+	db, err := sqliteutil.Open(filepath.Join(t.TempDir(), "hub.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	files := []migrate.File{
+		migrate.NewLocalFile("001.sql", []byte("CREATE TABLE first(id INTEGER);")),
+		migrate.NewLocalFile("002.sql", []byte("ALTER TABLE first ADD COLUMN name TEXT;")),
+	}
+	if err := applyMigrations(db, files); err == nil {
+		t.Fatal("incremental schema history accepted")
+	}
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table'").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("rejected initialization mutated database: %d %v", count, err)
+	}
+}

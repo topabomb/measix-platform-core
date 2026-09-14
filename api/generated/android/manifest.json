@@ -1,6 +1,6 @@
 {
   "generated": true,
   "source": "../api/client/client-control.openapi.yaml",
-  "sourceHash": "sha256:184c0d9807e232e6bcc9d315d2e1a9e9e612c2f0aae4f2a7dbc71e570597247d",
+  "sourceHash": "sha256:61adb2e9ff698aa10ae34639323e86eabcc05d0f9bdd4d5b24f54fc153ebd94e",
   "format": "openapi-3.0.3-client-schema-only"
 }

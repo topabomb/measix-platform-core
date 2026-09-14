@@ -30,6 +30,8 @@ type Tx struct {
 	ManagedRelease *ManagedReleaseClient
 	// ManagedState is the client for interacting with the ManagedState builders.
 	ManagedState *ManagedStateClient
+	// PortalSession is the client for interacting with the PortalSession builders.
+	PortalSession *PortalSessionClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
 	// RequestUsage is the client for interacting with the RequestUsage builders.
@@ -188,6 +190,7 @@ func (tx *Tx) init() {
 	tx.ManagedDraft = NewManagedDraftClient(tx.config)
 	tx.ManagedRelease = NewManagedReleaseClient(tx.config)
 	tx.ManagedState = NewManagedStateClient(tx.config)
+	tx.PortalSession = NewPortalSessionClient(tx.config)
 	tx.PricingRule = NewPricingRuleClient(tx.config)
 	tx.RequestUsage = NewRequestUsageClient(tx.config)
 	tx.Secret = NewSecretClient(tx.config)

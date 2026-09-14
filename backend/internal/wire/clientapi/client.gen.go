@@ -154,16 +154,13 @@ func (e EnterpriseUpdateSeverity) Valid() bool {
 
 // Defines values for ManagedSnapshotSchemaVersion.
 const (
-	ManagedSnapshotSchemaVersionN1 ManagedSnapshotSchemaVersion = 1
-	ManagedSnapshotSchemaVersionN2 ManagedSnapshotSchemaVersion = 2
+	N4 ManagedSnapshotSchemaVersion = 4
 )
 
 // Valid indicates whether the value is a known member of the ManagedSnapshotSchemaVersion enum.
 func (e ManagedSnapshotSchemaVersion) Valid() bool {
 	switch e {
-	case ManagedSnapshotSchemaVersionN1:
-		return true
-	case ManagedSnapshotSchemaVersionN2:
+	case N4:
 		return true
 	default:
 		return false
@@ -269,6 +266,36 @@ const (
 func (e ModelDefinitionOutputModalities) Valid() bool {
 	switch e {
 	case ModelDefinitionOutputModalitiesTEXT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformEnrollmentMaterialFormatVersion.
+const (
+	PlatformEnrollmentMaterialFormatVersionN1 PlatformEnrollmentMaterialFormatVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the PlatformEnrollmentMaterialFormatVersion enum.
+func (e PlatformEnrollmentMaterialFormatVersion) Valid() bool {
+	switch e {
+	case PlatformEnrollmentMaterialFormatVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformEnrollmentMaterialKind.
+const (
+	PLATFORMENROLLMENT PlatformEnrollmentMaterialKind = "PLATFORM_ENROLLMENT"
+)
+
+// Valid indicates whether the value is a known member of the PlatformEnrollmentMaterialKind enum.
+func (e PlatformEnrollmentMaterialKind) Valid() bool {
+	switch e {
+	case PLATFORMENROLLMENT:
 		return true
 	default:
 		return false
@@ -519,22 +546,27 @@ type ManagedDraftContent struct {
 	Bindings   []RuntimeBindingDefinition    `json:"bindings"`
 	Mcp        []McpDefinition               `json:"mcp"`
 	Models     []ModelDefinition             `json:"models"`
-	Policy     ManagedPolicy                 `json:"policy"`
-	Providers  []ProviderDefinition          `json:"providers"`
-	Starters   *[]AssistantStarterDefinition `json:"starters,omitempty"`
-	Tts        []TtsDefinition               `json:"tts"`
+
+	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
+	Policy    ManagedPolicy                 `json:"policy"`
+	Providers []ProviderDefinition          `json:"providers"`
+	Starters  *[]AssistantStarterDefinition `json:"starters,omitempty"`
+	Tts       []TtsDefinition               `json:"tts"`
 }
 
-// ManagedPolicy defines model for ManagedPolicy.
+// ManagedPolicy Current policy. All five admission flags are required; new policies initialize all five to false.
 type ManagedPolicy struct {
-	AllowLocalAsr       bool     `json:"allowLocalAsr"`
-	AllowLocalMcp       bool     `json:"allowLocalMcp"`
-	AllowLocalProviders bool     `json:"allowLocalProviders"`
-	AllowLocalTts       bool     `json:"allowLocalTts"`
-	DefaultAsrId        *AsrId   `json:"defaultAsrId,omitempty"`
-	DefaultModelId      *ModelId `json:"defaultModelId,omitempty"`
-	DefaultTtsId        *TtsId   `json:"defaultTtsId,omitempty"`
-	PolicyId            PolicyId `json:"policyId"`
+	AllowLocalAsr bool `json:"allowLocalAsr"`
+
+	// AllowLocalAssistants Allows user assistants; referenced resources remain independently governed.
+	AllowLocalAssistants bool     `json:"allowLocalAssistants"`
+	AllowLocalMcp        bool     `json:"allowLocalMcp"`
+	AllowLocalProviders  bool     `json:"allowLocalProviders"`
+	AllowLocalTts        bool     `json:"allowLocalTts"`
+	DefaultAsrId         *AsrId   `json:"defaultAsrId,omitempty"`
+	DefaultModelId       *ModelId `json:"defaultModelId,omitempty"`
+	DefaultTtsId         *TtsId   `json:"defaultTtsId,omitempty"`
+	PolicyId             PolicyId `json:"policyId"`
 }
 
 // ManagedSnapshot defines model for ManagedSnapshot.
@@ -548,7 +580,9 @@ type ManagedSnapshot struct {
 		PublishedAt       time.Time `json:"publishedAt"`
 		PublishedByUserId *UserId   `json:"publishedByUserId,omitempty"`
 	} `json:"metadata"`
-	Models        []ModelDefinition            `json:"models"`
+	Models []ModelDefinition `json:"models"`
+
+	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
 	Policy        ManagedPolicy                `json:"policy"`
 	Providers     []ProviderDefinition         `json:"providers"`
 	ReleaseId     ReleaseId                    `json:"releaseId"`
@@ -618,8 +652,43 @@ type ModelDefinitionOutputModalities string
 // ModelId defines model for ModelId.
 type ModelId = string
 
+// PlatformEnrollmentMaterial Versioned native scan/paste material; not an HTTP enrollment request. See Control Protocol section 8. The Admin public origin is used, never an internal Hub or Relay address.
+type PlatformEnrollmentMaterial struct {
+	Code          string                                  `json:"code"`
+	ExpiresAt     time.Time                               `json:"expiresAt"`
+	FormatVersion PlatformEnrollmentMaterialFormatVersion `json:"formatVersion"`
+	Kind          PlatformEnrollmentMaterialKind          `json:"kind"`
+	PlatformUrl   string                                  `json:"platformUrl"`
+}
+
+// PlatformEnrollmentMaterialFormatVersion defines model for PlatformEnrollmentMaterial.FormatVersion.
+type PlatformEnrollmentMaterialFormatVersion int
+
+// PlatformEnrollmentMaterialKind defines model for PlatformEnrollmentMaterial.Kind.
+type PlatformEnrollmentMaterialKind string
+
 // PolicyId defines model for PolicyId.
 type PolicyId = string
+
+// PortalGrant defines model for PortalGrant.
+type PortalGrant struct {
+	ExchangeUrl string    `json:"exchangeUrl"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+	Ticket      string    `json:"ticket"`
+}
+
+// PortalSession defines model for PortalSession.
+type PortalSession struct {
+	CsrfToken            string       `json:"csrfToken"`
+	DeploymentId         DeploymentId `json:"deploymentId"`
+	DeviceId             DeviceId     `json:"deviceId"`
+	EnterpriseName       string       `json:"enterpriseName"`
+	ExpiresAt            time.Time    `json:"expiresAt"`
+	SessionId            SessionId    `json:"sessionId"`
+	SessionIdleExpiresAt time.Time    `json:"sessionIdleExpiresAt"`
+	UserDisplayName      string       `json:"userDisplayName"`
+	UserId               UserId       `json:"userId"`
+}
 
 // PricingRuleId defines model for PricingRuleId.
 type PricingRuleId = string
@@ -766,6 +835,17 @@ type RefreshSessionParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ClosePortalSessionParams defines parameters for ClosePortalSession.
+type ClosePortalSessionParams struct {
+	Origin     string `json:"Origin"`
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ExchangePortalGrantFormdataBody defines parameters for ExchangePortalGrant.
+type ExchangePortalGrantFormdataBody struct {
+	Ticket string `form:"ticket" json:"ticket"`
+}
+
 // ExchangeEnrollmentJSONRequestBody defines body for ExchangeEnrollment for application/json ContentType.
 type ExchangeEnrollmentJSONRequestBody = EnrollmentExchangeRequest
 
@@ -774,6 +854,9 @@ type LogoutSessionJSONRequestBody = RefreshRequest
 
 // RefreshSessionJSONRequestBody defines body for RefreshSession for application/json ContentType.
 type RefreshSessionJSONRequestBody = RefreshRequest
+
+// ExchangePortalGrantFormdataRequestBody defines body for ExchangePortalGrant for application/x-www-form-urlencoded ContentType.
+type ExchangePortalGrantFormdataRequestBody ExchangePortalGrantFormdataBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -787,10 +870,10 @@ type ServerInterface interface {
 	// (POST /api/client/v1/enrollments/exchange)
 	ExchangeEnrollment(w http.ResponseWriter, r *http.Request)
 
-	// (GET /api/client/v1/enterprise-updates)
+	// (GET /api/client/v1/enterprise/updates)
 	ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request, params ListEnterpriseUpdatesParams)
 
-	// (GET /api/client/v1/enterprise-updates/{enterpriseUpdateId})
+	// (GET /api/client/v1/enterprise/updates/{enterpriseUpdateId})
 	GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId)
 
 	// (GET /api/client/v1/managed/snapshots/{generation})
@@ -799,11 +882,23 @@ type ServerInterface interface {
 	// (GET /api/client/v1/managed/state)
 	GetManagedState(w http.ResponseWriter, r *http.Request, params GetManagedStateParams)
 
+	// (POST /api/client/v1/portal/grants)
+	CreatePortalGrant(w http.ResponseWriter, r *http.Request)
+
 	// (POST /api/client/v1/sessions/logout)
 	LogoutSession(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/client/v1/sessions/refresh)
 	RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams)
+
+	// (DELETE /api/portal/v1/session)
+	ClosePortalSession(w http.ResponseWriter, r *http.Request, params ClosePortalSessionParams)
+
+	// (GET /api/portal/v1/session)
+	GetPortalSession(w http.ResponseWriter, r *http.Request)
+
+	// (POST /portal/session/exchange)
+	ExchangePortalGrant(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -825,12 +920,12 @@ func (_ Unimplemented) ExchangeEnrollment(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (GET /api/client/v1/enterprise-updates)
+// (GET /api/client/v1/enterprise/updates)
 func (_ Unimplemented) ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request, params ListEnterpriseUpdatesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (GET /api/client/v1/enterprise-updates/{enterpriseUpdateId})
+// (GET /api/client/v1/enterprise/updates/{enterpriseUpdateId})
 func (_ Unimplemented) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
@@ -845,6 +940,11 @@ func (_ Unimplemented) GetManagedState(w http.ResponseWriter, r *http.Request, p
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (POST /api/client/v1/portal/grants)
+func (_ Unimplemented) CreatePortalGrant(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (POST /api/client/v1/sessions/logout)
 func (_ Unimplemented) LogoutSession(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -852,6 +952,21 @@ func (_ Unimplemented) LogoutSession(w http.ResponseWriter, r *http.Request) {
 
 // (POST /api/client/v1/sessions/refresh)
 func (_ Unimplemented) RefreshSession(w http.ResponseWriter, r *http.Request, params RefreshSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/portal/v1/session)
+func (_ Unimplemented) ClosePortalSession(w http.ResponseWriter, r *http.Request, params ClosePortalSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/portal/v1/session)
+func (_ Unimplemented) GetPortalSession(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /portal/session/exchange)
+func (_ Unimplemented) ExchangePortalGrant(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1103,6 +1218,20 @@ func (siw *ServerInterfaceWrapper) GetManagedState(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// CreatePortalGrant operation middleware
+func (siw *ServerInterfaceWrapper) CreatePortalGrant(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePortalGrant(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // LogoutSession operation middleware
 func (siw *ServerInterfaceWrapper) LogoutSession(w http.ResponseWriter, r *http.Request) {
 
@@ -1153,6 +1282,102 @@ func (siw *ServerInterfaceWrapper) RefreshSession(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RefreshSession(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClosePortalSession operation middleware
+func (siw *ServerInterfaceWrapper) ClosePortalSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ClosePortalSessionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Origin" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Origin")]; found {
+		var Origin string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Origin", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Origin", valueList[0], &Origin, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Origin", Err: err})
+			return
+		}
+
+		params.Origin = Origin
+
+	} else {
+		err := fmt.Errorf("Header parameter Origin is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Origin", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClosePortalSession(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPortalSession operation middleware
+func (siw *ServerInterfaceWrapper) GetPortalSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPortalSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExchangePortalGrant operation middleware
+func (siw *ServerInterfaceWrapper) ExchangePortalGrant(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExchangePortalGrant(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1276,6 +1501,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/client/v1/portal/grants", wrapper.CreatePortalGrant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/portal/session/exchange", wrapper.ExchangePortalGrant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/portal/v1/session", wrapper.ClosePortalSession)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/portal/v1/session", wrapper.GetPortalSession)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/.well-known/measix", wrapper.Discover)
 	})
 	r.Group(func(r chi.Router) {
@@ -1297,10 +1534,10 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/client/v1/managed/snapshots/{generation}", wrapper.GetManagedSnapshot)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/client/v1/enterprise-updates", wrapper.ListEnterpriseUpdates)
+		r.Get(options.BaseURL+"/api/client/v1/enterprise/updates", wrapper.ListEnterpriseUpdates)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/client/v1/enterprise-updates/{enterpriseUpdateId}", wrapper.GetEnterpriseUpdate)
+		r.Get(options.BaseURL+"/api/client/v1/enterprise/updates/{enterpriseUpdateId}", wrapper.GetEnterpriseUpdate)
 	})
 
 	return r

@@ -1,0 +1,17 @@
+# Enterprise Portal support
+
+The independent frontend lives in sibling `measix-enterprise-portal`. Its README owns Vue/build/UI details. Hub owns Portal grant/session persistence, authentication and static serving; [Control Protocol §8](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) owns cross-component semantics.
+
+`internal/hub/identity/portal.go` stores only ticket/cookie digests in Ent `PortalSession`, linked to the authoritative parent Android Session. Exchange uses a conditional atomic update; consumed tickets stay consumed after database/service restart. Authentication reuses the same live parent validation as Android access, without requiring or extending an Access Token. Expired rows are removed when issuing a new grant. Portal never acquires Admin or general Client privileges.
+
+Client OpenAPI owns grant/exchange/session DTOs and the optional Portal Cookie scheme for only the two Feed GETs. Feed handlers share their existing read authority and serialization. The canonical Client Feed path is `/api/client/v1/enterprise/updates`; the former `/enterprise-updates` implementation spelling has been removed, including generated consumers and tests. Admin `/api/admin/v1/enterprise-updates` is a separate established surface and retains its path.
+
+Configure `HUB_PORTAL_ORIGIN` / `--portal-origin` with one approved canonical HTTPS platform origin (no path/query/fragment/userinfo). Only loopback development permits HTTP and a non-Secure cookie. `HUB_PORTAL_ASSETS_DIR` / `--portal-assets-dir` points to the independent production `dist` containing index.html; startup rejects missing origin or assets. Hub serves `/portal/` with a restrictive CSP, no referrer and no-store caching. There is no new production daemon.
+
+An unconfigured Portal returns 503 for an authenticated grant request and does not expose SPA assets. Existing Admin/runtime operation is unaffected. Initialize the single current database schema before startup; remove obsolete development databases instead of upgrading them. Schema checking includes PortalSession even when Portal is unconfigured. Keep ticket POST bodies and Cookie headers out of ingress/application logs.
+
+Verification lives in `identity/portal_test.go`, `httpapi/portal_test.go`, `portalstatic/handler_test.go` and the independent Portal suite. The latter reuses the core fresh-environment harness, builds real Hub/Relay binaries, applies migrations and drives the production SPA with Playwright. Its native POST API client is explicitly not Android device evidence. Current cross-stage status belongs only to [s0-execution-progress.md](s0-execution-progress.md).
+
+Portal has remote and bundled local builds sharing one UI/session/query owner. Only remote assets are served by Hub. The local build uses Android-intercepted virtual HTTPS reads, never Hub grants, Cookie authentication or a local HTTP server. See [native integration delivery](../../measix-enterprise-portal/docs/android-integration.md).
+
+The existing Feed supports optional inclusive startDate/endDate in deployment timezone; Portal explicitly sends limit=20 while other API consumers retain the contract's default 10. `httpapi/portal_feed_query_test.go` verifies both midnight boundaries through the Portal Cookie, conditional 304, changed query, invalid date/range/limit and revocation before ETag handling. Existing service tests cover DST/timezone changes. No extra backend date endpoint, synchronization write API or per-user Feed acknowledgement table is needed.

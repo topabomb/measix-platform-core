@@ -79,11 +79,6 @@ func ReleaseContentJSON(v []byte) predicate.ManagedRelease {
 	return predicate.ManagedRelease(sql.FieldEQ(FieldReleaseContentJSON, v))
 }
 
-// SnapshotSchemaVersion applies equality check predicate on the "snapshot_schema_version" field. It's identical to SnapshotSchemaVersionEQ.
-func SnapshotSchemaVersion(v int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldEQ(FieldSnapshotSchemaVersion, v))
-}
-
 // SnapshotJSON applies equality check predicate on the "snapshot_json" field. It's identical to SnapshotJSONEQ.
 func SnapshotJSON(v []byte) predicate.ManagedRelease {
 	return predicate.ManagedRelease(sql.FieldEQ(FieldSnapshotJSON, v))
@@ -252,46 +247,6 @@ func ReleaseContentJSONLT(v []byte) predicate.ManagedRelease {
 // ReleaseContentJSONLTE applies the LTE predicate on the "release_content_json" field.
 func ReleaseContentJSONLTE(v []byte) predicate.ManagedRelease {
 	return predicate.ManagedRelease(sql.FieldLTE(FieldReleaseContentJSON, v))
-}
-
-// SnapshotSchemaVersionEQ applies the EQ predicate on the "snapshot_schema_version" field.
-func SnapshotSchemaVersionEQ(v int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldEQ(FieldSnapshotSchemaVersion, v))
-}
-
-// SnapshotSchemaVersionNEQ applies the NEQ predicate on the "snapshot_schema_version" field.
-func SnapshotSchemaVersionNEQ(v int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldNEQ(FieldSnapshotSchemaVersion, v))
-}
-
-// SnapshotSchemaVersionIn applies the In predicate on the "snapshot_schema_version" field.
-func SnapshotSchemaVersionIn(vs ...int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldIn(FieldSnapshotSchemaVersion, vs...))
-}
-
-// SnapshotSchemaVersionNotIn applies the NotIn predicate on the "snapshot_schema_version" field.
-func SnapshotSchemaVersionNotIn(vs ...int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldNotIn(FieldSnapshotSchemaVersion, vs...))
-}
-
-// SnapshotSchemaVersionGT applies the GT predicate on the "snapshot_schema_version" field.
-func SnapshotSchemaVersionGT(v int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldGT(FieldSnapshotSchemaVersion, v))
-}
-
-// SnapshotSchemaVersionGTE applies the GTE predicate on the "snapshot_schema_version" field.
-func SnapshotSchemaVersionGTE(v int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldGTE(FieldSnapshotSchemaVersion, v))
-}
-
-// SnapshotSchemaVersionLT applies the LT predicate on the "snapshot_schema_version" field.
-func SnapshotSchemaVersionLT(v int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldLT(FieldSnapshotSchemaVersion, v))
-}
-
-// SnapshotSchemaVersionLTE applies the LTE predicate on the "snapshot_schema_version" field.
-func SnapshotSchemaVersionLTE(v int) predicate.ManagedRelease {
-	return predicate.ManagedRelease(sql.FieldLTE(FieldSnapshotSchemaVersion, v))
 }
 
 // SnapshotJSONEQ applies the EQ predicate on the "snapshot_json" field.

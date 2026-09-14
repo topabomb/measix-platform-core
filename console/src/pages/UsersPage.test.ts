@@ -15,6 +15,7 @@ import PageHeader from '../components/PageHeader.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { useSessionStore } from '../stores/session'
 import * as client from '../api/client'
+import QRCode from 'qrcode'
 
 // Mock qrcode — jsdom does not implement canvas getContext('2d')
 vi.mock('qrcode', () => ({
@@ -192,6 +193,14 @@ describe('UsersPage', () => {
     expect(body).toContain('ENROLL-CODE-12345')
     // Copy button should be present
     expect(body).toContain('content_copy')
+    await vi.waitFor(() => expect(vi.mocked(QRCode.toCanvas)).toHaveBeenCalled())
+    const material = JSON.parse(String(vi.mocked(QRCode.toCanvas).mock.calls.at(-1)![1]))
+    expect(material).toMatchObject({ formatVersion: 1, kind: 'PLATFORM_ENROLLMENT', platformUrl: window.location.origin, code: 'ENROLL-CODE-12345' })
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    ;(document.querySelector('[data-cy="copy-enrollment-material"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(JSON.parse(writeText.mock.calls[0]![0])).toEqual(material)
   })
 
   it('shows enrollment code expiry time', async () => {
@@ -263,7 +272,7 @@ describe('UsersPage', () => {
     // QRCode.toCanvas should have been called with the enrollment code
     expect(toCanvasSpy).toHaveBeenCalled()
     const callArgs = toCanvasSpy.mock.calls.at(-1)
-    expect(callArgs?.[1]).toBe('ENROLL-QR-CODE-67890')
+    expect(JSON.parse(String(callArgs?.[1]))).toMatchObject({ kind: 'PLATFORM_ENROLLMENT', platformUrl: window.location.origin, code: 'ENROLL-QR-CODE-67890' })
 
     // The canvas element with data-cy should be present in the dialog
     const qrCanvas = document.querySelector('[data-cy="enrollment-qr"]')

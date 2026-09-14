@@ -12,12 +12,9 @@ import (
 
 	"measix/platform/ent"
 	"measix/platform/ent/activation"
-	"measix/platform/ent/device"
 	"measix/platform/ent/idempotencyrecord"
 	"measix/platform/ent/managedrelease"
-	"measix/platform/ent/session"
 	"measix/platform/ent/upstreamconfigrevision"
-	"measix/platform/ent/user"
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/hub/upstream"
@@ -169,7 +166,16 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 		return ActivationResult{}, err
 	}
 	controlRevision := int(managed.DesiredControlRevision) + 1
-	state, err := s.compileState(ctx, draft.Content, generation, controlRevision)
+	for _, binding := range enabledBindings(draft.Content) {
+		row, err := s.Client.Upstream.Get(ctx, binding.UpstreamId)
+		if err != nil {
+			return ActivationResult{}, err
+		}
+		if row.ActiveConfigRevision == nil || row.Status != "ACTIVE" {
+			return ActivationResult{}, fmt.Errorf("upstream %s is not active", row.ID)
+		}
+	}
+	state, err := s.compileState(ctx, draft.Content, generation, controlRevision, nil)
 	if err != nil {
 		return ActivationResult{}, err
 	}
@@ -202,7 +208,8 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 	if err := s.persistPublishIntent(ctx, publishIntent{
 		Request: request, RequestHash: requestHash, ReleaseID: releaseID, ActivationID: activationID,
 		Generation: generation, ControlRevision: controlRevision, BundleHash: string(hash), DescriptorJSON: descriptorJSON,
-		ReleaseContentJSON: releaseContentJSON, SnapshotJSON: snapshotJSON, SnapshotHash: snapshotHash, Now: now,
+		ReleaseContentJSON: releaseContentJSON, SnapshotJSON: snapshotJSON, SnapshotHash: snapshotHash,
+		Now: now,
 	}); err != nil {
 		if errors.Is(err, ErrIdempotencyConflict) || errors.Is(err, ErrActivationInProgress) {
 			return ActivationResult{}, err
@@ -284,7 +291,8 @@ type publishIntent struct {
 	ReleaseContentJSON []byte
 	SnapshotJSON       []byte
 	SnapshotHash       string
-	Now                time.Time
+
+	Now time.Time
 }
 
 func (s *Service) persistPublishIntent(ctx context.Context, intent publishIntent) error {
@@ -340,7 +348,6 @@ func (s *Service) persistPublishIntent(ctx context.Context, intent publishIntent
 		SetManagedGeneration(int64(intent.Generation)).
 		SetStatus("STAGED").
 		SetReleaseContentJSON(intent.ReleaseContentJSON).
-		SetSnapshotSchemaVersion(1).
 		SetSnapshotJSON(intent.SnapshotJSON).
 		SetSnapshotHash(intent.SnapshotHash).
 		SetSourceDraftRevision(int64(intent.Request.ExpectedDraftRevision)).
@@ -605,91 +612,6 @@ func warningsAcknowledged(warnings []adminapi.ValidationIssue, acknowledged []st
 		}
 	}
 	return true
-}
-
-func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraftContent, generation, revision int) (relaycontrolapi.RuntimeControlState, error) {
-	jwk := s.Signer.PublicJWK()
-	key := relaycontrolapi.PublicJwk{
-		Kty: relaycontrolapi.OKP, Crv: relaycontrolapi.Ed25519, Alg: relaycontrolapi.EdDSA, Use: relaycontrolapi.Sig,
-		Kid: stringValue(jwk["kid"]), X: stringValue(jwk["x"]),
-	}
-	if key.Kid == "" || key.X == "" {
-		return relaycontrolapi.RuntimeControlState{}, fmt.Errorf("invalid signing key")
-	}
-
-	disabledUsers, err := s.Client.User.Query().Where(user.StatusEQ("DISABLED")).All(ctx)
-	if err != nil {
-		return relaycontrolapi.RuntimeControlState{}, err
-	}
-	revokedDevices, err := s.Client.Device.Query().Where(device.StatusEQ("REVOKED")).All(ctx)
-	if err != nil {
-		return relaycontrolapi.RuntimeControlState{}, err
-	}
-	revokedSessions, err := s.Client.Session.Query().Where(session.StatusEQ("REVOKED")).All(ctx)
-	if err != nil {
-		return relaycontrolapi.RuntimeControlState{}, err
-	}
-	principal := relaycontrolapi.PrincipalState{
-		DisabledUserIds: make([]string, 0, len(disabledUsers)), RevokedDeviceIds: make([]string, 0, len(revokedDevices)), RevokedSessionIds: make([]string, 0, len(revokedSessions)),
-	}
-	for _, value := range disabledUsers {
-		principal.DisabledUserIds = append(principal.DisabledUserIds, value.ID)
-	}
-	for _, value := range revokedDevices {
-		principal.RevokedDeviceIds = append(principal.RevokedDeviceIds, value.ID)
-	}
-	for _, value := range revokedSessions {
-		principal.RevokedSessionIds = append(principal.RevokedSessionIds, value.ID)
-	}
-
-	state := relaycontrolapi.RuntimeControlState{
-		ControlRevision: revision, ActiveManagedGeneration: generation, DeploymentId: s.Signer.DeploymentID,
-		AuthKeys: []relaycontrolapi.PublicJwk{key}, PrincipalState: principal,
-		ResourceRoutes: []relaycontrolapi.ResourceRoute{}, Routes: []relaycontrolapi.RuntimeRouteSpec{}, Upstreams: []relaycontrolapi.RuntimeUpstreamSpec{},
-		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: defaultMaxRequestBytes},
-	}
-
-	upstreamSpecs := map[string]relaycontrolapi.RuntimeUpstreamSpec{}
-	for _, binding := range content.Bindings {
-		row, err := s.Client.Upstream.Get(ctx, binding.UpstreamId)
-		if err != nil {
-			return relaycontrolapi.RuntimeControlState{}, err
-		}
-		if row.ActiveConfigRevision == nil || row.Status != "ACTIVE" {
-			return relaycontrolapi.RuntimeControlState{}, fmt.Errorf("upstream %s is not active", row.ID)
-		}
-		config, err := loadUpstreamRevision(ctx, s.Client, row.ID, int(*row.ActiveConfigRevision))
-		if err != nil {
-			return relaycontrolapi.RuntimeControlState{}, err
-		}
-		if _, exists := upstreamSpecs[row.ID]; !exists {
-			spec, err := s.compileUpstream(ctx, row.ID, config)
-			if err != nil {
-				return relaycontrolapi.RuntimeControlState{}, err
-			}
-			upstreamSpecs[row.ID] = spec
-		}
-		timeout := config.TimeoutDefaults
-		if binding.TimeoutPolicy != nil {
-			timeout = *binding.TimeoutPolicy
-		}
-		state.ResourceRoutes = append(state.ResourceRoutes, relaycontrolapi.ResourceRoute{ResourceId: binding.ResourceId, RuntimeRouteId: binding.RuntimeRouteId})
-		state.Routes = append(state.Routes, relaycontrolapi.RuntimeRouteSpec{
-			RuntimeRouteId: binding.RuntimeRouteId, UpstreamId: binding.UpstreamId,
-			AllowedMethods: append([]string(nil), binding.AllowedMethods...), AllowedPathPrefixes: append([]string(nil), binding.AllowedPathPrefixes...),
-			TransportPolicy: relaycontrolapi.RuntimeRouteSpecTransportPolicy(binding.TransportPolicy),
-			TimeoutPolicy:   relaycontrolapi.TimeoutPolicy{ConnectMs: timeout.ConnectMs, ResponseHeaderMs: timeout.ResponseHeaderMs, IdleMs: timeout.IdleMs},
-		})
-	}
-	ids := make([]string, 0, len(upstreamSpecs))
-	for id := range upstreamSpecs {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	for _, id := range ids {
-		state.Upstreams = append(state.Upstreams, upstreamSpecs[id])
-	}
-	return state, nil
 }
 
 func (s *Service) compileUpstream(ctx context.Context, upstreamID string, config adminapi.UpstreamConfig) (relaycontrolapi.RuntimeUpstreamSpec, error) {

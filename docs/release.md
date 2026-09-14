@@ -11,10 +11,10 @@ S0.1 Client Contract Freeze Candidate
   → pre-Android server-side product closure
 
 S0.2 Realm/Experience Freeze Candidate
-  → Snapshot v2 and product foundation
+  → Snapshot v4 and product foundation with five user-configuration policy flags
 
 S0.3 Gateway Freeze Candidate
-  → Snapshot v3 + three-daemon Gateway server closure
+  → Snapshot v5 + three-daemon Gateway server closure
 
 S0.4 Android Integration Candidate
   → real Android full managed runtime profile
@@ -49,25 +49,24 @@ It does **not** require `androidCommit`; later sub-stages consume this pinned ba
 
 The exact serialized manifest schema is implemented by the candidate/system harness. Markdown documents must not create a competing schema or use different field names such as a generic `adapterQualificationRef` when architecture requires `realAdapterQualificationRef`.
 
-### Candidate draft, accepted Freeze and historical evidence
+### Candidate draft and accepted Freeze
 
-`docs/s0-freeze-manifest.json` is retained historical evidence, not a planning/config file. New candidates default to `.artifacts/s0-freeze-candidate.json`; writing is exclusive and refuses the historical tracked path. Existing candidate files require a different explicitly selected output path, not overwrite. A draft with CAP-C7-002=NOT_EXECUTED is never a Freeze.
+Candidates default to `.artifacts/s0-freeze-candidate.json`; writes are exclusive. Use a new output path for a new candidate. A draft with CAP-C7-002=NOT_EXECUTED is never a Freeze.
 
 `freeze-manifest.mjs --validate --candidate --manifest <path>` validates candidate pins without accepting pending replay as final. Final validation additionally requires independent clean-source/runtime replay evidence. `replay-freeze.mjs --runtime-only --manifest <path>` records only fresh-runtime diagnostics and never mutates the manifest; invocation as full clean replay fails closed. If source/build/contract changes, rerun the required gate on the new composition.
 
-The retained manifest declares architecture `cc60f8f540d309f2b73228094c8b9cd1b0b0a60f`, core `a6075bc0afd78fa86d77e1a520f838c954c9adfa`, Snapshot v1. The 2026-08-31 audit did not replay/fully validate its external artifact chain; neither its presence nor declared PASS proves current HEAD or later stages.
 
 ### Current tooling limitations
 
 The writer validates current source/architecture cleanliness and identity, production build, four OpenAPI hashes, fixture/schema/Adapter pins, complete required scenario results, and every artifact plus metadata hash/exit/source. Qualification requires all four profiles in one run, each with observed adapter version, upstream/config revision, transport and forwarded usage evidence; unknown identity or an unexecuted profile fails. Partial diagnostic runs cannot be merged into qualification. Declared NONE/LEVEL_0 is not semantic Usage/header-echo qualification.
 
-Two deliberate boundaries remain: this CAP manifest compiler is S0.1-only and rejects current Snapshot v2 instead of relabeling it v1; independent clean-source checkout/rebuild/replay is not implemented. Runtime-only evidence cannot finalize CAP-C7-002. S0.2 needs its own ERX/consumer evidence schema and gate. Therefore `make freeze-gate` is not a working current S0.2 promotion path. The audit is historical; living completion/verification status is in [execution progress](s0-execution-progress.md).
+Two deliberate boundaries remain: this CAP manifest compiler verifies the resource baseline of the current Snapshot v4 but does not replace the S0.2 ERX gate; independent clean-source checkout/rebuild/replay is not implemented. Runtime-only evidence cannot finalize CAP-C7-002. S0.2 needs its own ERX/consumer evidence schema and gate. Therefore `make freeze-gate` is not a working current S0.2 promotion path. The audit is historical; living completion/verification status is in [execution progress](s0-execution-progress.md).
 
 ## 3. S0.2/S0.3/S0.4 candidates
 
 Each later sub-stage pins its own architecture/core/consumer/build/contract/scenario identities and consumes the previous valid freeze; a historical earlier manifest cannot prove a later candidate.
 
-S0.3 specifically requires a real `enterprise-tool-gateway` production binary/build identity, Gateway Control OpenAPI/hash, Snapshot v3 and canonical surface/catalog fixtures, real Hub/Gateway/Relay + downstream MCP + Test Client traffic, production Admin browser evidence, and executable production supervision/graceful lifecycle/structured-log collection/redaction evidence. The current repository does not yet provide these artifacts.
+S0.3 specifically requires a real `enterprise-tool-gateway` production binary/build identity, Gateway Control OpenAPI/hash, Snapshot v5 and canonical surface/catalog fixtures, real Hub/Gateway/Relay + downstream MCP + Test Client traffic, production Admin browser evidence, and executable production supervision/graceful lifecycle/structured-log collection/redaction evidence. The current repository does not yet provide these artifacts. Only the current unpublished version is supported per Control Protocol §10.10.1; there is no historical Snapshot compatibility requirement.
 
 S0.4 adds pinned real Android implementation/device evidence against the S0.3 baseline. Exact composition fields remain owned by architecture Testing Specs and executable harness schemas.
 

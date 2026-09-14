@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import { encodeEnrollmentMaterial } from '../api/enrollment'
 import { cursorPath, fetchAllPages } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
@@ -42,6 +43,7 @@ const createOpen = ref(false)
 const detailOpen = ref(false)
 const enrollmentOpen = ref(false)
 const enrollment = ref<Enrollment>()
+const enrollmentMaterial = ref('')
 const createForm = ref({ username: '', displayName: '', role: 'MEMBER' as 'ADMIN' | 'MEMBER' })
 const canMutate = computed(() => Boolean(session.csrfToken))
 
@@ -85,14 +87,15 @@ async function openUser(user: User) {
 
 function clearEnrollment() {
   enrollment.value = undefined
+  enrollmentMaterial.value = ''
 }
 
 const qrCanvas = ref<HTMLCanvasElement>()
 
 async function renderQrCode() {
-  if (!enrollment.value?.code || !qrCanvas.value) return
+  if (!enrollmentMaterial.value || !qrCanvas.value) return
   try {
-    await QRCode.toCanvas(qrCanvas.value, enrollment.value.code, { width: 200, margin: 2 })
+    await QRCode.toCanvas(qrCanvas.value, enrollmentMaterial.value, { width: 280, margin: 4 })
   } catch {
     // QR rendering is best-effort — do not block the enrollment flow
   }
@@ -104,9 +107,12 @@ async function createEnrollment() {
   if (!selected.value || !session.csrfToken) return
   error.value = undefined
   try {
-    enrollment.value = await apiFetch<Enrollment>(`/api/admin/v1/users/${encodeURIComponent(selected.value.userId)}/enrollments`, {
+    const grant = await apiFetch<Enrollment>(`/api/admin/v1/users/${encodeURIComponent(selected.value.userId)}/enrollments`, {
       method: 'POST', body: JSON.stringify({ expiresInSeconds: 600 }),
     }, session.csrfToken)
+    // Loopback HTTP is supported for isolated local deployments; other origins require HTTPS.
+    enrollmentMaterial.value = encodeEnrollmentMaterial(window.location.origin, grant, true)
+    enrollment.value = grant
     enrollmentOpen.value = true
   } catch (cause) {
     error.value = cause
@@ -144,8 +150,8 @@ async function revokeDevice(device: Device) {
 }
 
 async function copyEnrollment() {
-  if (!enrollment.value) return
-  try { await navigator.clipboard.writeText(enrollment.value.code) } catch (cause) { error.value = cause }
+  if (!enrollmentMaterial.value) return
+  try { await navigator.clipboard.writeText(enrollmentMaterial.value) } catch (cause) { error.value = cause }
 }
 
 onMounted(refresh)
@@ -206,7 +212,8 @@ onMounted(refresh)
     <q-dialog v-model="enrollmentOpen" @hide="clearEnrollment">
       <q-card v-if="enrollment" class="responsive-modal" style="max-width: 95vw"><q-card-section class="text-h6">{{ $t('users.enrollmentCode') }}</q-card-section><q-card-section>
         <q-banner class="bg-amber-1 q-mb-md rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
-        <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field"><template #append><q-btn flat dense icon="content_copy" @click="copyEnrollment()" /></template></q-input>
+        <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field" />
+        <q-input :model-value="enrollmentMaterial" readonly outlined autogrow :label="$t('users.enrollmentMaterial')" data-cy="enrollment-material-field" class="q-mt-md"><template #append><q-btn flat dense icon="content_copy" :aria-label="$t('users.enrollmentMaterial')" data-cy="copy-enrollment-material" @click="copyEnrollment()" /></template></q-input>
         <div class="row justify-center q-mt-md"><div class="text-center"><div class="text-caption q-mb-xs">{{ $t('users.enrollmentQr') }}</div><canvas ref="qrCanvas" data-cy="enrollment-qr" /></div></div>
         <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ enrollment.expiresAt }}</div>
       </q-card-section><q-card-actions align="right"><q-btn color="primary" :label="$t('common.done')" v-close-popup /></q-card-actions></q-card>

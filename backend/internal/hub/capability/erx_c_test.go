@@ -154,9 +154,7 @@ func TestERXC001CreateAndPublishManagedAssistant(t *testing.T) {
 	if !strings.Contains(string(stored.SnapshotJSON), starterID) {
 		t.Fatal("snapshot JSON should contain starter ID")
 	}
-	if stored.SnapshotSchemaVersion != 2 {
-		t.Fatalf("expected schema version 2, got %d", stored.SnapshotSchemaVersion)
-	}
+
 }
 
 // ERX-C-003: multiple non-empty memory seed items project read-only.
@@ -314,15 +312,12 @@ func TestERXC009DisabledModelRefBlocksValidation(t *testing.T) {
 	}
 }
 
-// ERX-C0-001: v1 frozen fixtures remain reproducible.
-// This is verified in the contract_test package (TestSnapshotAndRuntimeControlGoldenHashes).
-// Here we verify that a v1 snapshot with empty assistants/starters produces
-// the same hash as one where assistants/starters are nil — proving v1 compatibility.
-func TestERXC0001V1HashUnaffectedByEmptyV2Fields(t *testing.T) {
+// Empty experience arrays must not make a new policy compile as a legacy schema.
+// Current wire validation is covered by the shared contract fixtures.
+func TestCurrentSnapshotWithoutExperienceHasDeterministicHash(t *testing.T) {
 	ctx := context.Background()
 	_ = ctx
-	// Compile a snapshot without assistants/starters and verify it's schemaVersion=2
-	// but the hash is deterministic and v1-compatible (empty v2 fields with omitempty).
+	// Compile a current snapshot without assistants/starters.
 	st, boot, now := bootstrapI2(t)
 	cap := capability.NewService(st.Client)
 	cap.Now = func() time.Time { return now }
@@ -349,9 +344,8 @@ func TestERXC0001V1HashUnaffectedByEmptyV2Fields(t *testing.T) {
 	if hash != hash2 {
 		t.Fatalf("hash mismatch: compiled=%s, recomputed=%s", hash, hash2)
 	}
-	// Snapshot should have schemaVersion=2 and empty assistants/starters
-	if snapshot.SchemaVersion != 2 {
-		t.Fatalf("expected schemaVersion=2, got %d", snapshot.SchemaVersion)
+	if snapshot.SchemaVersion != 4 {
+		t.Fatalf("expected schemaVersion=4, got %d", snapshot.SchemaVersion)
 	}
 	if len(snapshot.Assistants) != 0 {
 		t.Fatalf("expected 0 assistants, got %d", len(snapshot.Assistants))

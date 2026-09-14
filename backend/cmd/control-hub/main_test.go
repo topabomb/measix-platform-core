@@ -23,7 +23,7 @@ func TestBootstrapRepeatAndConfiguredStaticHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.DB.Exec(migrations.SQLAfter("")); err != nil {
+	if _, err := st.DB.Exec(migrations.CurrentSQL()); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.Close(); err != nil {

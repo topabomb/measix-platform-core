@@ -149,8 +149,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Body = body
 	}
 
-	result := h.serveProxy(observer, r, route, upstream, runtimePath, requestID)
-	h.recordUsage(observer, body, attr, true, result.UpstreamStatus, result.ErrorClass)
+	result := &proxyResult{}
+	// ReverseProxy aborts an interrupted response with http.ErrAbortHandler.
+	// Meter in the unwind path as well, using the state captured at admission.
+	defer func() { h.recordUsage(observer, body, attr, true, result.UpstreamStatus, result.ErrorClass) }()
+	h.serveProxy(observer, r, route, upstream, runtimePath, requestID, result)
 }
 
 func writeProblem(w http.ResponseWriter, status int, code, title, requestID string, targetGeneration *int, forwarded bool) {

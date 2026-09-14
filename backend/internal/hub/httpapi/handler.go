@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/wire/adminapi"
@@ -260,7 +261,7 @@ func (h *clientHandler) Discover(w http.ResponseWriter, r *http.Request) {
 		DeploymentName:                  view.DeploymentName,
 		ClientApiBase:                   "/api/client/v1",
 		RuntimeApiBase:                  "/runtime/v1",
-		SupportedSnapshotSchemaVersions: []int{1, 2},
+		SupportedSnapshotSchemaVersions: []int{capability.CurrentSnapshotSchemaVersion},
 	})
 }
 
@@ -337,7 +338,7 @@ func (h *clientHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 	response.Session.ExpiresAt = view.SessionExpiresAt
 	response.Session.SessionIdleExpiresAt = view.SessionExpiresAt
 	response.ManagedState = managedStateWire(view.ManagedState, nil)
-	response.SupportedSnapshotSchemaVersions = []int{1, 2}
+	response.SupportedSnapshotSchemaVersions = []int{capability.CurrentSnapshotSchemaVersion}
 	writeJSON(w, http.StatusOK, response)
 }
 
@@ -361,7 +362,7 @@ func (h *clientHandler) GetManagedState(w http.ResponseWriter, r *http.Request, 
 
 func managedStateWire(state identity.ManagedStateView, applied *int) clientapi.ManagedState {
 	syncRequired := applied == nil || *applied != state.ActiveManagedGeneration
-	blocked := state.RuntimeStatus != "READY" || syncRequired
+	blocked := state.ActiveManagedGeneration == 0 || state.RuntimeStatus != "READY" || syncRequired
 	var target *int
 	if syncRequired && state.ActiveManagedGeneration > 0 {
 		value := state.ActiveManagedGeneration
@@ -414,6 +415,28 @@ func decodeStrictJSON(r *http.Request, target any) error {
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		return errors.New("request body must contain exactly one JSON value")
+	}
+	// Generated bool fields cannot distinguish an omitted/null value from false.
+	// All current draft writes require explicit values for the five permissions.
+	if _, isDraftWrite := target.(*adminapi.PutDraftRequest); isDraftWrite {
+		var envelope map[string]json.RawMessage
+		var content map[string]json.RawMessage
+		var policy map[string]json.RawMessage
+		if err := json.Unmarshal(payload, &envelope); err != nil {
+			return err
+		}
+		if err := json.Unmarshal(envelope["content"], &content); err != nil {
+			return err
+		}
+		if err := json.Unmarshal(content["policy"], &policy); err != nil {
+			return err
+		}
+		for _, name := range []string{"allowLocalProviders", "allowLocalTts", "allowLocalAsr", "allowLocalMcp", "allowLocalAssistants"} {
+			value := string(bytes.TrimSpace(policy[name]))
+			if value != "true" && value != "false" {
+				return errors.New("draft policy requires an explicit Boolean for " + name)
+			}
+		}
 	}
 	return nil
 }

@@ -22,7 +22,7 @@ import (
 )
 
 // migrationSQL reads the canonical migration file used in production.
-func migrationSQL(t *testing.T) string { t.Helper(); return migrations.SQLAfter("") }
+func migrationSQL(t *testing.T) string { t.Helper(); return migrations.CurrentSQL() }
 
 // applyMigration applies the migration SQL to the given database.
 func applyMigration(t *testing.T, db *sql.DB) {
@@ -189,8 +189,8 @@ func seedUserData(t *testing.T, db *sql.DB) (userID, upstreamID, releaseID strin
 
 	// Insert a managed release
 	releaseID = "rel_test_seed_001"
-	_, err = db.ExecContext(ctx, `INSERT INTO managed_releases (id, managed_generation, status, release_content_json, snapshot_schema_version, snapshot_json, snapshot_hash, source_draft_revision, created_by_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		releaseID, 1, "ACTIVE", []byte(`{}`), 1, []byte(`{}`), "sha256:abc123", 1, userID, now)
+	_, err = db.ExecContext(ctx, `INSERT INTO managed_releases (id, managed_generation, status, release_content_json, snapshot_json, snapshot_hash, source_draft_revision, created_by_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		releaseID, 1, "ACTIVE", []byte(`{}`), []byte(`{}`), "sha256:abc123", 1, userID, now)
 	if err != nil {
 		t.Fatalf("insert managed_release: %v", err)
 	}
@@ -212,135 +212,7 @@ func seedUserData(t *testing.T, db *sql.DB) (userID, upstreamID, releaseID strin
 	return userID, upstreamID, releaseID
 }
 
-// HUB-DB-002: upgrading from a real previous supported schema must preserve
-// seeded data and produce the current schema. We use a fixture SQL file that
-// represents the previous supported schema version, seed it with real data
-// (stable IDs, Release, Usage), then apply the current migration on top.
-// This is NOT the same as DB-001 (empty→current); DB-002 verifies the upgrade
-// path from a non-empty, previous-version database.
-func TestHUBDB002PreviousSchemaUpgrade(t *testing.T) {
-	// Read the previous-schema fixture
-	_, file, _, _ := runtime.Caller(0)
-	prevSchemaPath := filepath.Clean(filepath.Join(filepath.Dir(file), "testdata/fixture_previous_schema_v0.1.sql"))
-	prevSchemaSQL, err := os.ReadFile(prevSchemaPath)
-	if err != nil {
-		t.Fatalf("read previous schema fixture: %v", err)
-	}
-
-	// Start with a DB that has the previous supported schema
-	db, path := openEmptyDB(t)
-	defer db.Close()
-	if _, err := db.Exec(string(prevSchemaSQL)); err != nil {
-		t.Fatalf("apply previous schema fixture: %v", err)
-	}
-
-	// Seed real data into the previous-schema DB
-	origUserID, origUpstreamID, origReleaseID := seedUserData(t, db)
-
-	// Record data hashes before the upgrade
-	ctx := context.Background()
-	dataHashBefore := dbDataHash(t, db, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
-
-	// Replay every published upgrade after the initial baseline, and require success.
-	if _, err := db.Exec(migrations.SQLAfter("202608190001_initial")); err != nil {
-		t.Fatalf("apply real upgrade migrations: %v", err)
-	}
-
-	// Verify data is unchanged after the successful upgrade
-	dataHashAfter := dbDataHash(t, db, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
-	if dataHashBefore != dataHashAfter {
-		t.Fatal("data hash changed after migration upgrade attempt (data was modified)")
-	}
-
-	// Verify all required tables are present
-	check, err := maintenance.Check(ctx, db)
-	if err != nil {
-		t.Fatalf("after migration upgrade: %v", err)
-	}
-	if check.Integrity != "ok" {
-		t.Fatalf("integrity: %s", check.Integrity)
-	}
-	if check.Tables < 10 {
-		t.Fatalf("unexpected table count: %d", check.Tables)
-	}
-
-	// Verify seeded data is preserved
-	var restoredUserID string
-	err = db.QueryRowContext(ctx, "SELECT id FROM users WHERE username = ?", "testuser").Scan(&restoredUserID)
-	if err != nil {
-		t.Fatalf("user not preserved after upgrade: %v", err)
-	}
-	if restoredUserID != origUserID {
-		t.Fatalf("user ID changed: before=%s after=%s", origUserID, restoredUserID)
-	}
-
-	var restoredUpstreamID string
-	err = db.QueryRowContext(ctx, "SELECT id FROM upstreams WHERE name = ?", "Test Upstream").Scan(&restoredUpstreamID)
-	if err != nil {
-		t.Fatalf("upstream not preserved after upgrade: %v", err)
-	}
-	if restoredUpstreamID != origUpstreamID {
-		t.Fatalf("upstream ID changed: before=%s after=%s", origUpstreamID, restoredUpstreamID)
-	}
-
-	var restoredReleaseID string
-	err = db.QueryRowContext(ctx, "SELECT id FROM managed_releases WHERE managed_generation = 1").Scan(&restoredReleaseID)
-	if err != nil {
-		t.Fatalf("release not preserved after upgrade: %v", err)
-	}
-	if restoredReleaseID != origReleaseID {
-		t.Fatalf("release ID changed: before=%s after=%s", origReleaseID, restoredReleaseID)
-	}
-
-	// Verify usage records are preserved
-	var usageCount int
-	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM request_usages WHERE request_id = ?", "req_test_001").Scan(&usageCount)
-	if err != nil {
-		t.Fatalf("usage data not preserved after upgrade: %v", err)
-	}
-	if usageCount != 1 {
-		t.Fatalf("usage record missing after upgrade: count=%d", usageCount)
-	}
-
-	// Verify the atlas.sum file exists and is not empty (migration integrity file)
-	atlasSumPath := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../migrations/atlas.sum"))
-	atlasSumData, err := os.ReadFile(atlasSumPath)
-	if err != nil {
-		t.Fatalf("atlas.sum file missing: %v", err)
-	}
-	if len(strings.TrimSpace(string(atlasSumData))) == 0 {
-		t.Fatal("atlas.sum file is empty")
-	}
-
-	// Verify the DB file is durable on disk
-	db.Close()
-	db2, err := sqliteutil.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db2.Close()
-	check2, err := maintenance.Check(ctx, db2)
-	if err != nil {
-		t.Fatalf("after reopen: %v", err)
-	}
-	if check2.Tables != check.Tables {
-		t.Fatalf("table count changed after reopen: %d vs %d", check2.Tables, check.Tables)
-	}
-
-	// Verify all required tables are present by name
-	for _, table := range maintenance.RequiredTableList() {
-		var count int
-		err := db2.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&count)
-		if err != nil {
-			t.Fatalf("check table %s after reopen: %v", table, err)
-		}
-		if count != 1 {
-			t.Fatalf("required table %s is missing after migration upgrade", table)
-		}
-	}
-}
-
-// HUB-DB-003: completed migration history must not be rewritten by an ordinary
+// HUB-DB-003: current initialization SQL must not be rewritten by an ordinary
 // restart. We apply the migration, close and reopen the DB, then verify the
 // schema content hash (not just the SQL file hash) is unchanged.
 // This verifies the actual DB schema content, not just the source SQL file.
@@ -414,7 +286,7 @@ func TestHUBDB004IncompatibleSchemaRevisionFailFast(t *testing.T) {
 	}
 }
 
-// HUB-DB-005: released migration history/checksum must not be silently modified.
+// HUB-DB-005: current initialization schema/checksum must not be silently modified.
 // We compute the hash of the actual DB schema content (not the SQL file),
 // back up the DB, and verify the schema content hash is stable across backup.
 func TestHUBDB005MigrationChecksumNotTampered(t *testing.T) {
@@ -478,114 +350,6 @@ func TestHUBDB005MigrationChecksumNotTampered(t *testing.T) {
 	}
 
 	// Backup data hash must match source data hash
-	backupDataHash := dbDataHash(t, backupDB, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
-	if backupDataHash != dataHashBefore {
-		t.Fatalf("backup data hash mismatch: backup=%s source=%s", backupDataHash, dataHashBefore)
-	}
-}
-
-// HUB-DB-006: migration must preserve critical stable IDs / Release / Usage
-// history. We seed real data into a previous-schema DB, apply the upgrade
-// migration, and verify all IDs and data are intact after the upgrade.
-// This differs from DB-002 by focusing on the data-preservation aspect:
-// every seeded stable ID, Release, Usage record, and encrypted Secret must
-// survive the upgrade unchanged.
-func TestHUBDB006MigrationPreservesCriticalIDs(t *testing.T) {
-	ctx := context.Background()
-
-	// Read the previous-schema fixture
-	_, file, _, _ := runtime.Caller(0)
-	prevSchemaPath := filepath.Clean(filepath.Join(filepath.Dir(file), "testdata/fixture_previous_schema_v0.1.sql"))
-	prevSchemaSQL, err := os.ReadFile(prevSchemaPath)
-	if err != nil {
-		t.Fatalf("read previous schema fixture: %v", err)
-	}
-
-	// Start with the previous-schema DB (not current-schema)
-	db, _ := openEmptyDB(t)
-	defer db.Close()
-	if _, err := db.Exec(string(prevSchemaSQL)); err != nil {
-		t.Fatalf("apply previous schema fixture: %v", err)
-	}
-
-	// Seed real data into the previous-schema DB
-	origUserID, origUpstreamID, origReleaseID := seedUserData(t, db)
-
-	// Record data hashes before the upgrade
-	dataHashBefore := dbDataHash(t, db, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
-
-	// Replay every published upgrade after the initial baseline, and require success.
-	if _, err := db.Exec(migrations.SQLAfter("202608190001_initial")); err != nil {
-		t.Fatalf("apply real upgrade migrations: %v", err)
-	}
-
-	// Data must be unchanged after the successful upgrade
-	dataHashAfter := dbDataHash(t, db, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
-	if dataHashBefore != dataHashAfter {
-		t.Fatal("data hash changed after migration upgrade attempt (data was modified)")
-	}
-
-	// Now perform a real backup/restore cycle and verify all IDs are preserved
-	output := filepath.Join(t.TempDir(), "hub-backup-006.db")
-	_, err = maintenance.Backup(ctx, db, output, "test-build", time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Restore (open the backup)
-	backupDB, err := sqliteutil.Open(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer backupDB.Close()
-
-	// Verify all stable IDs are preserved
-	var restoredUserID, restoredUpstreamID, restoredReleaseID string
-	err = backupDB.QueryRowContext(ctx, "SELECT id FROM users WHERE username = ?", "testuser").Scan(&restoredUserID)
-	if err != nil {
-		t.Fatalf("user not preserved in backup: %v", err)
-	}
-	if restoredUserID != origUserID {
-		t.Fatalf("user ID changed: before=%s after=%s", origUserID, restoredUserID)
-	}
-
-	err = backupDB.QueryRowContext(ctx, "SELECT id FROM upstreams WHERE name = ?", "Test Upstream").Scan(&restoredUpstreamID)
-	if err != nil {
-		t.Fatalf("upstream not preserved in backup: %v", err)
-	}
-	if restoredUpstreamID != origUpstreamID {
-		t.Fatalf("upstream ID changed: before=%s after=%s", origUpstreamID, restoredUpstreamID)
-	}
-
-	err = backupDB.QueryRowContext(ctx, "SELECT id FROM managed_releases WHERE managed_generation = 1").Scan(&restoredReleaseID)
-	if err != nil {
-		t.Fatalf("release not preserved in backup: %v", err)
-	}
-	if restoredReleaseID != origReleaseID {
-		t.Fatalf("release ID changed: before=%s after=%s", origReleaseID, restoredReleaseID)
-	}
-
-	// Verify usage data is preserved
-	var usageCount int
-	err = backupDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM request_usages WHERE request_id = ?", "req_test_001").Scan(&usageCount)
-	if err != nil {
-		t.Fatalf("usage data not preserved: %v", err)
-	}
-	if usageCount != 1 {
-		t.Fatalf("usage record missing: count=%d", usageCount)
-	}
-
-	// Verify secret_versions data is preserved (encrypted payload)
-	var payloadLen int
-	err = backupDB.QueryRowContext(ctx, "SELECT LENGTH(encrypted_payload) FROM secret_versions WHERE secret_id = ?", "sec_test_seed_001").Scan(&payloadLen)
-	if err != nil {
-		t.Fatalf("secret version not preserved: %v", err)
-	}
-	if payloadLen == 0 {
-		t.Fatal("encrypted payload is empty in backup")
-	}
-
-	// Verify data hash matches between source and backup
 	backupDataHash := dbDataHash(t, backupDB, "users,upstreams,secrets,secret_versions,managed_releases,managed_states,request_usages")
 	if backupDataHash != dataHashBefore {
 		t.Fatalf("backup data hash mismatch: backup=%s source=%s", backupDataHash, dataHashBefore)
@@ -873,7 +637,7 @@ func TestHUBDB010WrongKeyFailsClosed(t *testing.T) {
 	}
 }
 
-// HUB-DB-001 (bonus): empty DB replay all versioned migrations must produce
+// HUB-DB-001 (bonus): empty DB applies the current initialization SQL must produce
 // the current schema with all required tables.
 func TestHUBDB001EmptyDBReplayAllMigrations(t *testing.T) {
 	ctx := context.Background()

@@ -176,7 +176,6 @@ var (
 		{Name: "managed_generation", Type: field.TypeInt64},
 		{Name: "status", Type: field.TypeString},
 		{Name: "release_content_json", Type: field.TypeBytes},
-		{Name: "snapshot_schema_version", Type: field.TypeInt},
 		{Name: "snapshot_json", Type: field.TypeBytes},
 		{Name: "snapshot_hash", Type: field.TypeString},
 		{Name: "source_draft_revision", Type: field.TypeInt64},
@@ -212,6 +211,24 @@ var (
 		Name:       "managed_states",
 		Columns:    ManagedStatesColumns,
 		PrimaryKey: []*schema.Column{ManagedStatesColumns[0]},
+	}
+	// PortalSessionsColumns holds the columns for the "portal_sessions" table.
+	PortalSessionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "session_id", Type: field.TypeString},
+		{Name: "origin", Type: field.TypeString},
+		{Name: "ticket_digest", Type: field.TypeBytes, Unique: true},
+		{Name: "cookie_digest", Type: field.TypeBytes, Unique: true, Nullable: true},
+		{Name: "grant_expires_at", Type: field.TypeTime},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "consumed", Type: field.TypeBool, Default: false},
+		{Name: "revoked", Type: field.TypeBool, Default: false},
+	}
+	// PortalSessionsTable holds the schema information for the "portal_sessions" table.
+	PortalSessionsTable = &schema.Table{
+		Name:       "portal_sessions",
+		Columns:    PortalSessionsColumns,
+		PrimaryKey: []*schema.Column{PortalSessionsColumns[0]},
 	}
 	// PricingRulesColumns holds the columns for the "pricing_rules" table.
 	PricingRulesColumns = []*schema.Column{
@@ -439,6 +456,7 @@ var (
 		ManagedDraftsTable,
 		ManagedReleasesTable,
 		ManagedStatesTable,
+		PortalSessionsTable,
 		PricingRulesTable,
 		RequestUsagesTable,
 		SecretsTable,

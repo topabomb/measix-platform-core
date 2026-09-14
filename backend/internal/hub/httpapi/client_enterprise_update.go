@@ -11,13 +11,7 @@ import (
 )
 
 func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http.Request, params clientapi.ListEnterpriseUpdatesParams) {
-	token, ok := bearerToken(r)
-	if !ok {
-		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
-		return
-	}
-	if _, err := h.identity.AuthenticateAccess(r.Context(), token); err != nil {
-		writeIdentityError(w, err)
+	if !h.authenticateFeed(w, r) {
 		return
 	}
 
@@ -56,7 +50,7 @@ func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http
 
 	etag := metadata.ETag
 	w.Header().Set("Cache-Control", "private, no-cache")
-	w.Header().Set("Vary", "Authorization")
+	w.Header().Set("Vary", "Authorization, Cookie")
 
 	// Check If-None-Match for conditional 304
 	if params.IfNoneMatch != nil && *params.IfNoneMatch == etag {
@@ -96,13 +90,7 @@ func (h *fullClientHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http
 
 func (h *fullClientHandler) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateID clientapi.EnterpriseUpdateId) {
 	w.Header().Set("Cache-Control", "no-store")
-	token, ok := bearerToken(r)
-	if !ok {
-		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
-		return
-	}
-	if _, err := h.identity.AuthenticateAccess(r.Context(), token); err != nil {
-		writeIdentityError(w, err)
+	if !h.authenticateFeed(w, r) {
 		return
 	}
 	item, err := h.enterpriseUpdate.Get(r.Context(), string(enterpriseUpdateID))

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/dev-setup.mjs — one-shot local development bootstrap for measix S0.
 //
-// Generates cryptographic material, applies the published migration SQL,
+// Generates cryptographic material, applies the single current initialization SQL,
 // and bootstraps the initial administrator. All secrets land in .secrets/
 // (gitignored). Run:  npm run setup
 import { randomBytes } from "node:crypto";
@@ -57,8 +57,8 @@ if (!existsSync(relayTokenPath)) {
   console.log("  generated relay-service.token");
 } else { console.log("  relay-service.token exists, skipping"); }
 
-// 3. Apply checked, ordered development migrations; never silently adopt an unknown schema.
-console.log("\n[2/4] Applying migration to local hub.db...");
+// 3. Initialize or verify the current schema; obsolete development databases are deleted and recreated.
+console.log("\n[2/4] Initializing current local hub.db...");
 const hubDBRel = "../.data/hub.db";
 const masterKeyRel = "../.secrets/master.key";
 const jwtKeyRel = "../.secrets/jwt-ed25519.seed";

@@ -13,6 +13,7 @@ import (
 	"measix/platform/internal/hub/httpapi"
 	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/testutil"
+	"measix/platform/internal/wire/clientapi"
 	"measix/platform/pkg/platformid"
 )
 
@@ -60,6 +61,11 @@ func loginAdmin(t *testing.T, h http.Handler) (string, string) {
 // enrollClient helper: creates enrollment, exchanges, returns access token.
 func enrollClient(t *testing.T, h http.Handler, adminCookie, csrf string) string {
 	t.Helper()
+	return enrollClientSession(t, h, adminCookie, csrf).AccessToken
+}
+
+func enrollClientSession(t *testing.T, h http.Handler, adminCookie, csrf string) clientapi.EnrollmentExchangeResponse {
+	t.Helper()
 	// Create enrollment
 	resp := doJSON(t, h, http.MethodPost, "/api/admin/v1/users", map[string]string{
 		"Cookie":       adminCookie,
@@ -100,11 +106,9 @@ func enrollClient(t *testing.T, h http.Handler, adminCookie, csrf string) string
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("exchange status=%d body=%s", resp.Code, resp.Body.String())
 	}
-	var tokens struct {
-		AccessToken string `json:"accessToken"`
-	}
+	var tokens clientapi.EnrollmentExchangeResponse
 	decodeJSON(t, resp, &tokens)
-	return tokens.AccessToken
+	return tokens
 }
 
 // --- Admin Enterprise Update HTTP Tests ---
@@ -394,7 +398,7 @@ func TestERXUPDHTTP006ClientListPublishedOnly(t *testing.T) {
 	}
 
 	// Client list — should only see the PUBLISHED item
-	resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise-updates?limit=10", map[string]string{
+	resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise/updates?limit=10", map[string]string{
 		"Authorization": "Bearer " + accessToken,
 	}, nil)
 	if resp.Code != http.StatusOK {
@@ -447,7 +451,7 @@ func TestERXUPDHTTP007ClientETagConditional(t *testing.T) {
 	}
 
 	// First request — get ETag
-	resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise-updates?limit=10", map[string]string{
+	resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise/updates?limit=10", map[string]string{
 		"Authorization": "Bearer " + accessToken,
 	}, nil)
 	if resp.Code != http.StatusOK {
@@ -459,7 +463,7 @@ func TestERXUPDHTTP007ClientETagConditional(t *testing.T) {
 	}
 
 	// Second request with If-None-Match — should return 304
-	req := httptest.NewRequest(http.MethodGet, "/api/client/v1/enterprise-updates?limit=10", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/client/v1/enterprise/updates?limit=10", nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("If-None-Match", etag)
 	w := httptest.NewRecorder()
@@ -494,7 +498,7 @@ func TestERXUPDHTTP008ClientGetSingle(t *testing.T) {
 	}
 
 	// Get published — should succeed
-	resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise-updates/"+pub.ID, map[string]string{
+	resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise/updates/"+pub.ID, map[string]string{
 		"Authorization": "Bearer " + accessToken,
 	}, nil)
 	if resp.Code != http.StatusOK {
@@ -513,7 +517,7 @@ func TestERXUPDHTTP008ClientGetSingle(t *testing.T) {
 	}
 
 	// Get draft — should return 404
-	resp = doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise-updates/"+draft.ID, map[string]string{
+	resp = doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise/updates/"+draft.ID, map[string]string{
 		"Authorization": "Bearer " + accessToken,
 	}, nil)
 	if resp.Code != http.StatusNotFound {
@@ -528,7 +532,7 @@ func TestERXUPDHTTP009ClientInvalidLimit(t *testing.T) {
 	accessToken := enrollClient(t, h, cookie, csrf)
 
 	for _, limit := range []string{"0", "21"} {
-		resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise-updates?limit="+limit, map[string]string{
+		resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise/updates?limit="+limit, map[string]string{
 			"Authorization": "Bearer " + accessToken,
 		}, nil)
 		if resp.Code != http.StatusBadRequest {
@@ -541,7 +545,7 @@ func TestERXUPDHTTP009ClientInvalidLimit(t *testing.T) {
 func TestERXUPDHTTP010ClientUnauthorized(t *testing.T) {
 	h, _, _, _, _ := setupFullHandler(t)
 
-	resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise-updates", nil, nil)
+	resp := doJSON(t, h, http.MethodGet, "/api/client/v1/enterprise/updates", nil, nil)
 	if resp.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 without token, got %d", resp.Code)
 	}

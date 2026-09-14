@@ -33,6 +33,9 @@ type ManagedRelease func(*sql.Selector)
 // ManagedState is the predicate function for managedstate builders.
 type ManagedState func(*sql.Selector)
 
+// PortalSession is the predicate function for portalsession builders.
+type PortalSession func(*sql.Selector)
+
 // PricingRule is the predicate function for pricingrule builders.
 type PricingRule func(*sql.Selector)
 

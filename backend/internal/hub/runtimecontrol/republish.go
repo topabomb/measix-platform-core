@@ -51,7 +51,7 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	if err != nil {
 		return ActivationResult{}, err
 	}
-	state, err := s.compileOperationalState(ctx, content, generation, controlRevision, nil)
+	state, err := s.compileState(ctx, content, generation, controlRevision, nil)
 	if err != nil {
 		return ActivationResult{}, err
 	}
@@ -85,7 +85,7 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	if _, err := tx.ManagedRelease.Create().
 		SetID(newReleaseID).SetManagedGeneration(int64(generation)).SetStatus("STAGED").
 		SetReleaseContentJSON(append([]byte(nil), source.ReleaseContentJSON...)).
-		SetSnapshotSchemaVersion(1).SetSnapshotJSON(snapshotJSON).SetSnapshotHash(snapshotHash).
+		SetSnapshotJSON(snapshotJSON).SetSnapshotHash(snapshotHash).
 		SetSourceDraftRevision(source.SourceDraftRevision).SetCreatedByUserID(adminUserID).SetCreatedAt(now).Save(ctx); err != nil {
 		return ActivationResult{}, err
 	}

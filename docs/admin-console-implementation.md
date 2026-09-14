@@ -31,6 +31,10 @@ Root repository 的 npm orchestration、实际开发命令与 system harness 生
 
 ## 2. 当前源码组织
 
+`ResourcesPage` 的 Policy 编辑器直接编辑当前五项必填用户配置准入开关并预览，沿用保存/验证/发布链。新草稿五项默认 false；不存在旧策略采用按钮或缺字段补齐逻辑，非当前旧草稿随旧开发数据库清理。服务端在 HTTP 边界独立校验五项必填 Boolean。
+
+`UsersPage` 的二维码和复制按钮共用 `api/enrollment.ts` 生成的完整接入资料，包含当前公共 origin 和短期凭据；裸注册码仅供显示排查。资料只在当前对话框内存中保存，关闭清理，不能放入 URL、日志或持久缓存。Client OpenAPI 定义原生消费的资料，`generated-client.ts` 仅提供其生成类型；Admin 仍只请求 Admin HTTP API。生产 origin 必须 HTTPS；隔离本机开发/测试仅接受 localhost/127.0.0.1/::1 的 HTTP，不放宽至私网地址。
+
 `console/src/` 当前以这些职责组织：
 
 ```text
@@ -66,11 +70,13 @@ css/          thin MEASIX semantic styling
 
 ## 4. 实现范围与后续验证
 
-具体“必须做什么”只引用 architecture；当前完成判断见 `docs/s0-execution-progress.md`，审查证据见 [alignment audit](architecture-alignment-audit.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。
+具体“必须做什么”只引用 architecture；当前实现与验证结果见 [当前状态](s0-execution-progress.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。
 
 S0.2 Assistant/Memory Seed/Starter 由 Resources 内的 `ManagedExperienceEditor.vue` 编辑，复用唯一 DraftStore/generated DTO/Save/Validate/Preview/Publish 流程；Seed 支持空数组及作者顺序，Starter 绑定 Assistant，删除 Assistant 同时移除其 local Draft Starters。Review diff 与 canonical Preview 覆盖这些对象；有未保存编辑时不运行 saved-Draft Preview/Validate。不存在第二套 API/store/schema。EnterpriseUpdatesPage 继续使用独立 Feed API；两者仍需按 ERX gate 证明真实 consumer 产品闭环。新增 Gateway profile 与运维状态不得借用现有页面截图声称已经实现。
 
 不要通过增加第二套 schema、自由 JSON editor、客户端自定义 Provider body/header DSL 或隐藏失败状态来绕过这些要求。
+
+Enterprise Update 的预览由 `useMarkdown.ts` 的独立 Marked parser 和 DOMPurify allowlist 渲染：仅保留合同文本子集，raw HTML 显示为文本，图片只保留替代文本，PLAIN 原样转义；不加载嵌入图片。单元回归覆盖 HTML/图片/脚本链接/代码块，浏览器 authoring 场景覆盖独立动态的创建、编辑、安全预览、发布、撤回与刷新持久化。
 
 ## 5. Browser E2E
 

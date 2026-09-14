@@ -192,10 +192,9 @@ See `docs/testing.md` for executable test organization, CI design, and the TDD c
 - `docs/testing.md` — executable test organization, CI design, and TDD.
 - `docs/database-migrations.md` — persistence migration workflow.
 - `docs/operations.md` — runtime operations.
+- `docs/portal-implementation.md` — Hub support/configuration/persistence for the independent Portal frontend.
 - `docs/release.md` — freeze/RC evidence composition.
-- `docs/architecture-alignment-audit.md` — dated source/evidence review and remediation plan, not a living status or semantic contract.
 - `docs/playwright-e2e-notes.md` — concrete browser entrypoints and evidence-based diagnosis.
-- `docs/s01-alignment-audit-plan.md` — retained 2026-08-27 historical audit, not a current completion claim.
 
 ### Documentation rule
 
@@ -234,7 +233,7 @@ Code layout, component decomposition, dependency choice, DB index, build tooling
 
 ### S0.1 Client Contract Freeze
 
-An accepted Snapshot v1 freeze proves only its pinned source/build/contract/artifact composition. A later HEAD does not inherit it. Candidate drafts, accepted evidence and retained historical declarations are different states; exact handling, the current two-phase writer/replay and known validation limits belong to [release procedures](docs/release.md). Never hand-edit evidence to claim success or overwrite a historical manifest during ordinary development.
+MEASIX is unpublished. Only the current protocol and initialization schema are supported; remove obsolete compatibility and upgrade paths. Current candidate acceptance still requires the actual source/build/contract/artifact chain; retained old reports never certify current work. See [release procedures](docs/release.md).
 
 ## 8. Change boundary
 

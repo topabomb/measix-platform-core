@@ -17,8 +17,6 @@ const (
 	FieldStatus = "status"
 	// FieldReleaseContentJSON holds the string denoting the release_content_json field in the database.
 	FieldReleaseContentJSON = "release_content_json"
-	// FieldSnapshotSchemaVersion holds the string denoting the snapshot_schema_version field in the database.
-	FieldSnapshotSchemaVersion = "snapshot_schema_version"
 	// FieldSnapshotJSON holds the string denoting the snapshot_json field in the database.
 	FieldSnapshotJSON = "snapshot_json"
 	// FieldSnapshotHash holds the string denoting the snapshot_hash field in the database.
@@ -39,7 +37,6 @@ var Columns = []string{
 	FieldManagedGeneration,
 	FieldStatus,
 	FieldReleaseContentJSON,
-	FieldSnapshotSchemaVersion,
 	FieldSnapshotJSON,
 	FieldSnapshotHash,
 	FieldSourceDraftRevision,
@@ -73,11 +70,6 @@ func ByManagedGeneration(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
-}
-
-// BySnapshotSchemaVersion orders the results by the snapshot_schema_version field.
-func BySnapshotSchemaVersion(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSnapshotSchemaVersion, opts...).ToFunc()
 }
 
 // BySnapshotHash orders the results by the snapshot_hash field.

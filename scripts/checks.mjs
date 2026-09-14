@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { gitCommit, gitDirty, writeMetaJson } from './lib/harness.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const GENERATED = ['backend/go.mod', 'backend/go.sum', 'backend/ent', 'backend/internal/wire', 'backend/migrations/atlas.sum', 'api/generated/android', 'console/pnpm-lock.yaml', 'console/src/api/generated.ts']
+const GENERATED = ['backend/go.mod', 'backend/go.sum', 'backend/ent', 'backend/internal/wire', 'backend/migrations/atlas.sum', 'api/generated/android', 'api/fixtures/client-integration', 'api/portal/client-feed.schemas.json', 'console/pnpm-lock.yaml', 'console/src/api/generated.ts', 'console/src/api/generated-client.ts']
 export function commandResult(result) {
   const output = String(result.stdout ?? '') + String(result.stderr ?? '') + (result.error?.message ?? '')
   const exitCode = Number.isInteger(result.status) ? result.status : 1
@@ -25,12 +26,26 @@ function checked(command, args, cwd) {
   if (result.output) process.stdout.write(result.output)
   return result
 }
+export function replayMigrations({ temporaryRoot = tmpdir(), run: execute = checked } = {}) {
+  const directory = mkdtempSync(join(resolve(temporaryRoot), 'measix-migrations-'))
+  const databaseUrl = 'sqlite://' + join(directory, 'hub.db').replaceAll('\\', '/')
+  try {
+    for (const operation of ['apply', 'status']) {
+      execute('atlas', ['migrate', operation, '--dir', 'file://backend/migrations', '--url', databaseUrl], ROOT)
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
 export function generate() {
   const backend = join(ROOT, 'backend')
+  checked('node', ['scripts/generate-portal-contract.mjs'])
   for (const [config, source] of [['admin', 'admin/admin'], ['client', 'client/client-control'], ['relay', 'internal/relay-control'], ['usage', 'internal/usage-ingest']]) {
     checked('go', ['run', 'github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0', '-config', 'api/codegen/' + config + '.yaml', 'api/' + source + '.openapi.yaml'])
   }
   checked('go', ['run', './cmd/generate-android-wire', '../api/client/client-control.openapi.yaml', '../api/generated/android/client-control.openapi.yaml', '../api/generated/android/manifest.json'], backend)
+  checked('go', ['run', './cmd/generate-client-fixtures'], backend)
+  checked('node', ['scripts/export-client-integration.mjs'])
   checked('go', ['generate', './ent'], backend)
   checked('go', ['mod', 'tidy'], backend)
   checked('pnpm', ['install', '--frozen-lockfile'], join(ROOT, 'console'))
@@ -38,7 +53,7 @@ export function generate() {
   checked('go', ['run', './cmd/migration-checksum'], backend)
 }
 function formatCheck() {
-  const files = requireSuccess(run('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'backend'])).output.split('\0').filter(f => f.endsWith('.go'))
+  const files = requireSuccess(run('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'backend'])).output.split('\0').filter(f => f.endsWith('.go') && existsSync(join(ROOT, f)))
   let output = ''
   for (let i = 0; i < files.length; i += 64) output += requireSuccess(run('gofmt', ['-l', ...files.slice(i, i + 64)])).output
   return commandResult({ status: output.trim() ? 1 : 0, stdout: output })
@@ -71,7 +86,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       case 'fmt': requireSuccess(formatCheck()); break
       case 'drift': requireSuccess(driftCheck()); break
       case 'static': collectStatic(); break
-      default: throw new Error('Usage: node scripts/checks.mjs generate|fmt|drift|static')
+      case 'migration-replay': replayMigrations(); break
+      default: throw new Error('Usage: node scripts/checks.mjs generate|fmt|drift|static|migration-replay')
     }
   } catch (error) { console.error(error.message); process.exitCode = 1 }
 }

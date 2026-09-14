@@ -55,7 +55,7 @@ func (s *Service) ApplyUpstream(ctx context.Context, adminUserID, idempotencyKey
 	if err != nil {
 		return ActivationResult{}, err
 	}
-	state, err := s.compileOperationalState(ctx, content, generation, controlRevision, map[string]int{upstreamID: targetRevision})
+	state, err := s.compileState(ctx, content, generation, controlRevision, map[string]int{upstreamID: targetRevision})
 	if err != nil {
 		return ActivationResult{}, err
 	}
@@ -209,7 +209,7 @@ func (s *Service) activeReleaseContent(ctx context.Context) (adminapi.ManagedDra
 	return content, nil
 }
 
-func (s *Service) compileOperationalState(ctx context.Context, content adminapi.ManagedDraftContent, generation, revision int, upstreamOverrides map[string]int) (relaycontrolapi.RuntimeControlState, error) {
+func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraftContent, generation, revision int, upstreamOverrides map[string]int) (relaycontrolapi.RuntimeControlState, error) {
 	jwk := s.Signer.PublicJWK()
 	key := relaycontrolapi.PublicJwk{Kty: relaycontrolapi.OKP, Crv: relaycontrolapi.Ed25519, Alg: relaycontrolapi.EdDSA, Use: relaycontrolapi.Sig, Kid: stringValue(jwk["kid"]), X: stringValue(jwk["x"])}
 	if key.Kid == "" || key.X == "" {
@@ -253,7 +253,7 @@ func (s *Service) compileOperationalState(ctx context.Context, content adminapi.
 		}
 		return config, nil
 	}
-	for _, binding := range content.Bindings {
+	for _, binding := range enabledBindings(content) {
 		config, err := ensureUpstream(binding.UpstreamId)
 		if err != nil {
 			return relaycontrolapi.RuntimeControlState{}, err

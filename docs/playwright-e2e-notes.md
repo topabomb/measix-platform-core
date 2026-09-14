@@ -1,6 +1,6 @@
 # Playwright Browser E2E 实施与排障
 
-本文只记录当前工程入口和诊断方法；CAP/ERX/ETG 行为要求由 architecture Testing Specs 定义。当前阶段判断见 [execution progress](s0-execution-progress.md)，本轮源码审查见 [alignment audit](architecture-alignment-audit.md)。
+本文只记录当前工程入口和诊断方法；CAP/ERX/ETG 行为要求由 architecture Testing Specs 定义。当前实现、验证结果和阶段门禁见 [当前状态](s0-execution-progress.md)。
 
 ## 1. 当前执行入口
 

@@ -14,7 +14,7 @@ import (
 )
 
 // CurrentSnapshotSchemaVersion is the only live compiler schema selection.
-const CurrentSnapshotSchemaVersion = 2
+const CurrentSnapshotSchemaVersion = 4
 
 type SnapshotInput struct {
 	DeploymentID      string
@@ -96,7 +96,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 		mcp = append(mcp, clientapi.McpDefinition{McpServerId: value.McpServerId, DisplayName: value.DisplayName, ClientProtocol: clientapi.McpDefinitionClientProtocol(value.ClientProtocol), AuthOwnership: clientapi.McpDefinitionAuthOwnership(value.AuthOwnership), RuntimePath: value.RuntimePath, Enabled: value.Enabled})
 	}
 	// Compile assistants
-	var assistants []clientapi.ManagedAssistantDefinition
+	assistants := make([]clientapi.ManagedAssistantDefinition, 0)
 	if input.Content.Assistants != nil {
 		assistants = make([]clientapi.ManagedAssistantDefinition, 0, len(*input.Content.Assistants))
 		for _, a := range *input.Content.Assistants {
@@ -122,7 +122,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 		}
 	}
 	// Compile starters
-	var starters []clientapi.AssistantStarterDefinition
+	starters := make([]clientapi.AssistantStarterDefinition, 0)
 	if input.Content.Starters != nil {
 		starters = make([]clientapi.AssistantStarterDefinition, 0, len(*input.Content.Starters))
 		for _, s := range *input.Content.Starters {
@@ -146,14 +146,15 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	sort.Slice(mcp, func(i, j int) bool { return mcp[i].McpServerId < mcp[j].McpServerId })
 
 	policy := clientapi.ManagedPolicy{
-		PolicyId:            input.Content.Policy.PolicyId,
-		AllowLocalProviders: input.Content.Policy.AllowLocalProviders,
-		AllowLocalTts:       input.Content.Policy.AllowLocalTts,
-		AllowLocalAsr:       input.Content.Policy.AllowLocalAsr,
-		AllowLocalMcp:       input.Content.Policy.AllowLocalMcp,
-		DefaultModelId:      input.Content.Policy.DefaultModelId,
-		DefaultTtsId:        input.Content.Policy.DefaultTtsId,
-		DefaultAsrId:        input.Content.Policy.DefaultAsrId,
+		PolicyId:             input.Content.Policy.PolicyId,
+		AllowLocalProviders:  input.Content.Policy.AllowLocalProviders,
+		AllowLocalTts:        input.Content.Policy.AllowLocalTts,
+		AllowLocalAsr:        input.Content.Policy.AllowLocalAsr,
+		AllowLocalMcp:        input.Content.Policy.AllowLocalMcp,
+		AllowLocalAssistants: input.Content.Policy.AllowLocalAssistants,
+		DefaultModelId:       input.Content.Policy.DefaultModelId,
+		DefaultTtsId:         input.Content.Policy.DefaultTtsId,
+		DefaultAsrId:         input.Content.Policy.DefaultAsrId,
 	}
 	var publishedBy *string
 	if input.PublishedByUserID != "" {
@@ -195,6 +196,9 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 // It is shared by contract tests and downstream verification tooling so the
 // canonical descriptor is not reimplemented outside the capability boundary.
 func HashSnapshot(snapshot clientapi.ManagedSnapshot) (string, error) {
+	if snapshot.SchemaVersion != CurrentSnapshotSchemaVersion {
+		return "", ErrInvalidDraft
+	}
 	metadata := snapshotMetadata{PublishedAt: snapshot.Metadata.PublishedAt}
 	if snapshot.Metadata.PublishedByUserId != nil {
 		value := string(*snapshot.Metadata.PublishedByUserId)
@@ -205,12 +209,8 @@ func HashSnapshot(snapshot clientapi.ManagedSnapshot) (string, error) {
 		ReleaseID: string(snapshot.ReleaseId), Providers: snapshot.Providers, Models: snapshot.Models, TTS: snapshot.Tts, ASR: snapshot.Asr, MCP: snapshot.Mcp,
 		Policy: snapshot.Policy, Metadata: metadata,
 	}
-	// Only include v2 fields (assistants, starters) for schemaVersion >= 2.
-	// v1 snapshots must produce the same hash as before the v2 fields were added.
-	if snapshot.SchemaVersion >= 2 {
-		descriptor.Assistants = snapshot.Assistants
-		descriptor.Starters = snapshot.Starters
-	}
+	descriptor.Assistants = snapshot.Assistants
+	descriptor.Starters = snapshot.Starters
 	payload, err := json.Marshal(descriptor)
 	if err != nil {
 		return "", err

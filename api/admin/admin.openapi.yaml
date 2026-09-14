@@ -1392,12 +1392,14 @@ components:
     ManagedPolicy:
       type: object
       additionalProperties: false
+      description: Current policy. All five admission flags are required; new policies initialize all five to false.
       required:
       - policyId
       - allowLocalProviders
       - allowLocalTts
       - allowLocalAsr
       - allowLocalMcp
+      - allowLocalAssistants
       properties:
         policyId:
           $ref: '#/components/schemas/PolicyId'
@@ -1409,6 +1411,9 @@ components:
           type: boolean
         allowLocalMcp:
           type: boolean
+        allowLocalAssistants:
+          type: boolean
+          description: Allows user assistants; referenced resources remain independently governed.
         defaultModelId:
           $ref: '#/components/schemas/ModelId'
         defaultTtsId:

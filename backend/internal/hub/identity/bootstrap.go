@@ -84,11 +84,12 @@ func (s *Service) Bootstrap(ctx context.Context, deploymentName, adminUsername, 
 		"mcp":       []any{},
 		"bindings":  []any{},
 		"policy": map[string]any{
-			"policyId":            policyID,
-			"allowLocalProviders": true,
-			"allowLocalTts":       true,
-			"allowLocalAsr":       true,
-			"allowLocalMcp":       true,
+			"policyId":             policyID,
+			"allowLocalProviders":  false,
+			"allowLocalTts":        false,
+			"allowLocalAsr":        false,
+			"allowLocalMcp":        false,
+			"allowLocalAssistants": false,
 		},
 	}
 	contentJSON, err := json.Marshal(content)

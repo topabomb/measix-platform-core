@@ -3,12 +3,15 @@ package config
 import (
 	"errors"
 	"flag"
+	"measix/platform/internal/hub/identity"
 	"net/url"
 	"os"
 	"time"
 )
 
 type Config struct {
+	PortalOrigin          string
+	PortalAssetsDir       string
 	AdminAssetsDir        string
 	ListenAddr            string
 	InternalListenAddr    string
@@ -32,6 +35,8 @@ func Load(args []string) (Config, error) {
 		return Config{}, err
 	}
 	cfg := Config{
+		PortalOrigin:          env("HUB_PORTAL_ORIGIN", ""),
+		PortalAssetsDir:       env("HUB_PORTAL_ASSETS_DIR", ""),
 		AdminAssetsDir:        env("HUB_ADMIN_ASSETS_DIR", ""),
 		ListenAddr:            env("HUB_LISTEN_ADDR", ":8080"),
 		InternalListenAddr:    env("HUB_INTERNAL_LISTEN_ADDR", "127.0.0.1:8081"),
@@ -44,6 +49,8 @@ func Load(args []string) (Config, error) {
 		ReconcileInterval:     reconcileInterval,
 	}
 	fs.StringVar(&cfg.AdminAssetsDir, "admin-assets-dir", cfg.AdminAssetsDir, "built Admin SPA directory (contains index.html)")
+	fs.StringVar(&cfg.PortalOrigin, "portal-origin", cfg.PortalOrigin, "approved Portal platform origin (HTTPS; HTTP only for loopback development)")
+	fs.StringVar(&cfg.PortalAssetsDir, "portal-assets-dir", cfg.PortalAssetsDir, "built Enterprise Portal SPA directory")
 	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "public listen address")
 	fs.StringVar(&cfg.InternalListenAddr, "internal-listen", cfg.InternalListenAddr, "internal (private) listen address for Relay→Hub service APIs")
 	fs.StringVar(&cfg.DBPath, "db", cfg.DBPath, "SQLite database path")
@@ -67,6 +74,9 @@ func Load(args []string) (Config, error) {
 	}
 	if cfg.AccessTokenTTL <= 0 || cfg.AccessTokenTTL > 10*time.Minute || cfg.ReconcileInterval <= 0 {
 		return Config{}, errors.New("invalid hub TTL/reconcile configuration")
+	}
+	if (cfg.PortalOrigin != "" && identity.ValidatePortalOrigin(cfg.PortalOrigin) != nil) || (cfg.PortalAssetsDir != "" && cfg.PortalOrigin == "") {
+		return Config{}, errors.New("invalid Portal origin/assets configuration")
 	}
 	return cfg, nil
 }

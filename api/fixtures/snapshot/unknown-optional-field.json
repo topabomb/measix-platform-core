@@ -1,6 +1,6 @@
 {
   "deploymentId": "dep_test-deployment",
-  "schemaVersion": 1,
+  "schemaVersion": 4,
   "managedGeneration": 1,
   "releaseId": "rel_test-release",
   "snapshotHash": "sha256:placeholder",
@@ -19,9 +19,15 @@
       "displayName": "Test Model",
       "upstreamModelKey": "gpt-4o",
       "runtimePath": "/v1/chat/completions",
-      "inputModalities": ["TEXT"],
-      "outputModalities": ["TEXT"],
-      "capabilities": ["TOOL"],
+      "inputModalities": [
+        "TEXT"
+      ],
+      "outputModalities": [
+        "TEXT"
+      ],
+      "capabilities": [
+        "TOOL"
+      ],
       "enabled": true,
       "futureOptionalField": "should-be-ignored-by-consumer"
     }
@@ -34,10 +40,13 @@
     "allowLocalProviders": true,
     "allowLocalTts": true,
     "allowLocalAsr": true,
-    "allowLocalMcp": true
+    "allowLocalMcp": true,
+    "allowLocalAssistants": false
   },
   "metadata": {
     "publishedAt": "2026-08-29T00:00:00Z",
     "publishedByUserId": "usr_admin"
-  }
+  },
+  "assistants": [],
+  "starters": []
 }

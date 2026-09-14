@@ -69,27 +69,6 @@ func (_u *ManagedReleaseUpdate) SetReleaseContentJSON(v []byte) *ManagedReleaseU
 	return _u
 }
 
-// SetSnapshotSchemaVersion sets the "snapshot_schema_version" field.
-func (_u *ManagedReleaseUpdate) SetSnapshotSchemaVersion(v int) *ManagedReleaseUpdate {
-	_u.mutation.ResetSnapshotSchemaVersion()
-	_u.mutation.SetSnapshotSchemaVersion(v)
-	return _u
-}
-
-// SetNillableSnapshotSchemaVersion sets the "snapshot_schema_version" field if the given value is not nil.
-func (_u *ManagedReleaseUpdate) SetNillableSnapshotSchemaVersion(v *int) *ManagedReleaseUpdate {
-	if v != nil {
-		_u.SetSnapshotSchemaVersion(*v)
-	}
-	return _u
-}
-
-// AddSnapshotSchemaVersion adds value to the "snapshot_schema_version" field.
-func (_u *ManagedReleaseUpdate) AddSnapshotSchemaVersion(v int) *ManagedReleaseUpdate {
-	_u.mutation.AddSnapshotSchemaVersion(v)
-	return _u
-}
-
 // SetSnapshotJSON sets the "snapshot_json" field.
 func (_u *ManagedReleaseUpdate) SetSnapshotJSON(v []byte) *ManagedReleaseUpdate {
 	_u.mutation.SetSnapshotJSON(v)
@@ -212,12 +191,6 @@ func (_u *ManagedReleaseUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.ReleaseContentJSON(); ok {
 		_spec.SetField(managedrelease.FieldReleaseContentJSON, field.TypeBytes, value)
 	}
-	if value, ok := _u.mutation.SnapshotSchemaVersion(); ok {
-		_spec.SetField(managedrelease.FieldSnapshotSchemaVersion, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedSnapshotSchemaVersion(); ok {
-		_spec.AddField(managedrelease.FieldSnapshotSchemaVersion, field.TypeInt, value)
-	}
 	if value, ok := _u.mutation.SnapshotJSON(); ok {
 		_spec.SetField(managedrelease.FieldSnapshotJSON, field.TypeBytes, value)
 	}
@@ -294,27 +267,6 @@ func (_u *ManagedReleaseUpdateOne) SetNillableStatus(v *string) *ManagedReleaseU
 // SetReleaseContentJSON sets the "release_content_json" field.
 func (_u *ManagedReleaseUpdateOne) SetReleaseContentJSON(v []byte) *ManagedReleaseUpdateOne {
 	_u.mutation.SetReleaseContentJSON(v)
-	return _u
-}
-
-// SetSnapshotSchemaVersion sets the "snapshot_schema_version" field.
-func (_u *ManagedReleaseUpdateOne) SetSnapshotSchemaVersion(v int) *ManagedReleaseUpdateOne {
-	_u.mutation.ResetSnapshotSchemaVersion()
-	_u.mutation.SetSnapshotSchemaVersion(v)
-	return _u
-}
-
-// SetNillableSnapshotSchemaVersion sets the "snapshot_schema_version" field if the given value is not nil.
-func (_u *ManagedReleaseUpdateOne) SetNillableSnapshotSchemaVersion(v *int) *ManagedReleaseUpdateOne {
-	if v != nil {
-		_u.SetSnapshotSchemaVersion(*v)
-	}
-	return _u
-}
-
-// AddSnapshotSchemaVersion adds value to the "snapshot_schema_version" field.
-func (_u *ManagedReleaseUpdateOne) AddSnapshotSchemaVersion(v int) *ManagedReleaseUpdateOne {
-	_u.mutation.AddSnapshotSchemaVersion(v)
 	return _u
 }
 
@@ -469,12 +421,6 @@ func (_u *ManagedReleaseUpdateOne) sqlSave(ctx context.Context) (_node *ManagedR
 	}
 	if value, ok := _u.mutation.ReleaseContentJSON(); ok {
 		_spec.SetField(managedrelease.FieldReleaseContentJSON, field.TypeBytes, value)
-	}
-	if value, ok := _u.mutation.SnapshotSchemaVersion(); ok {
-		_spec.SetField(managedrelease.FieldSnapshotSchemaVersion, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedSnapshotSchemaVersion(); ok {
-		_spec.AddField(managedrelease.FieldSnapshotSchemaVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.SnapshotJSON(); ok {
 		_spec.SetField(managedrelease.FieldSnapshotJSON, field.TypeBytes, value)

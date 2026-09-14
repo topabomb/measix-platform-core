@@ -1,8 +1,0 @@
-{
-  "runtimeStatus": "READY",
-  "activeManagedGeneration": 42,
-  "managedStateRevision": 78,
-  "syncRequired": true,
-  "targetManagedGeneration": 42,
-  "runtimeBlocked": false
-}

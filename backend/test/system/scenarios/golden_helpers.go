@@ -300,7 +300,7 @@ func (g *goldenPathTest) buildDraftContent(
 		},
 		"policy": map[string]interface{}{
 			"policyId": policyID, "allowLocalProviders": false, "allowLocalTts": false,
-			"allowLocalAsr": false, "allowLocalMcp": false,
+			"allowLocalAsr": false, "allowLocalMcp": false, "allowLocalAssistants": false,
 			"defaultModelId": modelID, "defaultTtsId": ttsID, "defaultAsrId": asrID,
 		},
 	}

@@ -1,5 +1,5 @@
-// Package migrations exposes the same immutable SQL files to binary diagnostics
-// and tests. Production application of migrations remains Atlas-owned.
+// Package migrations exposes the single current initialization schema to binary
+// diagnostics and tests. Production initialization remains Atlas-owned.
 package migrations
 
 import (
@@ -24,18 +24,14 @@ func CurrentRevision() string {
 	return strings.TrimSuffix(names[len(names)-1], ".sql")
 }
 
-func SQLAfter(revision string) string {
-	var out strings.Builder
-	for _, name := range Names() {
-		if strings.TrimSuffix(name, ".sql") <= revision {
-			continue
-		}
-		data, err := Source.ReadFile(name)
-		if err != nil {
-			panic(err)
-		}
-		out.Write(data)
-		out.WriteByte('\n')
+func CurrentSQL() string {
+	names := Names()
+	if len(names) != 1 {
+		panic("exactly one current initialization schema is required")
 	}
-	return out.String()
+	data, err := Source.ReadFile(names[0])
+	if err != nil {
+		panic(err)
+	}
+	return string(data)
 }

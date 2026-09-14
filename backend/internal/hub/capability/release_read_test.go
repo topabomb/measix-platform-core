@@ -12,7 +12,7 @@ func TestCorruptReleaseCannotBecomeEmptySuccessfulDiff(t *testing.T) {
 	ctx := context.Background()
 	id := platformid.New(platformid.Release)
 	_, err := st.Client.ManagedRelease.Create().SetID(id).SetManagedGeneration(1).SetStatus("ACTIVE").
-		SetReleaseContentJSON([]byte("{bad")).SetSnapshotSchemaVersion(2).SetSnapshotJSON([]byte("{}")).
+		SetReleaseContentJSON([]byte("{bad")).SetSnapshotJSON([]byte("{}")).
 		SetSnapshotHash("sha256:test").SetSourceDraftRevision(1).SetCreatedByUserID(boot.AdminUserID).SetCreatedAt(now).Save(ctx)
 	if err != nil {
 		t.Fatal(err)

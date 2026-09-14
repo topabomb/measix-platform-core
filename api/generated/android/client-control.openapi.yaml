@@ -3,6 +3,95 @@ info:
   title: MEASIX Client Control API
   version: 1.0.0
 paths:
+  /api/client/v1/portal/grants:
+    post:
+      operationId: createPortalGrant
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: One-use native WebView POST grant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalGrant'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /portal/session/exchange:
+    post:
+      operationId: exchangePortalGrant
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [ticket]
+              properties:
+                ticket:
+                  type: string
+                  minLength: 32
+                  maxLength: 128
+      responses:
+        '303':
+          description: Cookie established; navigate to /portal/
+          headers:
+            Location:
+              schema:
+                type: string
+            Set-Cookie:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /api/portal/v1/session:
+    get:
+      operationId: getPortalSession
+      security:
+      - portalCookie: []
+      responses:
+        '200':
+          description: Restricted Portal identity summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalSession'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+    delete:
+      description: Close only this restricted Portal session; exact Origin and CSRF are required.
+      operationId: closePortalSession
+      security:
+      - portalCookie: []
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Portal session closed; parent session unchanged
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
   /.well-known/measix:
     get:
       operationId: discover
@@ -160,11 +249,12 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
-  /api/client/v1/enterprise-updates:
+  /api/client/v1/enterprise/updates:
     get:
       operationId: listEnterpriseUpdates
       security:
       - bearerAuth: []
+      - portalCookie: []
       parameters:
       - name: startDate
         in: query
@@ -208,11 +298,12 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
-  /api/client/v1/enterprise-updates/{enterpriseUpdateId}:
+  /api/client/v1/enterprise/updates/{enterpriseUpdateId}:
     get:
       operationId: getEnterpriseUpdate
       security:
       - bearerAuth: []
+      - portalCookie: []
       parameters:
       - name: enterpriseUpdateId
         in: path
@@ -234,6 +325,69 @@ paths:
           $ref: '#/components/responses/Problem'
 components:
   schemas:
+    PlatformEnrollmentMaterial:
+      description: Versioned native scan/paste material; not an HTTP enrollment request. See Control Protocol section 8. The Admin public origin is used, never an internal Hub or Relay address.
+      type: object
+      additionalProperties: false
+      required: [formatVersion, kind, platformUrl, code, expiresAt]
+      properties:
+        formatVersion:
+          type: integer
+          enum: [1]
+        kind:
+          type: string
+          enum: [PLATFORM_ENROLLMENT]
+        platformUrl:
+          type: string
+          format: uri
+          maxLength: 1024
+        code:
+          type: string
+          minLength: 1
+          maxLength: 128
+        expiresAt:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}[Tt](?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?(?:[Zz]|\+00:00)$'
+
+    PortalGrant:
+      type: object
+      additionalProperties: false
+      required: [exchangeUrl, ticket, expiresAt]
+      properties:
+        exchangeUrl:
+          type: string
+          format: uri
+        ticket:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    PortalSession:
+      type: object
+      additionalProperties: false
+      required: [deploymentId, userId, deviceId, sessionId, enterpriseName, userDisplayName, expiresAt, sessionIdleExpiresAt, csrfToken]
+      properties:
+        deploymentId:
+          $ref: '#/components/schemas/DeploymentId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        deviceId:
+          $ref: '#/components/schemas/DeviceId'
+        sessionId:
+          $ref: '#/components/schemas/SessionId'
+        enterpriseName:
+          type: string
+        userDisplayName:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        sessionIdleExpiresAt:
+          type: string
+          format: date-time
+        csrfToken:
+          type: string
     DeploymentId:
       type: string
       pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -582,12 +736,14 @@ components:
     ManagedPolicy:
       type: object
       additionalProperties: false
+      description: Current policy. All five admission flags are required; new policies initialize all five to false.
       required:
       - policyId
       - allowLocalProviders
       - allowLocalTts
       - allowLocalAsr
       - allowLocalMcp
+      - allowLocalAssistants
       properties:
         policyId:
           $ref: '#/components/schemas/PolicyId'
@@ -599,6 +755,9 @@ components:
           type: boolean
         allowLocalMcp:
           type: boolean
+        allowLocalAssistants:
+          type: boolean
+          description: Allows user assistants; referenced resources remain independently governed.
         defaultModelId:
           $ref: '#/components/schemas/ModelId'
         defaultTtsId:
@@ -895,8 +1054,7 @@ components:
         schemaVersion:
           type: integer
           enum:
-          - 1
-          - 2
+          - 4
         managedGeneration:
           type: integer
           minimum: 1
@@ -1078,6 +1236,10 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   securitySchemes:
+    portalCookie:
+      type: apiKey
+      in: cookie
+      name: measix_portal_session
     bearerAuth:
       type: http
       scheme: bearer

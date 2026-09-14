@@ -180,30 +180,30 @@ if (useDotEnv) {
   const dotenv = loadDotEnv(dotenvPath)
 
   // MODEL profile (REQUIRED)
-  if (!profileConfig.model.endpoint) profileConfig.model.endpoint = dotenv.MODEL_ENDPOINT || dotenv.ADAPTER_ENDPOINT || null
-  if (!profileConfig.model.apiKey) profileConfig.model.apiKey = dotenv.MODEL_API_KEY || dotenv.ADAPTER_API_KEY || null
-  if (!profileConfig.model.modelId) profileConfig.model.modelId = dotenv.MODEL_ID || dotenv.ADAPTER_MODEL_ID || null
+  if (!profileConfig.model.endpoint) profileConfig.model.endpoint = dotenv.MODEL_ENDPOINT || null
+  if (!profileConfig.model.apiKey) profileConfig.model.apiKey = dotenv.MODEL_API_KEY || null
+  if (!profileConfig.model.modelId) profileConfig.model.modelId = dotenv.MODEL_ID || null
 
   // TTS profile (optional)
   if (!profileConfig.tts.endpoint) profileConfig.tts.endpoint = dotenv.TTS_ENDPOINT || null
   if (!profileConfig.tts.apiKey) profileConfig.tts.apiKey = dotenv.TTS_API_KEY || null
-  if (!profileConfig.tts.modelId) profileConfig.tts.modelId = dotenv.TTS_MODEL || dotenv.ADAPTER_TTS_MODEL || null
-  if (profileConfig.tts.voice === 'alloy' && (dotenv.TTS_VOICE || dotenv.ADAPTER_TTS_VOICE))
-    profileConfig.tts.voice = dotenv.TTS_VOICE || dotenv.ADAPTER_TTS_VOICE
+  if (!profileConfig.tts.modelId) profileConfig.tts.modelId = dotenv.TTS_MODEL || null
+  if (profileConfig.tts.voice === 'alloy' && (dotenv.TTS_VOICE))
+    profileConfig.tts.voice = dotenv.TTS_VOICE
 
   // ASR profile (optional)
   if (!profileConfig.asr.endpoint) profileConfig.asr.endpoint = dotenv.ASR_ENDPOINT || null
   if (!profileConfig.asr.apiKey) profileConfig.asr.apiKey = dotenv.ASR_API_KEY || null
-  if (!profileConfig.asr.modelId) profileConfig.asr.modelId = dotenv.ASR_MODEL || dotenv.ADAPTER_ASR_MODEL || null
+  if (!profileConfig.asr.modelId) profileConfig.asr.modelId = dotenv.ASR_MODEL || null
 
   // MCP profile (optional)
-  if (!profileConfig.mcp.endpoint) profileConfig.mcp.endpoint = dotenv.MCP_ENDPOINT || dotenv.ADAPTER_MCP_ENDPOINT || null
-  if (!profileConfig.mcp.apiKey) profileConfig.mcp.apiKey = dotenv.MCP_API_KEY || dotenv.ADAPTER_MCP_API_KEY || null
+  if (!profileConfig.mcp.endpoint) profileConfig.mcp.endpoint = dotenv.MCP_ENDPOINT || null
+  if (!profileConfig.mcp.apiKey) profileConfig.mcp.apiKey = dotenv.MCP_API_KEY || null
 
   if (dotenv.MEASIX_ADMIN_PASSWORD) adminPassword = dotenv.MEASIX_ADMIN_PASSWORD
 }
 
-// --- Set global endpoint/apiKey for backward compatibility (NOT_EXECUTED check) ---
+// Model endpoint and credential used by the model qualification run.
 endpoint = profileConfig.model.endpoint
 apiKey = profileConfig.model.apiKey
 
@@ -649,7 +649,7 @@ async function main() {
     }],
     policy: {
       policyId: policyId, allowLocalProviders: false, allowLocalTts: false,
-      allowLocalAsr: false, allowLocalMcp: false,
+      allowLocalAsr: false, allowLocalMcp: false, allowLocalAssistants: false,
       defaultModelId: modelId,
     },
   }

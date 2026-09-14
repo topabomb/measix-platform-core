@@ -38,7 +38,18 @@ func RegisterFull(router chi.Router, services Services) {
 	}
 	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity}, capability: services.Capability, enterpriseUpdate: services.EnterpriseUpdate}
 	adminapi.HandlerFromMux(admin, router)
-	clientapi.HandlerFromMux(client, router)
+	clientapi.HandlerWithOptions(client, clientapi.ChiServerOptions{BaseRouter: router, ErrorHandlerFunc: clientBindingError})
+}
+
+// Required security-header binding failures retain the Portal protocol's 403,
+// including requests rejected by generated code before the domain handler runs.
+func clientBindingError(w http.ResponseWriter, r *http.Request, err error) {
+	if r.Method == http.MethodDelete && r.URL.Path == "/api/portal/v1/session" {
+		w.Header().Set("Cache-Control", "no-store")
+		writeProblem(w, http.StatusForbidden, "forbidden", "Portal security headers required")
+		return
+	}
+	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
 func NewFull(services Services) http.Handler {

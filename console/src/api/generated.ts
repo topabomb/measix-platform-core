@@ -667,12 +667,15 @@ export interface components {
             transportPolicy: "HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART";
             timeoutPolicy?: components["schemas"]["TimeoutPolicy"];
         };
+        /** @description Current policy. All five admission flags are required; new policies initialize all five to false. */
         ManagedPolicy: {
             policyId: components["schemas"]["PolicyId"];
             allowLocalProviders: boolean;
             allowLocalTts: boolean;
             allowLocalAsr: boolean;
             allowLocalMcp: boolean;
+            /** @description Allows user assistants; referenced resources remain independently governed. */
+            allowLocalAssistants: boolean;
             defaultModelId?: components["schemas"]["ModelId"];
             defaultTtsId?: components["schemas"]["TtsId"];
             defaultAsrId?: components["schemas"]["AsrId"];

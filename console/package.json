@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "quasar dev",
     "prepare": "quasar prepare",
-    "generate:api": "openapi-typescript ../api/admin/admin.openapi.yaml -o src/api/generated.ts",
+    "generate:api": "openapi-typescript ../api/admin/admin.openapi.yaml -o src/api/generated.ts && openapi-typescript ../api/client/client-control.openapi.yaml -o src/api/generated-client.ts",
     "typecheck": "quasar prepare && vue-tsc --noEmit",
     "test": "vitest run",
     "build": "quasar build",

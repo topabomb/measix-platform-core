@@ -1,5 +1,44 @@
 import { test, expect, type Page } from '@playwright/test'
 
+test('ERX-UPD-001/002 Admin update authoring, safe preview, publish and withdraw', async ({ page }) => {
+  await login(page)
+  await page.goto('/admin/enterprise-updates')
+  const updates = page.locator('[data-cy="enterprise-updates-page"]')
+  const title = `Release notice ${Date.now()}`
+  const editedTitle = `${title} edited`
+  const embeddedRequests: string[] = []
+  page.on('request', request => {
+    if (request.url().includes('untrusted-embed.png')) embeddedRequests.push(request.url())
+  })
+  await updates.getByRole('button', { name: 'Create', exact: true }).click()
+  const dialog = page.locator('.q-dialog')
+  await dialog.getByLabel('Title', { exact: true }).fill(title)
+  await dialog.getByLabel('Content', { exact: true }).fill('**safe** <b>raw</b>\n\n![blocked](/untrusted-embed.png)')
+  await dialog.getByLabel('Format', { exact: true }).click()
+  await page.getByRole('option', { name: 'MARKDOWN', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+  let row = updates.locator('.q-list > .q-item').filter({ hasText: title })
+  await expect(row).toContainText('Draft')
+  await row.click()
+  await expect(dialog.locator('.markdown-body strong')).toHaveText('safe')
+  await expect(dialog.locator('.markdown-body')).toContainText('<b>raw</b>')
+  await expect(dialog.locator('.markdown-body img, .markdown-body b')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Edit', exact: true }).click()
+  await dialog.getByLabel('Title', { exact: true }).fill(editedTitle)
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  row = updates.locator('.q-list > .q-item').filter({ hasText: editedTitle })
+  await expect(row).toContainText('Draft')
+  page.once('dialog', prompt => prompt.accept())
+  await row.getByRole('button', { name: 'Publish', exact: true }).click()
+  await expect(row).toContainText('Published')
+  page.once('dialog', prompt => prompt.accept())
+  await row.getByRole('button', { name: 'Withdraw', exact: true }).click()
+  await expect(row).toContainText('Withdrawn')
+  await page.reload()
+  await expect(row).toContainText('Withdrawn')
+  expect(embeddedRequests).toEqual([])
+})
+
 /**
  * CAP-C6-001-Authoring — Browser Golden Path Phase 1-8 (Authoring + Publish).
  *
@@ -72,6 +111,17 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
 
     const codeField = page.locator('[data-cy="enrollment-code-field"]')
     await expect(codeField).not.toBeEmpty({ timeout: 10_000 })
+    const materialField = page.locator('[data-cy="enrollment-material-field"]')
+    const material = JSON.parse(await materialField.inputValue())
+    expect(material).toEqual({
+      formatVersion: 1,
+      kind: 'PLATFORM_ENROLLMENT',
+      platformUrl: new URL(page.url()).origin,
+      code: await codeField.inputValue(),
+      expiresAt: expect.any(String),
+    })
+    expect(Date.parse(material.expiresAt)).toBeGreaterThan(Date.now())
+    await expect(page.locator('[data-cy="copy-enrollment-material"]')).toBeVisible()
 
     await page.keyboard.press('Escape')
   })
@@ -197,10 +247,11 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.waitForTimeout(500)
 
     const policyFlags = [
-      { label: 'Allow Local Models', dataCy: 'policy-allow-local-models' },
-      { label: 'Allow Local TTS', dataCy: 'policy-allow-local-tts' },
-      { label: 'Allow Local ASR', dataCy: 'policy-allow-local-asr' },
-      { label: 'Allow Local MCP', dataCy: 'policy-allow-local-mcp' },
+      { label: 'Allow user Providers/models', dataCy: 'policy-allow-local-models' },
+      { label: 'Allow user TTS', dataCy: 'policy-allow-local-tts' },
+      { label: 'Allow user ASR', dataCy: 'policy-allow-local-asr' },
+      { label: 'Allow user MCP', dataCy: 'policy-allow-local-mcp' },
+      { label: 'Allow user assistants', dataCy: 'policy-allow-local-assistants' },
     ]
     for (const flag of policyFlags) {
       const toggle = page.getByRole('switch', { name: flag.label })
@@ -416,10 +467,11 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.click('[data-cy="tab-policy"]')
     await page.waitForTimeout(500)
     const policyFlagsAfter = [
-      'Allow Local Models',
-      'Allow Local TTS',
-      'Allow Local ASR',
-      'Allow Local MCP',
+      'Allow user Providers/models',
+      'Allow user TTS',
+      'Allow user ASR',
+      'Allow user MCP',
+      'Allow user assistants',
     ]
     for (const flagLabel of policyFlagsAfter) {
       const toggle = page.getByRole('switch', { name: flagLabel })

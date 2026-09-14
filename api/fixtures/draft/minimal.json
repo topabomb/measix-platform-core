@@ -13,7 +13,8 @@
       "allowLocalProviders": true,
       "allowLocalTts": true,
       "allowLocalAsr": true,
-      "allowLocalMcp": true
+      "allowLocalMcp": true,
+      "allowLocalAssistants": false
     },
     "assistants": [],
     "starters": []

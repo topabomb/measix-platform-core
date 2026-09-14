@@ -195,7 +195,7 @@ func publishDraft(upstreamID string) adminapi.ManagedDraftContent {
 			RuntimeRouteId: routeID, ResourceId: modelID, UpstreamId: upstreamID,
 			AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE,
 		}},
-		Policy: adminapi.ManagedPolicy{PolicyId: policyID, AllowLocalProviders: true, AllowLocalTts: true, AllowLocalAsr: true, AllowLocalMcp: true, DefaultModelId: &modelID},
+		Policy: adminapi.ManagedPolicy{PolicyId: policyID, AllowLocalProviders: true, AllowLocalTts: true, AllowLocalAsr: true, AllowLocalMcp: true, AllowLocalAssistants: false, DefaultModelId: &modelID},
 	}
 }
 

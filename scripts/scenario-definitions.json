@@ -1341,15 +1341,6 @@
     "required": true
   },
   {
-    "id": "HUB-DB-002",
-    "name": "Previous supported schema upgrade",
-    "artifact": "backend-test.json",
-    "testNames": [
-      "TestHUBDB002PreviousSchemaUpgrade"
-    ],
-    "required": true
-  },
-  {
     "id": "HUB-DB-003",
     "name": "Migration history not rewritten on restart",
     "artifact": "backend-test.json",
@@ -1373,15 +1364,6 @@
     "artifact": "backend-test.json",
     "testNames": [
       "TestHUBDB005MigrationChecksumNotTampered"
-    ],
-    "required": true
-  },
-  {
-    "id": "HUB-DB-006",
-    "name": "Migration preserves critical IDs",
-    "artifact": "backend-test.json",
-    "testNames": [
-      "TestHUBDB006MigrationPreservesCriticalIDs"
     ],
     "required": true
   },

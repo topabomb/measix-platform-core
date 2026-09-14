@@ -20,6 +20,7 @@ import (
 	"measix/platform/ent/manageddraft"
 	"measix/platform/ent/managedrelease"
 	"measix/platform/ent/managedstate"
+	"measix/platform/ent/portalsession"
 	"measix/platform/ent/pricingrule"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/secret"
@@ -58,6 +59,8 @@ type Client struct {
 	ManagedRelease *ManagedReleaseClient
 	// ManagedState is the client for interacting with the ManagedState builders.
 	ManagedState *ManagedStateClient
+	// PortalSession is the client for interacting with the PortalSession builders.
+	PortalSession *PortalSessionClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
 	// RequestUsage is the client for interacting with the RequestUsage builders.
@@ -96,6 +99,7 @@ func (c *Client) init() {
 	c.ManagedDraft = NewManagedDraftClient(c.config)
 	c.ManagedRelease = NewManagedReleaseClient(c.config)
 	c.ManagedState = NewManagedStateClient(c.config)
+	c.PortalSession = NewPortalSessionClient(c.config)
 	c.PricingRule = NewPricingRuleClient(c.config)
 	c.RequestUsage = NewRequestUsageClient(c.config)
 	c.Secret = NewSecretClient(c.config)
@@ -206,6 +210,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ManagedDraft:           NewManagedDraftClient(cfg),
 		ManagedRelease:         NewManagedReleaseClient(cfg),
 		ManagedState:           NewManagedStateClient(cfg),
+		PortalSession:          NewPortalSessionClient(cfg),
 		PricingRule:            NewPricingRuleClient(cfg),
 		RequestUsage:           NewRequestUsageClient(cfg),
 		Secret:                 NewSecretClient(cfg),
@@ -243,6 +248,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ManagedDraft:           NewManagedDraftClient(cfg),
 		ManagedRelease:         NewManagedReleaseClient(cfg),
 		ManagedState:           NewManagedStateClient(cfg),
+		PortalSession:          NewPortalSessionClient(cfg),
 		PricingRule:            NewPricingRuleClient(cfg),
 		RequestUsage:           NewRequestUsageClient(cfg),
 		Secret:                 NewSecretClient(cfg),
@@ -283,8 +289,8 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.Activation, c.Deployment, c.Device, c.Enrollment, c.EnterpriseUpdate,
 		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
-		c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion, c.SemanticUsage,
-		c.Session, c.Upstream, c.UpstreamConfigRevision, c.User,
+		c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion,
+		c.SemanticUsage, c.Session, c.Upstream, c.UpstreamConfigRevision, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -296,8 +302,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.Activation, c.Deployment, c.Device, c.Enrollment, c.EnterpriseUpdate,
 		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
-		c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion, c.SemanticUsage,
-		c.Session, c.Upstream, c.UpstreamConfigRevision, c.User,
+		c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion,
+		c.SemanticUsage, c.Session, c.Upstream, c.UpstreamConfigRevision, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -324,6 +330,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ManagedRelease.mutate(ctx, m)
 	case *ManagedStateMutation:
 		return c.ManagedState.mutate(ctx, m)
+	case *PortalSessionMutation:
+		return c.PortalSession.mutate(ctx, m)
 	case *PricingRuleMutation:
 		return c.PricingRule.mutate(ctx, m)
 	case *RequestUsageMutation:
@@ -1544,6 +1552,139 @@ func (c *ManagedStateClient) mutate(ctx context.Context, m *ManagedStateMutation
 	}
 }
 
+// PortalSessionClient is a client for the PortalSession schema.
+type PortalSessionClient struct {
+	config
+}
+
+// NewPortalSessionClient returns a client for the PortalSession from the given config.
+func NewPortalSessionClient(c config) *PortalSessionClient {
+	return &PortalSessionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `portalsession.Hooks(f(g(h())))`.
+func (c *PortalSessionClient) Use(hooks ...Hook) {
+	c.hooks.PortalSession = append(c.hooks.PortalSession, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `portalsession.Intercept(f(g(h())))`.
+func (c *PortalSessionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PortalSession = append(c.inters.PortalSession, interceptors...)
+}
+
+// Create returns a builder for creating a PortalSession entity.
+func (c *PortalSessionClient) Create() *PortalSessionCreate {
+	mutation := newPortalSessionMutation(c.config, OpCreate)
+	return &PortalSessionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PortalSession entities.
+func (c *PortalSessionClient) CreateBulk(builders ...*PortalSessionCreate) *PortalSessionCreateBulk {
+	return &PortalSessionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PortalSessionClient) MapCreateBulk(slice any, setFunc func(*PortalSessionCreate, int)) *PortalSessionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PortalSessionCreateBulk{err: fmt.Errorf("calling to PortalSessionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PortalSessionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PortalSessionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PortalSession.
+func (c *PortalSessionClient) Update() *PortalSessionUpdate {
+	mutation := newPortalSessionMutation(c.config, OpUpdate)
+	return &PortalSessionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PortalSessionClient) UpdateOne(_m *PortalSession) *PortalSessionUpdateOne {
+	mutation := newPortalSessionMutation(c.config, OpUpdateOne, withPortalSession(_m))
+	return &PortalSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PortalSessionClient) UpdateOneID(id string) *PortalSessionUpdateOne {
+	mutation := newPortalSessionMutation(c.config, OpUpdateOne, withPortalSessionID(id))
+	return &PortalSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PortalSession.
+func (c *PortalSessionClient) Delete() *PortalSessionDelete {
+	mutation := newPortalSessionMutation(c.config, OpDelete)
+	return &PortalSessionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PortalSessionClient) DeleteOne(_m *PortalSession) *PortalSessionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PortalSessionClient) DeleteOneID(id string) *PortalSessionDeleteOne {
+	builder := c.Delete().Where(portalsession.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PortalSessionDeleteOne{builder}
+}
+
+// Query returns a query builder for PortalSession.
+func (c *PortalSessionClient) Query() *PortalSessionQuery {
+	return &PortalSessionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePortalSession},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PortalSession entity by its id.
+func (c *PortalSessionClient) Get(ctx context.Context, id string) (*PortalSession, error) {
+	return c.Query().Where(portalsession.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PortalSessionClient) GetX(ctx context.Context, id string) *PortalSession {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PortalSessionClient) Hooks() []Hook {
+	return c.hooks.PortalSession
+}
+
+// Interceptors returns the client interceptors.
+func (c *PortalSessionClient) Interceptors() []Interceptor {
+	return c.inters.PortalSession
+}
+
+func (c *PortalSessionClient) mutate(ctx context.Context, m *PortalSessionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PortalSessionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PortalSessionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PortalSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PortalSessionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PortalSession mutation op: %q", m.Op())
+	}
+}
+
 // PricingRuleClient is a client for the PricingRule schema.
 type PricingRuleClient struct {
 	config
@@ -2745,14 +2886,14 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 type (
 	hooks struct {
 		Activation, Deployment, Device, Enrollment, EnterpriseUpdate, IdempotencyRecord,
-		ManagedDraft, ManagedRelease, ManagedState, PricingRule, RequestUsage, Secret,
-		SecretVersion, SemanticUsage, Session, Upstream, UpstreamConfigRevision,
-		User []ent.Hook
+		ManagedDraft, ManagedRelease, ManagedState, PortalSession, PricingRule,
+		RequestUsage, Secret, SecretVersion, SemanticUsage, Session, Upstream,
+		UpstreamConfigRevision, User []ent.Hook
 	}
 	inters struct {
 		Activation, Deployment, Device, Enrollment, EnterpriseUpdate, IdempotencyRecord,
-		ManagedDraft, ManagedRelease, ManagedState, PricingRule, RequestUsage, Secret,
-		SecretVersion, SemanticUsage, Session, Upstream, UpstreamConfigRevision,
-		User []ent.Interceptor
+		ManagedDraft, ManagedRelease, ManagedState, PortalSession, PricingRule,
+		RequestUsage, Secret, SecretVersion, SemanticUsage, Session, Upstream,
+		UpstreamConfigRevision, User []ent.Interceptor
 	}
 )

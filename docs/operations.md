@@ -1,6 +1,6 @@
 # Operations
 
-This document owns concrete operating procedures, configuration and current limitations. Architecture owns required behavior; [the alignment audit](architecture-alignment-audit.md) records the 2026-08-31 source baseline and remediation plan. A documented target is not an implemented production package.
+This document owns concrete operating procedures, configuration and current limitations. Architecture owns required behavior; [current status](s0-execution-progress.md) records implemented behavior and remaining stage gates. A documented target is not an implemented production package.
 
 ## 1. Implemented topology
 
@@ -21,6 +21,8 @@ Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/
 | `--listen` | `HUB_LISTEN_ADDR` | `:8080` |
 | `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8081`; keep private |
 | `--admin-assets-dir` | `HUB_ADMIN_ASSETS_DIR` | Optional production SPA directory |
+| `--portal-origin` | `HUB_PORTAL_ORIGIN` | Approved HTTPS platform origin; loopback HTTP only for development |
+| `--portal-assets-dir` | `HUB_PORTAL_ASSETS_DIR` | Optional independent Portal dist; requires approved origin |
 | `--db` | `HUB_DB_PATH` | Required SQLite path |
 | `--master-key-file` | `HUB_MASTER_KEY_FILE` | Required AES-256 key file; secret |
 | `--jwt-private-key-file` | `HUB_JWT_PRIVATE_KEY_FILE` | Required Ed25519 key file; secret |
@@ -73,6 +75,8 @@ Shared HTTP serving handles SIGINT/SIGTERM and invokes bounded drain: Hub uses 3
 
 Normal Relay shutdown attempts one final usage flush, capped at two seconds, and preserves the durable spool. It does not guarantee the entire backlog reaches Hub before exit. Sender retry/backoff and poison-batch splitting exist; the recorder degraded flag remains latched until restart. Diagnose failures before restart; never delete the spool as routine recovery.
 
+Runtime response cleanup records usage even when ReverseProxy aborts a mid-stream response. Such facts preserve the already-sent HTTP status and captured control/resource attribution, with `CLIENT_CANCELLED`, `UPSTREAM_TIMEOUT` or `UPSTREAM_UNAVAILABLE` distinguishing the failure. An upstream 200 alone does not prove a stream completed; inspect its error classification.
+
 ## 6. Persistence, backup and restore
 
 Hub owns its control/identity/usage SQLite database. Relay owns its local durable usage spool. Neither reads the other's database. Keep both outside replaceable binary directories; handle SQLite auxiliary files correctly when moving a stopped database.
@@ -114,3 +118,5 @@ Never emit tokens, cookies, credentials, enrollment/session/signing material, pr
 | Repeated process crash | Preserve diagnostics/persistent data; no production restart-rate-limit package exists yet |
 
 Upgrade must pin artifacts, verify applicable evidence, back up, apply reviewed migrations, deploy, validate readiness/control/static routing and run smoke/recovery checks. Binary downgrade is not assumed safe after schema changes. RC also needs isolated restore, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).
+
+For the 2026-09-07 repair, apply the release metadata migration described in [database migrations](database-migrations.md). The new common runtime compiler excludes disabled resources and models under disabled Providers and preserves the complete timeout policy. Existing committed descriptors remain immutable during restart recovery: after upgrading an existing deployment, explicitly Republish the intended Release through Admin to establish a new generation/descriptor, then verify disabled resources are denied. Do not rewrite an old descriptor/hash or claim that a binary restart alone has applied the new routing projection.

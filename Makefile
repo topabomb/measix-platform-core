@@ -121,9 +121,7 @@ migrations: migration-replay
 	git diff --exit-code -- backend/migrations/atlas.sum
 
 migration-replay:
-	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
-	atlas migrate apply --dir file://backend/migrations --url "sqlite://$tmp/hub.db" && \
-	atlas migrate status --dir file://backend/migrations --url "sqlite://$$tmp/hub.db"
+	node scripts/checks.mjs migration-replay
 
 generated-drift:
 	node scripts/checks.mjs drift

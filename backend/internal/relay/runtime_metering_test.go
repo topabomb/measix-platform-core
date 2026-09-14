@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	relayruntime "measix/platform/internal/relay/runtime"
 	"measix/platform/internal/wire/usageingestapi"
@@ -35,7 +36,7 @@ func TestAuthenticatedUnmappedResourceStillProducesUsage(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
-	events := recorder.snapshot()
+	events := recorder.waitFor(t, 1)
 	if len(events) != 1 {
 		t.Fatalf("authenticated denial lost usage: %d events", len(events))
 	}
@@ -55,6 +56,26 @@ func (r *captureUsageRecorder) snapshot() []usageingestapi.RequestUsageEvent {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]usageingestapi.RequestUsageEvent(nil), r.events...)
+}
+
+// Receiving the response bytes does not mean the server's cleanup has finished.
+func (r *captureUsageRecorder) waitFor(t *testing.T, count int) []usageingestapi.RequestUsageEvent {
+	t.Helper()
+	deadline := time.NewTimer(2 * time.Second)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		events := r.snapshot()
+		if len(events) >= count {
+			return events
+		}
+		select {
+		case <-deadline.C:
+			t.Fatalf("expected %d completed usage facts, got %d", count, len(events))
+		case <-tick.C:
+		}
+	}
 }
 
 func TestRLYI5RuntimeWritesCapturedRequestUsage(t *testing.T) {
@@ -83,7 +104,7 @@ func TestRLYI5RuntimeWritesCapturedRequestUsage(t *testing.T) {
 	if response.StatusCode != http.StatusCreated {
 		t.Fatalf("unexpected runtime status: %d body=%s", response.StatusCode, responseBody)
 	}
-	events := recorder.snapshot()
+	events := recorder.waitFor(t, 1)
 	if len(events) != 1 {
 		t.Fatalf("expected one usage event, got %d", len(events))
 	}
@@ -109,7 +130,7 @@ func TestRLYI5RuntimeWritesCapturedRequestUsage(t *testing.T) {
 	if response.StatusCode != http.StatusPreconditionRequired || upstreamCalls.Load() != 1 {
 		t.Fatalf("stale generation forwarded unexpectedly: status=%d calls=%d body=%s", response.StatusCode, upstreamCalls.Load(), staleBody)
 	}
-	events = recorder.snapshot()
+	events = recorder.waitFor(t, 2)
 	if len(events) != 2 || events[1].Forwarded || events[1].HttpStatus != http.StatusPreconditionRequired {
 		t.Fatalf("428 usage fact missing/incorrect: %+v", events)
 	}

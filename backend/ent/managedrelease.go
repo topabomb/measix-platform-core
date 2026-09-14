@@ -23,8 +23,6 @@ type ManagedRelease struct {
 	Status string `json:"status,omitempty"`
 	// ReleaseContentJSON holds the value of the "release_content_json" field.
 	ReleaseContentJSON []byte `json:"release_content_json,omitempty"`
-	// SnapshotSchemaVersion holds the value of the "snapshot_schema_version" field.
-	SnapshotSchemaVersion int `json:"snapshot_schema_version,omitempty"`
 	// SnapshotJSON holds the value of the "snapshot_json" field.
 	SnapshotJSON []byte `json:"snapshot_json,omitempty"`
 	// SnapshotHash holds the value of the "snapshot_hash" field.
@@ -45,7 +43,7 @@ func (*ManagedRelease) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case managedrelease.FieldReleaseContentJSON, managedrelease.FieldSnapshotJSON:
 			values[i] = new([]byte)
-		case managedrelease.FieldManagedGeneration, managedrelease.FieldSnapshotSchemaVersion, managedrelease.FieldSourceDraftRevision:
+		case managedrelease.FieldManagedGeneration, managedrelease.FieldSourceDraftRevision:
 			values[i] = new(sql.NullInt64)
 		case managedrelease.FieldID, managedrelease.FieldStatus, managedrelease.FieldSnapshotHash, managedrelease.FieldCreatedByUserID:
 			values[i] = new(sql.NullString)
@@ -89,12 +87,6 @@ func (_m *ManagedRelease) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field release_content_json", values[i])
 			} else if value != nil {
 				_m.ReleaseContentJSON = *value
-			}
-		case managedrelease.FieldSnapshotSchemaVersion:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field snapshot_schema_version", values[i])
-			} else if value.Valid {
-				_m.SnapshotSchemaVersion = int(value.Int64)
 			}
 		case managedrelease.FieldSnapshotJSON:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -170,9 +162,6 @@ func (_m *ManagedRelease) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("release_content_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ReleaseContentJSON))
-	builder.WriteString(", ")
-	builder.WriteString("snapshot_schema_version=")
-	builder.WriteString(fmt.Sprintf("%v", _m.SnapshotSchemaVersion))
 	builder.WriteString(", ")
 	builder.WriteString("snapshot_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SnapshotJSON))

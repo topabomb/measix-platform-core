@@ -26,8 +26,7 @@ type proxyResult struct {
 	ErrorClass     string
 }
 
-func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string) proxyResult {
-	result := proxyResult{}
+func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string, result *proxyResult) {
 	target := targetURL(upstream.BaseURL, runtimePath, r.URL.RawQuery)
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(request *httputil.ProxyRequest) {
@@ -74,8 +73,24 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 		defer cancel()
 		request = r.WithContext(ctx)
 	}
+	defer func() {
+		if cause := recover(); cause != nil {
+			result.ErrorClass = "INTERNAL_ERROR"
+			if cause == http.ErrAbortHandler {
+				switch request.Context().Err() {
+				case context.Canceled:
+					result.ErrorClass = "CLIENT_CANCELLED"
+				case context.DeadlineExceeded:
+					result.ErrorClass = "UPSTREAM_TIMEOUT"
+				default:
+					result.ErrorClass = "UPSTREAM_UNAVAILABLE"
+				}
+			}
+			// Preserve net/http's connection abort; a truncated 200 is not success.
+			panic(cause)
+		}
+	}()
 	proxy.ServeHTTP(w, request)
-	return result
 }
 
 func (h *Handler) transportFor(policy relaycontrolapi.TimeoutPolicy) http.RoundTripper {

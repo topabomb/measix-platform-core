@@ -6,6 +6,7 @@ import (
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enterpriseupdate"
+	"measix/platform/ent/portalsession"
 	"measix/platform/ent/schema"
 )
 
@@ -43,4 +44,14 @@ func init() {
 	enterpriseupdateDescSeverity := enterpriseupdateFields[5].Descriptor()
 	// enterpriseupdate.DefaultSeverity holds the default value on creation for the severity field.
 	enterpriseupdate.DefaultSeverity = enterpriseupdateDescSeverity.Default.(string)
+	portalsessionFields := schema.PortalSession{}.Fields()
+	_ = portalsessionFields
+	// portalsessionDescConsumed is the schema descriptor for consumed field.
+	portalsessionDescConsumed := portalsessionFields[7].Descriptor()
+	// portalsession.DefaultConsumed holds the default value on creation for the consumed field.
+	portalsession.DefaultConsumed = portalsessionDescConsumed.Default.(bool)
+	// portalsessionDescRevoked is the schema descriptor for revoked field.
+	portalsessionDescRevoked := portalsessionFields[8].Descriptor()
+	// portalsession.DefaultRevoked holds the default value on creation for the revoked field.
+	portalsession.DefaultRevoked = portalsessionDescRevoked.Default.(bool)
 }

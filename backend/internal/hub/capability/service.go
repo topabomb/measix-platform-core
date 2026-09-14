@@ -481,14 +481,15 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 		ASR:            projectionToAdminAsr(snapshot.Asr),
 		MCP:            projectionToAdminMcp(snapshot.Mcp),
 		Policy: adminapi.ManagedPolicy{
-			PolicyId:            snapshot.Policy.PolicyId,
-			AllowLocalProviders: snapshot.Policy.AllowLocalProviders,
-			AllowLocalTts:       snapshot.Policy.AllowLocalTts,
-			AllowLocalAsr:       snapshot.Policy.AllowLocalAsr,
-			AllowLocalMcp:       snapshot.Policy.AllowLocalMcp,
-			DefaultModelId:      snapshot.Policy.DefaultModelId,
-			DefaultTtsId:        snapshot.Policy.DefaultTtsId,
-			DefaultAsrId:        snapshot.Policy.DefaultAsrId,
+			PolicyId:             snapshot.Policy.PolicyId,
+			AllowLocalProviders:  snapshot.Policy.AllowLocalProviders,
+			AllowLocalTts:        snapshot.Policy.AllowLocalTts,
+			AllowLocalAsr:        snapshot.Policy.AllowLocalAsr,
+			AllowLocalMcp:        snapshot.Policy.AllowLocalMcp,
+			AllowLocalAssistants: snapshot.Policy.AllowLocalAssistants,
+			DefaultModelId:       snapshot.Policy.DefaultModelId,
+			DefaultTtsId:         snapshot.Policy.DefaultTtsId,
+			DefaultAsrId:         snapshot.Policy.DefaultAsrId,
 		},
 		Assistants: projectionToAdminAssistants(snapshot.Assistants),
 		Starters:   projectionToAdminStarters(snapshot.Starters),
@@ -544,7 +545,6 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 		SetManagedGeneration(int64(generation)).
 		SetStatus("STAGED").
 		SetReleaseContentJSON(releaseJSON).
-		SetSnapshotSchemaVersion(2).
 		SetSnapshotJSON(snapshotJSON).
 		SetSnapshotHash(hash).
 		SetSourceDraftRevision(int64(draft.DraftRevision)).

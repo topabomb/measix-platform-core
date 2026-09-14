@@ -273,7 +273,7 @@ export function validateCandidate(manifest, { allowPendingReplay = false } = {})
   const errors = [...validatePins(manifest,facts,SCENARIO_DEFS,allowPendingReplay), ...evidence.errors]
   if (gitDirty(ROOT) || gitDirty(ARCH_REPO)) errors.push('Current source checkout is dirty')
   if (facts.adminBuildHash === 'not-built') errors.push('Admin production build missing')
-  if (facts.snapshotSchemaVersion !== 1) errors.push('This CAP runner is S0.1-only; live Snapshot v2 requires the ERX/S0.2 gate and cannot be relabeled v1')
+  if (facts.snapshotSchemaVersion !== 4) errors.push(`This CAP runner requires current Snapshot v4; found v${facts.snapshotSchemaVersion}. Resource checks do not replace the S0.2 ERX gate`)
   for (const name of artifactNames) {
     const pin = manifest.artifactPins?.[name], current = evidence.pins[name]
     if (!pin || !current || pin.artifactSha256 !== current.artifactSha256 || pin.metaSha256 !== current.metaSha256) errors.push(name + ': manifest evidence pin mismatch')
@@ -298,7 +298,6 @@ function main() {
   if (process.argv.includes('--clean-replay')) throw new Error('--clean-replay is not validation. An independent clean-source rebuild/replay is required; runtime replay alone cannot finalize C7.')
   const index = process.argv.indexOf('--manifest')
   const path = index < 0 ? join(ARTIFACTS_DIR,'s0-freeze-candidate.json') : resolve(process.argv[index + 1] ?? '')
-  if (path === join(ROOT,'docs','s0-freeze-manifest.json')) throw new Error('Historical tracked manifest is immutable; use an artifact candidate path')
   if (process.argv.includes('--validate')) {
     const manifest = JSON.parse(readFileSync(path,'utf8'))
     const errors = validateCandidate(manifest,{allowPendingReplay:process.argv.includes('--candidate')})

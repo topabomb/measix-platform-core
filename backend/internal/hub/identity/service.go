@@ -16,18 +16,20 @@ import (
 )
 
 var (
-	ErrInvalidInput    = errors.New("invalid identity input")
-	ErrRefreshConflict = errors.New("refresh conflict")
-	ErrNotFound        = errors.New("identity not found")
-	ErrConflict        = errors.New("identity conflict")
-	ErrCredential      = errors.New("invalid credential")
-	ErrExpired         = errors.New("credential expired")
-	ErrRevoked         = errors.New("identity revoked")
-	ErrAlreadyUsed     = errors.New("enrollment already used")
-	ErrNotAuthorized   = errors.New("not authorized")
+	ErrInvalidInput      = errors.New("invalid identity input")
+	ErrRefreshConflict   = errors.New("refresh conflict")
+	ErrNotFound          = errors.New("identity not found")
+	ErrConflict          = errors.New("identity conflict")
+	ErrCredential        = errors.New("invalid credential")
+	ErrExpired           = errors.New("credential expired")
+	ErrRevoked           = errors.New("identity revoked")
+	ErrAlreadyUsed       = errors.New("enrollment already used")
+	ErrNotAuthorized     = errors.New("not authorized")
+	ErrPortalUnavailable = errors.New("portal unavailable")
 )
 
 type Service struct {
+	PortalOrigin      string
 	BootstrapTimezone string
 	Client            *ent.Client
 	Signer            *security.AccessSigner
@@ -290,48 +292,51 @@ func (s *Service) AuthenticateAccess(ctx context.Context, token string) (AccessP
 	if err != nil {
 		return AccessPrincipal{}, ErrCredential
 	}
-	se, err := s.Client.Session.Get(ctx, claims.SessionID)
+	p := AccessPrincipal{DeploymentID: claims.DeploymentID, UserID: claims.Subject, DeviceID: claims.DeviceID, SessionID: claims.SessionID}
+	if err := s.validateAccessPrincipal(ctx, p); err != nil {
+		return AccessPrincipal{}, err
+	}
+	return p, nil
+}
+
+func (s *Service) validateAccessPrincipal(ctx context.Context, p AccessPrincipal) error {
+	se, err := s.Client.Session.Get(ctx, p.SessionID)
 	if ent.IsNotFound(err) {
-		return AccessPrincipal{}, ErrRevoked
+		return ErrRevoked
 	}
 	if err != nil {
-		return AccessPrincipal{}, err
+		return err
 	}
 	if !s.Now().UTC().Before(se.ExpiresAt) {
-		return AccessPrincipal{}, ErrExpired
+		return ErrExpired
 	}
 	if se.Status != "ACTIVE" || se.Channel != "ANDROID" {
-		return AccessPrincipal{}, ErrRevoked
+		return ErrRevoked
 	}
-	if se.UserID != claims.Subject || se.DeviceID == nil || *se.DeviceID != claims.DeviceID {
-		return AccessPrincipal{}, ErrCredential
+	if se.UserID != p.UserID || se.DeviceID == nil || *se.DeviceID != p.DeviceID {
+		return ErrCredential
 	}
-	u, err := s.Client.User.Get(ctx, claims.Subject)
+	u, err := s.Client.User.Get(ctx, p.UserID)
 	if ent.IsNotFound(err) {
-		return AccessPrincipal{}, ErrRevoked
+		return ErrRevoked
 	}
 	if err != nil {
-		return AccessPrincipal{}, err
+		return err
 	}
 	if u.Status != "ACTIVE" {
-		return AccessPrincipal{}, ErrRevoked
+		return ErrRevoked
 	}
-	d, err := s.Client.Device.Get(ctx, claims.DeviceID)
+	d, err := s.Client.Device.Get(ctx, p.DeviceID)
 	if ent.IsNotFound(err) {
-		return AccessPrincipal{}, ErrRevoked
+		return ErrRevoked
 	}
 	if err != nil {
-		return AccessPrincipal{}, err
+		return err
 	}
 	if d.Status != "ACTIVE" || d.UserID != u.ID {
-		return AccessPrincipal{}, ErrRevoked
+		return ErrRevoked
 	}
-	return AccessPrincipal{
-		DeploymentID: claims.DeploymentID,
-		UserID:       u.ID,
-		DeviceID:     d.ID,
-		SessionID:    se.ID,
-	}, nil
+	return nil
 }
 
 func (s *Service) Logout(ctx context.Context, refreshToken string) error {

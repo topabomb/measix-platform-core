@@ -47,7 +47,7 @@ A semantic wire/state/ID/security change requires architecture authority first. 
 OpenAPI → fixtures → generated artifacts → tests → implementation
 ```
 
-Snapshot v1 is frozen only for the exact candidate pinned by the S0.1 manifest. Later v2/v3 additions and incompatible changes require the architecture-defined compatibility/versioning decision and their own executable evidence.
+MEASIX has never been released. Only the current protocol and database schema are supported. Remove obsolete prototypes, migration/adoption paths and historical compatibility tests; obsolete development databases/configuration can be deleted and recreated. Preserve current-version initialization, integrity and recovery checks. Android is outside this repository's ownership.
 
 ## Frontend dependencies
 

@@ -1,0 +1,83 @@
+[
+  {
+    "body": {
+      "messages": [
+        {
+          "content": "Hello",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-4o",
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
+    },
+    "contentType": "application/json",
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token",
+      "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000",
+      "X-Measix-Managed-Generation": "42"
+    },
+    "method": "POST",
+    "protocol": "OPENAI_CHAT_COMPLETIONS",
+    "resourceId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "responseKind": "SSE",
+    "url": "https://platform.example.invalid/runtime/v1/resources/mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/v1/chat/completions"
+  },
+  {
+    "body": {
+      "input": "Hello",
+      "model": "tts-1",
+      "voice": "alloy"
+    },
+    "contentType": "application/json",
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token",
+      "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000",
+      "X-Measix-Managed-Generation": "42"
+    },
+    "method": "POST",
+    "protocol": "OPENAI_AUDIO_SPEECH",
+    "resourceId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "responseKind": "BINARY_AUDIO",
+    "url": "https://platform.example.invalid/runtime/v1/resources/tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc/v1/audio/speech"
+  },
+  {
+    "contentType": "multipart/form-data",
+    "fields": {
+      "file": "\u003cclient audio bytes\u003e",
+      "language": "en",
+      "model": "whisper-1"
+    },
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token",
+      "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000",
+      "X-Measix-Managed-Generation": "42"
+    },
+    "method": "POST",
+    "protocol": "OPENAI_AUDIO_TRANSCRIPTIONS",
+    "resourceId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "responseKind": "JSON",
+    "url": "https://platform.example.invalid/runtime/v1/resources/asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd/v1/audio/transcriptions"
+  },
+  {
+    "body": {
+      "id": 1,
+      "jsonrpc": "2.0",
+      "method": "tools/list"
+    },
+    "contentType": "application/json",
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token",
+      "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000",
+      "X-Measix-Managed-Generation": "42"
+    },
+    "method": "POST",
+    "precondition": "MCP session initialized by client SDK; add negotiated protocol/session headers and Accept application/json, text/event-stream",
+    "protocol": "MCP_STREAMABLE_HTTP",
+    "resourceId": "mcp_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    "responseKind": "JSON_OR_SSE",
+    "url": "https://platform.example.invalid/runtime/v1/resources/mcp_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/mcp/v1"
+  }
+]

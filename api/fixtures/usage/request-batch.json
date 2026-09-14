@@ -1,0 +1,24 @@
+{
+  "events": [
+    {
+      "requestId": "req_550e8400-e29b-41d4-a716-446655440000",
+      "interactionId": "int_550e8400-e29b-41d4-a716-446655440000",
+      "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+      "userId": "usr_550e8400-e29b-41d4-a716-446655440000",
+      "deviceId": "dev_550e8400-e29b-41d4-a716-446655440000",
+      "resourceId": "mdl_550e8400-e29b-41d4-a716-446655440000",
+      "runtimeRouteId": "rte_550e8400-e29b-41d4-a716-446655440000",
+      "upstreamId": "ups_550e8400-e29b-41d4-a716-446655440000",
+      "managedGeneration": 42,
+      "controlRevision": 57,
+      "startedAt": "2026-08-19T03:00:00Z",
+      "completedAt": "2026-08-19T03:00:01Z",
+      "forwarded": true,
+      "httpStatus": 200,
+      "upstreamHttpStatus": 200,
+      "requestBytes": 120,
+      "responseBytes": 1024,
+      "durationMs": 1000
+    }
+  ]
+}

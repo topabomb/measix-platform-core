@@ -24,7 +24,7 @@ Every PR states:
 - Red evidence for behavior changes;
 - Green evidence and executed test layers;
 - OpenAPI/generated-code impact;
-- migration impact;
+- current schema impact;
 - operational/release impact.
 
 Use `.github/pull_request_template.md`.
@@ -41,7 +41,7 @@ Refactor: improve structure without weakening the test
 
 The Red test should preferably fail on a behavioral assertion rather than because of an unrelated compile/configuration error. The failing test remains in the final change.
 
-See `docs/tdd.md` for local and GitHub-only workflows.
+See `docs/testing.md` (§11–18) for local and GitHub-only TDD workflows.
 
 ## 4. Commit discipline
 
@@ -52,7 +52,7 @@ Do not:
 - weaken/delete a failing requirement to make CI green;
 - mix unrelated refactors into a semantic change without tests;
 - edit generated artifacts by hand;
-- edit an already-published Atlas migration;
+- edit generated Atlas/Ent artifacts without changing the current schema source;
 - copy architecture Markdown into this repository.
 
 ## 5. Required validation
@@ -63,7 +63,7 @@ Typical mapping:
 
 - pure Go domain change → T1 + affected T2;
 - Relay HTTP/streaming change → T1 + Relay T2 + affected T3;
-- Hub persistence change → unit + real SQLite component integration + migration checks where applicable;
+- Hub persistence change → unit + real SQLite component integration + current-schema checks;
 - Admin change → unit/store/component + build + affected real-Hub browser lane;
 - OpenAPI change → T0 contract/codegen/fixtures + all affected consumers;
 - cross-component behavior → required T3 and mapped `SYS-*` scenario as appropriate.
@@ -74,9 +74,9 @@ The architecture Testing Specs define what must be proven; `docs/testing.md` def
 
 Generated outputs are derived artifacts. Change the source OpenAPI/schema/generator configuration, regenerate deterministically, and verify drift. Never patch a generated DTO to create a protocol change.
 
-## 7. Database migrations
+## 7. Current database schema
 
-Follow `docs/database-migrations.md`. Ent schema and generated Atlas migration are reviewed together. An empty-database replay and affected upgrade test must pass before merge.
+Follow `docs/database-migrations.md`. Ent schema and the reviewed current Atlas initialization SQL are changed together. Empty-database initialization, schema-identity and atomic-failure tests must pass before merge.
 
 ## 8. Review standard
 
@@ -86,6 +86,6 @@ A PR is ready when:
 - required Red/Green evidence exists for behavior changes;
 - required CI checks pass on the latest commit;
 - generated artifacts and fixtures do not drift;
-- relevant migration/integration/system tests pass;
+- relevant schema/integration/system tests pass;
 - no critical scenario is skipped or hidden by retry;
 - documentation is updated only in the repository that owns the changed fact.

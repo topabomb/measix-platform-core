@@ -1,0 +1,7 @@
+{
+  "type": "about:blank",
+  "title": "Draft revision conflict",
+  "status": 409,
+  "code": "stale_draft_revision",
+  "currentDraftRevision": 8
+}

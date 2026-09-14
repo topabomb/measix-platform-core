@@ -1,0 +1,458 @@
+openapi: 3.0.3
+info:
+  title: MEASIX Relay Control API
+  version: 1.0.0
+paths:
+  /internal/v1/control/state:
+    put:
+      operationId: applyControlState
+      security:
+      - serviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimeControlState'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAck'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /internal/v1/control/status:
+    get:
+      operationId: getControlStatus
+      security:
+      - serviceAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlStatus'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+components:
+  schemas:
+    DeploymentId:
+      type: string
+      pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    UserId:
+      type: string
+      pattern: ^usr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DeviceId:
+      type: string
+      pattern: ^dev_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    EnrollmentId:
+      type: string
+      pattern: ^enr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    SessionId:
+      type: string
+      pattern: ^ses_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    InstallationId:
+      type: string
+      pattern: ^ins_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ProviderId:
+      type: string
+      pattern: ^prv_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ModelId:
+      type: string
+      pattern: ^mdl_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    TtsId:
+      type: string
+      pattern: ^tts_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AsrId:
+      type: string
+      pattern: ^asr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    McpServerId:
+      type: string
+      pattern: ^mcp_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    PolicyId:
+      type: string
+      pattern: ^pol_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DraftId:
+      type: string
+      pattern: ^drf_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ReleaseId:
+      type: string
+      pattern: ^rel_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    UpstreamId:
+      type: string
+      pattern: ^ups_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    SecretId:
+      type: string
+      pattern: ^sec_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    RuntimeRouteId:
+      type: string
+      pattern: ^rte_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ActivationId:
+      type: string
+      pattern: ^act_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    RequestId:
+      type: string
+      pattern: ^req_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    InteractionId:
+      type: string
+      pattern: ^int_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    PricingRuleId:
+      type: string
+      pattern: ^prc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    IdempotencyKey:
+      type: string
+      pattern: ^idem_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    Sha256Hash:
+      type: string
+      pattern: ^sha256:[0-9a-f]{64}$
+    Problem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+        detail:
+          type: string
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        activationId:
+          $ref: '#/components/schemas/ActivationId'
+        targetManagedGeneration:
+          type: integer
+          minimum: 0
+        currentDraftRevision:
+          type: integer
+          minimum: 0
+        forwarded:
+          type: boolean
+    ValidationIssue:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - severity
+      - path
+      - message
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+          enum:
+          - ERROR
+          - WARNING
+        path:
+          type: string
+        message:
+          type: string
+    PublicJwk:
+      type: object
+      additionalProperties: false
+      required:
+      - kty
+      - crv
+      - alg
+      - use
+      - kid
+      - x
+      properties:
+        kty:
+          type: string
+          enum:
+          - OKP
+        crv:
+          type: string
+          enum:
+          - Ed25519
+        alg:
+          type: string
+          enum:
+          - EdDSA
+        use:
+          type: string
+          enum:
+          - sig
+        kid:
+          type: string
+        x:
+          type: string
+    PrincipalState:
+      type: object
+      additionalProperties: false
+      required:
+      - disabledUserIds
+      - revokedDeviceIds
+      - revokedSessionIds
+      properties:
+        disabledUserIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserId'
+        revokedDeviceIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceId'
+        revokedSessionIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionId'
+    ResourceRoute:
+      type: object
+      additionalProperties: false
+      required:
+      - resourceId
+      - runtimeRouteId
+      properties:
+        resourceId:
+          type: string
+        runtimeRouteId:
+          $ref: '#/components/schemas/RuntimeRouteId'
+    TimeoutPolicy:
+      type: object
+      additionalProperties: false
+      required:
+      - connectMs
+      - responseHeaderMs
+      - idleMs
+      properties:
+        connectMs:
+          type: integer
+          minimum: 1
+        responseHeaderMs:
+          type: integer
+          minimum: 1
+        idleMs:
+          type: integer
+          minimum: 1
+        overallMs:
+          type: integer
+          minimum: 1
+    RuntimeRouteSpec:
+      type: object
+      additionalProperties: false
+      required:
+      - runtimeRouteId
+      - upstreamId
+      - allowedMethods
+      - allowedPathPrefixes
+      - transportPolicy
+      - timeoutPolicy
+      properties:
+        runtimeRouteId:
+          $ref: '#/components/schemas/RuntimeRouteId'
+        upstreamId:
+          $ref: '#/components/schemas/UpstreamId'
+        allowedMethods:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        allowedPathPrefixes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            pattern: ^/
+        transportPolicy:
+          type: string
+          enum:
+          - HTTP_REQUEST_RESPONSE
+          - HTTP_STREAMING_SSE
+          - HTTP_BINARY_STREAM
+          - HTTP_MULTIPART
+        timeoutPolicy:
+          $ref: '#/components/schemas/TimeoutPolicy'
+    SecretRef:
+      type: object
+      additionalProperties: false
+      required:
+      - secretId
+      - secretVersion
+      properties:
+        secretId:
+          $ref: '#/components/schemas/SecretId'
+        secretVersion:
+          type: integer
+          minimum: 1
+    RuntimeUpstreamAuth:
+      type: object
+      additionalProperties: true
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - NONE
+          - BEARER
+          - STATIC_HEADER
+          - BASIC
+    RuntimeUpstreamSpec:
+      type: object
+      additionalProperties: false
+      required:
+      - upstreamId
+      - baseUrl
+      - transportCapabilities
+      - enabled
+      - auth
+      properties:
+        upstreamId:
+          $ref: '#/components/schemas/UpstreamId'
+        baseUrl:
+          type: string
+          format: uri
+        transportCapabilities:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+        secretRef:
+          $ref: '#/components/schemas/SecretRef'
+        auth:
+          $ref: '#/components/schemas/RuntimeUpstreamAuth'
+    OperationalLimits:
+      type: object
+      additionalProperties: false
+      required:
+      - maxRequestBytes
+      properties:
+        maxRequestBytes:
+          type: integer
+          minimum: 1
+    RuntimeControlState:
+      type: object
+      additionalProperties: false
+      required:
+      - controlRevision
+      - bundleHash
+      - activeManagedGeneration
+      - deploymentId
+      - authKeys
+      - principalState
+      - resourceRoutes
+      - routes
+      - upstreams
+      - operationalLimits
+      properties:
+        controlRevision:
+          type: integer
+          minimum: 1
+        bundleHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        activeManagedGeneration:
+          type: integer
+          minimum: 0
+        deploymentId:
+          $ref: '#/components/schemas/DeploymentId'
+        authKeys:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicJwk'
+        principalState:
+          $ref: '#/components/schemas/PrincipalState'
+        resourceRoutes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceRoute'
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuntimeRouteSpec'
+        upstreams:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuntimeUpstreamSpec'
+        operationalLimits:
+          $ref: '#/components/schemas/OperationalLimits'
+    ControlAck:
+      type: object
+      additionalProperties: false
+      required:
+      - appliedControlRevision
+      - bundleHash
+      - activeManagedGeneration
+      - appliedAt
+      properties:
+        appliedControlRevision:
+          type: integer
+          minimum: 1
+        bundleHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        activeManagedGeneration:
+          type: integer
+          minimum: 0
+        appliedAt:
+          type: string
+          format: date-time
+    ControlStatus:
+      type: object
+      additionalProperties: false
+      required:
+      - ready
+      - appliedControlRevision
+      - bundleHash
+      - activeManagedGeneration
+      - startedAt
+      properties:
+        ready:
+          type: boolean
+        appliedControlRevision:
+          type: integer
+          minimum: 0
+        bundleHash:
+          type: string
+        activeManagedGeneration:
+          type: integer
+          minimum: 0
+        startedAt:
+          type: string
+          format: date-time
+        spoolState:
+          type: string
+          enum:
+          - OK
+          - METERING_DEGRADED
+        spoolPendingCount:
+          type: integer
+          minimum: 0
+        oldestPendingAgeSeconds:
+          type: integer
+          minimum: 0
+  responses:
+    Problem:
+      description: Problem response
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  securitySchemes:
+    serviceAuth:
+      type: http
+      scheme: bearer

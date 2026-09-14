@@ -1,0 +1,152 @@
+[
+  {
+    "method": "GET",
+    "name": "discovery",
+    "path": "/.well-known/measix",
+    "response": {
+      "body": {
+        "clientApiBase": "/api/client/v1",
+        "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+        "deploymentName": "S0.2 Integration",
+        "product": "MEASIX_AGENT_PLATFORM",
+        "protocolVersion": "1",
+        "runtimeApiBase": "/runtime/v1",
+        "supportedSnapshotSchemaVersions": [
+          4
+        ]
+      },
+      "status": 200
+    }
+  },
+  {
+    "body": {
+      "appVersion": "0.0.20",
+      "code": "synthetic-single-use-code",
+      "deviceName": "Android contract fixture",
+      "installationId": "ins_550e8400-e29b-41d4-a716-446655440000",
+      "platform": "ANDROID"
+    },
+    "method": "POST",
+    "name": "enrollment",
+    "path": "/api/client/v1/enrollments/exchange",
+    "response": {
+      "body": {
+        "accessToken": "synthetic.access.token",
+        "accessTokenExpiresAt": "2026-09-12T00:15:00Z",
+        "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+        "deviceId": "dev_550e8400-e29b-41d4-a716-446655440000",
+        "refreshExpiresAt": "2026-09-19T00:00:00Z",
+        "refreshToken": "synthetic-refresh-token",
+        "sessionId": "ses_550e8400-e29b-41d4-a716-446655440000",
+        "sessionIdleExpiresAt": "2026-09-19T00:00:00Z",
+        "userId": "usr_550e8400-e29b-41d4-a716-446655440000"
+      },
+      "status": 201
+    }
+  },
+  {
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token"
+    },
+    "method": "GET",
+    "name": "bootstrap",
+    "path": "/api/client/v1/bootstrap",
+    "response": {
+      "body": {
+        "deployment": {
+          "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+          "name": "S0.2 Integration"
+        },
+        "device": {
+          "deviceId": "dev_550e8400-e29b-41d4-a716-446655440000",
+          "status": "ACTIVE"
+        },
+        "managedState": {
+          "activeManagedGeneration": 42,
+          "managedStateRevision": 77,
+          "runtimeBlocked": true,
+          "runtimeStatus": "READY",
+          "syncRequired": true,
+          "targetManagedGeneration": 42
+        },
+        "session": {
+          "expiresAt": "2026-09-19T00:00:00Z",
+          "sessionId": "ses_550e8400-e29b-41d4-a716-446655440000",
+          "sessionIdleExpiresAt": "2026-09-19T00:00:00Z"
+        },
+        "supportedSnapshotSchemaVersions": [
+          4
+        ],
+        "user": {
+          "displayName": "Contract User",
+          "userId": "usr_550e8400-e29b-41d4-a716-446655440000"
+        }
+      },
+      "status": 200
+    }
+  },
+  {
+    "body": {
+      "refreshToken": "synthetic-refresh-token"
+    },
+    "headers": {
+      "Idempotency-Key": "idem_550e8400-e29b-41d4-a716-446655440000"
+    },
+    "method": "POST",
+    "name": "refresh",
+    "path": "/api/client/v1/sessions/refresh",
+    "response": {
+      "body": {
+        "accessToken": "synthetic.rotated.access",
+        "accessTokenExpiresAt": "2026-09-12T01:15:00Z",
+        "refreshExpiresAt": "2026-09-19T01:00:00Z",
+        "refreshToken": "synthetic-rotated-refresh",
+        "sessionIdleExpiresAt": "2026-09-19T01:00:00Z"
+      },
+      "status": 200
+    }
+  },
+  {
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token"
+    },
+    "method": "GET",
+    "name": "snapshot",
+    "path": "/api/client/v1/managed/snapshots/42",
+    "response": {
+      "bodyFile": "snapshot-v4.json",
+      "headers": {
+        "ETag": "\"sha256:42e6a847e6fd54ab88b46c21388bccdc9ee083f958f1963affed4634de671c77\""
+      },
+      "status": 200
+    }
+  },
+  {
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token",
+      "If-None-Match": "\"sha256:42e6a847e6fd54ab88b46c21388bccdc9ee083f958f1963affed4634de671c77\""
+    },
+    "method": "GET",
+    "name": "snapshot-not-modified",
+    "path": "/api/client/v1/managed/snapshots/42",
+    "response": {
+      "body": null,
+      "headers": {
+        "ETag": "\"sha256:42e6a847e6fd54ab88b46c21388bccdc9ee083f958f1963affed4634de671c77\""
+      },
+      "status": 304
+    }
+  },
+  {
+    "body": {
+      "refreshToken": "synthetic-rotated-refresh"
+    },
+    "method": "POST",
+    "name": "logout",
+    "path": "/api/client/v1/sessions/logout",
+    "response": {
+      "body": null,
+      "status": 204
+    }
+  }
+]

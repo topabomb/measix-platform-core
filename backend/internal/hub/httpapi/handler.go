@@ -109,7 +109,11 @@ func (h *adminHandler) ListUsers(w http.ResponseWriter, r *http.Request, params 
 	if !valid {
 		return
 	}
-	users, err := h.identity.ListUserViews(r.Context(), limit+1, after)
+	search := ""
+	if params.Query != nil {
+		search = *params.Query
+	}
+	users, err := h.identity.ListUserViews(r.Context(), search, limit+1, after)
 	if err != nil {
 		writeIdentityError(w, err)
 		return

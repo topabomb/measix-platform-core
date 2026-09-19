@@ -1447,6 +1447,7 @@ type PutPricingRequest struct {
 
 // Release defines model for Release.
 type Release struct {
+	// ActivationHistory Most recent activation attempts for this release, newest first. Bounded, because one release can be republished repeatedly and this array is returned with every release in the list.
 	ActivationHistory   []ActivationSummary `json:"activationHistory"`
 	CreatedAt           time.Time           `json:"createdAt"`
 	DiffSummary         DiffSummary         `json:"diffSummary"`
@@ -1498,10 +1499,13 @@ type RequestUsagePage struct {
 
 // RequestUsageView defines model for RequestUsageView.
 type RequestUsageView struct {
-	CompletedAt       time.Time      `json:"completedAt"`
-	ControlRevision   int            `json:"controlRevision"`
-	DeploymentId      DeploymentId   `json:"deploymentId"`
-	DeviceId          *DeviceId      `json:"deviceId,omitempty"`
+	CompletedAt     time.Time    `json:"completedAt"`
+	ControlRevision int          `json:"controlRevision"`
+	DeploymentId    DeploymentId `json:"deploymentId"`
+	DeviceId        *DeviceId    `json:"deviceId,omitempty"`
+
+	// DeviceName Device name reported at enrollment; empty when the request carries no device. Display metadata, not authorization identity.
+	DeviceName        string         `json:"deviceName,omitempty"`
 	DurationMs        int            `json:"durationMs"`
 	ErrorClass        *string        `json:"errorClass,omitempty"`
 	Forwarded         bool           `json:"forwarded"`
@@ -1519,7 +1523,10 @@ type RequestUsageView struct {
 	StartedAt           time.Time      `json:"startedAt"`
 	UpstreamHttpStatus  *int           `json:"upstreamHttpStatus,omitempty"`
 	UpstreamId          UpstreamId     `json:"upstreamId,omitempty"`
-	UserId              UserId         `json:"userId"`
+
+	// UserDisplayName Display name resolved from the users table. Always present, because a usage row cannot exist without its user. Display metadata, not authorization identity.
+	UserDisplayName string `json:"userDisplayName"`
+	UserId          UserId `json:"userId"`
 }
 
 // ResourceDiff defines model for ResourceDiff.
@@ -1997,6 +2004,9 @@ type UsageSummaryParamsCompleteness string
 type ListUsersParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Query Case-insensitive match against username or display name. Omitted or empty returns every user.
+	Query *string `form:"query,omitempty" json:"query,omitempty"`
 }
 
 // CreateUserParams defines parameters for CreateUser.
@@ -4140,6 +4150,19 @@ func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Requ
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
 		}
 		return
 	}

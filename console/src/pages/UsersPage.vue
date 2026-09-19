@@ -1,42 +1,58 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { copyToClipboard } from 'quasar'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import { encodeEnrollmentMaterial } from '../api/enrollment'
-import { cursorPath, fetchAllPages } from '../api/pagination'
+import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import UsageRequestList from '../components/UsageRequestList.vue'
 import { useActivationStore } from '../stores/activation'
 import QRCode from 'qrcode'
 import { useSessionStore } from '../stores/session'
 
 const { t: $t } = useI18n()
+const router = useRouter()
 
 type User = components['schemas']['User']
 type UserPage = components['schemas']['UserPage']
 type Device = components['schemas']['Device']
+type DevicePage = components['schemas']['DevicePage']
 type Enrollment = components['schemas']['CreateEnrollmentResponse']
 type Activation = components['schemas']['Activation']
+type UsageSummary = components['schemas']['UsageSummary']
 
 const session = useSessionStore()
 const activation = useActivationStore()
 const users = ref<User[]>([])
 const nextCursor = ref<string>()
+const listPath = ref('/api/admin/v1/users?limit=200')
+// A paginated list without a search box is the worst of both: an operator can
+// only reach an account by paging through all of them in creation order.
+const search = ref('')
+let listSequence = 0
+
 async function loadMore() {
   if (!nextCursor.value || loading.value) return
+  const current = listSequence
   loading.value = true
   try {
-    const page = await apiFetch<UserPage>(cursorPath('/api/admin/v1/users?limit=200', nextCursor.value))
+    const page = await apiFetch<UserPage>(cursorPath(listPath.value, nextCursor.value))
+    if (current !== listSequence) return
     users.value.push(...page.items)
     nextCursor.value = page.nextCursor
-  } catch (cause) { error.value = cause } finally { loading.value = false }
+  } catch (cause) { if (current === listSequence) error.value = cause } finally { if (current === listSequence) loading.value = false }
 }
 
 const devices = ref<Device[]>([])
+const devicesTruncated = ref(false)
+const loadingDevices = ref(false)
+let deviceSequence = 0
 const selected = ref<User>()
 const loading = ref(false)
 const error = ref<unknown>()
@@ -50,18 +66,29 @@ const createForm = ref({ username: '', displayName: '', role: 'MEMBER' as 'ADMIN
 const canMutate = computed(() => Boolean(session.csrfToken))
 
 async function refresh() {
+  const current = ++listSequence
   loading.value = true
   error.value = undefined
   try {
-    const page = await apiFetch<UserPage>('/api/admin/v1/users?limit=200')
+    const query = new URLSearchParams({ limit: '200' })
+    if (search.value.trim()) query.set('query', search.value.trim())
+    listPath.value = `/api/admin/v1/users?${query.toString()}`
+    const page = await apiFetch<UserPage>(listPath.value)
+    if (current !== listSequence) return
     users.value = page.items
     nextCursor.value = page.nextCursor
   } catch (cause) {
-    error.value = cause
+    if (current === listSequence) error.value = cause
   } finally {
-    loading.value = false
+    if (current === listSequence) loading.value = false
   }
 }
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { void refresh() }, 300)
+})
 
 async function createUser() {
   if (!session.csrfToken) return
@@ -80,12 +107,102 @@ async function openUser(user: User) {
   selected.value = user
   detailOpen.value = true
   error.value = undefined
+  applyUsagePeriod()
+  await Promise.all([loadDevices(user), loadUsage()])
+}
+
+// The previous user's devices are cleared and every response is checked against
+// the current selection: opening A and then B must never show A's devices under
+// B's name, which is what a stale, unguarded fetch did.
+async function loadDevices(user: User) {
+  const current = ++deviceSequence
+  loadingDevices.value = true
+  devices.value = []
+  devicesTruncated.value = false
   try {
-    devices.value = await fetchAllPages<Device>(`/api/admin/v1/users/${encodeURIComponent(user.userId)}/devices?limit=200`)
+    const page = await apiFetch<DevicePage>(`/api/admin/v1/users/${encodeURIComponent(user.userId)}/devices?limit=200`)
+    if (current !== deviceSequence) return
+    devices.value = page.items
+    devicesTruncated.value = Boolean(page.nextCursor)
   } catch (cause) {
-    error.value = cause
+    if (current === deviceSequence) error.value = cause
+  } finally {
+    if (current === deviceSequence) loadingDevices.value = false
   }
 }
+
+// Usage for one user is the question this page is opened to answer, so the
+// summary and the requests are read here instead of sending the operator to the
+// Usage page to paste an identifier by hand.
+const usagePeriods = [1, 7, 30]
+const usagePeriod = ref(7)
+const periodOptions = computed(() => usagePeriods.map(days => ({
+  label: $t(days === 1 ? 'usage.range24h' : days === 7 ? 'usage.range7d' : 'usage.range30d'),
+  value: days,
+})))
+const usage = ref<UsageSummary>()
+const loadingUsage = ref(false)
+const usageFrom = ref<string>()
+const usageTo = ref<string>()
+let usageSequence = 0
+
+function applyUsagePeriod() {
+  const to = new Date()
+  usageTo.value = to.toISOString()
+  usageFrom.value = new Date(to.getTime() - usagePeriod.value * 24 * 60 * 60 * 1000).toISOString()
+}
+
+function userUsageQuery(userId: string): string {
+  const query = new URLSearchParams({ from: usageFrom.value ?? '', to: usageTo.value ?? '', userId })
+  return `&${query.toString()}`
+}
+
+const usageQuery = computed(() => (selected.value && usageFrom.value ? userUsageQuery(selected.value.userId) : ''))
+
+async function loadUsage() {
+  if (!selected.value) return
+  const current = ++usageSequence
+  loadingUsage.value = true
+  usage.value = undefined
+  try {
+    const query = userUsageQuery(selected.value.userId).replace(/^&/, '')
+    const result = await apiFetch<UsageSummary>(`/api/admin/v1/usage/summary?${query}`)
+    if (current !== usageSequence) return
+    usage.value = result
+  } catch (cause) {
+    if (current === usageSequence) error.value = cause
+  } finally {
+    if (current === usageSequence) loadingUsage.value = false
+  }
+}
+
+watch(usagePeriod, () => {
+  applyUsagePeriod()
+  void loadUsage()
+})
+
+function viewAllUsage() {
+  if (!selected.value) return
+  void router.push({
+    name: 'Usage',
+    query: { userId: selected.value.userId, from: usageFrom.value, to: usageTo.value },
+  }).catch(() => {})
+}
+
+function fmtBytes(n: number | undefined): string {
+  if (n === undefined) return '—'
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const usageCost = computed(() => {
+  const cost = usage.value?.cost
+  if (cost && (cost.status === 'KNOWN' || cost.status === 'PARTIAL')) {
+    return `${cost.amount ?? '0'} ${cost.currency ?? ''}`.trim()
+  }
+  return $t('usage.costUnknown')
+})
 
 function clearEnrollment() {
   enrollmentCopied.value = false
@@ -163,6 +280,12 @@ async function copyEnrollment() {
 }
 
 onMounted(refresh)
+onBeforeUnmount(() => {
+  listSequence++
+  deviceSequence++
+  usageSequence++
+  if (searchTimer) clearTimeout(searchTimer)
+})
 </script>
 
 <template>
@@ -178,6 +301,11 @@ onMounted(refresh)
       <div class="row items-center justify-between"><span>{{ $t('users.securityActivation', { id: activation.activation.activationId }) }}</span><StatusChip :value="activation.activation.state" /></div>
       <div v-if="activation.activation.errorCode" class="text-caption">{{ activation.activation.errorCode }}</div>
     </q-banner>
+    <div class="row q-mb-md">
+      <q-input v-model="search" outlined dense clearable debounce="0" :label="$t('users.search')" :hint="$t('usage.filters.userHint')" data-cy="user-search" style="width: 340px">
+        <template #prepend><q-icon name="search" /></template>
+      </q-input>
+    </div>
     <LoadingState v-if="loading && !users.length" />
     <q-card v-else flat bordered>
       <q-list separator>
@@ -209,7 +337,9 @@ onMounted(refresh)
         <q-card-section class="row items-start justify-between"><div><div class="text-h6">{{ selected.displayName }}</div><div class="text-caption">{{ selected.username }} · {{ $t(`roles.${selected.role}`) }}</div><details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selected.userId }}</details></div><StatusChip :value="selected.status" /></q-card-section>
         <q-separator />
         <q-card-section><div class="row q-gutter-sm"><q-btn outline no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
-        <q-card-section><div class="text-subtitle2 q-mb-sm">{{ $t('users.devices') }}</div><q-list bordered separator>
+        <q-card-section><div class="text-subtitle2 q-mb-sm">{{ $t('users.devices') }}</div>
+          <div v-if="loadingDevices" class="text-caption text-grey-7 q-mb-sm" data-cy="devices-loading">{{ $t('common.loading') }}</div>
+          <q-list bordered separator data-cy="user-devices">
           <q-item v-for="device in devices" :key="device.deviceId">
             <q-item-section>
               <q-item-label>{{ device.deviceName }}</q-item-label>
@@ -228,8 +358,27 @@ onMounted(refresh)
               </div>
             </q-item-section>
           </q-item>
-          <q-item v-if="!devices.length"><q-item-section class="text-grey-7">{{ $t('users.noDevices') }}</q-item-section></q-item>
-        </q-list></q-card-section>
+          <q-item v-if="!devices.length && !loadingDevices"><q-item-section class="text-grey-7">{{ $t('users.noDevices') }}</q-item-section></q-item>
+        </q-list>
+        <div v-if="devicesTruncated" class="text-caption text-grey-7 q-mt-xs">{{ $t('users.devicesTruncated', { count: devices.length }) }}</div>
+        </q-card-section>
+        <q-card-section data-cy="user-usage">
+          <div class="row items-center justify-between q-mb-sm">
+            <div class="text-subtitle2">{{ $t('users.usage') }}</div>
+            <q-select v-model="usagePeriod" :options="periodOptions" :label="$t('users.usagePeriod')" outlined dense emit-value map-options data-cy="user-usage-period" style="width: 180px" />
+          </div>
+          <div class="row q-col-gutter-lg" data-cy="user-usage-summary">
+            <div><div class="text-caption text-grey-7">{{ $t('usage.requests') }}</div><div class="text-h6">{{ usage?.requestCount ?? '—' }}</div></div>
+            <div><div class="text-caption text-grey-7">{{ $t('usage.detail.forwarded') }}</div><div class="text-h6">{{ usage?.forwardedRequestCount ?? '—' }}</div></div>
+            <div><div class="text-caption text-grey-7">{{ $t('usage.bytes') }}</div><div class="text-h6">{{ usage ? fmtBytes(usage.requestBytes) : '—' }}</div></div>
+            <div><div class="text-caption text-grey-7">{{ $t('overview.costStatus') }}</div><div class="text-h6">{{ usageCost }}</div></div>
+          </div>
+          <div class="text-caption text-grey-7 q-mt-sm">{{ $t('users.usageHint') }}</div>
+          <div v-if="loadingUsage" class="text-caption text-grey-7 q-mt-sm">{{ $t('common.loading') }}</div>
+          <div class="text-subtitle2 q-mt-md q-mb-sm">{{ $t('users.recentRequests') }}</div>
+          <UsageRequestList :query="usageQuery" :page-size="25" max-height="20rem" />
+          <div class="q-mt-sm"><q-btn flat color="primary" no-caps :label="$t('users.viewAllUsage')" data-cy="view-all-usage" @click="viewAllUsage" /></div>
+        </q-card-section>
         <q-card-actions align="right"><q-btn flat :label="$t('common.close')" v-close-popup /></q-card-actions>
       </q-card>
     </q-dialog>

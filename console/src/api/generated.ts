@@ -974,6 +974,7 @@ export interface components {
             publishedAt: string;
             publishedBy: string;
             diffSummary: components["schemas"]["DiffSummary"];
+            /** @description Most recent activation attempts for this release, newest first. Bounded, because one release can be republished repeatedly and this array is returned with every release in the list. */
             activationHistory: components["schemas"]["ActivationSummary"][];
         };
         ReleasePage: {
@@ -1018,6 +1019,10 @@ export interface components {
             resourceId?: string;
             /** @description Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found. */
             resourceDisplayName?: string;
+            /** @description Display name resolved from the users table. Always present, because a usage row cannot exist without its user. Display metadata, not authorization identity. */
+            userDisplayName: string;
+            /** @description Device name reported at enrollment; empty when the request carries no device. Display metadata, not authorization identity. */
+            deviceName?: string;
             runtimeRouteId?: components["schemas"]["RuntimeRouteId"];
             upstreamId?: components["schemas"]["UpstreamId"];
             managedGeneration: number;
@@ -1242,6 +1247,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string;
+                /** @description Case-insensitive match against username or display name. Omitted or empty returns every user. */
+                query?: string;
             };
             header?: never;
             path?: never;

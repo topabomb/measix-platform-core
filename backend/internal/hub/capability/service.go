@@ -352,12 +352,18 @@ func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRe
 	}, nil
 }
 
+// activationHistoryLimit bounds the attempts returned per release. The history
+// travels with every release in the list, and one release can be republished
+// repeatedly, so returning all of it would grow without limit; the contract
+// states the same bound (Release.activationHistory maxItems).
+const activationHistoryLimit = 20
+
 // activationHistory returns the ordered activation attempts targeting the given
 // managed generation (release), newest first.
 func (s *Service) activationHistory(ctx context.Context, generation int) ([]adminapi.ActivationSummary, error) {
 	rows, err := s.Client.Activation.Query().Where(
 		activation.TargetGenerationEQ(int64(generation)),
-	).Order(ent.Desc(activation.FieldCreatedAt)).All(ctx)
+	).Order(ent.Desc(activation.FieldCreatedAt)).Limit(activationHistoryLimit).All(ctx)
 	if err != nil {
 		return nil, err
 	}

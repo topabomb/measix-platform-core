@@ -40,15 +40,6 @@ export function createIdempotencyKey(): string {
   return `idem_${uid()}`
 }
 
-export function buildCursorQuery(values: Record<string, string | number | boolean | undefined>): string {
-  const query = new URLSearchParams()
-  for (const [key, value] of Object.entries(values)) {
-    if (value !== undefined && value !== '') query.set(key, String(value))
-  }
-  const encoded = query.toString()
-  return encoded ? `?${encoded}` : ''
-}
-
 function isMutation(method?: string): boolean {
   const normalized = (method ?? 'GET').toUpperCase()
   return normalized !== 'GET' && normalized !== 'HEAD' && normalized !== 'OPTIONS'

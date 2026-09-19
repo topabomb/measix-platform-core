@@ -50,7 +50,14 @@ i18n/         locale messages and localization
 css/          thin MEASIX semantic styling
 ```
 
-列表页显式支持 nextCursor/load-more；配置引用选择器使用共享分页 helper 取全，避免只可选首批对象。System 显示 Relay spool/pending/oldest age；未观测值显示未知而非零。
+列表分两类，处理方式不同：
+
+- **配置型列表**（Users/Resources/Upstreams/Releases/EnterpriseUpdates）天然有界，用 `nextCursor`/load-more 分页。**分页必须与搜索同时存在**：只给分页不给搜索时，操作员只能按创建顺序线性翻页找人，这是最差的组合。用户列表因此有 `query` 检索，用户选择器按名搜索而不是让人手打 `usr_` 标识。
+- **审计型列表**（用量请求、激活历史）是无界时间序列，必须同时具备显式时间窗、服务端 keyset 分页、已加载条数，以及有界高度的滚动容器。用量请求按窗口列出并复用 `UsageRequestList.vue`；激活历史在后端与契约层都有上界（`Release.activationHistory` 的 `maxItems`）。
+
+**审计行必须自解释**：请求行直接显示用户与设备的显示名（由请求所属用户/设备表解析，不从用量行推断），使"这是谁的请求"无需先点开详情。`UsageRequestList.vue` 是 Usage 页与用户详情的共享实现，避免两处各写一份而漂移。
+
+配置引用选择器使用共享分页 helper 取全，避免只可选首批对象。System 显示 Relay spool/pending/oldest age；未观测值显示未知而非零。
 
 当前实现已有 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/Resources/Upstreams/Releases/Usage/System/EnterpriseUpdates 等 route-level pages。
 

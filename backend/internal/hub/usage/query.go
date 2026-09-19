@@ -12,10 +12,12 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"measix/platform/ent"
+	"measix/platform/ent/device"
 	"measix/platform/ent/managedrelease"
 	"measix/platform/ent/predicate"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/semanticusage"
+	"measix/platform/ent/user"
 	"measix/platform/internal/wire/clientapi"
 )
 
@@ -87,19 +89,24 @@ type RequestView struct {
 	DeviceID            *string
 	ResourceID          string
 	ResourceDisplayName string
-	RuntimeRouteID      string
-	UpstreamID          string
-	ManagedGeneration   int
-	ControlRevision     int
-	StartedAt           time.Time
-	CompletedAt         time.Time
-	Forwarded           bool
-	HTTPStatus          int
-	UpstreamHTTPStatus  *int
-	RequestBytes        int
-	ResponseBytes       int
-	DurationMs          int
-	ErrorClass          *string
+	// Display identity resolved from the users and devices tables so an audit row
+	// can be read without resolving identifiers by hand. Both are display
+	// metadata and carry no authority.
+	UserDisplayName    string
+	DeviceName         string
+	RuntimeRouteID     string
+	UpstreamID         string
+	ManagedGeneration  int
+	ControlRevision    int
+	StartedAt          time.Time
+	CompletedAt        time.Time
+	Forwarded          bool
+	HTTPStatus         int
+	UpstreamHTTPStatus *int
+	RequestBytes       int
+	ResponseBytes      int
+	DurationMs         int
+	ErrorClass         *string
 }
 
 func requestView(row *ent.RequestUsage) RequestView {
@@ -143,7 +150,71 @@ func (s *Service) ListRequests(ctx context.Context, filter Filter, limit int) ([
 	for _, row := range rows {
 		views = append(views, requestView(row))
 	}
-	return views, s.resourceNames(ctx, views)
+	return views, s.enrich(ctx, views)
+}
+
+// enrich resolves the display names a request carries but does not own: the
+// resource name from the release snapshot, and the identity of the user and
+// device. List and detail both go through here so the two views cannot disagree
+// about the same request.
+func (s *Service) enrich(ctx context.Context, views []RequestView) error {
+	if err := s.resourceNames(ctx, views); err != nil {
+		return err
+	}
+	return s.identityNames(ctx, views)
+}
+
+// identityNames resolves who and which device each request belongs to, in bulk so
+// that a page of results costs two queries rather than one per row. Names come
+// from the authoritative users and devices tables, never from the usage row. The
+// references are enforced by the schema (`user_id` is NOT NULL, `device_id`
+// nullable, both with a foreign key), so a present identifier always resolves;
+// a request without a device simply has no device name.
+func (s *Service) identityNames(ctx context.Context, views []RequestView) error {
+	if len(views) == 0 {
+		return nil
+	}
+	userIDs := make([]string, 0, len(views))
+	deviceIDs := make([]string, 0, len(views))
+	seenUser := make(map[string]bool, len(views))
+	seenDevice := make(map[string]bool, len(views))
+	for _, view := range views {
+		if view.UserID != "" && !seenUser[view.UserID] {
+			userIDs = append(userIDs, view.UserID)
+			seenUser[view.UserID] = true
+		}
+		if view.DeviceID != nil && *view.DeviceID != "" && !seenDevice[*view.DeviceID] {
+			deviceIDs = append(deviceIDs, *view.DeviceID)
+			seenDevice[*view.DeviceID] = true
+		}
+	}
+	userNames := make(map[string]string, len(userIDs))
+	if len(userIDs) > 0 {
+		rows, err := s.Client.User.Query().Where(user.IDIn(userIDs...)).All(ctx)
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			userNames[row.ID] = row.DisplayName
+		}
+	}
+	deviceNames := make(map[string]string, len(deviceIDs))
+	if len(deviceIDs) > 0 {
+		rows, err := s.Client.Device.Query().Where(device.IDIn(deviceIDs...)).All(ctx)
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			deviceNames[row.ID] = row.Name
+		}
+	}
+	for i := range views {
+		views[i].UserDisplayName = userNames[views[i].UserID]
+		if views[i].DeviceID != nil {
+			views[i].DeviceName = deviceNames[*views[i].DeviceID]
+		}
+	}
+	return nil
 }
 
 // Release snapshots are immutable. Batch by generation instead of querying each
@@ -266,7 +337,7 @@ func (s *Service) GetRequest(ctx context.Context, requestID string) (RequestView
 		return RequestView{}, err
 	}
 	views := []RequestView{requestView(row)}
-	err = s.resourceNames(ctx, views)
+	err = s.enrich(ctx, views)
 	return views[0], err
 }
 

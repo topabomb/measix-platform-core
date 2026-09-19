@@ -168,6 +168,7 @@ onMounted(refresh)
           <div v-else class="text-grey-7">{{ $t('common.noData') }}</div>
 
           <div class="text-subtitle2 q-mt-md">{{ $t('releases.activationHistory') }}</div>
+          <div class="text-caption text-grey-7">{{ $t('releases.activationHistoryRecent') }}</div>
           <div v-if="detailRelease.activationHistory.length">
             <q-timeline dense>
               <q-timeline-entry v-for="attempt in detailRelease.activationHistory" :key="attempt.activationId"

@@ -480,8 +480,16 @@ func (s *Service) GetUserView(ctx context.Context, userID string) (UserView, err
 	return userView(row), nil
 }
 
-func (s *Service) ListUserViews(ctx context.Context, limit int, after string) ([]UserView, error) {
-	rows, err := s.Client.User.Query().Where(user.IDGT(after)).Order(ent.Asc(user.FieldID)).Limit(limit).All(ctx)
+// ListUserViews pages users by id and optionally narrows them by a search term.
+// The term matches either the login name or the display name so an operator can
+// find an account without knowing its identifier; the cursor stays bound to the
+// whole query, so changing the term starts a new page sequence.
+func (s *Service) ListUserViews(ctx context.Context, search string, limit int, after string) ([]UserView, error) {
+	q := s.Client.User.Query().Where(user.IDGT(after))
+	if term := strings.TrimSpace(search); term != "" {
+		q = q.Where(user.Or(user.UsernameContainsFold(term), user.DisplayNameContainsFold(term)))
+	}
+	rows, err := q.Order(ent.Asc(user.FieldID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}

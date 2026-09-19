@@ -65,7 +65,7 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
-      parameters: &id006
+      parameters:
       - &id004
         name: limit
         in: query
@@ -79,6 +79,14 @@ paths:
         in: query
         schema:
           type: string
+      # Users are the one list an operator searches by name; without this the only
+      # way to find an account is to page linearly through every user.
+      - name: query
+        in: query
+        description: Case-insensitive match against username or display name. Omitted or empty returns every user.
+        schema:
+          type: string
+          maxLength: 200
     post:
       operationId: createUser
       responses:
@@ -437,7 +445,10 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
-      parameters: *id006
+      # Anchor home for the plain limit/cursor pair reused by every other list.
+      parameters: &id006
+      - *id004
+      - *id005
   /api/admin/v1/releases/{releaseId}:
     get:
       operationId: getRelease
@@ -2336,9 +2347,11 @@ components:
         diffSummary:
           $ref: '#/components/schemas/DiffSummary'
         activationHistory:
-          type: array
-          items:
-            $ref: '#/components/schemas/ActivationSummary'
+                    type: array
+                    description: Most recent activation attempts for this release, newest first. Bounded, because one release can be republished repeatedly and this array is returned with every release in the list.
+                    maxItems: 20
+                    items:
+                      $ref: '#/components/schemas/ActivationSummary'
     ReleasePage:
       type: object
       additionalProperties: false
@@ -2452,6 +2465,7 @@ components:
       - requestBytes
       - responseBytes
       - durationMs
+      - userDisplayName
       properties:
         requestId:
           $ref: '#/components/schemas/RequestId'
@@ -2470,6 +2484,18 @@ components:
           type: string
           x-go-type-skip-optional-pointer: true
           description: Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found.
+        # An audit row must identify whose request it is without a second lookup,
+        # so the display names travel with the row. Both are display metadata and
+        # carry no authority. user_id is NOT NULL with a foreign key, so the user
+        # name always resolves; device_id is nullable, so a request that carries
+        # no device carries no device name.
+        userDisplayName:
+          type: string
+          description: Display name resolved from the users table. Always present, because a usage row cannot exist without its user. Display metadata, not authorization identity.
+        deviceName:
+          type: string
+          x-go-type-skip-optional-pointer: true
+          description: Device name reported at enrollment; empty when the request carries no device. Display metadata, not authorization identity.
         runtimeRouteId:
           x-go-type-skip-optional-pointer: true
           $ref: '#/components/schemas/RuntimeRouteId'

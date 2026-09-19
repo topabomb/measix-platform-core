@@ -1,47 +1,35 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
-import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
+import UsageRequestList from '../components/UsageRequestList.vue'
 import PricingPanel from './PricingPanel.vue'
 
 const { t: $t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 type UsageSummary = components['schemas']['UsageSummary']
-type RequestUsagePage = components['schemas']['RequestUsagePage']
-type RequestUsage = components['schemas']['RequestUsageView']
+type User = components['schemas']['User']
+type UserPage = components['schemas']['UserPage']
 
 const activeTab = ref<'summary' | 'pricing'>('summary')
 const summary = ref<UsageSummary>()
-const requests = ref<RequestUsage[]>([])
-const nextCursor = ref<string>()
-const requestPath = ref('')
-const loading = ref(false)
-let querySequence = 0
-async function loadMore() {
-  if (!nextCursor.value || loading.value) return
-  const sequence = querySequence
-  loading.value = true
-  try {
-    const page = await apiFetch<RequestUsagePage>(cursorPath(requestPath.value, nextCursor.value))
-    if (sequence !== querySequence) return
-    requests.value.push(...page.items)
-    nextCursor.value = page.nextCursor
-  } catch (cause) {
-    if (sequence === querySequence) error.value = cause
-  } finally {
-    if (sequence === querySequence) loading.value = false
-  }
-}
 const error = ref<unknown>()
-const selectedRequest = ref<RequestUsage>()
-const detailOpen = ref(false)
+const loading = ref(false)
+let summarySequence = 0
+
+// Usage is a time series: an unbounded default made every visit aggregate the
+// whole history. The window is always explicit and starts at the last 24 hours.
 const fromISO = ref<string>()
 const toISO = ref<string>()
+const allTime = ref(false)
+
 function localDateTime(value: string | undefined): string {
   if (!value) return ''
   const date = new Date(value)
@@ -55,6 +43,7 @@ const toLocal = computed({
   get: () => localDateTime(toISO.value),
   set: (value: string) => { toISO.value = value ? new Date(value).toISOString() : undefined },
 })
+
 const userId = ref<string>()
 const resourceId = ref<string>()
 const resourceKind = ref<string>()
@@ -64,36 +53,142 @@ const completeness = ref<string>()
 const resourceKinds = ['PROVIDER', 'MODEL', 'TTS', 'ASR', 'MCP']
 const statuses = ['SUCCESS', 'ERROR', 'BLOCKED']
 const completenesses = ['EXACT', 'PARTIAL', 'UNKNOWN']
+const pageSizes = [25, 50, 100, 200]
+const pageSize = ref(50)
+
+// Users are chosen, not typed: requiring an operator to know a usr_ identifier by
+// heart is what made per-user filtering unusable.
+const userOptions = ref<{ label: string; value: string }[]>([])
+const loadingUsers = ref(false)
+let userSearchTimer: ReturnType<typeof setTimeout> | undefined
+
+async function loadUsers(term: string, keep?: string) {
+  loadingUsers.value = true
+  try {
+    const query = new URLSearchParams({ limit: '50' })
+    if (term.trim()) query.set('query', term.trim())
+    const page = await apiFetch<UserPage>(`/api/admin/v1/users?${query.toString()}`)
+    const options = page.items.map((user: User) => ({
+      label: user.username ? `${user.displayName} (${user.username})` : user.displayName,
+      value: user.userId,
+    }))
+    // A selection reached through a link must stay visible even when it is not in
+    // the first page of results, so fall back to showing its identifier.
+    if (keep && !options.some(option => option.value === keep)) {
+      options.unshift({ label: keep, value: keep })
+    }
+    userOptions.value = options
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    loadingUsers.value = false
+  }
+}
+
+function onUserFilter(term: string, update: (callback: () => void) => void) {
+  if (userSearchTimer) clearTimeout(userSearchTimer)
+  userSearchTimer = setTimeout(() => {
+    void loadUsers(term, userId.value).then(() => update(() => {}))
+  }, 250)
+}
+
 const activeFilters = computed(() => {
   const parts: string[] = []
-  if (fromISO.value) parts.push(`${$t('usage.filters.startTime')} ${new Date(fromISO.value).toLocaleString()}`)
-  if (toISO.value) parts.push(`${$t('usage.filters.endTime')} ${new Date(toISO.value).toLocaleString()}`)
-  if (userId.value) parts.push(`${$t('usage.filters.user')} ${userId.value}`)
+  if (allTime.value) parts.push($t('usage.rangeAll'))
+  else {
+    if (fromISO.value) parts.push(`${$t('usage.filters.startTime')} ${new Date(fromISO.value).toLocaleString()}`)
+    if (toISO.value) parts.push(`${$t('usage.filters.endTime')} ${new Date(toISO.value).toLocaleString()}`)
+  }
+  if (userId.value) {
+    const option = userOptions.value.find(candidate => candidate.value === userId.value)
+    parts.push(`${$t('usage.filters.user')} ${option?.label ?? userId.value}`)
+  }
   if (resourceId.value) parts.push(`${$t('usage.filters.resource')} ${resourceId.value}`)
   if (resourceKind.value) parts.push(`${$t('usage.filters.resourceKind')} ${resourceKind.value}`)
   if (upstreamId.value) parts.push(`${$t('usage.filters.upstream')} ${upstreamId.value}`)
-  if (status.value) parts.push(status.value)
-  if (completeness.value) parts.push(`${$t('usage.filters.completeness')} ${completeness.value}`)
+  if (status.value) parts.push(`${$t('status.' + status.value)}`)
+  if (completeness.value) parts.push(`${$t('usage.filters.completeness')} ${$t('status.' + completeness.value)}`)
   return parts
 })
 
 function applyRange(days: number) {
   const now = new Date()
-  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-  fromISO.value = from.toISOString()
+  allTime.value = false
+  fromISO.value = new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
   toISO.value = now.toISOString()
 }
 
-function resetFilters() {
+function applyAllTime() {
+  allTime.value = true
   fromISO.value = undefined
   toISO.value = undefined
-  userId.value = undefined
+}
+
+function resetFilters() {
   resourceId.value = undefined
+  userId.value = undefined
   resourceKind.value = undefined
   upstreamId.value = undefined
   status.value = undefined
   completeness.value = undefined
+  applyRange(1)
 }
+
+/** Encoded filter set shared by the summary and the request list. */
+const filterQuery = computed(() => {
+  const query = new URLSearchParams()
+  if (fromISO.value) query.set('from', fromISO.value)
+  if (toISO.value) query.set('to', toISO.value)
+  if (userId.value) query.set('userId', userId.value)
+  if (resourceId.value) query.set('resourceId', resourceId.value)
+  if (resourceKind.value) query.set('resourceKind', resourceKind.value)
+  if (upstreamId.value) query.set('upstreamId', upstreamId.value)
+  if (status.value) query.set('status', status.value)
+  if (completeness.value) query.set('completeness', completeness.value)
+  const encoded = query.toString()
+  return encoded ? `&${encoded}` : ''
+})
+
+async function refresh() {
+  const sequence = ++summarySequence
+  loading.value = true
+  error.value = undefined
+  summary.value = undefined
+  try {
+    const result = await apiFetch<UsageSummary>(`/api/admin/v1/usage/summary?${filterQuery.value.replace(/^&/, '')}`)
+    if (sequence !== summarySequence) return
+    summary.value = result
+  } catch (cause) {
+    if (sequence === summarySequence) error.value = cause
+  } finally {
+    if (sequence === summarySequence) loading.value = false
+  }
+}
+
+// The summary aggregates server-side, so free-text identifiers wait for typing to
+// settle instead of re-aggregating on every keystroke. Selects and dates apply at
+// once. Both paths end in the same refresh, which also re-reads the list because
+// the list follows filterQuery.
+let textTimer: ReturnType<typeof setTimeout> | undefined
+const textFilters = computed(() => `${resourceId.value ?? ''}\u0000${upstreamId.value ?? ''}`)
+watch(textFilters, () => {
+  if (textTimer) clearTimeout(textTimer)
+  textTimer = setTimeout(() => { void refresh() }, 300)
+})
+watch([fromISO, toISO, userId, resourceKind, status, completeness, pageSize, allTime], () => {
+  void refresh()
+})
+
+// Keeping the filters in the URL makes a per-user view linkable, back-navigable
+// and refresh-stable, which is what an operator sends to a colleague.
+watch([filterQuery, pageSize, activeTab], () => {
+  const query: Record<string, string> = {}
+  new URLSearchParams(filterQuery.value.replace(/^&/, '')).forEach((value, key) => { query[key] = value })
+  if (pageSize.value !== 50) query.pageSize = String(pageSize.value)
+  if (activeTab.value !== 'summary') query.tab = activeTab.value
+  void router.replace({ query }).catch(() => {})
+})
+
 const semanticMeters = computed(() => summary.value?.semanticMeters ?? [])
 
 const blockedCount = computed(() => {
@@ -105,40 +200,6 @@ function meterColor(meter: string): string {
   if (meter.includes('TOKEN')) return 'primary'
   if (meter === 'CHARACTERS' || meter === 'AUDIO_SECONDS') return 'teal'
   return 'grey'
-}
-
-async function refresh() {
-  const sequence = ++querySequence
-  loading.value = true
-  error.value = undefined
-  summary.value = undefined
-  requests.value = []
-  nextCursor.value = undefined
-  const query = new URLSearchParams()
-  if (fromISO.value) query.set('from', fromISO.value)
-  if (toISO.value) query.set('to', toISO.value)
-  if (userId.value) query.set('userId', userId.value)
-  if (resourceId.value) query.set('resourceId', resourceId.value)
-  if (resourceKind.value) query.set('resourceKind', resourceKind.value)
-  if (upstreamId.value) query.set('upstreamId', upstreamId.value)
-  if (status.value) query.set('status', status.value)
-  if (completeness.value) query.set('completeness', completeness.value)
-  const qs = query.toString()
-  try {
-    const [s, r] = await Promise.all([
-      apiFetch<UsageSummary>(`/api/admin/v1/usage/summary${qs ? `?${qs}` : ''}`),
-      apiFetch<RequestUsagePage>(`/api/admin/v1/usage/requests?limit=200${qs ? `&${qs}` : ''}`),
-    ])
-    if (sequence !== querySequence) return
-    summary.value = s
-    requests.value = r.items
-    nextCursor.value = r.nextCursor
-    requestPath.value = `/api/admin/v1/usage/requests?limit=200${qs ? `&${qs}` : ''}`
-  } catch (cause) {
-    if (sequence === querySequence) error.value = cause
-  } finally {
-    if (sequence === querySequence) loading.value = false
-  }
 }
 
 function fmtBytes(n: number | undefined): string {
@@ -159,39 +220,6 @@ const costLabel = computed(() => {
 
 const costStatus = computed(() => summary.value?.cost.status ?? 'UNKNOWN')
 
-/** Classify a resource id into its capability kind from the stable id prefix. */
-function kindOf(resourceId: string | undefined): string | undefined {
-  if (!resourceId) return undefined
-  if (resourceId.startsWith('mdl_')) return 'MODEL'
-  if (resourceId.startsWith('tts_')) return 'TTS'
-  if (resourceId.startsWith('asr_')) return 'ASR'
-  if (resourceId.startsWith('mcp_')) return 'MCP'
-  return undefined
-}
-
-function kindColor(kind: string): string {
-  switch (kind) {
-    case 'MODEL': return 'primary'
-    case 'TTS': return 'teal'
-    case 'ASR': return 'indigo'
-    case 'MCP': return 'deep-purple'
-    default: return 'grey'
-  }
-}
-
-function kindLabel(kind: string): string {
-  return $t(`usage.kind.${kind}`)
-}
-
-function errorLabel(code: string): string {
-  switch (code) {
-    case 'ROUTE_POLICY_DENIED': return $t('usage.errorReasons.routePolicyDenied')
-    case 'INVALID_INTERACTION': return $t('usage.errorReasons.invalidInteraction')
-    case 'MANAGED_SNAPSHOT_REQUIRED': return $t('usage.errorReasons.snapshotRequired')
-    default: return code
-  }
-}
-
 function costStatusColor(status: string): string {
   switch (status) {
     case 'KNOWN': return 'green'
@@ -208,19 +236,31 @@ function costStatusLabel(status: string): string {
   }
 }
 
-function openDetail(req: RequestUsage) {
-  selectedRequest.value = req
-  detailOpen.value = true
-}
+onMounted(async () => {
+  const initial = route.query
+  if (typeof initial.userId === 'string' && initial.userId) userId.value = initial.userId
+  if (typeof initial.resourceId === 'string' && initial.resourceId) resourceId.value = initial.resourceId
+  if (typeof initial.resourceKind === 'string' && initial.resourceKind) resourceKind.value = initial.resourceKind
+  if (typeof initial.upstreamId === 'string' && initial.upstreamId) upstreamId.value = initial.upstreamId
+  if (typeof initial.status === 'string' && initial.status) status.value = initial.status
+  if (typeof initial.completeness === 'string' && initial.completeness) completeness.value = initial.completeness
+  if (typeof initial.tab === 'string' && initial.tab === 'pricing') activeTab.value = 'pricing'
+  const size = Number(initial.pageSize)
+  if (pageSizes.includes(size)) pageSize.value = size
+  if (typeof initial.from === 'string' && typeof initial.to === 'string') {
+    fromISO.value = initial.from
+    toISO.value = initial.to
+  } else {
+    applyRange(1)
+  }
+  await Promise.all([refresh(), loadUsers('', userId.value)])
+})
 
-// Auto-refresh when filters change (Usage Admin UX §14 Filter applies live).
-watch(
-  [fromISO, toISO, userId, resourceId, resourceKind, upstreamId, status, completeness],
-  refresh,
-)
-
-onMounted(refresh)
-onBeforeUnmount(() => { querySequence++ })
+onBeforeUnmount(() => {
+  summarySequence++
+  if (textTimer) clearTimeout(textTimer)
+  if (userSearchTimer) clearTimeout(userSearchTimer)
+})
 </script>
 
 <template>
@@ -235,44 +275,46 @@ onBeforeUnmount(() => { querySequence++ })
       <q-tab name="pricing" :label="$t('pricing.title')" icon="sell" />
     </q-tabs>
 
-    <template v-if="activeTab === 'pricing'">
-      <PricingPanel />
-    </template>
+    <PricingPanel v-if="activeTab === 'pricing'" />
 
-    <div v-else class="row items-end q-col-gutter-sm q-mb-md">
-      <div class="col-auto"><q-input v-model="fromLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.startTime')" style="width: 230px" /></div>
-      <div class="col-auto"><q-input v-model="toLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.endTime')" style="width: 230px" /></div>
-      <div class="col-auto"><q-btn-dropdown dense flat :label="$t('usage.filters.quickRange')" :no-icon-animation="true" class="q-px-xs">
-        <q-list>
-          <q-item clickable v-close-popup @click="applyRange(1)"><q-item-section>{{ $t('usage.range24h') }}</q-item-section></q-item>
-          <q-item clickable v-close-popup @click="applyRange(7)"><q-item-section>{{ $t('usage.range7d') }}</q-item-section></q-item>
-          <q-item clickable v-close-popup @click="applyRange(30)"><q-item-section>{{ $t('usage.range30d') }}</q-item-section></q-item>
-        </q-list>
-      </q-btn-dropdown></div>
-      <div class="col-auto"><q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable style="width: 150px" /></div>
-      <div class="col-auto"><q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable style="width: 130px" /></div>
-      <div class="col-auto"><q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable style="width: 150px" /></div>
-      <div class="col-auto"><q-btn flat dense icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" /></div>
-      <details class="col-12 q-mt-sm" data-cy="usage-identity-filters">
-        <summary>{{ $t('usage.filters.byIdentity') }}</summary>
-        <div class="row q-col-gutter-sm q-mt-xs">
-          <div class="col-12 col-sm-4"><q-input v-model="userId" outlined dense :label="$t('usage.filters.user')" placeholder="usr_..." /></div>
-          <div class="col-12 col-sm-4"><q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." /></div>
-          <div class="col-12 col-sm-4"><q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." /></div>
-        </div>
-      </details>
-    </div>
-    <q-banner v-if="activeFilters.length" class="q-mb-md bg-grey-2 rounded-borders">
-      <div class="row items-center q-gutter-sm">
-        <span class="text-caption text-grey-7">{{ $t('usage.filters.active') }}:</span>
-        <q-chip v-for="f in activeFilters" :key="f" dense>{{ f }}</q-chip>
+    <template v-else>
+      <div class="row items-end q-col-gutter-sm q-mb-md">
+        <div class="col-auto"><q-input v-model="fromLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.startTime')" :disable="allTime" style="width: 230px" /></div>
+        <div class="col-auto"><q-input v-model="toLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.endTime')" :disable="allTime" style="width: 230px" /></div>
+        <div class="col-auto"><q-btn-dropdown dense flat :label="$t('usage.filters.quickRange')" :no-icon-animation="true" class="q-px-xs">
+          <q-list>
+            <q-item clickable v-close-popup @click="applyRange(1)"><q-item-section>{{ $t('usage.range24h') }}</q-item-section></q-item>
+            <q-item clickable v-close-popup @click="applyRange(7)"><q-item-section>{{ $t('usage.range7d') }}</q-item-section></q-item>
+            <q-item clickable v-close-popup @click="applyRange(30)"><q-item-section>{{ $t('usage.range30d') }}</q-item-section></q-item>
+            <q-item clickable v-close-popup @click="applyAllTime"><q-item-section>{{ $t('usage.rangeAll') }}</q-item-section></q-item>
+          </q-list>
+        </q-btn-dropdown></div>
+        <div class="col-auto"><q-select v-model="userId" :options="userOptions" :label="$t('usage.filters.user')" :hint="$t('usage.filters.userHint')" :placeholder="$t('usage.filters.anyUser')" :loading="loadingUsers" outlined dense clearable use-input emit-value map-options @filter="onUserFilter" style="width: 280px" /></div>
+        <div class="col-auto"><q-select v-model="pageSize" :options="pageSizes" :label="$t('usage.pageSize')" outlined dense emit-value map-options style="width: 150px" /></div>
       </div>
-    </q-banner>
-    <ProblemBanner :error="error" class="q-mb-md" />
+      <div class="row items-end q-col-gutter-sm q-mb-md">
+        <div class="col-auto"><q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable style="width: 150px" /></div>
+        <div class="col-auto"><q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable style="width: 130px" /></div>
+        <div class="col-auto"><q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable style="width: 150px" /></div>
+        <div class="col-auto"><q-btn flat dense icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" /></div>
+        <details class="col-12 q-mt-sm" data-cy="usage-identity-filters">
+          <summary>{{ $t('usage.filters.byIdentity') }}</summary>
+          <div class="row q-col-gutter-sm q-mt-xs">
+            <div class="col-12 col-sm-6"><q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." /></div>
+            <div class="col-12 col-sm-6"><q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." /></div>
+          </div>
+        </details>
+      </div>
+      <q-banner v-if="activeFilters.length" class="q-mb-md bg-grey-2 rounded-borders">
+        <div class="row items-center q-gutter-sm">
+          <span class="text-caption text-grey-7">{{ $t('usage.filters.active') }}:</span>
+          <q-chip v-for="f in activeFilters" :key="f" dense>{{ f }}</q-chip>
+        </div>
+      </q-banner>
+      <ProblemBanner :error="error" class="q-mb-md" />
 
-    <LoadingState v-if="loading && !summary" />
-    <template v-else-if="summary">
-      <div class="row q-col-gutter-md q-mb-md">
+      <LoadingState v-if="loading && !summary" />
+      <div v-else-if="summary" class="row q-col-gutter-md q-mb-md">
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
@@ -338,69 +380,8 @@ onBeforeUnmount(() => { querySequence++ })
           </q-card>
         </div>
       </div>
+
+      <UsageRequestList :query="filterQuery" :page-size="pageSize" allow-filter-resource @filter-resource="value => { resourceId = value }" />
     </template>
-
-    <q-card flat bordered>
-      <q-card-section><div class="text-subtitle2">{{ $t('usage.requests') }}</div></q-card-section>
-      <q-list separator>
-        <q-item v-for="req in requests" :key="req.requestId" clickable data-cy="usage-row" @click="openDetail(req)">
-          <q-item-section>
-            <q-item-label>
-              {{ req.resourceDisplayName ?? $t('usage.unnamedResource') }}
-              <q-chip v-if="kindOf(req.resourceId)" dense :color="kindColor(kindOf(req.resourceId)!)" text-color="white" size="sm">{{ kindLabel(kindOf(req.resourceId)!) }}</q-chip>
-              <q-chip v-if="req.errorClass" dense color="negative" text-color="white" size="sm">{{ errorLabel(req.errorClass) }}</q-chip>
-            </q-item-label>
-            <q-item-label caption>
-              {{ new Date(req.startedAt).toLocaleString() }}
-              <template v-if="req.durationMs !== undefined"> · {{ req.durationMs }} ms</template>
-            </q-item-label>
-          </q-item-section>
-          <q-item-section side>
-            <div class="row items-center q-gutter-sm">
-              <q-chip dense :color="req.forwarded ? 'green-2' : 'orange-2'">{{ req.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }}</q-chip>
-              <q-chip dense :class="req.httpStatus >= 400 ? 'text-negative' : 'text-grey-8'">{{ req.httpStatus }}</q-chip>
-              <q-chip v-if="req.upstreamHttpStatus && req.upstreamHttpStatus !== req.httpStatus" dense :class="req.upstreamHttpStatus >= 400 ? 'text-negative' : 'text-grey-8'">{{ $t('usage.detail.upstream') }} {{ req.upstreamHttpStatus }}</q-chip>
-            </div>
-          </q-item-section>
-        </q-item>
-        <q-item v-if="!requests.length"><q-item-section class="text-grey-7">{{ $t('usage.noRequests') }}</q-item-section></q-item>
-      </q-list>
-    </q-card>
-
-<!-- Request Detail (Usage Admin UX §14): never shows prompt/body/Secret. -->
-<q-dialog v-model="detailOpen" data-cy="usage-detail">
-      <q-card class="responsive-modal" style="max-width: 95vw">
-        <q-card-section>
-          <div class="text-h6">{{ $t('usage.detail.title') }}</div>
-          <div class="text-caption text-grey-7">{{ selectedRequest?.requestId }}</div>
-        </q-card-section>
-        <q-card-section v-if="selectedRequest">
-          <q-markup-table flat dense>
-            <tbody>
-              <tr><td class="text-grey-7">{{ $t('usage.detail.requestId') }}</td><td>{{ selectedRequest.requestId }}</td></tr>
-              <tr v-if="selectedRequest.interactionId"><td class="text-grey-7">{{ $t('usage.detail.interactionId') }}</td><td>{{ selectedRequest.interactionId }}</td></tr>
-              <tr v-if="selectedRequest.userId"><td class="text-grey-7">{{ $t('usage.detail.user') }}</td><td>{{ selectedRequest.userId }}</td></tr>
-              <tr v-if="selectedRequest.deviceId"><td class="text-grey-7">{{ $t('usage.detail.device') }}</td><td>{{ selectedRequest.deviceId }}</td></tr>
-              <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td>{{ selectedRequest.resourceDisplayName }}<div class="text-caption">{{ selectedRequest.resourceId }}</div></td></tr>
-              <tr><td class="text-grey-7">{{ $t('usage.detail.upstream') }}</td><td>{{ selectedRequest.upstreamId }}</td></tr>
-              <tr><td class="text-grey-7">{{ $t('usage.detail.runtimeRoute') }}</td><td>{{ selectedRequest.runtimeRouteId }}</td></tr>
-              <tr><td class="text-grey-7">{{ $t('usage.detail.generation') }}</td><td>{{ $t('releases.generation') }} {{ selectedRequest.managedGeneration }}</td></tr>
-              <tr><td class="text-grey-7">{{ $t('overview.desiredRevision') }}</td><td>{{ selectedRequest.controlRevision }}</td></tr>
-              <tr><td class="text-grey-7">{{ $t('common.status') }}</td><td>{{ selectedRequest.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }} · {{ selectedRequest.httpStatus }} <template v-if="selectedRequest.upstreamHttpStatus">· {{ $t('usage.detail.upstream') }} {{ selectedRequest.upstreamHttpStatus }}</template></td></tr>
-              <tr><td class="text-grey-7">{{ $t('usage.detail.duration') }}</td><td>{{ selectedRequest.durationMs }} ms</td></tr>
-              <tr><td class="text-grey-7">{{ $t('usage.bytes') }}</td><td>{{ fmtBytes(selectedRequest.requestBytes) }} in · {{ fmtBytes(selectedRequest.responseBytes) }} out</td></tr>
-              <tr v-if="selectedRequest.errorClass"><td class="text-grey-7">{{ $t('usage.errorClass') }}</td><td>{{ errorLabel(selectedRequest.errorClass) }} <span class="text-caption text-grey-7">({{ selectedRequest.errorClass }})</span></td></tr>
-            </tbody>
-          </q-markup-table>
-          <div class="text-caption text-grey-7 q-mt-sm">{{ $t('usage.detail.secretHint') }}</div>
-
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn v-if="selectedRequest?.resourceId" flat :label="$t('usage.filterThisResource')" @click="resourceId = selectedRequest.resourceId; detailOpen = false" />
-          <q-btn flat :label="$t('common.close')" v-close-popup />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-btn v-if="nextCursor && activeTab === 'summary'" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>

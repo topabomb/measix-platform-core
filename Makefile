@@ -1,4 +1,4 @@
-.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test s01-browser-candidate console-test contract freeze-manifest freeze-validate clean-replay collect-artifacts collect-static-contract collect-baseline collect-adapter-qualification
+.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test s01-browser-candidate console-build console-test tooling-test contract freeze-manifest freeze-validate clean-replay collect-artifacts collect-candidate collect-static-contract collect-baseline collect-adapter-qualification
 
 .NOTPARALLEL:
 
@@ -92,6 +92,17 @@ collect-artifacts:
 	@(cd console && pnpm vitest run --reporter=json --outputFile=../.artifacts/console-test.json 2>../.artifacts/console-test.stderr.log); exit_code=$$?; \
 	node scripts/write-meta.mjs console-test.json 'pnpm vitest run --reporter=json --outputFile' $$exit_code; \
 	if [ $$exit_code -ne 0 ]; then echo "ERROR: console tests failed (exit $$exit_code)"; exit $$exit_code; fi
+# collect-candidate records the explicit S0.1 candidate lane as freeze evidence.
+# freeze-manifest requires .artifacts/candidate-test.json plus matching metadata
+# dated to the frozen commit, and about thirty CAP scenarios take their evidence
+# from it. s01-candidate-test is the human-readable form of the same lane; this
+# target is what produces the machine-readable artifact.
+collect-candidate: console-build
+	@mkdir -p .artifacts
+	@echo "Collecting candidate test artifacts..."
+	@(cd backend && go test -tags=candidate ./test/system/scenarios/ -count=1 -json -timeout 15m > ../.artifacts/candidate-test.json); exit_code=$$?; \
+	node scripts/write-meta.mjs candidate-test.json 'go test -tags=candidate -json' $$exit_code; \
+	if [ $$exit_code -ne 0 ]; then echo "ERROR: candidate tests failed (exit $$exit_code)"; exit $$exit_code; fi
 # collect-static-contract runs actual commands and records their exit codes.
 # Comments explaining static-contract behavior:
 #   - Each check captures exit code AND SHA-256 of command output

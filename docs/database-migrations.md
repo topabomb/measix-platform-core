@@ -7,7 +7,7 @@ MEASIX 尚未发布，当前结构是唯一支持的数据库版本。旧开发�
 - Ent schema 定义业务结构，`backend/migrations/202609120001_current.sql` 是唯一完整初始化 SQL。
 - `migrations.CurrentSQL()` 要求恰好一份 SQL；测试使用同一来源。
 - Hub 启动不运行 ORM AutoMigrate，不静默修改已有 schema。Relay 本地 spool 独立于 `hub.db`。
-- 开发 helper `go run ./cmd/devmigrate --db ../.data/hub.db` 仅用于独立开发数据库。它读取当前 SQL、校验本地初始化记录，重复执行当前版本幂等，SQL 与初始化记录在同一事务中提交。非当前结构需清理相应旧数据库后重建，不修复或收养历史。
+- 开发 helper `go run ./cmd/devmigrate --db ../.data/hub.db` 仅用于独立开发数据库。它读取当前 SQL、校验本地初始化记录，重复执行当前版本幂等，SQL 与初始化记录在同一事务中提交。非当前结构需清理相应旧数据库后重建，不修复或收养历史。它不要求目录摘要文件；SQL 与数据库之间的漂移由 `devmigrate_revisions` 中记录的文件名与 sha256 检出。
 - `maintenance.Check` 校验 Ent 所需表/列及 SQLite integrity/foreign keys，不比较全部索引或列类型。System/backup 报告 binary expected revision。
 
 ## 修改与验证

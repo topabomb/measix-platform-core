@@ -106,7 +106,7 @@ try {
     }
     if (-not $ready) { throw "Device-demo did not become ready. Inspect $logRoot" }
     $env:MEASIX_REAL_DEVICE_ORIGIN = $origin
-    $env:MEASIX_REAL_DEVICE_ADMIN_PASSWORD = $passwordPath
+    $env:MEASIX_REAL_DEVICE_ADMIN_PASSWORD_FILE = $passwordPath
     $env:MEASIX_REAL_DEVICE_STATE = (Join-Path $dataRoot 'preset-state.json')
     & node scripts/real-device-preset.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Real-device configuration publish failed.' }

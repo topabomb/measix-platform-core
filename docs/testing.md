@@ -6,7 +6,7 @@ This document defines how `measix-platform-core` executes and records tests, and
 
 | Layer | Purpose | Repository implementation |
 |---|---|---|
-| T0 Static / Contract | current schema, codegen, fixture, build consistency | API validation, generated drift, fresh schema replay, production build |
+| T0 Static / Contract | current schema, codegen, fixture, build consistency | contract tests, evidence/tooling regression tests, console typecheck and production build. Regeneration/drift and schema replay are freeze-time collectors, not per-commit CI |
 | T1 Unit / Domain | pure validation/state/mapping | Go unit tests, Vitest unit/store helpers |
 | T2 Component Integration | one real component + local real boundaries | real SQLite, real HTTP server, component/static-host tests |
 | T3 Cross-component Integration | multiple real MEASIX components | real Hub↔Relay, Admin↔Hub where implemented, deterministic Adapter |
@@ -123,7 +123,7 @@ ci-gate
 
 The required gate evaluates the latest PR commit. Older Green checks are historical regression evidence only.
 
-The static job and `make ci` regenerate before drift checks through `scripts/checks.mjs`. The static job also runs Node evidence/tooling regression tests; console typecheck uses vue-tsc for Vue templates. A clean Git diff without regeneration does not prove generated output matches source. `make system-test` uses `-tags=smoke`; ordinary `go test ./...` excludes both smoke and candidate scenarios. Exact direct commands are in [development](development.md).
+`make ci` runs real tests only: the static job runs `npm run test:tooling` and `make fmt-check contract`, and the aggregate adds backend, system and console tests. Regeneration and drift comparison are local commands (`make generate`, `make drift`, `make collect-static-contract`) and are deliberately **not** part of CI, so a Green `ci-gate` does **not** prove that generated output matches its source: a clean Git diff without regeneration proves nothing. Regenerate, inspect and commit derived output before freezing. The static job also runs Node evidence/tooling regression tests, including the command-line and freeze-producer contract checks; console typecheck uses vue-tsc for Vue templates. `make system-test` uses `-tags=smoke`; ordinary `go test ./...` excludes both smoke and candidate scenarios. Exact direct commands are in [development](development.md).
 
 ## 8. Explicit S0.1 candidate verification
 

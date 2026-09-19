@@ -14,7 +14,8 @@ import { dirname, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 const origin = process.env.MEASIX_REAL_DEVICE_ORIGIN
-const passwordPath = process.env.MEASIX_REAL_DEVICE_ADMIN_PASSWORD || resolve(root, '.secrets/device-real-admin-password.txt')
+// The variable carries a path, never the secret itself, so it is named _FILE.
+const passwordPath = process.env.MEASIX_REAL_DEVICE_ADMIN_PASSWORD_FILE || resolve(root, '.secrets/device-real-admin-password.txt')
 const keyPath = process.env.MEASIX_REAL_DEVICE_SUPPLIER_KEYS || resolve(root, '.secrets/supplier-keys.env')
 const statePath = process.env.MEASIX_REAL_DEVICE_STATE || resolve(root, '.data/device-real/preset-state.json')
 

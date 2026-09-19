@@ -80,3 +80,37 @@ func TestInitializationRejectsIncrementalHistory(t *testing.T) {
 		t.Fatalf("rejected initialization mutated database: %d %v", count, err)
 	}
 }
+
+// The device preset and the make targets invoke this command against the
+// repository's own migrations directory, so the path through run() is what must
+// keep working. A previous change removed atlas.sum while leaving a directory
+// checksum validation inside run(); because every test called initializeSchema
+// directly, the breakage only surfaced when someone tried to initialize.
+func TestRunInitializesFromRepositoryMigrations(t *testing.T) {
+	migrations := filepath.Join("..", "..", "migrations")
+	dbPath := filepath.Join(t.TempDir(), "hub.db")
+	if err := run([]string{"--db", dbPath, "--migrations-dir", migrations}); err != nil {
+		t.Fatalf("run against repository migrations: %v", err)
+	}
+	db, err := sqliteutil.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var recorded int
+	if err := db.QueryRow("SELECT COUNT(*) FROM devmigrate_revisions").Scan(&recorded); err != nil || recorded != 1 {
+		t.Fatalf("initialization record missing: %d %v", recorded, err)
+	}
+	// Re-running the current schema stays idempotent.
+	if err := run([]string{"--db", dbPath, "--migrations-dir", migrations}); err != nil {
+		t.Fatalf("replay against repository migrations: %v", err)
+	}
+}
+
+// A directory holding no SQL is a configuration error, not a silent no-op.
+func TestRunRejectsEmptyMigrationsDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := run([]string{"--db", filepath.Join(dir, "hub.db"), "--migrations-dir", dir}); err == nil {
+		t.Fatal("empty migrations directory accepted")
+	}
+}

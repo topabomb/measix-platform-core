@@ -20,6 +20,7 @@ import { execFileSync } from 'node:child_process'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { cpus } from 'node:os'
+import { writeMetaJson } from './lib/harness.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
@@ -188,6 +189,10 @@ const artifact = {
 
 mkdirSync(ARTIFACTS_DIR, { recursive: true })
 writeFileSync(OUT_PATH, JSON.stringify(artifact, null, 2) + '\n')
+// freeze-manifest accepts an artifact only together with its metadata: the meta
+// records the source commits, tree cleanliness, exit code and artifact hash.
+// Writing the artifact without it leaves the freeze gate unsatisfiable.
+writeMetaJson(ARTIFACTS_DIR, 'resource-baseline.json', ROOT, join(ROOT, '..', 'measix-architecture'), 'node scripts/collect-baseline.mjs', artifact.status === 'GREEN' ? 0 : 1)
 console.log(`Wrote ${OUT_PATH}`)
 console.log(`Status: ${artifact.status}`)
 if (missingCategories.length > 0) {

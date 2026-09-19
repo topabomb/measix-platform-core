@@ -1,5 +1,10 @@
 // Command devmigrate initializes the single current schema for local development.
 // SQL and its checksum record commit atomically; Atlas-managed databases are excluded.
+//
+// It deliberately does not require an Atlas directory checksum (atlas.sum): this
+// repository keeps one current initialization SQL, and drift between that file
+// and an initialized database is caught by the sha256 recorded in
+// devmigrate_revisions, not by a separate summary file.
 package main
 
 import (
@@ -35,9 +40,6 @@ func run(args []string) error {
 	dir, err := migrate.NewLocalDir(*directory)
 	if err != nil {
 		return err
-	}
-	if err := migrate.Validate(dir); err != nil {
-		return fmt.Errorf("invalid migration directory checksum: %w", err)
 	}
 	files, err := dir.Files()
 	if err != nil {

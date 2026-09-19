@@ -53,6 +53,17 @@ The exact serialized manifest schema is implemented by the candidate/system harn
 
 Candidates default to `.artifacts/s0-freeze-candidate.json`; writes are exclusive. Use a new output path for a new candidate. A draft with CAP-C7-002=NOT_EXECUTED is never a Freeze.
 
+Evidence for the exact commit being frozen must already exist. The writer rejects a missing or stale artifact (`missing artifact/meta`, `source mismatch`, `artifact hash mismatch`), because every `*.meta.json` records the platform-core and architecture commits, tree cleanliness, exit code and artifact hash. Collect all eight on a clean tree at the frozen commit:
+
+```text
+make collect-artifacts                                   # backend/system/console test JSON
+make collect-candidate                                   # candidate lane JSON, required by the CAP scenarios
+make collect-static-contract                             # gofmt, go vet, codegen drift
+make collect-baseline                                    # resource baseline, must be GREEN
+make collect-adapter-qualification ENDPOINT=... KEY=...   # all four profiles VERIFIED
+make s01-browser-candidate                               # e2e-playwright.json
+```
+
 Use the following sequence on a clean pinned composition:
 
 ```text

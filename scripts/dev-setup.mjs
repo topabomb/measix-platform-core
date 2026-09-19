@@ -5,10 +5,11 @@
 // and bootstraps the initial administrator. All secrets land in .secrets/
 // (gitignored). Run:  npm run setup
 import { randomBytes } from "node:crypto";
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { isObsoleteDatabaseError } from "./lib/obsolete-database.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -23,6 +24,28 @@ function run(cmd, args, opts = {}) {
     console.error(`Command failed: ${cmd} ${args.join(" ")} (exit ${result.status})`);
     process.exit(result.status ?? 1);
   }
+}
+
+// devmigrate refuses a database initialized from a different revision of the
+// current SQL. That is obsolete development state: it is deleted and recreated
+// rather than migrated. Only the local development database is ever removed.
+/** Initialize the current schema, replacing an obsolete development database. */
+function initializeCurrentSchema() {
+  const args = ["run", "./cmd/devmigrate", "--db", hubDBRel];
+  console.log(`$ go ${args.join(" ")}`);
+  const first = spawnSync("go", args, { cwd: BACKEND, encoding: "utf8" });
+  process.stdout.write(first.stdout ?? "");
+  process.stderr.write(first.stderr ?? "");
+  if (first.status === 0) return;
+  const output = `${first.stdout ?? ""}${first.stderr ?? ""}`;
+  if (!isObsoleteDatabaseError(output)) {
+    console.error(`Command failed: go ${args.join(" ")} (exit ${first.status})`);
+    process.exit(first.status ?? 1);
+  }
+  const dbPath = join(DATA, "hub.db");
+  console.log(`  obsolete development database; deleting and initializing again: ${dbPath}`);
+  for (const suffix of ["", "-wal", "-shm"]) rmSync(dbPath + suffix, { force: true });
+  run("go", args, { cwd: BACKEND });
 }
 
 function writeSecret(name, bytes) {
@@ -57,13 +80,14 @@ if (!existsSync(relayTokenPath)) {
   console.log("  generated relay-service.token");
 } else { console.log("  relay-service.token exists, skipping"); }
 
-// 3. Initialize or verify the current schema; obsolete development databases are deleted and recreated.
+// 3. Initialize or verify the current schema. An obsolete development database is
+//    deleted and recreated rather than migrated; see docs/database-migrations.md.
 console.log("\n[2/4] Initializing current local hub.db...");
 const hubDBRel = "../.data/hub.db";
 const masterKeyRel = "../.secrets/master.key";
 const jwtKeyRel = "../.secrets/jwt-ed25519.seed";
 const adminPwRel = "../.secrets/admin-password.txt";
-run("go", ["run", "./cmd/devmigrate", "--db", hubDBRel], { cwd: BACKEND });
+initializeCurrentSchema();
 
 // 4. Bootstrap admin user
 console.log("\n[3/4] Bootstrapping admin user...");

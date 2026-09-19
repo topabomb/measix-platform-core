@@ -31,3 +31,5 @@ npm run device:real:reset
 ```
 
 `stop` 仅停止该预设自己记录的进程。`reset` 先停止该进程，再删除仅属于 `.data/device-real/` 的数据库、spool、日志和预设状态，随后建立新的真机联调环境；它不会触碰任何其他数据库或联调环境。
+
+若启动在初始化数据库时报 `non-current schema/checksum`，说明该目录下的库由当前初始化 SQL 的旧版本建立（当前结构与旧版本之间不做迁移）。这种情况执行 `npm run device:real:reset` 即可：它删除该库并以当前 SQL 重新初始化。同一情形出现在普通开发库 `.data/hub.db` 时，用 `npm run setup`。

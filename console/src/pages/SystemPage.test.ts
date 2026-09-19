@@ -60,6 +60,8 @@ const BASE = {
   appliedBundleHash: BUNDLE_HASH,
   appliedControlRevision: 5,
   relayReady: true,
+  portalMode: 'STANDARD' as const,
+  portalUrl: 'http://192.168.1.20:9000/portal/',
 }
 
 describe('SystemPage', () => {
@@ -72,6 +74,24 @@ describe('SystemPage', () => {
     const { wrapper } = mountSystem()
     await flushPromises()
     expect(wrapper.find('[data-cy="platform-public-origin"]').text()).toContain('http://192.168.1.20:9000')
+    wrapper.unmount()
+  })
+  it('shows the effective standard or custom Portal selected by Core deployment', async () => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/system/status') return {
+        ...BASE,
+        portalMode: 'CUSTOM',
+        portalUpstreamUrl: 'https://portal.enterprise.example/workbench/',
+      }
+      if (path === '/api/admin/v1/system/health') return { live: true, ready: true }
+      return { items: [] }
+    })
+    const { wrapper } = mountSystem()
+    await flushPromises()
+    const portal = wrapper.get('[data-cy="portal-status"]')
+    expect(portal.text()).toContain('Enterprise workbench')
+    expect(portal.text()).toContain('https://portal.enterprise.example/workbench/')
+    expect(portal.get('a').attributes('href')).toBe(BASE.portalUrl)
     wrapper.unmount()
   })
   it('keeps the last failure visible while a different operation awaits confirmation', async () => {

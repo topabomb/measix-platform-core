@@ -35,7 +35,8 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 	svc.PublicOrigin = "https://platform.example"
 	svc.Now = func() time.Time { return now }
 	signer.Now = svc.Now
-	if _, err := svc.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple"); err != nil {
+	boot, err := svc.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple")
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,6 +138,45 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 		DeviceID     string `json:"deviceId"`
 	}
 	decodeJSON(t, exchange, &tokens)
+	assertEnrollmentProblem := func(response *httptest.ResponseRecorder, code string) {
+		t.Helper()
+		if response.Code != http.StatusConflict {
+			t.Fatalf("enrollment conflict status=%d body=%s", response.Code, response.Body.String())
+		}
+		var problem struct {
+			Code string `json:"code"`
+		}
+		decodeJSON(t, response, &problem)
+		if problem.Code != code {
+			t.Fatalf("enrollment conflict code=%q, want %q", problem.Code, code)
+		}
+	}
+	used := doJSON(t, h, http.MethodPost, "/api/client/v1/enrollments/exchange", nil, map[string]any{
+		"code": grant.Code, "installationId": platformid.New(platformid.Installation),
+		"platform": "ANDROID", "deviceName": "test-device", "appVersion": "1.0.0",
+	})
+	assertEnrollmentProblem(used, "enrollment_already_used")
+
+	other, err := svc.CreateUser(ctx, "bob", "Bob", "MEMBER")
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherGrant, err := svc.CreateEnrollment(ctx, other.ID, boot.AdminUserID, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conflict := doJSON(t, h, http.MethodPost, "/api/client/v1/enrollments/exchange", nil, map[string]any{
+		"code": otherGrant.Code, "installationId": installationID,
+		"platform": "ANDROID", "deviceName": "other-device", "appVersion": "1.0.0",
+	})
+	assertEnrollmentProblem(conflict, "installation_user_conflict")
+	notConsumed := doJSON(t, h, http.MethodPost, "/api/client/v1/enrollments/exchange", nil, map[string]any{
+		"code": otherGrant.Code, "installationId": platformid.New(platformid.Installation),
+		"platform": "ANDROID", "deviceName": "other-device", "appVersion": "1.0.0",
+	})
+	if notConsumed.Code != http.StatusCreated {
+		t.Fatalf("installation conflict consumed enrollment: status=%d body=%s", notConsumed.Code, notConsumed.Body.String())
+	}
 
 	bootstrap := doJSON(t, h, http.MethodGet, "/api/client/v1/bootstrap", map[string]string{
 		"Authorization": "Bearer " + tokens.AccessToken,

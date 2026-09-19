@@ -2,6 +2,7 @@ package identity_test
 
 import (
 	"context"
+	"errors"
 	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/store"
 	"measix/platform/internal/hub/testutil"
@@ -102,5 +103,32 @@ func TestPublicOriginPolicy(t *testing.T) {
 		if identity.ValidatePublicOrigin(raw) == nil {
 			t.Fatalf("unsafe origin %s", raw)
 		}
+	}
+}
+
+func TestPortalGrantRequiresServedStaticArtifact(t *testing.T) {
+	ctx := context.Background()
+	st := testutil.OpenStore(t)
+	s := testutil.NewIdentityService(t, st, time.Now().UTC())
+	s.PublicOrigin = "https://platform.example"
+	s.PortalStaticAvailable = false
+	boot, err := s.Bootstrap(ctx, "Enterprise", "admin", "Admin", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := s.CreateUser(ctx, "alice", "Alice", "MEMBER")
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant, err := s.CreateEnrollment(ctx, member.ID, boot.AdminUserID, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	native, err := s.ExchangeEnrollment(ctx, grant.Code, platformid.New(platformid.Installation), "Phone", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreatePortalGrant(ctx, native.AccessToken); !errors.Is(err, identity.ErrPortalUnavailable) {
+		t.Fatalf("expected portal unavailable, got %v", err)
 	}
 }

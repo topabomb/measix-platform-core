@@ -1077,6 +1077,21 @@ export interface components {
              * @description Explicit public HTTP or HTTPS platform origin; absent when deployment configuration is incomplete.
              */
             publicOrigin?: string;
+            /**
+             * @description Effective deployment-selected Portal document source. This is operational configuration, not Managed Snapshot content.
+             * @enum {string}
+             */
+            portalMode: "STANDARD" | "CUSTOM" | "UNAVAILABLE";
+            /**
+             * Format: uri
+             * @description Device-facing Core /portal/ URL when Portal is available.
+             */
+            portalUrl?: string;
+            /**
+             * Format: uri
+             * @description Deployment-owned custom static Portal base URL proxied by Core; present only in CUSTOM mode.
+             */
+            portalUpstreamUrl?: string;
             /** @description Running Relay build identity from a successful private status read. Omitted when unavailable; never copied from Hub. */
             relayBuildVersion?: string;
             buildVersion: string;

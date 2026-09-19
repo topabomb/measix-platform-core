@@ -514,6 +514,27 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 	}
 }
 
+// Defines values for SystemStatusPortalMode.
+const (
+	CUSTOM      SystemStatusPortalMode = "CUSTOM"
+	STANDARD    SystemStatusPortalMode = "STANDARD"
+	UNAVAILABLE SystemStatusPortalMode = "UNAVAILABLE"
+)
+
+// Valid indicates whether the value is a known member of the SystemStatusPortalMode enum.
+func (e SystemStatusPortalMode) Valid() bool {
+	switch e {
+	case CUSTOM:
+		return true
+	case STANDARD:
+		return true
+	case UNAVAILABLE:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SystemStatusRuntimeStatus.
 const (
 	SystemStatusRuntimeStatusACTIVATING SystemStatusRuntimeStatus = "ACTIVATING"
@@ -1605,6 +1626,15 @@ type SystemStatus struct {
 	ManagedStateRevision    int         `json:"managedStateRevision"`
 	OldestPendingAgeSeconds *int        `json:"oldestPendingAgeSeconds,omitempty"`
 
+	// PortalMode Effective deployment-selected Portal document source. This is operational configuration, not Managed Snapshot content.
+	PortalMode SystemStatusPortalMode `json:"portalMode"`
+
+	// PortalUpstreamUrl Deployment-owned custom static Portal base URL proxied by Core; present only in CUSTOM mode.
+	PortalUpstreamUrl *string `json:"portalUpstreamUrl,omitempty"`
+
+	// PortalUrl Device-facing Core /portal/ URL when Portal is available.
+	PortalUrl *string `json:"portalUrl,omitempty"`
+
 	// PublicOrigin Explicit public HTTP or HTTPS platform origin; absent when deployment configuration is incomplete.
 	PublicOrigin *string `json:"publicOrigin,omitempty"`
 
@@ -1623,6 +1653,9 @@ type SystemStatus struct {
 	// SpoolState Omitted when Relay spool status is unavailable; omission does not mean OK.
 	SpoolState *SystemStatusSpoolState `json:"spoolState,omitempty"`
 }
+
+// SystemStatusPortalMode Effective deployment-selected Portal document source. This is operational configuration, not Managed Snapshot content.
+type SystemStatusPortalMode string
 
 // SystemStatusRuntimeStatus defines model for SystemStatus.RuntimeStatus.
 type SystemStatusRuntimeStatus string

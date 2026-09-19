@@ -1,6 +1,6 @@
 # Android 真实平台接入说明
 
-本说明面向 Android 维护方。当前唯一组合是 Discovery protocolVersion="1"、Snapshot v4、Portal Bridge v3、localReadVersion=2；资料包 formatVersion=1 独立。MEASIX 从未发布，不做旧 Snapshot、旧数据库或配置转换。本说明约定目标接线和验收，不以某个 Android 历史版本的缺口代替当前源码审查；上游测试不代表设备联调已完成。
+本说明面向 Android 维护方。当前唯一组合是 Discovery protocolVersion="1"、Snapshot v4 与 Portal Bridge v3；Enrollment 资料 formatVersion=1 独立。MEASIX 从未发布，不做旧 Snapshot、旧数据库或配置转换。本说明约定目标接线和验收，不以某个 Android 历史版本的缺口代替当前源码审查；上游测试不代表设备联调已完成。
 
 ## 权威与资料入口
 
@@ -30,7 +30,7 @@
 
 | 可能阻止使用的条件 | 本轮明确的处理方式 |
 | --- | --- |
-| 原生仍拒绝 PLATFORM_ENROLLMENT | 实现独立 Platform source；不能只替换 Portal 包或复用演示 source |
+| 原生仍拒绝 PLATFORM_ENROLLMENT | 实现并修复唯一 Platform source；不能靠 Portal 包或手机端模拟企业替代 |
 | 手机不能访问开发电脑的 127.0.0.1 | 配置手机可达的 HTTP 或 HTTPS 统一公共入口（域名或 IP 均可），Hub PublicOrigin 保持相同；Discovery/Client/Runtime/Portal 都从该 origin 访问。具体 ingress 配置由 Core operations 文档维护 |
 | 当前预览上游是合成服务 | 它只证明协议和转发；真实使用须在 Admin 配置实际供应商/CLIProxyAPI 地址、模型、凭据并应用、发布。客户端不接收企业密钥，不能把合成回复当成真实生成 |
 | 五项 allowLocal* 为 false | 这是禁止企业域使用用户自带配置，不是禁用企业下发的资源。需要混用时由管理员启用对应策略并发布，不能由客户端越权绕过 |
@@ -44,7 +44,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 
 另外两种当前模型协议 `GOOGLE_GENERATE_CONTENT`、`ANTHROPIC_MESSAGES` 分别使用 `snapshot-v4-gemini.json`、`snapshot-v4-claude.json`。复用 Android 原生 provider 编码器，但把地址和认证接到平台 Runtime owner：Gemini 使用完整 runtimePath 并追加 `alt=sse`；Claude 保留 `anthropic-version` 和 `max_tokens`。工具后续请求须保留调用与结果的配对、适用 reasoning items 和 Gemini thoughtSignature。不能在 Relay 中解析、补全或重写这些供应商字段。
 
-以下 Kotlin 名称只用于定位当前实现，不改变 wire。平台 source 应有独立适配层，复用现有 ConfigurationResolver/执行准入，不能修改本地示例 source 来伪装平台已经接通。
+以下 Kotlin 名称只用于定位当前实现，不改变 wire。平台 source 应有独立适配层，复用现有 ConfigurationResolver/执行准入；不存在并行的手机端示例企业 source。
 
 | 平台字段/事实 | 当前 Android 模型处理 |
 | --- | --- |
@@ -65,7 +65,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | Starter.starterId/assistantDefinitionId/title/prompt/description/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击只进入原生输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
 | policy 五项 allowLocal* | EnterprisePolicy 五项必填 Boolean；缺失/null/错误类型均拒绝。只控制本企业域内用户原配置准入，不复制用户定义、端点和密钥 |
 | defaultModelId/defaultTtsId/defaultAsrId/defaultAssistantId | defaults.chatModelId/ttsId/asrId/assistantId；显式无效引用不回退首项。没有用户已选助手时采用 defaultAssistantId；用户已选助手失效时呈现选择与修复入口，不静默改选默认助手。未提供的默认值保持未指定，由既有本域选择规则处理 |
-| defaults.fastModelId/titleModelId/imageGenerationModelId/attachmentInspectionModelId/suggestionModelId/compressModelId | v4 无对应的企业强制字段。保留本域偏好和功能已有选择规则，不把 defaultModelId 批量写入所有槽位，不继承本地示例值 |
+| defaults.fastModelId/titleModelId/imageGenerationModelId/attachmentInspectionModelId/suggestionModelId/compressModelId | v4 无对应的企业强制字段。保留本域偏好和功能已有选择规则，不把 defaultModelId 批量写入所有槽位 |
 | allowAsSubAssistant/allowedSubAssistantIds、gateways | v4 不下发企业子助手关系或 Gateway；平台适配输出 false/空集合。用户自有子助手仍按现有五项准入和执行权限处理，不扩展 wire |
 
 ## 认证、同步与恢复时序
@@ -75,7 +75,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 3. access token 只用于 Client/Runtime Bearer；Portal JS 不可读取。`GET bootstrap` 的 session.expiresAt 是会话 idle 到期时间，不能替代 accessTokenExpiresAt。七天 idle 只由有效刷新续期，普通查询不续期。
 4. 没有首个 Release 时 activeManagedGeneration=0，保持待配置且 Runtime 禁止；不请求 Snapshot 0、不因 READY 字样而执行。首次 Bootstrap 不带已应用 generation，因此有发布配置时也需要同步。
 5. `GET managed/state` 可带 `X-Measix-Applied-Managed-Generation`。下载目标 generation 的 Snapshot，验证部署/版本/generation、ETag 与 body.snapshotHash 一致性、必填策略、资源 enum 与引用闭包后原子应用，之后才通过 `PUT /api/client/v1/managed/applied` 报告 `{managedGeneration,snapshotHash}`，使用当前母 Session 的 Bearer；成功返回 204。状态查询 header、下载和 304 不记录回执。报告失败不回滚配置或重放业务，下次同步检查重报当前已应用值；409 表示同 Session 倒退报告，422 表示发布/hash 不匹配。保留最后完整状态用于展示，但不能绕过新状态的执行阻止。
-6. Snapshot HTTP 200 返回 JSON 与带引号的 ETag；If-None-Match 命中返回无 body 的 304。仅当同一来源、身份及 generation 的已验证缓存存在时才能复用。真实 HTTP 304 与 Portal 本地消息响应是两套语义，本地消息不得伪造 HTTP 304。
+6. Snapshot HTTP 200 返回 JSON 与带引号的 ETag；If-None-Match 命中返回无 body 的 304。仅当同一来源、身份及 generation 的已验证缓存存在时才能复用。Portal 数据使用独立的同源 Core HTTP Session/Feed，不经过原生 Bridge 伪造 HTTP 语义。
 7. 每个 Session 的 refresh 串行化。先持久化本次 Idempotency-Key；不确定响应只用同一旧 refreshToken + 同一 key 重试。服务端短恢复窗内返回完全相同的轮换结果；原子提交新令牌后才开启下一次刷新。旧 token + 新 key / 新 token + 旧 key 为 409 refresh_conflict。恢复窗已过按明确失败重新接入，不循环重试。
 8. Runtime 请求冻结 authority/session/generation/resource；`428 managed_snapshot_required` 且 forwarded=false 表示未转发，进入配置同步与重新准入，不能绕过 generation barrier 或盲重放已经发生 I/O 的业务。
 9. Client logout 是 `POST sessions/logout`，JSON body 携带当前 refreshToken；不是 access-token-only 请求。成功 204。母 Session 撤销后 Client 查询返回 403 session_revoked，正确 ETag 也不能绕过授权。401 认证过期/失效与 403 撤销、资源禁止分别处理。

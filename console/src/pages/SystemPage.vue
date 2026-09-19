@@ -94,6 +94,17 @@ onMounted(refresh)
           <div class="text-caption text-grey-7 q-mt-xs">{{ $t('system.publicOriginHint') }}</div>
         </q-card-section>
       </q-card>
+      <q-card flat bordered class="q-mb-xs" data-cy="portal-status">
+        <q-card-section>
+          <div class="row items-center q-gutter-sm">
+            <div class="text-subtitle1">{{ $t('system.portal') }}</div>
+            <q-badge :color="status.portalMode === 'UNAVAILABLE' ? 'red' : status.portalMode === 'CUSTOM' ? 'blue' : 'green'" :label="$t(`system.portalModes.${status.portalMode}`)" />
+          </div>
+          <a v-if="status.portalUrl" :href="status.portalUrl" target="_blank" rel="noopener noreferrer" class="text-body1 text-break q-mt-xs block">{{ status.portalUrl }}</a>
+          <div v-if="status.portalUpstreamUrl" class="text-caption text-grey-7 text-break q-mt-xs">{{ $t('system.portalUpstream') }}: {{ status.portalUpstreamUrl }}</div>
+          <div class="text-caption text-grey-7 q-mt-xs">{{ $t('system.portalHint') }}</div>
+        </q-card-section>
+      </q-card>
       <div class="row q-col-gutter-xs q-mb-xs">
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>

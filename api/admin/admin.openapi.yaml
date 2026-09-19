@@ -2626,11 +2626,24 @@ components:
       - managedStateRevision
       - desiredControlRevision
       - relayReady
+      - portalMode
       properties:
         publicOrigin:
           type: string
           format: uri
           description: Explicit public HTTP or HTTPS platform origin; absent when deployment configuration is incomplete.
+        portalMode:
+          type: string
+          enum: [STANDARD, CUSTOM, UNAVAILABLE]
+          description: Effective deployment-selected Portal document source. This is operational configuration, not Managed Snapshot content.
+        portalUrl:
+          type: string
+          format: uri
+          description: Device-facing Core /portal/ URL when Portal is available.
+        portalUpstreamUrl:
+          type: string
+          format: uri
+          description: Deployment-owned custom static Portal base URL proxied by Core; present only in CUSTOM mode.
         relayBuildVersion:
           type: string
           minLength: 1

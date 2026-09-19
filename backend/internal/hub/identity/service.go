@@ -29,23 +29,25 @@ var (
 )
 
 type Service struct {
-	PublicOrigin      string
-	BootstrapTimezone string
-	Client            *ent.Client
-	Signer            *security.AccessSigner
-	CSRFKey           []byte
-	Now               func() time.Time
-	Random            func(int) (string, error)
+	PublicOrigin          string
+	PortalStaticAvailable bool
+	BootstrapTimezone     string
+	Client                *ent.Client
+	Signer                *security.AccessSigner
+	CSRFKey               []byte
+	Now                   func() time.Time
+	Random                func(int) (string, error)
 }
 
 func New(client *ent.Client, signer *security.AccessSigner, csrfKey []byte) *Service {
 	return &Service{
-		BootstrapTimezone: "UTC",
-		Client:            client,
-		Signer:            signer,
-		CSRFKey:           append([]byte(nil), csrfKey...),
-		Now:               time.Now,
-		Random:            security.RandomToken,
+		BootstrapTimezone:     "UTC",
+		PortalStaticAvailable: true,
+		Client:                client,
+		Signer:                signer,
+		CSRFKey:               append([]byte(nil), csrfKey...),
+		Now:                   time.Now,
+		Random:                security.RandomToken,
 	}
 }
 

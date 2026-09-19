@@ -76,7 +76,7 @@ Push-Location $repoRoot
 try {
     & pnpm -C console build
     if ($LASTEXITCODE -ne 0) { throw 'Admin Console build failed.' }
-    & pnpm -C $portalRoot build:all
+    & pnpm -C $portalRoot build
     if ($LASTEXITCODE -ne 0) { throw 'Enterprise Portal build failed.' }
     Push-Location $backendRoot
     try {
@@ -94,6 +94,11 @@ try {
         '--relay-service-token-file', $relayTokenPath, '--spool', $spoolPath,
         '--admin-assets-dir', (Join-Path $repoRoot 'console\dist\spa'), '--portal-assets-dir', (Join-Path $portalRoot 'dist')
     )
+    $portalUpstream = $env:MEASIX_PORTAL_UPSTREAM_URL
+    if (-not [string]::IsNullOrWhiteSpace($portalUpstream)) {
+        if ($portalUpstream -notmatch '^https?://') { throw 'MEASIX_PORTAL_UPSTREAM_URL must be an HTTP or HTTPS URL.' }
+        $args += @('--portal-upstream-url', $portalUpstream)
+    }
     $process = Start-Process -FilePath $binaryPath -ArgumentList $args -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logRoot 'device-demo.out.log') -RedirectStandardError (Join-Path $logRoot 'device-demo.err.log')
     @{ pid = $process.Id; executable = $binaryPath; origin = $origin; startedAt = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $pidPath -NoNewline
 

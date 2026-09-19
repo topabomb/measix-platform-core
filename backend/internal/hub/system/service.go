@@ -18,6 +18,9 @@ type Service struct {
 	Store          *store.Store
 	RuntimeControl *runtimecontrol.Service
 	BuildVersion   string
+	PortalMode     string
+	PortalURL      *string
+	PortalUpstream *string
 	Now            func() time.Time
 }
 
@@ -43,10 +46,13 @@ type Status struct {
 	RequestUsageIngestLagSeconds *int
 	SemanticOrphanCount          *int
 	SemanticUnknownRequestCount  *int
+	PortalMode                   string
+	PortalURL                    *string
+	PortalUpstream               *string
 }
 
 func New(store *store.Store, control *runtimecontrol.Service, buildVersion string) *Service {
-	return &Service{Store: store, RuntimeControl: control, BuildVersion: buildVersion, Now: time.Now}
+	return &Service{Store: store, RuntimeControl: control, BuildVersion: buildVersion, PortalMode: "UNAVAILABLE", Now: time.Now}
 }
 
 // Health is a cheap local dependency probe. Full integrity/history/Relay
@@ -54,7 +60,8 @@ func New(store *store.Store, control *runtimecontrol.Service, buildVersion strin
 func (s *Service) Health(ctx context.Context) error { return s.Store.DB.PingContext(ctx) }
 
 func (s *Service) Status(ctx context.Context) (Status, error) {
-	result := Status{BuildVersion: s.BuildVersion, SchemaIdentity: maintenance.CurrentSchemaIdentity}
+	result := Status{BuildVersion: s.BuildVersion, SchemaIdentity: maintenance.CurrentSchemaIdentity,
+		PortalMode: s.PortalMode, PortalURL: s.PortalURL, PortalUpstream: s.PortalUpstream}
 	if _, err := maintenance.Check(ctx, s.Store.DB); err != nil {
 		result.DBHealth = "DEGRADED"
 	} else {

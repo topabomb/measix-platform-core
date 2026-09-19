@@ -28,9 +28,9 @@ import (
 var buildVersion = "dev"
 
 type options struct {
-	listen, hubInternalListen, relayInternalListen string
-	db, masterKey, jwtKey, relayToken, spool       string
-	publicOrigin, adminAssets, portalAssets        string
+	listen, hubInternalListen, relayInternalListen          string
+	db, masterKey, jwtKey, relayToken, spool                string
+	publicOrigin, adminAssets, portalAssets, portalUpstream string
 }
 
 func main() {
@@ -54,12 +54,13 @@ func run(args []string, log *slog.Logger) error {
 	fs.StringVar(&opt.spool, "spool", "", "Relay durable usage spool")
 	fs.StringVar(&opt.publicOrigin, "public-origin", "", "device-reachable platform origin")
 	fs.StringVar(&opt.adminAssets, "admin-assets-dir", "", "built Admin SPA directory")
-	fs.StringVar(&opt.portalAssets, "portal-assets-dir", "", "built Portal SPA directory")
+	fs.StringVar(&opt.portalAssets, "portal-assets-dir", "", "built standard Portal SPA directory")
+	fs.StringVar(&opt.portalUpstream, "portal-upstream-url", "", "optional custom Portal HTTP/HTTPS static base URL")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if opt.listen == "" || opt.hubInternalListen == "" || opt.relayInternalListen == "" || opt.db == "" || opt.masterKey == "" || opt.jwtKey == "" || opt.relayToken == "" || opt.spool == "" || opt.publicOrigin == "" {
-		return errors.New("all device-demo addresses, storage paths, credentials and public origin are required")
+	if opt.listen == "" || opt.hubInternalListen == "" || opt.relayInternalListen == "" || opt.db == "" || opt.masterKey == "" || opt.jwtKey == "" || opt.relayToken == "" || opt.spool == "" || opt.publicOrigin == "" || opt.portalAssets == "" {
+		return errors.New("all device-demo addresses, storage paths, credentials, public origin and Portal assets are required")
 	}
 
 	serviceToken, err := readToken(opt.relayToken)
@@ -79,7 +80,7 @@ func run(args []string, log *slog.Logger) error {
 		PublicOrigin: opt.publicOrigin, ListenAddr: opt.listen, InternalListenAddr: opt.hubInternalListen,
 		DBPath: opt.db, MasterKeyFile: opt.masterKey, JWTPrivateKeyFile: opt.jwtKey,
 		RelayInternalURL: "http://" + opt.relayInternalListen, RelayServiceTokenFile: opt.relayToken,
-		AdminAssetsDir: opt.adminAssets, PortalAssetsDir: opt.portalAssets,
+		AdminAssetsDir: opt.adminAssets, PortalAssetsDir: opt.portalAssets, PortalUpstreamURL: opt.portalUpstream,
 		AccessTokenTTL: 10 * time.Minute, ReconcileInterval: 2 * time.Second,
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)

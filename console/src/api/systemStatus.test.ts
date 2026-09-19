@@ -12,6 +12,7 @@ const ready: SystemStatus = {
   desiredControlRevision: 1, appliedControlRevision: 1,
   desiredBundleHash: hash('b'),
   appliedBundleHash: hash('b'), relayReady: true,
+  portalMode: 'STANDARD',
 }
 
 describe('managed runtime convergence', () => {

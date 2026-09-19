@@ -1,6 +1,6 @@
 # S0 Platform Core 当前实现状态
 
-> 状态日期：2026-09-19。本文是唯一 living implementation/stage status。执行清单见 [A1–P3 计划](android-platform-contract-readiness-plan.md)。后文保留各次执行证据，以本节最新状态为准。
+> 状态日期：2026-09-19。本文是唯一 living implementation/stage status。后文历史证据以本节最新状态为准。
 
 ## 审查后修正（2026-09-19，当前工作树）
 
@@ -52,7 +52,7 @@ Android 工作树已有其他维护方新增的 PlatformControlClient/Mapper/rep
 
 ## 当前唯一契约
 
-MEASIX 从未发布。Snapshot v4、Bridge v3、local-read v2、Enrollment formatVersion 1 和当前 HTTP `/v1` 是唯一实现目标；这些编号用于识别当前 wire contract，不表示兼容旧实现。旧 Snapshot、四项策略 DTO、策略收养、字段补值、双读/双写、增量数据库升级和历史命令别名均不维护。Gateway/Snapshot v5 仍是后续阶段目标。
+MEASIX 从未发布。Snapshot v4、Bridge v3、Enrollment formatVersion 1 和当前 HTTP `/v1` 是唯一实现目标；这些编号用于识别当前 wire contract，不表示兼容旧实现。Portal Session/Feed 只走 Core HTTP，不存在 local-read。旧 Snapshot、四项策略 DTO、策略收养、字段补值、双读/双写、增量数据库升级和历史命令别名均不维护。Gateway/Snapshot v5 仍是后续阶段目标。
 
 当前数据库只有 `backend/migrations/202609120001_current.sql` 一份完整初始化 SQL。空库初始化后以 SQL SHA-256 作为 `schemaIdentity`；非当前开发数据库或配置直接删除重建，不转换、回填或旁路打开。当前 schema 的原子初始化、重复核对、完整性、备份恢复和失败不污染测试继续保留。
 
@@ -64,7 +64,7 @@ MEASIX 从未发布。Snapshot v4、Bridge v3、local-read v2、Enrollment forma
 | Core wire/backend | Admin/Client OpenAPI 要求 Assistants、Starters 和五项策略全部显式存在；资源字段执行当前最小约束。Bootstrap 直接创建完整当前 Draft。Hub Preview 将保存的 Draft 与最新 immutable Release 比较，返回资源、Binding、Policy、Assistant、Starter 的权威 diff |
 | Core Admin | 一个配置工作台覆盖 Overview、Models、TTS、ASR、MCP、Assistants、Policy；桌面固定导航、窄屏选择器。Assistant 采用 collection → selected settings，包含 Basic、Instructions、Memory、Model & MCP、Starters。资源删除检查 defaults/Assistant/Binding 引用；Validation issue 可返回对应分区；脏 Draft 的刷新、离页和重新加载需要确认 |
 | Core current-only cleanup | 删除旧的本地 diff 路径猜测、772 行重复 E2E、不可工作的 `freeze-gate` wrapper、旧 browser/schema 命令别名和迁移措辞；schema 工具只接受一份当前 SQL并拒绝增量历史 |
-| Portal | 继续使用独立仓库和同一当前 Feed/Bridge 合同；远端与 bundled local 生产构建重新生成。Portal 不拥有 Managed 配置编辑，Core Admin 不复制 Portal 工作台 |
+| Portal | 独立仓库只生成一套标准静态工作台；Core 默认分发该构建，或同源代理企业自有 HTTP/HTTPS 静态站点。Portal 不拥有 Managed 配置编辑，Core Admin 不复制 Portal 工作台 |
 
 Android 集成导出只含客户端实际消费的内容：可执行 Client OpenAPI、Portal Bridge 契约、共享 fixtures、428 问题样例与接入说明；不内嵌架构文档正文，也不含 Core 测试源码。它由 `scripts/export-client-integration.mjs` 从本仓库源文件直接复制生成，不含摘要清单或独立校验器。
 
@@ -77,9 +77,9 @@ Android 集成导出只含客户端实际消费的内容：可执行 Client Open
 | Core Admin | 21 个 Vitest 文件、137 项测试通过；`vue-tsc --noEmit` 与 Quasar production build 通过 |
 | Core browser | `node scripts/e2e-harness.mjs` 通过 Admin authoring/publish、四类 runtime traffic、usage/system 和 topology security；System 页面在干净 Chromium 中没有页面脚本异常 |
 | Current schema | 空库应用唯一一份 SQL 的 Go 测试通过（应用、业务读写、重复初始化、失败事务回滚） |
-| Portal | 8 个 Vitest 文件、102 项测试和 2 项交付测试通过；format、remote/local production build 通过；6 项 Playwright（5 项 local + 1 项真实 Hub 生命周期）通过 |
+| Portal | 当前单元、typecheck、production build 与真实 Hub 生命周期需以本工作树最新重跑结果为准；旧 remote/local 双构建与 local-read 证据已废止 |
 
-Windows 当前 Go 环境未启用 CGO，`go test -race` 在测试启动前被 Go 拒绝。当前协议扩展后的全量 Go 测试、vet、Admin 测试与完整浏览器 harness 已运行；candidate system 最新运行通过（207.9 秒）。Portal 最新 102 项单元测试、2 项交付测试、两种生产构建及 6 项浏览器测试（5 项 bundled local + 1 项真实 Hub 生命周期）通过。没有执行 Android 编译/设备测试、付费模型/语音供应商 qualification、独立 clean-source rebuild/replay 或最终 Freeze。Firecrawl 官方免密钥 MCP 已完成真实调用，不能替代其他供应商证据。
+Windows 当前 Go 环境未启用 CGO，`go test -race` 在测试启动前被 Go 拒绝。历史 candidate system、Core/Admin 和浏览器证据不自动适用于本工作树最新候选；交付时必须记录本轮重跑结果。旧 Portal 双构建、本地包和 local-read 测试结果不再是当前证据。付费模型/语音供应商 qualification、独立 clean-source rebuild/replay 与最终 Freeze 仍需独立证明。Firecrawl 官方免密钥 MCP 的真实调用不能替代其他供应商证据。
 
 ## 管理员实际操作审查（本机独立预览）
 
@@ -109,7 +109,7 @@ Relay 构建标识已从运行进程通过 private status 传至 Hub/Admin；开
 
 最终人工复查已修复用量页日期输入、资源名称与信息层次：日期用本地选择器并转换为 UTC 查询，名称从请求所属不可变 Release 批量读取；技术编号筛选折叠，单条详情可筛选同一资源。浏览器实际确认 Firecrawl 名称与 4 条筛选结果；移除借用汇总成本的伪单请求成本。用户详情设备编号已缩短并折叠完整标识；四个页面的刷新按钮已补可访问名称。System 的 current/last 操作已按当前合同实现与验证。用量查询增加请求序号隔离：筛选变化清空旧数据，过时的成功、错误和分页响应均不得覆盖当前结果；三个响应乱序测试通过。
 
-Android 仓库仍由其维护方独立修改，本轮保持只读。其当前在途工作不能由 Core/Portal 的 Green 代替。Android 维护方下一步应消费上述 exact 导出，保持 Snapshot v4/五项策略/Bridge v3/local-read v2 解析一致，并完成真实 Platform source、远端 Relay 四 profile、428/刷新/退出和物理设备互操作证据。
+Android 必须消费当前 exact 导出，保持 Snapshot v4、五项策略和 Bridge v3 一致，并完成真实 Platform source、Portal grant/session、远端 Relay 四 profile、428/刷新/退出和物理设备互操作证据。Core/Portal 的 Green 不能替代 Android 设备证据。
 
 S0.3 的 Enterprise Tool Gateway、Snapshot v5、真实生产 supervisor/package 和后续 User Sync 不在本批实现范围，也没有预建空模块或兼容入口。
 

@@ -29,6 +29,38 @@ func TestPortalCloseMissingCSRFIsForbidden(t *testing.T) {
 	}
 }
 
+func TestPortalExchangeAcceptsNativeOpaqueOriginButRejectsCrossSite(t *testing.T) {
+	h, id, _, ctx, _ := setupFullHandler(t)
+	id.PublicOrigin = "http://192.168.1.20:9000"
+	admin, csrf := loginAdmin(t, h)
+	token := enrollClient(t, h, admin, csrf)
+	exchange := func(ticket, fetchSite string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, "/portal/session/exchange",
+			strings.NewReader(url.Values{"ticket": {ticket}}.Encode()))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+		r.Header.Set("Origin", "null")
+		r.Header.Set("Sec-Fetch-Site", fetchSite)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+
+	grant, err := id.CreatePortalGrant(ctx, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := exchange(grant.Ticket, "none"); got.Code != http.StatusSeeOther {
+		t.Fatalf("native opaque-origin exchange status=%d body=%s", got.Code, got.Body)
+	}
+	grant, err = id.CreatePortalGrant(ctx, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := exchange(grant.Ticket, "cross-site"); got.Code != http.StatusForbidden {
+		t.Fatalf("cross-site opaque-origin exchange status=%d, want 403", got.Code)
+	}
+}
+
 func TestPortalSessionLifecycleAndIsolation(t *testing.T) {
 	for _, origin := range []string{"https://platform.example", "http://192.168.1.20:9000", "http://platform.example:9000"} {
 		t.Run(origin, func(t *testing.T) { testPortalSessionLifecycle(t, origin) })

@@ -38,15 +38,20 @@ func TestPortalExportManifestMatchesCanonicalInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	var manifest struct {
-		BridgeVersion    int
-		LocalReadVersion int
-		Artifacts        map[string]struct{ Source, Sha256 string }
+		BridgeVersion int
+		Artifacts     map[string]struct{ Source, Sha256 string }
 	}
 	if err = json.Unmarshal(data, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.BridgeVersion != 3 || manifest.LocalReadVersion != 2 || len(manifest.Artifacts) != 8 {
+	expected := []string{"portal-contract.openapi.json", "client-feed.schemas.json", "native-vectors.json", "feed-vectors.json", "platform-v1.json", "cases.json"}
+	if manifest.BridgeVersion != 3 || len(manifest.Artifacts) != len(expected) {
 		t.Fatal("incomplete native export manifest")
+	}
+	for _, name := range expected {
+		if _, ok := manifest.Artifacts[name]; !ok {
+			t.Fatalf("missing native export %s", name)
+		}
 	}
 	for name, artifact := range manifest.Artifacts {
 		canonical, err := os.ReadFile(filepath.Join(root, "..", artifact.Source))
@@ -121,21 +126,5 @@ func TestPortalNativeSharedVectors(t *testing.T) {
 				t.Fatalf("valid=%t, got %v", vector.Valid, err)
 			}
 		})
-	}
-}
-
-func TestPortalDocumentBoundRequest(t *testing.T) {
-	loader := openapi3.NewLoader()
-	loader.IsExternalRefsAllowed = true
-	document, err := loader.LoadFromFile(filepath.Join(fixtureRoot(t), "..", "portal", "portal-contract.openapi.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, version := range []float64{2, 3} {
-		request := map[string]any{"bridgeVersion": version, "documentId": "doc_fixture", "requestId": "request_fixture", "method": "listLocalUpdates", "params": map[string]any{"limit": float64(20)}}
-		err := document.Components.Schemas["BridgeRequest"].Value.VisitJSON(request)
-		if (err == nil) != (version == 3) {
-			t.Fatalf("v%v accepted=%v: %v", version, err == nil, err)
-		}
 	}
 }

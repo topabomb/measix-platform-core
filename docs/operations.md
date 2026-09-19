@@ -19,7 +19,7 @@ caddy validate --config deploy/Caddyfile --adapter caddyfile
 caddy run --config deploy/Caddyfile --adapter caddyfile
 ```
 
-Clients use `http://127.0.0.1:9000`; they resolve `clientApiBase` and `runtimeApiBase` from `/.well-known/measix`, never the internal component ports. For remote Portal, also set Hub `--public-origin http://127.0.0.1:9000 --portal-assets-dir ../../measix-enterprise-portal/dist` when running from `backend/`, with the independent Portal remote build present. Admin assets remain `--admin-assets-dir ../console/dist/spa`.
+Clients use `http://127.0.0.1:9000`; they resolve `clientApiBase` and `runtimeApiBase` from `/.well-known/measix`, never the internal component ports. For the standard Portal, also set Hub `--public-origin http://127.0.0.1:9000 --portal-assets-dir ../../measix-enterprise-portal/dist` when running from `backend/`. To use an independently deployed enterprise Portal, set `--portal-upstream-url http://portal.example/` instead; Android still opens Hub `/portal/`. Admin assets remain `--admin-assets-dir ../console/dist/spa`.
 
 For a device deployment, set `MEASIX_PUBLIC_ADDRESS` to the device-reachable HTTP or HTTPS origin and `MEASIX_BIND` to the intended ingress interface. Set Hub `--public-origin` to that same origin. For example, `http://192.168.31.235:9000` is a valid LAN deployment; IP addresses, domain names and custom ports are supported. HTTP does not require DNS or certificates. HTTPS termination belongs to the ingress when selected. `MEASIX_HUB_UPSTREAM` and `MEASIX_RELAY_UPSTREAM` override the private backend addresses. Expose only the public ingress; loopback on Android refers to the device, not this computer. The application does not configure router forwarding or firewall rules; verify the selected address from the device network.
 
@@ -37,7 +37,8 @@ Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/
 | `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8081`; keep private |
 | `--admin-assets-dir` | `HUB_ADMIN_ASSETS_DIR` | Optional production SPA directory |
 | `--public-origin` | `HUB_PUBLIC_ORIGIN` | Public HTTP/HTTPS platform origin; IP/domain and optional port |
-| `--portal-assets-dir` | `HUB_PORTAL_ASSETS_DIR` | Optional independent Portal dist; requires approved origin |
+| `--portal-assets-dir` | `HUB_PORTAL_ASSETS_DIR` | Standard `measix-enterprise-portal/dist`; requires approved origin |
+| `--portal-upstream-url` | `HUB_PORTAL_UPSTREAM_URL` | Optional custom enterprise HTTP/HTTPS static site; takes precedence over assets and does not fall back |
 | `--db` | `HUB_DB_PATH` | Required SQLite path |
 | `--master-key-file` | `HUB_MASTER_KEY_FILE` | Required AES-256 key file; secret |
 | `--jwt-private-key-file` | `HUB_JWT_PRIVATE_KEY_FILE` | Required Ed25519 key file; secret |

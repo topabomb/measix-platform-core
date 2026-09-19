@@ -57,7 +57,7 @@ css/          thin MEASIX semantic styling
 
 **审计行必须自解释**：请求行直接显示用户与设备的显示名（由请求所属用户/设备表解析，不从用量行推断），使"这是谁的请求"无需先点开详情。`UsageRequestList.vue` 是 Usage 页与用户详情的共享实现，避免两处各写一份而漂移。
 
-配置引用选择器使用共享分页 helper 取全，避免只可选首批对象。System 显示 Relay spool/pending/oldest age；未观测值显示未知而非零。
+配置引用选择器使用共享分页 helper 取全，避免只可选首批对象。System 显示 Relay spool/pending/oldest age；未观测值显示未知而非零。System 同时只读显示 Portal 的 STANDARD/CUSTOM/UNAVAILABLE 模式、Android 实际访问 URL 与 CUSTOM 上游 URL；选择模式属于 Hub 启动配置，不在 Admin 中复制一套可变部署配置。
 
 当前实现已有 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/Resources/Upstreams/Releases/Usage/System/EnterpriseUpdates 等 route-level pages。
 

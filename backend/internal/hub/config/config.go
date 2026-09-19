@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"measix/platform/internal/hub/identity"
+	"measix/platform/internal/hub/portalstatic"
 	"net/url"
 	"os"
 	"time"
@@ -12,6 +13,7 @@ import (
 type Config struct {
 	PublicOrigin          string
 	PortalAssetsDir       string
+	PortalUpstreamURL     string
 	AdminAssetsDir        string
 	ListenAddr            string
 	InternalListenAddr    string
@@ -37,6 +39,7 @@ func Load(args []string) (Config, error) {
 	cfg := Config{
 		PublicOrigin:          env("HUB_PUBLIC_ORIGIN", ""),
 		PortalAssetsDir:       env("HUB_PORTAL_ASSETS_DIR", ""),
+		PortalUpstreamURL:     env("HUB_PORTAL_UPSTREAM_URL", ""),
 		AdminAssetsDir:        env("HUB_ADMIN_ASSETS_DIR", ""),
 		ListenAddr:            env("HUB_LISTEN_ADDR", ":8080"),
 		InternalListenAddr:    env("HUB_INTERNAL_LISTEN_ADDR", "127.0.0.1:8081"),
@@ -50,7 +53,8 @@ func Load(args []string) (Config, error) {
 	}
 	fs.StringVar(&cfg.AdminAssetsDir, "admin-assets-dir", cfg.AdminAssetsDir, "built Admin SPA directory (contains index.html)")
 	fs.StringVar(&cfg.PublicOrigin, "public-origin", cfg.PublicOrigin, "public platform origin (HTTP or HTTPS, IP or domain)")
-	fs.StringVar(&cfg.PortalAssetsDir, "portal-assets-dir", cfg.PortalAssetsDir, "built Enterprise Portal SPA directory")
+	fs.StringVar(&cfg.PortalAssetsDir, "portal-assets-dir", cfg.PortalAssetsDir, "built standard Enterprise Portal SPA directory")
+	fs.StringVar(&cfg.PortalUpstreamURL, "portal-upstream-url", cfg.PortalUpstreamURL, "optional enterprise Portal HTTP/HTTPS static base URL")
 	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "public listen address")
 	fs.StringVar(&cfg.InternalListenAddr, "internal-listen", cfg.InternalListenAddr, "internal (private) listen address for Relay→Hub service APIs")
 	fs.StringVar(&cfg.DBPath, "db", cfg.DBPath, "SQLite database path")
@@ -75,8 +79,16 @@ func Load(args []string) (Config, error) {
 	if cfg.AccessTokenTTL <= 0 || cfg.AccessTokenTTL > 10*time.Minute || cfg.ReconcileInterval <= 0 {
 		return Config{}, errors.New("invalid hub TTL/reconcile configuration")
 	}
-	if (cfg.PublicOrigin != "" && identity.ValidatePublicOrigin(cfg.PublicOrigin) != nil) || (cfg.PortalAssetsDir != "" && cfg.PublicOrigin == "") {
+	if (cfg.PublicOrigin != "" && identity.ValidatePublicOrigin(cfg.PublicOrigin) != nil) ||
+		((cfg.PortalAssetsDir != "" || cfg.PortalUpstreamURL != "") && cfg.PublicOrigin == "") {
 		return Config{}, errors.New("invalid public origin or missing origin for Portal assets")
+	}
+	if cfg.PortalUpstreamURL != "" {
+		parsed, err := portalstatic.ParseUpstream(cfg.PortalUpstreamURL)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.PortalUpstreamURL = parsed.String()
 	}
 	return cfg, nil
 }

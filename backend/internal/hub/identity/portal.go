@@ -36,7 +36,7 @@ func (s *Service) CreatePortalGrant(ctx context.Context, token string) (clientap
 	if err != nil {
 		return clientapi.PortalGrant{}, err
 	}
-	if s.PublicOrigin == "" || ValidatePublicOrigin(s.PublicOrigin) != nil {
+	if !s.PortalStaticAvailable || s.PublicOrigin == "" || ValidatePublicOrigin(s.PublicOrigin) != nil {
 		return clientapi.PortalGrant{}, ErrPortalUnavailable
 	}
 	now := s.Now().UTC()

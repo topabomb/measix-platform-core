@@ -2,9 +2,9 @@
 
 This document defines executable-contract ownership in `measix-platform-core`. Semantic meaning remains authoritative in `topabomb/measix-architecture`.
 
-## Portal contract synchronization (2026-09-08)
+## Portal contract synchronization
 
-[Control Protocol §8](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) now targets Bridge v3 / localReadVersion=2: document bootstrap and correlated message replies, plus three typed local reads. Native OpenAPI, shared cases, Android exports and Portal consumers implement this profile. Older v2 bundles are rejected by the delivery checks. Reuse Client Feed DTOs and existing date fixtures; remote Hub HTTP remains unchanged. The [implementation status](s0-execution-progress.md) and [Android handoff](../../measix-enterprise-portal/docs/android-alignment-handoff.md) track the remaining work.
+[Control Protocol §8](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) owns Bridge v3 document bootstrap and correlated native operations. Portal Session and Feed data use Core HTTP only; there are no native local-read methods or phone-side Portal data source. Native OpenAPI, shared cases, Android exports and Portal consumers implement this single profile. The [implementation status](s0-execution-progress.md) and [Android handoff](../../measix-enterprise-portal/docs/android-alignment-handoff.md) track remaining device evidence.
 
 ## 1. Current and planned S0 OpenAPI surfaces
 
@@ -19,7 +19,7 @@ api/internal/usage-ingest.openapi.yaml
 
 They are separated so Admin/Android consumers do not accidentally generate or depend on Relay-internal APIs.
 
-An additional schema-only document, `api/portal/portal-contract.openapi.json`, owns Bridge v3 bootstrap/requests/responses and local read v2 results; enrollment/context formatVersion remains 1. Its empty `paths` is intentional: it creates no Hub endpoint. Local transport and authorization remain Control Protocol §8 semantics implemented by the native host. Feed response types remain in Client OpenAPI. The generator derives client-feed.schemas.json and its transitive schema dependencies from that single authority; the native schema references this adjacent generated file. Both files must travel together. The export manifest includes eight artifacts; a standalone-directory test verifies reference resolution without sibling repositories, and the generated dependency records the Client source SHA256.
+An additional schema-only document, `api/portal/portal-contract.openapi.json`, owns Bridge v3 bootstrap/requests/responses. Its empty `paths` is intentional: it creates no Hub endpoint. Native transport and authorization remain Control Protocol §8 semantics implemented by the Android host. Feed response types remain in Client OpenAPI. The generator derives `client-feed.schemas.json` and its transitive dependencies from that single authority. The Android export manifest records every artifact and source digest; standalone-directory tests verify reference resolution without sibling repositories.
 
 `api/fixtures/portal/native-vectors.json` contains named valid/invalid wire cases consumed by Go and Portal. `api/fixtures/enrollment/cases.json` preserves raw text, duplicate keys, UTF-8 byte limits, origin/expiry/source checks under a fixed clock. The Go reference oracle does not prove Android parser adoption. Admin produces the canonical platform fixture; native scan/paste must consume both material kinds using the same parser.
 
@@ -55,7 +55,7 @@ Snapshot v4 is the only current profile; Gateway v5 remains planned. Policy has 
 - `measix-s0-control-protocol.md`;
 - relevant component/product/testing specs.
 
-The current Client API requires refresh Idempotency-Key, rotating credentials and sessionIdleExpiresAt; enrollment is 201 and requires deviceName. Feed HTTP fields/queries are camelCase; snake_case belongs only to the planned Gateway platform-tool schema. Ingest allows missing resource/route/upstream for authenticated unforwarded denials, never for forwarded requests. Generated Android export carries these changes; actual Android consumers must explicitly adopt and verify them before compatibility/Freeze claims.
+The current Client API requires refresh Idempotency-Key, rotating credentials and sessionIdleExpiresAt; enrollment is 201 and requires deviceName. Enrollment exchange distinguishes a consumed one-time code (`409 enrollment_already_used`) from an installation already bound to another user (`409 installation_user_conflict`); the latter does not consume the code. Feed HTTP fields/queries are camelCase; snake_case belongs only to the planned Gateway platform-tool schema. Ingest allows missing resource/route/upstream for authenticated unforwarded denials, never for forwarded requests. Generated Android export carries these changes; actual Android consumers must explicitly adopt and verify them before compatibility/Freeze claims.
 
 Current implementation, verification results and remaining stage gates are maintained in [current status](s0-execution-progress.md).
 
@@ -63,7 +63,7 @@ Current implementation, verification results and remaining stage gates are maint
 
 Portal grant/exchange/restricted Web Session operations are in the Client OpenAPI. Only the two canonical `/api/client/v1/enterprise/updates` GETs accept the additional Portal Cookie scheme; other Client/Admin/runtime operations retain their own authentication. The independent Portal generates TypeScript from this same file and records its input SHA256. See [Portal implementation](portal-implementation.md) for source/config/test ownership.
 
-`PlatformEnrollmentMaterial` in the Client OpenAPI describes the native scan/paste document, not the HTTP Enrollment request. Its canonical sample is `api/fixtures/enrollment/platform-v1.json`; Android export and Admin's `generated-client.ts` derive from this same source. The Admin generator emits both surface type files; it imports only the native material type from the Client output and does not call Client HTTP APIs. Control Protocol §8 owns source selection, trust checks, byte limits and the separate local example material. The local example consumer and private configuration-file format remain Android implementation responsibilities.
+`PlatformEnrollmentMaterial` in the Client OpenAPI describes the native scan/paste document, not the HTTP Enrollment request. Its canonical sample is `api/fixtures/enrollment/platform-v1.json`; Android export and Admin's `generated-client.ts` derive from this same source. The Admin generator emits both surface type files; it imports only the native material type from the Client output and does not call Client HTTP APIs. Control Protocol §8 owns trust checks and byte limits. Private configuration-file import, if any, is an Android concern and is not an Enrollment or Portal protocol.
 
 Cross-component fixtures live only under `api/fixtures/` and must cover valid representative payloads, required invalid/strict-decoding cases, forward-compatible response behavior, deterministic Snapshot/RuntimeControl canonicalization and all S0.1 required Managed Capability profiles.
 
@@ -124,7 +124,7 @@ The complete manifest evidence contract belongs to `measix-s0-capability-deliver
 
 New draft evidence writes exclusively to `.artifacts/s0-freeze-candidate.json` (or an explicit new output), without overwriting an existing candidate. Current CAP tooling validates the current v4 resource baseline; C7 requires independent clean-source rebuild/replay and separate validated finalization. Final acceptance and unimplemented later-stage gates are defined in [release](release.md); do not infer them from the filename.
 
-MEASIX has not been released, so the current Snapshot v4, Bridge v3 and local-read v2 profile is the only supported profile. Contract changes replace the current candidate and regenerate every consumer/export; they do not add old-version branches. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; current S0.2 evidence cannot prove those later capabilities.
+MEASIX has not been released, so the current Snapshot v4 and Bridge v3 profile is the only supported profile. Contract changes replace the current candidate and regenerate every consumer/export; they do not add old-version branches. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; current S0.2 evidence cannot prove those later capabilities.
 
 ## 8. Current contract strictness and extensibility
 

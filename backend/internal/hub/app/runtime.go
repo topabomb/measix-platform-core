@@ -63,6 +63,14 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 			return nil, fmt.Errorf("Portal assets require index.html")
 		}
 	}
+	if cfg.PortalUpstreamURL != "" {
+		if cfg.PublicOrigin == "" {
+			return nil, fmt.Errorf("Portal upstream requires approved origin")
+		}
+		if _, err := portalstatic.ParseUpstream(cfg.PortalUpstreamURL); err != nil {
+			return nil, err
+		}
+	}
 	if options.AdminAssets == nil && cfg.AdminAssetsDir != "" {
 		options.AdminAssets = os.DirFS(cfg.AdminAssetsDir)
 	}
@@ -124,10 +132,32 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	if client == nil {
 		client = &http.Client{Timeout: 20 * time.Second}
 	}
+	var portalHandler http.Handler
+	portalMode := "UNAVAILABLE"
+	var portalUpstream *string
+	if cfg.PortalUpstreamURL != "" {
+		portalHandler, err = portalstatic.NewRemote(cfg.PortalUpstreamURL, client)
+		if err != nil {
+			return closeOnError(err)
+		}
+		portalMode = "CUSTOM"
+		value := cfg.PortalUpstreamURL
+		portalUpstream = &value
+	} else if cfg.PortalAssetsDir != "" {
+		portalHandler = portalstatic.New(os.DirFS(cfg.PortalAssetsDir))
+		portalMode = "STANDARD"
+	}
+	identityService.PortalStaticAvailable = portalHandler != nil
 	relayClient := runtimecontrol.NewHTTPRelayClient(cfg.RelayInternalURL, serviceCredential, client)
 	runtimeControl := runtimecontrol.NewService(st.Client, capabilityService, upstreamService, signer, relayClient)
 	usageService := usage.NewService(st.Client)
 	systemService := system.New(st, runtimeControl, options.BuildVersion)
+	systemService.PortalMode = portalMode
+	if portalHandler != nil {
+		value := strings.TrimSuffix(cfg.PublicOrigin, "/") + "/portal/"
+		systemService.PortalURL = &value
+	}
+	systemService.PortalUpstream = portalUpstream
 	services := httpapi.Services{
 		Identity: identityService, Capability: capabilityService, Upstream: upstreamService,
 		RuntimeControl: runtimeControl, Usage: usageService, System: systemService,
@@ -139,10 +169,9 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	router.Get("/live", h.Live)
 	router.Get("/ready", h.Ready)
 	httpapi.RegisterFull(router, services)
-	if cfg.PortalAssetsDir != "" {
-		static := portalstatic.New(os.DirFS(cfg.PortalAssetsDir))
-		router.Handle("/portal", static)
-		router.Handle("/portal/*", static)
+	if portalHandler != nil {
+		router.Handle("/portal", portalHandler)
+		router.Handle("/portal/*", portalHandler)
 	}
 	if options.AdminAssets != nil {
 		static := adminstatic.New(options.AdminAssets)

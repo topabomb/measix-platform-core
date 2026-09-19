@@ -286,7 +286,7 @@ func (h *clientHandler) ExchangeEnrollment(w http.ResponseWriter, r *http.Reques
 	}
 	result, err := h.identity.ExchangeEnrollment(r.Context(), request.Code, request.InstallationId, request.DeviceName, request.AppVersion)
 	if err != nil {
-		writeIdentityError(w, err)
+		writeEnrollmentError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, clientapi.EnrollmentExchangeResponse{
@@ -300,6 +300,17 @@ func (h *clientHandler) ExchangeEnrollment(w http.ResponseWriter, r *http.Reques
 		RefreshExpiresAt:     result.RefreshExpiresAt,
 		SessionIdleExpiresAt: result.RefreshExpiresAt,
 	})
+}
+
+func writeEnrollmentError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, identity.ErrAlreadyUsed):
+		writeProblem(w, http.StatusConflict, "enrollment_already_used", "Enrollment code already used")
+	case errors.Is(err, identity.ErrConflict):
+		writeProblem(w, http.StatusConflict, "installation_user_conflict", "Installation is already bound to another user")
+	default:
+		writeIdentityError(w, err)
+	}
 }
 
 func (h *clientHandler) RefreshSession(w http.ResponseWriter, r *http.Request, params clientapi.RefreshSessionParams) {

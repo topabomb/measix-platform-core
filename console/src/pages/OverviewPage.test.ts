@@ -53,6 +53,7 @@ const STATUS = {
   dbHealth: 'OK',
   schemaIdentity: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   runtimeStatus: 'READY',
+  portalMode: 'STANDARD' as const,
   activeManagedGeneration: 3,
   managedStateRevision: 2,
   desiredControlRevision: 7,

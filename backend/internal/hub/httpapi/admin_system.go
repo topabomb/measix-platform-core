@@ -43,6 +43,8 @@ func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) 
 		RequestUsageIngestLagSeconds: status.RequestUsageIngestLagSeconds, SemanticOrphanCount: status.SemanticOrphanCount,
 		SpoolPendingCount: status.SpoolPendingCount, OldestPendingAgeSeconds: status.OldestPendingAgeSeconds,
 		SemanticUnknownRequestCount: status.SemanticUnknownRequestCount,
+		PortalMode:                  adminapi.SystemStatusPortalMode(status.PortalMode), PortalUrl: status.PortalURL,
+		PortalUpstreamUrl: status.PortalUpstream,
 	}
 	if h.identity.PublicOrigin != "" {
 		wire.PublicOrigin = &h.identity.PublicOrigin

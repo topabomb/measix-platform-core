@@ -37,6 +37,16 @@ func (h *fullClientHandler) portalOriginAllowed(r *http.Request, required bool) 
 	return h.identity.PublicOrigin != "" && r.Header.Get("Sec-Fetch-Site") != "cross-site" && ((!required && origin == "") || origin == h.identity.PublicOrigin)
 }
 
+// WebView.postUrl is a native navigation with no browser document initiator and therefore
+// serializes its opaque origin as "null". The one-time ticket authenticates this endpoint;
+// the opaque form is accepted only for a non-cross-site native navigation, never as the
+// origin policy for the subsequent cookie-authenticated Portal APIs.
+func (h *fullClientHandler) portalExchangeOriginAllowed(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	return h.identity.PublicOrigin != "" && r.Header.Get("Sec-Fetch-Site") != "cross-site" &&
+		(origin == "" || origin == "null" || origin == h.identity.PublicOrigin)
+}
+
 func (h *fullClientHandler) setPortalCookie(w http.ResponseWriter, value string, expiry time.Time) {
 	maxAge := 0
 	if value == "" {
@@ -48,7 +58,7 @@ func (h *fullClientHandler) setPortalCookie(w http.ResponseWriter, value string,
 func (h *fullClientHandler) ExchangePortalGrant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
-	if !h.portalOriginAllowed(r, false) {
+	if !h.portalExchangeOriginAllowed(r) {
 		writeProblem(w, 403, "forbidden", "Origin rejected")
 		return
 	}

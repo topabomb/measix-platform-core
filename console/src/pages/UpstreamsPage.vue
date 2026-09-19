@@ -378,7 +378,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding data-cy="upstreams-page">
+  <q-page class="admin-page" data-cy="upstreams-page">
     <PageHeader :title="$t('upstreams.title')" :subtitle="$t('upstreams.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
@@ -386,11 +386,16 @@ onMounted(refresh)
         <q-btn color="primary" icon="cloud_queue" :label="$t('upstreams.createUpstream')" :disable="!canMutate" @click="createOpen = true" data-cy="create-upstream-btn" />
       </template>
     </PageHeader>
-    <ProblemBanner :error="error" class="q-mb-md" />
-    <q-banner v-if="justCreatedSecret && !createOpen" data-cy="created-secret-notice" class="bg-green-1 q-mb-md rounded-borders">
+    <ProblemBanner :error="error" class="q-mb-xs" />
+    <q-banner v-if="justCreatedSecret && !createOpen" data-cy="created-secret-notice" class="bg-green-1 q-mb-xs rounded-borders">
       {{ $t('upstreams.createdSecretNotice', { name: justCreatedSecret.name, version: justCreatedSecret.secretVersion }) }}
+      <!-- The notice describes a one-time step; without a way to dismiss it, it
+           stays on the page for the rest of the session. -->
+      <template #action>
+        <q-btn flat dense icon="close" :aria-label="$t('common.close')" @click="justCreatedSecret = undefined" />
+      </template>
     </q-banner>
-    <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-md rounded-borders">
+    <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-xs rounded-borders">
       <div class="row items-center justify-between">
         <span>{{ $t('resources.draft.latestOperation') }}</span>
         <StatusChip :value="activation.activation.state" />
@@ -401,6 +406,16 @@ onMounted(refresh)
     </q-banner>
     <LoadingState v-if="loading && !upstreams.length" />
     <q-card v-else flat bordered>
+      <q-card-section class="row items-center justify-between q-py-xs">
+        <div>
+          <div class="text-subtitle2">{{ $t('upstreams.title') }}</div>
+          <div class="text-caption text-grey-7">
+            {{ $t('common.loadedCount', { count: upstreams.length }) }}
+            <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
+          </div>
+        </div>
+      </q-card-section>
+      <q-separator />
       <q-list separator>
         <q-item v-for="upstream in upstreams" :key="upstream.upstreamId" clickable data-cy="upstream-row" @click="openUpstream(upstream)">
           <q-item-section>
@@ -422,13 +437,16 @@ onMounted(refresh)
         </q-item>
         <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">{{ $t('upstreams.noUpstreams') }}</q-item-section></q-item>
       </q-list>
+      <q-card-actions v-if="nextCursor" class="justify-center">
+        <q-btn outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" />
+      </q-card-actions>
     </q-card>
 
     <!-- Create upstream dialog -->
     <q-dialog v-model="createOpen">
-      <q-card class="responsive-modal" style="max-width: 95vw">
+      <q-card class="app-dialog">
         <q-card-section class="text-h6">{{ $t('upstreams.createUpstream') }}</q-card-section>
-        <q-card-section class="q-gutter-md">
+        <q-card-section class="q-gutter-xs app-dialog__body">
           <q-banner class="bg-blue-1 rounded-borders">{{ $t('upstreams.createFlowHint') }}</q-banner>
           <q-input v-model="createForm.name" outlined :label="$t('upstreams.name')" data-cy="upstream-form-name" />
           <q-input v-model="createForm.baseUrl" outlined :label="$t('upstreams.baseUrl')" placeholder="https://api.example.com" data-cy="upstream-form-base-url" />
@@ -437,7 +455,7 @@ onMounted(refresh)
           <q-select v-model="createForm.auth.type" outlined emit-value map-options :label="$t('upstreams.authMode')" :options="authOptions" />
           <template v-if="createForm.auth.type !== 'NONE'">
             <q-select v-model="selectedSecretId" outlined emit-value map-options :label="$t('upstreams.existingSecret')" :options="secretOptions" data-cy="create-secret-picker" />
-            <div v-if="selectedSecret" class="row items-center q-gutter-sm">
+            <div v-if="selectedSecret" class="row items-center q-gutter-xs">
               <q-icon name="vpn_key" color="positive" />
               <div class="col">
                 <div class="text-body2">{{ selectedSecret.name }}</div>
@@ -456,13 +474,13 @@ onMounted(refresh)
           </template>
 
           <details data-cy="upstream-create-advanced">
-            <summary class="text-primary cursor-pointer q-mb-md">{{ $t('upstreams.advancedSettings') }}</summary>
-            <div class="q-gutter-md">
+            <summary class="text-primary cursor-pointer q-mb-xs">{{ $t('upstreams.advancedSettings') }}</summary>
+            <div class="q-gutter-xs">
               <q-select v-model="createForm.transportCapabilities" outlined emit-value map-options :label="$t('upstreams.transportCapabilities')" multiple :options="transportOptions" />
               <q-select v-model="createForm.correlationMode" outlined emit-value map-options :label="$t('upstreams.correlationMode')" :options="correlationOptions" />
               <q-select v-model="createForm.usageCapabilityLevel" outlined emit-value map-options :label="$t('upstreams.usageCapabilityLevel')" :options="usageOptions" />
               <div class="text-subtitle2">{{ $t('upstreams.timeoutDefaults') }} (ms)</div>
-              <div class="row q-gutter-sm">
+              <div class="row q-gutter-xs">
                 <q-input v-model.number="createForm.timeoutDefaults.connectMs" type="number" outlined :label="$t('upstreams.connect')" class="col" />
                 <q-input v-model.number="createForm.timeoutDefaults.responseHeaderMs" type="number" outlined :label="$t('upstreams.responseHeader')" class="col" />
                 <q-input v-model.number="createForm.timeoutDefaults.idleMs" type="number" outlined :label="$t('upstreams.idle')" class="col" />
@@ -479,7 +497,7 @@ onMounted(refresh)
 
     <!-- Upstream detail + editor dialog -->
     <q-dialog v-model="detailOpen">
-      <q-card v-if="selected" class="responsive-modal" style="max-width: 95vw">
+      <q-card v-if="selected" class="app-dialog app-dialog--lg">
         <q-card-section class="row items-start justify-between">
           <div>
             <div class="text-h6">{{ selected.name }}</div>
@@ -492,22 +510,22 @@ onMounted(refresh)
         </q-card-section>
         <q-separator />
 
-        <q-card-section>
+        <q-card-section class="app-dialog__body">
           <!-- Candidate vs Active banner -->
-          <q-banner v-if="candidateVsActive?.pending" class="bg-orange-1 q-mb-md rounded-borders">
+          <q-banner v-if="candidateVsActive?.pending" class="bg-orange-1 q-mb-xs rounded-borders">
             <div class="text-body2">{{ candidateVsActive.active === null ? $t('upstreams.notAppliedHint') : $t('upstreams.unappliedChangesHint') }}</div>
             <div class="text-caption text-grey-7">{{ $t('upstreams.applyHint') }}</div>
           </q-banner>
 
           <!-- Stale revision banner -->
-          <q-banner v-if="conflictRevision !== undefined" class="bg-orange-1 q-mb-md rounded-borders">
+          <q-banner v-if="conflictRevision !== undefined" class="bg-orange-1 q-mb-xs rounded-borders">
             <div class="text-weight-medium">{{ $t('upstreams.staleCandidate', { rev: editExpectedRevision }) }}</div>
             <div class="text-body2">{{ $t('upstreams.staleHint', { rev: conflictRevision }) }}</div>
             <template #action><q-btn flat :label="$t('upstreams.discardLocal')" @click="discardEdit" /></template>
           </q-banner>
 
           <!-- Action buttons -->
-          <div class="row q-gutter-sm q-mb-md">
+          <div class="row q-gutter-xs q-mb-xs">
             <q-btn v-if="!editMode" outline color="primary" :label="$t('upstreams.editCandidate')" @click="startEdit" />
             <template v-else>
               <q-btn outline color="primary" :label="$t('upstreams.saveCandidate')" :loading="saving" :disable="!editDirty" @click="saveEdit" />
@@ -529,7 +547,7 @@ onMounted(refresh)
                 <tr v-if="selected.config?.auth && 'passwordSecretRef' in selected.config.auth"><td class="text-grey-7">{{ $t('upstreams.passwordSecret') }}</td><td>{{ secretDisplayName(selected.config.auth.passwordSecretRef?.secretId) }} v{{ selected.config.auth.passwordSecretRef?.secretVersion ?? '—' }}</td></tr>
               </tbody>
             </q-markup-table>
-            <details data-cy="upstream-detail-advanced" class="q-mt-md">
+            <details data-cy="upstream-detail-advanced" class="q-mt-xs">
               <summary class="text-primary cursor-pointer">{{ $t('upstreams.detailAdvanced') }}</summary>
               <q-markup-table flat dense>
               <tbody>
@@ -544,40 +562,40 @@ onMounted(refresh)
             </details>
 
             <!-- Secret replace button -->
-            <div v-if="selected.config?.auth && selected.config.auth.type !== 'NONE' && 'secretRef' in selected.config.auth && selected.config.auth.secretRef" class="q-mt-md">
+            <div v-if="selected.config?.auth && selected.config.auth.type !== 'NONE' && 'secretRef' in selected.config.auth && selected.config.auth.secretRef" class="q-mt-xs">
               <q-btn outline color="warning" icon="key" :label="$t('upstreams.replaceSecret')" size="sm" @click="openReplaceSecret(selected.config.auth.secretRef!.secretId, selected.config.auth.secretRef!.secretVersion)" />
-              <span class="text-caption text-grey-7 q-ml-sm">{{ $t('upstreams.replaceSecretHint') }}</span>
+              <span class="text-caption text-grey-7 q-ml-xs">{{ $t('upstreams.replaceSecretHint') }}</span>
             </div>
-            <div v-if="selected.config?.auth && selected.config.auth.type === 'BASIC' && 'passwordSecretRef' in selected.config.auth && selected.config.auth.passwordSecretRef" class="q-mt-md">
+            <div v-if="selected.config?.auth && selected.config.auth.type === 'BASIC' && 'passwordSecretRef' in selected.config.auth && selected.config.auth.passwordSecretRef" class="q-mt-xs">
               <q-btn outline color="warning" icon="key" :label="$t('upstreams.replacePasswordSecret')" size="sm" @click="openReplaceSecret(selected.config.auth.passwordSecretRef!.secretId, selected.config.auth.passwordSecretRef!.secretVersion)" />
             </div>
           </template>
 
           <!-- Editable form -->
           <template v-else>
-            <div class="q-gutter-md">
+            <div class="q-gutter-xs">
               <q-input v-model="editForm.name" outlined :label="$t('upstreams.name')" @update:model-value="markEditDirty" />
               <q-input v-model="editForm.baseUrl" outlined :label="$t('upstreams.baseUrl')" placeholder="https://api.example.com" @update:model-value="markEditDirty" />
               <div class="text-subtitle2">{{ $t('upstreams.auth') }}</div>
               <q-select v-model="editForm.auth.type" outlined emit-value map-options :label="$t('upstreams.authMode')" :options="authOptions" @update:model-value="markEditDirty" />
               <template v-if="editForm.auth.type !== 'NONE'">
                 <q-select :model-value="editSecretId" outlined emit-value map-options :label="$t('upstreams.existingSecret')" :options="secretOptions" data-cy="edit-secret-picker" @update:model-value="selectEditSecret" />
-                <div v-if="'secretRef' in editForm.auth && editForm.auth.secretRef" class="row items-center q-gutter-sm">
+                <div v-if="'secretRef' in editForm.auth && editForm.auth.secretRef" class="row items-center q-gutter-xs">
                   <q-input :model-value="editForm.auth.secretRef?.secretId" outlined readonly :label="$t('upstreams.secretRef')" class="col" />
-                  <q-input :model-value="String(editForm.auth.secretRef?.secretVersion ?? '')" outlined readonly :label="$t('upstreams.secretVersion')" style="width: 100px" />
+                  <q-input :model-value="String(editForm.auth.secretRef?.secretVersion ?? '')" outlined dense readonly :label="$t('upstreams.secretVersion')" class="col-3" />
                   <q-btn flat dense color="warning" icon="key" :label="$t('upstreams.replace')" @click="openReplaceSecret(editForm.auth.secretRef!.secretId, editForm.auth.secretRef!.secretVersion)" />
                 </div>
                 <q-input v-if="editForm.auth.type === 'STATIC_HEADER'" v-model="editForm.auth.headerName" outlined :label="$t('upstreams.headerName')" placeholder="X-Api-Key" @update:model-value="markEditDirty" />
                 <q-input v-if="editForm.auth.type === 'BASIC'" v-model="editForm.auth.username" outlined :label="$t('upstreams.username')" @update:model-value="markEditDirty" />
               </template>
               <details data-cy="upstream-edit-advanced">
-                <summary class="text-primary cursor-pointer q-mb-md">{{ $t('upstreams.advancedSettings') }}</summary>
-                <div class="q-gutter-md">
+                <summary class="text-primary cursor-pointer q-mb-xs">{{ $t('upstreams.advancedSettings') }}</summary>
+                <div class="q-gutter-xs">
                   <q-select v-model="editForm.transportCapabilities" outlined emit-value map-options :label="$t('upstreams.transportCapabilities')" multiple :options="transportOptions" @update:model-value="markEditDirty" />
                   <q-select v-model="editForm.correlationMode" outlined emit-value map-options :label="$t('upstreams.correlationMode')" :options="correlationOptions" @update:model-value="markEditDirty" />
                   <q-select v-model="editForm.usageCapabilityLevel" outlined emit-value map-options :label="$t('upstreams.usageCapabilityLevel')" :options="usageOptions" @update:model-value="markEditDirty" />
                   <div class="text-subtitle2">{{ $t('upstreams.timeoutDefaults') }} (ms)</div>
-                  <div class="row q-gutter-sm">
+                  <div class="row q-gutter-xs">
                     <q-input v-model.number="editForm.timeoutDefaults.connectMs" type="number" outlined :label="$t('upstreams.connect')" class="col" @update:model-value="markEditDirty" />
                     <q-input v-model.number="editForm.timeoutDefaults.responseHeaderMs" type="number" outlined :label="$t('upstreams.responseHeader')" class="col" @update:model-value="markEditDirty" />
                     <q-input v-model.number="editForm.timeoutDefaults.idleMs" type="number" outlined :label="$t('upstreams.idle')" class="col" @update:model-value="markEditDirty" />
@@ -588,10 +606,10 @@ onMounted(refresh)
           </template>
 
           <!-- Test result -->
-          <div v-if="testResult" class="q-mt-md">
+          <div v-if="testResult" class="q-mt-xs">
             <div class="text-subtitle2">{{ $t('upstreams.testResult') }}</div>
             <div class="text-caption text-grey-7">{{ $t('upstreams.testScope') }}</div>
-            <q-banner :class="!testResult.reachable ? 'bg-red-1' : (testResult.httpStatus ?? 0) >= 400 ? 'bg-amber-1' : 'bg-blue-1'" class="rounded-borders q-my-sm">
+            <q-banner :class="!testResult.reachable ? 'bg-red-1' : (testResult.httpStatus ?? 0) >= 400 ? 'bg-amber-1' : 'bg-blue-1'" class="rounded-borders q-my-xs">
               <div class="row items-center justify-between">
                 <span>{{ testResult.reachable ? $t('upstreams.reachable') : $t('upstreams.unreachable') }}</span>
                 <span v-if="testResult.latencyMs != null" class="text-caption">{{ testResult.latencyMs }} ms</span>
@@ -616,7 +634,7 @@ onMounted(refresh)
     </q-dialog>
 
     <q-dialog v-model="applyConfirmOpen">
-      <q-card class="responsive-modal">
+      <q-card class="app-dialog app-dialog--sm">
         <q-card-section class="text-h6">{{ $t(candidateVsActive?.pending ? 'upstreams.apply' : 'upstreams.reapply') }}</q-card-section>
         <q-card-section>{{ $t(candidateVsActive?.pending ? 'upstreams.applyConfirm' : 'upstreams.reapplyConfirm', { name: selected?.name }) }}</q-card-section>
         <q-card-actions align="right">
@@ -628,13 +646,13 @@ onMounted(refresh)
 
     <!-- Secret create/replace dialog -->
     <q-dialog v-model="secretOpen">
-      <q-card class="responsive-modal" style="max-width: 95vw">
+      <q-card class="app-dialog app-dialog--sm">
         <q-card-section class="text-h6">{{ secretMode === 'create' ? $t('upstreams.createSecret') : $t('upstreams.replaceSecret') }}</q-card-section>
-        <q-card-section class="q-gutter-md">
-          <p v-if="secretMode === 'create'" class="text-body2 text-grey-7 q-mt-none q-mb-sm">
+        <q-card-section class="q-gutter-xs">
+          <p v-if="secretMode === 'create'" class="text-body2 text-grey-7 q-mt-none q-mb-xs">
             {{ $t('upstreams.secretCreateHint') }}
           </p>
-          <p v-else class="text-body2 text-grey-7 q-mt-none q-mb-sm">
+          <p v-else class="text-body2 text-grey-7 q-mt-none q-mb-xs">
             {{ $t('upstreams.secretReplaceHint') }}
           </p>
           <q-input v-if="secretMode === 'create'" v-model="secretName" outlined :label="$t('upstreams.secretName')" placeholder="OpenAI key" data-cy="secret-form-name" />
@@ -653,6 +671,5 @@ onMounted(refresh)
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>

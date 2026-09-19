@@ -311,7 +311,9 @@ describe('UsagePage', () => {
     const kindSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label')).includes('kind') || String(s.props('label')).includes('Kind'))
     await kindSelect!.setValue('MODEL')
     await flushPromises()
-    expect(wrapper.findAllComponents(QChip).some((c) => c.text().includes('MODEL'))).toBe(true)
+    // The filter is proven by the query it produces, not by a chip restating it.
+    const filteredCall = fetchSpy.mock.calls.find((c) => c[0].includes('/usage/requests') && c[0].includes('resourceKind=MODEL'))
+    expect(filteredCall).toBeTruthy()
 
     const resetBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Reset'))
     expect(resetBtn).toBeTruthy()

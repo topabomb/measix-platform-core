@@ -217,20 +217,30 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding data-cy="enterprise-updates-page">
+  <q-page class="admin-page" data-cy="enterprise-updates-page">
     <PageHeader :title="$t('enterpriseUpdates.title')" :subtitle="$t('enterpriseUpdates.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
         <q-btn unelevated color="primary" icon="add" :label="$t('enterpriseUpdates.create')" @click="openCreate" />
       </template>
     </PageHeader>
-    <ProblemBanner :error="error" class="q-mb-md" />
-    <q-banner class="bg-blue-1 q-mb-md rounded-borders">
+    <ProblemBanner :error="error" class="q-mb-xs" />
+    <q-banner class="bg-blue-1 q-mb-xs rounded-borders">
       <div>{{ $t('enterpriseUpdates.separatePublishHint') }}</div>
       <details v-if="feedRevision" class="text-caption text-grey-7"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ $t('enterpriseUpdates.feedRevision') }}: {{ feedRevision }}</details>
     </q-banner>
     <LoadingState v-if="loading && !updates.length" />
     <q-card v-else flat bordered>
+      <q-card-section class="row items-center justify-between q-py-xs">
+        <div>
+          <div class="text-subtitle2">{{ $t('enterpriseUpdates.title') }}</div>
+          <div class="text-caption text-grey-7">
+            {{ $t('common.loadedCount', { count: updates.length }) }}
+            <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
+          </div>
+        </div>
+      </q-card-section>
+      <q-separator />
       <q-list separator>
         <q-item v-for="item in updates" :key="item.enterpriseUpdateId" clickable @click="openDetail(item)">
           <q-item-section>
@@ -245,7 +255,7 @@ onMounted(refresh)
             </q-item-label>
           </q-item-section>
           <q-item-section side>
-            <div class="row items-center q-gutter-sm">
+            <div class="row items-center q-gutter-xs">
               <StatusChip :value="item.status" />
               <q-btn v-if="item.status === 'DRAFT'" outline color="primary" icon="edit" size="sm" @click.stop="openEdit(item)" />
               <q-btn v-if="item.status === 'DRAFT'" outline color="positive" icon="publish" size="sm" :label="$t('enterpriseUpdates.publish')" @click.stop="publish(item)" />
@@ -255,18 +265,21 @@ onMounted(refresh)
         </q-item>
         <q-item v-if="!updates.length"><q-item-section class="text-grey-7">{{ $t('enterpriseUpdates.noUpdates') }}</q-item-section></q-item>
       </q-list>
+      <q-card-actions v-if="nextCursor" class="justify-center">
+        <q-btn outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" />
+      </q-card-actions>
     </q-card>
 
     <!-- Create Dialog -->
     <q-dialog v-model="createOpen">
-      <q-card class="responsive-modal" style="max-width: 80vw; width: 600px;">
+      <q-card class="app-dialog">
         <q-card-section>
           <div class="text-h6">{{ $t('enterpriseUpdates.createTitle') }}</div>
         </q-card-section>
         <q-separator />
-        <q-card-section>
-          <q-input v-model="createTitle" :label="$t('enterpriseUpdates.titleLabel')" outlined dense class="q-mb-md" />
-          <div class="row q-gutter-sm q-mb-md">
+        <q-card-section class="app-dialog__body">
+          <q-input v-model="createTitle" :label="$t('enterpriseUpdates.titleLabel')" outlined dense class="q-mb-xs" />
+          <div class="row q-gutter-xs q-mb-xs">
             <q-select v-model="createContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="formatOptions" outlined dense emit-value map-options class="col" />
             <q-select v-model="createCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="categoryOptions" outlined dense emit-value map-options class="col" />
             <q-select v-model="createSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="severityOptions" outlined dense emit-value map-options class="col" />
@@ -284,15 +297,15 @@ onMounted(refresh)
 
     <!-- Edit Dialog -->
     <q-dialog v-model="editOpen">
-      <q-card class="responsive-modal" style="max-width: 80vw; width: 600px;">
+      <q-card class="app-dialog">
         <q-card-section>
           <div class="text-h6">{{ $t('enterpriseUpdates.editTitle') }}</div>
           <div class="text-caption text-grey-7">{{ editItem?.enterpriseUpdateId }}</div>
         </q-card-section>
         <q-separator />
-        <q-card-section>
-          <q-input v-model="editTitle" :label="$t('enterpriseUpdates.titleLabel')" outlined dense class="q-mb-md" />
-          <div class="row q-gutter-sm q-mb-md">
+        <q-card-section class="app-dialog__body">
+          <q-input v-model="editTitle" :label="$t('enterpriseUpdates.titleLabel')" outlined dense class="q-mb-xs" />
+          <div class="row q-gutter-xs q-mb-xs">
             <q-select v-model="editContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="formatOptions" outlined dense emit-value map-options class="col" />
             <q-select v-model="editCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="categoryOptions" outlined dense emit-value map-options class="col" />
             <q-select v-model="editSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="severityOptions" outlined dense emit-value map-options class="col" />
@@ -310,10 +323,10 @@ onMounted(refresh)
 
     <!-- Detail Dialog -->
     <q-dialog v-model="detailOpen">
-      <q-card class="responsive-modal" style="max-width: 90vw; width: 700px;">
+      <q-card class="app-dialog">
         <q-card-section v-if="detailItem">
           <div class="text-h6">{{ detailItem.title }}</div>
-          <div class="row q-gutter-xs q-mt-sm">
+          <div class="row q-gutter-xs q-mt-xs">
             <q-badge dense :color="categoryColor[detailItem.category] ?? 'grey'" :label="$t(`enterpriseUpdates.category.${detailItem.category.toLowerCase()}`)" />
             <q-badge dense :color="severityColor[detailItem.severity] ?? 'grey'" :label="$t(`enterpriseUpdates.severity.${detailItem.severity.toLowerCase()}`)" />
             <StatusChip :value="detailItem.status" />
@@ -324,7 +337,7 @@ onMounted(refresh)
           <details class="text-caption text-grey-7"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ detailItem.enterpriseUpdateId }} · {{ detailItem.contentFormat }}</details>
         </q-card-section>
         <q-separator />
-        <q-card-section v-if="detailItem">
+        <q-card-section v-if="detailItem" class="app-dialog__body">
           <div v-if="detailItem.contentFormat === 'MARKDOWN'" class="markdown-body" v-html="detailHtml" />
           <div v-else class="text-body2" style="white-space: pre-wrap;">{{ detailItem.content }}</div>
         </q-card-section>
@@ -336,7 +349,6 @@ onMounted(refresh)
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>
 

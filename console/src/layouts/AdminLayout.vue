@@ -89,8 +89,12 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
         <!-- Hamburger toggle — always visible. On wide screens the drawer is
              persistent (managed by Quasar show-if-above), so this button has
              no visual effect there. On narrow screens it toggles the overlay. -->
+        <!-- Shown only where the drawer is an overlay (< 1024px). Above the
+             breakpoint Quasar keeps the drawer persistent, so a toggle there
+             would have no effect. -->
         <q-btn
           flat round dense icon="menu"
+          class="lt-lg"
           :aria-label="$t('nav.menu')"
           @click="drawerOpen = !drawerOpen"
         />
@@ -109,7 +113,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
         </q-btn>
 
         <!-- Global high-priority runtime indicator (product §4.1). -->
-        <HealthIndicator v-if="session.authenticated" class="q-mr-sm" />
+        <HealthIndicator v-if="session.authenticated" class="q-mr-xs" />
 
         <!-- Current admin identity + sign out. -->
         <q-btn
@@ -169,19 +173,13 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
       </q-list>
     </q-drawer>
 
-    <q-page-container class="bg-grey-1">
-      <!-- Center the content column on very wide screens for readable line lengths
-           while staying fluid down to mobile (implementation §5 Desktop/Wide). -->
-      <div class="admin-content">
-        <router-view />
-      </div>
+    <!-- No local background: the page container uses the body background so the
+         shell shows one colour instead of two near-identical greys. -->
+    <q-page-container>
+      <!-- Fluid, full width. The admin console is a data surface, not prose:
+           a centered max-width column starved the card grids and left large
+           dead margins on wide screens. Page margin is the 4px .admin-page. -->
+      <router-view />
     </q-page-container>
   </q-layout>
 </template>
-
-<style scoped>
-.admin-content {
-  margin: 0 auto;
-  max-width: 1280px;
-}
-</style>

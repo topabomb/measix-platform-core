@@ -3,7 +3,6 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, createCandidateId } from '../api/client'
-import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import { useSessionStore } from '../stores/session'
@@ -22,25 +21,17 @@ const revision = ref<number>()
 const rules = ref<PricingRule[]>([])
 const usageCost = ref<UsageSummary['cost']>()
 
+// One option per meter value. A meter is scoped by the rule's resourceId, not
+// by a static kind — AUDIO_SECONDS and REQUESTS are used by more than one
+// resource kind, so a single option per value cannot mis-select the other.
 const METER_OPTIONS = [
-  { label: 'MODEL · INPUT_TOKENS', value: 'INPUT_TOKENS' },
-  { label: 'MODEL · OUTPUT_TOKENS', value: 'OUTPUT_TOKENS' },
-  { label: 'MODEL · CACHED_TOKENS', value: 'CACHED_TOKENS' },
-  { label: 'MODEL · REQUESTS', value: 'REQUESTS' },
-  { label: 'TTS · CHARACTERS', value: 'CHARACTERS' },
-  { label: 'TTS · AUDIO_SECONDS', value: 'AUDIO_SECONDS' },
-  { label: 'ASR · AUDIO_SECONDS', value: 'AUDIO_SECONDS' },
-  { label: 'MCP · REQUESTS', value: 'REQUESTS' },
+  { label: 'INPUT_TOKENS', value: 'INPUT_TOKENS' },
+  { label: 'OUTPUT_TOKENS', value: 'OUTPUT_TOKENS' },
+  { label: 'CACHED_TOKENS', value: 'CACHED_TOKENS' },
+  { label: 'REQUESTS', value: 'REQUESTS' },
+  { label: 'CHARACTERS', value: 'CHARACTERS' },
+  { label: 'AUDIO_SECONDS', value: 'AUDIO_SECONDS' },
 ]
-
-const METER_KIND_MAP: Record<string, string> = {
-  INPUT_TOKENS: 'MODEL',
-  OUTPUT_TOKENS: 'MODEL',
-  CACHED_TOKENS: 'MODEL',
-  REQUESTS: 'MCP',
-  CHARACTERS: 'TTS',
-  AUDIO_SECONDS: 'ASR',
-}
 
 async function refresh() {
   loading.value = true
@@ -114,17 +105,25 @@ onMounted(refresh)
 
 <template>
   <q-card flat bordered>
-    <PageHeader :title="$t('pricing.title')" :subtitle="`${$t('pricing.subtitle')} ${$t('pricing.revision')} ${revision ?? '—'}`">
-      <template #actions>
-        <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
-        <q-btn outline icon="add" :label="$t('pricing.addRule')" @click="addRule" data-cy="pricing-add-rule-btn" />
-        <q-btn color="primary" icon="save" :label="$t('common.save')" :disable="revision === undefined" :loading="saving" @click="save" data-cy="pricing-save-btn" />
-      </template>
-    </PageHeader>
+    <!-- Card header, not a page header: this panel renders inside the Usage
+         page, where a page-level header would stack a second title on top of
+         the page's own. -->
+    <q-card-section class="row items-center justify-between q-py-xs">
+      <div>
+        <div class="text-subtitle2">{{ $t('pricing.title') }}</div>
+        <div class="text-caption text-grey-7">{{ $t('pricing.subtitle') }} · {{ $t('pricing.revision') }} {{ revision ?? '—' }}</div>
+      </div>
+      <div class="row items-center q-gutter-xs">
+        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
+        <q-btn outline dense icon="add" :label="$t('pricing.addRule')" @click="addRule" data-cy="pricing-add-rule-btn" />
+        <q-btn dense color="primary" icon="save" :label="$t('common.save')" :disable="revision === undefined" :loading="saving" @click="save" data-cy="pricing-save-btn" />
+      </div>
+    </q-card-section>
+    <q-separator />
 
     <!-- Cost completeness banner -->
-    <q-banner v-if="usageCost" class="bg-grey-2 q-ma-md rounded-borders">
-      <div class="row items-center q-gutter-md">
+    <q-banner v-if="usageCost" class="bg-grey-2 card-inset q-mt-xs rounded-borders">
+      <div class="row items-center q-gutter-xs">
         <div>
           <div class="text-caption text-grey-7">{{ $t('pricing.currentCostStatus') }}</div>
           <q-chip dense :color="costStatusColor(usageCost.status)" text-color="white" :label="costStatusLabel(usageCost.status)" />
@@ -134,17 +133,15 @@ onMounted(refresh)
       </div>
     </q-banner>
 
-    <q-separator />
-    <ProblemBanner :error="error" class="q-ma-md" />
+    <ProblemBanner :error="error" class="card-inset q-mt-xs" />
     <LoadingState v-if="loading" />
 
     <q-list v-else separator>
       <q-item v-for="(rule, idx) in rules" :key="rule.pricingRuleId">
         <q-item-section>
-          <div class="row q-col-gutter-sm items-center">
+          <div class="row q-col-gutter-xs items-center">
             <div class="col-12 col-md-2">
               <q-select v-model="rule.meter" dense outlined :options="METER_OPTIONS" emit-value map-options :label="$t('pricing.meter')" />
-              <div class="text-caption text-grey-7">{{ $t('pricing.meterKind') }}: {{ METER_KIND_MAP[rule.meter] ?? '—' }}</div>
             </div>
             <div class="col-6 col-md-2">
               <q-input v-model="rule.resourceId" dense outlined :label="$t('pricing.resourceId')" placeholder="(global)" :hint="$t('pricing.resourceIdHint')" />

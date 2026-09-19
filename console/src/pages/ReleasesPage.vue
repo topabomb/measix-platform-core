@@ -104,18 +104,18 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding data-cy="releases-page">
+  <q-page class="admin-page" data-cy="releases-page">
     <PageHeader :title="$t('releases.title')" :subtitle="$t('releases.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
       </template>
     </PageHeader>
-    <ProblemBanner :error="error" class="q-mb-md" />
-    <q-banner class="bg-blue-1 q-mb-md rounded-borders">
+    <ProblemBanner :error="error" class="q-mb-xs" />
+    <q-banner class="bg-blue-1 q-mb-xs rounded-borders">
       {{ $t('releases.deviceApplicationHint') }}
       <q-btn flat no-caps :to="{ name: 'Users' }" :label="$t('releases.viewDevices')" />
     </q-banner>
-    <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-md rounded-borders">
+    <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-xs rounded-borders">
       <div class="row items-center justify-between">
         <span>{{ $t('resources.draft.latestOperation') }}</span>
         <StatusChip :value="activation.activation.state" />
@@ -124,6 +124,16 @@ onMounted(refresh)
     </q-banner>
     <LoadingState v-if="loading && !releases.length" />
     <q-card v-else flat bordered>
+      <q-card-section class="row items-center justify-between q-py-xs">
+        <div>
+          <div class="text-subtitle2">{{ $t('releases.title') }}</div>
+          <div class="text-caption text-grey-7">
+            {{ $t('common.loadedCount', { count: releases.length }) }}
+            <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
+          </div>
+        </div>
+      </q-card-section>
+      <q-separator />
       <q-list separator>
         <q-item v-for="release in releases" :key="release.releaseId" clickable @click="showDetail(release)">
           <q-item-section>
@@ -133,17 +143,20 @@ onMounted(refresh)
             </q-item-label>
           </q-item-section>
           <q-item-section side>
-            <div class="row items-center q-gutter-sm">
+            <div class="row items-center q-gutter-xs">
               <StatusChip :value="release.status" />
             </div>
           </q-item-section>
         </q-item>
         <q-item v-if="!releases.length"><q-item-section class="text-grey-7">{{ $t('releases.noReleases') }}</q-item-section></q-item>
       </q-list>
+      <q-card-actions v-if="nextCursor" class="justify-center">
+        <q-btn outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" />
+      </q-card-actions>
     </q-card>
 
     <q-dialog v-model="detailOpen">
-      <q-card v-if="detailRelease" class="responsive-modal" style="max-width: 95vw">
+      <q-card v-if="detailRelease" class="app-dialog">
         <q-card-section class="row items-center justify-between">
           <div>
             <div class="text-h6">{{ $t('releases.versionLabel', { generation: detailRelease.managedGeneration }) }}</div>
@@ -152,7 +165,7 @@ onMounted(refresh)
           <StatusChip :value="detailRelease.status" />
         </q-card-section>
         <q-separator />
-        <q-card-section>
+        <q-card-section class="app-dialog__body">
           <div class="text-subtitle2">{{ $t('releases.diff') }}</div>
           <q-markup-table flat dense v-if="detailRelease.diffSummary.details?.length">
             <thead><tr><th>{{ $t('resources.relationship.kind') }}</th><th class="text-right">{{ $t('resources.review.added') }}</th><th class="text-right">{{ $t('resources.review.changed') }}</th><th class="text-right">{{ $t('resources.review.removed') }}</th></tr></thead>
@@ -167,13 +180,13 @@ onMounted(refresh)
           </q-markup-table>
           <div v-else class="text-grey-7">{{ $t('common.noData') }}</div>
 
-          <div class="text-subtitle2 q-mt-md">{{ $t('releases.activationHistory') }}</div>
+          <div class="text-subtitle2 q-mt-xs">{{ $t('releases.activationHistory') }}</div>
           <div class="text-caption text-grey-7">{{ $t('releases.activationHistoryRecent') }}</div>
           <div v-if="detailRelease.activationHistory.length">
             <q-timeline dense>
               <q-timeline-entry v-for="attempt in detailRelease.activationHistory" :key="attempt.activationId"
                 :title="localTime(attempt.createdAt)" :color="attempt.state === 'COMPLETED' ? 'positive' : attempt.state === 'FAILED' ? 'negative' : 'primary'">
-                <div class="row items-center q-gutter-sm">
+                <div class="row items-center q-gutter-xs">
                   <StatusChip :value="attempt.state" />
                   <span v-if="attempt.errorCode" class="text-negative text-caption">{{ attempt.errorCode }}</span>
                 </div>
@@ -182,7 +195,7 @@ onMounted(refresh)
             </q-timeline>
           </div>
           <div v-else class="text-grey-7">{{ $t('common.noData') }}</div>
-          <details class="text-caption text-grey-7 q-mt-md"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>
+          <details class="text-caption text-grey-7 q-mt-xs"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>
             {{ $t('releases.sourceDraft') }} r{{ detailRelease.sourceDraftRevision }} · {{ $t('releases.publishedBy') }} {{ detailRelease.publishedBy || '—' }}<br>
             {{ detailRelease.releaseId }} · {{ detailRelease.snapshotHash }}
           </details>
@@ -194,6 +207,5 @@ onMounted(refresh)
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>

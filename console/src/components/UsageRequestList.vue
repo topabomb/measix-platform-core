@@ -129,24 +129,24 @@ defineExpose({ refresh: () => load(false) })
 
 <template>
   <q-card flat bordered>
-    <q-card-section class="row items-center justify-between q-py-sm">
+    <q-card-section class="row items-center justify-between q-py-xs">
       <div class="text-subtitle2">{{ $t('usage.requests') }}</div>
-      <div class="row items-center q-gutter-md">
+      <div class="row items-center q-gutter-xs">
         <!-- View controls for this list (page size and the like) belong next to
              the count they affect, not among the query filters above. -->
         <slot name="toolbar" />
         <div class="text-caption text-grey-7">
-          {{ $t('usage.loadedCount', { count: loaded }) }}
-          <template v-if="nextCursor"> · {{ $t('usage.hasMore') }}</template>
-          <template v-else-if="loaded"> · {{ $t('usage.allLoaded') }}</template>
+          {{ $t('common.loadedCount', { count: loaded }) }}
+          <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
+          <template v-else-if="loaded"> · {{ $t('common.allLoaded') }}</template>
         </div>
       </div>
     </q-card-section>
-    <div class="text-caption text-grey-7 q-px-md">{{ $t('usage.windowHint') }}</div>
-    <ProblemBanner :error="error" class="q-mx-md q-mt-sm" />
+    <div class="text-caption text-grey-7 card-inset">{{ $t('usage.windowHint') }}</div>
+    <ProblemBanner :error="error" class="card-inset q-mt-xs" />
     <!-- Bounded height: a long page scrolls inside the card instead of pushing the
          filter controls and the rest of the page out of reach. -->
-    <div :style="{ maxHeight, overflowY: 'auto' }" class="q-mt-sm">
+    <div :style="{ maxHeight, overflowY: 'auto' }" class="q-mt-xs">
       <q-list separator>
         <q-item v-for="req in items" :key="req.requestId" clickable data-cy="usage-row" @click="openDetail(req)">
           <q-item-section>
@@ -166,7 +166,7 @@ defineExpose({ refresh: () => load(false) })
             </q-item-label>
           </q-item-section>
           <q-item-section side>
-            <div class="row items-center q-gutter-sm">
+            <div class="row items-center q-gutter-xs">
               <q-chip dense :color="req.forwarded ? 'green-2' : 'orange-2'">{{ req.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }}</q-chip>
               <q-chip dense :class="req.httpStatus >= 400 ? 'text-negative' : 'text-grey-8'">{{ req.httpStatus }}</q-chip>
             </div>
@@ -181,12 +181,12 @@ defineExpose({ refresh: () => load(false) })
     </q-card-actions>
 
     <q-dialog v-model="detailOpen" data-cy="usage-detail">
-      <q-card class="responsive-modal" style="max-width: 95vw">
+      <q-card class="app-dialog">
         <q-card-section>
           <div class="text-h6">{{ $t('usage.detail.title') }}</div>
           <div class="text-caption text-grey-7">{{ selected?.requestId }}</div>
         </q-card-section>
-        <q-card-section v-if="selected">
+        <q-card-section v-if="selected" class="app-dialog__body">
           <q-markup-table flat dense>
             <tbody>
               <tr><td class="text-grey-7">{{ $t('usage.detail.requestId') }}</td><td>{{ selected.requestId }}</td></tr>
@@ -204,7 +204,7 @@ defineExpose({ refresh: () => load(false) })
               <tr v-if="selected.errorClass"><td class="text-grey-7">{{ $t('usage.errorClass') }}</td><td>{{ errorLabel(selected.errorClass) }} <span class="text-caption text-grey-7">({{ selected.errorClass }})</span></td></tr>
             </tbody>
           </q-markup-table>
-          <div class="text-caption text-grey-7 q-mt-sm">{{ $t('usage.detail.secretHint') }}</div>
+          <div class="text-caption text-grey-7 q-mt-xs">{{ $t('usage.detail.secretHint') }}</div>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn v-if="allowFilterResource && selected?.resourceId" flat :label="$t('usage.filterThisResource')" data-cy="filter-this-resource" @click="emit('filterResource', selected!.resourceId!); detailOpen = false" />

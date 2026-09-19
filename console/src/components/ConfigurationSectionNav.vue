@@ -85,7 +85,8 @@ function select(value: string) {
 
 .configuration-section-nav__desktop {
   position: sticky;
-  top: 72px;
+  /* Header (50px) + the single page margin (4px). */
+  top: 54px;
 }
 
 .configuration-section-nav__desktop .q-item {

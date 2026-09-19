@@ -92,11 +92,11 @@ function removeAssistant() {
 
 <template>
   <section data-cy="experience-editor">
-    <q-banner class="bg-blue-1 q-mb-md rounded-borders">
+    <q-banner class="bg-blue-1 q-mb-xs rounded-borders">
       <div class="text-weight-medium">{{ t('experience.managedSource') }}</div>
       <div class="text-body2">{{ t('experience.hint') }}</div>
     </q-banner>
-    <div class="row q-col-gutter-md">
+    <div class="row q-col-gutter-xs">
       <div class="col-12 col-md-4">
         <q-card flat bordered>
           <q-card-section class="row items-center justify-between">
@@ -127,7 +127,7 @@ function removeAssistant() {
 
       <div v-if="selected" class="col-12 col-md-8">
         <q-card flat bordered>
-          <q-card-section class="row items-start justify-between q-gutter-sm">
+          <q-card-section class="row items-start justify-between q-gutter-xs">
             <div>
               <div class="text-h6">{{ selected.displayName }}</div>
               <details class="text-caption text-grey-7" data-cy="assistant-identity"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ selected.assistantDefinitionId }}</details>
@@ -148,7 +148,7 @@ function removeAssistant() {
               </q-item>
             </q-list>
 
-            <q-card-section class="assistant-settings-detail q-gutter-md">
+            <q-card-section class="assistant-settings-detail q-gutter-xs">
               <template v-if="selectedSection === 'basic'">
                 <div class="text-subtitle1">{{ t('experience.sections.basic') }}</div>
                 <q-input v-model="selected.displayName" outlined :label="t('experience.name')" :disable="disabled" data-cy="assistant-name" @update:model-value="draft.markDirty" />
@@ -186,7 +186,7 @@ function removeAssistant() {
               </template>
 
               <template v-else>
-                <div class="row items-center justify-between q-gutter-sm">
+                <div class="row items-center justify-between q-gutter-xs">
                   <div>
                     <div class="text-subtitle1">{{ t('experience.starters') }}</div>
                     <div class="text-body2 text-grey-7">{{ t('experience.startersHint') }}</div>
@@ -194,12 +194,12 @@ function removeAssistant() {
                   <q-btn outline icon="add" :label="t('experience.addStarter')" :disable="disabled" data-cy="starter-add" @click="draft.addStarter(selected.assistantDefinitionId, t('experience.newStarter'))" />
                 </div>
                 <q-card v-for="s in starters" :key="s.starterId" flat bordered>
-                  <q-card-section class="q-gutter-sm">
+                  <q-card-section class="q-gutter-xs">
                     <details class="text-caption text-grey-7"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ s.starterId }}</details>
                     <q-input data-cy="starter-title" v-model="s.title" outlined :label="t('experience.title')" :disable="disabled" @update:model-value="draft.markDirty" />
                     <q-input v-model="s.description" outlined :label="t('experience.description')" :disable="disabled" @update:model-value="draft.markDirty" />
                     <q-input data-cy="starter-prompt" v-model="s.prompt" outlined autogrow type="textarea" :label="t('experience.starterPrompt')" :disable="disabled" @update:model-value="draft.markDirty" />
-                    <div class="row items-center q-col-gutter-md">
+                    <div class="row items-center q-col-gutter-xs">
                       <q-input v-model.number="s.sortOrder" outlined dense type="number" step="1" :label="t('experience.sortOrder')" :disable="disabled" class="col-12 col-sm-6" @update:model-value="draft.markDirty" />
                       <q-toggle v-model="s.enabled" :label="t('experience.enabled')" :disable="disabled" class="col-12 col-sm-6" @update:model-value="draft.markDirty" />
                     </div>
@@ -219,8 +219,8 @@ function removeAssistant() {
 .assistant-settings-workbench {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
-  gap: 16px;
-  padding: 16px;
+  gap: 4px;
+  padding: 4px;
 }
 
 .assistant-settings-sections {
@@ -236,7 +236,7 @@ function removeAssistant() {
 .seed-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 4px;
   align-items: start;
 }
 

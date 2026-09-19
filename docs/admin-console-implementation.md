@@ -107,6 +107,10 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 
 共享 primitive 只在出现真实复用后抽取。Shell、PageHeader、status/health、operation state 等跨页能力可以共享；Activation、未来 AgentRun、AgentSpaceOperation 等领域对象不能为了 UI 方便合并成万能 operation model。
 
+**间距与尺度**：控制台只有一套间距——元素之间的边距和栅格间距统一用 Quasar `xs`（4px），模板中不再出现 `sm`/`md`/`lg` 间距类。页面外边距由 `css/app.css` 的 `.admin-page`（4px）统一提供，页面不再使用 `q-page padding` 或局部覆盖。Shell 内容区为流式全宽，不设居中 max-width——管理台是数据界面而非阅读界面，居中列宽只会在宽屏下产生大片死白。卡片与横幅内部是 `8px 12px`（直接在卡片内渲染的元素用 `.card-inset` 与之对齐）；对话框统一 `.app-dialog`（宽度 `--sm` 480 / 默认 640 / `--lg` 760，`max-height:90vh`，内容长的用 `.app-dialog__body` 内部滚动），不再出现内联尺寸。
+
+**列表形状**：所有列表（Users / Upstreams / Releases / EnterpriseUpdates / 用量请求）共用同一张卡结构——头部行（名称 + `common.loadedCount` 与 `common.hasMore`）、分隔线、行、卡片底部居中的 Load more。分页控件属于它分页的那张卡，不放卡片外。
+
 ## 7. 文档与完成声明
 
 - 产品/UX 变化 → architecture Admin Product Requirements；

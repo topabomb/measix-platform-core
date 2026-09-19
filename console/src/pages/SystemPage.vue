@@ -70,31 +70,31 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding data-cy="system-page">
+  <q-page class="admin-page" data-cy="system-page">
     <PageHeader :title="$t('system.title')" :subtitle="$t('system.subtitle')">
       <template #actions>
-        <q-btn flat icon="refresh" :label="$t('common.refresh')" :loading="loading" @click="refresh" />
+        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
       </template>
     </PageHeader>
-    <ProblemBanner :error="error" class="q-mb-md" />
-    <q-banner v-if="noPublishedConfiguration" data-cy="system-setup-state" class="bg-amber-1 text-warning q-mb-md rounded-borders">
+    <ProblemBanner :error="error" class="q-mb-xs" />
+    <q-banner v-if="noPublishedConfiguration" data-cy="system-setup-state" class="bg-amber-1 text-warning q-mb-xs rounded-borders">
       {{ $t('system.noPublishedConfiguration') }} {{ $t('system.setupGuidance') }}
-      <div class="row q-gutter-sm q-mt-sm">
+      <div class="row q-gutter-xs q-mt-xs">
         <q-btn flat dense :to="{ name: 'Upstreams' }" :label="$t('nav.upstreams')" />
         <q-btn flat dense :to="{ name: 'Resources' }" :label="$t('nav.resources')" />
       </div>
     </q-banner>
     <LoadingState v-if="loading && !status" />
     <template v-else-if="status">
-      <q-card flat bordered class="q-mb-md" data-cy="platform-public-origin">
+      <q-card flat bordered class="q-mb-xs" data-cy="platform-public-origin">
         <q-card-section>
           <div class="text-subtitle1">{{ $t('system.publicOrigin') }}</div>
           <div v-if="status.publicOrigin" class="text-body1 text-break q-mt-xs">{{ status.publicOrigin }}</div>
           <div v-else class="text-negative q-mt-xs">{{ $t('system.publicOriginMissing') }}</div>
-          <div class="text-caption text-grey-7 q-mt-sm">{{ $t('system.publicOriginHint') }}</div>
+          <div class="text-caption text-grey-7 q-mt-xs">{{ $t('system.publicOriginHint') }}</div>
         </q-card-section>
       </q-card>
-      <div class="row q-col-gutter-md q-mb-md">
+      <div class="row q-col-gutter-xs q-mb-xs">
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
@@ -117,7 +117,7 @@ onMounted(refresh)
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('overview.managedRuntime') }}</div>
               <div data-cy="system-runtime-status"><StatusChip :value="status.runtimeStatus" /></div>
-              <div class="text-caption q-mt-sm">{{ $t('overview.activeGeneration') }} {{ status.activeManagedGeneration }} · {{ $t('system.managedStateRevision') }} {{ status.managedStateRevision }}</div>
+              <div class="text-caption q-mt-xs">{{ $t('overview.activeGeneration') }} {{ status.activeManagedGeneration }} · {{ $t('system.managedStateRevision') }} {{ status.managedStateRevision }}</div>
             </q-card-section>
           </q-card>
         </div>
@@ -127,17 +127,14 @@ onMounted(refresh)
               <div class="text-caption text-grey-7">{{ $t('system.relayReady') }}</div>
               <div class="text-caption">{{ $t('system.relayVersion') }}: <span data-cy="relay-build-version">{{ status.relayBuildVersion ?? '—' }}</span></div>
               <q-badge data-cy="system-relay-status" :color="status.relayReady ? 'green' : 'red'" :label="status.relayReady ? $t('status.READY') : $t('status.NOT_READY')" />
-              <div class="text-caption q-mt-sm">{{ $t('overview.desiredRevision') }} {{ status.desiredControlRevision }} · {{ $t('overview.appliedRevision') }} {{ status.appliedControlRevision ?? '—' }}</div>
+              <div class="text-caption q-mt-xs">{{ $t('overview.desiredRevision') }} {{ status.desiredControlRevision }} · {{ $t('overview.appliedRevision') }} {{ status.appliedControlRevision ?? '—' }}</div>
               <div class="text-caption">{{ $t('system.bundle').toLowerCase() }} {{ status.appliedBundleHash ? status.appliedBundleHash.slice(7, 19) : '—' }}</div>
               <div v-if="!converged" class="text-caption text-warning q-mt-xs">{{ $t('status.NOT_CONVERGED') }}</div>
               <div class="text-caption text-grey-7 q-mt-xs">{{ $t('system.lastRelaySeen') }}: {{ status.lastRelaySeenAt ?? '—' }}</div>
             </q-card-section>
           </q-card>
         </div>
-      </div>
-
       <!-- Metering & spool state -->
-      <div class="row q-col-gutter-md q-mb-md">
         <div class="col-12 col-md-6">
           <q-card flat bordered>
             <q-card-section class="text-subtitle2">{{ $t('system.meteringSpool') }}</q-card-section>
@@ -175,10 +172,7 @@ onMounted(refresh)
             </q-list>
           </q-card>
         </div>
-      </div>
-
       <!-- In-flight and completed operations are independent observations. -->
-      <div class="row q-col-gutter-md q-mb-md">
         <div v-for="operation in [{ key: 'currentActivation', value: status.currentActivation }, { key: 'lastActivation', value: status.lastActivation }]" :key="operation.key" class="col-12 col-md-6" :data-cy="operation.key">
           <q-card flat bordered>
             <q-card-section class="text-subtitle2">{{ $t(`system.${operation.key}`) }}</q-card-section>
@@ -188,7 +182,7 @@ onMounted(refresh)
                   <q-item-section>
                     <q-item-label>{{ $t(`system.operationKinds.${operation.value.kind}`) }}</q-item-label>
                     <q-item-label caption>{{ new Date(operation.value.updatedAt).toLocaleString() }}</q-item-label>
-                    <details class="text-caption q-mt-sm">
+                    <details class="text-caption q-mt-xs">
                       <summary>{{ $t('resources.review.technicalDetails') }}</summary>
                       <div class="text-break">{{ operation.value.activationId }}</div>
                       <div>{{ $t('overview.desiredRevision') }} {{ operation.value.desiredControlRevision }}</div>
@@ -196,7 +190,7 @@ onMounted(refresh)
                     </details>
                   </q-item-section>
                   <q-item-section side>
-                    <div class="row items-center q-gutter-sm">
+                    <div class="row items-center q-gutter-xs">
                       <StatusChip :value="operation.value.state" />
                       <q-badge v-if="operation.value.errorCode" color="negative" :label="operation.value.errorCode" />
                     </div>
@@ -210,7 +204,7 @@ onMounted(refresh)
       </div>
     </template>
 
-    <ProblemBanner :error="healthError" class="q-mb-md" />
+    <ProblemBanner :error="healthError" class="q-mb-xs" />
     <q-card v-if="health" flat bordered>
       <q-card-section><div class="text-subtitle2">{{ $t('system.hubHealth') }}</div></q-card-section>
       <q-markup-table flat dense>
@@ -222,12 +216,12 @@ onMounted(refresh)
         </tbody>
       </q-markup-table>
     </q-card>
-    <q-card flat bordered class="q-mt-md" data-cy="system-upstream-status">
+    <q-card flat bordered class="q-mt-xs" data-cy="system-upstream-status">
       <q-card-section>
         <div class="text-subtitle2">{{ $t('system.upstreamConfiguration') }}</div>
         <div class="text-caption text-grey-7">{{ $t('system.upstreamStatusNote') }}</div>
       </q-card-section>
-      <ProblemBanner :error="upstreamError" class="q-mx-md q-mb-md" />
+      <ProblemBanner :error="upstreamError" class="card-inset q-mb-xs" />
       <q-list v-if="upstreams" separator>
         <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">{{ $t('upstreams.noUpstreams') }}</q-item-section></q-item>
         <q-item v-for="upstreamState in upstreamStates" :key="upstreamState">

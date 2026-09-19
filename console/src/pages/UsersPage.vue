@@ -289,41 +289,57 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <q-page padding data-cy="users-page">
+  <q-page class="admin-page" data-cy="users-page">
     <PageHeader :title="$t('users.title')" :subtitle="$t('users.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
         <q-btn color="primary" icon="person_add" :label="$t('users.createUser')" data-cy="create-user-btn" :disable="!canMutate" @click="createOpen = true" />
       </template>
     </PageHeader>
-    <ProblemBanner :error="error" class="q-mb-md" />
-    <q-banner v-if="activation.activation && !activation.succeeded" class="bg-orange-1 q-mb-md rounded-borders">
+    <ProblemBanner :error="error" class="q-mb-xs" />
+    <q-banner v-if="activation.activation && !activation.succeeded" class="bg-orange-1 q-mb-xs rounded-borders">
       <div class="row items-center justify-between"><span>{{ $t('users.securityActivation', { id: activation.activation.activationId }) }}</span><StatusChip :value="activation.activation.state" /></div>
       <div v-if="activation.activation.errorCode" class="text-caption">{{ activation.activation.errorCode }}</div>
     </q-banner>
-    <div class="row q-mb-md">
-      <q-input v-model="search" outlined dense clearable debounce="0" :label="$t('users.search')" :hint="$t('usage.filters.userHint')" data-cy="user-search" style="width: 340px">
-        <template #prepend><q-icon name="search" /></template>
-      </q-input>
-    </div>
     <LoadingState v-if="loading && !users.length" />
+    <!-- One list card shape for the whole console: a header row naming what is
+         listed and how much of it is loaded, the rows, then paging at the
+         bottom of the card instead of below it. -->
     <q-card v-else flat bordered>
+      <q-card-section class="row items-center justify-between q-py-xs">
+        <div>
+          <div class="text-subtitle2">{{ $t('users.title') }}</div>
+          <div class="text-caption text-grey-7">
+            {{ $t('common.loadedCount', { count: users.length }) }}
+            <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
+          </div>
+        </div>
+        <!-- Search belongs to the list it filters, not to a row above it. The
+             debounce is the 300ms timer below; Quasar's own debounce is off. -->
+        <q-input v-model="search" outlined dense clearable :label="$t('users.search')" data-cy="user-search" style="width: 100%; max-width: 280px">
+          <template #prepend><q-icon name="search" /></template>
+        </q-input>
+      </q-card-section>
+      <q-separator />
       <q-list separator>
         <q-item v-for="user in users" :key="user.userId" clickable data-cy="user-row" @click="openUser(user)">
           <q-item-section><q-item-label>{{ user.displayName }}</q-item-label><q-item-label caption>{{ user.username }}</q-item-label></q-item-section>
           <q-item-section side><div class="row items-center q-gutter-xs"><q-chip dense>{{ $t(`roles.${user.role}`) }}</q-chip><StatusChip :value="user.status" /></div></q-item-section>
         </q-item>
-        <q-item v-if="!users.length"><q-item-section class="text-grey-7">{{ $t('users.noUsers') }}</q-item-section></q-item>
+        <q-item v-if="!users.length"><q-item-section class="text-grey-7">{{ search.trim() ? $t('users.noMatches') : $t('users.noUsers') }}</q-item-section></q-item>
       </q-list>
+      <q-card-actions v-if="nextCursor" class="justify-center">
+        <q-btn outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" />
+      </q-card-actions>
     </q-card>
 
     <q-dialog v-model="createOpen">
-      <q-card class="responsive-modal" style="max-width: 95vw">
+      <q-card class="app-dialog app-dialog--sm">
         <q-card-section class="text-h6">{{ $t('users.createUser') }}</q-card-section>
-        <q-card-section class="q-gutter-md">
-          <q-input v-model="createForm.username" outlined :label="$t('users.username')" data-cy="user-form-username" />
-          <q-input v-model="createForm.displayName" outlined :label="$t('users.displayName')" data-cy="user-form-display-name" />
-          <q-select v-model="createForm.role" outlined :label="$t('users.role')" :options="['MEMBER','ADMIN'].map(value => ({label: $t(`roles.${value}`), value}))" emit-value map-options />
+        <q-card-section class="q-gutter-xs">
+          <q-input v-model="createForm.username" outlined dense :label="$t('users.username')" data-cy="user-form-username" />
+          <q-input v-model="createForm.displayName" outlined dense :label="$t('users.displayName')" data-cy="user-form-display-name" />
+          <q-select v-model="createForm.role" outlined dense :label="$t('users.role')" :options="['MEMBER','ADMIN'].map(value => ({label: $t(`roles.${value}`), value}))" emit-value map-options />
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat :label="$t('common.cancel')" v-close-popup />
@@ -336,15 +352,15 @@ onBeforeUnmount(() => {
       <!-- Bounded and internally scrollable: this dialog carries the devices and
            the usage for one account, and it must not push its own actions off
            screen when either grows. -->
-      <q-card v-if="selected" style="width: 820px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column">
+      <q-card v-if="selected" class="app-dialog app-dialog--lg">
         <q-card-section class="row items-start justify-between"><div><div class="text-h6">{{ selected.displayName }}</div><div class="text-caption">{{ selected.username }} · {{ $t(`roles.${selected.role}`) }}</div><details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selected.userId }}</details></div><StatusChip :value="selected.status" /></q-card-section>
         <q-separator />
-        <!-- min-height:0 lets this flex child shrink below its content height so
-             the body scrolls instead of stretching the card. -->
-        <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto">
-        <q-card-section><div class="row q-gutter-sm"><q-btn outline no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
-        <q-card-section><div class="text-subtitle2 q-mb-sm">{{ $t('users.devices') }}</div>
-          <div v-if="loadingDevices" class="text-caption text-grey-7 q-mb-sm" data-cy="devices-loading">{{ $t('common.loading') }}</div>
+        <!-- The body scrolls inside the card so the dialog actions stay visible
+             however long the device list or the usage block grows. -->
+        <div class="app-dialog__body">
+        <q-card-section><div class="row q-gutter-xs"><q-btn outline no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
+        <q-card-section><div class="text-subtitle2 q-mb-xs">{{ $t('users.devices') }}</div>
+          <div v-if="loadingDevices" class="text-caption text-grey-7 q-mb-xs" data-cy="devices-loading">{{ $t('common.loading') }}</div>
           <q-list bordered separator data-cy="user-devices">
           <q-item v-for="device in devices" :key="device.deviceId">
             <q-item-section>
@@ -358,7 +374,7 @@ onBeforeUnmount(() => {
               </details>
             </q-item-section>
             <q-item-section side>
-              <div class="row items-center q-gutter-sm">
+              <div class="row items-center q-gutter-xs">
                 <StatusChip :value="device.status" />
                 <q-btn v-if="device.status !== 'REVOKED'" flat dense color="negative" :label="$t('users.revoke')" @click="revokeDevice(device)" />
               </div>
@@ -369,21 +385,21 @@ onBeforeUnmount(() => {
         <div v-if="devicesTruncated" class="text-caption text-grey-7 q-mt-xs">{{ $t('users.devicesTruncated', { count: devices.length }) }}</div>
         </q-card-section>
         <q-card-section data-cy="user-usage">
-          <div class="row items-center justify-between q-mb-sm">
+          <div class="row items-center justify-between q-mb-xs">
             <div class="text-subtitle2">{{ $t('users.usage') }}</div>
             <q-select v-model="usagePeriod" :options="periodOptions" :label="$t('users.usagePeriod')" outlined dense emit-value map-options data-cy="user-usage-period" style="width: 180px" />
           </div>
-          <div class="row q-col-gutter-lg" data-cy="user-usage-summary">
+          <div class="row q-col-gutter-xs" data-cy="user-usage-summary">
             <div><div class="text-caption text-grey-7">{{ $t('usage.requests') }}</div><div class="text-h6">{{ usage?.requestCount ?? '—' }}</div></div>
             <div><div class="text-caption text-grey-7">{{ $t('usage.detail.forwarded') }}</div><div class="text-h6">{{ usage?.forwardedRequestCount ?? '—' }}</div></div>
             <div><div class="text-caption text-grey-7">{{ $t('usage.bytes') }}</div><div class="text-h6">{{ usage ? fmtBytes(usage.requestBytes) : '—' }}</div></div>
             <div><div class="text-caption text-grey-7">{{ $t('overview.costStatus') }}</div><div class="text-h6">{{ usageCost }}</div></div>
           </div>
-          <div class="text-caption text-grey-7 q-mt-sm">{{ $t('users.usageHint') }}</div>
-          <div v-if="loadingUsage" class="text-caption text-grey-7 q-mt-sm">{{ $t('common.loading') }}</div>
-          <div class="text-subtitle2 q-mt-md q-mb-sm">{{ $t('users.recentRequests') }}</div>
+          <div class="text-caption text-grey-7 q-mt-xs">{{ $t('users.usageHint') }}</div>
+          <div v-if="loadingUsage" class="text-caption text-grey-7 q-mt-xs">{{ $t('common.loading') }}</div>
+          <div class="text-subtitle2 q-mt-xs q-mb-xs">{{ $t('users.recentRequests') }}</div>
           <UsageRequestList :query="usageQuery" :page-size="25" max-height="none" :show-user="false" />
-          <div class="q-mt-sm"><q-btn flat color="primary" no-caps :label="$t('users.viewAllUsage')" data-cy="view-all-usage" @click="viewAllUsage" /></div>
+          <div class="q-mt-xs"><q-btn flat color="primary" no-caps :label="$t('users.viewAllUsage')" data-cy="view-all-usage" @click="viewAllUsage" /></div>
         </q-card-section>
         </div>
         <q-separator />
@@ -392,17 +408,16 @@ onBeforeUnmount(() => {
     </q-dialog>
 
     <q-dialog v-model="enrollmentOpen" @hide="clearEnrollment">
-      <q-card v-if="enrollment" class="responsive-modal" style="max-width: 95vw"><q-card-section class="text-h6">{{ $t('users.enrollmentTitle') }}</q-card-section><q-card-section>
-        <q-banner class="bg-amber-1 q-mb-md rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
+      <q-card v-if="enrollment" class="app-dialog"><q-card-section class="text-h6">{{ $t('users.enrollmentTitle') }}</q-card-section><q-card-section>
+        <q-banner class="bg-amber-1 q-mb-xs rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
         <div class="row justify-center"><div class="text-center"><div class="text-body2 q-mb-xs">{{ $t('users.enrollmentQr') }}</div><canvas ref="qrCanvas" data-cy="enrollment-qr" /></div></div>
-        <q-input :model-value="enrollmentMaterial" readonly outlined autogrow :label="$t('users.enrollmentMaterial')" data-cy="enrollment-material-field" class="q-mt-md"><template #append><q-btn flat dense icon="content_copy" :aria-label="$t('users.enrollmentMaterial')" data-cy="copy-enrollment-material" @click="copyEnrollment()" /></template></q-input>
-        <div v-if="enrollmentCopied" role="status" class="text-positive q-mt-sm" data-cy="enrollment-copy-result">{{ $t('common.copied') }}</div>
-        <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ new Date(enrollment.expiresAt).toLocaleString() }}</div>
-        <details data-cy="enrollment-code-details" class="q-mt-md"><summary class="text-primary cursor-pointer">{{ $t('users.showCodeForTroubleshooting') }}</summary>
-          <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field" class="q-mt-sm" />
+        <q-input :model-value="enrollmentMaterial" readonly outlined autogrow :label="$t('users.enrollmentMaterial')" data-cy="enrollment-material-field" class="q-mt-xs"><template #append><q-btn flat dense icon="content_copy" :aria-label="$t('users.enrollmentMaterial')" data-cy="copy-enrollment-material" @click="copyEnrollment()" /></template></q-input>
+        <div v-if="enrollmentCopied" role="status" class="text-positive q-mt-xs" data-cy="enrollment-copy-result">{{ $t('common.copied') }}</div>
+        <div class="text-caption q-mt-xs">{{ $t('users.expiresAt') }} {{ new Date(enrollment.expiresAt).toLocaleString() }}</div>
+        <details data-cy="enrollment-code-details" class="q-mt-xs"><summary class="text-primary cursor-pointer">{{ $t('users.showCodeForTroubleshooting') }}</summary>
+          <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field" class="q-mt-xs" />
         </details>
       </q-card-section><q-card-actions align="right"><q-btn color="primary" :label="$t('common.done')" v-close-popup /></q-card-actions></q-card>
     </q-dialog>
-    <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />
   </q-page>
 </template>

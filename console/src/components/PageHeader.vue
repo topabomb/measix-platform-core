@@ -29,7 +29,7 @@ const router = useRouter()
 </script>
 
 <template>
-  <div class="page-header row items-center justify-between q-mb-lg q-gutter-sm">
+  <div class="page-header row items-center justify-between q-mb-xs q-gutter-xs">
     <div class="col-grow" style="min-width: 0">
       <q-breadcrumbs v-if="breadcrumbs?.length" class="q-mb-xs text-grey-6">
         <q-breadcrumbs-el
@@ -40,19 +40,24 @@ const router = useRouter()
           @click="crumb.to && router.push(crumb.to)"
         />
       </q-breadcrumbs>
-      <div class="row items-center q-gutter-sm">
+      <div class="row items-center q-gutter-xs">
         <div class="text-h5 text-weight-bold text-no-wrap" style="min-width: 0">{{ title }}</div>
         <StatusChip v-if="status" :value="status" />
       </div>
       <div v-if="subtitle" class="text-body2 text-grey-7">{{ subtitle }}</div>
     </div>
     <!-- Actions: visible inline on sm+, collapsed into dropdown on xs -->
-    <div v-if="$slots.actions" class="row items-center q-gutter-sm gt-xs">
+    <div v-if="$slots.actions" class="row items-center q-gutter-xs gt-xs">
       <slot name="actions" />
     </div>
+    <!-- Narrow screens: the same actions, one per row. The column wrapper is
+         what gives a slotted button its own row and a full-width hit area
+         instead of letting buttons flow inline inside the list. -->
     <q-btn-dropdown v-if="$slots.actions" flat dense no-caps auto-close :label="$t('common.actions')" icon="more_vert" class="xs">
       <q-list>
-        <slot name="actions" />
+        <div class="column q-gutter-xs q-pa-xs">
+          <slot name="actions" />
+        </div>
       </q-list>
     </q-btn-dropdown>
   </div>

@@ -82,57 +82,55 @@ onMounted(refresh)
 </script>
 
 <template>
-  <q-page padding data-cy="overview-page">
+  <q-page class="admin-page" data-cy="overview-page">
     <PageHeader :title="$t('overview.title')" :subtitle="$t('overview.subtitle')">
       <template #actions>
-        <q-btn flat icon="refresh" :label="$t('common.refresh')" :loading="loading" @click="refresh" />
+        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
       </template>
     </PageHeader>
-    <ProblemBanner :error="error" class="q-mb-md" />
+    <ProblemBanner :error="error" class="q-mb-xs" />
     <LoadingState v-if="loading && !system" />
     <template v-else-if="system">
-      <q-card flat bordered data-cy="overview-delivery-guide" class="q-mb-md">
+      <q-card flat bordered data-cy="overview-delivery-guide" class="q-mb-xs">
         <q-card-section>
-          <div class="row items-center q-gutter-sm">
+          <div class="row items-center q-gutter-xs">
             <div class="text-h6">{{ noPublishedConfiguration ? $t('overview.notPublishedTitle') : $t('overview.publishedTitle', { generation: system.activeManagedGeneration }) }}</div>
             <StatusChip :value="system.runtimeStatus" />
           </div>
-          <div class="text-body2 text-grey-7 q-mt-sm">
+          <div class="text-body2 text-grey-7 q-mt-xs">
             {{ noPublishedConfiguration ? $t('overview.setupIntro') : $t('overview.publishedIntro') }}
           </div>
-          <div v-if="noPublishedConfiguration" data-cy="overview-setup-state" class="text-body2 q-mt-sm">
+          <div v-if="noPublishedConfiguration" data-cy="overview-setup-state" class="text-body2 q-mt-xs">
             {{ $t('overview.setupSteps') }}
           </div>
-          <div v-else-if="!converged" class="text-warning q-mt-sm">
+          <div v-else-if="!converged" class="text-warning q-mt-xs">
             {{ $t('overview.runtimePending') }}
           </div>
-          <div class="row q-gutter-sm q-mt-md">
+          <div class="row q-gutter-xs q-mt-xs">
             <q-btn outline color="primary" to="/users" :label="$t('overview.openUsers')" />
             <q-btn outline color="primary" to="/upstreams" :label="$t('overview.openUpstreams')" />
             <q-btn color="primary" to="/resources" :label="$t('overview.openResources')" />
           </div>
         </q-card-section>
       </q-card>
-      <q-banner v-if="recentActivationFailures.length" class="bg-red-1 text-negative q-mb-md rounded-borders">
+      <q-banner v-if="recentActivationFailures.length" class="bg-red-1 text-negative q-mb-xs rounded-borders">
         {{ $t('overview.recentFailureAction') }}
       </q-banner>
-      <details data-cy="overview-diagnostics" class="overview-diagnostics q-mt-md">
-        <summary class="text-primary cursor-pointer q-mb-md">{{ $t('overview.showDiagnostics') }}</summary>
-      <div class="row q-col-gutter-md">
+      <details data-cy="overview-diagnostics" class="overview-diagnostics q-mt-xs">
+        <summary class="text-primary cursor-pointer q-mb-xs">{{ $t('overview.showDiagnostics') }}</summary>
+      <div class="row q-col-gutter-xs">
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.managedRuntime') }}</div><div class="q-mt-xs"><StatusChip :value="system.runtimeStatus" /></div><div class="text-caption q-mt-sm">{{ $t('system.relay') }} {{ system.relayReady ? $t('status.READY').toLowerCase() : $t('status.NOT_CONVERGED').toLowerCase() }}</div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.managedRuntime') }}</div><div class="q-mt-xs"><StatusChip :value="system.runtimeStatus" /></div><div class="text-caption q-mt-xs">{{ $t('system.relay') }} {{ system.relayReady ? $t('status.READY').toLowerCase() : $t('status.NOT_CONVERGED').toLowerCase() }}</div></q-card-section></q-card>
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.activeGeneration') }}</div><div class="text-h4 q-mt-xs">{{ system.activeManagedGeneration }}</div><div class="text-caption q-mt-sm">{{ $t('system.managedStateRevision') }} {{ system.managedStateRevision }}</div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.activeGeneration') }}</div><div class="text-h6 q-mt-xs">{{ system.activeManagedGeneration }}</div><div class="text-caption q-mt-xs">{{ $t('system.managedStateRevision') }} {{ system.managedStateRevision }}</div></q-card-section></q-card>
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.desiredRevision') }}</div><div class="text-h4 q-mt-xs">{{ system.desiredControlRevision }}</div><div class="text-caption q-mt-sm">{{ $t('system.relay') }} {{ system.appliedControlRevision ?? '—' }} · <span class="text-caption">{{ $t('system.bundle').toLowerCase() }} {{ system.desiredBundleHash ? system.desiredBundleHash.slice(7, 19) : '—' }}</span></div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.desiredRevision') }}</div><div class="text-h6 q-mt-xs">{{ system.desiredControlRevision }}</div><div class="text-caption q-mt-xs">{{ $t('system.relay') }} {{ system.appliedControlRevision ?? '—' }} · <span class="text-caption">{{ $t('system.bundle').toLowerCase() }} {{ system.desiredBundleHash ? system.desiredBundleHash.slice(7, 19) : '—' }}</span></div></q-card-section></q-card>
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
-          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.requests') }}</div><div class="text-h4 q-mt-xs">{{ usage?.requestCount ?? 0 }}</div><div class="text-caption q-mt-sm">{{ usage?.forwardedRequestCount ?? 0 }} {{ $t('usage.detail.forwarded').toLowerCase() }}</div></q-card-section></q-card>
+          <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.requests') }}</div><div class="text-h6 q-mt-xs">{{ usage?.requestCount ?? 0 }}</div><div class="text-caption q-mt-xs">{{ usage?.forwardedRequestCount ?? 0 }} {{ $t('usage.detail.forwarded').toLowerCase() }}</div></q-card-section></q-card>
         </div>
-      </div>
-      <div class="row q-col-gutter-md q-mt-xs">
         <div class="col-12 col-md-6">
           <q-card flat bordered>
             <q-card-section class="text-subtitle1 text-weight-medium">{{ $t('system.lastActivation') }}</q-card-section>
@@ -156,9 +154,7 @@ onMounted(refresh)
             </q-list>
           </q-card>
         </div>
-      </div>
       <!-- Resource counts by kind -->
-      <div class="row q-col-gutter-md q-mt-xs">
         <div class="col-12 col-md-6">
           <q-card flat bordered>
             <q-card-section class="text-subtitle1 text-weight-medium">{{ $t('overview.resourceCounts') }}</q-card-section>
@@ -186,8 +182,6 @@ onMounted(refresh)
             </q-list>
           </q-card>
         </div>
-      </div>
-      <div class="row q-col-gutter-md q-mt-xs">
         <div class="col-12 col-md-6">
           <q-card flat bordered>
             <q-card-section class="text-subtitle1 text-weight-medium">{{ $t('system.title') }}</q-card-section>

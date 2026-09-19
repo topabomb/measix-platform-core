@@ -264,13 +264,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <q-page padding data-cy="usage-page">
+  <q-page class="admin-page" data-cy="usage-page">
     <PageHeader :title="$t('usage.title')" :subtitle="$t('usage.subtitle')">
       <template #actions>
-        <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
+        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
       </template>
     </PageHeader>
-    <q-tabs v-model="activeTab" class="q-mb-md" dense align="left">
+    <q-tabs v-model="activeTab" class="q-mb-xs" dense align="left">
       <q-tab name="summary" :label="$t('usage.summary')" icon="insights" />
       <q-tab name="pricing" :label="$t('pricing.title')" icon="sell" />
     </q-tabs>
@@ -278,51 +278,47 @@ onBeforeUnmount(() => {
     <PricingPanel v-if="activeTab === 'pricing'" />
 
     <template v-else>
-      <div class="row items-end q-col-gutter-sm q-mb-md">
-        <div class="col-auto"><q-input v-model="fromLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.startTime')" :disable="allTime" style="width: 230px" /></div>
-        <div class="col-auto"><q-input v-model="toLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.endTime')" :disable="allTime" style="width: 230px" /></div>
-        <div class="col-auto"><q-btn-dropdown dense flat :label="$t('usage.filters.quickRange')" :no-icon-animation="true" class="q-px-xs">
+      <!-- Filter grid: every control is an equal cell, so wrapping always lands
+           in whole columns instead of stranding one or two controls on a
+           ragged second line — fixed pixel widths cannot do that. -->
+      <div class="usage-filters q-mb-xs">
+        <q-input v-model="fromLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.startTime')" :disable="allTime" />
+        <q-input v-model="toLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.endTime')" :disable="allTime" />
+        <q-btn-dropdown dense outline no-caps class="usage-filters__cell-btn" :label="$t('usage.filters.quickRange')" :no-icon-animation="true">
           <q-list>
             <q-item clickable v-close-popup @click="applyRange(1)"><q-item-section>{{ $t('usage.range24h') }}</q-item-section></q-item>
             <q-item clickable v-close-popup @click="applyRange(7)"><q-item-section>{{ $t('usage.range7d') }}</q-item-section></q-item>
             <q-item clickable v-close-popup @click="applyRange(30)"><q-item-section>{{ $t('usage.range30d') }}</q-item-section></q-item>
             <q-item clickable v-close-popup @click="applyAllTime"><q-item-section>{{ $t('usage.rangeAll') }}</q-item-section></q-item>
           </q-list>
-        </q-btn-dropdown></div>
-        </div>
-      <!-- One row of query filters. The user picker filters like the others; it is
-           not a companion of the date range. -->
-      <div class="row items-end q-col-gutter-sm q-mb-sm">
-        <div class="col-auto"><q-select v-model="userId" :options="userOptions" :label="$t('usage.filters.user')" :hint="$t('usage.filters.userHint')" :placeholder="$t('usage.filters.anyUser')" :loading="loadingUsers" outlined dense clearable use-input emit-value map-options @filter="onUserFilter" style="width: 280px" data-cy="usage-user-filter" /></div>
-        <div class="col-auto"><q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable style="width: 150px" /></div>
-        <div class="col-auto"><q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable style="width: 130px" /></div>
-        <div class="col-auto"><q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable style="width: 150px" /></div>
-        <div class="col-auto"><q-btn flat dense icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" /></div>
+        </q-btn-dropdown>
+        <!-- The user picker filters like the others; it is not a companion of
+             the date range. No hint: it made this one control stand taller
+             than the whole row. -->
+        <q-select v-model="userId" :options="userOptions" :label="$t('usage.filters.user')" :placeholder="$t('usage.filters.anyUser')" :loading="loadingUsers" outlined dense clearable use-input emit-value map-options @filter="onUserFilter" data-cy="usage-user-filter" />
+        <q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable />
+        <q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable />
+        <q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable />
+        <q-btn flat dense align="left" class="usage-filters__cell-btn" icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" />
       </div>
       <!-- Its own collapsed disclosure: an optional raw-identifier path, not a
            stray line trailing the filter row. -->
-      <details class="q-mb-md" data-cy="usage-identity-filters">
+      <details class="q-mb-xs" data-cy="usage-identity-filters">
         <summary class="text-caption text-grey-7 cursor-pointer">{{ $t('usage.filters.byIdentity') }}</summary>
-        <div class="row q-col-gutter-sm q-mt-xs">
+        <div class="row q-col-gutter-xs q-mt-xs">
           <div class="col-12 col-sm-6"><q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." /></div>
           <div class="col-12 col-sm-6"><q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." /></div>
         </div>
       </details>
-      <q-banner v-if="activeFilters.length" class="q-mb-md bg-grey-2 rounded-borders">
-        <div class="row items-center q-gutter-sm">
-          <span class="text-caption text-grey-7">{{ $t('usage.filters.active') }}:</span>
-          <q-chip v-for="f in activeFilters" :key="f" dense>{{ f }}</q-chip>
-        </div>
-      </q-banner>
-      <ProblemBanner :error="error" class="q-mb-md" />
+      <ProblemBanner :error="error" class="q-mb-xs" />
 
       <LoadingState v-if="loading && !summary" />
-      <div v-else-if="summary" class="row q-col-gutter-md q-mb-md">
+      <div v-else-if="summary" class="row q-col-gutter-xs q-mb-xs">
         <div class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('usage.requests') }}</div>
-              <div class="text-h5">{{ summary.requestCount }}</div>
+              <div class="text-h6">{{ summary.requestCount }}</div>
               <div class="text-caption">{{ $t('usage.detail.forwarded') }} {{ summary.forwardedRequestCount }}</div>
             </q-card-section>
           </q-card>
@@ -331,7 +327,7 @@ onBeforeUnmount(() => {
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('usage.bytes') }}</div>
-              <div class="text-h5">{{ fmtBytes(summary.requestBytes) }}</div>
+              <div class="text-h6">{{ fmtBytes(summary.requestBytes) }}</div>
               <div class="text-caption">{{ $t('usage.responseBytes') }} {{ fmtBytes(summary.responseBytes) }}</div>
             </q-card-section>
           </q-card>
@@ -340,7 +336,7 @@ onBeforeUnmount(() => {
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('overview.costStatus') }}</div>
-              <div class="text-h5">{{ costLabel }}</div>
+              <div class="text-h6">{{ costLabel }}</div>
               <q-chip dense :color="costStatusColor(costStatus)" :label="costStatusLabel(costStatus)" text-color="white" />
             </q-card-section>
           </q-card>
@@ -349,7 +345,7 @@ onBeforeUnmount(() => {
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('usage.blocked') }}</div>
-              <div class="text-h5">{{ blockedCount }}</div>
+              <div class="text-h6">{{ blockedCount }}</div>
               <div class="text-caption">{{ $t('usage.blockedHint') }}</div>
             </q-card-section>
           </q-card>
@@ -358,7 +354,7 @@ onBeforeUnmount(() => {
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('usage.semanticMeters') }}</div>
-              <div class="q-mt-sm">
+              <div class="q-mt-xs">
                 <q-chip v-for="m in semanticMeters" :key="m.meter" dense :color="meterColor(m.meter)" text-color="white" size="sm">
                   {{ m.meter }}: {{ m.quantity }}
                   <q-badge v-if="m.confidence === 'UNKNOWN'" color="grey" label="?" class="q-ml-xs" />
@@ -392,3 +388,20 @@ onBeforeUnmount(() => {
     </template>
   </q-page>
 </template>
+
+<style scoped>
+/* Equal filter cells: controls stretch to the cell, the grid wraps in whole
+   columns, and buttons match the 40px dense field height so the row reads as
+   one line of same-shaped controls. */
+.usage-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 4px;
+  align-items: end;
+}
+
+.usage-filters__cell-btn {
+  width: 100%;
+  height: 40px;
+}
+</style>

@@ -289,22 +289,25 @@ onBeforeUnmount(() => {
             <q-item clickable v-close-popup @click="applyAllTime"><q-item-section>{{ $t('usage.rangeAll') }}</q-item-section></q-item>
           </q-list>
         </q-btn-dropdown></div>
-        <div class="col-auto"><q-select v-model="userId" :options="userOptions" :label="$t('usage.filters.user')" :hint="$t('usage.filters.userHint')" :placeholder="$t('usage.filters.anyUser')" :loading="loadingUsers" outlined dense clearable use-input emit-value map-options @filter="onUserFilter" style="width: 280px" /></div>
-        <div class="col-auto"><q-select v-model="pageSize" :options="pageSizes" :label="$t('usage.pageSize')" outlined dense emit-value map-options style="width: 150px" /></div>
-      </div>
-      <div class="row items-end q-col-gutter-sm q-mb-md">
+        </div>
+      <!-- One row of query filters. The user picker filters like the others; it is
+           not a companion of the date range. -->
+      <div class="row items-end q-col-gutter-sm q-mb-sm">
+        <div class="col-auto"><q-select v-model="userId" :options="userOptions" :label="$t('usage.filters.user')" :hint="$t('usage.filters.userHint')" :placeholder="$t('usage.filters.anyUser')" :loading="loadingUsers" outlined dense clearable use-input emit-value map-options @filter="onUserFilter" style="width: 280px" data-cy="usage-user-filter" /></div>
         <div class="col-auto"><q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable style="width: 150px" /></div>
         <div class="col-auto"><q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable style="width: 130px" /></div>
         <div class="col-auto"><q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable style="width: 150px" /></div>
         <div class="col-auto"><q-btn flat dense icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" /></div>
-        <details class="col-12 q-mt-sm" data-cy="usage-identity-filters">
-          <summary>{{ $t('usage.filters.byIdentity') }}</summary>
-          <div class="row q-col-gutter-sm q-mt-xs">
-            <div class="col-12 col-sm-6"><q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." /></div>
-            <div class="col-12 col-sm-6"><q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." /></div>
-          </div>
-        </details>
       </div>
+      <!-- Its own collapsed disclosure: an optional raw-identifier path, not a
+           stray line trailing the filter row. -->
+      <details class="q-mb-md" data-cy="usage-identity-filters">
+        <summary class="text-caption text-grey-7 cursor-pointer">{{ $t('usage.filters.byIdentity') }}</summary>
+        <div class="row q-col-gutter-sm q-mt-xs">
+          <div class="col-12 col-sm-6"><q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." /></div>
+          <div class="col-12 col-sm-6"><q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." /></div>
+        </div>
+      </details>
       <q-banner v-if="activeFilters.length" class="q-mb-md bg-grey-2 rounded-borders">
         <div class="row items-center q-gutter-sm">
           <span class="text-caption text-grey-7">{{ $t('usage.filters.active') }}:</span>
@@ -381,7 +384,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <UsageRequestList :query="filterQuery" :page-size="pageSize" allow-filter-resource @filter-resource="value => { resourceId = value }" />
+      <UsageRequestList :query="filterQuery" :page-size="pageSize" allow-filter-resource @filter-resource="value => { resourceId = value }">
+        <template #toolbar>
+          <q-select v-model="pageSize" :options="pageSizes" :label="$t('usage.pageSize')" outlined dense emit-value map-options style="width: 150px" data-cy="usage-page-size" />
+        </template>
+      </UsageRequestList>
     </template>
   </q-page>
 </template>

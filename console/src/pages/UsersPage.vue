@@ -333,9 +333,15 @@ onBeforeUnmount(() => {
     </q-dialog>
 
     <q-dialog v-model="detailOpen">
-      <q-card v-if="selected" style="width: 760px; max-width: 95vw">
+      <!-- Bounded and internally scrollable: this dialog carries the devices and
+           the usage for one account, and it must not push its own actions off
+           screen when either grows. -->
+      <q-card v-if="selected" style="width: 820px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column">
         <q-card-section class="row items-start justify-between"><div><div class="text-h6">{{ selected.displayName }}</div><div class="text-caption">{{ selected.username }} · {{ $t(`roles.${selected.role}`) }}</div><details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selected.userId }}</details></div><StatusChip :value="selected.status" /></q-card-section>
         <q-separator />
+        <!-- min-height:0 lets this flex child shrink below its content height so
+             the body scrolls instead of stretching the card. -->
+        <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto">
         <q-card-section><div class="row q-gutter-sm"><q-btn outline no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
         <q-card-section><div class="text-subtitle2 q-mb-sm">{{ $t('users.devices') }}</div>
           <div v-if="loadingDevices" class="text-caption text-grey-7 q-mb-sm" data-cy="devices-loading">{{ $t('common.loading') }}</div>
@@ -376,9 +382,11 @@ onBeforeUnmount(() => {
           <div class="text-caption text-grey-7 q-mt-sm">{{ $t('users.usageHint') }}</div>
           <div v-if="loadingUsage" class="text-caption text-grey-7 q-mt-sm">{{ $t('common.loading') }}</div>
           <div class="text-subtitle2 q-mt-md q-mb-sm">{{ $t('users.recentRequests') }}</div>
-          <UsageRequestList :query="usageQuery" :page-size="25" max-height="20rem" />
+          <UsageRequestList :query="usageQuery" :page-size="25" max-height="none" :show-user="false" />
           <div class="q-mt-sm"><q-btn flat color="primary" no-caps :label="$t('users.viewAllUsage')" data-cy="view-all-usage" @click="viewAllUsage" /></div>
         </q-card-section>
+        </div>
+        <q-separator />
         <q-card-actions align="right"><q-btn flat :label="$t('common.close')" v-close-popup /></q-card-actions>
       </q-card>
     </q-dialog>

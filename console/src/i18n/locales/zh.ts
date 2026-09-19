@@ -652,7 +652,7 @@ export default {
     costUnknown: '未知成本',
     costUnknownHint: '无可靠语义计量。未知成本不等于零。',
     filters: {
-      byIdentity: '按用户、资源或上游编号筛选',
+      byIdentity: '按资源或上游编号精确筛选',
       title: '筛选',
       startTime: '开始时间',
       endTime: '结束时间',

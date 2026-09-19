@@ -652,7 +652,7 @@ export default {
     costUnknown: 'Unknown cost',
     costUnknownHint: 'No reliable semantic meter. Unknown cost is not zero.',
     filters: {
-      byIdentity: 'Filter by user, resource or upstream ID',
+      byIdentity: 'Filter by an exact resource or upstream identifier',
       title: 'Filters',
       startTime: 'Start time',
       endTime: 'End time',

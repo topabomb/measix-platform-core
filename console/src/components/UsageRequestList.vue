@@ -21,11 +21,14 @@ const props = withDefaults(defineProps<{
   maxHeight?: string
   /** Only offered where the host can act on it; elsewhere the button is hidden. */
   allowFilterResource?: boolean
+  /** A host already scoped to one user hides the user name repeated on every row. */
+  showUser?: boolean
 }>(), {
   query: '',
   pageSize: 50,
   maxHeight: '28rem',
   allowFilterResource: false,
+  showUser: true,
 })
 
 const emit = defineEmits<{ filterResource: [string] }>()
@@ -126,12 +129,17 @@ defineExpose({ refresh: () => load(false) })
 
 <template>
   <q-card flat bordered>
-    <q-card-section class="row items-center justify-between">
+    <q-card-section class="row items-center justify-between q-py-sm">
       <div class="text-subtitle2">{{ $t('usage.requests') }}</div>
-      <div class="text-caption text-grey-7">
-        {{ $t('usage.loadedCount', { count: loaded }) }}
-        <template v-if="nextCursor"> · {{ $t('usage.hasMore') }}</template>
-        <template v-else-if="loaded"> · {{ $t('usage.allLoaded') }}</template>
+      <div class="row items-center q-gutter-md">
+        <!-- View controls for this list (page size and the like) belong next to
+             the count they affect, not among the query filters above. -->
+        <slot name="toolbar" />
+        <div class="text-caption text-grey-7">
+          {{ $t('usage.loadedCount', { count: loaded }) }}
+          <template v-if="nextCursor"> · {{ $t('usage.hasMore') }}</template>
+          <template v-else-if="loaded"> · {{ $t('usage.allLoaded') }}</template>
+        </div>
       </div>
     </q-card-section>
     <div class="text-caption text-grey-7 q-px-md">{{ $t('usage.windowHint') }}</div>
@@ -147,9 +155,10 @@ defineExpose({ refresh: () => load(false) })
               <q-chip v-if="kindOf(req.resourceId)" dense :color="kindColor(kindOf(req.resourceId)!)" text-color="white" size="sm">{{ kindLabel(kindOf(req.resourceId)!) }}</q-chip>
               <q-chip v-if="req.errorClass" dense color="negative" text-color="white" size="sm">{{ errorLabel(req.errorClass) }}</q-chip>
             </q-item-label>
-            <q-item-label caption data-cy="usage-row-identity">
-              {{ $t('usage.filters.user') }}: {{ identity(req) }}
-              <template v-if="req.deviceName"> · {{ $t('usage.detail.device') }}: {{ req.deviceName }}</template>
+            <q-item-label v-if="showUser || req.deviceName" caption data-cy="usage-row-identity">
+              <template v-if="showUser">{{ $t('usage.filters.user') }}: {{ identity(req) }}</template>
+              <template v-if="showUser && req.deviceName"> · </template>
+              <template v-if="req.deviceName">{{ $t('usage.detail.device') }}: {{ req.deviceName }}</template>
             </q-item-label>
             <q-item-label caption>
               {{ new Date(req.startedAt).toLocaleString() }}

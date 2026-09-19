@@ -107,7 +107,7 @@ CAP-C7-*  freeze/handoff
 | CAP-C0-002 | Unsupported normal product protocol | Admin/Validate 不把 native Anthropic/Google/Realtime 当 S0.1 supported capability |
 | CAP-C0-003 | Model vocabulary | modalities/capabilities 只接受 frozen vocabulary，未知 request value 被拒绝 |
 | CAP-C0-004 | TTS voice | enabled Managed TTS 无 voice 时 validation fail |
-| CAP-C0-005 | ASR profile | HTTP transcription Definition 可表达；Realtime/WebSocket config 不属于 Managed S0.1 schema |
+| CAP-C0-005 | ASR profile | HTTP 文件转写、OpenAI/DashScope 实时识别可表达；按协议验证参数、传输及共享快照，禁止跨类型字段 |
 | CAP-C0-006 | MCP auth | `ENTERPRISE_MANAGED|NONE` valid；未定义 user-managed relay 不被接受为 S0.1 profile |
 | CAP-C0-007 | unknown optional response | generated/consumer test ignores unknown optional response field |
 | CAP-C0-008 | unknown request field | request contract rejects unknown field according to global rule |

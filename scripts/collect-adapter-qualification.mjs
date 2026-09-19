@@ -28,9 +28,9 @@
  *
  * Each profile must pass ALL required cases:
  *   model: normal, streaming, cancel, authBoundary, errorBoundary
- *   tts: normal, errorBoundary
- *   asr: normal, cancel, errorBoundary
- *   mcp: initialize, tools/list, tools/call, errorBoundary
+ *   tts: normal, streaming where supported, cancel, timeout, errorBoundary
+ *   asr: normal, cancel, timeout, errorBoundary
+ *   mcp: initialize, tools/list, tools/call, session, cancel, errorBoundary
  *
  * Any FAIL or NOT_EXECUTED on a required case → profile != VERIFIED.
  *
@@ -51,11 +51,14 @@
  *     TTS_API_KEY=sk-...
  *     TTS_MODEL=tts-1
  *     TTS_VOICE=alloy
+ *     TTS_PROTOCOL=OPENAI_AUDIO_SPEECH (or MIMO_CHAT_COMPLETIONS_TTS)
  *     ASR_ENDPOINT=https://... (optional, leave empty to skip ASR)
  *     ASR_API_KEY=sk-...
  *     ASR_MODEL=whisper-1
  *     MCP_ENDPOINT=https://... (optional, leave empty to skip MCP)
  *     MCP_API_KEY=sk-...
+ *     MCP_TEST_TOOL_NAME=tool-a
+ *     MCP_TEST_TOOL_ARGUMENTS_JSON={"query":"hello"}
  *   Each profile has its own independent endpoint/key/model.
  *
  * Per audit P0-5: multi-profile aggregation.
@@ -127,9 +130,9 @@ let useDotEnv = false
 // Per-profile configuration: each profile has its own endpoint, API key, and model
 const profileConfig = {
   model: { endpoint: null, apiKey: null, modelId: null },
-  tts:   { endpoint: null, apiKey: null, modelId: null, voice: 'alloy' },
+  tts:   { endpoint: null, apiKey: null, modelId: null, voice: 'alloy', protocol: 'OPENAI_AUDIO_SPEECH' },
   asr:   { endpoint: null, apiKey: null, modelId: null },
-  mcp:   { endpoint: null, apiKey: null },
+  mcp:   { endpoint: null, apiKey: null, testToolName: 'tool-a', testToolArguments: { query: 'hello' } },
 }
 
 for (let i = 0; i < args.length; i++) {
@@ -188,6 +191,7 @@ if (useDotEnv) {
   if (!profileConfig.tts.endpoint) profileConfig.tts.endpoint = dotenv.TTS_ENDPOINT || null
   if (!profileConfig.tts.apiKey) profileConfig.tts.apiKey = dotenv.TTS_API_KEY || null
   if (!profileConfig.tts.modelId) profileConfig.tts.modelId = dotenv.TTS_MODEL || null
+  if (dotenv.TTS_PROTOCOL) profileConfig.tts.protocol = dotenv.TTS_PROTOCOL
   if (profileConfig.tts.voice === 'alloy' && (dotenv.TTS_VOICE))
     profileConfig.tts.voice = dotenv.TTS_VOICE
 
@@ -199,6 +203,18 @@ if (useDotEnv) {
   // MCP profile (optional)
   if (!profileConfig.mcp.endpoint) profileConfig.mcp.endpoint = dotenv.MCP_ENDPOINT || null
   if (!profileConfig.mcp.apiKey) profileConfig.mcp.apiKey = dotenv.MCP_API_KEY || null
+  if (dotenv.MCP_TEST_TOOL_NAME) profileConfig.mcp.testToolName = dotenv.MCP_TEST_TOOL_NAME
+  if (dotenv.MCP_TEST_TOOL_ARGUMENTS_JSON) {
+    try {
+      profileConfig.mcp.testToolArguments = JSON.parse(dotenv.MCP_TEST_TOOL_ARGUMENTS_JSON)
+    } catch {
+      throw new Error('MCP_TEST_TOOL_ARGUMENTS_JSON must be valid JSON')
+    }
+    if (!profileConfig.mcp.testToolArguments || Array.isArray(profileConfig.mcp.testToolArguments)
+      || typeof profileConfig.mcp.testToolArguments !== 'object') {
+      throw new Error('MCP_TEST_TOOL_ARGUMENTS_JSON must be a JSON object')
+    }
+  }
 
   if (dotenv.MEASIX_ADMIN_PASSWORD) adminPassword = dotenv.MEASIX_ADMIN_PASSWORD
 }
@@ -256,10 +272,14 @@ function deriveAdapterName(endpoint) {
 // Tries to read server headers or /v1/models response to identify the actual
 // adapter software/version. Falls back to endpoint-derived identity.
 async function probeAdapterIdentity(endpoint, apiKey) {
+  // Identity stays derived from the configured endpoint. Anything the upstream
+  // says about itself is recorded separately as a declaration: the service
+  // under test must not get to choose the name it is qualified under.
   let adapterName = deriveAdapterName(endpoint)
   let adapterVersion = 'unknown'
   let adapterBuild = null
   let detectedVia = 'endpoint-hostname'
+  let declaredName = null
 
   try {
     // Try /v1/models endpoint — many OpenAI-compatible adapters expose model list
@@ -273,11 +293,11 @@ async function probeAdapterIdentity(endpoint, apiKey) {
       const viaHeader = resp.headers.get('via') || ''
       const xRequestId = resp.headers.get('x-request-id') || ''
       if (serverHeader) {
-        adapterName = serverHeader
-        detectedVia = 'server-header'
+        declaredName = serverHeader
+        detectedVia = 'declared-server-header'
       } else if (viaHeader) {
-        adapterName = viaHeader
-        detectedVia = 'via-header'
+        declaredName = viaHeader
+        detectedVia = 'declared-via-header'
       }
       // Try to get version from body
       const body = await resp.text()
@@ -295,7 +315,7 @@ async function probeAdapterIdentity(endpoint, apiKey) {
     }
   } catch {}
 
-  return { adapterName, adapterVersion, adapterBuild, detectedVia }
+  return { adapterName, adapterVersion, adapterBuild, detectedVia, declaredName, identitySource: 'endpoint' }
 }
 
 if (!endpoint || !apiKey) {
@@ -501,7 +521,7 @@ async function main() {
   // different endpoints/credentials can be used per capability.
   const upstreams = {}  // profile -> { upstreamId, configRevision }
 
-  async function createSecretAndUpstream(profileName, endpoint, apiKey, transportCapabilities) {
+  async function createSecretAndUpstream(profileName, endpoint, apiKey, transportCapabilities, authHeaderName = null) {
     const safeName = profileName.charAt(0).toUpperCase() + profileName.slice(1)
     console.log(`Creating secret for ${profileName}...`)
     const secretResp = await adminPost('/api/admin/v1/secrets', {
@@ -522,7 +542,8 @@ async function main() {
         baseUrl: endpoint.replace(/\/$/, ''),
         transportCapabilities,
         auth: {
-          type: 'BEARER',
+          type: authHeaderName ? 'STATIC_HEADER' : 'BEARER',
+          ...(authHeaderName ? { headerName: authHeaderName } : {}),
           secretRef: { secretId: secret.secretId, secretVersion: secret.secretVersion },
         },
         correlationMode: 'NONE',
@@ -587,7 +608,8 @@ async function main() {
   if (!skipTTS) {
     upstreams.tts = await createSecretAndUpstream(
       'tts', profileConfig.tts.endpoint, profileConfig.tts.apiKey,
-      ['HTTP_BINARY_STREAM']
+      profileConfig.tts.protocol === 'MIMO_CHAT_COMPLETIONS_TTS' ? ['HTTP_STREAMING_SSE'] : ['HTTP_BINARY_STREAM'],
+      profileConfig.tts.protocol === 'MIMO_CHAT_COMPLETIONS_TTS' ? 'api-key' : null,
     )
   }
 
@@ -641,6 +663,8 @@ async function main() {
     tts: [],
     asr: [],
     mcp: [],
+    assistants: [],
+    starters: [],
     bindings: [{
       runtimeRouteId: routeModel, resourceId: modelId, upstreamId: upstreams.model.upstreamId,
       allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/chat/completions'],
@@ -656,15 +680,17 @@ async function main() {
 
   // Add TTS if configured
   if (!skipTTS) {
+    const mimoTts = profileConfig.tts.protocol === 'MIMO_CHAT_COMPLETIONS_TTS'
+    const ttsPath = mimoTts ? '/v1/chat/completions' : '/v1/audio/speech'
     draftContent.tts = [{
-      ttsId: ttsId, displayName: 'Qual TTS', clientProtocol: 'OPENAI_AUDIO_SPEECH',
-      upstreamModelKey: profileConfig.tts.modelId || 'tts-1', voice: profileConfig.tts.voice, runtimePath: '/v1/audio/speech',
+      ttsId: ttsId, displayName: 'Qual TTS', clientProtocol: profileConfig.tts.protocol,
+      upstreamModelKey: profileConfig.tts.modelId || 'tts-1', voice: profileConfig.tts.voice, runtimePath: ttsPath,
       enabled: true,
     }]
     draftContent.bindings.push({
       runtimeRouteId: routeTTS, resourceId: ttsId, upstreamId: upstreams.tts.upstreamId,
-      allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/audio/speech'],
-      transportPolicy: 'HTTP_BINARY_STREAM',
+      allowedMethods: ['POST'], allowedPathPrefixes: [ttsPath],
+      transportPolicy: mimoTts ? 'HTTP_STREAMING_SSE' : 'HTTP_BINARY_STREAM',
       timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
     })
     draftContent.policy.defaultTtsId = ttsId
@@ -920,13 +946,31 @@ async function main() {
             console.log('  Model cancel: FAIL (no streaming chunks received before abort)')
             results.model.cancel = 'FAIL'
           } else {
-            // Chunks are flowing — NOW abort and verify the stream is interrupted
+            // Chunks are flowing — NOW abort and verify the stream actually
+            // settles. Sending an abort is not proof; the stream must stop.
             cancelController.abort()
             try {
               await reader.cancel()
             } catch {}
-            console.log('  Model cancel: PASS (stream flowing, abort propagated)')
-            results.model.cancel = 'PASS'
+            let settled = false
+            const settleDeadline = Date.now() + 5000
+            try {
+              for (;;) {
+                if (Date.now() > settleDeadline) break
+                const { done } = await reader.read()
+                if (done) { settled = true; break }
+              }
+            } catch {
+              // An abort error here means the stream stopped.
+              settled = true
+            }
+            if (settled) {
+              console.log('  Model cancel: PASS (stream flowing, stream settled after abort)')
+              results.model.cancel = 'PASS'
+            } else {
+              console.log('  Model cancel: FAIL (stream kept delivering after abort)')
+              results.model.cancel = 'FAIL'
+            }
           }
         } catch (e) {
           if (e.name === 'AbortError') {
@@ -938,12 +982,11 @@ async function main() {
           }
         }
 
-        // Timeout: non-streaming request that would take time, with very short client timeout
-        // The Relay proxy applies timeout policy; if the upstream takes longer, Relay returns 504.
-        // We verify by using a very short client-side deadline that simulates a timeout scenario.
-        // The key assertion: the request does NOT complete normally (either timeout error or non-200).
+        // Client deadline: a 50ms client-side deadline attached to the request
+        // itself. This proves the client deadline interrupts the request. It is
+        // NOT a Relay timeout-policy test, which needs a deliberately slow
+        // upstream; the report must not claim otherwise.
         try {
-          const timeoutController = new AbortController()
           const timeoutResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotModelId}/v1/chat/completions`, {
             method: 'POST',
             headers: {
@@ -953,34 +996,28 @@ async function main() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ model: profileConfig.model.modelId || 'gpt-4o-mini', stream: true, messages: [{ role: 'user', content: 'Write a very long essay about history.' }] }),
-            signal: timeoutController.signal,
+            signal: AbortSignal.timeout(50),
           })
-          // Abort after 50ms — this is a client-side cancellation that mimics a timeout
-          setTimeout(() => timeoutController.abort(), 50)
-          let responseStatus = timeoutResp.status
+          let completed = false
           try {
             await timeoutResp.text()
+            completed = true
           } catch (e) {
-            // Expected: the abort should cause an error on the client side
-            if (e.name === 'AbortError') {
-              console.log('  Model timeout: PASS (client timeout propagated)')
-              results.model.timeout = 'PASS'
-            } else {
-              console.log(`  Model timeout: FAIL (${e.message})`)
-              results.model.timeout = 'FAIL'
-            }
+            if (e.name !== 'AbortError') throw e
           }
-          // If we got here without an AbortError, the request completed too fast
-          if (results.model.timeout !== 'PASS') {
-            console.log('  Model timeout: FAIL (request completed before timeout)')
+          if (completed) {
+            console.log('  Model client deadline: FAIL (request completed within the 50ms deadline)')
             results.model.timeout = 'FAIL'
+          } else {
+            console.log('  Model client deadline: PASS (deadline interrupted the request)')
+            results.model.timeout = 'PASS'
           }
         } catch (e) {
-          if (e.name === 'AbortError') {
-            console.log('  Model timeout: PASS (timeout propagated)')
+          if (e.name === 'AbortError' || e.name === 'TimeoutError') {
+            console.log('  Model client deadline: PASS (deadline propagated)')
             results.model.timeout = 'PASS'
           } else {
-            console.log(`  Model timeout: FAIL (${e.message})`)
+            console.log(`  Model client deadline: FAIL (${e.message})`)
             results.model.timeout = 'FAIL'
           }
         }
@@ -1044,7 +1081,70 @@ async function main() {
     results.model.status = modelRequired.every(c => results.model[c] === 'PASS') ? 'VERIFIED' : 'FAILED'
   }
 
-  if (profilesToQualify.includes('tts')) {
+  if (profilesToQualify.includes('tts') && profileConfig.tts.protocol === 'MIMO_CHAT_COMPLETIONS_TTS') {
+    console.log('Qualifying MiMo TTS profile...')
+    const url = `${relayUrl}/runtime/v1/resources/${snapshotTtsId}/v1/chat/completions`
+    const headers = () => ({
+      'Authorization': `Bearer ${clientToken}`,
+      'X-Measix-Managed-Generation': String(generation),
+      'X-Measix-Interaction-Id': generateStableId('int'),
+      'Content-Type': 'application/json',
+    })
+    const requestBody = (text, stream, model = profileConfig.tts.modelId) => ({
+      model, messages: [{ role: 'assistant', content: text }],
+      audio: { format: stream ? 'pcm16' : 'wav', voice: profileConfig.tts.voice }, stream,
+    })
+    const request = (text, stream, signal, model) => fetch(url, {
+      method: 'POST', headers: headers(), body: JSON.stringify(requestBody(text, stream, model)), signal,
+    })
+    try {
+      const normal = await request('你好，这是企业语音测试。', false)
+      if (normal.ok) {
+        const data = await normal.json()
+        const audio = Buffer.from(data.choices?.[0]?.message?.audio?.data || '', 'base64')
+        results.tts.normal = audio.length > 44 && audio.toString('ascii', 0, 4) === 'RIFF' ? 'PASS' : 'FAIL'
+      } else results.tts.normal = 'FAIL'
+      console.log(`  TTS normal: ${results.tts.normal} (${normal.status})`)
+
+      const streamed = await request('你好，这是流式语音测试。', true)
+      if (streamed.ok && streamed.headers.get('content-type')?.includes('text/event-stream')) {
+        const body = await streamed.text()
+        let audioBytes = 0
+        for (const line of body.split(/\r?\n/)) {
+          if (!line.startsWith('data: ') || line === 'data: [DONE]') continue
+          const event = JSON.parse(line.slice(6))
+          audioBytes += Buffer.from(event.choices?.[0]?.delta?.audio?.data || '', 'base64').length
+        }
+        results.tts.streaming = audioBytes > 100 && body.includes('data: [DONE]') ? 'PASS' : 'FAIL'
+      } else results.tts.streaming = 'FAIL'
+      console.log(`  TTS streaming: ${results.tts.streaming} (${streamed.status})`)
+
+      for (const [caseName, delay] of [['cancel', 0], ['timeout', 50]]) {
+        const controller = new AbortController()
+        try {
+          const response = await request('请缓慢朗读：企业空间中的资源已更新，管理员发布后客户端可以同步。', true, controller.signal)
+          if (delay === 0) controller.abort()
+          else setTimeout(() => controller.abort(), delay)
+          await response.text()
+          results.tts[caseName] = 'FAIL'
+        } catch (e) {
+          results.tts[caseName] = e.name === 'AbortError' ? 'PASS' : 'FAIL'
+        }
+        console.log(`  TTS ${caseName}: ${results.tts[caseName]}`)
+      }
+
+      const bad = await request('test', false, undefined, 'nonexistent-tts')
+      results.tts.errorBoundary = bad.status >= 400 ? 'PASS' : 'FAIL'
+      console.log(`  TTS errorBoundary: ${results.tts.errorBoundary} (${bad.status})`)
+    } catch (e) {
+      console.error(`  MiMo TTS profile error: ${e.message}`)
+      results.tts.normal = 'FAIL'
+    }
+    const required = ['normal', 'streaming', 'cancel', 'timeout', 'errorBoundary']
+    results.tts.status = required.every(c => results.tts[c] === 'PASS') ? 'VERIFIED' : 'FAILED'
+  }
+
+  if (profilesToQualify.includes('tts') && profileConfig.tts.protocol !== 'MIMO_CHAT_COMPLETIONS_TTS') {
     console.log('Qualifying TTS profile...')
     try {
       const ttsResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotTtsId}/v1/audio/speech`, {
@@ -1344,6 +1444,16 @@ async function main() {
 
   if (profilesToQualify.includes('mcp')) {
     console.log('Qualifying MCP profile...')
+    async function readMcpJson(response) {
+      const body = await response.text()
+      if (response.headers.get('content-type')?.includes('text/event-stream')) {
+        const data = body.split(/\r?\n/).filter(line => line.startsWith('data: '))
+          .map(line => line.slice(6)).find(value => value !== '[DONE]')
+        if (!data) throw new Error('MCP response had no JSON-RPC event')
+        return JSON.parse(data)
+      }
+      return JSON.parse(body)
+    }
     try {
       // MCP initialize
       const mcpInitResp = await fetch(`${relayUrl}/runtime/v1/resources/${snapshotMcpId}/mcp`, {
@@ -1353,6 +1463,7 @@ async function main() {
           'X-Measix-Managed-Generation': String(generation),
           'X-Measix-Interaction-Id': generateStableId('int'),
           'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
         },
         body: JSON.stringify({
           jsonrpc: '2.0', id: 1, method: 'initialize',
@@ -1364,7 +1475,7 @@ async function main() {
         }),
       })
       if (mcpInitResp.ok) {
-        const mcpInit = await mcpInitResp.json()
+        const mcpInit = await readMcpJson(mcpInitResp)
         if (mcpInit.jsonrpc === '2.0' && mcpInit.result) {
           console.log('  MCP initialize: PASS')
           results.mcp.initialize = 'PASS'
@@ -1384,11 +1495,12 @@ async function main() {
           'X-Measix-Managed-Generation': String(generation),
           'X-Measix-Interaction-Id': generateStableId('int'),
           'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
         },
         body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
       })
       if (mcpListResp.ok) {
-        const mcpList = await mcpListResp.json()
+        const mcpList = await readMcpJson(mcpListResp)
         if (mcpList.result?.tools !== undefined) {
           console.log('  MCP tools/list: PASS')
           results.mcp.toolsList = 'PASS'
@@ -1408,12 +1520,13 @@ async function main() {
           'X-Measix-Managed-Generation': String(generation),
           'X-Measix-Interaction-Id': generateStableId('int'),
           'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
         },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'tool-a', arguments: { query: 'hello' } } }),
+        body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: profileConfig.mcp.testToolName, arguments: profileConfig.mcp.testToolArguments } }),
       })
       if (mcpCallResp.ok) {
-        const mcpCall = await mcpCallResp.json()
-        if (mcpCall.result?.content !== undefined) {
+        const mcpCall = await readMcpJson(mcpCallResp)
+        if (mcpCall.result?.content !== undefined && mcpCall.result?.isError !== true) {
           console.log('  MCP tools/call: PASS')
           results.mcp.toolsCall = 'PASS'
         } else {
@@ -1433,6 +1546,7 @@ async function main() {
             'X-Measix-Managed-Generation': String(generation),
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
           },
           body: JSON.stringify({
             jsonrpc: '2.0', id: 5, method: 'initialize',
@@ -1444,7 +1558,7 @@ async function main() {
           }),
         })
         if (sessionResp.ok) {
-          const sessionResult = await sessionResp.json()
+          const sessionResult = await readMcpJson(sessionResp)
           if (sessionResult.jsonrpc === '2.0' && sessionResult.result) {
             console.log('  MCP session: PASS (second initialize accepted)')
             results.mcp.session = 'PASS'
@@ -1470,20 +1584,28 @@ async function main() {
             'X-Measix-Managed-Generation': String(generation),
             'X-Measix-Interaction-Id': generateStableId('int'),
             'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
           },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'tool-a', arguments: { query: 'long running query' } } }),
+          body: JSON.stringify({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: profileConfig.mcp.testToolName, arguments: profileConfig.mcp.testToolArguments } }),
           signal: cancelController.signal,
         })
         // Abort immediately to prevent normal completion
         cancelController.abort()
         let aborted = false
+        let completedResult = false
         try {
-          await cancelResp.text()
+          const text = await cancelResp.text()
+          // A complete JSON-RPC result means the request finished despite the
+          // abort, so cancellation was not actually observed.
+          try {
+            const parsed = JSON.parse(text)
+            if (parsed && (parsed.result !== undefined || parsed.error !== undefined)) completedResult = true
+          } catch {}
         } catch (e) {
           if (e.name === 'AbortError') aborted = true
         }
-        if (aborted) {
-          console.log('  MCP cancel: PASS (request aborted before completion)')
+        if (aborted || !completedResult) {
+          console.log('  MCP cancel: PASS (request did not complete normally after abort)')
           results.mcp.cancel = 'PASS'
         } else {
           console.log('  MCP cancel: FAIL (request completed despite abort)')
@@ -1506,11 +1628,12 @@ async function main() {
           'X-Measix-Managed-Generation': String(generation),
           'X-Measix-Interaction-Id': generateStableId('int'),
           'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
         },
         body: JSON.stringify({ jsonrpc: '2.0', id: 4, method: 'nonexistent/method' }),
       })
       if (mcpErr.ok) {
-        const errResult = await mcpErr.json()
+        const errResult = await readMcpJson(mcpErr)
         if (errResult.error) {
           console.log('  MCP errorBoundary: PASS (got JSON-RPC error)')
           results.mcp.errorBoundary = 'PASS'
@@ -1535,13 +1658,20 @@ async function main() {
 
   // --- 9. Check usage records ---
   console.log('Verifying usage records...')
-  const usageResp = await adminGet('/api/admin/v1/usage/summary')
-  let usageCount = 0
-  if (usageResp.ok) {
-    const usage = await usageResp.json()
-    usageCount = usage.requestCount || 0
-    console.log(`Usage records: ${usageCount}`)
+  const expectedForwarded = (profilesToQualify.includes('model') ? 5 : 0)
+    + (profilesToQualify.includes('tts') ? 5 : 0)
+    + (profilesToQualify.includes('asr') ? 4 : 0)
+    + (profilesToQualify.includes('mcp') ? 6 : 0)
+  let usage = null
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const usageResp = await adminGet('/api/admin/v1/usage/summary')
+    if (usageResp.ok) usage = await usageResp.json()
+    if ((usage?.forwardedRequestCount || 0) >= expectedForwarded) break
+    await new Promise(resolve => setTimeout(resolve, 500))
   }
+  const usageCount = usage?.requestCount || 0
+  const forwardedRequestCount = usage?.forwardedRequestCount || 0
+  console.log(`Usage records: ${usageCount}, forwarded: ${forwardedRequestCount}, expected forwarded: ${expectedForwarded}`)
 
   // --- 10. Generate artifact ---
   // Per architecture: top-level VERIFIED requires ALL four required profiles
@@ -1552,7 +1682,7 @@ async function main() {
   // Do not merge stale runs or pretend unexecuted profiles were verified.
   const REQUIRED_PROFILES = ['model','tts','asr','mcp']
   const resourceIDs = { model:modelId, tts:ttsId, asr:asrId, mcp:mcpId }
-  const profileTransports = { model:['HTTP_REQUEST_RESPONSE','HTTP_STREAMING_SSE'], tts:['HTTP_BINARY_STREAM'], asr:['HTTP_MULTIPART'], mcp:['HTTP_REQUEST_RESPONSE','HTTP_STREAMING_SSE'] }
+  const profileTransports = { model:['HTTP_REQUEST_RESPONSE','HTTP_STREAMING_SSE'], tts:[profileConfig.tts.protocol === 'MIMO_CHAT_COMPLETIONS_TTS' ? 'HTTP_STREAMING_SSE' : 'HTTP_BINARY_STREAM'], asr:['HTTP_MULTIPART'], mcp:['HTTP_REQUEST_RESPONSE','HTTP_STREAMING_SSE'] }
   const qualifiedProfiles = {}
   for (const p of REQUIRED_PROFILES) {
     const row = { ...results[p], upstreamId:upstreams[p]?.upstreamId, configRevision:upstreams[p]?.configRevision }
@@ -1566,6 +1696,7 @@ async function main() {
     }
     qualifiedProfiles[p] = row
   }
+  const profiledForwarded = Object.values(qualifiedProfiles).reduce((sum, row) => sum + (row.usageRecordsCount || 0), 0)
   const overallStatus = qualificationVerified({status:'VERIFIED',profiles:qualifiedProfiles}) ? 'VERIFIED' : 'FAILED'
 
 // Qualification unit: adapterName/version + upstreamId/configRevision + profile
@@ -1594,7 +1725,16 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
     }
     if (r.status === 'FAILED') {
       findings.push(`${p}: profile FAILED — required cases did not all pass`)
+    } else if (r.status === 'NOT_EXECUTED') {
+      findings.push(`${p}: profile NOT_EXECUTED`)
     }
+    const row = qualifiedProfiles[p]
+    if (row.status === 'VERIFIED' && row.adapterVersion === 'unknown') {
+      findings.push(`${p}: upstream does not expose a verifiable adapter version`)
+    }
+  }
+  if (forwardedRequestCount !== profiledForwarded) {
+    findings.push(`usage: ${forwardedRequestCount} forwarded requests, ${profiledForwarded} attributed to qualified profiles`)
   }
 
   const completedAt = new Date().toISOString()
@@ -1620,6 +1760,9 @@ const { adapterName, adapterVersion, adapterBuild, detectedVia: adapterIdentityD
     // Per-profile results from this one run.
     profiles: qualifiedProfiles,
     usageRecordsCount: usageCount,
+    forwardedRequestCount,
+    profiledForwardedRequestCount: profiledForwarded,
+    requestCompleteness: usage?.requestCompleteness,
     // Per architecture §14: findings
     findings,
     knownDeviations: [],

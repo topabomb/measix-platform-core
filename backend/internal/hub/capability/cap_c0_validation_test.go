@@ -108,7 +108,7 @@ func TestCAPC0006MCPAuthOwnershipValidation(t *testing.T) {
 	}}
 	content.Bindings = append(content.Bindings, adminapi.RuntimeBindingDefinition{
 		RuntimeRouteId: platformid.New(platformid.Route), ResourceId: mcpID, UpstreamId: up.UpstreamID,
-		AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/mcp"}, TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE,
+		AllowedMethods: []string{"POST", "GET", "DELETE"}, AllowedPathPrefixes: []string{"/mcp"}, TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE,
 	})
 	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	if err != nil {

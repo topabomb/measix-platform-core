@@ -274,7 +274,7 @@ S0 明确不提前引入：
 - generic quota engine；
 - 自研生产 process manager、通用 scheduler 或独立日志采集 daemon；
 - broad provider-native matrix；
-- Runtime WebSocket skeleton；
+- 实时 ASR 之外的通用 WebSocket 业务框架；
 - Gateway write/destructive tool、HA、必选 vector/Router LLM 或通用 Connector skeleton；
 - 空的 future navigation/module/package。
 

@@ -44,11 +44,13 @@ S0.2 Exit 后，S0.3 先完成 Enterprise Tool Gateway 服务端闭环；S0.4 �
 
 S0.2 最小产品场景要求一个可用的 Managed Chat Model。S0.1 已定义的 Provider/Model/TTS/ASR 继续保留在 Snapshot v4；TTS/ASR 的完整 Android execution Exit 属于 S0.4。
 
+最小场景不是运行能力上限。当前 Control Protocol 已定义的模型、TTS、ASR 和 Direct MCP 可以随真实平台 source 一并适配、逐项验证；无需等待 S0.3，也不能为满足“最小场景”而丢弃已发布的其他资源。正式阶段 Gate 与提前联调的区别见 Foundation Contract §3。
+
 ### 3.2 B — Enterprise Capability foundation
 
 S0.2 以 Enterprise Update Feed + Portal 列表/详情交付第一个 B 类用户能力，但不在 Hub 内建立一次性 MCP projection。Control Hub 持有 Enterprise Update authority、Client/Portal Feed 和未来 Gateway 使用的 private typed read semantics。
 
-`get_enterprise_updates` 的模型工具暴露、`discover_tools` / `invoke_tool` 和第三个 daemon 均属于 S0.3。S0.2 不再宣称模型工具调用闭环，也不为过渡期保留 Hub MCP initialize/tools/list/tools/call 旁路。
+`get_enterprise_updates` 的模型工具暴露、`discover_tools` / `invoke_tool` 和第三个 daemon 均属于 S0.3。S0.2 不宣称企业动态的模型工具调用闭环，也不为过渡期保留 Hub MCP initialize/tools/list/tools/call 旁路。已发布 Direct Managed MCP 的助手绑定和工具调用沿用现行基线，不依赖 Gateway。
 
 ### 3.3 C — Experience Asset
 
@@ -124,7 +126,7 @@ S0.2 不下发 Android `Assistant` 的完整 Local schema。以下内容不进�
 
 平台 Definition 到客户端运行配置的适配不得扩大企业配置权限。memorySeed 以原助手 ID、generation 和原数组顺序保持身份；实现为显示或索引派生的内部标识不能写入平台 wire，不能转成可编辑运行记忆。配置替换更新 Seed，不覆盖本主体的运行记忆。
 
-S0.2 未下发企业子助手关系；客户端本地示例中的固定子助手扩展不自动变成平台定义，真实来源不得从同名本地助手补入关系。获准用户子助手仍按用户定义与本域授权执行。policy 仅提供 Control Protocol 已定义的默认资源，客户端其他角色选择归本域偏好或既有解析规则；显式失效引用不得按目录第一项或名称静默替换。Starter 选择沿原生 Draft 协议预填并等待用户发送，不增加网页聊天写权限。
+S0.2 未下发企业子助手关系；客户端本地示例中的固定子助手扩展不自动变成平台定义，真实来源不得从同名本地助手补入关系。获准用户子助手仍按用户定义与本域授权执行。policy 提供 Control Protocol 已定义的默认资源和 `defaultAssistantId`；首次企业会话在无本地选择时使用这个显式助手，其他角色选择归本域偏好或既有解析规则。显式失效引用不得按目录第一项或名称静默替换。没有默认助手时，空间页保持可进入并提供助手选择入口。Starter 选择沿原生 Draft 协议预填并等待用户发送，不增加网页聊天写权限。
 
 ### 4.2 AssistantStarterDefinition
 

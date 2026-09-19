@@ -25,16 +25,13 @@ type handler struct {
 	relaycontrolapi.Unimplemented
 	store        *Store
 	serviceToken string
+	buildVersion string
 	spoolStatus  SpoolStatusProvider
 }
 
-func NewHandler(store *Store, serviceToken string) http.Handler {
-	return NewHandlerWithSpoolStatus(store, serviceToken, nil)
-}
-
-func NewHandlerWithSpoolStatus(store *Store, serviceToken string, statusProvider SpoolStatusProvider) http.Handler {
+func NewHandler(store *Store, serviceToken, buildVersion string, statusProvider SpoolStatusProvider) http.Handler {
 	router := chi.NewRouter()
-	relaycontrolapi.HandlerFromMux(&handler{store: store, serviceToken: serviceToken, spoolStatus: statusProvider}, router)
+	relaycontrolapi.HandlerFromMux(&handler{store: store, serviceToken: serviceToken, buildVersion: buildVersion, spoolStatus: statusProvider}, router)
 	return router
 }
 
@@ -69,6 +66,7 @@ func (h *handler) GetControlStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := h.store.Status()
+	status.BuildVersion = h.buildVersion
 	if h.spoolStatus != nil {
 		extra, err := h.spoolStatus(r.Context())
 		if err != nil {

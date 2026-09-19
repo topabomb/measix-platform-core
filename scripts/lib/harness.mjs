@@ -12,7 +12,7 @@
  */
 import { createHash, randomFillSync } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, resolve, relative, extname } from 'node:path'
+import { join, resolve, relative, extname, sep } from 'node:path'
 import { execFileSync, spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
@@ -100,15 +100,22 @@ export function adminBuildHash(root) {
  * @returns {string} 'sha256:...'
  */
 export function deterministicAdapterVersion(root) {
-  const ADAPTER_SOURCE = join(root, 'backend', 'test', 'system', 'adapter', 'adapter.go')
-  const ADAPTER_TEST = join(root, 'backend', 'test', 'system', 'adapter', 'adapter_test.go')
-  const CLIENT_SOURCE = join(root, 'backend', 'test', 'system', 'client', 'client.go')
+  const files = []
+  for (const directory of ['backend/test/system/adapter', 'backend/test/system/client']) {
+    files.push(...collectFiles(join(root, directory)))
+  }
+  // Both browser harnesses and Go scenarios contribute to the deterministic peer.
+  for (const path of ['scripts/_server-worker.mjs', 'scripts/lib/harness.mjs']) {
+    const file = join(root, path)
+    if (existsSync(file)) files.push(file)
+  }
   const hash = createHash('sha256')
-  if (existsSync(ADAPTER_SOURCE)) hash.update(readFileSync(ADAPTER_SOURCE).toString('utf-8').replace(/\r\n/g, '\n'))
-  hash.update('\0')
-  if (existsSync(ADAPTER_TEST)) hash.update(readFileSync(ADAPTER_TEST).toString('utf-8').replace(/\r\n/g, '\n'))
-  hash.update('\0')
-  if (existsSync(CLIENT_SOURCE)) hash.update(readFileSync(CLIENT_SOURCE).toString('utf-8').replace(/\r\n/g, '\n'))
+  for (const file of files.sort()) {
+    hash.update(relative(root, file).replace(/\\/g, '/'))
+    hash.update('\0')
+    hash.update(readFileSync(file).toString('utf-8').replace(/\r\n/g, '\n'))
+    hash.update('\0')
+  }
   return 'sha256:' + hash.digest('hex')
 }
 
@@ -277,6 +284,7 @@ export function startHubAndRelay(env, opts = {}) {
   const hubProc = spawn(env.hubBin, [
     'run',
     '--listen', `127.0.0.1:${env.hubPort}`,
+    '--public-origin', opts.publicOrigin || process.env.HUB_PUBLIC_ORIGIN || env.hubBaseURL,
     '--internal-listen', `127.0.0.1:${env.hubInternalPort}`,
     '--db', env.hubDB,
     '--master-key-file', env.masterKeyFile,
@@ -312,25 +320,44 @@ export function startHubAndRelay(env, opts = {}) {
  * @param {boolean} keep - if true, don't clean up
  * @param {function} [log] - optional log function
  */
+/**
+ * Resolve a request-supplied relative path inside a root directory.
+ * Returns null when the result escapes the root, so a traversal attempt is
+ * never served even if normalization upstream changes.
+ */
+export function resolveWithin(root, relativePath) {
+  const resolvedRoot = resolve(root)
+  const target = resolve(resolvedRoot, relativePath)
+  if (target !== resolvedRoot && !target.startsWith(resolvedRoot + sep)) return null
+  return target
+}
+
+/**
+ * Tear down a temporary environment. This is deliberately synchronous: the
+ * previous implementation deferred the forced kill and directory removal to a
+ * 3s timer, which is discarded whenever a harness calls process.exit() on the
+ * failure path — leaking child processes and temp directories. Callers that
+ * want evidence written must write it before teardown.
+ */
 export function cleanupEnvironment(processes, servers, envRoot, keep, log = null) {
   if (keep) {
     if (log) log(`Keeping temp dir: ${envRoot}`)
     return
   }
-  for (const p of processes) {
-    try { p.kill('SIGTERM') } catch {}
-  }
   for (const s of servers) {
     try { s.close() } catch {}
   }
-  setTimeout(() => {
-    for (const p of processes) {
-      try { p.kill('SIGKILL') } catch {}
-    }
-    if (envRoot) {
-      try { rmSync(envRoot, { recursive: true, force: true }) } catch {}
-    }
-  }, 3000)
+  for (const p of processes) {
+    try { p.kill('SIGTERM') } catch {}
+  }
+  // Escalate immediately rather than scheduling it: a scheduled kill never runs
+  // once the process is exiting.
+  for (const p of processes) {
+    try { p.kill('SIGKILL') } catch {}
+  }
+  if (envRoot) {
+    try { rmSync(envRoot, { recursive: true, force: true }) } catch {}
+  }
 }
 
 // --- Deterministic Adapter (Node HTTP server) ---
@@ -374,6 +401,7 @@ export function startDeterministicAdapter(port) {
             `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}`,
             `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"hel"}}]}`,
             `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"lo"}}]}`,
+            `data: {"id":"1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
             `data: [DONE]`,
           ]
           for (const c of chunks) {
@@ -408,12 +436,24 @@ export function startDeterministicAdapter(port) {
       }
 
       if (path === '/mcp') {
+        if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
+        if (bodyJSON?.jsonrpc !== '2.0' || typeof bodyJSON.method !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } }))
+          return
+        }
+        if (!Object.hasOwn(bodyJSON, 'id')) { res.writeHead(202); res.end(); return }
+        const result = bodyJSON.method === 'initialize'
+          ? { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'measix-test-adapter', version: '1.0.0' } }
+          : bodyJSON.method === 'tools/list'
+            ? { tools: [{ name: 'tool-a', inputSchema: { type: 'object' } }] }
+            : bodyJSON.method === 'tools/call'
+              ? { content: [{ type: 'text', text: 'tool-a executed' }] }
+              : null
         res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          result: { tools: [{ name: 'tool-a' }] },
-        }))
+        res.end(JSON.stringify(result === null
+          ? { jsonrpc: '2.0', id: bodyJSON.id, error: { code: -32601, message: 'Method not found' } }
+          : { jsonrpc: '2.0', id: bodyJSON.id, result }))
         return
       }
 
@@ -492,8 +532,8 @@ export function startSpaProxy(port, spaDir, hubPort) {
       let filePath = path.replace(/^\/admin\/?/, '')
       if (!filePath) filePath = 'index.html'
 
-      const full = join(spaDir, filePath)
-      if (existsSync(full) && statSync(full).isFile()) {
+      const full = resolveWithin(spaDir, filePath)
+      if (full && existsSync(full) && statSync(full).isFile()) {
         serveStaticFile(res, full, filePath)
         return
       }

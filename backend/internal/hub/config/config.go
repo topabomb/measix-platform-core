@@ -10,7 +10,7 @@ import (
 )
 
 type Config struct {
-	PortalOrigin          string
+	PublicOrigin          string
 	PortalAssetsDir       string
 	AdminAssetsDir        string
 	ListenAddr            string
@@ -35,7 +35,7 @@ func Load(args []string) (Config, error) {
 		return Config{}, err
 	}
 	cfg := Config{
-		PortalOrigin:          env("HUB_PORTAL_ORIGIN", ""),
+		PublicOrigin:          env("HUB_PUBLIC_ORIGIN", ""),
 		PortalAssetsDir:       env("HUB_PORTAL_ASSETS_DIR", ""),
 		AdminAssetsDir:        env("HUB_ADMIN_ASSETS_DIR", ""),
 		ListenAddr:            env("HUB_LISTEN_ADDR", ":8080"),
@@ -49,7 +49,7 @@ func Load(args []string) (Config, error) {
 		ReconcileInterval:     reconcileInterval,
 	}
 	fs.StringVar(&cfg.AdminAssetsDir, "admin-assets-dir", cfg.AdminAssetsDir, "built Admin SPA directory (contains index.html)")
-	fs.StringVar(&cfg.PortalOrigin, "portal-origin", cfg.PortalOrigin, "approved Portal platform origin (HTTPS; HTTP only for loopback development)")
+	fs.StringVar(&cfg.PublicOrigin, "public-origin", cfg.PublicOrigin, "public platform origin (HTTP or HTTPS, IP or domain)")
 	fs.StringVar(&cfg.PortalAssetsDir, "portal-assets-dir", cfg.PortalAssetsDir, "built Enterprise Portal SPA directory")
 	fs.StringVar(&cfg.ListenAddr, "listen", cfg.ListenAddr, "public listen address")
 	fs.StringVar(&cfg.InternalListenAddr, "internal-listen", cfg.InternalListenAddr, "internal (private) listen address for Relay→Hub service APIs")
@@ -75,8 +75,8 @@ func Load(args []string) (Config, error) {
 	if cfg.AccessTokenTTL <= 0 || cfg.AccessTokenTTL > 10*time.Minute || cfg.ReconcileInterval <= 0 {
 		return Config{}, errors.New("invalid hub TTL/reconcile configuration")
 	}
-	if (cfg.PortalOrigin != "" && identity.ValidatePortalOrigin(cfg.PortalOrigin) != nil) || (cfg.PortalAssetsDir != "" && cfg.PortalOrigin == "") {
-		return Config{}, errors.New("invalid Portal origin/assets configuration")
+	if (cfg.PublicOrigin != "" && identity.ValidatePublicOrigin(cfg.PublicOrigin) != nil) || (cfg.PortalAssetsDir != "" && cfg.PublicOrigin == "") {
+		return Config{}, errors.New("invalid public origin or missing origin for Portal assets")
 	}
 	return cfg, nil
 }

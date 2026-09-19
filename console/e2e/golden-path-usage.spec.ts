@@ -47,6 +47,10 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     // Timeout is longer because usage ingestion may be delayed.
     const usageRows = page.locator('[data-cy="usage-row"]')
     await expect(usageRows.first()).toBeVisible({ timeout: 30_000 })
+    // This adapter emits no semantic meters: every recorded request is UNKNOWN.
+    const completeness = page.locator('[data-cy="request-completeness"]')
+    const unknownText = await completeness.locator('.q-chip').last().innerText()
+    expect(Number.parseInt(unknownText, 10)).toBeGreaterThanOrEqual(4)
 
     // Verify multiple resource kinds are represented.
     const allRowTexts: string[] = []
@@ -70,24 +74,41 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     const detailPanel = page.locator('[data-cy="usage-detail"]')
     await expect(detailPanel).toBeVisible({ timeout: 5_000 })
     const detailText = await detailPanel.textContent()
-    expect(detailText).toMatch(/KNOWN|PARTIAL|UNKNOWN|known|partial|unknown/i)
+    expect(detailText).toMatch(/req_[a-f0-9-]+/)
+    expect(detailText).toMatch(/mdl_|tts_|asr_|mcp_/)
   })
 
   // ========================================================================
   // Phase 10: System verification — CAP-C6-003 runtime/relay health
   // ========================================================================
   await test.step('CAP-C6-003 system closure — verify Hub/Relay health', async () => {
-    await page.goto('/admin/system')
-    await expect(page.locator('[data-cy="system-page"]')).toBeVisible()
-    await expect(page.locator('[data-cy="system-runtime-status"]')).toBeVisible()
+    const pageErrors: string[] = []
+    const recordPageError = (error: Error) => pageErrors.push(error.message)
+    page.on('pageerror', recordPageError)
+    try {
+      await page.goto('/admin/system')
+      await expect(page.locator('[data-cy="system-page"]')).toBeVisible()
+      await expect(page.locator('[data-cy="system-runtime-status"]')).toBeVisible()
 
-    const statusText = await page.locator('[data-cy="system-runtime-status"]').textContent()
-    expect(statusText).toMatch(/READY|DEGRADED|NOT_READY/i)
+      const statusText = await page.locator('[data-cy="system-runtime-status"]').textContent()
+      expect(statusText).toMatch(/READY|DEGRADED|NOT_READY/i)
 
-    const relayStatus = page.locator('[data-cy="system-relay-status"]')
-    await expect(relayStatus).toBeVisible({ timeout: 5_000 })
-    const relayText = await relayStatus.textContent()
-    expect(relayText).toMatch(/READY|DEGRADED|NOT_READY|OFFLINE/i)
+      const relayStatus = page.locator('[data-cy="system-relay-status"]')
+      await expect(relayStatus).toBeVisible({ timeout: 5_000 })
+      await expect(page.locator('[data-cy="relay-build-version"]')).toHaveText('dev')
+      const relayText = await relayStatus.textContent()
+      expect(relayText).toMatch(/READY|DEGRADED|NOT_READY|OFFLINE/i)
+      await expect(page.locator('[data-cy="system-convergence-status"]')).toBeVisible()
+      await expect(page.locator('[data-cy="system-upstream-status"]')).toBeVisible()
+      // The deterministic adapter produces request usage but no semantic meters.
+      // Verify the real Hub ledger count reaches the rendered diagnostics.
+      const unknownCount = page.locator('[data-cy="semantic-unknown-count"]')
+      await expect(unknownCount).toHaveText(/^\d+$/)
+      expect(Number(await unknownCount.textContent())).toBeGreaterThanOrEqual(4)
+      expect(pageErrors).toEqual([])
+    } finally {
+      page.off('pageerror', recordPageError)
+    }
   })
 
   // ========================================================================

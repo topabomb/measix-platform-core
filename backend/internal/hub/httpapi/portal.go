@@ -34,7 +34,7 @@ func (h *fullClientHandler) CreatePortalGrant(w http.ResponseWriter, r *http.Req
 
 func (h *fullClientHandler) portalOriginAllowed(r *http.Request, required bool) bool {
 	origin := r.Header.Get("Origin")
-	return h.identity.PortalOrigin != "" && r.Header.Get("Sec-Fetch-Site") != "cross-site" && ((!required && origin == "") || origin == h.identity.PortalOrigin)
+	return h.identity.PublicOrigin != "" && r.Header.Get("Sec-Fetch-Site") != "cross-site" && ((!required && origin == "") || origin == h.identity.PublicOrigin)
 }
 
 func (h *fullClientHandler) setPortalCookie(w http.ResponseWriter, value string, expiry time.Time) {
@@ -42,7 +42,7 @@ func (h *fullClientHandler) setPortalCookie(w http.ResponseWriter, value string,
 	if value == "" {
 		maxAge = -1
 	}
-	http.SetCookie(w, &http.Cookie{Name: portalCookie, Value: value, Path: "/", Expires: expiry, MaxAge: maxAge, Secure: strings.HasPrefix(h.identity.PortalOrigin, "https://"), HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: portalCookie, Value: value, Path: "/", Expires: expiry, MaxAge: maxAge, Secure: strings.HasPrefix(h.identity.PublicOrigin, "https://"), HttpOnly: true, SameSite: http.SameSiteStrictMode})
 }
 
 func (h *fullClientHandler) ExchangePortalGrant(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,7 @@ func (h *fullClientHandler) ExchangePortalGrant(w http.ResponseWriter, r *http.R
 }
 
 func (h *fullClientHandler) authenticatePortal(w http.ResponseWriter, r *http.Request) (clientapi.PortalSession, bool) {
-	if _, err := r.Cookie(portalCookie); err != nil || h.identity.PortalOrigin == "" {
+	if _, err := r.Cookie(portalCookie); err != nil || h.identity.PublicOrigin == "" {
 		writeProblem(w, 401, "unauthorized", "Unauthorized")
 		return clientapi.PortalSession{}, false
 	}

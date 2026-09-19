@@ -1,4 +1,6 @@
-export type CandidatePrefix = 'prv' | 'mdl' | 'tts' | 'asr' | 'mcp' | 'rte' | 'asd' | 'str'
+import { uid } from 'quasar'
+
+export type CandidatePrefix = 'prv' | 'mdl' | 'tts' | 'asr' | 'mcp' | 'rte' | 'asd' | 'str' | 'prc'
 
 type UnauthorizedHandler = (() => void | Promise<void>) | undefined
 let unauthorizedHandler: UnauthorizedHandler
@@ -31,11 +33,11 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler) {
 }
 
 export function createCandidateId(prefix: CandidatePrefix): string {
-  return `${prefix}_${crypto.randomUUID()}`
+  return `${prefix}_${uid()}`
 }
 
 export function createIdempotencyKey(): string {
-  return `idem_${crypto.randomUUID()}`
+  return `idem_${uid()}`
 }
 
 export function buildCursorQuery(values: Record<string, string | number | boolean | undefined>): string {

@@ -39,7 +39,7 @@ function mountUsagePage() {
             QBtn, QBanner, QSelect, QList, QItem, QItemSection, QItemLabel,
             QChip, QSpinner, QIcon, QToolbarTitle, QBreadcrumbs, QBreadcrumbsEl,
             QBtnDropdown, QTab, QTabs, QSeparator, QMenu, QDialog, QCardActions,
-            QMarkupTable, PageHeader, PricingPanel,
+  QMarkupTable, PageHeader, PricingPanel,
           },
           directives: { ClosePopup },
         }], pinia, router],
@@ -58,6 +58,7 @@ describe('UsagePage', () => {
           from: '2026-08-01T00:00:00Z',
           to: '2026-08-20T00:00:00Z',
           requestCount: 12,
+          requestCompleteness: { exact: 8, partial: 1, unknown: 3 },
           forwardedRequestCount: 10,
           requestBytes: 2048,
           responseBytes: 4096,
@@ -77,13 +78,92 @@ describe('UsagePage', () => {
     expect(text).not.toContain('[object Object]')
   })
 
+  it.each([false, true])('ignores an obsolete filter response (failure=%s)', async (failOld) => {
+    let resolveOld!: (value: unknown) => void
+    let rejectOld!: (reason: Error) => void
+    const oldResponse = new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject })
+    const currentSummary = {
+      requestCount: 1, forwardedRequestCount: 1, requestBytes: 0, responseBytes: 0,
+      requestCompleteness: { exact: 0, partial: 0, unknown: 1 },
+      semanticMeters: [], cost: { status: 'UNKNOWN' },
+    }
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path.includes('resourceKind=MODEL')) return oldResponse
+      if (path.includes('/summary')) return currentSummary
+      return { items: path.includes('resourceKind=TTS') ? [{ requestId: 'new', resourceId: 'tts_new', resourceDisplayName: 'Current speech', forwarded: true, httpStatus: 200 }] : [] }
+    })
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    const kind = wrapper.findAllComponents(QSelect).find(input => input.props('label') === 'Resource kind')!
+    await kind.setValue('MODEL')
+    await kind.setValue('TTS')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Current speech')
+    if (failOld) rejectOld(new Error('Obsolete query failed'))
+    else resolveOld({ ...currentSummary, items: [{ requestId: 'old', resourceDisplayName: 'Obsolete model' }] })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Current speech')
+    expect(wrapper.text()).not.toContain('Obsolete model')
+    expect(wrapper.text()).not.toContain('Obsolete query failed')
+    wrapper.unmount()
+  })
+
+  it('discards pagination from a previous filter after a new query starts', async () => {
+    let resolvePage!: (value: unknown) => void
+    const pendingPage = new Promise(resolve => { resolvePage = resolve })
+    const originalFetch = vi.mocked(client.apiFetch).getMockImplementation()!
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path.includes('/summary')) return originalFetch(path)
+      if (path.includes('cursor=')) return pendingPage
+      if (path.includes('resourceKind=TTS')) return { items: [{ requestId: 'current', resourceId: 'tts_current', resourceDisplayName: 'Filtered speech', forwarded: true, httpStatus: 200 }] }
+      return { items: [], nextCursor: 'older-page' }
+    })
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    await wrapper.get('[data-cy="load-more"]').trigger('click')
+    const kind = wrapper.findAllComponents(QSelect).find(input => input.props('label') === 'Resource kind')!
+    await kind.setValue('TTS')
+    await flushPromises()
+    resolvePage({ items: [{ requestId: 'old', resourceId: 'mdl_old', resourceDisplayName: 'Unfiltered old model' }], nextCursor: 'still-older' })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Filtered speech')
+    expect(wrapper.text()).not.toContain('Unfiltered old model')
+    expect(wrapper.find('[data-cy="load-more"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('uses whole-request completeness from the server instead of counting meter groups', async () => {
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    const counts = wrapper.find('[data-cy="request-completeness"]').text()
+    expect(counts).toContain('8 exact')
+    expect(counts).toContain('1 partial')
+    expect(counts).toContain('3 unknown')
+    wrapper.unmount()
+  })
+
+  it('distinguishes the start and end of the usage time filter', async () => {
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    const labels = wrapper.findAllComponents(QInput).map(input => input.props('label'))
+    expect(labels).toContain('Start time')
+    expect(labels).toContain('End time')
+    const start = wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Start time')!
+    expect(start.props('type')).toBe('datetime-local')
+    await start.setValue('2026-09-18T09:30')
+    await flushPromises()
+    const paths = vi.mocked(client.apiFetch).mock.calls.map(call => call[0]).filter(path => path.includes('/usage/requests'))
+    expect(new URL(paths.at(-1)!, 'http://localhost').searchParams.get('from')).toBe(new Date('2026-09-18T09:30').toISOString())
+    wrapper.unmount()
+  })
+
   it('renders unknown cost status without amount when unknown', async () => {
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z',
           to: '2026-08-20T00:00:00Z',
-          requestCount: 0,
+          requestCount: 0, requestCompleteness: { exact: 0, partial: 0, unknown: 0 },
           forwardedRequestCount: 0,
           requestBytes: 0,
           responseBytes: 0,
@@ -103,16 +183,16 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 4, forwardedRequestCount: 4, requestBytes: 0, responseBytes: 0,
+          requestCount: 4, requestCompleteness: { exact: 0, partial: 0, unknown: 4 }, forwardedRequestCount: 3, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'KNOWN', amount: '0', currency: 'USD' },
         }
       }
       return {
         items: [
-          { requestId: 'req_1', resourceId: 'mdl_aaa', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
+          { requestId: 'req_1', resourceId: 'mdl_aaa', resourceDisplayName: 'Enterprise model', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
           { requestId: 'req_2', resourceId: 'tts_bbb', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
           { requestId: 'req_3', resourceId: 'asr_ccc', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
-          { requestId: 'req_4', resourceId: 'mcp_ddd', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
+          { requestId: 'req_4', resourceId: 'mcp_ddd', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: false, httpStatus: 403, errorClass: 'ROUTE_POLICY_DENIED' },
         ],
         nextCursor: undefined,
       }
@@ -120,10 +200,15 @@ describe('UsagePage', () => {
     const { wrapper } = mountUsagePage()
     await flushPromises()
     const text = wrapper.text()
-    expect(text).toContain('MODEL')
+    expect(text).toContain('Model')
     expect(text).toContain('TTS')
     expect(text).toContain('ASR')
     expect(text).toContain('MCP')
+    expect(text).toContain('Route does not allow this request')
+    const firstRow = wrapper.find('[data-cy="usage-row"]')
+    expect(firstRow.text()).toContain('Enterprise model')
+    expect(firstRow.text()).not.toContain('req_1')
+    expect(firstRow.text()).not.toContain('ups_a')
   })
 
   it('shows error class and duration for a failed request', async () => {
@@ -131,7 +216,7 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 1, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0,
+          requestCount: 1, requestCompleteness: { exact: 0, partial: 0, unknown: 1 }, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'UNKNOWN' },
         }
       }
@@ -154,7 +239,7 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 0, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0,
+          requestCount: 0, requestCompleteness: { exact: 0, partial: 0, unknown: 0 }, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'PARTIAL', amount: '0.0100', currency: 'USD' },
         }
       }
@@ -162,7 +247,7 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
-    expect(wrapper.text()).toContain('PARTIAL')
+    expect(wrapper.text()).toContain('Partial cost')
     expect(wrapper.text()).toContain('0.0100 USD')
   })
 
@@ -189,7 +274,7 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 0, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0,
+          requestCount: 0, requestCompleteness: { exact: 0, partial: 0, unknown: 0 }, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'UNKNOWN' },
         }
       }
@@ -214,7 +299,7 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 0, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0,
+          requestCount: 0, requestCompleteness: { exact: 0, partial: 0, unknown: 0 }, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'UNKNOWN' },
         }
       }
@@ -244,7 +329,7 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 1, forwardedRequestCount: 1, requestBytes: 0, responseBytes: 0,
+          requestCount: 1, requestCompleteness: { exact: 0, partial: 0, unknown: 1 }, forwardedRequestCount: 1, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'UNKNOWN' },
         }
       }
@@ -275,6 +360,7 @@ describe('UsagePage', () => {
     expect(text).toContain('45 ms')
     expect(text).toContain('Desired Revision')
     expect(text).toContain('>5<')
+    expect(document.querySelector('[data-cy="usage-detail"]')?.textContent).not.toContain('Unknown cost')
   })
 
   it('request detail never shows prompt, body or secret content', async () => {
@@ -282,7 +368,7 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 1, forwardedRequestCount: 1, requestBytes: 0, responseBytes: 0,
+          requestCount: 1, requestCompleteness: { exact: 0, partial: 0, unknown: 1 }, forwardedRequestCount: 1, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'UNKNOWN' },
         }
       }
@@ -308,7 +394,7 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 10, forwardedRequestCount: 7, requestBytes: 0, responseBytes: 0,
+          requestCount: 10, requestCompleteness: { exact: 0, partial: 0, unknown: 10 }, forwardedRequestCount: 7, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'UNKNOWN' },
         }
       }
@@ -327,7 +413,7 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 2, forwardedRequestCount: 2, requestBytes: 0, responseBytes: 0,
+          requestCount: 2, requestCompleteness: { exact: 0, partial: 0, unknown: 2 }, forwardedRequestCount: 2, requestBytes: 0, responseBytes: 0,
           semanticMeters: [
             { meter: 'INPUT_TOKENS', quantity: '1000', confidence: 'EXACT' },
             { meter: 'OUTPUT_TOKENS', quantity: '500', confidence: 'PARTIAL' },
@@ -345,9 +431,9 @@ describe('UsagePage', () => {
     expect(text).toContain('1000')
     expect(text).toContain('OUTPUT_TOKENS')
     expect(text).toContain('CHARACTERS')
-    // Completeness summary counts by confidence.
-    expect(text).toContain('1 exact')
-    expect(text).toContain('1 partial')
-    expect(text).toContain('1 unknown')
+    // Three meter groups do not turn two unknown requests into three requests.
+    expect(text).toContain('0 exact')
+    expect(text).toContain('0 partial')
+    expect(text).toContain('2 unknown')
   })
 })

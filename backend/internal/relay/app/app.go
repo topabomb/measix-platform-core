@@ -20,11 +20,7 @@ type App struct {
 	Spool            *metering.Spool
 }
 
-func New(serviceToken string) *App {
-	return NewWithMetering(serviceToken, nil, nil)
-}
-
-func NewWithMetering(serviceToken string, spool *metering.Spool, recorder *metering.Recorder) *App {
+func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *metering.Recorder) *App {
 	h := &health.State{}
 	store := control.NewStore(nil)
 
@@ -57,7 +53,7 @@ func NewWithMetering(serviceToken string, spool *metering.Spool, recorder *meter
 			return control.SpoolStatus{State: state, PendingCount: stats.PendingCount, OldestAgeSeconds: oldest}, nil
 		}
 	}
-	internal.Mount("/", control.NewHandlerWithSpoolStatus(store, serviceToken, statusProvider))
+	internal.Mount("/", control.NewHandler(store, serviceToken, buildVersion, statusProvider))
 
 	return &App{Public: pub, Internal: internal, Health: h, Control: store, Recorder: recorder, Spool: spool}
 }

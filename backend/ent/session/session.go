@@ -37,6 +37,12 @@ const (
 	FieldLastUsedAt = "last_used_at"
 	// FieldRevokedAt holds the string denoting the revoked_at field in the database.
 	FieldRevokedAt = "revoked_at"
+	// FieldAppliedManagedGeneration holds the string denoting the applied_managed_generation field in the database.
+	FieldAppliedManagedGeneration = "applied_managed_generation"
+	// FieldAppliedSnapshotHash holds the string denoting the applied_snapshot_hash field in the database.
+	FieldAppliedSnapshotHash = "applied_snapshot_hash"
+	// FieldAppliedReportedAt holds the string denoting the applied_reported_at field in the database.
+	FieldAppliedReportedAt = "applied_reported_at"
 	// Table holds the table name of the session in the database.
 	Table = "sessions"
 )
@@ -57,6 +63,9 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldLastUsedAt,
 	FieldRevokedAt,
+	FieldAppliedManagedGeneration,
+	FieldAppliedSnapshotHash,
+	FieldAppliedReportedAt,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -125,4 +134,19 @@ func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByRevokedAt orders the results by the revoked_at field.
 func ByRevokedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRevokedAt, opts...).ToFunc()
+}
+
+// ByAppliedManagedGeneration orders the results by the applied_managed_generation field.
+func ByAppliedManagedGeneration(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAppliedManagedGeneration, opts...).ToFunc()
+}
+
+// ByAppliedSnapshotHash orders the results by the applied_snapshot_hash field.
+func ByAppliedSnapshotHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAppliedSnapshotHash, opts...).ToFunc()
+}
+
+// ByAppliedReportedAt orders the results by the applied_reported_at field.
+func ByAppliedReportedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAppliedReportedAt, opts...).ToFunc()
 }

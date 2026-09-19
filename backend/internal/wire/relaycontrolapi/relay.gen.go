@@ -96,6 +96,7 @@ const (
 	HTTPMULTIPART       RuntimeRouteSpecTransportPolicy = "HTTP_MULTIPART"
 	HTTPREQUESTRESPONSE RuntimeRouteSpecTransportPolicy = "HTTP_REQUEST_RESPONSE"
 	HTTPSTREAMINGSSE    RuntimeRouteSpecTransportPolicy = "HTTP_STREAMING_SSE"
+	WEBSOCKET           RuntimeRouteSpecTransportPolicy = "WEBSOCKET"
 )
 
 // Valid indicates whether the value is a known member of the RuntimeRouteSpecTransportPolicy enum.
@@ -108,6 +109,8 @@ func (e RuntimeRouteSpecTransportPolicy) Valid() bool {
 	case HTTPREQUESTRESPONSE:
 		return true
 	case HTTPSTREAMINGSSE:
+		return true
+	case WEBSOCKET:
 		return true
 	default:
 		return false
@@ -172,8 +175,11 @@ type ControlAck struct {
 
 // ControlStatus defines model for ControlStatus.
 type ControlStatus struct {
-	ActiveManagedGeneration int                      `json:"activeManagedGeneration"`
-	AppliedControlRevision  int                      `json:"appliedControlRevision"`
+	ActiveManagedGeneration int `json:"activeManagedGeneration"`
+	AppliedControlRevision  int `json:"appliedControlRevision"`
+
+	// BuildVersion Build identity of the running Relay process; dev for a development build.
+	BuildVersion            string                   `json:"buildVersion"`
 	BundleHash              string                   `json:"bundleHash"`
 	OldestPendingAgeSeconds *int                     `json:"oldestPendingAgeSeconds,omitempty"`
 	Ready                   bool                     `json:"ready"`

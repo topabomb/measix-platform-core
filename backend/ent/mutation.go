@@ -12620,26 +12620,30 @@ func (m *SemanticUsageMutation) ResetEdge(name string) error {
 // SessionMutation represents an operation that mutates the Session nodes in the graph.
 type SessionMutation struct {
 	config
-	op                          Op
-	typ                         string
-	id                          *string
-	user_id                     *string
-	device_id                   *string
-	channel                     *string
-	refresh_digest              *[]byte
-	previous_refresh_digest     *[]byte
-	refresh_request_key         *string
-	refresh_replay_until        *time.Time
-	refresh_response_ciphertext *[]byte
-	expires_at                  *time.Time
-	status                      *string
-	created_at                  *time.Time
-	last_used_at                *time.Time
-	revoked_at                  *time.Time
-	clearedFields               map[string]struct{}
-	done                        bool
-	oldValue                    func(context.Context) (*Session, error)
-	predicates                  []predicate.Session
+	op                            Op
+	typ                           string
+	id                            *string
+	user_id                       *string
+	device_id                     *string
+	channel                       *string
+	refresh_digest                *[]byte
+	previous_refresh_digest       *[]byte
+	refresh_request_key           *string
+	refresh_replay_until          *time.Time
+	refresh_response_ciphertext   *[]byte
+	expires_at                    *time.Time
+	status                        *string
+	created_at                    *time.Time
+	last_used_at                  *time.Time
+	revoked_at                    *time.Time
+	applied_managed_generation    *int64
+	addapplied_managed_generation *int64
+	applied_snapshot_hash         *string
+	applied_reported_at           *time.Time
+	clearedFields                 map[string]struct{}
+	done                          bool
+	oldValue                      func(context.Context) (*Session, error)
+	predicates                    []predicate.Session
 }
 
 var _ ent.Mutation = (*SessionMutation)(nil)
@@ -13318,6 +13322,174 @@ func (m *SessionMutation) ResetRevokedAt() {
 	delete(m.clearedFields, session.FieldRevokedAt)
 }
 
+// SetAppliedManagedGeneration sets the "applied_managed_generation" field.
+func (m *SessionMutation) SetAppliedManagedGeneration(i int64) {
+	m.applied_managed_generation = &i
+	m.addapplied_managed_generation = nil
+}
+
+// AppliedManagedGeneration returns the value of the "applied_managed_generation" field in the mutation.
+func (m *SessionMutation) AppliedManagedGeneration() (r int64, exists bool) {
+	v := m.applied_managed_generation
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAppliedManagedGeneration returns the old "applied_managed_generation" field's value of the Session entity.
+// If the Session object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SessionMutation) OldAppliedManagedGeneration(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAppliedManagedGeneration is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAppliedManagedGeneration requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAppliedManagedGeneration: %w", err)
+	}
+	return oldValue.AppliedManagedGeneration, nil
+}
+
+// AddAppliedManagedGeneration adds i to the "applied_managed_generation" field.
+func (m *SessionMutation) AddAppliedManagedGeneration(i int64) {
+	if m.addapplied_managed_generation != nil {
+		*m.addapplied_managed_generation += i
+	} else {
+		m.addapplied_managed_generation = &i
+	}
+}
+
+// AddedAppliedManagedGeneration returns the value that was added to the "applied_managed_generation" field in this mutation.
+func (m *SessionMutation) AddedAppliedManagedGeneration() (r int64, exists bool) {
+	v := m.addapplied_managed_generation
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearAppliedManagedGeneration clears the value of the "applied_managed_generation" field.
+func (m *SessionMutation) ClearAppliedManagedGeneration() {
+	m.applied_managed_generation = nil
+	m.addapplied_managed_generation = nil
+	m.clearedFields[session.FieldAppliedManagedGeneration] = struct{}{}
+}
+
+// AppliedManagedGenerationCleared returns if the "applied_managed_generation" field was cleared in this mutation.
+func (m *SessionMutation) AppliedManagedGenerationCleared() bool {
+	_, ok := m.clearedFields[session.FieldAppliedManagedGeneration]
+	return ok
+}
+
+// ResetAppliedManagedGeneration resets all changes to the "applied_managed_generation" field.
+func (m *SessionMutation) ResetAppliedManagedGeneration() {
+	m.applied_managed_generation = nil
+	m.addapplied_managed_generation = nil
+	delete(m.clearedFields, session.FieldAppliedManagedGeneration)
+}
+
+// SetAppliedSnapshotHash sets the "applied_snapshot_hash" field.
+func (m *SessionMutation) SetAppliedSnapshotHash(s string) {
+	m.applied_snapshot_hash = &s
+}
+
+// AppliedSnapshotHash returns the value of the "applied_snapshot_hash" field in the mutation.
+func (m *SessionMutation) AppliedSnapshotHash() (r string, exists bool) {
+	v := m.applied_snapshot_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAppliedSnapshotHash returns the old "applied_snapshot_hash" field's value of the Session entity.
+// If the Session object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SessionMutation) OldAppliedSnapshotHash(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAppliedSnapshotHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAppliedSnapshotHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAppliedSnapshotHash: %w", err)
+	}
+	return oldValue.AppliedSnapshotHash, nil
+}
+
+// ClearAppliedSnapshotHash clears the value of the "applied_snapshot_hash" field.
+func (m *SessionMutation) ClearAppliedSnapshotHash() {
+	m.applied_snapshot_hash = nil
+	m.clearedFields[session.FieldAppliedSnapshotHash] = struct{}{}
+}
+
+// AppliedSnapshotHashCleared returns if the "applied_snapshot_hash" field was cleared in this mutation.
+func (m *SessionMutation) AppliedSnapshotHashCleared() bool {
+	_, ok := m.clearedFields[session.FieldAppliedSnapshotHash]
+	return ok
+}
+
+// ResetAppliedSnapshotHash resets all changes to the "applied_snapshot_hash" field.
+func (m *SessionMutation) ResetAppliedSnapshotHash() {
+	m.applied_snapshot_hash = nil
+	delete(m.clearedFields, session.FieldAppliedSnapshotHash)
+}
+
+// SetAppliedReportedAt sets the "applied_reported_at" field.
+func (m *SessionMutation) SetAppliedReportedAt(t time.Time) {
+	m.applied_reported_at = &t
+}
+
+// AppliedReportedAt returns the value of the "applied_reported_at" field in the mutation.
+func (m *SessionMutation) AppliedReportedAt() (r time.Time, exists bool) {
+	v := m.applied_reported_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAppliedReportedAt returns the old "applied_reported_at" field's value of the Session entity.
+// If the Session object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SessionMutation) OldAppliedReportedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAppliedReportedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAppliedReportedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAppliedReportedAt: %w", err)
+	}
+	return oldValue.AppliedReportedAt, nil
+}
+
+// ClearAppliedReportedAt clears the value of the "applied_reported_at" field.
+func (m *SessionMutation) ClearAppliedReportedAt() {
+	m.applied_reported_at = nil
+	m.clearedFields[session.FieldAppliedReportedAt] = struct{}{}
+}
+
+// AppliedReportedAtCleared returns if the "applied_reported_at" field was cleared in this mutation.
+func (m *SessionMutation) AppliedReportedAtCleared() bool {
+	_, ok := m.clearedFields[session.FieldAppliedReportedAt]
+	return ok
+}
+
+// ResetAppliedReportedAt resets all changes to the "applied_reported_at" field.
+func (m *SessionMutation) ResetAppliedReportedAt() {
+	m.applied_reported_at = nil
+	delete(m.clearedFields, session.FieldAppliedReportedAt)
+}
+
 // Where appends a list predicates to the SessionMutation builder.
 func (m *SessionMutation) Where(ps ...predicate.Session) {
 	m.predicates = append(m.predicates, ps...)
@@ -13352,7 +13524,7 @@ func (m *SessionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SessionMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 16)
 	if m.user_id != nil {
 		fields = append(fields, session.FieldUserID)
 	}
@@ -13392,6 +13564,15 @@ func (m *SessionMutation) Fields() []string {
 	if m.revoked_at != nil {
 		fields = append(fields, session.FieldRevokedAt)
 	}
+	if m.applied_managed_generation != nil {
+		fields = append(fields, session.FieldAppliedManagedGeneration)
+	}
+	if m.applied_snapshot_hash != nil {
+		fields = append(fields, session.FieldAppliedSnapshotHash)
+	}
+	if m.applied_reported_at != nil {
+		fields = append(fields, session.FieldAppliedReportedAt)
+	}
 	return fields
 }
 
@@ -13426,6 +13607,12 @@ func (m *SessionMutation) Field(name string) (ent.Value, bool) {
 		return m.LastUsedAt()
 	case session.FieldRevokedAt:
 		return m.RevokedAt()
+	case session.FieldAppliedManagedGeneration:
+		return m.AppliedManagedGeneration()
+	case session.FieldAppliedSnapshotHash:
+		return m.AppliedSnapshotHash()
+	case session.FieldAppliedReportedAt:
+		return m.AppliedReportedAt()
 	}
 	return nil, false
 }
@@ -13461,6 +13648,12 @@ func (m *SessionMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldLastUsedAt(ctx)
 	case session.FieldRevokedAt:
 		return m.OldRevokedAt(ctx)
+	case session.FieldAppliedManagedGeneration:
+		return m.OldAppliedManagedGeneration(ctx)
+	case session.FieldAppliedSnapshotHash:
+		return m.OldAppliedSnapshotHash(ctx)
+	case session.FieldAppliedReportedAt:
+		return m.OldAppliedReportedAt(ctx)
 	}
 	return nil, fmt.Errorf("unknown Session field %s", name)
 }
@@ -13561,6 +13754,27 @@ func (m *SessionMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRevokedAt(v)
 		return nil
+	case session.FieldAppliedManagedGeneration:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAppliedManagedGeneration(v)
+		return nil
+	case session.FieldAppliedSnapshotHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAppliedSnapshotHash(v)
+		return nil
+	case session.FieldAppliedReportedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAppliedReportedAt(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Session field %s", name)
 }
@@ -13568,13 +13782,21 @@ func (m *SessionMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *SessionMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addapplied_managed_generation != nil {
+		fields = append(fields, session.FieldAppliedManagedGeneration)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *SessionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case session.FieldAppliedManagedGeneration:
+		return m.AddedAppliedManagedGeneration()
+	}
 	return nil, false
 }
 
@@ -13583,6 +13805,13 @@ func (m *SessionMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *SessionMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case session.FieldAppliedManagedGeneration:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAppliedManagedGeneration(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Session numeric field %s", name)
 }
@@ -13614,6 +13843,15 @@ func (m *SessionMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(session.FieldRevokedAt) {
 		fields = append(fields, session.FieldRevokedAt)
+	}
+	if m.FieldCleared(session.FieldAppliedManagedGeneration) {
+		fields = append(fields, session.FieldAppliedManagedGeneration)
+	}
+	if m.FieldCleared(session.FieldAppliedSnapshotHash) {
+		fields = append(fields, session.FieldAppliedSnapshotHash)
+	}
+	if m.FieldCleared(session.FieldAppliedReportedAt) {
+		fields = append(fields, session.FieldAppliedReportedAt)
 	}
 	return fields
 }
@@ -13652,6 +13890,15 @@ func (m *SessionMutation) ClearField(name string) error {
 		return nil
 	case session.FieldRevokedAt:
 		m.ClearRevokedAt()
+		return nil
+	case session.FieldAppliedManagedGeneration:
+		m.ClearAppliedManagedGeneration()
+		return nil
+	case session.FieldAppliedSnapshotHash:
+		m.ClearAppliedSnapshotHash()
+		return nil
+	case session.FieldAppliedReportedAt:
+		m.ClearAppliedReportedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown Session nullable field %s", name)
@@ -13699,6 +13946,15 @@ func (m *SessionMutation) ResetField(name string) error {
 		return nil
 	case session.FieldRevokedAt:
 		m.ResetRevokedAt()
+		return nil
+	case session.FieldAppliedManagedGeneration:
+		m.ResetAppliedManagedGeneration()
+		return nil
+	case session.FieldAppliedSnapshotHash:
+		m.ResetAppliedSnapshotHash()
+		return nil
+	case session.FieldAppliedReportedAt:
+		m.ResetAppliedReportedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown Session field %s", name)

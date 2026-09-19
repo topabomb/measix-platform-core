@@ -30,6 +30,28 @@ func (h *fullAdminHandler) CreateSecret(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusCreated, adminapi.Secret{SecretId: view.SecretID, Name: view.Name, SecretVersion: view.SecretVersion})
 }
 
+func (h *fullAdminHandler) ListSecrets(w http.ResponseWriter, r *http.Request, params adminapi.ListSecretsParams) {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	limit, after, valid := pageParams(w, r, params.Limit, params.Cursor)
+	if !valid {
+		return
+	}
+	rows, err := h.services.Upstream.ListSecrets(r.Context(), limit+1, after)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	rows, next := pageResult(r, rows, limit, func(v upstream.SecretView) string { return v.SecretID })
+	items := make([]adminapi.Secret, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, adminapi.Secret{SecretId: row.SecretID, Name: row.Name, SecretVersion: row.SecretVersion})
+	}
+	writeJSON(w, http.StatusOK, adminapi.SecretPage{Items: items, NextCursor: next})
+}
+
 func (h *fullAdminHandler) ReplaceSecret(w http.ResponseWriter, r *http.Request, secretID adminapi.SecretId, params adminapi.ReplaceSecretParams) {
 	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
 	if err != nil {
@@ -162,18 +184,15 @@ func (h *fullAdminHandler) TestUpstream(w http.ResponseWriter, r *http.Request, 
 	}
 	response, err := http.DefaultClient.Do(request)
 	latency := int(time.Since(started).Milliseconds())
-	result := adminapi.UpstreamTestResult{Reachable: err == nil, LatencyMs: &latency, VerifiedCapabilities: []string{}, Warnings: []string{}}
+	result := adminapi.UpstreamTestResult{Reachable: err == nil, LatencyMs: &latency, Warnings: []string{}}
 	if response != nil {
 		_ = response.Body.Close()
+		result.HttpStatus = &response.StatusCode
 		if response.StatusCode >= 500 {
 			result.Warnings = append(result.Warnings, "upstream_http_5xx")
 		}
 	}
-	if err == nil {
-		for _, tc := range view.Config.TransportCapabilities {
-			result.VerifiedCapabilities = append(result.VerifiedCapabilities, string(tc))
-		}
-	} else {
+	if err != nil {
 		result.Warnings = append(result.Warnings, "upstream_unreachable")
 	}
 	writeJSON(w, http.StatusOK, result)

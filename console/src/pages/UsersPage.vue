@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { copyToClipboard } from 'quasar'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import { encodeEnrollmentMaterial } from '../api/enrollment'
@@ -44,6 +45,7 @@ const detailOpen = ref(false)
 const enrollmentOpen = ref(false)
 const enrollment = ref<Enrollment>()
 const enrollmentMaterial = ref('')
+const enrollmentCopied = ref(false)
 const createForm = ref({ username: '', displayName: '', role: 'MEMBER' as 'ADMIN' | 'MEMBER' })
 const canMutate = computed(() => Boolean(session.csrfToken))
 
@@ -86,6 +88,7 @@ async function openUser(user: User) {
 }
 
 function clearEnrollment() {
+  enrollmentCopied.value = false
   enrollment.value = undefined
   enrollmentMaterial.value = ''
 }
@@ -111,7 +114,7 @@ async function createEnrollment() {
       method: 'POST', body: JSON.stringify({ expiresInSeconds: 600 }),
     }, session.csrfToken)
     // Loopback HTTP is supported for isolated local deployments; other origins require HTTPS.
-    enrollmentMaterial.value = encodeEnrollmentMaterial(window.location.origin, grant, true)
+    enrollmentMaterial.value = encodeEnrollmentMaterial(grant.platformUrl, grant)
     enrollment.value = grant
     enrollmentOpen.value = true
   } catch (cause) {
@@ -151,7 +154,12 @@ async function revokeDevice(device: Device) {
 
 async function copyEnrollment() {
   if (!enrollmentMaterial.value) return
-  try { await navigator.clipboard.writeText(enrollmentMaterial.value) } catch (cause) { error.value = cause }
+  const material = enrollmentMaterial.value
+  enrollmentCopied.value = false
+  try {
+    await copyToClipboard(material)
+    if (enrollmentMaterial.value === material) enrollmentCopied.value = true
+  } catch (cause) { error.value = cause }
 }
 
 onMounted(refresh)
@@ -161,7 +169,7 @@ onMounted(refresh)
   <q-page padding data-cy="users-page">
     <PageHeader :title="$t('users.title')" :subtitle="$t('users.subtitle')">
       <template #actions>
-        <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
+        <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
         <q-btn color="primary" icon="person_add" :label="$t('users.createUser')" data-cy="create-user-btn" :disable="!canMutate" @click="createOpen = true" />
       </template>
     </PageHeader>
@@ -174,8 +182,8 @@ onMounted(refresh)
     <q-card v-else flat bordered>
       <q-list separator>
         <q-item v-for="user in users" :key="user.userId" clickable data-cy="user-row" @click="openUser(user)">
-          <q-item-section><q-item-label>{{ user.displayName }}</q-item-label><q-item-label caption>{{ user.username }} · {{ user.userId }}</q-item-label></q-item-section>
-          <q-item-section side><div class="row items-center q-gutter-xs"><q-chip dense>{{ user.role }}</q-chip><StatusChip :value="user.status" /></div></q-item-section>
+          <q-item-section><q-item-label>{{ user.displayName }}</q-item-label><q-item-label caption>{{ user.username }}</q-item-label></q-item-section>
+          <q-item-section side><div class="row items-center q-gutter-xs"><q-chip dense>{{ $t(`roles.${user.role}`) }}</q-chip><StatusChip :value="user.status" /></div></q-item-section>
         </q-item>
         <q-item v-if="!users.length"><q-item-section class="text-grey-7">{{ $t('users.noUsers') }}</q-item-section></q-item>
       </q-list>
@@ -187,7 +195,7 @@ onMounted(refresh)
         <q-card-section class="q-gutter-md">
           <q-input v-model="createForm.username" outlined :label="$t('users.username')" data-cy="user-form-username" />
           <q-input v-model="createForm.displayName" outlined :label="$t('users.displayName')" data-cy="user-form-display-name" />
-          <q-select v-model="createForm.role" outlined :label="$t('users.role')" :options="['MEMBER','ADMIN']" />
+          <q-select v-model="createForm.role" outlined :label="$t('users.role')" :options="['MEMBER','ADMIN'].map(value => ({label: $t(`roles.${value}`), value}))" emit-value map-options />
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat :label="$t('common.cancel')" v-close-popup />
@@ -198,11 +206,28 @@ onMounted(refresh)
 
     <q-dialog v-model="detailOpen">
       <q-card v-if="selected" style="width: 760px; max-width: 95vw">
-        <q-card-section class="row items-start justify-between"><div><div class="text-h6">{{ selected.displayName }}</div><div class="text-caption">{{ selected.userId }}</div></div><StatusChip :value="selected.status" /></q-card-section>
+        <q-card-section class="row items-start justify-between"><div><div class="text-h6">{{ selected.displayName }}</div><div class="text-caption">{{ selected.username }} · {{ $t(`roles.${selected.role}`) }}</div><details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selected.userId }}</details></div><StatusChip :value="selected.status" /></q-card-section>
         <q-separator />
-        <q-card-section><div class="row q-gutter-sm"><q-btn outline color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
+        <q-card-section><div class="row q-gutter-sm"><q-btn outline no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
         <q-card-section><div class="text-subtitle2 q-mb-sm">{{ $t('users.devices') }}</div><q-list bordered separator>
-          <q-item v-for="device in devices" :key="device.deviceId"><q-item-section><q-item-label>{{ device.deviceId }}</q-item-label><q-item-label caption>{{ device.appVersion ?? $t('common.unknown') }} · {{ $t('users.lastSeen') }} {{ device.lastSeenAt ?? '—' }}</q-item-label></q-item-section><q-item-section side><div class="row items-center q-gutter-sm"><StatusChip :value="device.status" /><q-btn v-if="device.status !== 'REVOKED'" flat dense color="negative" :label="$t('users.revoke')" @click="revokeDevice(device)" /></div></q-item-section></q-item>
+          <q-item v-for="device in devices" :key="device.deviceId">
+            <q-item-section>
+              <q-item-label>{{ device.deviceName }}</q-item-label>
+              <q-item-label caption>{{ $t('users.appVersion') }} {{ device.appVersion ?? $t('common.unknown') }} · {{ $t('users.lastSeen') }} {{ device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : '—' }}</q-item-label>
+              <q-item-label data-cy="device-application-state">{{ $t(`users.application.${device.applicationState}`) }}</q-item-label>
+              <q-item-label v-if="device.appliedReportedAt" caption>{{ $t('users.appliedReport', { applied: device.appliedManagedGeneration, target: device.targetManagedGeneration, time: new Date(device.appliedReportedAt).toLocaleString() }) }}</q-item-label>
+              <details data-cy="device-identity" class="text-caption q-mt-xs">
+                <summary>{{ $t('resources.review.technicalDetails') }}</summary>
+                <div class="text-break">{{ device.deviceId }}</div>
+              </details>
+            </q-item-section>
+            <q-item-section side>
+              <div class="row items-center q-gutter-sm">
+                <StatusChip :value="device.status" />
+                <q-btn v-if="device.status !== 'REVOKED'" flat dense color="negative" :label="$t('users.revoke')" @click="revokeDevice(device)" />
+              </div>
+            </q-item-section>
+          </q-item>
           <q-item v-if="!devices.length"><q-item-section class="text-grey-7">{{ $t('users.noDevices') }}</q-item-section></q-item>
         </q-list></q-card-section>
         <q-card-actions align="right"><q-btn flat :label="$t('common.close')" v-close-popup /></q-card-actions>
@@ -210,12 +235,15 @@ onMounted(refresh)
     </q-dialog>
 
     <q-dialog v-model="enrollmentOpen" @hide="clearEnrollment">
-      <q-card v-if="enrollment" class="responsive-modal" style="max-width: 95vw"><q-card-section class="text-h6">{{ $t('users.enrollmentCode') }}</q-card-section><q-card-section>
+      <q-card v-if="enrollment" class="responsive-modal" style="max-width: 95vw"><q-card-section class="text-h6">{{ $t('users.enrollmentTitle') }}</q-card-section><q-card-section>
         <q-banner class="bg-amber-1 q-mb-md rounded-borders">{{ $t('users.enrollmentCodeHint') }}</q-banner>
-        <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field" />
+        <div class="row justify-center"><div class="text-center"><div class="text-body2 q-mb-xs">{{ $t('users.enrollmentQr') }}</div><canvas ref="qrCanvas" data-cy="enrollment-qr" /></div></div>
         <q-input :model-value="enrollmentMaterial" readonly outlined autogrow :label="$t('users.enrollmentMaterial')" data-cy="enrollment-material-field" class="q-mt-md"><template #append><q-btn flat dense icon="content_copy" :aria-label="$t('users.enrollmentMaterial')" data-cy="copy-enrollment-material" @click="copyEnrollment()" /></template></q-input>
-        <div class="row justify-center q-mt-md"><div class="text-center"><div class="text-caption q-mb-xs">{{ $t('users.enrollmentQr') }}</div><canvas ref="qrCanvas" data-cy="enrollment-qr" /></div></div>
-        <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ enrollment.expiresAt }}</div>
+        <div v-if="enrollmentCopied" role="status" class="text-positive q-mt-sm" data-cy="enrollment-copy-result">{{ $t('common.copied') }}</div>
+        <div class="text-caption q-mt-sm">{{ $t('users.expiresAt') }} {{ new Date(enrollment.expiresAt).toLocaleString() }}</div>
+        <details data-cy="enrollment-code-details" class="q-mt-md"><summary class="text-primary cursor-pointer">{{ $t('users.showCodeForTroubleshooting') }}</summary>
+          <q-input :model-value="enrollment.code" readonly outlined :label="$t('users.enrollmentCode')" data-cy="enrollment-code-field" class="q-mt-sm" />
+        </details>
       </q-card-section><q-card-actions align="right"><q-btn color="primary" :label="$t('common.done')" v-close-popup /></q-card-actions></q-card>
     </q-dialog>
     <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" class="q-mt-md" />

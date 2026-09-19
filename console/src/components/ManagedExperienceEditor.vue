@@ -130,7 +130,7 @@ function removeAssistant() {
           <q-card-section class="row items-start justify-between q-gutter-sm">
             <div>
               <div class="text-h6">{{ selected.displayName }}</div>
-              <div class="text-caption text-grey-7">{{ t('experience.managedIdentity') }} · {{ selected.assistantDefinitionId }}</div>
+              <details class="text-caption text-grey-7" data-cy="assistant-identity"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ selected.assistantDefinitionId }}</details>
             </div>
             <q-toggle v-model="selected.enabled" :label="t('experience.enabled')" :disable="disabled" @update:model-value="draft.markDirty" />
           </q-card-section>
@@ -195,7 +195,7 @@ function removeAssistant() {
                 </div>
                 <q-card v-for="s in starters" :key="s.starterId" flat bordered>
                   <q-card-section class="q-gutter-sm">
-                    <div class="text-caption text-grey-7">{{ s.starterId }}</div>
+                    <details class="text-caption text-grey-7"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ s.starterId }}</details>
                     <q-input data-cy="starter-title" v-model="s.title" outlined :label="t('experience.title')" :disable="disabled" @update:model-value="draft.markDirty" />
                     <q-input v-model="s.description" outlined :label="t('experience.description')" :disable="disabled" @update:model-value="draft.markDirty" />
                     <q-input data-cy="starter-prompt" v-model="s.prompt" outlined autogrow type="textarea" :label="t('experience.starterPrompt')" :disable="disabled" @update:model-value="draft.markDirty" />

@@ -99,7 +99,7 @@ log(`spa (same-origin proxy): ${spaBaseURL}`)
 // --- Start Hub and Relay ---
 
 log('starting Control Hub and Runtime Relay...')
-const { hubProc, relayProc } = startHubAndRelay(env, { stdio: 'pipe', log })
+const { hubProc, relayProc } = startHubAndRelay(env, { stdio: 'pipe', log, publicOrigin: spaBaseURL })
 processes.push(hubProc, relayProc)
 
 // --- Start deterministic Adapter ---
@@ -127,7 +127,7 @@ if (!existsSync(spaDir)) {
 // Start HTTP servers (SPA proxy + Adapter) in a worker thread to avoid
 // blocking the Node.js event loop when using execSync for Playwright.
 const worker = new Worker(join(ROOT, 'scripts', '_server-worker.mjs'), {
-  workerData: { spaPort, spaDir, adapterPort, hubPort: env.hubPort },
+  workerData: { spaPort, spaDir, adapterPort, hubPort: env.hubPort, relayPort: env.relayPubPort },
 })
 await new Promise((resolve, reject) => {
   worker.on('message', (msg) => { if (msg.ready) resolve() })
@@ -173,13 +173,10 @@ if (!existsSync(artifactsDir)) {
   mkdirSync(artifactsDir, { recursive: true })
 }
 
-// Track envRoot for cleanup
-env.envRoot_ref = env.envRoot
-
 // Per audit P1-1: use try/finally to ensure Worker, Hub, Relay, Adapter,
 // SPA proxy and temp directory are cleaned up regardless of pass/fail.
 //
-// The E2E test is executed in 3 phases (matching candidate-orchestrator):
+// This is the single browser candidate entry:
 //   Phase A: golden-path-authoring.spec.ts (setup, upstream, resources, publish)
 //   Phase B: Four-capability runtime traffic (Model/TTS/ASR/MCP)
 //   Phase C: Wait for usage ingestion
@@ -245,7 +242,11 @@ function mergePlaywrightJsons(filePaths, outputPath) {
           })
         }
       }
-    } catch {}
+    } catch (error) {
+      // An unreadable report must not be silently dropped: the merged artifact
+      // would then under-report and look complete.
+      throw new Error(`Cannot merge Playwright report ${fp}: ${error.message}`)
+    }
   }
   writeFileSync(outputPath, JSON.stringify(merged, null, 2))
   // Clean up temp files
@@ -253,9 +254,15 @@ function mergePlaywrightJsons(filePaths, outputPath) {
 }
 
 async function runFourCapabilityTraffic() {
-  // Same logic as candidate-orchestrator's runFourCapabilityTraffic
+  const discoveryResponse = await fetch(`${spaBaseURL}/.well-known/measix`)
+  if (!discoveryResponse.ok) throw new Error(`Discovery through public origin failed: ${discoveryResponse.status}`)
+  const discovery = await discoveryResponse.json()
+  const runtimeBase = new URL(discovery.runtimeApiBase, spaBaseURL)
+  if (runtimeBase.origin !== spaBaseURL || runtimeBase.pathname !== '/runtime/v1') throw new Error('Discovery did not provide the current same-origin Runtime base')
+  const clientBase = new URL(discovery.clientApiBase, spaBaseURL)
+  if (clientBase.origin !== spaBaseURL || clientBase.pathname !== '/api/client/v1') throw new Error('Discovery did not provide the current same-origin Client base')
   // Login as admin to get CSRF token + cookie
-  const loginResp = await fetch(`${env.hubBaseURL}/api/admin/v1/session/login`, {
+  const loginResp = await fetch(`${spaBaseURL}/api/admin/v1/session/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'admin', password: adminPassword }),
@@ -266,7 +273,7 @@ async function runFourCapabilityTraffic() {
   const cookie = loginResp.headers.get('set-cookie')?.split(';')[0] || ''
 
   // Create a managed user
-  const userResp = await fetch(`${env.hubBaseURL}/api/admin/v1/users`, {
+  const userResp = await fetch(`${spaBaseURL}/api/admin/v1/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'X-CSRF-Token': csrfToken },
     body: JSON.stringify({ username: 'e2e-user-' + Date.now(), displayName: 'E2E User', role: 'MEMBER' }),
@@ -276,7 +283,7 @@ async function runFourCapabilityTraffic() {
   const managedUserId = userJson.userId
 
   // Create enrollment
-  const enrollResp = await fetch(`${env.hubBaseURL}/api/admin/v1/users/${managedUserId}/enrollments`, {
+  const enrollResp = await fetch(`${spaBaseURL}/api/admin/v1/users/${managedUserId}/enrollments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'X-CSRF-Token': csrfToken },
     body: JSON.stringify({ expiresInSeconds: 3600 }),
@@ -286,7 +293,7 @@ async function runFourCapabilityTraffic() {
   const enrollmentCode = enrollJson.code
 
   // Exchange enrollment for access token
-  const exchangeResp = await fetch(`${env.hubBaseURL}/api/client/v1/enrollments/exchange`, {
+  const exchangeResp = await fetch(`${clientBase.href}/enrollments/exchange`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ platform: 'ANDROID', deviceName: 'Test device', code: enrollmentCode, installationId: `ins_${randomUUID()}`, appVersion: 'e2e-1.0' }),
@@ -296,7 +303,7 @@ async function runFourCapabilityTraffic() {
   const clientToken = exchangeJson.accessToken
 
   // Get managed state for generation + resource IDs
-  const stateResp = await fetch(`${env.hubBaseURL}/api/client/v1/managed/state`, {
+  const stateResp = await fetch(`${clientBase.href}/managed/state`, {
     headers: { 'Authorization': `Bearer ${clientToken}` },
   })
   if (!stateResp.ok) throw new Error(`get managed state failed: ${stateResp.status}`)
@@ -304,7 +311,7 @@ async function runFourCapabilityTraffic() {
   const generation = stateJson.activeManagedGeneration
 
   // Fetch the snapshot to get resource IDs
-  const snapResp = await fetch(`${env.hubBaseURL}/api/client/v1/managed/snapshots/${generation}`, {
+  const snapResp = await fetch(`${clientBase.href}/managed/snapshots/${generation}`, {
     headers: { 'Authorization': `Bearer ${clientToken}` },
   })
   if (!snapResp.ok) throw new Error(`get snapshot failed: ${snapResp.status}`)
@@ -319,7 +326,7 @@ async function runFourCapabilityTraffic() {
     throw new Error(`snapshot missing resource IDs: model=${modelId} tts=${ttsId} asr=${asrId} mcp=${mcpId}`)
   }
 
-  const relayUrl = env.relayPubBaseURL
+  const runtimeURL = (id, path) => `${runtimeBase.href}/resources/${id}${path}`
   const baseHeaders = {
     'Authorization': `Bearer ${clientToken}`,
     'X-Measix-Managed-Generation': String(generation),
@@ -327,19 +334,19 @@ async function runFourCapabilityTraffic() {
   }
 
   // 1. Model streaming
-  const modelResp = await fetch(`${relayUrl}/runtime/v1/resources/${modelId}/v1/chat/completions`, {
+  const modelResp = await fetch(runtimeURL(modelId, snapJson.models[0].runtimePath), {
     method: 'POST',
     headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
-    body: JSON.stringify({ model: 'gpt-test', stream: true, messages: [{ role: 'user', content: 'Say hello' }] }),
+    body: JSON.stringify({ model: snapJson.models[0].upstreamModelKey, stream: true, messages: [{ role: 'user', content: 'Say hello' }] }),
   })
   if (!modelResp.ok) throw new Error(`model request failed: ${modelResp.status}`)
   await modelResp.text()
 
   // 2. TTS
-  const ttsResp = await fetch(`${relayUrl}/runtime/v1/resources/${ttsId}/v1/audio/speech`, {
+  const ttsResp = await fetch(runtimeURL(ttsId, snapJson.tts[0].runtimePath), {
     method: 'POST',
     headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
-    body: JSON.stringify({ model: 'tts-test', input: 'hello', voice: 'alloy' }),
+    body: JSON.stringify({ model: snapJson.tts[0].upstreamModelKey, input: 'hello', voice: snapJson.tts[0].voice }),
   })
   if (!ttsResp.ok) throw new Error(`tts request failed: ${ttsResp.status}`)
   await ttsResp.text()
@@ -347,8 +354,8 @@ async function runFourCapabilityTraffic() {
   // 3. ASR
   const asrFormData = new FormData()
   asrFormData.append('file', new Blob([Buffer.from('RIFF')]), 'sample.wav')
-  asrFormData.append('model', 'whisper-test')
-  const asrResp = await fetch(`${relayUrl}/runtime/v1/resources/${asrId}/v1/audio/transcriptions`, {
+  asrFormData.append('model', snapJson.asr[0].upstreamModelKey)
+  const asrResp = await fetch(runtimeURL(asrId, snapJson.asr[0].runtimePath), {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${clientToken}`, 'X-Measix-Managed-Generation': String(generation), 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
     body: asrFormData,
@@ -357,7 +364,7 @@ async function runFourCapabilityTraffic() {
   await asrResp.text()
 
   // 4. MCP
-  const mcpResp = await fetch(`${relayUrl}/runtime/v1/resources/${mcpId}/mcp`, {
+  const mcpResp = await fetch(runtimeURL(mcpId, snapJson.mcp[0].runtimePath), {
     method: 'POST',
     headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e-client', version: '1.0' } } }),
@@ -372,7 +379,9 @@ async function waitForUsageIngestion(minRequests, maxWaitSeconds) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'admin', password: adminPassword }),
   })
-  if (!loginResp.ok) return
+  // An unreachable or unauthenticated Admin API means usage cannot be
+  // verified; returning silently would let a broken run look complete.
+  if (!loginResp.ok) throw new Error(`usage ingestion check could not authenticate: HTTP ${loginResp.status}`)
   const loginBody = await loginResp.json()
   const cookie = loginResp.headers.get('set-cookie')?.split(';')[0] || ''
   const csrfToken = loginBody.csrfToken || ''
@@ -397,13 +406,14 @@ try {
   if (phaseA !== 0) throw new Error(`Phase A failed (exit ${phaseA})`)
   log('Phase A PASSED')
 
-  // Phase B: Four-capability runtime traffic
+  // Phase B: Four-capability runtime traffic. A failure here is a gate
+  // failure, not a warning: the four-capability path is the point of the run.
   log('Phase B: Four-capability runtime traffic...')
   try {
     await runFourCapabilityTraffic()
     log('Phase B PASSED')
   } catch (e) {
-    log(`Phase B WARNING: ${e.message} (continuing...)`)
+    throw new Error(`Phase B failed: ${e.message}`)
   }
 
   // Phase C: Wait for usage ingestion
@@ -439,8 +449,19 @@ try {
     join(artifactsDir, '_e2e-usage.json'),
     join(artifactsDir, '_e2e-topology.json'),
   ].filter(f => existsSync(f))
-  if (tempFiles.length > 0) {
-    mergePlaywrightJsons(tempFiles, join(artifactsDir, 'e2e-playwright.json'))
+  if (tempFiles.length === 0) {
+    // Writing meta without a refreshed artifact would let a stale
+    // e2e-playwright.json be presented as evidence for this run.
+    log('ERROR: no per-phase Playwright reports were produced; e2e-playwright.json was not refreshed')
+    if (exitCode === 0) exitCode = 1
+  } else {
+    try {
+      mergePlaywrightJsons(tempFiles, join(artifactsDir, 'e2e-playwright.json'))
+    } catch (error) {
+      // Inside finally: record the failure without masking the original error.
+      log(`ERROR: ${error.message}`)
+      if (exitCode === 0) exitCode = 1
+    }
   }
 
   // Write meta.json for provenance regardless of pass/fail

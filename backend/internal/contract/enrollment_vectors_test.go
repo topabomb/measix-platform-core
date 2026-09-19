@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"measix/platform/internal/hub/identity"
 )
 
 // This is a contract reference oracle, not evidence that Android adopted the parser.
@@ -102,8 +102,7 @@ func TestEnrollmentRawSharedVectors(t *testing.T) {
 					return "invalid"
 				}
 				if value["kind"] == "PLATFORM_ENROLLMENT" {
-					origin, err := url.Parse(value["platformUrl"].(string))
-					if err != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.RawQuery != "" || origin.Fragment != "" || (origin.Path != "" && origin.Path != "/") {
+					if identity.ValidatePublicOrigin(strings.TrimSuffix(value["platformUrl"].(string), "/")) != nil {
 						return "invalid"
 					}
 				}

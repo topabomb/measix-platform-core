@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"measix/platform/ent"
+	"measix/platform/ent/secret"
 	"measix/platform/ent/secretversion"
 	"measix/platform/ent/upstream"
 	"measix/platform/ent/upstreamconfigrevision"
@@ -91,6 +92,18 @@ func (s *Service) CreateSecret(ctx context.Context, createdBy, name, value strin
 		return SecretView{}, err
 	}
 	return SecretView{SecretID: id, Name: name, SecretVersion: 1}, nil
+}
+
+func (s *Service) ListSecrets(ctx context.Context, limit int, after string) ([]SecretView, error) {
+	rows, err := s.Client.Secret.Query().Where(secret.IDGT(after)).Order(ent.Asc(secret.FieldID)).Limit(limit).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]SecretView, 0, len(rows))
+	for _, row := range rows {
+		views = append(views, SecretView{SecretID: row.ID, Name: row.Name, SecretVersion: int(row.LatestSecretVersion)})
+	}
+	return views, nil
 }
 
 func (s *Service) ReplaceSecret(ctx context.Context, createdBy, secretID string, expectedVersion int, value string) (SecretView, error) {

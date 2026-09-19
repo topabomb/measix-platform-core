@@ -53,14 +53,25 @@ The exact serialized manifest schema is implemented by the candidate/system harn
 
 Candidates default to `.artifacts/s0-freeze-candidate.json`; writes are exclusive. Use a new output path for a new candidate. A draft with CAP-C7-002=NOT_EXECUTED is never a Freeze.
 
-`freeze-manifest.mjs --validate --candidate --manifest <path>` validates candidate pins without accepting pending replay as final. Final validation additionally requires independent clean-source/runtime replay evidence. `replay-freeze.mjs --runtime-only --manifest <path>` records only fresh-runtime diagnostics and never mutates the manifest; invocation as full clean replay fails closed. If source/build/contract changes, rerun the required gate on the new composition.
+Use the following sequence on a clean pinned composition:
+
+```text
+node scripts/freeze-manifest.mjs --validate --candidate --manifest <candidate.json>
+node scripts/replay-freeze.mjs --manifest <candidate.json>
+node scripts/freeze-manifest.mjs --finalize --manifest <candidate.json> --output <new-final.json>
+node scripts/freeze-manifest.mjs --validate --manifest <new-final.json>
+```
+
+Replay clones pinned Core and architecture commits into independent sibling checkouts, excluding worktree edits, local secrets, dependencies and build artifacts. It installs locked dependencies, regenerates contracts, checks format/types, rebuilds the production SPA and compares all source/contract/fixture/build pins. Then it runs contract, vet, backend, smoke, system (adapter/client), candidate, console and the complete browser harness. Its workspace lives under `.artifacts/replay/` because finalization reads the per-stage logs back. Regeneration or tests that dirty the checkout fail. Atlas schema replay is not part of this runner; see `make schema`.
+
+Full logs remain in the reported independent workspace; preserve that workspace with the evidence. `.artifacts/replay-artifact.json` is written exclusively, including failures, and binds original candidate bytes, rebuilt facts and ordered command results. Finalization validates the report and log hashes, updates CAP-C7-002 in a new manifest, and leaves the candidate untouched. Existing output is never overwritten. There is no runtime-only shortcut. Changed source/build/contract requires a new composition and gate run.
 
 
 ### Current tooling limitations
 
 The writer validates current source/architecture cleanliness and identity, production build, four OpenAPI hashes, fixture/schema/Adapter pins, complete required scenario results, and every artifact plus metadata hash/exit/source. Qualification requires all four profiles in one run, each with observed adapter version, upstream/config revision, transport and forwarded usage evidence; unknown identity or an unexecuted profile fails. Partial diagnostic runs cannot be merged into qualification. Declared NONE/LEVEL_0 is not semantic Usage/header-echo qualification.
 
-Two deliberate boundaries remain: this CAP manifest compiler verifies the resource baseline of the current Snapshot v4 but does not replace the S0.2 ERX gate; independent clean-source checkout/rebuild/replay is not implemented. Runtime-only evidence cannot finalize CAP-C7-002. S0.2 needs its own ERX/consumer evidence schema and gate. Candidate promotion therefore executes and records each required gate explicitly. Living completion/verification status is in [execution progress](s0-execution-progress.md).
+This CAP manifest compiler verifies the resource baseline of current Snapshot v4 but does not replace the S0.2 ERX gate, which needs its own ERX/consumer evidence schema. The clean-source runner is implemented; passing runner fixture tests is not an executed candidate replay. Candidate promotion executes and records each required gate explicitly. Living completion/verification status is in [execution progress](s0-execution-progress.md).
 
 ## 3. S0.2/S0.3/S0.4 candidates
 

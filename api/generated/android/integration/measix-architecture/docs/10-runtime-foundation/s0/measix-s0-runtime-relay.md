@@ -241,7 +241,7 @@ Relay 只执行 HTTP/security/credential boundary，不解析/改写 MCP JSON-RP
 
 对 `twg_*` Gateway resource，Relay 也只做相同透明传输：不知道 `discover_tools` query、`toolRef`、真实 tool name 或 arguments。Gateway tool-level error/result 不能被 Relay重写成另一套业务协议。
 
-S0 不实现 Runtime WebSocket tunnel。
+实时 ASR 使用显式 WEBSOCKET 路由与 GET 升级；握手前执行同一 admission 链，普通 HTTP 路由拒绝 Upgrade。透明保留音频帧/转写事件，按连接记录 HTTP 101、时长和双向传输字节，不能伪造语义识别时长。字节计量不含 HTTP 握手头；请求字节上限约束单连接累计客户端到上游的帧传输字节，并非单帧大小。连接遵守 idle/overall 限制，关闭任一端或取消须关闭另一端。详见 Control Protocol §10.6。
 
 ## 11. Timeout / cancellation / retry
 
@@ -338,7 +338,7 @@ S0 Relay 不实现：
 1. PREPARE/BARRIER/COMMIT/ABORT state machine；
 2. durable full control-state/Secret cache；
 3. Provider protocol/body translation；
-4. Runtime WebSocket skeleton；
+4. 实时 ASR 之外的通用 WebSocket 业务框架；
 5. Redis/Kafka/message broker；
 6. client-visible runtimeRouteId；
 7. per-user/group capability ACL index；

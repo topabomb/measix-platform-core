@@ -285,6 +285,7 @@ components:
           - HTTP_STREAMING_SSE
           - HTTP_BINARY_STREAM
           - HTTP_MULTIPART
+          - WEBSOCKET
         timeoutPolicy:
           $ref: '#/components/schemas/TimeoutPolicy'
     SecretRef:
@@ -415,12 +416,17 @@ components:
       type: object
       additionalProperties: false
       required:
+      - buildVersion
       - ready
       - appliedControlRevision
       - bundleHash
       - activeManagedGeneration
       - startedAt
       properties:
+        buildVersion:
+          type: string
+          minLength: 1
+          description: Build identity of the running Relay process; dev for a development build.
         ready:
           type: boolean
         appliedControlRevision:

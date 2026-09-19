@@ -52,13 +52,14 @@ function select(value: string) {
       </q-list>
     </q-card>
 
+    <div class="configuration-section-nav__mobile">
+      <div class="text-caption text-grey-7 q-mb-xs">{{ title }}</div>
     <q-select
-      class="configuration-section-nav__mobile"
       outlined
       dense
       emit-value
       map-options
-      :label="title"
+      :aria-label="title"
       :model-value="props.modelValue"
       :options="items.map(item => ({ label: item.label, value: item.id, description: item.description, icon: item.icon }))"
       @update:model-value="select"
@@ -73,6 +74,7 @@ function select(value: string) {
         </q-item>
       </template>
     </q-select>
+    </div>
   </nav>
 </template>
 

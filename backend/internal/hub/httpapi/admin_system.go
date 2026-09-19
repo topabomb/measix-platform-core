@@ -38,9 +38,14 @@ func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) 
 		RuntimeStatus:           adminapi.SystemStatusRuntimeStatus(status.RuntimeStatus),
 		ActiveManagedGeneration: status.ActiveManagedGeneration, ManagedStateRevision: status.ManagedStateRevision,
 		DesiredControlRevision: status.DesiredControlRevision, RelayReady: status.RelayReady,
+		RelayBuildVersion:      status.RelayBuildVersion,
 		AppliedControlRevision: status.AppliedControlRevision, LastRelaySeenAt: status.LastRelaySeenAt,
 		RequestUsageIngestLagSeconds: status.RequestUsageIngestLagSeconds, SemanticOrphanCount: status.SemanticOrphanCount,
 		SpoolPendingCount: status.SpoolPendingCount, OldestPendingAgeSeconds: status.OldestPendingAgeSeconds,
+		SemanticUnknownRequestCount: status.SemanticUnknownRequestCount,
+	}
+	if h.identity.PublicOrigin != "" {
+		wire.PublicOrigin = &h.identity.PublicOrigin
 	}
 	if status.SpoolState != nil {
 		value := adminapi.SystemStatusSpoolState(*status.SpoolState)
@@ -54,9 +59,13 @@ func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) 
 		value := adminapi.Sha256Hash(*status.AppliedBundleHash)
 		wire.AppliedBundleHash = &value
 	}
-	if status.LatestActivation != nil {
-		activation := activationWire(*status.LatestActivation)
-		wire.LatestActivation = &activation
+	if status.CurrentActivation != nil {
+		activation := activationWire(*status.CurrentActivation)
+		wire.CurrentActivation = &activation
+	}
+	if status.LastActivation != nil {
+		activation := activationWire(*status.LastActivation)
+		wire.LastActivation = &activation
 	}
 	writeJSON(w, http.StatusOK, wire)
 }

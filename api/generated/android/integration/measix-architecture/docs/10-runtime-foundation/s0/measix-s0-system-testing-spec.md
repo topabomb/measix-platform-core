@@ -308,7 +308,7 @@ Assert model selector, TOOL/REASONING capability metadata, streaming flush, requ
 - Android records/captures audio；
 - multipart file/model/language reaches Adapter；
 - JSON transcript reaches existing UI；
-- no runtime WebSocket；
+- 文件转写使用 HTTP multipart；实时 ASR 另须验证受管 WebSocket 握手、录音配置、增量/完成转写、停止/取消、鉴权和 generation 拒绝；
 - Local realtime ASR regression remains Green。
 
 ### Direct MCP

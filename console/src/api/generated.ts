@@ -221,7 +221,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical projection hash and sorted resource arrays so the operator can review the exact shape that would be published. The projectionHash is computed from the same canonical projection as a real snapshot but uses placeholder releaseId/generation/publishedAt — it is NOT the final snapshotHash. */
+        /** @description Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical projection hash and sorted resource arrays so the operator can review the exact shape that would be published. The projectionHash uses deterministic placeholder releaseId/generation/publishedAt, so repeated previews of the same saved draft are stable. It is NOT the final snapshotHash, which includes the real Release metadata. */
         post: operations["previewDraft"];
         delete?: never;
         options?: never;
@@ -364,7 +364,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** @description Lists only Secret metadata for selection after page reload. Never returns credential values or encrypted payloads. */
+        get: operations["listSecrets"];
         put?: never;
         post: operations["createSecret"];
         delete?: never;
@@ -607,7 +608,7 @@ export interface components {
             providerId: components["schemas"]["ProviderId"];
             displayName: string;
             /** @enum {string} */
-            clientProtocol: "OPENAI_CHAT_COMPLETIONS";
+            clientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "GOOGLE_GENERATE_CONTENT" | "ANTHROPIC_MESSAGES";
             enabled: boolean;
         };
         ModelDefinition: {
@@ -625,19 +626,31 @@ export interface components {
             ttsId: components["schemas"]["TtsId"];
             displayName: string;
             /** @enum {string} */
-            clientProtocol: "OPENAI_AUDIO_SPEECH";
-            upstreamModelKey: string;
-            voice: string;
-            runtimePath: string;
+            clientProtocol: "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "SYSTEM_TTS";
+            upstreamModelKey?: string;
+            voice?: string;
+            runtimePath?: string;
+            voiceDesignPrompt?: string;
+            /** Format: double */
+            speechRate?: number;
+            /** Format: double */
+            pitch?: number;
             enabled: boolean;
         };
         AsrDefinition: {
             asrId: components["schemas"]["AsrId"];
             displayName: string;
             /** @enum {string} */
-            clientProtocol: "OPENAI_AUDIO_TRANSCRIPTIONS";
+            clientProtocol: "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR";
             upstreamModelKey: string;
             language?: string;
+            /** @enum {integer} */
+            sampleRate?: 8000 | 16000 | 24000;
+            /** Format: double */
+            vadThreshold?: number;
+            silenceDurationMs?: number;
+            prefixPaddingMs?: number;
+            prompt?: string;
             runtimePath: string;
             enabled: boolean;
         };
@@ -664,7 +677,7 @@ export interface components {
             allowedMethods: string[];
             allowedPathPrefixes: string[];
             /** @enum {string} */
-            transportPolicy: "HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART";
+            transportPolicy: "HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART" | "WEBSOCKET";
             timeoutPolicy?: components["schemas"]["TimeoutPolicy"];
         };
         /** @description Current policy. All five admission flags are required; new policies initialize all five to false. */
@@ -679,6 +692,7 @@ export interface components {
             defaultModelId?: components["schemas"]["ModelId"];
             defaultTtsId?: components["schemas"]["TtsId"];
             defaultAsrId?: components["schemas"]["AsrId"];
+            defaultAssistantId?: components["schemas"]["AssistantDefinitionId"];
         };
         ManagedDraftContent: {
             providers: components["schemas"]["ProviderDefinition"][];
@@ -759,12 +773,28 @@ export interface components {
             expiresInSeconds: number;
         };
         CreateEnrollmentResponse: {
+            /**
+             * Format: uri
+             * @description Configured public HTTP or HTTPS platform origin; never inferred from the request.
+             */
+            platformUrl: string;
             enrollmentId: components["schemas"]["EnrollmentId"];
             code: string;
             /** Format: date-time */
             expiresAt: string;
         };
         Device: {
+            /** @description Device name supplied during enrollment; display metadata, not authorization identity. */
+            deviceName: string;
+            /**
+             * @description Last report of the current valid session, not an online or runtime admission assertion.
+             * @enum {string}
+             */
+            applicationState: "UNKNOWN" | "PENDING" | "APPLIED" | "UNPUBLISHED";
+            targetManagedGeneration: number;
+            appliedManagedGeneration?: number;
+            /** Format: date-time */
+            appliedReportedAt?: string;
             deviceId: components["schemas"]["DeviceId"];
             userId: components["schemas"]["UserId"];
             installationId?: components["schemas"]["InstallationId"];
@@ -819,7 +849,7 @@ export interface components {
             name: string;
             /** Format: uri */
             baseUrl: string;
-            transportCapabilities: ("HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART")[];
+            transportCapabilities: ("HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART" | "WEBSOCKET")[];
             auth: components["schemas"]["UpstreamAuth"];
             /** @enum {string} */
             correlationMode: "HEADER_ECHO" | "VIRTUAL_KEY" | "REQUEST_LOG_ID" | "USAGE_API" | "WEBHOOK" | "NONE";
@@ -844,15 +874,21 @@ export interface components {
             config: components["schemas"]["UpstreamConfig"];
         };
         UpstreamTestResult: {
+            /** @description A response was received by an unauthenticated HEAD probe of the saved candidate base URL. Does not verify authentication or capability support. */
             reachable: boolean;
             latencyMs?: number;
-            verifiedCapabilities: string[];
+            /** @description Observed HTTP response status; omitted when no response was received. */
+            httpStatus?: number;
             warnings: string[];
         };
         Secret: {
             secretId: components["schemas"]["SecretId"];
             name: string;
             secretVersion: number;
+        };
+        SecretPage: {
+            items: components["schemas"]["Secret"][];
+            nextCursor?: string;
         };
         CreateSecretRequest: {
             name: string;
@@ -951,6 +987,7 @@ export interface components {
             to: string;
             requestCount: number;
             forwardedRequestCount: number;
+            requestCompleteness: components["schemas"]["RequestCompletenessCounts"];
             requestBytes: number;
             responseBytes: number;
             semanticMeters: {
@@ -966,6 +1003,12 @@ export interface components {
                 currency?: string;
             };
         };
+        /** @description Counts of whole requests within the same summary filter; sum equals requestCount. */
+        RequestCompletenessCounts: {
+            exact: number;
+            partial: number;
+            unknown: number;
+        };
         RequestUsageView: {
             requestId: components["schemas"]["RequestId"];
             interactionId?: components["schemas"]["InteractionId"];
@@ -973,6 +1016,8 @@ export interface components {
             userId: components["schemas"]["UserId"];
             deviceId?: components["schemas"]["DeviceId"];
             resourceId?: string;
+            /** @description Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found. */
+            resourceDisplayName?: string;
             runtimeRouteId?: components["schemas"]["RuntimeRouteId"];
             upstreamId?: components["schemas"]["UpstreamId"];
             managedGeneration: number;
@@ -1022,6 +1067,13 @@ export interface components {
             rules: components["schemas"]["PricingRule"][];
         };
         SystemStatus: {
+            /**
+             * Format: uri
+             * @description Explicit public HTTP or HTTPS platform origin; absent when deployment configuration is incomplete.
+             */
+            publicOrigin?: string;
+            /** @description Running Relay build identity from a successful private status read. Omitted when unavailable; never copied from Hub. */
+            relayBuildVersion?: string;
             buildVersion: string;
             dbHealth: string;
             schemaIdentity: string;
@@ -1036,7 +1088,8 @@ export interface components {
             appliedBundleHash?: components["schemas"]["Sha256Hash"];
             /** Format: date-time */
             lastRelaySeenAt?: string;
-            latestActivation?: components["schemas"]["Activation"];
+            currentActivation?: components["schemas"]["Activation"];
+            lastActivation?: components["schemas"]["Activation"];
             /**
              * @description Omitted when Relay spool status is unavailable; omission does not mean OK.
              * @enum {string}
@@ -1046,6 +1099,8 @@ export interface components {
             oldestPendingAgeSeconds?: number;
             requestUsageIngestLagSeconds?: number;
             semanticOrphanCount?: number;
+            /** @description Number of retained requests with no linked semantic records or at least one UNKNOWN record. Counts requests once, excludes unlinked provider records, and uses the same completeness rule as Usage. Omission means unavailable, not zero. */
+            semanticUnknownRequestCount?: number;
         };
         Health: {
             live: boolean;
@@ -1413,6 +1468,7 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     listDevices: {
@@ -1894,6 +1950,31 @@ export interface operations {
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    listSecrets: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretPage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
         };
     };
     createSecret: {

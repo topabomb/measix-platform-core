@@ -2,7 +2,7 @@
 
 .NOTPARALLEL:
 
-ci: generate fmt-check contract backend-test system-test console-test schema generated-drift
+ci: generate fmt-check contract backend-test system-test console-test tooling-test schema generated-drift
 
 fmt-check:
 	node scripts/checks.mjs fmt
@@ -50,10 +50,12 @@ freeze-manifest:
 freeze-validate:
 	node scripts/freeze-manifest.mjs --validate
 
-# Full clean-source replay is not implemented. This target fails closed;
-# runtime-only diagnostics cannot finalize CAP-C7-002.
+# Clean-source replay clones the pinned Core and architecture commits into
+# independent checkouts and replays the required gates. It requires an exact
+# candidate manifest and never reuses runtime-only diagnostics.
 clean-replay:
-	node scripts/replay-freeze.mjs
+	@if [ -z "$(MANIFEST)" ]; then echo "Usage: make clean-replay MANIFEST=<candidate.json>"; exit 2; fi
+	node scripts/replay-freeze.mjs --manifest $(MANIFEST)
 
 # collect-baseline runs the baseline test and generates .artifacts/resource-baseline.json
 # Measures architecture §17 required metrics: RSS/CPU, first-byte overhead,
@@ -97,6 +99,11 @@ collect-static-contract:
 
 console-test:
 	cd console && corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build
+
+# Evidence/tooling tests. Kept separate from console-test because the public
+# origin test needs the production SPA built by console-test.
+tooling-test:
+	npm run test:tooling
 
 schema: schema-replay
 	cd backend && go run ./cmd/migration-checksum

@@ -128,7 +128,7 @@ If an endpoint does not support Audio Speech, it cannot be used for S0.1 Managed
 - compatible transcription result；
 - large-body/cancellation behavior；
 - audio duration semantic usage only claimed if reliable；
-- no WebSocket requirement。
+- HTTP 文件转写的结果不替代实时 ASR 验收；声称实时协议可用时须另验证当前 session.update、PCM 音频、转写事件、停止及取消，并记录实际端点与协议。
 
 ## 9. MCP — Streamable HTTP
 

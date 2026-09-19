@@ -174,9 +174,10 @@ Final Android T4 不能用 JVM Test Client 代替。
 - `AND-ASR-003` multipart file/model/optional language correct；
 - `AND-ASR-004` transcription result maps to existing consumer/UI；
 - `AND-ASR-005` upload cancel 不 retry/replay；
-- `AND-ASR-006` Managed ASR 不要求 WebSocket；
+- `AND-ASR-006` Managed 实时 ASR 使用平台 Runtime URL 与握手鉴权，通过真实 WebSocket 验证双向音频/转写事件；
 - `AND-ASR-007` Local realtime ASR regress Green；
-- `AND-ASR-008` realtime VAD/sample-rate/WebSocket settings 不从 Managed Snapshot fabricated。
+- `AND-ASR-008` 实时 VAD/采样率等参数严格取自有效 Managed Snapshot；HTTP 转写不得携带实时参数，不得使用个人配置补齐企业配置。
+- `AND-ASR-009` `DASHSCOPE_HTTP_ASR` 使用平台 Runtime 的 POST JSON，WAV/MP3 Data URI 与 `parameters.format` 一致；读取 `output.text`、取消不重放；绝不误走 multipart 或 WebSocket。未知协议拒绝候选 Snapshot，不以 OpenAI 格式猜测。
 
 ## 13. Direct Managed MCP
 
@@ -280,6 +281,8 @@ no pre-injected enterprise session/snapshot
 JVM Test Client 或 direct internal API 不能替代 Android T4。
 
 ## 20. Component Exit
+
+当前公共入口/应用报告契约增加验收：Debug 与 Release 均覆盖 HTTP/IP、HTTP 域名、HTTPS 和端口；`ws`/`wss` 与绑定来源一致，Portal Cookie/原生换票可用。进入企业、恢复前台、手动同步和每次新 interaction 的检查共享 owner；模拟应用成功但报告失败，下次检查重报，不回滚配置或重复执行工具。下载、校验失败和半写入不能报告成功；退出、重登、旧 Session 迟到响应、报告过期和撤销保持隔离。管理台对应未知→已应用→待更新→已应用的设备状态须有联调证据，不用上游模拟测试代替设备验收。
 
 Android S0.4 可以进入 Final S0 System/RC Gate，仅当：
 

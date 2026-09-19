@@ -122,7 +122,7 @@ Before a later stage treats S0.1 as an accepted frozen dependency, the exact can
 
 The complete manifest evidence contract belongs to `measix-s0-capability-delivery-system-testing-spec.md` and `docs/release.md`; this document intentionally does **not** maintain a second partial field list.
 
-New draft evidence writes exclusively to `.artifacts/s0-freeze-candidate.json` (or an explicit new output), without overwriting an existing candidate. Current CAP tooling validates the current v4 resource baseline; runtime-only replay cannot finalize C7. Final acceptance and unimplemented later-stage gates are defined in [release](release.md); do not infer them from the filename.
+New draft evidence writes exclusively to `.artifacts/s0-freeze-candidate.json` (or an explicit new output), without overwriting an existing candidate. Current CAP tooling validates the current v4 resource baseline; C7 requires independent clean-source rebuild/replay and separate validated finalization. Final acceptance and unimplemented later-stage gates are defined in [release](release.md); do not infer them from the filename.
 
 MEASIX has not been released, so the current Snapshot v4, Bridge v3 and local-read v2 profile is the only supported profile. Contract changes replace the current candidate and regenerate every consumer/export; they do not add old-version branches. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; current S0.2 evidence cannot prove those later capabilities.
 

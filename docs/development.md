@@ -41,7 +41,7 @@ In another terminal from the repository root:
 pnpm -C console dev
 ```
 
-These are development HTTP endpoints, not production origin/TLS qualification. The console dev server/proxy is not a packaged production ingress. To exercise Hub static hosting, first build the console then add `--admin-assets-dir ../console/dist/spa` to Hub; same-origin runtime routing still needs the ingress/proxy. `go run`/`concurrently` provide no production restart/rate-limit/log-retention guarantee.
+These are development HTTP endpoints, not production origin/TLS qualification. To exercise the complete same-origin path, build the console and Portal, configure their Hub asset directories, then use the checked-in [Caddy ingress recipe](operations.md#one-public-origin). Discovery, enrollment, Snapshot, Runtime and Portal must use this public origin. `go run`/`concurrently` provide no production restart/rate-limit/log-retention guarantee.
 
 ## 3. Normal checks
 
@@ -78,7 +78,7 @@ Schema changes update the reviewed current initialization SQL and checksum, with
 There are two real implementations of test orchestration, not one physical harness:
 
 - `backend/test/system/{harness,adapter,client,scenarios}`: Go component/system environment and tagged scenarios.
-- `scripts/lib/harness.mjs`, `scripts/e2e-harness.mjs`, `scripts/candidate-orchestrator.mjs`: Node process/static-host/browser/candidate orchestration.
+- `scripts/lib/harness.mjs`, `scripts/e2e-harness.mjs`: Node process/static-host/browser/candidate orchestration. The browser candidate gate has a single entry (`node scripts/e2e-harness.mjs`); no parallel orchestrator or artifact exists.
 - `console/e2e/`: browser actions/assertions; it must not recreate its own daemon lifecycle.
 
 Keep orchestration out of feature tests. Share contracts/fixtures and align evidence, rather than declaring the two environments identical. A scenario requiring browser → traffic → Usage/System closure must run those steps against the **same** runtime, not combine unrelated Green runs.
@@ -93,4 +93,4 @@ Use a meaningful observed Red → Green → Refactor loop for behavior/regressio
 
 GitHub-only work uses a Draft PR and actual check/log inspection; current CI triggers on PRs to `main` and pushes to `main`, not arbitrary branch pushes. CI's four work jobs are static-contract, backend-test, system-test and console-test, aggregated by ci-gate. It excludes browser T4.1 and real external qualification.
 
-Evidence tooling rejects failed commands, dirty/mismatched source/build/contract/artifact pins and incomplete one-run Adapter profiles. It creates new candidate artifacts without overwriting existing files. The CAP runner verifies the resource baseline of current v4 and does not replace S0.2 ERX; independent clean-source replay is not implemented (runtime-only diagnostics cannot finalize C7). See [testing](testing.md) and [release](release.md); candidate acceptance requires each named gate rather than a wrapper target.
+Evidence tooling rejects failed commands, dirty/mismatched source/build/contract/artifact pins and incomplete one-run Adapter profiles. It creates new candidate artifacts without overwriting existing files. The CAP runner verifies the resource baseline of current v4 and does not replace S0.2 ERX; independent clean-source replay rebuilds pinned commits and reruns the required path before finalization. See [testing](testing.md) and [release](release.md); candidate acceptance requires each named gate rather than a wrapper target.

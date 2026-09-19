@@ -10,7 +10,7 @@ import (
 )
 
 // The S0 Control Protocol (§15) fixes the Upstream transport capability
-// vocabulary. A typed executable contract must enumerate exactly these four
+// vocabulary. A typed executable contract must enumerate the current
 // values rather than accepting arbitrary strings.
 func TestAdminUpstreamTransportCapabilitiesFrozenEnum(t *testing.T) {
 	doc := loadAdminDoc(t)
@@ -26,14 +26,15 @@ func TestAdminUpstreamTransportCapabilitiesFrozenEnum(t *testing.T) {
 		"HTTP_STREAMING_SSE":    true,
 		"HTTP_BINARY_STREAM":    true,
 		"HTTP_MULTIPART":        true,
+		"WEBSOCKET":             true,
 	}
 	for _, v := range values {
 		if !want[v] {
 			t.Fatalf("unexpected transport capability %q, allowed: HTTP_REQUEST_RESPONSE, HTTP_STREAMING_SSE, HTTP_BINARY_STREAM, HTTP_MULTIPART", v)
 		}
 	}
-	if len(values) != 4 {
-		t.Fatalf("transportCapabilities enum=%v want exactly 4 values", values)
+	if len(values) != len(want) {
+		t.Fatalf("transportCapabilities enum=%v want %d values", values, len(want))
 	}
 }
 

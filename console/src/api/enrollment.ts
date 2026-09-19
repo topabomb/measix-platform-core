@@ -5,10 +5,9 @@ type Grant = Pick<components['schemas']['CreateEnrollmentResponse'], 'code' | 'e
 type Material = ClientComponents['schemas']['PlatformEnrollmentMaterial']
 
 /** The same ephemeral document is used for both native QR scan and paste. */
-export function encodeEnrollmentMaterial(platformOrigin: string, grant: Grant, allowLoopbackHttp = false): string {
+export function encodeEnrollmentMaterial(platformOrigin: string, grant: Grant): string {
   const url = new URL(platformOrigin)
-  const localHttp = allowLoopbackHttp && url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
-  if ((url.protocol !== 'https:' && !localHttp) || url.username || url.password || url.search || url.hash || url.pathname !== '/' || url.origin.length > 1024) {
+  if (!['http:', 'https:'].includes(url.protocol) || url.port === '0' || url.username || url.password || /[?#]/.test(platformOrigin) || url.pathname !== '/' || url.origin.length > 1024) {
     throw new Error('Invalid enrollment platform origin')
   }
   const timestamp = Date.parse(grant.expiresAt)

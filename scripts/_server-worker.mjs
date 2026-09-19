@@ -3,12 +3,14 @@
  * thread so the main thread can use execSync without blocking the event loop.
  */
 import { parentPort, workerData } from 'node:worker_threads'
+import { once } from 'node:events'
 import { join } from 'node:path'
+import { resolveWithin } from './lib/harness.mjs'
 import { existsSync } from 'node:fs'
 import http from 'node:http'
 import { readFileSync, statSync } from 'node:fs'
 
-const { spaPort, spaDir, adapterPort, hubPort } = workerData
+const { spaPort, spaDir, adapterPort, hubPort, relayPort } = workerData
 
 // --- MIME types ---
 const MIME_TYPES = {
@@ -53,6 +55,7 @@ const adapterServer = http.createServer((req, res) => {
           `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}`,
           `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"hel"}}]}`,
           `data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"lo"}}]}`,
+          `data: {"id":"1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
           `data: [DONE]`,
         ]
         for (const c of chunks) res.write(c + '\n\n')
@@ -77,8 +80,24 @@ const adapterServer = http.createServer((req, res) => {
       return
     }
     if (path === '/mcp') {
+      if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
+      if (bodyJSON?.jsonrpc !== '2.0' || typeof bodyJSON.method !== 'string') {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } }))
+        return
+      }
+      if (!Object.hasOwn(bodyJSON, 'id')) { res.writeHead(202); res.end(); return }
+      const result = bodyJSON.method === 'initialize'
+        ? { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'measix-test-adapter', version: '1.0.0' } }
+        : bodyJSON.method === 'tools/list'
+          ? { tools: [{ name: 'tool-a', inputSchema: { type: 'object' } }] }
+          : bodyJSON.method === 'tools/call'
+            ? { content: [{ type: 'text', text: 'tool-a executed' }] }
+            : null
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { tools: [{ name: 'tool-a' }] } }))
+      res.end(JSON.stringify(result === null
+        ? { jsonrpc: '2.0', id: bodyJSON.id, error: { code: -32601, message: 'Method not found' } }
+        : { jsonrpc: '2.0', id: bodyJSON.id, result }))
       return
     }
     if (path.startsWith('/v1/errors/')) {
@@ -115,11 +134,12 @@ const spaServer = http.createServer((req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${spaPort}`)
   const path = url.pathname
 
-  // Proxy API requests to Hub
-  if (path.startsWith('/api/') || path === '/live' || path === '/ready') {
+  // One public origin: Discovery/control to Hub, Runtime to Relay.
+  const runtime = path.startsWith('/runtime/v1/')
+  if (runtime || path === '/.well-known/measix' || path.startsWith('/api/') || path === '/live' || path === '/ready') {
     const proxyReq = http.request({
       hostname: '127.0.0.1',
-      port: hubPort,
+      port: runtime ? relayPort : hubPort,
       path: req.url,
       method: req.method,
       headers: req.headers,
@@ -141,8 +161,8 @@ const spaServer = http.createServer((req, res) => {
   if (path === '/admin' || path.startsWith('/admin/')) {
     let filePath = path.replace(/^\/admin\/?/, '')
     if (!filePath) filePath = 'index.html'
-    const full = join(spaDir, filePath)
-    if (existsSync(full) && statSync(full).isFile()) {
+    const full = resolveWithin(spaDir, filePath)
+    if (full && existsSync(full) && statSync(full).isFile()) {
       serveStaticFile(res, full, filePath)
       return
     }
@@ -172,6 +192,7 @@ spaServer.keepAliveTimeout = 30000
 spaServer.headersTimeout = 35000
 spaServer.listen(spaPort, '127.0.0.1')
 
+await Promise.all([once(adapterServer, 'listening'), once(spaServer, 'listening')])
 parentPort.postMessage({ ready: true })
 
 parentPort.on('message', (msg) => {

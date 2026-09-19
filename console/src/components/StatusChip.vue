@@ -6,12 +6,12 @@ import { useI18n } from 'vue-i18n'
 // to stable semantic tones — healthy / pending / degraded / failed / neutral.
 // Status is always rendered with text (never color alone).
 
-const props = defineProps<{ value: string }>()
+const props = defineProps<{ value: string; label?: string }>()
 const { t, te } = useI18n()
 
 type Tone = 'healthy' | 'pending' | 'degraded' | 'failed' | 'neutral'
 
-const HEALTHY = ['READY', 'ACTIVE', 'COMPLETED', 'KNOWN', 'EXACT', 'SUCCESS', 'SUPERSEDED', 'LIVE', 'STAGED', 'PUBLISHED']
+const HEALTHY = ['READY', 'ACTIVE', 'COMPLETED', 'KNOWN', 'EXACT', 'SUCCESS', 'LIVE', 'STAGED', 'PUBLISHED']
 const PENDING = ['APPLYING', 'ACTIVATING', 'PENDING', 'STAGING', 'VALIDATING', 'PARTIAL', 'INACTIVE', 'ENROLLED', 'DRAFT']
 const DEGRADED = ['DEGRADED', 'UNKNOWN', 'WARNING', 'ERROR']
 const FAILED = ['FAILED', 'BLOCKED', 'REVOKED', 'DISABLED', 'ACTIVATION_FAILED', 'NOT_READY', 'EXPIRED', 'WITHDRAWN']
@@ -35,6 +35,7 @@ const classes: Record<Tone, string> = {
 
 /** Translate the status value via the status.* i18n namespace; fall back to raw. */
 const label = computed(() => {
+  if (props.label) return props.label
   const key = `status.${props.value}`
   return te(key) ? t(key) : props.value
 })

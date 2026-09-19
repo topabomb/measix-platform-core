@@ -14,7 +14,7 @@ import (
 )
 
 func TestRelayAppFailsClosedUntilControlApply(t *testing.T) {
-	a := app.New("relay-service-token")
+	a := app.New("relay-service-token", "relay-test-build", nil, nil)
 
 	ready := httptest.NewRecorder()
 	a.Public.ServeHTTP(ready, httptest.NewRequest(http.MethodGet, "/ready", nil))
@@ -65,11 +65,26 @@ func TestRelayAppFailsClosedUntilControlApply(t *testing.T) {
 }
 
 func TestRelayInternalControlRequiresServiceCredential(t *testing.T) {
-	a := app.New("relay-service-token")
+	a := app.New("relay-service-token", "relay-test-build", nil, nil)
 	request := httptest.NewRequest(http.MethodGet, "/internal/v1/control/status", nil)
 	response := httptest.NewRecorder()
 	a.Internal.ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("internal status without credential=%d want=401", response.Code)
+	}
+}
+
+func TestRelayStatusReportsOwnBuildBeforeControlApply(t *testing.T) {
+	a := app.New("relay-service-token", "relay-test-build", nil, nil)
+	request := httptest.NewRequest(http.MethodGet, "/internal/v1/control/status", nil)
+	request.Header.Set("Authorization", "Bearer relay-service-token")
+	response := httptest.NewRecorder()
+	a.Internal.ServeHTTP(response, request)
+	var status map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &status); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusOK || status["buildVersion"] != "relay-test-build" || status["ready"] != false {
+		t.Fatalf("unexpected status: %d %s", response.Code, response.Body.String())
 	}
 }

@@ -11,6 +11,7 @@ require (
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/oapi-codegen/runtime v1.7.0
 	golang.org/x/crypto v0.46.0
 	golang.org/x/sync v0.21.0

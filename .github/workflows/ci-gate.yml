@@ -88,7 +88,7 @@ jobs:
           key: pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('console/pnpm-lock.yaml') }}
 
       - name: 验证证据与开发工具
-        run: node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs
+        run: npm run test:tooling
 
       - name: 执行 T0 静态与契约门禁
         run: make fmt-check contract schema generated-drift
@@ -161,6 +161,9 @@ jobs:
             pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-
       - name: 执行 Admin Console T1/T2 门禁
         run: make console-test
+
+      - name: 验证同源公共入口（需要已构建的生产 SPA）
+        run: npm run test:public-origin
 
   ci-gate:
     if: ${{ always() }}

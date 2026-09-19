@@ -150,9 +150,9 @@ Apply
 ### ASR
 
 - Display Name、Model Key、optional Language、Upstream、Runtime Path、Enabled；
-- `OPENAI_AUDIO_TRANSCRIPTIONS`；
-- 明确 HTTP multipart transcription；
-- 不出现 realtime/WebSocket/VAD/sample-rate future controls。
+- 按 Control Protocol §10.6 选择文件转写或实时识别协议；
+- 文件转写明确 HTTP multipart，不显示实时参数；
+- 实时协议使用对应默认参数和折叠录音设置，切换清除不适用字段，预览可核对最终协议与参数。
 
 ### MCP
 
@@ -255,6 +255,8 @@ public client/admin/runtime topology only
 - `ADM-GTW-014` Gateway Status distinguishes supervisor process-active from application ready and exposes only safe event correlation, not raw logs or forbidden payloads。
 
 ## 14. Component Exit
+
+进入门禁前，须按 Product Requirements 的公共入口/设备状态要求，从真实浏览器完成普通 HTTP/IP 和 HTTPS 下的登录、生成/复制完整接入资料、编辑资源、审查和发布。HTTP 路径不得依赖仅安全上下文提供的 Clipboard/randomUUID API。设备先下载不报告仍为未知，报告后已应用，新发布后待更新，再报告后已应用；页面必须区分服务端成功与设备应用，不能以报告时间声称在线。地址未配置时提示具体修复动作并阻止生成错误材料。合成客户端的报告证据与 Android 真机证据分开记录。
 
 Admin component 可以进入 S0.1 System Gate，仅当：
 

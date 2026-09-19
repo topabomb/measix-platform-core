@@ -85,11 +85,12 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	}
 	tts := make([]clientapi.TtsDefinition, 0, len(input.Content.Tts))
 	for _, value := range input.Content.Tts {
-		tts = append(tts, clientapi.TtsDefinition{TtsId: value.TtsId, DisplayName: value.DisplayName, ClientProtocol: clientapi.TtsDefinitionClientProtocol(value.ClientProtocol), UpstreamModelKey: value.UpstreamModelKey, Voice: value.Voice, RuntimePath: value.RuntimePath, Enabled: value.Enabled})
+		tts = append(tts, clientapi.TtsDefinition{TtsId: value.TtsId, DisplayName: value.DisplayName, ClientProtocol: clientapi.TtsDefinitionClientProtocol(value.ClientProtocol), UpstreamModelKey: value.UpstreamModelKey, Voice: value.Voice, RuntimePath: value.RuntimePath, Enabled: value.Enabled, VoiceDesignPrompt: value.VoiceDesignPrompt, SpeechRate: value.SpeechRate, Pitch: value.Pitch})
 	}
 	asr := make([]clientapi.AsrDefinition, 0, len(input.Content.Asr))
 	for _, value := range input.Content.Asr {
-		asr = append(asr, clientapi.AsrDefinition{AsrId: value.AsrId, DisplayName: value.DisplayName, ClientProtocol: clientapi.AsrDefinitionClientProtocol(value.ClientProtocol), UpstreamModelKey: value.UpstreamModelKey, Language: value.Language, RuntimePath: value.RuntimePath, Enabled: value.Enabled})
+		asr = append(asr, clientapi.AsrDefinition{AsrId: value.AsrId, DisplayName: value.DisplayName, ClientProtocol: clientapi.AsrDefinitionClientProtocol(value.ClientProtocol), UpstreamModelKey: value.UpstreamModelKey, Language: value.Language, RuntimePath: value.RuntimePath, Enabled: value.Enabled,
+			SampleRate: (*clientapi.AsrDefinitionSampleRate)(value.SampleRate), VadThreshold: value.VadThreshold, SilenceDurationMs: value.SilenceDurationMs, PrefixPaddingMs: value.PrefixPaddingMs, Prompt: value.Prompt})
 	}
 	mcp := make([]clientapi.McpDefinition, 0, len(input.Content.Mcp))
 	for _, value := range input.Content.Mcp {
@@ -149,6 +150,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 		DefaultModelId:       input.Content.Policy.DefaultModelId,
 		DefaultTtsId:         input.Content.Policy.DefaultTtsId,
 		DefaultAsrId:         input.Content.Policy.DefaultAsrId,
+		DefaultAssistantId:   input.Content.Policy.DefaultAssistantId,
 	}
 	var publishedBy *string
 	if input.PublishedByUserID != "" {
@@ -302,6 +304,7 @@ func projectionToAdminTts(src []clientapi.TtsDefinition) []adminapi.TtsDefinitio
 			ClientProtocol:   adminapi.TtsDefinitionClientProtocol(string(v.ClientProtocol)),
 			UpstreamModelKey: v.UpstreamModelKey, Voice: v.Voice,
 			RuntimePath: v.RuntimePath, Enabled: v.Enabled,
+			VoiceDesignPrompt: v.VoiceDesignPrompt, SpeechRate: v.SpeechRate, Pitch: v.Pitch,
 		}
 	}
 	return dst
@@ -315,6 +318,7 @@ func projectionToAdminAsr(src []clientapi.AsrDefinition) []adminapi.AsrDefinitio
 			AsrId: v.AsrId, DisplayName: v.DisplayName,
 			ClientProtocol:   adminapi.AsrDefinitionClientProtocol(string(v.ClientProtocol)),
 			UpstreamModelKey: v.UpstreamModelKey, Language: v.Language,
+			SampleRate: (*adminapi.AsrDefinitionSampleRate)(v.SampleRate), VadThreshold: v.VadThreshold, SilenceDurationMs: v.SilenceDurationMs, PrefixPaddingMs: v.PrefixPaddingMs, Prompt: v.Prompt,
 			RuntimePath: v.RuntimePath, Enabled: v.Enabled,
 		}
 	}

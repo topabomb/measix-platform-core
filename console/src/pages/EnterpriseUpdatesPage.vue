@@ -11,7 +11,7 @@ import StatusChip from '../components/StatusChip.vue'
 import { useSessionStore } from '../stores/session'
 import { renderContent } from '../composables/useMarkdown'
 
-const { t: $t } = useI18n()
+const { t: $t, locale } = useI18n()
 
 type EnterpriseUpdatePage = components['schemas']['EnterpriseUpdatePage']
 type EnterpriseUpdate = components['schemas']['EnterpriseUpdate']
@@ -39,6 +39,13 @@ const error = ref<unknown>()
 const CATEGORIES: EnterpriseUpdateCategory[] = ['ANNOUNCEMENT', 'MAINTENANCE', 'NOTICE']
 const SEVERITIES: EnterpriseUpdateSeverity[] = ['INFO', 'WARNING', 'CRITICAL']
 const CONTENT_FORMATS: EnterpriseUpdateContentFormat[] = ['MARKDOWN', 'PLAIN']
+const formatOptions = computed(() => CONTENT_FORMATS.map(value => ({ label: $t(`enterpriseUpdates.format.${value.toLowerCase()}`), value })))
+const categoryOptions = computed(() => CATEGORIES.map(value => ({ label: $t(`enterpriseUpdates.category.${value.toLowerCase()}`), value })))
+const severityOptions = computed(() => SEVERITIES.map(value => ({ label: $t(`enterpriseUpdates.severity.${value.toLowerCase()}`), value })))
+function localTime(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US')
+}
 
 const categoryColor: Record<string, string> = {
   ANNOUNCEMENT: 'primary',
@@ -176,7 +183,7 @@ function openDetail(item: EnterpriseUpdate) {
 
 async function publish(item: EnterpriseUpdate) {
   if (!session.csrfToken) return
-  if (!window.confirm($t('enterpriseUpdates.publishConfirm', { id: item.enterpriseUpdateId }))) return
+  if (!window.confirm($t('enterpriseUpdates.publishConfirm', { title: item.title }))) return
   error.value = undefined
   try {
     await apiFetch<EnterpriseUpdate>(
@@ -192,7 +199,7 @@ async function publish(item: EnterpriseUpdate) {
 
 async function withdraw(item: EnterpriseUpdate) {
   if (!session.csrfToken) return
-  if (!window.confirm($t('enterpriseUpdates.withdrawConfirm', { id: item.enterpriseUpdateId }))) return
+  if (!window.confirm($t('enterpriseUpdates.withdrawConfirm', { title: item.title }))) return
   error.value = undefined
   try {
     await apiFetch<EnterpriseUpdate>(
@@ -213,13 +220,14 @@ onMounted(refresh)
   <q-page padding data-cy="enterprise-updates-page">
     <PageHeader :title="$t('enterpriseUpdates.title')" :subtitle="$t('enterpriseUpdates.subtitle')">
       <template #actions>
-        <q-btn flat icon="refresh" :loading="loading" @click="refresh" />
+        <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
         <q-btn unelevated color="primary" icon="add" :label="$t('enterpriseUpdates.create')" @click="openCreate" />
       </template>
     </PageHeader>
     <ProblemBanner :error="error" class="q-mb-md" />
-    <q-banner v-if="feedRevision" class="bg-blue-1 q-mb-md rounded-borders">
-      <span class="text-grey-8">{{ $t('enterpriseUpdates.feedRevision') }}: {{ feedRevision }}</span>
+    <q-banner class="bg-blue-1 q-mb-md rounded-borders">
+      <div>{{ $t('enterpriseUpdates.separatePublishHint') }}</div>
+      <details v-if="feedRevision" class="text-caption text-grey-7"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ $t('enterpriseUpdates.feedRevision') }}: {{ feedRevision }}</details>
     </q-banner>
     <LoadingState v-if="loading && !updates.length" />
     <q-card v-else flat bordered>
@@ -227,16 +235,13 @@ onMounted(refresh)
         <q-item v-for="item in updates" :key="item.enterpriseUpdateId" clickable @click="openDetail(item)">
           <q-item-section>
             <q-item-label>{{ item.title }}</q-item-label>
-            <q-item-label caption class="text-grey-7" style="white-space: pre-wrap; max-height: 3em; overflow: hidden;">
-              {{ item.content }}
-            </q-item-label>
+            <div data-cy="update-list-preview" class="markdown-body text-body2 text-grey-7" style="max-height: 3em; overflow: hidden;" v-html="renderContent(item.content, item.contentFormat)" />
             <div class="row q-gutter-xs q-mt-xs">
               <q-badge v-if="item.category" dense :color="categoryColor[item.category] ?? 'grey'" :label="$t(`enterpriseUpdates.category.${item.category.toLowerCase()}`)" />
               <q-badge v-if="item.severity" dense :color="severityColor[item.severity] ?? 'grey'" :label="$t(`enterpriseUpdates.severity.${item.severity.toLowerCase()}`)" />
-              <q-badge v-if="item.contentFormat === 'MARKDOWN'" dense color="deep-purple" label="MD" />
             </div>
             <q-item-label caption class="text-grey-6">
-              {{ item.enterpriseUpdateId }} · {{ $t('enterpriseUpdates.createdAt') }} {{ item.createdAt }}
+              {{ $t('enterpriseUpdates.createdAt') }} {{ localTime(item.createdAt) }}
             </q-item-label>
           </q-item-section>
           <q-item-section side>
@@ -262,9 +267,9 @@ onMounted(refresh)
         <q-card-section>
           <q-input v-model="createTitle" :label="$t('enterpriseUpdates.titleLabel')" outlined dense class="q-mb-md" />
           <div class="row q-gutter-sm q-mb-md">
-            <q-select v-model="createContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="CONTENT_FORMATS" outlined dense emit-value map-options class="col" />
-            <q-select v-model="createCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="CATEGORIES" outlined dense emit-value map-options class="col" />
-            <q-select v-model="createSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="SEVERITIES" outlined dense emit-value map-options class="col" />
+            <q-select v-model="createContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="formatOptions" outlined dense emit-value map-options class="col" />
+            <q-select v-model="createCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="categoryOptions" outlined dense emit-value map-options class="col" />
+            <q-select v-model="createSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="severityOptions" outlined dense emit-value map-options class="col" />
           </div>
           <q-input v-model="createContent" :label="$t('enterpriseUpdates.contentLabel')" type="textarea" outlined dense :input-style="{ minHeight: '150px' }" />
           <div v-if="createContentFormat === 'MARKDOWN'" class="text-caption text-grey-7 q-mt-xs">{{ $t('enterpriseUpdates.markdownHint') }}</div>
@@ -288,9 +293,9 @@ onMounted(refresh)
         <q-card-section>
           <q-input v-model="editTitle" :label="$t('enterpriseUpdates.titleLabel')" outlined dense class="q-mb-md" />
           <div class="row q-gutter-sm q-mb-md">
-            <q-select v-model="editContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="CONTENT_FORMATS" outlined dense emit-value map-options class="col" />
-            <q-select v-model="editCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="CATEGORIES" outlined dense emit-value map-options class="col" />
-            <q-select v-model="editSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="SEVERITIES" outlined dense emit-value map-options class="col" />
+            <q-select v-model="editContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="formatOptions" outlined dense emit-value map-options class="col" />
+            <q-select v-model="editCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="categoryOptions" outlined dense emit-value map-options class="col" />
+            <q-select v-model="editSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="severityOptions" outlined dense emit-value map-options class="col" />
           </div>
           <q-input v-model="editContent" :label="$t('enterpriseUpdates.contentLabel')" type="textarea" outlined dense :input-style="{ minHeight: '150px' }" />
           <div v-if="editContentFormat === 'MARKDOWN'" class="text-caption text-grey-7 q-mt-xs">{{ $t('enterpriseUpdates.markdownHint') }}</div>
@@ -311,12 +316,12 @@ onMounted(refresh)
           <div class="row q-gutter-xs q-mt-sm">
             <q-badge dense :color="categoryColor[detailItem.category] ?? 'grey'" :label="$t(`enterpriseUpdates.category.${detailItem.category.toLowerCase()}`)" />
             <q-badge dense :color="severityColor[detailItem.severity] ?? 'grey'" :label="$t(`enterpriseUpdates.severity.${detailItem.severity.toLowerCase()}`)" />
-            <q-badge v-if="detailItem.contentFormat === 'MARKDOWN'" dense color="deep-purple" label="Markdown" />
-            <q-badge dense :color="detailItem.status === 'PUBLISHED' ? 'green' : detailItem.status === 'DRAFT' ? 'orange' : 'grey'" :label="detailItem.status" />
+            <StatusChip :value="detailItem.status" />
           </div>
           <div class="text-caption text-grey-7 q-mt-xs">
-            {{ detailItem.enterpriseUpdateId }} · {{ detailItem.publishedAt ?? detailItem.createdAt }}
+            {{ detailItem.publishedAt ? $t('enterpriseUpdates.publishedAt') : $t('enterpriseUpdates.createdAt') }} {{ localTime(detailItem.publishedAt ?? detailItem.createdAt) }}
           </div>
+          <details class="text-caption text-grey-7"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ detailItem.enterpriseUpdateId }} · {{ detailItem.contentFormat }}</details>
         </q-card-section>
         <q-separator />
         <q-card-section v-if="detailItem">

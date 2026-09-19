@@ -59,7 +59,7 @@ func newRuntimeControlEnv(t *testing.T) (*testutil.StoreHandle, *runtimecontrol.
 		t.Fatal(err)
 	}
 	relayStore := control.NewStore(func() time.Time { return now })
-	relayHandler := control.NewHandler(relayStore, "relay-service-token")
+	relayHandler := control.NewHandler(relayStore, "relay-service-token", "test-relay", nil)
 	relayServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		relayHandler.ServeHTTP(w, r)
 	}))

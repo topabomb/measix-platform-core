@@ -9,6 +9,19 @@ type ValidateDraftResponse = components['schemas']['ValidateDraftResponse']
 type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
 type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
 export type ManagedResourceKind = 'MODEL' | 'TTS' | 'ASR' | 'MCP'
+export type TtsProtocol = components['schemas']['TtsDefinition']['clientProtocol']
+export type AsrProtocol = components['schemas']['AsrDefinition']['clientProtocol']
+export function isRealtimeAsr(protocol: AsrProtocol): boolean {
+  return protocol === 'OPENAI_REALTIME_TRANSCRIPTION' || protocol === 'DASHSCOPE_REALTIME_ASR'
+}
+export function asrTransport(protocol: AsrProtocol): TransportPolicy {
+  return protocol === 'OPENAI_AUDIO_TRANSCRIPTIONS' ? 'HTTP_MULTIPART'
+    : protocol === 'DASHSCOPE_HTTP_ASR' ? 'HTTP_REQUEST_RESPONSE' : 'WEBSOCKET'
+}
+export function ttsTransport(protocol: TtsProtocol): TransportPolicy {
+  return protocol === 'MIMO_CHAT_COMPLETIONS_TTS' ? 'HTTP_STREAMING_SSE'
+    : protocol === 'GEMINI_GENERATE_CONTENT_TTS' ? 'HTTP_REQUEST_RESPONSE' : 'HTTP_BINARY_STREAM'
+}
 
 export const useDraftStore = defineStore('draft', () => {
   const baselineContent = ref<ManagedDraftContent>()
@@ -127,6 +140,7 @@ export const useDraftStore = defineStore('draft', () => {
     const content = requireContent()
     content.assistants = content.assistants.filter(a => a.assistantDefinitionId !== id)
     content.starters = content.starters.filter(s => s.assistantDefinitionId !== id)
+    if (content.policy.defaultAssistantId === id) delete content.policy.defaultAssistantId
     markDirty()
   }
 
@@ -134,7 +148,10 @@ export const useDraftStore = defineStore('draft', () => {
     const content = requireContent()
     if (!content.assistants.some(a => a.assistantDefinitionId === assistantDefinitionId)) throw new Error('assistant not found')
     const starterId = createCandidateId('str')
-    content.starters.push({ starterId, assistantDefinitionId, title, prompt: '', sortOrder: 0, enabled: true })
+    const nextSortOrder = content.starters
+      .filter(starter => starter.assistantDefinitionId === assistantDefinitionId)
+      .reduce((highest, starter) => Math.max(highest, starter.sortOrder), -1) + 1
+    content.starters.push({ starterId, assistantDefinitionId, title, prompt: '', sortOrder: nextSortOrder, enabled: true })
     markDirty()
     return starterId
   }
@@ -150,6 +167,23 @@ export const useDraftStore = defineStore('draft', () => {
     return requireContent().bindings.find((b) => b.resourceId === resourceId)
   }
 
+  function runtimeResourceFor(resourceId: string) {
+    const content = requireContent()
+    return [...content.models, ...content.tts, ...content.asr, ...content.mcp]
+      .find(resource => ('modelId' in resource ? resource.modelId
+        : 'ttsId' in resource ? resource.ttsId
+          : 'asrId' in resource ? resource.asrId : resource.mcpServerId) === resourceId)
+  }
+
+  function setRuntimePath(resourceId: string, runtimePath: string) {
+    const resource = runtimeResourceFor(resourceId)
+    if (!resource) throw new Error('runtime resource not found')
+    resource.runtimePath = runtimePath
+    const binding = bindingFor(resourceId)
+    if (binding) binding.allowedPathPrefixes = [runtimePath]
+    markDirty()
+  }
+
   /**
    * Upsert a runtime binding for an enabled resource. Reuses an existing
    * runtimeRouteId so candidate IDs stay stable across edits; a binding that
@@ -162,14 +196,17 @@ export const useDraftStore = defineStore('draft', () => {
       return
     }
     const content = requireContent()
+    const resource = runtimeResourceFor(resourceId)
+    if (!resource?.runtimePath) throw new Error('runtime path is required before binding an upstream')
     const existing = content.bindings.find((b) => b.resourceId === resourceId)
     const runtimeRouteId = existing?.runtimeRouteId ?? createCandidateId('rte')
+    const defaultMethods = transportPolicy === 'WEBSOCKET' ? ['GET'] : content.mcp.some(mcp => mcp.mcpServerId === resourceId) ? ['POST', 'GET', 'DELETE'] : ['POST']
     const next: RuntimeBindingDefinition = {
       runtimeRouteId,
       resourceId,
       upstreamId,
-      allowedMethods: existing?.allowedMethods?.length ? existing.allowedMethods : ['POST'],
-      allowedPathPrefixes: existing?.allowedPathPrefixes?.length ? existing.allowedPathPrefixes : ['/'],
+      allowedMethods: defaultMethods,
+      allowedPathPrefixes: [resource.runtimePath],
       transportPolicy,
     }
     if (existing) {
@@ -186,6 +223,45 @@ export const useDraftStore = defineStore('draft', () => {
     const before = content.bindings.length
     content.bindings = content.bindings.filter((b) => b.resourceId !== resourceId)
     if (content.bindings.length !== before) markDirty()
+  }
+
+  function setTtsProtocol(id: string, protocol: TtsProtocol) {
+    const content = requireContent()
+    const index = content.tts.findIndex(tts => tts.ttsId === id)
+    const previous = content.tts[index]
+    if (!previous || previous.clientProtocol === protocol) return
+    const settings = protocol === 'SYSTEM_TTS' ? { speechRate: 1, pitch: 1 }
+      : protocol === 'MIMO_CHAT_COMPLETIONS_TTS' ? { upstreamModelKey: 'mimo-v2.5-tts', voice: 'mimo_default', runtimePath: '/v1/chat/completions' }
+        : protocol === 'GEMINI_GENERATE_CONTENT_TTS' ? { upstreamModelKey: 'gemini-2.5-flash-preview-tts', voice: 'Kore', runtimePath: '/v1beta/models/gemini-2.5-flash-preview-tts:generateContent' }
+          : { upstreamModelKey: 'gpt-4o-mini-tts', voice: 'alloy', runtimePath: '/v1/audio/speech' }
+    content.tts[index] = { ttsId: id, displayName: previous.displayName, enabled: previous.enabled, clientProtocol: protocol, ...settings }
+    const binding = bindingFor(id)
+    if (protocol === 'SYSTEM_TTS') removeBinding(id)
+    else if (binding) setBinding(id, binding.upstreamId, ttsTransport(protocol))
+    markDirty()
+  }
+
+  function setAsrProtocol(id: string, protocol: AsrProtocol) {
+    const content = requireContent()
+    const index = content.asr.findIndex(asr => asr.asrId === id)
+    const previous = content.asr[index]
+    if (!previous || previous.clientProtocol === protocol) return
+    const settings = protocol === 'OPENAI_REALTIME_TRANSCRIPTION'
+      ? { upstreamModelKey: 'gpt-4o-transcribe', runtimePath: '/v1/realtime', sampleRate: 24000 as const, vadThreshold: 0.5, silenceDurationMs: 500, prefixPaddingMs: 300 }
+      : protocol === 'DASHSCOPE_REALTIME_ASR'
+        ? { upstreamModelKey: 'qwen3-asr-flash-realtime', runtimePath: '/api-ws/v1/realtime', sampleRate: 16000 as const, vadThreshold: 0, silenceDurationMs: 400 }
+        : protocol === 'DASHSCOPE_HTTP_ASR'
+          ? { upstreamModelKey: 'qwen-audio-3.0-asr-flash', runtimePath: '/api/v1/services/aigc/multimodal-generation/generation' }
+        : { upstreamModelKey: 'whisper-1', runtimePath: '/v1/audio/transcriptions' }
+    content.asr[index] = { asrId: id, displayName: previous.displayName, enabled: previous.enabled, clientProtocol: protocol, ...settings }
+    if (previous.language) content.asr[index]!.language = previous.language
+    const binding = bindingFor(id)
+    if (binding) {
+      binding.allowedMethods = isRealtimeAsr(protocol) ? ['GET'] : ['POST']
+      binding.allowedPathPrefixes = [settings.runtimePath]
+      binding.transportPolicy = asrTransport(protocol)
+    }
+    markDirty()
   }
 
   function resourceReferences(kind: ManagedResourceKind, resourceId: string): string[] {
@@ -267,6 +343,6 @@ export const useDraftStore = defineStore('draft', () => {
   return {
     baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
     load, save, validate, addModel, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, markDirty,
-    bindingFor, setBinding, removeBinding, resourceReferences, removeResource,
+    bindingFor, setBinding, setRuntimePath, removeBinding, resourceReferences, removeResource, setTtsProtocol, setAsrProtocol,
   }
 })

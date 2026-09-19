@@ -108,5 +108,8 @@ func (c *HTTPRelayClient) Status(ctx context.Context) (relaycontrolapi.ControlSt
 	if err := json.NewDecoder(response.Body).Decode(&status); err != nil {
 		return relaycontrolapi.ControlStatus{}, err
 	}
+	if strings.TrimSpace(status.BuildVersion) == "" {
+		return relaycontrolapi.ControlStatus{}, errors.New("relay status missing buildVersion")
+	}
 	return status, nil
 }

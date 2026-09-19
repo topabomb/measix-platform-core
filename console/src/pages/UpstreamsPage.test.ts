@@ -14,6 +14,7 @@ import { h } from 'vue'
 import UpstreamsPage from './UpstreamsPage.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useSessionStore } from '../stores/session'
+import { useActivationStore } from '../stores/activation'
 import * as client from '../api/client'
 
 /**
@@ -69,7 +70,115 @@ function setupSession(pinia: ReturnType<typeof createPinia>) {
 
 describe('UpstreamsPage', () => {
   beforeEach(() => {
+    vi.restoreAllMocks()
     vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [], nextCursor: undefined })
+  })
+
+  it('does not suggest recovery after an upstream activation completes', async () => {
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+    useActivationStore(pinia).accept({
+      activationId: 'act_00000000-0000-4000-8000-000000000001',
+      kind: 'RUNTIME_CONFIG',
+      state: 'COMPLETED',
+      desiredControlRevision: 1,
+      createdAt: '2026-09-18T00:00:00Z',
+      updatedAt: '2026-09-18T00:00:00Z',
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Completed')
+    expect(wrapper.text()).not.toContain('Recovery: refresh the page')
+    wrapper.unmount()
+  })
+
+  it('confirms a standalone secret was created and still needs an upstream', async () => {
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/api/admin/v1/secrets' && init?.method === 'POST') {
+        return { secretId: 'sec_00000000-0000-4000-8000-000000000001', name: 'Demo key', secretVersion: 1 }
+      }
+      if (path.startsWith('/api/admin/v1/upstreams')) return { items: [], nextCursor: undefined }
+      return {}
+    })
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'Create secret')!.trigger('click')
+    await flushPromises()
+    await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Secret name')!.setValue('Demo key')
+    await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Secret value')!.setValue('demo-secret')
+    await wrapper.findAllComponents(QBtn).filter(button => button.props('label') === 'Create secret').at(-1)!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-cy="created-secret-notice"]').text()).toContain('Demo key')
+    expect(wrapper.get('[data-cy="created-secret-notice"]').text()).toContain('Create an upstream')
+    wrapper.unmount()
+  })
+
+  it('reuses a secret listed after page reload when creating an upstream', async () => {
+    const secret = { secretId: 'sec_existing', name: 'Existing key', secretVersion: 3 }
+    const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/api/admin/v1/secrets?limit=200') return { items: [secret] }
+      if (path === '/api/admin/v1/upstreams' && init?.method === 'POST') {
+        return { upstreamId: 'ups_created', name: 'Example', configRevision: 1, status: 'INACTIVE' }
+      }
+      return { items: [], nextCursor: undefined }
+    })
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="create-upstream-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Auth mode')!.setValue('BEARER')
+    expect(wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Auth mode')!.props('options')).toContainEqual({ label: 'Bearer token', value: 'BEARER' })
+    expect(wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Usage capability level')!.props('options')).toContainEqual({ label: 'Request facts only (Level 0)', value: 'LEVEL_0' })
+    await flushPromises()
+    const picker = wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Existing secret')
+    expect(picker?.props('options')).toContainEqual({ label: 'Existing key (v3)', value: secret.secretId })
+    await picker!.setValue(secret.secretId)
+    await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Name')!.setValue('Example')
+    await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Base URL')!.setValue('https://example.test')
+    await wrapper.findAllComponents(QBtn).find(button => button.attributes('data-cy') === 'upstream-form-submit')!.trigger('click')
+    await flushPromises()
+    const call = fetchSpy.mock.calls.find(([path, init]) => path === '/api/admin/v1/upstreams' && init?.method === 'POST')
+    expect(call).toBeDefined()
+    expect(JSON.parse(call![1]!.body as string).config.auth).toEqual({
+      type: 'BEARER', secretRef: { secretId: secret.secretId, secretVersion: 3 },
+    })
+    wrapper.unmount()
+  })
+
+  it('saves an existing secret on an upstream candidate without applying it', async () => {
+    const secret = { secretId: 'sec_existing', name: 'Existing key', secretVersion: 3 }
+    const upstream = {
+      upstreamId: 'ups_existing', name: 'Example', configRevision: 1, status: 'INACTIVE',
+      config: {
+        name: 'Example', baseUrl: 'https://example.test', transportCapabilities: ['HTTP_STREAMING_SSE'],
+        auth: { type: 'BEARER', secretRef: { secretId: 'sec_previous', secretVersion: 1 } },
+        correlationMode: 'NONE', usageCapabilityLevel: 'LEVEL_0',
+        timeoutDefaults: { connectMs: 1000, responseHeaderMs: 5000, idleMs: 30000 },
+      },
+    }
+    const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/api/admin/v1/secrets?limit=200') return { items: [secret] }
+      if (path === '/api/admin/v1/upstreams?limit=200') return { items: [upstream] }
+      if (path === '/api/admin/v1/upstreams/ups_existing' && init?.method === 'PUT') return { ...upstream, configRevision: 2, config: JSON.parse(init.body as string).config }
+      return {}
+    })
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.findComponent(QItem).trigger('click')
+    await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'Edit connection')!.trigger('click')
+    await flushPromises()
+    const picker = wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Existing secret')
+    expect(picker?.props('options')).toContainEqual({ label: 'Existing key (v3)', value: secret.secretId })
+    await picker!.setValue(secret.secretId)
+    await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'Save pending changes')!.trigger('click')
+    await flushPromises()
+    const call = fetchSpy.mock.calls.find(([path, init]) => path === '/api/admin/v1/upstreams/ups_existing' && init?.method === 'PUT')
+    expect(JSON.parse(call![1]!.body as string).config.auth.secretRef).toEqual({ secretId: secret.secretId, secretVersion: 3 })
+    expect(fetchSpy.mock.calls.some(([path]) => path.includes(':apply'))).toBe(false)
+    wrapper.unmount()
   })
 
   it('does not render a Provider kind select in the create form', async () => {
@@ -93,6 +202,20 @@ describe('UpstreamsPage', () => {
       return label.includes('Provider kind') || label.includes('providerKind')
     })
     expect(providerKindSelect).toBeUndefined()
+  })
+
+  it('shows the candidate workflow before advanced connection settings', async () => {
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="create-upstream-btn"]').trigger('click')
+    await flushPromises()
+    expect(document.body.innerHTML).toContain('Test the connection')
+    const advanced = document.querySelector('[data-cy="upstream-create-advanced"]') as HTMLDetailsElement
+    expect(advanced).not.toBeNull()
+    expect(advanced.open).toBe(false)
+    expect(advanced.textContent).toContain('Transport Capabilities')
+    wrapper.unmount()
   })
 
   it('can create a secret inline within the create-upstream dialog and auto-binds it', async () => {
@@ -217,7 +340,7 @@ describe('UpstreamsPage', () => {
 
   it('tests connection on an upstream detail and shows the result', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
-    const testResult = { reachable: true, statusCode: 200, latencyMs: 45 }
+    const testResult = { reachable: true, httpStatus: 401, latencyMs: 45, warnings: [] }
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path.startsWith('/api/admin/v1/upstreams') && !path.includes(':')) return { items: [{ upstreamId: 'ups_test', name: 'OpenAI', configRevision: 1, status: 'ACTIVE' }], nextCursor: undefined }
       if (path.includes(':test')) return testResult
@@ -230,6 +353,9 @@ describe('UpstreamsPage', () => {
     // Open the upstream detail row.
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
+    const advanced = document.querySelector('[data-cy="upstream-detail-advanced"]')
+    expect(advanced).not.toBeNull()
+    expect(advanced).not.toHaveProperty('open', true)
 
     const btns = wrapper.findAllComponents(QBtn)
     const testBtn = btns.find((b) => String(b.props('label') ?? '') === 'Test connection')
@@ -240,6 +366,9 @@ describe('UpstreamsPage', () => {
     const testCall = fetchSpy.mock.calls.find((c) => c[0].includes(':test'))
     expect(testCall).toBeTruthy()
     expect(testCall![1]!.method).toBe('POST')
+    expect(document.querySelector('[data-cy="upstream-test-http-status"]')?.textContent).toBe('401')
+    expect(document.body.textContent).toContain('This checks connectivity only')
+    expect(document.body.textContent).not.toContain('Verified capabilities')
   })
 
   it('applies an upstream with an Idempotency-Key and surfaces the activation', async () => {
@@ -251,7 +380,6 @@ describe('UpstreamsPage', () => {
       }
       return {}
     })
-    window.confirm = vi.fn(() => true)
     const { wrapper, pinia } = mountUpstreamsPage()
     setupSession(pinia)
     await flushPromises()
@@ -265,9 +393,18 @@ describe('UpstreamsPage', () => {
     await applyBtn!.trigger('click')
     await flushPromises()
 
+    expect(fetchSpy.mock.calls.some(([path]) => path.includes(':apply'))).toBe(false)
+    const confirmButton = document.querySelector<HTMLButtonElement>('[data-cy="upstream-apply-confirm"]')
+    expect(confirmButton).not.toBeNull()
+    confirmButton!.click()
+    await flushPromises()
+
     const applyCall = fetchSpy.mock.calls.find((c) => c[0].includes(':apply'))
     expect(applyCall).toBeTruthy()
     expect((applyCall![1] as RequestInit).headers).toHaveProperty('Idempotency-Key')
     expect(wrapper.text()).toContain('act_001')
+    const details = wrapper.find('[data-cy="upstream-activation-details"]')
+    expect(details.text()).toContain('act_001')
+    expect(details.attributes('open')).toBeUndefined()
   })
 })

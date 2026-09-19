@@ -93,8 +93,10 @@ describe('UsersPage', () => {
     const text = wrapper.text()
     expect(text).toContain('Admin User')
     expect(text).toContain('Member User')
-    expect(text).toContain('ADMIN')
-    expect(text).toContain('MEMBER')
+    expect(text).toContain('Admin')
+    expect(text).toContain('Member')
+    expect(text).not.toContain('ADMIN')
+    expect(text).not.toContain('MEMBER')
   })
 
   it('opens create user dialog with username, display name and role fields', async () => {
@@ -156,9 +158,9 @@ describe('UsersPage', () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path.startsWith('/api/admin/v1/users') && path.includes('/enrollments') && init?.method === 'POST') {
-        return { code: 'ENROLL-CODE-12345', expiresAt: '2026-12-31T23:59:59Z' }
+        return { platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-CODE-12345', expiresAt: '2026-12-31T23:59:59Z' }
       }
-      if (path.startsWith('/api/admin/v1/users')) {
+      if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices')) {
         return {
           items: [{ userId: 'usr_001', username: 'admin', displayName: 'Admin User', role: 'ADMIN', status: 'ACTIVE' }],
           nextCursor: undefined,
@@ -183,8 +185,13 @@ describe('UsersPage', () => {
       (b.textContent ?? '').includes('enrollment') || (b.textContent ?? '').includes('Enrollment'),
     )
     expect(enrollBtn).toBeTruthy()
+    expect(enrollBtn!.textContent).toContain('Generate Android enrollment material')
     enrollBtn!.click()
     await flushPromises()
+
+    const codeDetails = document.querySelector('[data-cy="enrollment-code-details"]') as HTMLDetailsElement
+    expect(codeDetails).not.toBeNull()
+    expect(codeDetails.open).toBe(false)
 
     const enrollCall = fetchSpy.mock.calls.find((c) => c[0].includes('/enrollments') && c[1]?.method === 'POST')
     expect(enrollCall).toBeDefined()
@@ -195,19 +202,33 @@ describe('UsersPage', () => {
     expect(body).toContain('content_copy')
     await vi.waitFor(() => expect(vi.mocked(QRCode.toCanvas)).toHaveBeenCalled())
     const material = JSON.parse(String(vi.mocked(QRCode.toCanvas).mock.calls.at(-1)![1]))
-    expect(material).toMatchObject({ formatVersion: 1, kind: 'PLATFORM_ENROLLMENT', platformUrl: window.location.origin, code: 'ENROLL-CODE-12345' })
+    expect(material).toMatchObject({ formatVersion: 1, kind: 'PLATFORM_ENROLLMENT', platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-CODE-12345' })
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
     ;(document.querySelector('[data-cy="copy-enrollment-material"]') as HTMLButtonElement).click()
     await flushPromises()
     expect(JSON.parse(writeText.mock.calls[0]![0])).toEqual(material)
+    expect(document.querySelector('[data-cy="enrollment-copy-result"]')?.textContent).toBe('Copied')
+    // Ordinary HTTP has no Async Clipboard API. Copy must still work from the dialog.
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
+    let copiedText = ''
+    const execCommand = vi.fn(() => {
+      copiedText = (document.activeElement as HTMLTextAreaElement).value
+      return true
+    })
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
+    ;(document.querySelector('[data-cy="copy-enrollment-material"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(execCommand).toHaveBeenCalledWith('copy')
+    expect(JSON.parse(copiedText)).toEqual(material)
+    expect(document.querySelector('body > textarea')).toBeNull()
   })
 
   it('shows enrollment code expiry time', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path.includes('/enrollments') && init?.method === 'POST') {
-        return { code: 'ENROLL-EXPIRY', expiresAt: '2026-12-31T23:59:59Z' }
+        return { platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-EXPIRY', expiresAt: '2026-12-31T23:59:59Z' }
       }
       if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices')) {
         return {
@@ -244,7 +265,7 @@ describe('UsersPage', () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path.includes('/enrollments') && init?.method === 'POST') {
-        return { code: 'ENROLL-QR-CODE-67890', expiresAt: '2026-12-31T23:59:59Z' }
+        return { platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-QR-CODE-67890', expiresAt: '2026-12-31T23:59:59Z' }
       }
       if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices')) {
         return {
@@ -272,7 +293,7 @@ describe('UsersPage', () => {
     // QRCode.toCanvas should have been called with the enrollment code
     expect(toCanvasSpy).toHaveBeenCalled()
     const callArgs = toCanvasSpy.mock.calls.at(-1)
-    expect(JSON.parse(String(callArgs?.[1]))).toMatchObject({ kind: 'PLATFORM_ENROLLMENT', platformUrl: window.location.origin, code: 'ENROLL-QR-CODE-67890' })
+    expect(JSON.parse(String(callArgs?.[1]))).toMatchObject({ kind: 'PLATFORM_ENROLLMENT', platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-QR-CODE-67890' })
 
     // The canvas element with data-cy should be present in the dialog
     const qrCanvas = document.querySelector('[data-cy="enrollment-qr"]')
@@ -283,7 +304,7 @@ describe('UsersPage', () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path.includes('/enrollments') && init?.method === 'POST') {
-        return { code: 'ENROLL-ONE-TIME-XYZ', expiresAt: '2026-12-31T23:59:59Z' }
+        return { platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-ONE-TIME-XYZ', expiresAt: '2026-12-31T23:59:59Z' }
       }
       if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices')) {
         return {
@@ -332,8 +353,8 @@ describe('UsersPage', () => {
       if (path.includes('/devices')) {
         return {
           items: [
-            { deviceId: 'dev_001', status: 'ACTIVE', appVersion: '1.0.0', lastSeenAt: '2026-08-01T00:00:00Z' },
-            { deviceId: 'dev_002', status: 'REVOKED', appVersion: '0.9.0', lastSeenAt: '2026-07-01T00:00:00Z' },
+            { deviceId: 'dev_001', deviceName: 'Office phone', applicationState: 'APPLIED', targetManagedGeneration: 2, appliedManagedGeneration: 2, appliedReportedAt: '2026-09-18T12:00:00Z', status: 'ACTIVE', appVersion: '1.0.0', lastSeenAt: '2026-08-01T00:00:00Z' },
+            { deviceId: 'dev_002', deviceName: 'Old phone', applicationState: 'UNKNOWN', targetManagedGeneration: 2, status: 'REVOKED', appVersion: '0.9.0', lastSeenAt: '2026-07-01T00:00:00Z' },
           ],
           nextCursor: undefined,
         }
@@ -350,7 +371,13 @@ describe('UsersPage', () => {
 
     const body = document.body.innerHTML
     expect(body).toContain('dev_001')
+    expect(body).toContain('Office phone')
     expect(body).toContain('dev_002')
+    expect(body).toContain('Reported applied')
+    expect(body).toContain('Application status unknown')
+    const identities = document.querySelectorAll('details[data-cy="device-identity"]')
+    expect(identities).toHaveLength(2)
+    expect(identities[0]?.hasAttribute('open')).toBe(false)
     // StatusChip renders status via i18n ("Active" / "Revoked")
     expect(body.toLowerCase()).toContain('active')
     expect(body.toLowerCase()).toContain('revoked')

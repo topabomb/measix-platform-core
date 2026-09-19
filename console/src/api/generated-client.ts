@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/client/v1/managed/applied": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["reportManagedApplied"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/client/v1/portal/grants": {
         parameters: {
             query?: never;
@@ -201,7 +217,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Versioned native scan/paste material; not an HTTP enrollment request. See Control Protocol section 8. The Admin public origin is used, never an internal Hub or Relay address. */
+        ManagedAppliedReport: {
+            managedGeneration: number;
+            snapshotHash: string;
+        };
+        /** @description Versioned native scan/paste material; not an HTTP enrollment request. See Control Protocol section 8. The explicit deployment public HTTP/HTTPS origin is used, never the browser origin or an internal Hub/Relay address. */
         PlatformEnrollmentMaterial: {
             /** @enum {integer} */
             formatVersion: 1;
@@ -283,7 +303,7 @@ export interface components {
             providerId: components["schemas"]["ProviderId"];
             displayName: string;
             /** @enum {string} */
-            clientProtocol: "OPENAI_CHAT_COMPLETIONS";
+            clientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "GOOGLE_GENERATE_CONTENT" | "ANTHROPIC_MESSAGES";
             enabled: boolean;
         };
         ModelDefinition: {
@@ -301,19 +321,31 @@ export interface components {
             ttsId: components["schemas"]["TtsId"];
             displayName: string;
             /** @enum {string} */
-            clientProtocol: "OPENAI_AUDIO_SPEECH";
-            upstreamModelKey: string;
-            voice: string;
-            runtimePath: string;
+            clientProtocol: "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "SYSTEM_TTS";
+            upstreamModelKey?: string;
+            voice?: string;
+            runtimePath?: string;
+            voiceDesignPrompt?: string;
+            /** Format: double */
+            speechRate?: number;
+            /** Format: double */
+            pitch?: number;
             enabled: boolean;
         };
         AsrDefinition: {
             asrId: components["schemas"]["AsrId"];
             displayName: string;
             /** @enum {string} */
-            clientProtocol: "OPENAI_AUDIO_TRANSCRIPTIONS";
+            clientProtocol: "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR";
             upstreamModelKey: string;
             language?: string;
+            /** @enum {integer} */
+            sampleRate?: 8000 | 16000 | 24000;
+            /** Format: double */
+            vadThreshold?: number;
+            silenceDurationMs?: number;
+            prefixPaddingMs?: number;
+            prompt?: string;
             runtimePath: string;
             enabled: boolean;
         };
@@ -340,7 +372,7 @@ export interface components {
             allowedMethods: string[];
             allowedPathPrefixes: string[];
             /** @enum {string} */
-            transportPolicy: "HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART";
+            transportPolicy: "HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART" | "WEBSOCKET";
             timeoutPolicy?: components["schemas"]["TimeoutPolicy"];
         };
         /** @description Current policy. All five admission flags are required; new policies initialize all five to false. */
@@ -355,6 +387,7 @@ export interface components {
             defaultModelId?: components["schemas"]["ModelId"];
             defaultTtsId?: components["schemas"]["TtsId"];
             defaultAsrId?: components["schemas"]["AsrId"];
+            defaultAssistantId?: components["schemas"]["AssistantDefinitionId"];
         };
         ManagedDraftContent: {
             providers: components["schemas"]["ProviderDefinition"][];
@@ -526,6 +559,33 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    reportManagedApplied: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagedAppliedReport"];
+            };
+        };
+        responses: {
+            /** @description Current session application report recorded; does not renew session or authorize runtime. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
     createPortalGrant: {
         parameters: {
             query?: never;

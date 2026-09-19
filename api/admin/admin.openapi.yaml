@@ -245,6 +245,8 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
       requestBody:
         required: true
         content:
@@ -397,7 +399,7 @@ paths:
   /api/admin/v1/draft:preview:
     post:
       operationId: previewDraft
-      description: Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical projection hash and sorted resource arrays so the operator can review the exact shape that would be published. The projectionHash is computed from the same canonical projection as a real snapshot but uses placeholder releaseId/generation/publishedAt — it is NOT the final snapshotHash.
+      description: Compiles the current draft into a read-only snapshot preview without publishing. Returns the canonical projection hash and sorted resource arrays so the operator can review the exact shape that would be published. The projectionHash uses deterministic placeholder releaseId/generation/publishedAt, so repeated previews of the same saved draft are stable. It is NOT the final snapshotHash, which includes the real Release metadata.
       responses:
         '200':
           description: OK
@@ -652,6 +654,23 @@ paths:
       - *id001
       - *id003
   /api/admin/v1/secrets:
+    get:
+      operationId: listSecrets
+      description: Lists only Secret metadata for selection after page reload. Never returns credential values or encrypted payloads.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecretPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id004
+      - *id005
     post:
       operationId: createSecret
       responses:
@@ -1194,6 +1213,9 @@ components:
           type: string
           enum:
           - OPENAI_CHAT_COMPLETIONS
+          - OPENAI_RESPONSES
+          - GOOGLE_GENERATE_CONTENT
+          - ANTHROPIC_MESSAGES
         enabled:
           type: boolean
     ModelDefinition:
@@ -1254,9 +1276,6 @@ components:
       - ttsId
       - displayName
       - clientProtocol
-      - upstreamModelKey
-      - runtimePath
-      - voice
       - enabled
       properties:
         ttsId:
@@ -1268,15 +1287,35 @@ components:
           type: string
           enum:
           - OPENAI_AUDIO_SPEECH
+          - GEMINI_GENERATE_CONTENT_TTS
+          - MIMO_CHAT_COMPLETIONS_TTS
+          - SYSTEM_TTS
         upstreamModelKey:
           type: string
           minLength: 1
+          x-go-type-skip-optional-pointer: true
         voice:
           type: string
           minLength: 1
+          x-go-type-skip-optional-pointer: true
         runtimePath:
           type: string
           pattern: ^/[^?#]*$
+          x-go-type-skip-optional-pointer: true
+        voiceDesignPrompt:
+          type: string
+          minLength: 1
+          x-go-type-skip-optional-pointer: true
+        speechRate:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+        pitch:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
         enabled:
           type: boolean
     AsrDefinition:
@@ -1299,10 +1338,30 @@ components:
           type: string
           enum:
           - OPENAI_AUDIO_TRANSCRIPTIONS
+          - DASHSCOPE_HTTP_ASR
+          - OPENAI_REALTIME_TRANSCRIPTION
+          - DASHSCOPE_REALTIME_ASR
         upstreamModelKey:
           type: string
           minLength: 1
         language:
+          type: string
+          minLength: 1
+        sampleRate:
+          type: integer
+          enum: [8000, 16000, 24000]
+        vadThreshold:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        silenceDurationMs:
+          type: integer
+          minimum: 1
+        prefixPaddingMs:
+          type: integer
+          minimum: 0
+        prompt:
           type: string
           minLength: 1
         runtimePath:
@@ -1395,6 +1454,7 @@ components:
           - HTTP_STREAMING_SSE
           - HTTP_BINARY_STREAM
           - HTTP_MULTIPART
+          - WEBSOCKET
         timeoutPolicy:
           $ref: '#/components/schemas/TimeoutPolicy'
     ManagedPolicy:
@@ -1428,6 +1488,8 @@ components:
           $ref: '#/components/schemas/TtsId'
         defaultAsrId:
           $ref: '#/components/schemas/AsrId'
+        defaultAssistantId:
+          $ref: '#/components/schemas/AssistantDefinitionId'
     ManagedDraftContent:
       type: object
       additionalProperties: false
@@ -1678,7 +1740,12 @@ components:
       - enrollmentId
       - code
       - expiresAt
+      - platformUrl
       properties:
+        platformUrl:
+          type: string
+          format: uri
+          description: Configured public HTTP or HTTPS platform origin; never inferred from the request.
         enrollmentId:
           $ref: '#/components/schemas/EnrollmentId'
         code:
@@ -1691,9 +1758,28 @@ components:
       additionalProperties: false
       required:
       - deviceId
+      - deviceName
       - userId
       - status
+      - applicationState
+      - targetManagedGeneration
       properties:
+        deviceName:
+          type: string
+          description: Device name supplied during enrollment; display metadata, not authorization identity.
+        applicationState:
+          type: string
+          enum: [UNKNOWN, PENDING, APPLIED, UNPUBLISHED]
+          description: Last report of the current valid session, not an online or runtime admission assertion.
+        targetManagedGeneration:
+          type: integer
+          minimum: 0
+        appliedManagedGeneration:
+          type: integer
+          minimum: 1
+        appliedReportedAt:
+          type: string
+          format: date-time
         deviceId:
           $ref: '#/components/schemas/DeviceId'
         userId:
@@ -1852,6 +1938,7 @@ components:
             - HTTP_STREAMING_SSE
             - HTTP_BINARY_STREAM
             - HTTP_MULTIPART
+            - WEBSOCKET
         auth:
           $ref: '#/components/schemas/UpstreamAuth'
         correlationMode:
@@ -1925,18 +2012,19 @@ components:
       additionalProperties: false
       required:
       - reachable
-      - verifiedCapabilities
       - warnings
       properties:
         reachable:
           type: boolean
+          description: A response was received by an unauthenticated HEAD probe of the saved candidate base URL. Does not verify authentication or capability support.
         latencyMs:
           type: integer
           minimum: 0
-        verifiedCapabilities:
-          type: array
-          items:
-            type: string
+        httpStatus:
+          type: integer
+          minimum: 100
+          maximum: 599
+          description: Observed HTTP response status; omitted when no response was received.
         warnings:
           type: array
           items:
@@ -1956,6 +2044,18 @@ components:
         secretVersion:
           type: integer
           minimum: 1
+    SecretPage:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Secret'
+        nextCursor:
+          type: string
     CreateSecretRequest:
       type: object
       additionalProperties: false
@@ -2259,6 +2359,7 @@ components:
       - to
       - requestCount
       - forwardedRequestCount
+      - requestCompleteness
       - requestBytes
       - responseBytes
       - semanticMeters
@@ -2276,6 +2377,8 @@ components:
         forwardedRequestCount:
           type: integer
           minimum: 0
+        requestCompleteness:
+          $ref: '#/components/schemas/RequestCompletenessCounts'
         requestBytes:
           type: integer
           minimum: 0
@@ -2318,6 +2421,21 @@ components:
               type: string
             currency:
               type: string
+    RequestCompletenessCounts:
+      type: object
+      additionalProperties: false
+      required: [exact, partial, unknown]
+      description: Counts of whole requests within the same summary filter; sum equals requestCount.
+      properties:
+        exact:
+          type: integer
+          minimum: 0
+        partial:
+          type: integer
+          minimum: 0
+        unknown:
+          type: integer
+          minimum: 0
     RequestUsageView:
       type: object
       additionalProperties: false
@@ -2348,6 +2466,10 @@ components:
         resourceId:
           x-go-type-skip-optional-pointer: true
           type: string
+        resourceDisplayName:
+          type: string
+          x-go-type-skip-optional-pointer: true
+          description: Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found.
         runtimeRouteId:
           x-go-type-skip-optional-pointer: true
           $ref: '#/components/schemas/RuntimeRouteId'
@@ -2479,6 +2601,14 @@ components:
       - desiredControlRevision
       - relayReady
       properties:
+        publicOrigin:
+          type: string
+          format: uri
+          description: Explicit public HTTP or HTTPS platform origin; absent when deployment configuration is incomplete.
+        relayBuildVersion:
+          type: string
+          minLength: 1
+          description: Running Relay build identity from a successful private status read. Omitted when unavailable; never copied from Hub.
         buildVersion:
           type: string
         dbHealth:
@@ -2513,7 +2643,9 @@ components:
         lastRelaySeenAt:
           type: string
           format: date-time
-        latestActivation:
+        currentActivation:
+          $ref: '#/components/schemas/Activation'
+        lastActivation:
           $ref: '#/components/schemas/Activation'
         spoolState:
           type: string
@@ -2531,6 +2663,10 @@ components:
         semanticOrphanCount:
           type: integer
           minimum: 0
+        semanticUnknownRequestCount:
+          type: integer
+          minimum: 0
+          description: Number of retained requests with no linked semantic records or at least one UNKNOWN record. Counts requests once, excludes unlinked provider records, and uses the same completeness rule as Usage. Omission means unavailable, not zero.
     Health:
       type: object
       additionalProperties: false

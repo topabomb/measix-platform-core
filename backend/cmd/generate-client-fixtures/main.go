@@ -81,6 +81,10 @@ func main() {
 		}},
 		{"default-disabled-tts", "invalid_default_tts", func(v object) { v["tts"].([]any)[0].(map[string]any)["enabled"] = false }},
 		{"default-disabled-asr", "invalid_default_asr", func(v object) { v["asr"].([]any)[0].(map[string]any)["enabled"] = false }},
+		{"default-missing-assistant", "invalid_default_assistant", func(v object) {
+			v["policy"].(map[string]any)["defaultAssistantId"] = "asd_99999999-9999-4999-8999-999999999999"
+		}},
+		{"default-disabled-assistant", "invalid_default_assistant", func(v object) { v["assistants"].([]any)[0].(map[string]any)["enabled"] = false }},
 	}
 	for _, mutation := range mutations {
 		value := clone(content)
@@ -93,6 +97,61 @@ func main() {
 		cases = append(cases, wireCase{name, schema, valid, value})
 	}
 	add("v4-full", "ManagedSnapshot", true, snapshot)
+	var responsesContent adminapi.ManagedDraftContent
+	must(json.Unmarshal(raw, &responsesContent))
+	responsesContent.Providers[0].ClientProtocol = adminapi.OPENAIRESPONSES
+	for i := range responsesContent.Models {
+		responsesContent.Models[i].RuntimePath = "/v1/responses"
+	}
+	responsesSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: responsesContent, PublishedAt: at, PublishedByUserID: user})
+	must(err)
+	write("snapshot-v4-responses.json", responsesSnapshot)
+	add("v4-responses", "ManagedSnapshot", true, responsesSnapshot)
+	for _, profile := range []struct{ name, protocol, path string }{
+		{"gemini", "GOOGLE_GENERATE_CONTENT", "/v1beta/models/gemini-test:streamGenerateContent"},
+		{"claude", "ANTHROPIC_MESSAGES", "/v1/messages"},
+	} {
+		var nativeContent adminapi.ManagedDraftContent
+		must(json.Unmarshal(raw, &nativeContent))
+		nativeContent.Providers[0].ClientProtocol = adminapi.ProviderDefinitionClientProtocol(profile.protocol)
+		for i := range nativeContent.Models {
+			nativeContent.Models[i].RuntimePath = profile.path
+		}
+		nativeSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: nativeContent, PublishedAt: at, PublishedByUserID: user})
+		must(err)
+		write("snapshot-v4-"+profile.name+".json", nativeSnapshot)
+		add("v4-"+profile.name, "ManagedSnapshot", true, nativeSnapshot)
+	}
+	// Compile every Android speech profile, including an enterprise-owned
+	// device voice while user-created local TTS remains forbidden.
+	var speechContent adminapi.ManagedDraftContent
+	must(json.Unmarshal(raw, &speechContent))
+	must(json.Unmarshal([]byte(`[
+		{"ttsId":"tts_11111111-1111-4111-8111-111111111111","displayName":"OpenAI speech","clientProtocol":"OPENAI_AUDIO_SPEECH","enabled":true,"upstreamModelKey":"gpt-4o-mini-tts","voice":"alloy","runtimePath":"/v1/audio/speech"},
+		{"ttsId":"tts_22222222-2222-4222-8222-222222222222","displayName":"Gemini speech","clientProtocol":"GEMINI_GENERATE_CONTENT_TTS","enabled":true,"upstreamModelKey":"gemini-2.5-flash-preview-tts","voice":"Kore","runtimePath":"/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"},
+		{"ttsId":"tts_33333333-3333-4333-8333-333333333333","displayName":"MiMo speech","clientProtocol":"MIMO_CHAT_COMPLETIONS_TTS","enabled":true,"upstreamModelKey":"mimo-v2.5-tts","voice":"mimo_default","runtimePath":"/v1/chat/completions"},
+		{"ttsId":"tts_44444444-4444-4444-8444-444444444444","displayName":"MiMo voice design","clientProtocol":"MIMO_CHAT_COMPLETIONS_TTS","enabled":true,"upstreamModelKey":"mimo-v2.5-tts-voicedesign","voiceDesignPrompt":"Warm, calm voice","runtimePath":"/v1/chat/completions"},
+		{"ttsId":"tts_55555555-5555-4555-8555-555555555555","displayName":"Device speech","clientProtocol":"SYSTEM_TTS","enabled":true,"speechRate":1.2,"pitch":0.9}
+	]`), &speechContent.Tts))
+	speechContent.Policy.DefaultTtsId = &speechContent.Tts[4].TtsId
+	speechContent.Policy.AllowLocalTts = false
+	speechSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: speechContent, PublishedAt: at, PublishedByUserID: user})
+	must(err)
+	write("snapshot-v4-speech.json", speechSnapshot)
+	add("v4-speech", "ManagedSnapshot", true, speechSnapshot)
+	var asrContent adminapi.ManagedDraftContent
+	must(json.Unmarshal(raw, &asrContent))
+	must(json.Unmarshal([]byte(`[
+		{"asrId":"asr_11111111-1111-4111-8111-111111111111","displayName":"File transcription","clientProtocol":"OPENAI_AUDIO_TRANSCRIPTIONS","enabled":true,"upstreamModelKey":"whisper-1","runtimePath":"/v1/audio/transcriptions"},
+		{"asrId":"asr_44444444-4444-4444-8444-444444444444","displayName":"DashScope HTTP transcription","clientProtocol":"DASHSCOPE_HTTP_ASR","enabled":true,"upstreamModelKey":"qwen-audio-3.0-asr-flash","runtimePath":"/api/v1/services/aigc/multimodal-generation/generation"},
+		{"asrId":"asr_22222222-2222-4222-8222-222222222222","displayName":"OpenAI realtime","clientProtocol":"OPENAI_REALTIME_TRANSCRIPTION","enabled":true,"upstreamModelKey":"gpt-4o-transcribe","runtimePath":"/v1/realtime","sampleRate":24000,"vadThreshold":0.5,"silenceDurationMs":500,"prefixPaddingMs":300},
+		{"asrId":"asr_33333333-3333-4333-8333-333333333333","displayName":"DashScope realtime","clientProtocol":"DASHSCOPE_REALTIME_ASR","enabled":true,"upstreamModelKey":"qwen3-asr-flash-realtime","runtimePath":"/api-ws/v1/realtime","sampleRate":16000,"vadThreshold":0,"silenceDurationMs":400}
+	]`), &asrContent.Asr))
+	asrContent.Policy.DefaultAsrId = &asrContent.Asr[1].AsrId
+	asrSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: asrContent, PublishedAt: at, PublishedByUserID: user})
+	must(err)
+	write("snapshot-v4-asr.json", asrSnapshot)
+	add("v4-asr", "ManagedSnapshot", true, asrSnapshot)
 	add("v4-policy-denied", "ManagedSnapshot", true, deniedSnapshot)
 	for _, flag := range []string{"allowLocalProviders", "allowLocalTts", "allowLocalAsr", "allowLocalMcp", "allowLocalAssistants"} {
 		for _, mutation := range []string{"missing", "null", "string"} {
@@ -142,6 +201,12 @@ func main() {
 		write(entry.name+".json", entry.value)
 		add(entry.name, entry.schema, true, entry.value)
 	}
+	applied := object{"managedGeneration": 42, "snapshotHash": snapshot.SnapshotHash}
+	add("managed-applied-report", "ManagedAppliedReport", true, applied)
+	add("managed-applied-zero", "ManagedAppliedReport", false, object{"managedGeneration": 0, "snapshotHash": snapshot.SnapshotHash})
+	add("managed-applied-missing-hash", "ManagedAppliedReport", false, object{"managedGeneration": 42})
+	add("managed-applied-empty-hash", "ManagedAppliedReport", false, object{"managedGeneration": 42, "snapshotHash": ""})
+	add("managed-applied-spoof-device", "ManagedAppliedReport", false, object{"managedGeneration": 42, "snapshotHash": snapshot.SnapshotHash, "deviceId": device})
 	write("cases.json", cases)
 	response := func(status int, body any) object { return object{"status": status, "body": body} }
 	httpExamples := []object{
@@ -151,6 +216,7 @@ func main() {
 		{"name": "refresh", "method": "POST", "path": "/api/client/v1/sessions/refresh", "headers": object{"Idempotency-Key": "idem_550e8400-e29b-41d4-a716-446655440000"}, "body": object{"refreshToken": "synthetic-refresh-token"}, "response": response(200, refresh)},
 		{"name": "snapshot", "method": "GET", "path": "/api/client/v1/managed/snapshots/42", "headers": object{"Authorization": "Bearer synthetic.access.token"}, "response": object{"status": 200, "headers": object{"ETag": "\"" + snapshot.SnapshotHash + "\""}, "bodyFile": "snapshot-v4.json"}},
 		{"name": "snapshot-not-modified", "method": "GET", "path": "/api/client/v1/managed/snapshots/42", "headers": object{"Authorization": "Bearer synthetic.access.token", "If-None-Match": "\"" + snapshot.SnapshotHash + "\""}, "response": object{"status": 304, "headers": object{"ETag": "\"" + snapshot.SnapshotHash + "\""}, "body": nil}},
+		{"name": "report-atomically-applied", "method": "PUT", "path": "/api/client/v1/managed/applied", "headers": object{"Authorization": "Bearer synthetic.access.token"}, "body": applied, "response": response(204, nil)},
 		{"name": "logout", "method": "POST", "path": "/api/client/v1/sessions/logout", "body": object{"refreshToken": "synthetic-rotated-refresh"}, "response": response(204, nil)},
 	}
 	write("http-examples.json", httpExamples)
@@ -177,6 +243,7 @@ func main() {
 		{"resourceId": snapshot.Models[0].ModelId, "protocol": snapshot.Providers[0].ClientProtocol, "method": "POST", "url": base + snapshot.Models[0].ModelId + snapshot.Models[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": snapshot.Models[0].UpstreamModelKey, "messages": []object{{"role": "user", "content": "Hello"}}, "stream": true, "stream_options": object{"include_usage": true}}, "responseKind": "SSE"},
 		{"resourceId": snapshot.Tts[0].TtsId, "protocol": snapshot.Tts[0].ClientProtocol, "method": "POST", "url": base + snapshot.Tts[0].TtsId + snapshot.Tts[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": snapshot.Tts[0].UpstreamModelKey, "voice": snapshot.Tts[0].Voice, "input": "Hello"}, "responseKind": "BINARY_AUDIO"},
 		{"resourceId": snapshot.Asr[0].AsrId, "protocol": snapshot.Asr[0].ClientProtocol, "method": "POST", "url": base + snapshot.Asr[0].AsrId + snapshot.Asr[0].RuntimePath, "headers": headers, "contentType": "multipart/form-data", "fields": object{"model": snapshot.Asr[0].UpstreamModelKey, "language": snapshot.Asr[0].Language, "file": "<client audio bytes>"}, "responseKind": "JSON"},
+		{"resourceId": asrSnapshot.Asr[1].AsrId, "protocol": asrSnapshot.Asr[1].ClientProtocol, "method": "POST", "url": base + asrSnapshot.Asr[1].AsrId + asrSnapshot.Asr[1].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": asrSnapshot.Asr[1].UpstreamModelKey, "input": object{"messages": []object{{"role": "user", "content": []object{{"type": "input_audio", "input_audio": object{"data": "data:audio/wav;base64,<recording>"}}}}}}, "parameters": object{"format": "wav"}}, "responseKind": "JSON_OUTPUT_TEXT"},
 		{"resourceId": snapshot.Mcp[0].McpServerId, "protocol": snapshot.Mcp[0].ClientProtocol, "method": "POST", "url": base + snapshot.Mcp[0].McpServerId + snapshot.Mcp[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, "precondition": "MCP session initialized by client SDK; add negotiated protocol/session headers and Accept application/json, text/event-stream", "responseKind": "JSON_OR_SSE"},
 	})
 	// HTTP response fields are schema examples, not live credentials or a substitute for handler tests.

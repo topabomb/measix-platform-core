@@ -29,7 +29,7 @@ var (
 )
 
 type Service struct {
-	PortalOrigin      string
+	PublicOrigin      string
 	BootstrapTimezone string
 	Client            *ent.Client
 	Signer            *security.AccessSigner
@@ -461,7 +461,7 @@ func userView(row *ent.User) UserView {
 }
 
 func deviceView(row *ent.Device) DeviceView {
-	return DeviceView{ID: row.ID, UserID: row.UserID, InstallationID: row.InstallationID, AppVersion: row.AppVersion, LastSeenAt: row.LastSeenAt, Status: row.Status}
+	return DeviceView{Name: row.Name, ID: row.ID, UserID: row.UserID, InstallationID: row.InstallationID, AppVersion: row.AppVersion, LastSeenAt: row.LastSeenAt, Status: row.Status}
 }
 
 func (s *Service) CreateUserView(ctx context.Context, username, displayName, role string) (UserView, error) {
@@ -501,7 +501,8 @@ func (s *Service) UpdateUserView(ctx context.Context, userID, username, displayN
 }
 
 func (s *Service) ListDeviceViews(ctx context.Context, userID string, limit int, after string) ([]DeviceView, error) {
-	if _, err := s.GetUser(ctx, userID); err != nil {
+	owner, err := s.GetUser(ctx, userID)
+	if err != nil {
 		return nil, err
 	}
 	rows, err := s.Client.Device.Query().Where(device.UserIDEQ(userID), device.IDGT(after)).Order(ent.Asc(device.FieldID)).Limit(limit).All(ctx)
@@ -509,8 +510,44 @@ func (s *Service) ListDeviceViews(ctx context.Context, userID string, limit int,
 		return nil, err
 	}
 	views := make([]DeviceView, 0, len(rows))
+	if len(rows) == 0 {
+		return views, nil
+	}
+	state, err := s.ManagedState(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(rows))
 	for _, row := range rows {
-		views = append(views, deviceView(row))
+		ids = append(ids, row.ID)
+	}
+	sessions, err := s.Client.Session.Query().Where(session.UserIDEQ(userID), session.DeviceIDIn(ids...), session.ChannelEQ("ANDROID"), session.StatusEQ("ACTIVE"), session.ExpiresAtGT(s.Now())).Order(ent.Desc(session.FieldCreatedAt)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	current := make(map[string]*ent.Session, len(sessions))
+	for _, row := range sessions {
+		if row.DeviceID != nil && current[*row.DeviceID] == nil {
+			current[*row.DeviceID] = row
+		}
+	}
+	for _, row := range rows {
+		view := deviceView(row)
+		view.TargetManagedGeneration = state.ActiveManagedGeneration
+		view.ApplicationState = "UNKNOWN"
+		if state.ActiveManagedGeneration == 0 {
+			view.ApplicationState = "UNPUBLISHED"
+		}
+		if report := current[row.ID]; owner.Status == "ACTIVE" && row.Status == "ACTIVE" && report != nil && report.AppliedManagedGeneration != nil {
+			generation := int(*report.AppliedManagedGeneration)
+			view.AppliedManagedGeneration = &generation
+			view.AppliedReportedAt = report.AppliedReportedAt
+			view.ApplicationState = "PENDING"
+			if generation == state.ActiveManagedGeneration {
+				view.ApplicationState = "APPLIED"
+			}
+		}
+		views = append(views, view)
 	}
 	return views, nil
 }

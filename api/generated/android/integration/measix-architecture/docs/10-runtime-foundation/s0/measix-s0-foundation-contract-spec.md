@@ -71,6 +71,8 @@ S0.1 证明“服务端已经能生产、执行、计量并冻结可消费的 Ma
 
 ## 3. S0 组件与仓库边界
 
+阶段 Exit 顺序不禁止对当前已实现合同提前开展端到端适配。S0.1/S0.2 当前 Snapshot v4 的真实平台接入、Model/TTS/ASR/Direct MCP 与企业体验联调可以在 Gateway 实现前进行；其准入依据是当前明确的合同、可核验的候选资料及实际服务端证据，不是尚未实现的 v5/Gateway。此联调不宣称 S0.4 已开始或通过正式阶段 Gate，也不要求客户端制造 Gateway 占位资源、等待不存在的 Gateway readiness，或维护 v4/v5 双轨兼容。正式 S0.4/Final RC 仍执行其完整冻结与设备门禁。
+
 S0 有六个逻辑组件和一个外部 Adapter 边界；生产服务端有三个 daemon：
 
 ```text
@@ -164,7 +166,7 @@ multipart upload
 cancellation
 ```
 
-S0 不实现 Runtime WebSocket tunnel、generic path rewrite DSL 或 Provider-specific body translation。
+当前协议扩展包含实时 ASR 所需的受管 WebSocket 传输；不实现 generic path rewrite DSL 或 Provider-specific body translation。
 
 ### 4.6 Usage
 
@@ -266,7 +268,7 @@ S0 不实现：
 - generic Quota Engine；
 - SaaS Billing / invoice；
 - Provider-native protocol translation in Relay；
-- Runtime WebSocket/Reatime tunnel；
+- 实时 ASR 之外的通用实时业务框架；
 - 未经 contract + qualification 定义的 provider/profile 扩张。
 - Gateway write/destructive tools、用户审批、per-user OAuth/RBAC、Code/Shell/Batch workflow、HA 和必选向量/Router LLM。
 

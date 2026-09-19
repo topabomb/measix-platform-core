@@ -16,13 +16,43 @@ import (
 
 // Defines values for AsrDefinitionClientProtocol.
 const (
-	OPENAIAUDIOTRANSCRIPTIONS AsrDefinitionClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	DASHSCOPEHTTPASR            AsrDefinitionClientProtocol = "DASHSCOPE_HTTP_ASR"
+	DASHSCOPEREALTIMEASR        AsrDefinitionClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	OPENAIAUDIOTRANSCRIPTIONS   AsrDefinitionClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	OPENAIREALTIMETRANSCRIPTION AsrDefinitionClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
 )
 
 // Valid indicates whether the value is a known member of the AsrDefinitionClientProtocol enum.
 func (e AsrDefinitionClientProtocol) Valid() bool {
 	switch e {
+	case DASHSCOPEHTTPASR:
+		return true
+	case DASHSCOPEREALTIMEASR:
+		return true
 	case OPENAIAUDIOTRANSCRIPTIONS:
+		return true
+	case OPENAIREALTIMETRANSCRIPTION:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AsrDefinitionSampleRate.
+const (
+	N16000 AsrDefinitionSampleRate = 16000
+	N24000 AsrDefinitionSampleRate = 24000
+	N8000  AsrDefinitionSampleRate = 8000
+)
+
+// Valid indicates whether the value is a known member of the AsrDefinitionSampleRate enum.
+func (e AsrDefinitionSampleRate) Valid() bool {
+	switch e {
+	case N16000:
+		return true
+	case N24000:
+		return true
+	case N8000:
 		return true
 	default:
 		return false
@@ -304,13 +334,22 @@ func (e PlatformEnrollmentMaterialKind) Valid() bool {
 
 // Defines values for ProviderDefinitionClientProtocol.
 const (
+	ANTHROPICMESSAGES     ProviderDefinitionClientProtocol = "ANTHROPIC_MESSAGES"
+	GOOGLEGENERATECONTENT ProviderDefinitionClientProtocol = "GOOGLE_GENERATE_CONTENT"
 	OPENAICHATCOMPLETIONS ProviderDefinitionClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	OPENAIRESPONSES       ProviderDefinitionClientProtocol = "OPENAI_RESPONSES"
 )
 
 // Valid indicates whether the value is a known member of the ProviderDefinitionClientProtocol enum.
 func (e ProviderDefinitionClientProtocol) Valid() bool {
 	switch e {
+	case ANTHROPICMESSAGES:
+		return true
+	case GOOGLEGENERATECONTENT:
+		return true
 	case OPENAICHATCOMPLETIONS:
+		return true
+	case OPENAIRESPONSES:
 		return true
 	default:
 		return false
@@ -323,6 +362,7 @@ const (
 	HTTPMULTIPART       RuntimeBindingDefinitionTransportPolicy = "HTTP_MULTIPART"
 	HTTPREQUESTRESPONSE RuntimeBindingDefinitionTransportPolicy = "HTTP_REQUEST_RESPONSE"
 	HTTPSTREAMINGSSE    RuntimeBindingDefinitionTransportPolicy = "HTTP_STREAMING_SSE"
+	WEBSOCKET           RuntimeBindingDefinitionTransportPolicy = "WEBSOCKET"
 )
 
 // Valid indicates whether the value is a known member of the RuntimeBindingDefinitionTransportPolicy enum.
@@ -336,6 +376,8 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 		return true
 	case HTTPSTREAMINGSSE:
 		return true
+	case WEBSOCKET:
+		return true
 	default:
 		return false
 	}
@@ -343,13 +385,22 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 
 // Defines values for TtsDefinitionClientProtocol.
 const (
-	OPENAIAUDIOSPEECH TtsDefinitionClientProtocol = "OPENAI_AUDIO_SPEECH"
+	GEMINIGENERATECONTENTTTS TtsDefinitionClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	MIMOCHATCOMPLETIONSTTS   TtsDefinitionClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	OPENAIAUDIOSPEECH        TtsDefinitionClientProtocol = "OPENAI_AUDIO_SPEECH"
+	SYSTEMTTS                TtsDefinitionClientProtocol = "SYSTEM_TTS"
 )
 
 // Valid indicates whether the value is a known member of the TtsDefinitionClientProtocol enum.
 func (e TtsDefinitionClientProtocol) Valid() bool {
 	switch e {
+	case GEMINIGENERATECONTENTTTS:
+		return true
+	case MIMOCHATCOMPLETIONSTTS:
+		return true
 	case OPENAIAUDIOSPEECH:
+		return true
+	case SYSTEMTTS:
 		return true
 	default:
 		return false
@@ -379,17 +430,25 @@ type ActivationId = string
 
 // AsrDefinition defines model for AsrDefinition.
 type AsrDefinition struct {
-	AsrId            AsrId                       `json:"asrId"`
-	ClientProtocol   AsrDefinitionClientProtocol `json:"clientProtocol"`
-	DisplayName      string                      `json:"displayName"`
-	Enabled          bool                        `json:"enabled"`
-	Language         *string                     `json:"language,omitempty"`
-	RuntimePath      string                      `json:"runtimePath"`
-	UpstreamModelKey string                      `json:"upstreamModelKey"`
+	AsrId             AsrId                       `json:"asrId"`
+	ClientProtocol    AsrDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName       string                      `json:"displayName"`
+	Enabled           bool                        `json:"enabled"`
+	Language          *string                     `json:"language,omitempty"`
+	PrefixPaddingMs   *int                        `json:"prefixPaddingMs,omitempty"`
+	Prompt            *string                     `json:"prompt,omitempty"`
+	RuntimePath       string                      `json:"runtimePath"`
+	SampleRate        *AsrDefinitionSampleRate    `json:"sampleRate,omitempty"`
+	SilenceDurationMs *int                        `json:"silenceDurationMs,omitempty"`
+	UpstreamModelKey  string                      `json:"upstreamModelKey"`
+	VadThreshold      *float64                    `json:"vadThreshold,omitempty"`
 }
 
 // AsrDefinitionClientProtocol defines model for AsrDefinition.ClientProtocol.
 type AsrDefinitionClientProtocol string
+
+// AsrDefinitionSampleRate defines model for AsrDefinition.SampleRate.
+type AsrDefinitionSampleRate int
 
 // AsrId defines model for AsrId.
 type AsrId = string
@@ -527,6 +586,12 @@ type InstallationId = string
 // InteractionId defines model for InteractionId.
 type InteractionId = string
 
+// ManagedAppliedReport defines model for ManagedAppliedReport.
+type ManagedAppliedReport struct {
+	ManagedGeneration int    `json:"managedGeneration"`
+	SnapshotHash      string `json:"snapshotHash"`
+}
+
 // ManagedAssistantDefinition defines model for ManagedAssistantDefinition.
 type ManagedAssistantDefinition struct {
 	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
@@ -559,14 +624,15 @@ type ManagedPolicy struct {
 	AllowLocalAsr bool `json:"allowLocalAsr"`
 
 	// AllowLocalAssistants Allows user assistants; referenced resources remain independently governed.
-	AllowLocalAssistants bool     `json:"allowLocalAssistants"`
-	AllowLocalMcp        bool     `json:"allowLocalMcp"`
-	AllowLocalProviders  bool     `json:"allowLocalProviders"`
-	AllowLocalTts        bool     `json:"allowLocalTts"`
-	DefaultAsrId         *AsrId   `json:"defaultAsrId,omitempty"`
-	DefaultModelId       *ModelId `json:"defaultModelId,omitempty"`
-	DefaultTtsId         *TtsId   `json:"defaultTtsId,omitempty"`
-	PolicyId             PolicyId `json:"policyId"`
+	AllowLocalAssistants bool                   `json:"allowLocalAssistants"`
+	AllowLocalMcp        bool                   `json:"allowLocalMcp"`
+	AllowLocalProviders  bool                   `json:"allowLocalProviders"`
+	AllowLocalTts        bool                   `json:"allowLocalTts"`
+	DefaultAsrId         *AsrId                 `json:"defaultAsrId,omitempty"`
+	DefaultAssistantId   *AssistantDefinitionId `json:"defaultAssistantId,omitempty"`
+	DefaultModelId       *ModelId               `json:"defaultModelId,omitempty"`
+	DefaultTtsId         *TtsId                 `json:"defaultTtsId,omitempty"`
+	PolicyId             PolicyId               `json:"policyId"`
 }
 
 // ManagedSnapshot defines model for ManagedSnapshot.
@@ -652,7 +718,7 @@ type ModelDefinitionOutputModalities string
 // ModelId defines model for ModelId.
 type ModelId = string
 
-// PlatformEnrollmentMaterial Versioned native scan/paste material; not an HTTP enrollment request. See Control Protocol section 8. The Admin public origin is used, never an internal Hub or Relay address.
+// PlatformEnrollmentMaterial Versioned native scan/paste material; not an HTTP enrollment request. See Control Protocol section 8. The explicit deployment public HTTP/HTTPS origin is used, never the browser origin or an internal Hub/Relay address.
 type PlatformEnrollmentMaterial struct {
 	Code          string                                  `json:"code"`
 	ExpiresAt     time.Time                               `json:"expiresAt"`
@@ -780,13 +846,16 @@ type TimeoutPolicy struct {
 
 // TtsDefinition defines model for TtsDefinition.
 type TtsDefinition struct {
-	ClientProtocol   TtsDefinitionClientProtocol `json:"clientProtocol"`
-	DisplayName      string                      `json:"displayName"`
-	Enabled          bool                        `json:"enabled"`
-	RuntimePath      string                      `json:"runtimePath"`
-	TtsId            TtsId                       `json:"ttsId"`
-	UpstreamModelKey string                      `json:"upstreamModelKey"`
-	Voice            string                      `json:"voice"`
+	ClientProtocol    TtsDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName       string                      `json:"displayName"`
+	Enabled           bool                        `json:"enabled"`
+	Pitch             *float64                    `json:"pitch,omitempty"`
+	RuntimePath       string                      `json:"runtimePath,omitempty"`
+	SpeechRate        *float64                    `json:"speechRate,omitempty"`
+	TtsId             TtsId                       `json:"ttsId"`
+	UpstreamModelKey  string                      `json:"upstreamModelKey,omitempty"`
+	Voice             string                      `json:"voice,omitempty"`
+	VoiceDesignPrompt string                      `json:"voiceDesignPrompt,omitempty"`
 }
 
 // TtsDefinitionClientProtocol defines model for TtsDefinition.ClientProtocol.
@@ -849,6 +918,9 @@ type ExchangePortalGrantFormdataBody struct {
 // ExchangeEnrollmentJSONRequestBody defines body for ExchangeEnrollment for application/json ContentType.
 type ExchangeEnrollmentJSONRequestBody = EnrollmentExchangeRequest
 
+// ReportManagedAppliedJSONRequestBody defines body for ReportManagedApplied for application/json ContentType.
+type ReportManagedAppliedJSONRequestBody = ManagedAppliedReport
+
 // LogoutSessionJSONRequestBody defines body for LogoutSession for application/json ContentType.
 type LogoutSessionJSONRequestBody = RefreshRequest
 
@@ -875,6 +947,9 @@ type ServerInterface interface {
 
 	// (GET /api/client/v1/enterprise/updates/{enterpriseUpdateId})
 	GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId)
+
+	// (PUT /api/client/v1/managed/applied)
+	ReportManagedApplied(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/client/v1/managed/snapshots/{generation})
 	GetManagedSnapshot(w http.ResponseWriter, r *http.Request, generation int, params GetManagedSnapshotParams)
@@ -927,6 +1002,11 @@ func (_ Unimplemented) ListEnterpriseUpdates(w http.ResponseWriter, r *http.Requ
 
 // (GET /api/client/v1/enterprise/updates/{enterpriseUpdateId})
 func (_ Unimplemented) GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/client/v1/managed/applied)
+func (_ Unimplemented) ReportManagedApplied(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1118,6 +1198,20 @@ func (siw *ServerInterfaceWrapper) GetEnterpriseUpdate(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetEnterpriseUpdate(w, r, enterpriseUpdateId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReportManagedApplied operation middleware
+func (siw *ServerInterfaceWrapper) ReportManagedApplied(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReportManagedApplied(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1500,6 +1594,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/client/v1/managed/applied", wrapper.ReportManagedApplied)
+	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/client/v1/portal/grants", wrapper.CreatePortalGrant)
 	})

@@ -70,6 +70,7 @@
     "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     "defaultTtsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "defaultAssistantId": "asd_11111111-1111-4111-8111-111111111111",
     "allowLocalAssistants": true
   },
   "assistants": [

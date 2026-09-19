@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sort"
 	"testing"
@@ -11,7 +12,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-// CAP-C0-001: Provider.clientProtocol must be a frozen enum with exactly OPENAI_CHAT_COMPLETIONS.
+// CAP-C0-001: only the four current model wire protocols are accepted.
 func TestCAPC0001ProviderClientProtocolIsFrozenEnum(t *testing.T) {
 	doc := loadClientDoc(t)
 	schema := getSchema(t, doc, "ProviderDefinition")
@@ -20,8 +21,8 @@ func TestCAPC0001ProviderClientProtocolIsFrozenEnum(t *testing.T) {
 		t.Fatal("ProviderDefinition.clientProtocol is not a frozen enum (enum is empty)")
 	}
 	values := enumStringValues(t, prop.Enum)
-	if len(values) != 1 || values[0] != "OPENAI_CHAT_COMPLETIONS" {
-		t.Fatalf("ProviderDefinition.clientProtocol enum=%v want=[OPENAI_CHAT_COMPLETIONS]", values)
+	if len(values) != 4 || values[0] != "ANTHROPIC_MESSAGES" || values[1] != "GOOGLE_GENERATE_CONTENT" || values[2] != "OPENAI_CHAT_COMPLETIONS" || values[3] != "OPENAI_RESPONSES" {
+		t.Fatalf("ProviderDefinition.clientProtocol enum=%v want four supported model protocols", values)
 	}
 }
 
@@ -82,7 +83,7 @@ func TestCAPC0002ModelCapabilitiesFrozenEnum(t *testing.T) {
 	}
 }
 
-// CAP-C0-003: ASR.clientProtocol must be a frozen enum with OPENAI_AUDIO_TRANSCRIPTIONS.
+// CAP-C0-003: ASR.clientProtocol contains the supported upload and realtime protocols.
 func TestCAPC0003AsrClientProtocolFrozenEnum(t *testing.T) {
 	doc := loadClientDoc(t)
 	schema := getSchema(t, doc, "AsrDefinition")
@@ -91,8 +92,9 @@ func TestCAPC0003AsrClientProtocolFrozenEnum(t *testing.T) {
 		t.Fatal("AsrDefinition.clientProtocol is not a frozen enum (enum is empty)")
 	}
 	values := enumStringValues(t, prop.Enum)
-	if len(values) != 1 || values[0] != "OPENAI_AUDIO_TRANSCRIPTIONS" {
-		t.Fatalf("AsrDefinition.clientProtocol enum=%v want=[OPENAI_AUDIO_TRANSCRIPTIONS]", values)
+	want := []string{"DASHSCOPE_HTTP_ASR", "DASHSCOPE_REALTIME_ASR", "OPENAI_AUDIO_TRANSCRIPTIONS", "OPENAI_REALTIME_TRANSCRIPTION"}
+	if !reflect.DeepEqual(values, want) {
+		t.Fatalf("AsrDefinition.clientProtocol enum=%v want=%v", values, want)
 	}
 }
 

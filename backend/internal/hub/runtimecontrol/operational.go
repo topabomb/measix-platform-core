@@ -5,10 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
-	"time"
 
 	"measix/platform/ent"
 	"measix/platform/ent/activation"
@@ -16,7 +14,6 @@ import (
 	"measix/platform/ent/idempotencyrecord"
 	"measix/platform/ent/session"
 	"measix/platform/ent/user"
-	"measix/platform/internal/hub/upstream"
 	"measix/platform/internal/wire/adminapi"
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/internal/wire/relaystate"
@@ -323,18 +320,27 @@ func hashOperation(value any) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-var _ = upstream.ErrInvalidConfig
-var _ = time.Now
-var _ = errors.Is
-
-func (s *Service) LatestActivation(ctx context.Context) (*ActivationResult, error) {
-	row, err := s.Client.Activation.Query().Order(ent.Desc(activation.FieldCreatedAt), ent.Desc(activation.FieldID)).First(ctx)
-	if ent.IsNotFound(err) {
-		return nil, nil
-	}
+func (s *Service) ActivationStatus(ctx context.Context) (current, last *ActivationResult, err error) {
+	tx, err := s.Client.Tx(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	view := activationView(row)
-	return &view, nil
+	defer tx.Rollback()
+	queries := []*ent.ActivationQuery{
+		tx.Activation.Query().Where(activation.StateIn("APPLYING", "UNKNOWN")).Order(ent.Desc(activation.FieldCreatedAt), ent.Desc(activation.FieldID)),
+		tx.Activation.Query().Where(activation.StateIn("COMPLETED", "FAILED")).Order(ent.Desc(activation.FieldCompletedAt), ent.Desc(activation.FieldCreatedAt), ent.Desc(activation.FieldID)),
+	}
+	results := []**ActivationResult{&current, &last}
+	for i, query := range queries {
+		row, readErr := query.First(ctx)
+		if ent.IsNotFound(readErr) {
+			continue
+		}
+		if readErr != nil {
+			return nil, nil, readErr
+		}
+		view := activationView(row)
+		*results[i] = &view
+	}
+	return current, last, tx.Commit()
 }

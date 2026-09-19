@@ -51,11 +51,11 @@ type RuntimeOptions struct {
 
 func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) {
 	cfg := options.Config
-	if cfg.PortalOrigin != "" && identity.ValidatePortalOrigin(cfg.PortalOrigin) != nil {
-		return nil, fmt.Errorf("invalid Portal origin")
+	if cfg.PublicOrigin != "" && identity.ValidatePublicOrigin(cfg.PublicOrigin) != nil {
+		return nil, fmt.Errorf("invalid platform public origin")
 	}
 	if cfg.PortalAssetsDir != "" {
-		if cfg.PortalOrigin == "" {
+		if cfg.PublicOrigin == "" {
 			return nil, fmt.Errorf("Portal assets require approved origin")
 		}
 		info, err := fs.Stat(os.DirFS(cfg.PortalAssetsDir), "index.html")
@@ -112,7 +112,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	csrfMaterial := append([]byte("measix:admin-csrf:"), masterKey...)
 	csrfDigest := sha256.Sum256(csrfMaterial)
 	identityService := identity.New(st.Client, signer, csrfDigest[:])
-	identityService.PortalOrigin = cfg.PortalOrigin
+	identityService.PublicOrigin = cfg.PublicOrigin
 	box, err := security.NewSecretBox(masterKey, 1)
 	if err != nil {
 		return closeOnError(err)

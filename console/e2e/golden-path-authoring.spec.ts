@@ -15,7 +15,7 @@ test('ERX-UPD-001/002 Admin update authoring, safe preview, publish and withdraw
   await dialog.getByLabel('Title', { exact: true }).fill(title)
   await dialog.getByLabel('Content', { exact: true }).fill('**safe** <b>raw</b>\n\n![blocked](/untrusted-embed.png)')
   await dialog.getByLabel('Format', { exact: true }).click()
-  await page.getByRole('option', { name: 'MARKDOWN', exact: true }).click()
+  await page.getByRole('option', { name: 'Formatted text (Markdown)', exact: true }).click()
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   let row = updates.locator('.q-list > .q-item').filter({ hasText: title })
   await expect(row).toContainText('Draft')
@@ -107,6 +107,8 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.locator('[data-cy="user-row"]').last().click()
 
     await page.click('[data-cy="generate-enrollment-btn"]')
+    await expect(page.locator('[data-cy="enrollment-material-field"]')).toBeVisible({ timeout: 10_000 })
+    await page.locator('[data-cy="enrollment-code-details"] summary').click()
     await expect(page.locator('[data-cy="enrollment-code-field"]')).toBeVisible({ timeout: 10_000 })
 
     const codeField = page.locator('[data-cy="enrollment-code-field"]')
@@ -150,11 +152,8 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.fill('[data-cy="upstream-form-base-url"]', ADAPTER_URL)
 
     // Set auth type to BEARER
-    const authSelect = page.locator('.q-card').locator('label:has-text("Auth Mode")').locator('..')
-    await authSelect.click()
-    await page.waitForTimeout(300)
-    const popup = page.locator('.q-popup, .q-menu').locator('text=BEARER').first()
-    await popup.click({ timeout: 5000 })
+    await page.locator('.q-dialog .q-select').first().click()
+    await page.getByRole('option', { name: 'Bearer token', exact: true }).click({ timeout: 5000 })
 
     await page.click('[data-cy="upstream-form-submit"]')
 
@@ -166,16 +165,12 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     // Test the upstream
     await page.click('[data-cy="upstream-test-btn"]')
     await expect(page.locator('text=/reachable|Reachable/i')).toBeVisible({ timeout: 15_000 })
-
-    // Accept the confirmation dialog before Apply
-    // Per audit P0-1: window.confirm must be explicitly accepted.
-    page.once('dialog', dialog => {
-      console.log(`[test] Accepting confirm dialog: ${dialog.message()}`)
-      dialog.accept()
-    })
+    await expect(page.locator('[data-cy="upstream-test-http-status"]')).toHaveText(/^\d{3}$/)
+    await expect(page.getByText(/This checks connectivity only/)).toBeVisible()
 
     // Apply the upstream
     await page.click('[data-cy="upstream-apply-btn"]')
+    await page.click('[data-cy="upstream-apply-confirm"]')
 
     // Wait for apply to complete — must be exactly ACTIVE (not INACTIVE)
     await expect(page.locator('.q-chip').filter({ hasText: /^ACTIVE$/i }).first()).toBeVisible({ timeout: 30_000 })
@@ -331,11 +326,8 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.click('[data-cy="draft-validate-btn"]')
     await page.waitForTimeout(2_000)
 
-    const errorChip = page.locator('.q-chip.text-negative, .q-chip.bg-negative').first()
-    const hasErrors = await errorChip.isVisible().catch(() => false)
-    expect(hasErrors, 'Validation should not have blocking errors').toBe(false)
-    const validationChip = page.locator('.q-chip').filter({ hasText: /valid|warning|error/i }).first()
-    await expect(validationChip).toBeVisible({ timeout: 10_000 })
+    const validationSummary = page.locator('[data-cy="draft-validation-summary"]')
+    await expect(validationSummary.locator('.q-banner')).toContainText('Draft is valid.', { timeout: 10_000 })
   })
 
   // ========================================================================
@@ -355,10 +347,10 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     expect(projection.starters).toHaveLength(1)
     expect(projection.starters[0].assistantDefinitionId).toBe(projection.assistants[0].assistantDefinitionId)
 
-    await expect(page.locator('text=/projection hash|Projection Hash|hash/i')).toBeVisible({ timeout: 10_000 })
-
     const previewDialog = page.locator('.q-dialog')
     await expect(previewDialog).toBeVisible()
+    await previewDialog.locator('details summary').first().click()
+    await expect(previewDialog.locator('text=/projection hash|Projection Hash|hash/i')).toBeVisible({ timeout: 10_000 })
     await expect(previewDialog.locator('text=Providers').first()).toBeVisible()
     await expect(previewDialog.locator('text=Models').first()).toBeVisible()
     await expect(previewDialog.locator('text=TTS').first()).toBeVisible()
@@ -387,11 +379,8 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.waitForTimeout(500)
     const applyBtn = page.locator('[data-cy="upstream-apply-btn"]')
     if (await applyBtn.isVisible().catch(() => false)) {
-      page.once('dialog', dialog => {
-        console.log(`[test] Accepting confirm dialog: ${dialog.message()}`)
-        dialog.accept()
-      })
       await applyBtn.click()
+      await page.click('[data-cy="upstream-apply-confirm"]')
       await expect(page.locator('.q-chip').filter({ hasText: /^ACTIVE$/i }).first()).toBeVisible({ timeout: 30_000 })
     }
     await page.keyboard.press('Escape')

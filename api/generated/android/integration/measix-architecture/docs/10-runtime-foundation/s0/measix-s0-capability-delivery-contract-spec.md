@@ -61,10 +61,6 @@ Usage Ledger / Pricing / Cost / Diagnostics
 S0.1 明确不做：
 
 - Android Enterprise Binding/Managed Runtime implementation；
-- native Anthropic/Google/Gemini provider compatibility；
-- OpenAI Responses 作为 required profile；
-- Realtime/WebSocket Runtime tunnel；
-- realtime Managed ASR；
 - Embedding resource；
 - standalone Image Generation resource/API；
 - generic provider custom-header/custom-body DSL；
@@ -81,12 +77,12 @@ S0.1 明确不做：
 
 ### 4.1 决策
 
-S0.1 只要求完整实现一套高价值、行业常见、Android 当前容易映射的 **OpenAI-Compatible Reference Profile**：
+当前交付包含 Android 已使用的模型与语音协议，并保持 Relay 的协议无关边界：
 
 ```text
-Managed Model  → OPENAI_CHAT_COMPLETIONS
-Managed TTS    → OPENAI_AUDIO_SPEECH
-Managed ASR    → OPENAI_AUDIO_TRANSCRIPTIONS
+Managed Model  → OPENAI_CHAT_COMPLETIONS | OPENAI_RESPONSES | GOOGLE_GENERATE_CONTENT | ANTHROPIC_MESSAGES
+Managed TTS    → OpenAI Speech / Gemini TTS / MiMo TTS / 设备系统朗读
+Managed ASR    → HTTP 文件转写 / OpenAI 实时识别 / DashScope 实时识别
 Managed MCP    → MCP_STREAMABLE_HTTP
 ```
 
@@ -96,21 +92,15 @@ MCP 是独立标准协议，不属于 OpenAI provider family，但同样属于 S
 
 S0.1 的目标是最大化 Adapter compatibility、最小化协议面，而不是追逐最新 Provider-native API。`OPENAI_CHAT_COMPLETIONS` 在第三方 OpenAI-compatible Adapter/Provider 中兼容面更广，Android 当前也有成熟执行路径，因此作为 S0.1 required model profile。
 
-`OPENAI_RESPONSES` 可在后续作为兼容扩展增加，但不是 S0.1/S0.4 Exit blocker。
+企业模型必须同时可表达 Chat Completions 与 Responses，两者是当前支持范围内的不同线协议，不是旧新版本兼容或失败回退。管理员在 Provider Definition 中明确选择；模型继承该协议，接口路径独立配置。DeepSeek 按其 Chat Completions 接口配置；CLIProxyAPI 可按部署实际支持选择任一协议。不得根据模型名或 Relay 域名猜测协议，不得在调用失败后切换协议。
+
+Responses 的当前客户端执行约定是 HTTP POST + SSE，以完整 `input` 维护对话，`store=false`，不依赖 `previous_response_id` 或供应商会话存储；保留适用的 reasoning items 与 function-call output。客户端负责编码和解析，Relay 仅透明转发，不翻译为 Chat Completions。模型声明 TOOL/REASONING 表示管理员配置的能力，仍需对应供应商协议验收；不是运行时探测结果。共享样例与消费测试必须分别覆盖两种协议，未执行 Android 消费验证不得宣称 S0.4 完成。
+
+当前范围同时包含 Android 已有的 Google Gemini 与 Anthropic Claude 原生模型协议。`GOOGLE_GENERATE_CONTENT` 使用 `contents`/`parts`、对应 tools/functionCall/functionResponse；流式路径为 `/v1beta/models/{实际模型名}:streamGenerateContent`，客户端追加 `alt=sse`，解析 `candidates` 增量。`ANTHROPIC_MESSAGES` 使用 `/v1/messages`、显式 `max_tokens`、messages、独立 system 及 tools/tool_use/tool_result，`stream=true`，解析命名 SSE 事件直至 message_stop。两者均由客户端维护完整对话，不改写为 OpenAI body。供应商认证分别由上游注入 `x-goog-api-key`、`x-api-key`；Anthropic 的 `anthropic-version` 为公开协议头，由客户端按当前协议设置并透明转发。客户端到 Relay 始终使用平台 Bearer，不下发供应商密钥。各协议须独立验证文本及工具调用、错误和取消；支持声明与已验收证据分别记录。
 
 ### 4.3 “协议存在”与“产品支持”分离
 
-通用 Upstream Adapter Contract 或 executable enum 中即使保留：
-
-```text
-OPENAI_RESPONSES
-ANTHROPIC_MESSAGES
-...
-```
-
-也不代表当前产品已 VERIFIED 支持。
-
-S0.1 Admin 只应默认暴露已实现且可 qualification 的 required profile；未验证 protocol 不得显示成“可直接使用”的正常选项。
+协议枚举及配置入口不代表供应商或 Android 已 VERIFIED 支持。Admin 暴露当前已实现的 profile，并明确区分配置校验、连接检查与实际调用验收；不能把管理员声明的 TOOL/REASONING 或连通性结果呈现为能力验证成功。未知或未实现协议不提供正常配置入口。
 
 ## 5. Managed Resource 模型
 
@@ -124,7 +114,7 @@ Provider Definition 是客户端侧模型分组/协议身份，不是 Upstream e
 ProviderDefinition
   providerId      prv_*
   displayName
-  clientProtocol  OPENAI_CHAT_COMPLETIONS   # S0.1 required profile
+  clientProtocol  OPENAI_CHAT_COMPLETIONS | OPENAI_RESPONSES | GOOGLE_GENERATE_CONTENT | ANTHROPIC_MESSAGES
   enabled
 ```
 
@@ -173,16 +163,12 @@ Model Definition 不下发：custom headers、custom body、provider overwrite�
 TtsDefinition
   ttsId               tts_*
   displayName
-  clientProtocol      OPENAI_AUDIO_SPEECH
-  upstreamModelKey
-  voice
-  runtimePath
+  clientProtocol      explicit cloud protocol or SYSTEM_TTS
+  protocol fields     see Control Protocol §10.5
   enabled
 ```
 
-`voice` 是 required field；不能依赖 Android 本地默认值。
-
-S0.1 首个 execution profile 固定为客户端可直接播放的 MP3 output semantics。`responseFormat` 不作为首版可配置矩阵，避免让一个通用 codec abstraction 阻塞闭环；需要其他格式时以兼容扩展加入。
+TTS 编辑器先选择 OpenAI、Gemini、MiMo 或系统朗读，再显示该类型必需的字段；不让管理员填写无意义的上游、模型或路径。云端鉴权保留服务端；系统朗读作为企业资源在设备执行，无 Relay 绑定。字段、音频格式及混用拒绝规则由 Control Protocol §10.5 唯一维护，Android 需执行对应消费验证。配置、Snapshot 投影与客户端默认选择必须保留协议差异，不能仅换模型名复用 OpenAI Speech。
 
 ### 5.4 ASR Definition
 
@@ -190,16 +176,16 @@ S0.1 首个 execution profile 固定为客户端可直接播放的 MP3 output se
 AsrDefinition
   asrId               asr_*
   displayName
-  clientProtocol      OPENAI_AUDIO_TRANSCRIPTIONS
+  clientProtocol      见 Control Protocol §10.6
   upstreamModelKey
   runtimePath
   language?           optional default language
   enabled
 ```
 
-S0.1 ASR transport 固定为 HTTP multipart upload + JSON transcription response；不支持 WebSocket realtime。
+ASR 包含 HTTP 文件转写及 Android 已有的 OpenAI/DashScope 实时识别，参数、WebSocket 路径与握手语义统一见 Control Protocol §10.6。管理台按协议显示对应字段，切换时清除不适用参数。
 
-`prompt`、VAD、sample rate tuning 不成为 S0.1 Managed Definition，避免把 Android realtime controller 配置错误搬到 HTTP transcription profile。
+`prompt`、VAD 与采样率只属于对应实时识别协议，不得写入 HTTP 文件转写配置。
 
 ### 5.5 MCP Definition
 
@@ -248,6 +234,8 @@ RuntimeBinding
   transportPolicy
   timeoutPolicy
 ```
+
+发布前须验证客户端定义的 `runtimePath` 位于对应 binding 的 `allowedPathPrefixes` 内。Direct MCP 的 Streamable HTTP binding 包含 `POST`、`GET`、`DELETE`；上游若不提供 GET 事件流可自行返回 405，平台路由不能预先拒绝。
 
 Hub 内部维护 `runtimeRouteId (rte_*)`，但：
 
@@ -382,7 +370,7 @@ Runtime Path
 Enabled
 ```
 
-UI 明确标记 S0.1 Managed ASR 是 HTTP transcription，不是 realtime ASR。
+UI 明确区分 HTTP 文件转写与实时录音协议，按所选协议展示字段和传输方式。
 
 ### 8.5 MCP editor
 
@@ -518,7 +506,7 @@ Required profile 对应 transport：
 
 必须覆盖 cancellation、timeout、4xx/5xx、content type、stream flush、binary integrity、multipart integrity。
 
-WebSocket 不属于 S0.1。
+当前实时 ASR 扩展必须验证真实 WebSocket 升级、双向帧、鉴权与 generation 拒绝、取消/关闭、超时、传输限制及连接计量；HTTP 上传测试不能代替这些证据。
 
 ## 13. Usage / Cost Product Contract
 
@@ -741,15 +729,7 @@ MCP 使用一个真实或受控标准 Streamable HTTP server 验证协议。
 
 ## 20. S0.1 完成后的允许变化
 
-S0.1 Exit 后仍可继续增加：
-
-```text
-OPENAI_RESPONSES
-Anthropic native
-Google/Gemini native
-additional TTS/ASR profiles
-provider-specific semantic Usage Connector
-```
+§4 已明确的四种模型、四种 TTS 与三种 ASR 属于当前交付范围，不是等待 S0.1 Exit 后再做的功能。后续仍可增加当前范围之外的 profile 或 provider-specific semantic Usage Connector。
 
 但必须满足：
 
@@ -759,4 +739,4 @@ provider-specific semantic Usage Connector
 - 有 Adapter qualification；
 - 不阻塞 S0.2、S0.3、S0.4 或 S1。
 
-如果新 profile 必须破坏现有 client wire，则先做 schema/versioning decision，而不是在 v1 中静默改变含义。
+新增 profile 先更新架构与 executable contract，再同步共享样例及消费者。当前产品从未发布，不增加旧原型兼容或自动回退路径。

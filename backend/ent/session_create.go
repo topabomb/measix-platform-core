@@ -138,6 +138,48 @@ func (_c *SessionCreate) SetNillableRevokedAt(v *time.Time) *SessionCreate {
 	return _c
 }
 
+// SetAppliedManagedGeneration sets the "applied_managed_generation" field.
+func (_c *SessionCreate) SetAppliedManagedGeneration(v int64) *SessionCreate {
+	_c.mutation.SetAppliedManagedGeneration(v)
+	return _c
+}
+
+// SetNillableAppliedManagedGeneration sets the "applied_managed_generation" field if the given value is not nil.
+func (_c *SessionCreate) SetNillableAppliedManagedGeneration(v *int64) *SessionCreate {
+	if v != nil {
+		_c.SetAppliedManagedGeneration(*v)
+	}
+	return _c
+}
+
+// SetAppliedSnapshotHash sets the "applied_snapshot_hash" field.
+func (_c *SessionCreate) SetAppliedSnapshotHash(v string) *SessionCreate {
+	_c.mutation.SetAppliedSnapshotHash(v)
+	return _c
+}
+
+// SetNillableAppliedSnapshotHash sets the "applied_snapshot_hash" field if the given value is not nil.
+func (_c *SessionCreate) SetNillableAppliedSnapshotHash(v *string) *SessionCreate {
+	if v != nil {
+		_c.SetAppliedSnapshotHash(*v)
+	}
+	return _c
+}
+
+// SetAppliedReportedAt sets the "applied_reported_at" field.
+func (_c *SessionCreate) SetAppliedReportedAt(v time.Time) *SessionCreate {
+	_c.mutation.SetAppliedReportedAt(v)
+	return _c
+}
+
+// SetNillableAppliedReportedAt sets the "applied_reported_at" field if the given value is not nil.
+func (_c *SessionCreate) SetNillableAppliedReportedAt(v *time.Time) *SessionCreate {
+	if v != nil {
+		_c.SetAppliedReportedAt(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *SessionCreate) SetID(v string) *SessionCreate {
 	_c.mutation.SetID(v)
@@ -279,6 +321,18 @@ func (_c *SessionCreate) createSpec() (*Session, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.RevokedAt(); ok {
 		_spec.SetField(session.FieldRevokedAt, field.TypeTime, value)
 		_node.RevokedAt = &value
+	}
+	if value, ok := _c.mutation.AppliedManagedGeneration(); ok {
+		_spec.SetField(session.FieldAppliedManagedGeneration, field.TypeInt64, value)
+		_node.AppliedManagedGeneration = &value
+	}
+	if value, ok := _c.mutation.AppliedSnapshotHash(); ok {
+		_spec.SetField(session.FieldAppliedSnapshotHash, field.TypeString, value)
+		_node.AppliedSnapshotHash = &value
+	}
+	if value, ok := _c.mutation.AppliedReportedAt(); ok {
+		_spec.SetField(session.FieldAppliedReportedAt, field.TypeTime, value)
+		_node.AppliedReportedAt = &value
 	}
 	return _node, _spec
 }

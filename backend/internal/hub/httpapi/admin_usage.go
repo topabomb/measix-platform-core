@@ -88,7 +88,8 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 	wire := adminapi.UsageSummary{
 		From: summary.From, To: summary.To,
 		RequestCount: summary.RequestCount, ForwardedRequestCount: summary.ForwardedRequestCount,
-		RequestBytes: int(summary.RequestBytes), ResponseBytes: int(summary.ResponseBytes),
+		RequestCompleteness: adminapi.RequestCompletenessCounts{Exact: summary.RequestCompleteness.Exact, Partial: summary.RequestCompleteness.Partial, Unknown: summary.RequestCompleteness.Unknown},
+		RequestBytes:        int(summary.RequestBytes), ResponseBytes: int(summary.ResponseBytes),
 		SemanticMeters: []struct {
 			Confidence adminapi.UsageSummarySemanticMetersConfidence `json:"confidence"`
 			Meter      adminapi.PricingMeter                         `json:"meter"`
@@ -207,7 +208,8 @@ func requestUsageWire(row usage.RequestView) adminapi.RequestUsageView {
 	return adminapi.RequestUsageView{
 		RequestId: row.RequestID, InteractionId: row.InteractionID, DeploymentId: row.DeploymentID,
 		UserId: row.UserID, DeviceId: row.DeviceID, ResourceId: row.ResourceID, RuntimeRouteId: row.RuntimeRouteID,
-		UpstreamId: row.UpstreamID, ManagedGeneration: row.ManagedGeneration, ControlRevision: row.ControlRevision,
+		ResourceDisplayName: row.ResourceDisplayName,
+		UpstreamId:          row.UpstreamID, ManagedGeneration: row.ManagedGeneration, ControlRevision: row.ControlRevision,
 		StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, Forwarded: row.Forwarded,
 		HttpStatus: row.HTTPStatus, UpstreamHttpStatus: row.UpstreamHTTPStatus,
 		RequestBytes: row.RequestBytes, ResponseBytes: row.ResponseBytes, DurationMs: row.DurationMs, ErrorClass: row.ErrorClass,

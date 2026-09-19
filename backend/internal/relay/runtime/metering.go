@@ -19,6 +19,7 @@ type responseObserver struct {
 	http.ResponseWriter
 	status int
 	bytes  int64
+	tunnel *upgradedStream
 }
 
 func (w *responseObserver) WriteHeader(status int) {
@@ -100,6 +101,11 @@ func (h *Handler) recordUsage(observer *responseObserver, body *countingBody, at
 	if body != nil {
 		requestBytes = body.bytes
 	}
+	responseBytes := observer.bytes
+	if observer.tunnel != nil {
+		requestBytes = observer.tunnel.requestBytes.Load()
+		responseBytes = observer.tunnel.responseBytes.Load()
+	}
 	var errorValue *string
 	if errorClass != "" {
 		errorValue = &errorClass
@@ -111,7 +117,7 @@ func (h *Handler) recordUsage(observer *responseObserver, body *countingBody, at
 		ManagedGeneration: attr.state.ActiveManagedGeneration, ControlRevision: attr.state.ControlRevision,
 		StartedAt: attr.startedAt, CompletedAt: completedAt, Forwarded: forwarded,
 		HttpStatus: status, UpstreamHttpStatus: upstreamStatus,
-		RequestBytes: int(requestBytes), ResponseBytes: int(observer.bytes),
+		RequestBytes: int(requestBytes), ResponseBytes: int(responseBytes),
 		DurationMs: int(completedAt.Sub(attr.startedAt).Milliseconds()), ErrorClass: errorValue,
 	}
 	_ = h.recorder.Record(event)

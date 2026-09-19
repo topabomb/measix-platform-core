@@ -33,7 +33,7 @@ func TestI5SecurityDisableIsDenyFirstAndEnableIsAllowLast(t *testing.T) {
 	upstreams := upstream.NewService(st.Client, box)
 	capabilities := capability.NewService(st.Client)
 	relayStore := control.NewStore(func() time.Time { return now })
-	relayServer := httptest.NewServer(control.NewHandler(relayStore, "relay-service-token"))
+	relayServer := httptest.NewServer(control.NewHandler(relayStore, "relay-service-token", "test-relay", nil))
 	defer relayServer.Close()
 	relayClient := runtimecontrol.NewHTTPRelayClient(relayServer.URL, "relay-service-token", relayServer.Client())
 	service := runtimecontrol.NewService(st.Client, capabilities, upstreams, identity.Signer, relayClient)
@@ -108,7 +108,7 @@ func TestI5DeviceRevokeIsAppliedToRelay(t *testing.T) {
 	upstreams := upstream.NewService(st.Client, box)
 	capabilities := capability.NewService(st.Client)
 	relayStore := control.NewStore(func() time.Time { return now })
-	relayServer := httptest.NewServer(control.NewHandler(relayStore, "relay-service-token"))
+	relayServer := httptest.NewServer(control.NewHandler(relayStore, "relay-service-token", "test-relay", nil))
 	defer relayServer.Close()
 	service := runtimecontrol.NewService(st.Client, capabilities, upstreams, identity.Signer, runtimecontrol.NewHTTPRelayClient(relayServer.URL, "relay-service-token", relayServer.Client()))
 	service.Now = func() time.Time { return now }

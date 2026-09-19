@@ -16,18 +16,16 @@ import {
 
 const ROOT = resolveRoot(import.meta.dirname)
 const FIXTURES_DIR = join(ROOT, 'api', 'fixtures')
-const CLIENT_OPENAPI = join(ROOT, 'api', 'client', 'client-control.openapi.yaml')
-const ADMIN_OPENAPI = join(ROOT, 'api', 'admin', 'admin.openapi.yaml')
 const ARTIFACTS_DIR = join(ROOT, '.artifacts')
 const ARCH_REPO = resolve(ROOT, '..', 'measix-architecture')
 const SCENARIO_DEFS = JSON.parse(readFileSync(join(ROOT, 'scripts', 'scenario-definitions.json'), 'utf-8'))
 
 
 // Local-only: fixtures hash (not shared with harness.mjs)
-function fixturesHash() {
+function fixturesHash(directory = FIXTURES_DIR) {
   const hash = createHash('sha256')
-  for (const file of collectFiles(FIXTURES_DIR).sort()) {
-    hash.update(relative(FIXTURES_DIR, file).replace(/\\/g, '/'))
+  for (const file of collectFiles(directory).sort()) {
+    hash.update(relative(directory, file).replace(/\\/g, '/'))
     hash.update('\0')
     hash.update(readFileSync(file).toString('utf-8').replace(/\r\n/g, '\n'))
     hash.update('\0')
@@ -147,7 +145,52 @@ function extractPlaywrightSpecs(suite, results) {
 
 // --- Scenario result compilation ---
 
-function compileScenarioResults() {
+const MANIFEST_KIND = 'measix-s0-client-contract-freeze'
+const PINNED_HASH_FIELDS = ['adminBuildHash', 'clientControlOpenApiHash', 'adminOpenApiHash', 'relayControlOpenApiHash', 'usageIngestOpenApiHash', 'canonicalFixtureHash']
+
+/**
+ * Evidence for "Freeze Manifest Generated" (CAP-C7-001).
+ * A manifest file existing is not evidence by itself; the manifest must carry a
+ * complete, clean, hash-pinned identity produced by this compiler.
+ */
+export function manifestSelfEvidence(manifest) {
+  if (!manifest || typeof manifest !== 'object') return ['Manifest not available']
+  const errors = []
+  if (manifest.manifest !== MANIFEST_KIND) errors.push('Manifest kind missing/altered')
+  for (const field of ['platformCoreCommit', 'architectureCommit']) {
+    if (!/^[a-f0-9]{40}$/.test(manifest[field] ?? '')) errors.push(`${field} is not a full commit SHA`)
+  }
+  if (manifest.workingTreeDirty !== false || manifest.architectureRepoDirty !== false) errors.push('Manifest source was dirty or unknown')
+  if (manifest.snapshotSchemaVersion !== 4) errors.push('Manifest is not pinned to current Snapshot v4')
+  for (const field of PINNED_HASH_FIELDS) {
+    if (!/^sha256:[a-f0-9]{64}$/.test(manifest[field] ?? '')) errors.push(`${field} is not a pinned hash`)
+  }
+  if (typeof manifest.deterministicAdapterVersion !== 'string' || manifest.deterministicAdapterVersion.length === 0) errors.push('deterministicAdapterVersion missing')
+  const pins = manifest.artifactPins
+  if (!pins || typeof pins !== 'object') return [...errors, 'Missing artifactPins']
+  for (const name of artifactNames) {
+    const pin = pins[name]
+    if (!/^sha256:[a-f0-9]{64}$/.test(pin?.artifactSha256 ?? '') || !/^sha256:[a-f0-9]{64}$/.test(pin?.metaSha256 ?? '')) errors.push(`Incomplete evidence pin: ${name}`)
+  }
+  return errors
+}
+
+/**
+ * Required scenario rows must be proven. Only a pending clean-source replay may
+ * leave CAP-C7-002 unresolved; every other required row, including CAP-C7-001,
+ * is held to the same evidence standard.
+ */
+export function scenarioResultErrors(rows, { allowPendingReplay = false } = {}) {
+  const errors = []
+  for (const row of rows ?? []) {
+    if (!row.required || row.result === 'PASS') continue
+    if (allowPendingReplay && row.id === 'CAP-C7-002' && row.result === 'NOT_EXECUTED') continue
+    errors.push('Artifact scenario not PASS: ' + row.id)
+  }
+  return errors
+}
+
+export function compileScenarioResults(manifest) {
   const artifacts = {
     'backend-test.json': loadGoTestResults('backend-test.json'),
     'system-test.json': loadGoTestResults('system-test.json'),
@@ -178,11 +221,13 @@ function compileScenarioResults() {
       if (a && a.status === 'VERIFIED') result = 'PASS'
       else if (a && a.status && a.status !== 'NOT_EXECUTED') result = 'FAIL'
     } else if (s.id === 'CAP-C7-001') {
-      result = 'PASS'
+      // Proven by the manifest's own pinned identity and complete evidence pins;
+      // never by the mere existence of a manifest file.
+      result = manifestSelfEvidence(manifest).length === 0 ? 'PASS' : 'FAIL'
     } else if (s.id === 'CAP-C7-002') {
       // Two-phase freeze: candidate manifest writes NOT_EXECUTED.
       // After clean replay passes, the final manifest writes PASS.
-      // Current runtime-only replay cannot finalize this scenario.
+      // Only separately validated clean-source replay can finalize this scenario.
       result = 'NOT_EXECUTED'
     } else if (s.artifact && s.testNames.length > 0) {
       const artifact = artifacts[s.artifact]
@@ -234,19 +279,39 @@ export function validatePins(manifest, facts, definitions = SCENARIO_DEFS, allow
   return errors
 }
 
-const artifactNames = ['backend-test.json','system-test.json','console-test.json','candidate-test.json','e2e-playwright.json','static-contract.json','resource-baseline.json','real-adapter-qualification.json']
+/** Replay stages required for a clean-source candidate, in execution order. */
+export const REPLAY_STAGES = ['generate', 'format', 'typecheck', 'admin-build', 'contract', 'go-vet', 'backend', 'smoke', 'system', 'candidate', 'console', 'browser']
+
+export function validateReplay(replay, facts, candidateHash) {
+  const errors = []
+  if (replay?.status !== 'PASS' || replay?.replayKind !== 'CLEAN_SOURCE_AND_RUNTIME') return ['Missing successful clean-source replay']
+  if (!/^sha256:[a-f0-9]{64}$/.test(candidateHash ?? '') || replay.candidateManifestHash !== candidateHash) errors.push('Replay candidate identity mismatch')
+  for (const [name, value] of Object.entries(facts)) {
+    if (replay.rebuiltFacts?.[name] !== value) errors.push('Replay rebuilt pin mismatch: ' + name)
+  }
+  if (replay.platformCoreCommit !== facts.platformCoreCommit || replay.architectureCommit !== facts.architectureCommit) errors.push('Replay source mismatch')
+  const required = REPLAY_STAGES
+  if (!Array.isArray(replay.stages) || replay.stages.length !== required.length) errors.push('Replay command set mismatch')
+  for (const [index, id] of required.entries()) {
+    const stage = replay.stages?.[index]
+    if (stage?.id !== id || stage.exitCode !== 0 || !/^sha256:[a-f0-9]{64}$/.test(stage.outputHash ?? '')) errors.push('Replay command not proven: ' + id)
+  }
+  return errors
+}
+
+export const artifactNames = ['backend-test.json','system-test.json','console-test.json','candidate-test.json','e2e-playwright.json','static-contract.json','resource-baseline.json','real-adapter-qualification.json']
 function byteHash(path) { return 'sha256:' + createHash('sha256').update(readFileSync(path)).digest('hex') }
-function sourceFacts() {
-  const source = readFileSync(join(ROOT,'backend/internal/hub/capability/snapshot.go'),'utf8')
+export function sourceFacts(root = ROOT, architecture = ARCH_REPO) {
+  const source = readFileSync(join(root,'backend/internal/hub/capability/snapshot.go'),'utf8')
   const version = source.match(/const CurrentSnapshotSchemaVersion = (\d+)/)?.[1]
   if (!version) throw new Error('Cannot determine live Snapshot compiler schema')
   return {
-    platformCoreCommit: gitCommit(ROOT), architectureCommit: gitCommit(ARCH_REPO),
-    snapshotSchemaVersion: Number(version), adminBuildHash: adminBuildHash(ROOT),
-    clientControlOpenApiHash: sha256File(CLIENT_OPENAPI), adminOpenApiHash: sha256File(ADMIN_OPENAPI),
-    relayControlOpenApiHash: sha256File(join(ROOT,'api/internal/relay-control.openapi.yaml')),
-    usageIngestOpenApiHash: sha256File(join(ROOT,'api/internal/usage-ingest.openapi.yaml')),
-    canonicalFixtureHash: fixturesHash(), deterministicAdapterVersion: deterministicAdapterVersion(ROOT),
+    platformCoreCommit: gitCommit(root), architectureCommit: gitCommit(architecture),
+    snapshotSchemaVersion: Number(version), adminBuildHash: adminBuildHash(root),
+    clientControlOpenApiHash: sha256File(join(root,'api/client/client-control.openapi.yaml')), adminOpenApiHash: sha256File(join(root,'api/admin/admin.openapi.yaml')),
+    relayControlOpenApiHash: sha256File(join(root,'api/internal/relay-control.openapi.yaml')),
+    usageIngestOpenApiHash: sha256File(join(root,'api/internal/usage-ingest.openapi.yaml')),
+    canonicalFixtureHash: fixturesHash(join(root,'api/fixtures')), deterministicAdapterVersion: deterministicAdapterVersion(root),
   }
 }
 
@@ -278,26 +343,48 @@ export function validateCandidate(manifest, { allowPendingReplay = false } = {})
     const pin = manifest.artifactPins?.[name], current = evidence.pins[name]
     if (!pin || !current || pin.artifactSha256 !== current.artifactSha256 || pin.metaSha256 !== current.metaSha256) errors.push(name + ': manifest evidence pin mismatch')
   }
-  const actual = compileScenarioResults()
-  for (const row of actual) {
-    if (row.required && !row.id.startsWith('CAP-C7-') && row.result !== 'PASS') errors.push('Artifact scenario not PASS: ' + row.id)
-  }
+  const actual = compileScenarioResults(manifest)
+  errors.push(...scenarioResultErrors(actual, { allowPendingReplay }))
   if (!allowPendingReplay) {
-    // Runtime-only replay is deliberately not accepted as clean-source C7 proof.
     if (manifest.replayKind !== 'CLEAN_SOURCE_AND_RUNTIME') errors.push('Missing independently rebuilt clean-source replay')
     const path = join(ARTIFACTS_DIR,'replay-artifact.json')
     if (!existsSync(path) || manifest.replayArtifactHash !== byteHash(path)) errors.push('Missing/changed replay artifact')
     const replay = loadJsonArtifact('replay-artifact.json')
-    if (replay?.status !== 'PASS' || replay?.replayKind !== 'CLEAN_SOURCE_AND_RUNTIME' || replay?.platformCoreCommit !== facts.platformCoreCommit || replay?.architectureCommit !== facts.architectureCommit) errors.push('Replay provenance mismatch')
+    errors.push(...validateReplay(replay, facts, manifest.sourceCandidateManifestHash))
+    for (const stage of replay?.stages ?? []) {
+      if (!/^[a-z-]+$/.test(stage.id ?? '') || typeof replay.workspace !== 'string') { errors.push('Invalid replay log identity'); continue }
+      const log = join(replay.workspace, 'evidence', stage.id + '.log')
+      if (!existsSync(log) || byteHash(log) !== stage.outputHash) errors.push('Replay log missing/changed: ' + stage.id)
+    }
   }
   return errors
 }
 
 function main() {
   const startedAt = new Date().toISOString()
-  if (process.argv.includes('--clean-replay')) throw new Error('--clean-replay is not validation. An independent clean-source rebuild/replay is required; runtime replay alone cannot finalize C7.')
+  if (process.argv.includes('--clean-replay')) throw new Error('Run replay-freeze.mjs --manifest first, then --finalize with a distinct --output path')
   const index = process.argv.indexOf('--manifest')
   const path = index < 0 ? join(ARTIFACTS_DIR,'s0-freeze-candidate.json') : resolve(process.argv[index + 1] ?? '')
+  if (process.argv.includes('--finalize')) {
+    const outputIndex = process.argv.indexOf('--output')
+    if (outputIndex < 0 || !process.argv[outputIndex + 1]) throw new Error('Finalization requires a distinct --output file')
+    const candidate = JSON.parse(readFileSync(path, 'utf8'))
+    const candidateErrors = validateCandidate(candidate, { allowPendingReplay: true })
+    if (candidateErrors.length) throw new Error(candidateErrors.join('\n'))
+    const finalized = {
+      ...candidate, sourceCandidateManifestHash: byteHash(path), replayKind: 'CLEAN_SOURCE_AND_RUNTIME',
+      replayArtifactHash: byteHash(join(ARTIFACTS_DIR, 'replay-artifact.json')),
+      scenarioResults: candidate.scenarioResults.map(row => row.id === 'CAP-C7-002' ? { ...row, result: 'PASS' } : row),
+      completedAt: new Date().toISOString(),
+    }
+    const finalErrors = validateCandidate(finalized)
+    if (finalErrors.length) throw new Error(finalErrors.join('\n'))
+    const output = resolve(process.argv[outputIndex + 1])
+    if (output === path) throw new Error('Candidate evidence is immutable; choose a distinct output')
+    writeFileSync(output, JSON.stringify(finalized, null, 2) + '\n', { flag: 'wx' })
+    console.log('Wrote validated final manifest: ' + output)
+    return
+  }
   if (process.argv.includes('--validate')) {
     const manifest = JSON.parse(readFileSync(path,'utf8'))
     const errors = validateCandidate(manifest,{allowPendingReplay:process.argv.includes('--candidate')})
@@ -306,12 +393,18 @@ function main() {
     return
   }
   const facts = sourceFacts(), evidence = evidenceChecks(facts)
-  const manifest = {
-    manifest:'measix-s0-client-contract-freeze', stage:'S0.1', ...facts,
+  // CAP-C7-001 evidence is computed from the same identity that is written, so
+  // a generated manifest cannot certify itself after the fact.
+  const identity = {
+    manifest: MANIFEST_KIND, ...facts,
     workingTreeDirty:gitDirty(ROOT), architectureRepoDirty:gitDirty(ARCH_REPO),
+    artifactPins:evidence.pins,
+  }
+  const manifest = {
+    ...identity, stage:'S0.1',
     realAdapterQualificationRef:'.artifacts/real-adapter-qualification.json', realAdapterQualificationStatus:loadJsonArtifact('real-adapter-qualification.json')?.status,
     resourceBaselineRef:'.artifacts/resource-baseline.json', resourceBaselineStatus:loadJsonArtifact('resource-baseline.json')?.status,
-    artifactPins:evidence.pins, scenarioResults:compileScenarioResults(), startedAt, completedAt:new Date().toISOString(),
+    scenarioResults:compileScenarioResults(identity), startedAt, completedAt:new Date().toISOString(),
   }
   const errors = validateCandidate(manifest,{allowPendingReplay:true})
   if (errors.length) throw new Error(errors.join('\n'))

@@ -92,7 +92,7 @@ func TestI3ControlApplyAndRuntimeAdmission(t *testing.T) {
 	}
 
 	store := control.NewStore(func() time.Time { return now })
-	internal := httptest.NewServer(control.NewHandler(store, "relay-service-token"))
+	internal := httptest.NewServer(control.NewHandler(store, "relay-service-token", "test-relay", nil))
 	defer internal.Close()
 	applyControl(t, internal.URL, "relay-service-token", state, http.StatusOK)
 

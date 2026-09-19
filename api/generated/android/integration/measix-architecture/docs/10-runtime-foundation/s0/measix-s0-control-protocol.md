@@ -24,7 +24,7 @@ S0 必须保证：
 8. S0.1 Client Snapshot 能完整表达首个 required Managed Capability profile；
 9. MEASIX 尚未发布，只支持当前 Snapshot v4；Gateway v5 为后续目标。旧原型版本、兼容和升级不构成当前要求，唯一规则见 §10.10.1。
 
-S0 不要求：Push、Control SSE、Device heartbeat、Runtime WebSocket、多 Relay 共识、多 generation 灰度、generic path rewrite、Provider-specific body translation。
+S0 不要求：Push、Control SSE、Device heartbeat、多 Relay 共识、多 generation 灰度、generic path rewrite、Provider-specific body translation。实时 ASR 的受管 WebSocket 见 §10.6。
 
 ## 2. Contract artifacts 与 API 面
 
@@ -329,6 +329,7 @@ transportPolicy
   HTTP_STREAMING_SSE
   HTTP_BINARY_STREAM
   HTTP_MULTIPART
+  WEBSOCKET
 timeoutPolicy
 ```
 
@@ -419,6 +420,7 @@ appliedControlRevision
 bundleHash
 activeManagedGeneration
 startedAt
+buildVersion
 ```
 
 Hub reconciliation compares desired/appplied revision + hash and either finalizes or replays same desired state.
@@ -469,10 +471,10 @@ User Enable 使用 Relay-first completion；Relay ACK 后 Hub 才 finalize ACTIV
 
 | kind | 其余字段 | 接收与验证 |
 |---|---|---|
-| `PLATFORM_ENROLLMENT` | `platformUrl,code,expiresAt` | platformUrl 最多 1024 字符，为部署公共 HTTPS origin，无 userinfo/query/fragment/path（根 `/` 可归一化）；code 为 1..128 字符不透明短期凭据；expiresAt 为 RFC3339 UTC 时间，仅供预检查，服务端仍是到期/消费权威 |
+| `PLATFORM_ENROLLMENT` | `platformUrl,code,expiresAt` | platformUrl 最多 1024 字符，为部署公共 HTTP 或 HTTPS origin，无 userinfo/query/fragment/path（根 `/` 可归一化）；code 为 1..128 字符不透明短期凭据；expiresAt 为 RFC3339 UTC 时间，仅供预检查，服务端仍是到期/消费权威 |
 | `LOCAL_EXAMPLE_ENROLLMENT` | `sourceNamespace,deploymentId,code,expiresAt` | sourceNamespace 为应用已安装并明确标为本地示例的来源 ID；其余身份和 code 由该来源校验；无 platformUrl，不能发往网络 Enrollment |
 
-平台资料来源于当前 Admin 的部署公共 origin（不是 Hub/Relay 内网地址，也不接受 QR 自称可信）；Android 展示解析后的目标 origin，用户明确接入后从该 origin 执行 Discovery，核对产品、协议及受支持 schema，再向同一 origin 的固定 Enrollment endpoint 交换 code。禁用跨 origin 重定向，code 不进入 Discovery URL；Discovery 中的 API base 仍限定同源 path。无服务端返回前不能据二维码显示名或 code 直接发布 BOUND。仅显式开发/测试配置可允许 loopback HTTP；发行版不能把私网或任意 HTTP 当作该例外。
+平台资料来源于服务端显式配置的唯一部署公共 origin（不是 Hub/Relay 内网地址，也不接受 QR 自称可信）；Android 展示解析后的目标 origin，用户明确接入后从该 origin 执行 Discovery，核对产品、协议及受支持 schema，再向同一 origin 的固定 Enrollment endpoint 交换 code。禁用跨 origin 重定向，code 不进入 Discovery URL；Discovery 中的 API base 仍限定同源 path。无服务端返回前不能据二维码显示名或 code 直接发布 BOUND。HTTP 与 HTTPS 均为正式支持的接入形式，域名、局域网 IP、公网 IP、IPv6 和自定义端口按同一规则校验；不得以非回环 HTTP 为由拒绝接入。不依赖管理员浏览器 location、Host 或 Forwarded 头生成平台地址。HTTP 不提供传输加密，但不因此成为仅开发可用的旁路。
 
 本地资料的 sourceNamespace/deploymentId/code 均为 1..128 字符不透明标识，不允许通过资料动态注册来源、导入脚本或打开网络地址。示例一键接入也生成同一资料并经过同一解析/验证/提交。未知来源、到期、已消费、缺配置、坏配置分别处理：前者不建立绑定；身份已成功而配置暂未就绪时保留明确的已接入/待配置状态，不能假报可执行。
 
@@ -579,10 +581,10 @@ Refresh rotation 及以下 Portal 交互仍须 OpenAPI、持久化并发/丢响�
 
 本节 HTTP grant/Cookie/CSRF 仅用于真实平台 Portal。本地示例可在专属受信 origin 承载随包网页，但使用独立本地 document/session owner，不伪造平台 token、grant、Cookie 或生产认证结果。两种来源共用下面的 Native Bridge v3 与同一组产品行为；本地网页与远端网页的打包、资源加载和 Feed I/O 适配由实现仓库负责，不在生产远端 Portal 内放置可绕过认证的“模拟登录”开关。
 
-S0.2 Portal 使用部署配置批准的单一 platform HTTPS origin，静态入口为 `/portal/`；不接受客户端自选 origin 或重定向地址。仅本地开发/测试允许 loopback HTTP。Hub 不从 Host/Forwarded 请求头推断批准 origin。
+S0.2 Portal 使用部署配置的同一个公共 HTTP 或 HTTPS origin，静态入口为 `/portal/`；不接受客户端自选 origin 或重定向地址。Portal 不另设独立来源配置。Hub 不从 Host/Forwarded 请求头推断公共 origin。
 
 1. Android 以有效 Client Access Token 调用 `POST /api/client/v1/portal/grants`，无 request body。Hub 返回 `201 {exchangeUrl, ticket, expiresAt}`，`exchangeUrl` 固定为批准 origin 的 `/portal/session/exchange`。ticket 为不可预测的一次性凭据，最多 60 秒有效，绑定 Deployment/User/Device/母 Enterprise Session/origin；服务端只保存摘要。
-2. Android 使用 WebView 原生 POST 向 exchangeUrl 提交 `application/x-www-form-urlencoded` 的 `ticket`。ticket 不进入 URL、历史、日志或 JavaScript；禁止以 access/refresh token 替代。Hub 原子消费 ticket 后返回 `303 Location: /portal/`，设置 `measix_portal_session` Cookie：Secure、HttpOnly、SameSite=Strict、Path=/、无 Domain。Web Session 最多 10 分钟且不晚于母 Session idle expiry。兑换丢响应时重新申请 grant，不重放 ticket；不同并发兑换最多一个成功。若 Origin 存在必须精确匹配批准 origin，cross-site fetch 拒绝；无 Origin 仅为原生 POST 交付保留。
+2. Android 使用 WebView 原生 POST 向 exchangeUrl 提交 `application/x-www-form-urlencoded` 的 `ticket`。ticket 不进入 URL、历史、日志或 JavaScript；禁止以 access/refresh token 替代。Hub 原子消费 ticket 后返回 `303 Location: /portal/`，设置 `measix_portal_session` Cookie：HttpOnly、SameSite=Strict、Path=/、无 Domain；公共 origin 为 HTTPS 时设置 Secure，HTTP 时不设置 Secure。Web Session 最多 10 分钟且不晚于母 Session idle expiry。兑换丢响应时重新申请 grant，不重放 ticket；不同并发兑换最多一个成功。若 Origin 存在必须精确匹配批准 origin，cross-site fetch 拒绝；无 Origin 仅为原生 POST 交付保留。
 3. Cookie 只授权 Portal session 查询/关闭和公开 Enterprise Update Feed 读取，不授权 Admin、Client Bootstrap/Snapshot、Runtime 或 grant 签发。每次请求校验母 Session、User、Device 仍有效；Refresh 轮换不延长已发出的 Web Session，Portal 操作从不续期母 Session。
 4. `GET /api/portal/v1/session` 返回 `{deploymentId,userId,deviceId,sessionId,enterpriseName,userDisplayName,expiresAt,sessionIdleExpiresAt,csrfToken}`。其中 sessionId 为母 Enterprise Session，用于客户端缓存隔离；不返回任何 Android credential。所有 session/grant/exchange 响应为 `Cache-Control: no-store`。Portal Feed 复用 §10.16 的路径、query、DTO 和 ETag 语义，但只在该两个只读 endpoint 接受 Portal Cookie。
 5. `DELETE /api/portal/v1/session` 必须同时具有有效 Cookie、精确 Origin 和 `X-CSRF-Token`；成功返回 204 并撤销 Web Session、清除 Cookie，不撤销母 Session。缺少或失效认证返回 401；origin/CSRF 拒绝返回 403，错误响应不泄露凭据。ticket 过期/已消费一律返回 401。Hub 重启不恢复被消费 ticket 的使用权。
@@ -716,23 +718,23 @@ Enterprise Update 使用独立 Draft/Publish/Withdraw 与 Feed revision，不进
 
 ### 10.2 S0.1 client protocol vocabulary
 
-Protocol vocabulary can be extensible, but **S0.1/S0.4 required and VERIFIED runtime baseline** is exactly：
+当前要求交付的客户端协议如下；枚举存在不是完成或 VERIFIED 证据，必须执行对应配置、发布、运行通道与消费验收：
 
 ```text
 OPENAI_CHAT_COMPLETIONS
+OPENAI_RESPONSES
+GOOGLE_GENERATE_CONTENT
+ANTHROPIC_MESSAGES
 OPENAI_AUDIO_SPEECH
+GEMINI_GENERATE_CONTENT_TTS
+MIMO_CHAT_COMPLETIONS_TTS
+SYSTEM_TTS
 OPENAI_AUDIO_TRANSCRIPTIONS
+DASHSCOPE_HTTP_ASR
+OPENAI_REALTIME_TRANSCRIPTION
+DASHSCOPE_REALTIME_ASR
 MCP_STREAMABLE_HTTP
 ```
-
-Compatibility-extension values such as：
-
-```text
-OPENAI_RESPONSES
-ANTHROPIC_MESSAGES
-```
-
-may remain reserved/implemented later, but their presence in an executable enum does **not** imply S0.1 product support. Admin must not present unqualified values as normal supported choices.
 
 ### 10.3 ProviderDefinition
 
@@ -744,6 +746,8 @@ enabled
 ```
 
 S0.1 ProviderDefinition is client-side grouping/protocol metadata, not Upstream infrastructure. No base URL/API key/SecretRef.
+
+`clientProtocol` 必填，当前模型值为 `OPENAI_CHAT_COMPLETIONS`、`OPENAI_RESPONSES`、`GOOGLE_GENERATE_CONTENT`、`ANTHROPIC_MESSAGES`，由引用该提供商的模型继承。四种协议共用 Runtime Resource 路由与平台鉴权；`runtimePath` 是配置的实际接口路径，Relay 不追加协议后缀或转换请求体。客户端执行约定见 Capability Delivery Contract §4.2。变更提供商协议必须在发布前审查其全部模型的接口路径与客户端消费能力。
 
 ### 10.4 ModelDefinition
 
@@ -774,30 +778,43 @@ Unknown request value is validation error for the frozen S0.1 profile. Future ca
 ```text
 ttsId             tts_*
 displayName
-clientProtocol     OPENAI_AUDIO_SPEECH
-upstreamModelKey
-voice              required non-empty
-runtimePath
+clientProtocol     OPENAI_AUDIO_SPEECH | GEMINI_GENERATE_CONTENT_TTS | MIMO_CHAT_COMPLETIONS_TTS | SYSTEM_TTS
+upstreamModelKey?   required for cloud execution
+voice?             required for cloud execution except MiMo voice design
+runtimePath?       required for cloud execution
+voiceDesignPrompt? MiMo only
+speechRate?        SYSTEM_TTS only, required positive number
+pitch?             SYSTEM_TTS only, required positive number
 enabled
 ```
 
-`voice` is part of the Managed execution definition and must not be supplied by an implicit Android default.
+四种协议属于当前唯一 Definition，不是旧格式兼容。云端协议必须提供实际模型、接口路径和有效 RuntimeBinding；不得带 speechRate/pitch。OpenAI Speech 与 Gemini 必须显式指定 voice，且不得带 voiceDesignPrompt。OpenAI 输出 MP3 二进制；Gemini voice 映射 prebuiltVoiceConfig.voiceName，以 generateContent 的 AUDIO 响应读取 inlineData PCM（24 kHz、16-bit、mono）。
 
-S0.1 required response audio profile is MP3; it is a release profile rule, not a generic codec DSL field.
+MiMo 按 Chat Completions 编码：目标文字为 assistant message，非空 voiceDesignPrompt 为前置 user message，stream=true、audio.format=pcm16，从 choices[0].delta.audio.data 解码音频。标准模型必须指定 voice；模型名含 voicedesign 时必须提供非空 voiceDesignPrompt、不得带 voice。基础地址、鉴权与模型可由部署配置，不以 Relay 主机名识别提供商。云端格式由协议确定，不增加通用音频 DSL 或 Relay 翻译。
+
+SYSTEM_TTS 使用设备系统朗读，必须显式提供 speechRate/pitch（1 表示正常，均大于 0）；不得包含云端字段、RuntimeBinding、上游凭据或虚假接口路径，也不生成 Relay 路由和调用计量。它仍是企业拥有的 tts_* 定义，可以被 defaultTtsId 引用；allowLocalTts=false 不禁用这一企业定义。设备引擎不可用时给出明确错误，不自动改用另一语音资源。云端与系统字段混用是当前协议校验错误，不做忽略或转换。
 
 ### 10.6 AsrDefinition
 
 ```text
 asrId              asr_*
 displayName
-clientProtocol      OPENAI_AUDIO_TRANSCRIPTIONS
+clientProtocol      OPENAI_AUDIO_TRANSCRIPTIONS | DASHSCOPE_HTTP_ASR | OPENAI_REALTIME_TRANSCRIPTION | DASHSCOPE_REALTIME_ASR
 upstreamModelKey
 runtimePath
 language?           optional default language
 enabled
 ```
 
-S0.1/S0.4 ASR semantics are HTTP multipart transcription. Realtime/WebSocket/VAD/sample-rate provider configuration is not part of this Managed definition.
+当前企业 ASR 覆盖两种 HTTP 文件转写及 OpenAI Realtime、DashScope Realtime，均须显式选择协议，不自动回退。所有类型保留稳定资源身份、模型、接口路径、可选语言和启用状态；企业密钥仅由 Relay 注入。
+
+`DASHSCOPE_HTTP_ASR` 对应百炼 Qwen-Audio-3.0-ASR-Flash 的同步 DashScope HTTP API。RuntimeBinding 使用 `HTTP_REQUEST_RESPONSE`、仅 POST，`runtimePath=/api/v1/services/aigc/multimodal-generation/generation`。客户端将 WAV 或 MP3 录音编码为 Data URI，发送 `model=upstreamModelKey`、`input.messages=[{role:"user",content:[{type:"input_audio",input_audio:{data:"data:audio/wav;base64,..."}}]}]`、`parameters.format="wav"`（或 `mp3`，必须与实际音频一致）；有明确语言时可用 `parameters.language_hints=[language]`，未指定则由上游自动检测。成功响应从 `output.text` 读取转写文字，不能按 OpenAI `text` 顶层字段解析。Relay 只透传 JSON 和注入平台 Secret，不转换文件、请求体或响应。此资源是非实时识别，不出现 WebSocket、VAD 或实时参数。完整供应商字段以[百炼 HTTP ASR 官方接口](https://help.aliyun.com/en/model-studio/fun-asr-flash-recorded-speech-recognition-http-api)为准。
+
+实时类型额外必填 `sampleRate`、`vadThreshold`、`silenceDurationMs`。OpenAI PCM 采样率固定 24000，额外必填 `prefixPaddingMs`，可选 `prompt`；DashScope PCM 采样率为 8000 或 16000，不携带 OpenAI 专有字段。VAD threshold 范围 0–1，silenceDurationMs 为正整数，prefixPaddingMs 为非负整数。两种 HTTP 类型不得携带实时参数；OpenAI HTTP 绑定为 `HTTP_MULTIPART`，DashScope HTTP 绑定为 `HTTP_REQUEST_RESPONSE`。
+
+`runtimePath` 仍是无 query 的路径。OpenAI 使用 `/v1/realtime` 并由客户端追加 `intent=transcription`；DashScope 使用 `/api-ws/v1/realtime` 并追加经过 URL 编码的 `model=upstreamModelKey`。运行 URL 由已绑定的平台 origin 按 HTTPS→wss、HTTP→ws 转换，再拼接同一 Runtime Resource 路由；HTTP/ws 不限于回环或测试部署。握手携带平台 Bearer、managedGeneration、interactionId；不把凭据放入 query。运行绑定显式选择 WEBSOCKET、GET；普通 HTTP 绑定不得借 Upgrade 绕过传输约束。
+
+客户端按各供应商当前协议构造 session.update、input_audio_buffer.append 和停止事件，负责 PCM 编码与增量/完成转写合并；Relay 不解释或转换这些业务消息。取消、连接关闭、超时须关闭两端；握手前沿用当前授权与 generation barrier，失败保留普通 HTTP Problem，不能伪装成已连接。WebSocket 用量记录实际握手状态、连接时长与传输字节，不从音频字节猜测识别时长或费用。当前帧/连接限制、取消与凭据隔离均须有真实升级连接测试，未验证不宣称实时 ASR 可用。
 
 ### 10.7 McpDefinition
 
@@ -852,6 +869,7 @@ timeoutPolicy?
 ```
 
 Binding is Draft/server runtime input and **never appears in Client Snapshot**.
+Hub 验证每个资源的 `runtimePath` 落在其 binding 的 `allowedPathPrefixes[]` 内，使用与 Relay 相同的路径段边界规则；不允许发布一个快照指向会被自身路由拒绝的接口。Direct `MCP_STREAMABLE_HTTP` binding 必须允许 `POST`、`GET`、`DELETE` 到该 MCP 路径，以便初始化、通知、服务端事件流和会话关闭均能到达上游；上游不支持可选 GET 事件流时返回 HTTP 405 是上游协议结果，Relay 不得提前以路由策略 403 拒绝。
 
 ### 10.10 ManagedPolicy
 
@@ -865,9 +883,12 @@ allowLocalAssistants  # required
 defaultModelId?
 defaultTtsId?
 defaultAsrId?
+defaultAssistantId?   # enabled asd_*; first enterprise conversation when the user has no selection
 ```
 
 No User/Group assignment in S0.
+
+`defaultAssistantId` 是管理员明确选择的首次企业会话助手，必须引用同一 Snapshot 中启用的 `ManagedAssistantDefinition`。客户端已有的有效企业助手选择优先；无选择时使用这个默认值。已保存但失效的选择不得静默改用默认值或目录首项，应提示用户重新选择。未配置默认助手时，企业空间仍可打开并显示助手选择入口，不能因会话尚无助手而阻断空间页或 Portal。`defaultAssistantId` 不授予该助手所引用资源之外的新权限。
 
 当前五项 `allowLocal*` 的类型对应与准入语义见生命周期架构 §4.1：允许时直接引用用户唯一配置及其用户凭据，禁止时仅影响企业域可用性，运行数据仍按域和主体隔离。清单外准入及主/子助手引用按该节独立规则执行，助手开关不连带授权其他受控资源。
 
@@ -939,7 +960,7 @@ Only ACTIVE/SUPERSEDED finalized Release snapshot can be downloaded; STAGED/ACTI
 
 `snapshotHash = sha256:<hex>` from deterministic descriptor excluding `snapshotHash` itself; entity arrays sorted by stable ID.
 
-Client does not invent another JSON canonicalization. It verifies HTTP ETag == body snapshotHash plus TLS/schema/reference/deployment identity, then atomically commits.
+Client does not invent another JSON canonicalization. It verifies HTTP ETag == body snapshotHash plus bound origin, schema, references and deployment identity, then atomically commits. HTTPS additionally requires normal certificate verification; choosing HTTP does not relax the configuration checks.
 
 ### 10.14 当前 Snapshot 的 Enterprise Experience 字段
 
@@ -1084,6 +1105,7 @@ Preview：
 
 - does not create Release/generation；
 - does not change runtime；
+- `projectionHash` 对同一 Deployment 的同一已保存 Draft 内容必须稳定；预览编译使用确定的 Release/generation/publishedAt 占位值。它只标识待发布的客户端投影，不是正式 Release 的 `snapshotHash`，不能与发布后的 ETag 直接比较；
 - must show client-visible providers/models/tts/asr/mcp/policy，当前 v4 显示 assistants/starters，未来 v5 显示 Gateway logical resource + surfaceHash；
 - must not contain binding/upstream/internal route/Secret/Pricing；
 - exact Admin endpoint is executable-contract detail, but must be represented in Admin OpenAPI before implementation。
@@ -1142,7 +1164,7 @@ Gateway resource 仍是 MCP Streamable HTTP；Relay 透明转发 JSON-RPC，不�
 
 Relay does not parse Provider body, translate model schemas, rewrite audio fields or infer semantic usage.
 
-WebSocket is not supported in S0 runtime contract.
+实时 ASR 可使用显式 WEBSOCKET transport；握手、关闭、计量与限制遵守 §10.6，不改变 Relay 的透明传输边界。
 
 ## 15. 428 generation contract
 
@@ -1174,7 +1196,7 @@ GET/POST /api/admin/v1/upstreams
 GET/PUT  /api/admin/v1/upstreams/{upstreamId}
 POST     /api/admin/v1/upstreams/{upstreamId}:test
 POST     /api/admin/v1/upstreams/{upstreamId}:apply
-POST     /api/admin/v1/secrets
+GET/POST /api/admin/v1/secrets
 POST     /api/admin/v1/secrets/{secretId}:replace
 ```
 
@@ -1195,6 +1217,7 @@ timeoutDefaults { connectMs, responseHeaderMs, idleMs }
 ```
 
 `secretRef = {secretId,secretVersion}` references immutable SecretVersion.
+`GET /secrets` 使用 Admin 列表通用 `limit/cursor` 分页，仅返回 `{items:[{secretId,name,secretVersion}],nextCursor?}` 元数据；绝不返回明文、加密负载、密钥版本密文或认证头。管理员可以在重新打开页面后选择已创建的 Secret 最新版本；选择只改变本地候选表单，仍需保存并 Apply Upstream。
 
 Save candidate only increments `configRevision`; `:apply` Relay ACK then changes `activeConfigRevision`.
 
@@ -1203,6 +1226,8 @@ Secret replace creates new version only; it does not mutate candidate or active 
 `baseUrl` cannot contain userinfo/query/fragment. Runtime Client never supplies scheme/host/port.
 
 `:test` tests candidate only and returns reachability/latency/verified capabilities/warnings without changing active runtime.
+
+Admin Upstream 的 Test Connection 是对当前已保存候选基础地址执行无凭据 HEAD 的连通性检查；HTTP 响应（包括 401/405/5xx）证明地址可响应，不证明认证、业务请求或传输能力通过。结果必须区分网络不可达与实际 HTTP 状态，不得将配置声明的能力当作已验证能力。该检查不 Apply 候选，也不替代 capability qualification 或实时健康监测。
 
 ## 17. Admin Draft / Release / Activation contract
 
@@ -1381,7 +1406,9 @@ cost status/amount/currency when meaningful
 
 `RequestUsageView`/detail includes request correlation and semantic/cost details but never Secret/header/prompt/body.
 
-列表与汇总必须应用同一套显式筛选，不得只过滤 request counts 而把其他用户/资源的 semantic meters 或 cost 汇入结果。Request completeness 由已关联的 Semantic Usage 聚合：无记录或任一 UNKNOWN 为 UNKNOWN，否则任一 PARTIAL 为 PARTIAL，否则为 EXACT。未关联 requestId 的 provider-level Semantic Usage 可进入未按用户/请求状态限定的 upstream/resource 汇总；不得推断其 User 或混入用户/请求状态筛选结果。语义记录的 resource/upstream 过滤使用已验证归属，时间窗为下界包含、上界排除。部分缺少成本时不能将可得小计标为完整 KNOWN。
+列表与汇总必须应用同一套显式筛选，不得只过滤 request counts 而把其他用户/资源的 semantic meters 或 cost 汇入结果。Request completeness 由已关联的 Semantic Usage 聚合：无记录或任一 UNKNOWN 为 UNKNOWN，否则任一 PARTIAL 为 PARTIAL，否则为 EXACT。汇总必须返回当前筛选内这三类请求的数量，每条请求只计一次，三项之和等于 requestCount；不能用 meter 种类或汇总项的数量代替请求数量。未关联 requestId 的 provider-level Semantic Usage 可进入未按用户/请求状态限定的 upstream/resource 汇总；不得推断其 User 或混入用户/请求状态筛选结果。语义记录的 resource/upstream 过滤使用已验证归属，时间窗为下界包含、上界排除。部分缺少成本时不能将可得小计标为完整 KNOWN。
+
+Admin Request Usage 可返回 resourceDisplayName，名称必须来自该请求 managedGeneration 对应的不可变 Snapshot，不能用当前草稿名称改写历史。无对应已发布资源（如准入拒绝）时省略名称，仍保留原 resourceId；管理员界面以名称/资源类型和本地时间为摘要，完整 correlation ID 放入请求详情。
 
 ## 21. System status contract
 
@@ -1397,6 +1424,7 @@ managedStateRevision
 desiredControlRevision
 desiredBundleHash
 relayReady
+relayBuildVersion?
 appliedControlRevision
 appliedBundleHash
 lastRelaySeenAt
@@ -1406,12 +1434,19 @@ gatewayReady?
 appliedGatewayControlRevision?
 appliedGatewayBundleHash?
 lastGatewaySeenAt?
-latestActivation?
+currentActivation?
+lastActivation?
 requestUsageIngestLagSeconds?
 semanticOrphanCount
 ```
 
+currentActivation 为 APPLYING/UNKNOWN 的在途操作；lastActivation 为最近结束的 COMPLETED/FAILED 操作，按 completedAt、createdAt、activationId 降序确定。二者从同一读取快照获得，分别省略表示没有该类操作；不能用最近一条记录同时冒充两者，也不保留旧 latestActivation 字段。UNKNOWN 不等于失败或结束。
+
 S0.1 may add optional response fields such as spool/backlog/unknown summaries when needed by the executable Admin UI; current consumers ignore unknown optional fields, and Secret/credential cannot appear.
+
+Relay 的 private status 必须报告自身运行构建的 buildVersion；Hub 仅在成功读取该状态后转交 relayBuildVersion，不以 Hub 版本或旧缓存替代。Relay 状态不可取得时字段省略，Admin 显示未知。开发构建可标为 dev；该标签标识构建，不承担协议兼容或数据库迁移语义。
+
+未知计量请求数统计当前保留的 Request Usage 全量：无关联 Semantic Usage 或任一关联记录为 UNKNOWN 的请求计入一次；EXACT/PARTIAL 请求不计入，未关联请求的 provider-level 记录不计入。该口径复用 §20 的请求完整度，不表示零用量或未知成本记录数；未取得统计时显示不可用，不补零。
 
 ## 22. Auth boundary
 
@@ -1493,3 +1528,13 @@ S0.3 must consume the frozen S0.2 baseline and prove Snapshot v5、Gateway stand
 S0.4 must consume the pinned S0.3 baseline and prove Android Enrollment/Keystore/LKG/Effective Runtime/Model/TTS/HTTP-ASR/Direct MCP/Gateway/428/UI semantics while retaining S0.1–S0.3 regression evidence.
 
 Final S0 Exit remains governed by `measix-s0-system-testing-spec.md` and requires real Android emulator/device + Admin browser + real Hub/Gateway/Relay + qualified Adapter/downstream MCP evidence.
+
+## 当前公共入口与设备应用报告
+
+部署配置只有一个公共 origin，供 Enrollment 资料、Portal grant 和 Admin 地址展示使用；监听地址独立。origin 仅包含 HTTP/HTTPS scheme、host、可选有效端口，不含凭据、query、fragment 或非根路径。Admin 会话 Cookie 同样按部署公共 origin 的 scheme 设置 Secure，保留 HttpOnly、SameSite 与 CSRF。地址修改属于部署操作：客户端已绑定 origin 不被静默迁移，需要以新接入材料重新接入；不建立地址别名、自动跳转或旧 origin 兼容。
+
+客户端只有在完整校验 Snapshot 并原子持久化应用成功后，才能调用 `PUT /api/client/v1/managed/applied`，Bearer 属于当前 Android Session，body 为 `{managedGeneration, snapshotHash}`。服务端核对该发布 generation 与 hash 存在且一致，关联认证得到的 User/Device/Session，记录服务端接收时间，成功 204。客户端不得指定 deviceId/sessionId 或客户端时间。相同报告允许重试；同一 Session 不接受低于已确认 generation 的报告（409），非法/不匹配发布返回 422。新 Session 与旧报告隔离，旧 Session 不能更新新 Session 的设备状态。
+
+Managed State 的 Applied header 只用于计算本次同步需要，不构成应用报告；Snapshot 下载、ETag 命中、Runtime 调用和报告都不续 Session idle。报告不改变发布/控制 revision，不代替 Runtime generation/auth/resource 准入，报告失败也不回滚客户端已经成功应用的配置；下次同步/前台检查重试当前报告，不重放业务请求。
+
+Admin 设备展示使用当前有效 Session 的最后有效报告：无报告为“状态未知”；报告 generation 等于已发布 generation 为“已报告应用”；低于目标为“待更新”。同时展示报告时间，不推断设备在线、实时可用或仍保留本地数据。新发布不伪造设备确认；撤销、重新接入后旧 Session 的报告不能显示为当前已应用。没有发布时显示“尚未发布”。本轮不增加 Push、心跳保活或主动通知协议。

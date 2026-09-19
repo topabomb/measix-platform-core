@@ -9,7 +9,7 @@ import (
 
 func TestPortalCookieFeedDatesETagAndRevocation(t *testing.T) {
 	h, id, updates, ctx, adminID := setupFullHandler(t)
-	id.PortalOrigin = "https://platform.example"
+	id.PublicOrigin = "https://platform.example"
 	admin, csrf := loginAdmin(t, h)
 	token := enrollClient(t, h, admin, csrf)
 	grant, err := id.CreatePortalGrant(ctx, token)

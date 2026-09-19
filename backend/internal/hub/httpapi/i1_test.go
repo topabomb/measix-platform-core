@@ -32,6 +32,7 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 	}
 	svc := identity.New(st.Client, signer, []byte("01234567890123456789012345678901"))
 	now := time.Date(2026, 8, 19, 0, 0, 0, 0, time.UTC)
+	svc.PublicOrigin = "https://platform.example"
 	svc.Now = func() time.Time { return now }
 	signer.Now = svc.Now
 	if _, err := svc.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple"); err != nil {

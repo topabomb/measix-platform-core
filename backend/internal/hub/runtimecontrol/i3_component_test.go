@@ -63,7 +63,7 @@ func TestI3PublishPersistsIntentBeforeRelayAndFinalizesAfterAck(t *testing.T) {
 	}
 
 	relayStore := control.NewStore(func() time.Time { return now })
-	relayHandler := control.NewHandler(relayStore, "relay-service-token")
+	relayHandler := control.NewHandler(relayStore, "relay-service-token", "test-relay", nil)
 	var applyCalls atomic.Int32
 	guardedRelay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut && r.URL.Path == "/internal/v1/control/state" {

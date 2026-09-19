@@ -14,7 +14,7 @@ func enabledBindings(content adminapi.ManagedDraftContent) []adminapi.RuntimeBin
 		enabled[model.ModelId] = model.Enabled && providers[model.ProviderId]
 	}
 	for _, tts := range content.Tts {
-		enabled[tts.TtsId] = tts.Enabled
+		enabled[tts.TtsId] = tts.Enabled && tts.ClientProtocol != adminapi.SYSTEMTTS
 	}
 	for _, asr := range content.Asr {
 		enabled[asr.AsrId] = asr.Enabled

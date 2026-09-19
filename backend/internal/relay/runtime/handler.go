@@ -136,6 +136,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.recordUsage(observer, nil, attr, false, nil, "UPSTREAM_DISABLED")
 		return
 	}
+	wantsUpgrade := strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
+	if (route.TransportPolicy == relaycontrolapi.WEBSOCKET && (!wantsUpgrade || r.Method != http.MethodGet)) || (route.TransportPolicy != relaycontrolapi.WEBSOCKET && r.Header.Get("Upgrade") != "") {
+		writeProblem(observer, http.StatusBadRequest, "invalid_request", "Request does not match route transport", requestID, nil, false)
+		h.recordUsage(observer, nil, attr, false, nil, "INVALID_TRANSPORT")
+		return
+	}
 
 	maxRequestBytes := int64(state.OperationalLimits.MaxRequestBytes)
 	if r.ContentLength > maxRequestBytes {
@@ -153,7 +159,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// ReverseProxy aborts an interrupted response with http.ErrAbortHandler.
 	// Meter in the unwind path as well, using the state captured at admission.
 	defer func() { h.recordUsage(observer, body, attr, true, result.UpstreamStatus, result.ErrorClass) }()
-	h.serveProxy(observer, r, route, upstream, runtimePath, requestID, result)
+	h.serveProxy(observer, r, route, upstream, runtimePath, requestID, result, maxRequestBytes)
 }
 
 func writeProblem(w http.ResponseWriter, status int, code, title, requestID string, targetGeneration *int, forwarded bool) {

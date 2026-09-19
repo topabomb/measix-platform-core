@@ -234,6 +234,73 @@ func (_u *SessionUpdate) ClearRevokedAt() *SessionUpdate {
 	return _u
 }
 
+// SetAppliedManagedGeneration sets the "applied_managed_generation" field.
+func (_u *SessionUpdate) SetAppliedManagedGeneration(v int64) *SessionUpdate {
+	_u.mutation.ResetAppliedManagedGeneration()
+	_u.mutation.SetAppliedManagedGeneration(v)
+	return _u
+}
+
+// SetNillableAppliedManagedGeneration sets the "applied_managed_generation" field if the given value is not nil.
+func (_u *SessionUpdate) SetNillableAppliedManagedGeneration(v *int64) *SessionUpdate {
+	if v != nil {
+		_u.SetAppliedManagedGeneration(*v)
+	}
+	return _u
+}
+
+// AddAppliedManagedGeneration adds value to the "applied_managed_generation" field.
+func (_u *SessionUpdate) AddAppliedManagedGeneration(v int64) *SessionUpdate {
+	_u.mutation.AddAppliedManagedGeneration(v)
+	return _u
+}
+
+// ClearAppliedManagedGeneration clears the value of the "applied_managed_generation" field.
+func (_u *SessionUpdate) ClearAppliedManagedGeneration() *SessionUpdate {
+	_u.mutation.ClearAppliedManagedGeneration()
+	return _u
+}
+
+// SetAppliedSnapshotHash sets the "applied_snapshot_hash" field.
+func (_u *SessionUpdate) SetAppliedSnapshotHash(v string) *SessionUpdate {
+	_u.mutation.SetAppliedSnapshotHash(v)
+	return _u
+}
+
+// SetNillableAppliedSnapshotHash sets the "applied_snapshot_hash" field if the given value is not nil.
+func (_u *SessionUpdate) SetNillableAppliedSnapshotHash(v *string) *SessionUpdate {
+	if v != nil {
+		_u.SetAppliedSnapshotHash(*v)
+	}
+	return _u
+}
+
+// ClearAppliedSnapshotHash clears the value of the "applied_snapshot_hash" field.
+func (_u *SessionUpdate) ClearAppliedSnapshotHash() *SessionUpdate {
+	_u.mutation.ClearAppliedSnapshotHash()
+	return _u
+}
+
+// SetAppliedReportedAt sets the "applied_reported_at" field.
+func (_u *SessionUpdate) SetAppliedReportedAt(v time.Time) *SessionUpdate {
+	_u.mutation.SetAppliedReportedAt(v)
+	return _u
+}
+
+// SetNillableAppliedReportedAt sets the "applied_reported_at" field if the given value is not nil.
+func (_u *SessionUpdate) SetNillableAppliedReportedAt(v *time.Time) *SessionUpdate {
+	if v != nil {
+		_u.SetAppliedReportedAt(*v)
+	}
+	return _u
+}
+
+// ClearAppliedReportedAt clears the value of the "applied_reported_at" field.
+func (_u *SessionUpdate) ClearAppliedReportedAt() *SessionUpdate {
+	_u.mutation.ClearAppliedReportedAt()
+	return _u
+}
+
 // Mutation returns the SessionMutation object of the builder.
 func (_u *SessionUpdate) Mutation() *SessionMutation {
 	return _u.mutation
@@ -337,6 +404,27 @@ func (_u *SessionUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.RevokedAtCleared() {
 		_spec.ClearField(session.FieldRevokedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.AppliedManagedGeneration(); ok {
+		_spec.SetField(session.FieldAppliedManagedGeneration, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedAppliedManagedGeneration(); ok {
+		_spec.AddField(session.FieldAppliedManagedGeneration, field.TypeInt64, value)
+	}
+	if _u.mutation.AppliedManagedGenerationCleared() {
+		_spec.ClearField(session.FieldAppliedManagedGeneration, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.AppliedSnapshotHash(); ok {
+		_spec.SetField(session.FieldAppliedSnapshotHash, field.TypeString, value)
+	}
+	if _u.mutation.AppliedSnapshotHashCleared() {
+		_spec.ClearField(session.FieldAppliedSnapshotHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.AppliedReportedAt(); ok {
+		_spec.SetField(session.FieldAppliedReportedAt, field.TypeTime, value)
+	}
+	if _u.mutation.AppliedReportedAtCleared() {
+		_spec.ClearField(session.FieldAppliedReportedAt, field.TypeTime)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -564,6 +652,73 @@ func (_u *SessionUpdateOne) ClearRevokedAt() *SessionUpdateOne {
 	return _u
 }
 
+// SetAppliedManagedGeneration sets the "applied_managed_generation" field.
+func (_u *SessionUpdateOne) SetAppliedManagedGeneration(v int64) *SessionUpdateOne {
+	_u.mutation.ResetAppliedManagedGeneration()
+	_u.mutation.SetAppliedManagedGeneration(v)
+	return _u
+}
+
+// SetNillableAppliedManagedGeneration sets the "applied_managed_generation" field if the given value is not nil.
+func (_u *SessionUpdateOne) SetNillableAppliedManagedGeneration(v *int64) *SessionUpdateOne {
+	if v != nil {
+		_u.SetAppliedManagedGeneration(*v)
+	}
+	return _u
+}
+
+// AddAppliedManagedGeneration adds value to the "applied_managed_generation" field.
+func (_u *SessionUpdateOne) AddAppliedManagedGeneration(v int64) *SessionUpdateOne {
+	_u.mutation.AddAppliedManagedGeneration(v)
+	return _u
+}
+
+// ClearAppliedManagedGeneration clears the value of the "applied_managed_generation" field.
+func (_u *SessionUpdateOne) ClearAppliedManagedGeneration() *SessionUpdateOne {
+	_u.mutation.ClearAppliedManagedGeneration()
+	return _u
+}
+
+// SetAppliedSnapshotHash sets the "applied_snapshot_hash" field.
+func (_u *SessionUpdateOne) SetAppliedSnapshotHash(v string) *SessionUpdateOne {
+	_u.mutation.SetAppliedSnapshotHash(v)
+	return _u
+}
+
+// SetNillableAppliedSnapshotHash sets the "applied_snapshot_hash" field if the given value is not nil.
+func (_u *SessionUpdateOne) SetNillableAppliedSnapshotHash(v *string) *SessionUpdateOne {
+	if v != nil {
+		_u.SetAppliedSnapshotHash(*v)
+	}
+	return _u
+}
+
+// ClearAppliedSnapshotHash clears the value of the "applied_snapshot_hash" field.
+func (_u *SessionUpdateOne) ClearAppliedSnapshotHash() *SessionUpdateOne {
+	_u.mutation.ClearAppliedSnapshotHash()
+	return _u
+}
+
+// SetAppliedReportedAt sets the "applied_reported_at" field.
+func (_u *SessionUpdateOne) SetAppliedReportedAt(v time.Time) *SessionUpdateOne {
+	_u.mutation.SetAppliedReportedAt(v)
+	return _u
+}
+
+// SetNillableAppliedReportedAt sets the "applied_reported_at" field if the given value is not nil.
+func (_u *SessionUpdateOne) SetNillableAppliedReportedAt(v *time.Time) *SessionUpdateOne {
+	if v != nil {
+		_u.SetAppliedReportedAt(*v)
+	}
+	return _u
+}
+
+// ClearAppliedReportedAt clears the value of the "applied_reported_at" field.
+func (_u *SessionUpdateOne) ClearAppliedReportedAt() *SessionUpdateOne {
+	_u.mutation.ClearAppliedReportedAt()
+	return _u
+}
+
 // Mutation returns the SessionMutation object of the builder.
 func (_u *SessionUpdateOne) Mutation() *SessionMutation {
 	return _u.mutation
@@ -697,6 +852,27 @@ func (_u *SessionUpdateOne) sqlSave(ctx context.Context) (_node *Session, err er
 	}
 	if _u.mutation.RevokedAtCleared() {
 		_spec.ClearField(session.FieldRevokedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.AppliedManagedGeneration(); ok {
+		_spec.SetField(session.FieldAppliedManagedGeneration, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedAppliedManagedGeneration(); ok {
+		_spec.AddField(session.FieldAppliedManagedGeneration, field.TypeInt64, value)
+	}
+	if _u.mutation.AppliedManagedGenerationCleared() {
+		_spec.ClearField(session.FieldAppliedManagedGeneration, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.AppliedSnapshotHash(); ok {
+		_spec.SetField(session.FieldAppliedSnapshotHash, field.TypeString, value)
+	}
+	if _u.mutation.AppliedSnapshotHashCleared() {
+		_spec.ClearField(session.FieldAppliedSnapshotHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.AppliedReportedAt(); ok {
+		_spec.SetField(session.FieldAppliedReportedAt, field.TypeTime, value)
+	}
+	if _u.mutation.AppliedReportedAtCleared() {
+		_spec.ClearField(session.FieldAppliedReportedAt, field.TypeTime)
 	}
 	_node = &Session{config: _u.config}
 	_spec.Assign = _node.assignValues

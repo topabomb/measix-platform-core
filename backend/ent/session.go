@@ -42,8 +42,14 @@ type Session struct {
 	// LastUsedAt holds the value of the "last_used_at" field.
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	// RevokedAt holds the value of the "revoked_at" field.
-	RevokedAt    *time.Time `json:"revoked_at,omitempty"`
-	selectValues sql.SelectValues
+	RevokedAt *time.Time `json:"revoked_at,omitempty"`
+	// AppliedManagedGeneration holds the value of the "applied_managed_generation" field.
+	AppliedManagedGeneration *int64 `json:"applied_managed_generation,omitempty"`
+	// AppliedSnapshotHash holds the value of the "applied_snapshot_hash" field.
+	AppliedSnapshotHash *string `json:"applied_snapshot_hash,omitempty"`
+	// AppliedReportedAt holds the value of the "applied_reported_at" field.
+	AppliedReportedAt *time.Time `json:"applied_reported_at,omitempty"`
+	selectValues      sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -53,9 +59,11 @@ func (*Session) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case session.FieldRefreshDigest, session.FieldPreviousRefreshDigest, session.FieldRefreshResponseCiphertext:
 			values[i] = new([]byte)
-		case session.FieldID, session.FieldUserID, session.FieldDeviceID, session.FieldChannel, session.FieldRefreshRequestKey, session.FieldStatus:
+		case session.FieldAppliedManagedGeneration:
+			values[i] = new(sql.NullInt64)
+		case session.FieldID, session.FieldUserID, session.FieldDeviceID, session.FieldChannel, session.FieldRefreshRequestKey, session.FieldStatus, session.FieldAppliedSnapshotHash:
 			values[i] = new(sql.NullString)
-		case session.FieldRefreshReplayUntil, session.FieldExpiresAt, session.FieldCreatedAt, session.FieldLastUsedAt, session.FieldRevokedAt:
+		case session.FieldRefreshReplayUntil, session.FieldExpiresAt, session.FieldCreatedAt, session.FieldLastUsedAt, session.FieldRevokedAt, session.FieldAppliedReportedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -161,6 +169,27 @@ func (_m *Session) assignValues(columns []string, values []any) error {
 				_m.RevokedAt = new(time.Time)
 				*_m.RevokedAt = value.Time
 			}
+		case session.FieldAppliedManagedGeneration:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field applied_managed_generation", values[i])
+			} else if value.Valid {
+				_m.AppliedManagedGeneration = new(int64)
+				*_m.AppliedManagedGeneration = value.Int64
+			}
+		case session.FieldAppliedSnapshotHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field applied_snapshot_hash", values[i])
+			} else if value.Valid {
+				_m.AppliedSnapshotHash = new(string)
+				*_m.AppliedSnapshotHash = value.String
+			}
+		case session.FieldAppliedReportedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field applied_reported_at", values[i])
+			} else if value.Valid {
+				_m.AppliedReportedAt = new(time.Time)
+				*_m.AppliedReportedAt = value.Time
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -249,6 +278,21 @@ func (_m *Session) String() string {
 	builder.WriteString(", ")
 	if v := _m.RevokedAt; v != nil {
 		builder.WriteString("revoked_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.AppliedManagedGeneration; v != nil {
+		builder.WriteString("applied_managed_generation=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.AppliedSnapshotHash; v != nil {
+		builder.WriteString("applied_snapshot_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.AppliedReportedAt; v != nil {
+		builder.WriteString("applied_reported_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteByte(')')

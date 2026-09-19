@@ -78,6 +78,12 @@ Validate             ≠ active runtime change
 
 主表单先展示完成任务必需字段。Timeout、diagnostic identity、advanced transport 等仅在确实存在并需要时进入 Advanced/Details。
 
+首次使用时，Overview 先用管理员能理解的语言说明“是否已有可供 Android 同步的已发布配置”及下一步入口；Generation、Revision、Activation、哈希和数据库结构等诊断标识可查，但不占据主任务说明。列表以名称、用途和“尚未应用／正在使用／有待应用修改”等状态为首要信息，稳定 ID 与修订号留在详情。
+
+创建上游的默认表单只要求名称、端点和认证资料，并明确“创建候选 → 测试 → 应用”的顺序。传输能力、关联模式、用量能力和超时作为可展开的高级连接设置。封闭枚举向人展示本地化名称，提交值仍使用合同原值；任何英文合同值都不能作为面向普通管理员的唯一解释。
+
+资源工作台默认呈现分区选择和正在编辑的内容；完整资源→上游关系表作为可展开的核对视图。上游详情默认回答“连接是否在使用、地址和认证是什么、下一步该做什么”，修订号与传输/用量细节按需展开。已应用配置的再次应用与待应用修改的首次应用必须使用不同的动作说明。
+
 ### 3.4 Recoverable operations
 
 Publish、Apply、Revoke 等不能只靠 toast。页面持续展示 operation state、activation identity、阶段、失败原因和恢复动作。
@@ -157,6 +163,8 @@ Enterprise Tools
 
 Overview 需要回答：平台是否可用、当前生效哪个 generation/revision、最近什么需要管理员处理。
 
+主视图先给出企业配置当前是否已发布、修改配置和邀请设备的直接入口；详细运行时/数据库诊断可展开或进入 System。未发布时要按 User/Enrollment → Upstream → Resources → Review/Publish 顺序提示，不把“运行时已收敛”误写成已可下发。
+
 至少展示：
 
 ```text
@@ -182,7 +190,7 @@ Users 至少支持：
 
 ```text
 Display Name / Username / Status
-Devices / Last Seen
+Devices (name supplied at enrollment, technical identity expandable) / Last Seen
 Enable / Disable
 Set or reset password where applicable
 Generate Enrollment Code
@@ -191,6 +199,10 @@ Recent usage context where available
 ```
 
 Enrollment Code：one-time、short-lived、完整值只显示一次。扫码/复制入口输出 Control Protocol §8 的完整 PLATFORM_ENROLLMENT 资料，包含版本、类型、公共平台 origin、code 与 expiresAt；不能只输出裸 code 让客户端猜地址。QR 和复制内容一致，另行显示可核对的平台地址和到期时间。资料不进入日志或持久浏览器存储，隐藏对话框清理内存与二维码。原始 code 可供独立诊断显示，但不得与“复制接入资料”按钮语义混淆。
+
+平台地址取自部署显式配置的唯一公共 origin，不从管理员浏览器地址推断。HTTP/HTTPS、域名、局域网或公网 IP、自定义端口均可正式使用。管理台显示实际配置地址；未配置时说明修改部署配置的操作，禁止生成猜测地址的接入材料。地址合法不等于手机网络可达，不能宣称管理台已经替设备验证连通性。
+
+设备列表显示配置应用状态及报告时间，按 Control Protocol「当前公共入口与设备应用报告」判定。发布页提供到设备状态的入口，明确区分服务端发布成功与客户端已应用；下载、状态查询和最近联系都不能冒充应用回执或当前在线。状态未知时说明尚无当前有效会话的应用报告；已有报告落后于发布时显示待更新。
 
 Restrictive change 显示 Relay enforcement pending，直到真正 enforce；permissive enable 只有 authoritative finalize 后显示 ACTIVE。
 
@@ -256,6 +268,7 @@ Secret plaintext：
 - submit 后输入清除；
 - 不进 localStorage/browser persistence；
 - normal UI 只显示 name/id/version metadata。
+- 创建后及页面重载后均能从仅含元数据的分页列表中选择已有 Secret；选择最新版本不会自动保存或 Apply Upstream。取消创建上游后，已创建 Secret 仍可重新选择，不得成为无法绑定的孤立凭据。
 
 ## 9. Resources / Policy
 
@@ -304,19 +317,19 @@ S0.1 required profile：`OPENAI_CHAT_COMPLETIONS`。
 
 ### 9.2 TTS
 
-Profile：`OPENAI_AUDIO_SPEECH`。
+按 Control Protocol §10.5 提供 OpenAI Speech、Gemini TTS、MiMo TTS、设备系统朗读四种显式选择。
 
-至少编辑：Display Name、Upstream Model Key、**Voice(required)**、Upstream、runtimePath、Enabled。MP3 是当前 required output baseline summary，不提前展示通用 codec matrix。
+共同编辑显示名称、语音服务、Enabled。云端服务编辑模型、音色、上游与接口路径；MiMo 音色设计改为必填描述并移除预置音色。设备系统朗读只编辑语速、音调，不显示上游、密钥或请求路径。切换服务须明确提示参数重置并清除不适用字段。输出摘要按所选服务说明 MP3 或 PCM，不展示无关 codec matrix。发布预览显示服务类型及实际语音设置；企业下发系统朗读可作为默认资源，不能与个人 TTS 准入开关混淆。
 
 无权威 runtime Test API 时，不做前端伪试听成功。
 
 ### 9.3 ASR
 
-Profile：`OPENAI_AUDIO_TRANSCRIPTIONS`。
+支持 OpenAI multipart 文件转写、DashScope HTTP JSON 文件转写、OpenAI 实时识别和 DashScope 实时识别；协议及字段约束以 Control Protocol §10.6 为准。
 
-至少编辑：Display Name、Upstream Model Key、optional Language、Upstream、runtimePath、Enabled，并明确是 HTTP multipart transcription。
+共同编辑名称、模型、可选语言、上游、运行路径和启用状态。协议选择明确区分 multipart、JSON 音频 Data URI 与实时录音；切换协议时使用对应默认值，并清除不适用参数、同步路由方法和传输类型。
 
-不展示 realtime/WebSocket/VAD/sample-rate 等非 S0.1 Managed 控件。
+实时识别的采样率、VAD 和静音时长放入默认折叠的录音参数区，OpenAI 另提供前缀缓冲时长及可选提示词。文件转写不显示这些字段。客户端预览应能确认所选协议和录音参数。
 
 ### 9.4 Direct Managed MCP
 
@@ -331,6 +344,8 @@ NONE
 
 ENTERPRISE_MANAGED 明确说明 credential 在 server-side Upstream/Secret；NONE 不制造无意义 Secret requirement。S0.1 不展示 USER_MANAGED OAuth/custom-header DSL。
 
+新建 Direct MCP 上游绑定默认允许 POST、GET、DELETE，以覆盖 Streamable HTTP 请求、可选服务器流和会话关闭。服务不实现可选方法时，其 405 响应由 Relay 透传；界面不应默认在路由层提前拒绝这些标准方法。显式编辑过的方法限制保留管理员选择。
+
 ### 9.5 Policy
 
 Local coexistence 使用独立、语义明确的 controls：
@@ -343,7 +358,7 @@ Allow Local MCP
 Allow Local Assistants
 ```
 
-Default Model/TTS/ASR 使用对应 resource picker，只允许有效且 enabled 的同 kind resource。无效 default 必须形成可导航 validation error。
+Default Model/TTS/ASR/Assistant 使用对应 resource picker，只允许有效且 enabled 的同 kind resource。管理员可明确指定首次企业会话的默认助手；无效 default 必须形成可导航 validation error。Preview/Review 展示 Android 实际收到的默认助手，清空默认助手不影响空间页进入，客户端应提供助手选择入口。
 
 ### 9.6 Managed Assistant / Memory Seed / Starter（S0.2）
 
@@ -354,6 +369,8 @@ Save 只改 Managed Draft；Validate 展示缺失/disabled 引用；Preview/Revi
 ### 9.7 Enterprise Updates（S0.2）
 
 独立列表/详情/编辑面提供 title、content、contentFormat、category、severity，以及 Draft→Publish→Withdraw。状态、发布时间、Feed revision 和失败恢复可见；只读 Markdown 预览遵守 Realm/Experience Contract 的安全子集。
+
+列表和详情以实际排版后的公告正文、标题、状态和本地时间为主；Markdown 源码标记、Feed revision 与稳定 ID 只用于技术核对。发布和撤回确认使用公告标题标识对象，不要求管理员辨认 ID。
 
 发布/撤回动态仅更新 Feed，不改 Managed Draft/Release/generation。PUBLISHED 内容不能当 Draft 原地编辑；用户明确看到当前可见内容与未发布编辑工作区的区别。不引入回执、评论、定时发布或分组投递。
 
@@ -434,6 +451,10 @@ Resource → Upstream → candidate/active state → runtime path/transport
 
 Review 的 Published→Candidate 差异由 Hub 将当前已保存 Draft 与最新不可变 Release 比较后返回；浏览器不得把保存后的本地 baseline 当成 Published，也不得自行重建权威差异。没有 Release 时明确显示“无已发布基线”，并把当前候选计为新增内容。
 
+当已有 Release 且权威差异为零时，Review 应明确说明草稿与当前发布相同，不提供普通 Publish 动作；重新应用历史 Release 使用 Releases 的明确操作，避免管理员因重复点击产生无意义的新发布。投影哈希等诊断标识留在可展开的技术信息中。
+
+Review 默认只列实际发生变更的资源类别和运行时影响，能直接打开同一份 canonical Client Snapshot Preview 核对 Android 最终可见内容，然后返回审查继续发布；不以全是零的表格或单个变更总数替代内容核对。
+
 正式审查面至少展示：
 
 ```text
@@ -463,6 +484,7 @@ Client never receives:
 ```
 
 Preview 无 Release/generation/control side effect，浏览器不自行重建 Snapshot。
+同一已保存 Draft 重复预览时，`projectionHash` 必须保持稳定，方便管理员识别内容是否变化；它不是包含正式 Release 元数据的 `snapshotHash`。
 
 ## 13. Publish / Releases
 
@@ -471,6 +493,8 @@ S0：`Publish = activate + enforce`。
 Publish progress 至少表达 validating/staging/applying-gateway/applying-relay/finalizing/active/failed-degraded 这些真实阶段，不由浏览器模拟成功。目标含 Gateway 时，即使 Catalog 字节不变也须显示新 generation 映射的 apply；移除 Gateway 按 Protocol 显示 route 移除与后续 cleanup，不能用“无 Gateway 内容变化”跳过必要控制操作。refresh 恢复同一 Activation。
 
 Releases 至少显示 generation、release identity、status、published metadata、Snapshot hash、source Draft revision、diff summary、activation history。Timeline 用于历史，不创造第二份状态真源。
+
+发布历史列表以“第 N 版”、本地发布时间、变更摘要和是否仍活跃为主；打开详情后才显示激活时间线、重新发布动作及可展开的 release ID、快照哈希、草稿修订号和发布者 ID。旧版本状态要表达“已被新版本替代”，避免直接露出状态码。
 
 ## 14. Pricing / Usage
 

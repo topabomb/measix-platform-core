@@ -71,44 +71,22 @@ HTTP_REQUEST_RESPONSE
 HTTP_STREAMING_SSE
 HTTP_BINARY_STREAM
 HTTP_MULTIPART
+WEBSOCKET
 ```
 
-S0 不支持 Runtime WebSocket tunnel。
+当前实时 ASR 扩展支持受管 WebSocket，使用 WEBSOCKET transport，握手鉴权和 query 语义见 Control Protocol §10.6。
 
 ## 6. Protocol vocabulary 与 release support 分离
 
-通用兼容 vocabulary 可以包含：
+当前产品协议范围由 Capability Delivery Contract §4 定义，精确字段和枚举由 Control Protocol §10 定义；本文件不维护第二份协议清单。当前模型、云端语音和实时识别扩展均按各自原生协议接入；设备系统朗读不经过 Upstream Adapter。
 
-```text
-OPENAI_CHAT_COMPLETIONS
-OPENAI_RESPONSES
-ANTHROPIC_MESSAGES
-OPENAI_AUDIO_SPEECH
-OPENAI_AUDIO_TRANSCRIPTIONS
-MCP_STREAMABLE_HTTP
-```
-
-但是 **S0.1/S0.4 required and VERIFIED release baseline** 只有：
-
-```text
-OPENAI_CHAT_COMPLETIONS
-OPENAI_AUDIO_SPEECH
-OPENAI_AUDIO_TRANSCRIPTIONS
-MCP_STREAMABLE_HTTP
-```
-
-因此：
-
-- enum 存在不代表当前产品已支持；
-- Admin 正常 authoring 只暴露已实现/qualification 的 profile；
-- future Responses/Anthropic/Google-native 等 profile 需要 client compatibility + qualification；
-- unknown/unimplemented protocol 不允许 silent fallback。
+协议可配置、通过本地边界测试、通过真实供应商 qualification、通过 Android 消费验证是不同证据。Admin 可提供已实现的配置入口，但不得把管理员选择的能力或连通性检查标记为供应商已验证。未知或未实现协议不得静默回退。
 
 ## 7. Required reference profile
 
 ### Model
 
-Adapter 接受 OpenAI Chat Completions-compatible request；如果资源声明 streaming，则支持 compatible streaming/SSE response。Relay 不做 provider body translation。
+Chat Completions 是基础 reference profile；当前其他模型协议及其客户端请求约定见 Capability Delivery Contract §4.2。每个配置的协议独立验证文本流、工具调用与结果回传、错误和取消；Relay 不做 provider body translation。
 
 ### TTS
 
@@ -121,7 +99,7 @@ voice
 response format = MP3 for S0.1 required profile
 ```
 
-返回 binary audio；Relay 不转码。
+返回 binary audio；Relay 不转码。其他当前云端 TTS 按 Control Protocol §10.5 的原生请求与响应验证，不能用该 binary reference profile 代替 Gemini JSON 音频或 MiMo SSE 音频证据。
 
 ### ASR
 
@@ -133,7 +111,7 @@ model
 optional language
 ```
 
-返回 compatible transcription result。Realtime/WebSocket 不属于 S0 required profile。
+HTTP 文件转写返回 compatible transcription result；当前实时 ASR 扩展另按 Control Protocol §10.6 验证 OpenAI/DashScope WebSocket，不以 HTTP 文件上传替代。
 
 ### MCP
 

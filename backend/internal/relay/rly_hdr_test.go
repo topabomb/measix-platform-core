@@ -7,9 +7,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-
-	"measix/platform/internal/wire/relaycontrolapi"
-	"measix/platform/pkg/platformid"
 )
 
 // RLY-HDR-001..008: Outbound header/credential policy.
@@ -158,7 +155,3 @@ func TestRLYHDRRedirectNotFollowed(t *testing.T) {
 		t.Fatalf("redirect followed: status=%d", resp.StatusCode)
 	}
 }
-
-// Ensure imports are used.
-var _ = relaycontrolapi.HTTPSTREAMINGSSE
-var _ = platformid.New

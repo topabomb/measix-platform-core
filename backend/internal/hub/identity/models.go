@@ -55,12 +55,17 @@ type UserView struct {
 }
 
 type DeviceView struct {
-	ID             string
-	UserID         string
-	InstallationID *string
-	AppVersion     *string
-	LastSeenAt     *time.Time
-	Status         string
+	Name                     string
+	ApplicationState         string
+	TargetManagedGeneration  int
+	AppliedManagedGeneration *int
+	AppliedReportedAt        *time.Time
+	ID                       string
+	UserID                   string
+	InstallationID           *string
+	AppVersion               *string
+	LastSeenAt               *time.Time
+	Status                   string
 }
 
 type AdminPrincipalView struct {

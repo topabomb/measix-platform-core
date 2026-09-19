@@ -35,6 +35,18 @@ func TestDisabledResourcesStayUnroutableAcrossActivations(t *testing.T) {
 				for _, id := range []string{ttsID, asrID, mcpID} {
 					binding := content.Bindings[0]
 					binding.ResourceId, binding.RuntimeRouteId = id, platformid.New(platformid.Route)
+					if id == asrID {
+						binding.TransportPolicy = "HTTP_MULTIPART"
+					}
+					switch id {
+					case ttsID:
+						binding.AllowedPathPrefixes = []string{"/v1/audio/speech"}
+					case asrID:
+						binding.AllowedPathPrefixes = []string{"/v1/audio/transcriptions"}
+					case mcpID:
+						binding.AllowedPathPrefixes = []string{"/mcp"}
+						binding.AllowedMethods = []string{"POST", "GET", "DELETE"}
+					}
 					content.Bindings = append(content.Bindings, binding)
 				}
 			}

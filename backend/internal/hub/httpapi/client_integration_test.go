@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/httpapi"
@@ -110,6 +111,76 @@ func TestClientIntegrationPendingSnapshotAndLogout(t *testing.T) {
 	if response.Code != 404 {
 		t.Fatal("unpublished generation", response.Code)
 	}
+	principal, err := id.AuthenticateAccess(ctx, session.AccessToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeReport, err := id.Client.Session.Get(ctx, principal.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if beforeReport.AppliedManagedGeneration != nil || beforeReport.AppliedReportedAt != nil {
+		t.Fatal("query/download must not acknowledge application")
+	}
+	for _, report := range []struct {
+		generation int
+		hash       string
+		status     int
+	}{
+		{42, "wrong", 422}, {99, snap.SnapshotHash, 422}, {42, snap.SnapshotHash, 204}, {42, snap.SnapshotHash, 204},
+	} {
+		got := doJSON(t, h, http.MethodPut, "/api/client/v1/managed/applied", headers, map[string]any{"managedGeneration": report.generation, "snapshotHash": report.hash})
+		if got.Code != report.status {
+			t.Fatalf("application report: %d want %d", got.Code, report.status)
+		}
+	}
+	afterReport, err := id.Client.Session.Get(ctx, principal.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterReport.AppliedManagedGeneration == nil || *afterReport.AppliedManagedGeneration != 42 || afterReport.AppliedSnapshotHash == nil || *afterReport.AppliedSnapshotHash != snap.SnapshotHash || afterReport.AppliedReportedAt == nil {
+		t.Fatal("application report not durably recorded")
+	}
+	if !afterReport.ExpiresAt.Equal(beforeReport.ExpiresAt) {
+		t.Fatal("report extended session lifetime")
+	}
+	devices, err := id.ListDeviceViews(ctx, principal.UserID, 20, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 1 || devices[0].ApplicationState != "APPLIED" || devices[0].AppliedReportedAt == nil {
+		t.Fatalf("device acknowledgement missing: %+v", devices)
+	}
+	if err := id.Client.ManagedState.UpdateOneID("current").SetActiveManagedGeneration(43).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	devices, err = id.ListDeviceViews(ctx, principal.UserID, 20, "")
+	if err != nil || devices[0].ApplicationState != "PENDING" || devices[0].TargetManagedGeneration != 43 || *devices[0].AppliedManagedGeneration != 42 {
+		t.Fatal("new publication did not expose pending application")
+	}
+	nextReleaseID := platformid.New(platformid.Release)
+	nextSnapshot, _, err := cap.CompileSnapshot(capability.SnapshotInput{DeploymentID: id.Signer.DeploymentID, ReleaseID: nextReleaseID, ManagedGeneration: 43, Content: content, PublishedAt: id.Now(), PublishedByUserID: adminID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextEncoded, err := json.Marshal(nextSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := id.Client.ManagedRelease.UpdateOneID(releaseID).SetStatus("SUPERSEDED").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := id.Client.ManagedRelease.Create().SetID(nextReleaseID).SetManagedGeneration(43).SetStatus("ACTIVE").SetReleaseContentJSON(raw).SetSnapshotJSON(nextEncoded).SetSnapshotHash(nextSnapshot.SnapshotHash).SetSourceDraftRevision(2).SetCreatedByUserID(adminID).SetCreatedAt(id.Now()).Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	response = doJSON(t, h, http.MethodPut, "/api/client/v1/managed/applied", headers, map[string]any{"managedGeneration": 43, "snapshotHash": nextSnapshot.SnapshotHash})
+	if response.Code != 204 {
+		t.Fatal("new application report", response.Code)
+	}
+	response = doJSON(t, h, http.MethodPut, "/api/client/v1/managed/applied", headers, map[string]any{"managedGeneration": 42, "snapshotHash": snap.SnapshotHash})
+	if response.Code != 409 {
+		t.Fatal("regressed report accepted", response.Code)
+	}
 	response = doJSON(t, h, http.MethodPost, "/api/client/v1/sessions/logout", nil, map[string]string{"refreshToken": session.RefreshToken})
 	if response.Code != 204 {
 		t.Fatal("logout", response.Code)
@@ -117,5 +188,51 @@ func TestClientIntegrationPendingSnapshotAndLogout(t *testing.T) {
 	response = doJSON(t, h, http.MethodGet, path, headers, nil)
 	if response.Code != 403 {
 		t.Fatal("ETag bypassed revoked session", response.Code)
+	}
+	response = doJSON(t, h, http.MethodPut, "/api/client/v1/managed/applied", headers, map[string]any{"managedGeneration": 42, "snapshotHash": snap.SnapshotHash})
+	if response.Code != 403 {
+		t.Fatal("revoked session reported application", response.Code)
+	}
+	devices, err = id.ListDeviceViews(ctx, principal.UserID, 20, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if devices[0].ApplicationState != "UNKNOWN" || devices[0].AppliedManagedGeneration != nil {
+		t.Fatal("revoked session acknowledgement leaked into current device status")
+	}
+	device, err := id.Client.Device.Get(ctx, principal.DeviceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant, err := id.CreateEnrollment(ctx, principal.UserID, adminID, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejoined, err := id.ExchangeEnrollment(ctx, grant.Code, *device.InstallationID, device.Name, *device.AppVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rejoined.DeviceID != principal.DeviceID || rejoined.SessionID == principal.SessionID {
+		t.Fatal("re-enrollment identity incorrect")
+	}
+	devices, err = id.ListDeviceViews(ctx, principal.UserID, 20, "")
+	if err != nil || devices[0].ApplicationState != "UNKNOWN" || devices[0].AppliedReportedAt != nil {
+		t.Fatal("new session inherited old report")
+	}
+	headers["Authorization"] = "Bearer " + rejoined.AccessToken
+	response = doJSON(t, h, http.MethodPut, "/api/client/v1/managed/applied", headers, map[string]any{"managedGeneration": 43, "snapshotHash": nextSnapshot.SnapshotHash})
+	if response.Code != 204 {
+		t.Fatal("new session cannot report its applied state", response.Code)
+	}
+	if err := id.Client.Session.UpdateOneID(rejoined.SessionID).SetExpiresAt(id.Now().Add(-time.Second)).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	response = doJSON(t, h, http.MethodPut, "/api/client/v1/managed/applied", headers, map[string]any{"managedGeneration": 43, "snapshotHash": nextSnapshot.SnapshotHash})
+	if response.Code != 401 {
+		t.Fatal("expired session report accepted", response.Code)
+	}
+	devices, err = id.ListDeviceViews(ctx, principal.UserID, 20, "")
+	if err != nil || devices[0].ApplicationState != "UNKNOWN" || devices[0].AppliedReportedAt != nil {
+		t.Fatal("expired session remained applied")
 	}
 }

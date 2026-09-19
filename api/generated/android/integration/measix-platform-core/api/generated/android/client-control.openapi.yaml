@@ -3,6 +3,30 @@ info:
   title: MEASIX Client Control API
   version: 1.0.0
 paths:
+  /api/client/v1/managed/applied:
+    put:
+      operationId: reportManagedApplied
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManagedAppliedReport'
+      responses:
+        '204':
+          description: Current session application report recorded; does not renew session or authorize runtime.
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
   /api/client/v1/portal/grants:
     post:
       operationId: createPortalGrant
@@ -325,8 +349,19 @@ paths:
           $ref: '#/components/responses/Problem'
 components:
   schemas:
+    ManagedAppliedReport:
+      type: object
+      additionalProperties: false
+      required: [managedGeneration, snapshotHash]
+      properties:
+        managedGeneration:
+          type: integer
+          minimum: 1
+        snapshotHash:
+          type: string
+          minLength: 1
     PlatformEnrollmentMaterial:
-      description: Versioned native scan/paste material; not an HTTP enrollment request. See Control Protocol section 8. The Admin public origin is used, never an internal Hub or Relay address.
+      description: Versioned native scan/paste material; not an HTTP enrollment request. See Control Protocol section 8. The explicit deployment public HTTP/HTTPS origin is used, never the browser origin or an internal Hub/Relay address.
       type: object
       additionalProperties: false
       required: [formatVersion, kind, platformUrl, code, expiresAt]
@@ -538,6 +573,9 @@ components:
           type: string
           enum:
           - OPENAI_CHAT_COMPLETIONS
+          - OPENAI_RESPONSES
+          - GOOGLE_GENERATE_CONTENT
+          - ANTHROPIC_MESSAGES
         enabled:
           type: boolean
     ModelDefinition:
@@ -598,9 +636,6 @@ components:
       - ttsId
       - displayName
       - clientProtocol
-      - upstreamModelKey
-      - runtimePath
-      - voice
       - enabled
       properties:
         ttsId:
@@ -612,15 +647,35 @@ components:
           type: string
           enum:
           - OPENAI_AUDIO_SPEECH
+          - GEMINI_GENERATE_CONTENT_TTS
+          - MIMO_CHAT_COMPLETIONS_TTS
+          - SYSTEM_TTS
         upstreamModelKey:
           type: string
           minLength: 1
+          x-go-type-skip-optional-pointer: true
         voice:
           type: string
           minLength: 1
+          x-go-type-skip-optional-pointer: true
         runtimePath:
           type: string
           pattern: ^/[^?#]*$
+          x-go-type-skip-optional-pointer: true
+        voiceDesignPrompt:
+          type: string
+          minLength: 1
+          x-go-type-skip-optional-pointer: true
+        speechRate:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+        pitch:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
         enabled:
           type: boolean
     AsrDefinition:
@@ -643,10 +698,30 @@ components:
           type: string
           enum:
           - OPENAI_AUDIO_TRANSCRIPTIONS
+          - DASHSCOPE_HTTP_ASR
+          - OPENAI_REALTIME_TRANSCRIPTION
+          - DASHSCOPE_REALTIME_ASR
         upstreamModelKey:
           type: string
           minLength: 1
         language:
+          type: string
+          minLength: 1
+        sampleRate:
+          type: integer
+          enum: [8000, 16000, 24000]
+        vadThreshold:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        silenceDurationMs:
+          type: integer
+          minimum: 1
+        prefixPaddingMs:
+          type: integer
+          minimum: 0
+        prompt:
           type: string
           minLength: 1
         runtimePath:
@@ -739,6 +814,7 @@ components:
           - HTTP_STREAMING_SSE
           - HTTP_BINARY_STREAM
           - HTTP_MULTIPART
+          - WEBSOCKET
         timeoutPolicy:
           $ref: '#/components/schemas/TimeoutPolicy'
     ManagedPolicy:
@@ -772,6 +848,8 @@ components:
           $ref: '#/components/schemas/TtsId'
         defaultAsrId:
           $ref: '#/components/schemas/AsrId'
+        defaultAssistantId:
+          $ref: '#/components/schemas/AssistantDefinitionId'
     ManagedDraftContent:
       type: object
       additionalProperties: false

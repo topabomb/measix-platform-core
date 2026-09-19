@@ -137,8 +137,20 @@ func (a *Adapter) serve(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	switch {
+	case r.URL.Path == "/v1/realtime" || r.URL.Path == "/api-ws/v1/realtime":
+		a.handleRealtimeASR(w, r)
+	case r.URL.Path == "/v1/messages":
+		a.handleClaude(w, r, fact)
+	case strings.HasPrefix(r.URL.Path, "/v1beta/models/") && strings.HasSuffix(r.URL.Path, ":streamGenerateContent"):
+		a.handleGeminiModel(w, r, fact)
+	case r.URL.Path == "/v1/chat/completions" && strings.HasPrefix(fmt.Sprint(fact.BodyJSON["model"]), "mimo-v2.5-tts"):
+		a.handleMiMoSpeech(w, r, fact)
+	case strings.HasPrefix(r.URL.Path, "/v1beta/models/") && strings.HasSuffix(r.URL.Path, "-tts:generateContent"):
+		a.handleGeminiSpeech(w, r, fact)
 	case r.URL.Path == "/v1/chat/completions":
 		a.handleChat(w, r, fact)
+	case r.URL.Path == "/v1/responses":
+		a.handleResponses(w, r, fact)
 	case r.URL.Path == "/v1/audio/speech":
 		a.handleSpeech(w, r)
 	case r.URL.Path == "/v1/audio/transcriptions":
@@ -263,6 +275,7 @@ func (a *Adapter) handleChat(w http.ResponseWriter, r *http.Request, fact *Reque
 			`data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}`,
 			`data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"hel"}}]}`,
 			`data: {"id":"1","object":"chat.completion.chunk","choices":[{"delta":{"content":"lo"}}]}`,
+			`data: {"id":"1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
 			`data: [DONE]`,
 		}
 		for _, c := range chunks {
@@ -290,6 +303,10 @@ func (a *Adapter) handleTranscriptions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Adapter) handleMCP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 
 	// Parse JSON-RPC request to determine method
@@ -309,6 +326,12 @@ func (a *Adapter) handleMCP(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &rpcReq); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid Request"}}`)
+		return
+	}
+
+	// JSON-RPC notifications have no response ID and must not produce a response body.
+	if len(rpcReq.ID) == 0 {
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 

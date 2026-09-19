@@ -7,6 +7,7 @@ import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { fetchAllPages } from '../api/pagination'
+import { hasPublishedConfiguration, isManagedRuntimeConverged } from '../api/systemStatus'
 import PageHeader from '../components/PageHeader.vue'
 
 const { t: $t } = useI18n()
@@ -23,12 +24,8 @@ const draft = ref<Draft>()
 const loading = ref(false)
 const error = ref<unknown>()
 
-const converged = computed(() => {
-  if (!system.value) return false
-  if (system.value.appliedControlRevision !== undefined && system.value.appliedControlRevision !== system.value.desiredControlRevision) return false
-  if (system.value.appliedBundleHash && system.value.desiredBundleHash && system.value.appliedBundleHash !== system.value.desiredBundleHash) return false
-  return true
-})
+const converged = computed(() => isManagedRuntimeConverged(system.value))
+const noPublishedConfiguration = computed(() => !!system.value && !hasPublishedConfiguration(system.value))
 
 const upstreamCounts = computed(() => {
   const counts: Record<string, number> = {}
@@ -51,8 +48,8 @@ const resourceCounts = computed(() => {
 
 /** Recent activation failures from latest activation. */
 const recentActivationFailures = computed(() => {
-  if (!system.value?.latestActivation) return []
-  const act = system.value.latestActivation
+  if (!system.value?.lastActivation) return []
+  const act = system.value.lastActivation
   if (act.state === 'FAILED') return [act]
   return []
 })
@@ -94,10 +91,33 @@ onMounted(refresh)
     <ProblemBanner :error="error" class="q-mb-md" />
     <LoadingState v-if="loading && !system" />
     <template v-else-if="system">
-      <q-banner v-if="system.runtimeStatus !== 'READY' || !system.relayReady || !converged" class="bg-orange-1 text-warning q-mb-md rounded-borders">
-        {{ $t('overview.subtitle') }}
-        <template v-if="!converged"> <span class="text-weight-medium">{{ $t('status.NOT_CONVERGED') }}</span> ({{ $t('overview.desiredRevision') }} {{ system.desiredControlRevision }} / {{ $t('overview.appliedRevision') }} {{ system.appliedControlRevision ?? '—' }}).</template>
+      <q-card flat bordered data-cy="overview-delivery-guide" class="q-mb-md">
+        <q-card-section>
+          <div class="row items-center q-gutter-sm">
+            <div class="text-h6">{{ noPublishedConfiguration ? $t('overview.notPublishedTitle') : $t('overview.publishedTitle', { generation: system.activeManagedGeneration }) }}</div>
+            <StatusChip :value="system.runtimeStatus" />
+          </div>
+          <div class="text-body2 text-grey-7 q-mt-sm">
+            {{ noPublishedConfiguration ? $t('overview.setupIntro') : $t('overview.publishedIntro') }}
+          </div>
+          <div v-if="noPublishedConfiguration" data-cy="overview-setup-state" class="text-body2 q-mt-sm">
+            {{ $t('overview.setupSteps') }}
+          </div>
+          <div v-else-if="!converged" class="text-warning q-mt-sm">
+            {{ $t('overview.runtimePending') }}
+          </div>
+          <div class="row q-gutter-sm q-mt-md">
+            <q-btn outline color="primary" to="/users" :label="$t('overview.openUsers')" />
+            <q-btn outline color="primary" to="/upstreams" :label="$t('overview.openUpstreams')" />
+            <q-btn color="primary" to="/resources" :label="$t('overview.openResources')" />
+          </div>
+        </q-card-section>
+      </q-card>
+      <q-banner v-if="recentActivationFailures.length" class="bg-red-1 text-negative q-mb-md rounded-borders">
+        {{ $t('overview.recentFailureAction') }}
       </q-banner>
+      <details data-cy="overview-diagnostics" class="overview-diagnostics q-mt-md">
+        <summary class="text-primary cursor-pointer q-mb-md">{{ $t('overview.showDiagnostics') }}</summary>
       <div class="row q-col-gutter-md">
         <div class="col-12 col-sm-6 col-lg-3">
           <q-card flat bordered><q-card-section><div class="text-caption text-grey-7">{{ $t('overview.managedRuntime') }}</div><div class="q-mt-xs"><StatusChip :value="system.runtimeStatus" /></div><div class="text-caption q-mt-sm">{{ $t('system.relay') }} {{ system.relayReady ? $t('status.READY').toLowerCase() : $t('status.NOT_CONVERGED').toLowerCase() }}</div></q-card-section></q-card>
@@ -115,13 +135,13 @@ onMounted(refresh)
       <div class="row q-col-gutter-md q-mt-xs">
         <div class="col-12 col-md-6">
           <q-card flat bordered>
-            <q-card-section class="text-subtitle1 text-weight-medium">{{ $t('system.currentActivation') }}</q-card-section>
+            <q-card-section class="text-subtitle1 text-weight-medium">{{ $t('system.lastActivation') }}</q-card-section>
             <q-list separator>
-              <template v-if="system.latestActivation">
-                <q-item><q-item-section><q-item-label>{{ system.latestActivation.activationId }}</q-item-label><q-item-label caption>{{ system.latestActivation.kind }} · rev {{ system.latestActivation.desiredControlRevision }}</q-item-label></q-item-section><q-item-section side><StatusChip :value="system.latestActivation.state" /></q-item-section></q-item>
+              <template v-if="system.lastActivation">
+                <q-item><q-item-section><q-item-label>{{ system.lastActivation.activationId }}</q-item-label><q-item-label caption>{{ system.lastActivation.kind }} · rev {{ system.lastActivation.desiredControlRevision }}</q-item-label></q-item-section><q-item-section side><StatusChip :value="system.lastActivation.state" /></q-item-section></q-item>
               </template>
               <q-item v-else><q-item-section class="text-grey-7">{{ $t('common.noData') }}</q-item-section></q-item>
-              <q-item><q-item-section>{{ $t('system.lastReconciliation') }}</q-item-section><q-item-section side>{{ system.lastRelaySeenAt ?? '—' }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('system.lastRelaySeen') }}</q-item-section><q-item-section side>{{ system.lastRelaySeenAt ?? '—' }}</q-item-section></q-item>
             </q-list>
           </q-card>
         </div>
@@ -131,7 +151,7 @@ onMounted(refresh)
             <q-list separator>
               <q-item><q-item-section>{{ $t('status.ACTIVE') }}</q-item-section><q-item-section side>{{ upstreamCounts.ACTIVE ?? 0 }} {{ $t('status.ACTIVE').toLowerCase() }}</q-item-section></q-item>
               <q-item><q-item-section>{{ $t('status.DEGRADED') }}</q-item-section><q-item-section side>{{ upstreamCounts.DEGRADED ?? 0 }} {{ $t('status.DEGRADED').toLowerCase() }}</q-item-section></q-item>
-              <q-item><q-item-section>{{ $t('status.DISABLED') }} / {{ $t('status.INACTIVE').toLowerCase() }}</q-item-section><q-item-section side>{{ (upstreamCounts.DISABLED ?? 0) + (upstreamCounts.INACTIVE ?? 0) }} {{ $t('status.DISABLED').toLowerCase() }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('status.DISABLED') }} / {{ $t('status.INACTIVE').toLowerCase() }}</q-item-section><q-item-section side>{{ (upstreamCounts.DISABLED ?? 0) + (upstreamCounts.INACTIVE ?? 0) }} {{ $t('overview.unavailableUpstreams') }}</q-item-section></q-item>
               <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">{{ $t('upstreams.noUpstreams') }}</q-item-section></q-item>
             </q-list>
           </q-card>
@@ -173,9 +193,9 @@ onMounted(refresh)
             <q-card-section class="text-subtitle1 text-weight-medium">{{ $t('system.title') }}</q-card-section>
             <q-list separator>
               <q-item><q-item-section>{{ $t('system.dbHealth') }}</q-item-section><q-item-section side>{{ system.dbHealth }}</q-item-section></q-item>
-              <q-item><q-item-section>{{ $t('system.schemaIdentity') }}</q-item-section><q-item-section side><code>{{ system.schemaIdentity }}</code></q-item-section></q-item>
-              <q-item><q-item-section>{{ $t('overview.ingestLag') }}</q-item-section><q-item-section side>{{ system.requestUsageIngestLagSeconds ?? 0 }}s</q-item-section></q-item>
-              <q-item><q-item-section>{{ $t('system.semanticOrphan') }}</q-item-section><q-item-section side>{{ system.semanticOrphanCount ?? 0 }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('system.schemaIdentity') }}</q-item-section><q-item-section side style="min-width: 0; max-width: 70%; overflow-wrap: anywhere"><code>{{ system.schemaIdentity }}</code></q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('overview.ingestLag') }}</q-item-section><q-item-section side data-cy="overview-ingest-lag">{{ system.requestUsageIngestLagSeconds === undefined ? '—' : `${system.requestUsageIngestLagSeconds}s` }}</q-item-section></q-item>
+              <q-item><q-item-section>{{ $t('system.semanticOrphan') }}</q-item-section><q-item-section side>{{ system.semanticOrphanCount ?? '—' }}</q-item-section></q-item>
             </q-list>
           </q-card>
         </div>
@@ -193,6 +213,11 @@ onMounted(refresh)
           </q-card>
         </div>
       </div>
+      </details>
     </template>
   </q-page>
 </template>
+
+<style scoped>
+.overview-diagnostics .row > [class*='col-'] { box-sizing: border-box; min-width: 0; }
+</style>

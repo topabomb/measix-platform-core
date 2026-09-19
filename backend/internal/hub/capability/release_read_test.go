@@ -63,3 +63,27 @@ func TestPreviewDiffUsesLatestImmutableRelease(t *testing.T) {
 		t.Fatalf("authoritative preview diff=%+v", preview.DiffSummary)
 	}
 }
+
+func TestPreviewProjectionHashStableForUnchangedDraft(t *testing.T) {
+	st, _, now := bootstrapI2(t)
+	ctx := context.Background()
+	cap := capability.NewService(st.Client)
+	currentTime := now
+	cap.Now = func() time.Time { return currentTime }
+	draft, err := cap.GetDraft(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := cap.PreviewDraft(ctx, draft.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentTime = currentTime.Add(time.Hour)
+	second, err := cap.PreviewDraft(ctx, draft.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ProjectionHash != second.ProjectionHash {
+		t.Fatalf("unchanged draft preview hash changed: %q != %q", first.ProjectionHash, second.ProjectionHash)
+	}
+}

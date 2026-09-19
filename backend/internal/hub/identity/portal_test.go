@@ -16,7 +16,7 @@ func TestPortalParentLifetimeAndRestart(t *testing.T) {
 			ctx := context.Background()
 			st := testutil.OpenStore(t)
 			s := testutil.NewIdentityService(t, st, time.Now().UTC())
-			s.PortalOrigin = "https://platform.example"
+			s.PublicOrigin = "https://platform.example"
 			boot, err := s.Bootstrap(ctx, "Enterprise", "admin", "Admin", "correct horse battery staple")
 			if err != nil {
 				t.Fatal(err)
@@ -66,7 +66,7 @@ func TestPortalParentLifetimeAndRestart(t *testing.T) {
 			defer reopened.Close()
 			s.Client = reopened.Client
 			restarted := identity.New(reopened.Client, s.Signer, s.CSRFKey)
-			restarted.PortalOrigin = s.PortalOrigin
+			restarted.PublicOrigin = s.PublicOrigin
 			restarted.Now = s.Now
 			if _, _, err := restarted.ExchangePortalGrant(ctx, ticket.Ticket); err == nil {
 				t.Fatal("restart allowed replay")
@@ -92,14 +92,14 @@ func TestPortalParentLifetimeAndRestart(t *testing.T) {
 	}
 }
 
-func TestPortalOriginPolicy(t *testing.T) {
-	for _, raw := range []string{"https://portal.example", "http://127.0.0.1:8080", "http://[::1]:8080"} {
-		if err := identity.ValidatePortalOrigin(raw); err != nil {
+func TestPublicOriginPolicy(t *testing.T) {
+	for _, raw := range []string{"https://portal.example", "http://portal.example:9000", "http://192.168.1.20:9000", "http://203.0.113.20:9000", "https://203.0.113.20:9443", "http://127.0.0.1:8080", "http://[::1]:8080"} {
+		if err := identity.ValidatePublicOrigin(raw); err != nil {
 			t.Fatalf("valid origin %s", raw)
 		}
 	}
-	for _, raw := range []string{"", "http://portal.example", "https://evil@portal.example", "https://portal.example/path", "https://portal.example?redirect=evil", "https://portal.example#x", "javascript:alert(1)"} {
-		if identity.ValidatePortalOrigin(raw) == nil {
+	for _, raw := range []string{"", "http://:9000", "http://platform.example:0", "http://platform.example:65536", "http://platform.example?", "http://platform.example#", "https://evil@portal.example", "https://portal.example/path", "https://portal.example?redirect=evil", "https://portal.example#x", "javascript:alert(1)"} {
+		if identity.ValidatePublicOrigin(raw) == nil {
 			t.Fatalf("unsafe origin %s", raw)
 		}
 	}

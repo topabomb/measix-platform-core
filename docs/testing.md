@@ -135,7 +135,7 @@ Real external Adapter qualification is a separate explicit lane and is not repla
 
 ## 9. Freeze evidence
 
-A **final accepted** S0.1 manifest requires all applicable candidate scenarios and real Adapter qualification, including replay. The current writer can produce only an S0.1 candidate draft with CAP-C7-002=NOT_EXECUTED. It accepts only the current Snapshot v4 resource baseline; the runtime-only replayer cannot finalize C7 and independent clean-source replay is not implemented. That draft is not a Freeze. Preserve historical evidence without labeling it current; see [release](release.md) for provenance and known script limitations.
+A **final accepted** S0.1 manifest requires all applicable candidate scenarios and real Adapter qualification, including replay. The writer first produces a draft with CAP-C7-002=NOT_EXECUTED. Independent clean-source replay must rebuild the pinned composition and execute the required path before separate finalization can set C7 to PASS. The CAP runner accepts the current Snapshot v4 resource baseline but does not replace the S0.2 ERX gate. A draft is not a Freeze. Preserve historical evidence without labeling it current; see [release](release.md) for provenance and commands.
 
 The architecture System Testing Spec is authoritative for the manifest fields. Current required identities include at least:
 

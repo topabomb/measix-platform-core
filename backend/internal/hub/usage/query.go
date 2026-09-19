@@ -2,6 +2,7 @@ package usage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"measix/platform/pkg/platformid"
@@ -11,9 +12,11 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"measix/platform/ent"
+	"measix/platform/ent/managedrelease"
 	"measix/platform/ent/predicate"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/semanticusage"
+	"measix/platform/internal/wire/clientapi"
 )
 
 type Summary struct {
@@ -21,10 +24,15 @@ type Summary struct {
 	To                    time.Time
 	RequestCount          int
 	ForwardedRequestCount int
+	RequestCompleteness   RequestCompletenessCounts
 	RequestBytes          int64
 	ResponseBytes         int64
 	Meters                []MeterSummary
 	Cost                  CostSummary
+}
+
+type RequestCompletenessCounts struct {
+	Exact, Partial, Unknown int
 }
 
 type MeterSummary struct {
@@ -72,25 +80,26 @@ type Filter struct {
 }
 
 type RequestView struct {
-	RequestID          string
-	InteractionID      *string
-	DeploymentID       string
-	UserID             string
-	DeviceID           *string
-	ResourceID         string
-	RuntimeRouteID     string
-	UpstreamID         string
-	ManagedGeneration  int
-	ControlRevision    int
-	StartedAt          time.Time
-	CompletedAt        time.Time
-	Forwarded          bool
-	HTTPStatus         int
-	UpstreamHTTPStatus *int
-	RequestBytes       int
-	ResponseBytes      int
-	DurationMs         int
-	ErrorClass         *string
+	RequestID           string
+	InteractionID       *string
+	DeploymentID        string
+	UserID              string
+	DeviceID            *string
+	ResourceID          string
+	ResourceDisplayName string
+	RuntimeRouteID      string
+	UpstreamID          string
+	ManagedGeneration   int
+	ControlRevision     int
+	StartedAt           time.Time
+	CompletedAt         time.Time
+	Forwarded           bool
+	HTTPStatus          int
+	UpstreamHTTPStatus  *int
+	RequestBytes        int
+	ResponseBytes       int
+	DurationMs          int
+	ErrorClass          *string
 }
 
 func requestView(row *ent.RequestUsage) RequestView {
@@ -134,7 +143,53 @@ func (s *Service) ListRequests(ctx context.Context, filter Filter, limit int) ([
 	for _, row := range rows {
 		views = append(views, requestView(row))
 	}
-	return views, nil
+	return views, s.resourceNames(ctx, views)
+}
+
+// Release snapshots are immutable. Batch by generation instead of querying each
+// request or substituting names from the current editable draft.
+func (s *Service) resourceNames(ctx context.Context, views []RequestView) error {
+	if len(views) == 0 {
+		return nil
+	}
+	generations := make([]int64, 0, len(views))
+	seen := make(map[int64]bool)
+	for _, view := range views {
+		generation := int64(view.ManagedGeneration)
+		if !seen[generation] {
+			generations = append(generations, generation)
+			seen[generation] = true
+		}
+	}
+	releases, err := s.Client.ManagedRelease.Query().Where(managedrelease.ManagedGenerationIn(generations...)).All(ctx)
+	if err != nil {
+		return err
+	}
+	names := make(map[int]map[string]string, len(releases))
+	for _, release := range releases {
+		var snapshot clientapi.ManagedSnapshot
+		if err := json.Unmarshal(release.SnapshotJSON, &snapshot); err != nil {
+			return err
+		}
+		resources := make(map[string]string)
+		for _, model := range snapshot.Models {
+			resources[model.ModelId] = model.DisplayName
+		}
+		for _, speech := range snapshot.Tts {
+			resources[speech.TtsId] = speech.DisplayName
+		}
+		for _, speech := range snapshot.Asr {
+			resources[speech.AsrId] = speech.DisplayName
+		}
+		for _, tool := range snapshot.Mcp {
+			resources[tool.McpServerId] = tool.DisplayName
+		}
+		names[int(release.ManagedGeneration)] = resources
+	}
+	for i := range views {
+		views[i].ResourceDisplayName = names[views[i].ManagedGeneration][views[i].ResourceID]
+	}
+	return nil
 }
 
 // requestFilterPreds returns the combinable predicates for a Filter over the
@@ -210,7 +265,9 @@ func (s *Service) GetRequest(ctx context.Context, requestID string) (RequestView
 	if err != nil {
 		return RequestView{}, err
 	}
-	return requestView(row), nil
+	views := []RequestView{requestView(row)}
+	err = s.resourceNames(ctx, views)
+	return views[0], err
 }
 
 func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
@@ -242,6 +299,20 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 		return Summary{}, err
 	}
 	result := Summary{From: from, To: to, Cost: CostSummary{State: CostUnknown}}
+	for _, bucket := range []struct {
+		state Completeness
+		count *int
+	}{
+		{CompletenessComplete, &result.RequestCompleteness.Exact},
+		{CompletenessPartial, &result.RequestCompleteness.Partial},
+		{CompletenessUnknown, &result.RequestCompleteness.Unknown},
+	} {
+		count, err := tx.RequestUsage.Query().Where(preds...).Where(requestCompletenessPred(bucket.state)).Count(ctx)
+		if err != nil {
+			return Summary{}, err
+		}
+		*bucket.count = count
+	}
 	for _, row := range requests {
 		result.RequestCount++
 		if row.Forwarded {
@@ -358,6 +429,12 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 }
 
 var ErrPricingRevisionConflict = errors.New("pricing revision conflict")
+
+// UnknownRequestCount covers the retained request ledger using the same
+// whole-request completeness rules as the usage list and its filters.
+func (s *Service) UnknownRequestCount(ctx context.Context) (int, error) {
+	return s.Client.RequestUsage.Query().Where(requestCompletenessPred(CompletenessUnknown)).Count(ctx)
+}
 
 func requestCompletenessPred(value Completeness) predicate.RequestUsage {
 	return func(sel *sql.Selector) {

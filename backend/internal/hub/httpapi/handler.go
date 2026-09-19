@@ -52,7 +52,7 @@ func (h *adminHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Value:    result.CookieSecret,
 		Path:     "/",
 		Expires:  result.ExpiresAt,
-		Secure:   true,
+		Secure:   strings.HasPrefix(h.identity.PublicOrigin, "https://"),
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 	})
@@ -96,7 +96,7 @@ func (h *adminHandler) LogoutAdmin(w http.ResponseWriter, r *http.Request, param
 		writeIdentityError(w, err)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: "/", MaxAge: -1, Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: "/", MaxAge: -1, Secure: strings.HasPrefix(h.identity.PublicOrigin, "https://"), HttpOnly: true, SameSite: http.SameSiteStrictMode})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -194,6 +194,10 @@ func (h *adminHandler) CreateEnrollment(w http.ResponseWriter, r *http.Request, 
 		writeIdentityError(w, err)
 		return
 	}
+	if identity.ValidatePublicOrigin(h.identity.PublicOrigin) != nil {
+		writeProblem(w, http.StatusServiceUnavailable, "platform_origin_unconfigured", "Configure the platform public origin before issuing enrollment material")
+		return
+	}
 	var request adminapi.CreateEnrollmentRequest
 	if err := decodeStrictJSON(r, &request); err != nil {
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
@@ -208,7 +212,7 @@ func (h *adminHandler) CreateEnrollment(w http.ResponseWriter, r *http.Request, 
 		writeIdentityError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, adminapi.CreateEnrollmentResponse{EnrollmentId: grant.EnrollmentID, Code: grant.Code, ExpiresAt: grant.ExpiresAt})
+	writeJSON(w, http.StatusCreated, adminapi.CreateEnrollmentResponse{EnrollmentId: grant.EnrollmentID, Code: grant.Code, ExpiresAt: grant.ExpiresAt, PlatformUrl: h.identity.PublicOrigin})
 }
 
 func (h *adminHandler) ListDevices(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.ListDevicesParams) {
@@ -229,12 +233,17 @@ func (h *adminHandler) ListDevices(w http.ResponseWriter, r *http.Request, userI
 	items := make([]adminapi.Device, 0, len(devices))
 	for _, d := range devices {
 		items = append(items, adminapi.Device{
-			DeviceId:       d.ID,
-			UserId:         d.UserID,
-			InstallationId: d.InstallationID,
-			AppVersion:     d.AppVersion,
-			LastSeenAt:     d.LastSeenAt,
-			Status:         adminapi.DeviceStatus(d.Status),
+			DeviceName:               d.Name,
+			ApplicationState:         adminapi.DeviceApplicationState(d.ApplicationState),
+			TargetManagedGeneration:  d.TargetManagedGeneration,
+			AppliedManagedGeneration: d.AppliedManagedGeneration,
+			AppliedReportedAt:        d.AppliedReportedAt,
+			DeviceId:                 d.ID,
+			UserId:                   d.UserID,
+			InstallationId:           d.InstallationID,
+			AppVersion:               d.AppVersion,
+			LastSeenAt:               d.LastSeenAt,
+			Status:                   adminapi.DeviceStatus(d.Status),
 		})
 	}
 	writeJSON(w, http.StatusOK, adminapi.DevicePage{Items: items, NextCursor: next})

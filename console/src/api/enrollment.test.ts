@@ -8,7 +8,7 @@ describe('platform enrollment material', () => {
     expect(JSON.parse(value)).toEqual(fixture)
     expect(new TextEncoder().encode(value).length).toBeLessThanOrEqual(2048)
   })
-  it.each(['http://platform.example', 'https://user:secret@platform.example', 'https://platform.example/internal', 'https://platform.example?code=secret', 'https://platform.example#fragment'])('rejects invalid public origin %s', (origin) => {
+  it.each(['http://:9000', 'http://platform.example:0', 'http://platform.example:65536', 'https://platform.example?', 'https://platform.example#', 'ftp://platform.example', 'https://user:secret@platform.example', 'https://platform.example/internal', 'https://platform.example?code=secret', 'https://platform.example#fragment'])('rejects invalid public origin %s', (origin) => {
     expect(() => encodeEnrollmentMaterial(origin, fixture)).toThrow()
   })
   it('rejects malformed credentials and timestamps instead of generating a broken QR', () => {
@@ -16,9 +16,7 @@ describe('platform enrollment material', () => {
     expect(() => encodeEnrollmentMaterial(fixture.platformUrl, { ...fixture, code: 'a'.repeat(129) })).toThrow()
     expect(() => encodeEnrollmentMaterial(fixture.platformUrl, { ...fixture, expiresAt: 'tomorrow' })).toThrow()
   })
-  it('requires explicit loopback HTTP support and never extends it to private hosts', () => {
-    expect(() => encodeEnrollmentMaterial('http://localhost:8080', fixture)).toThrow()
-    expect(JSON.parse(encodeEnrollmentMaterial('http://127.0.0.1:8080', fixture, true)).platformUrl).toBe('http://127.0.0.1:8080')
-    expect(() => encodeEnrollmentMaterial('http://192.168.1.10', fixture, true)).toThrow()
+  it.each(['http://localhost:8080', 'http://192.168.1.10:9000', 'http://203.0.113.10', 'http://platform.example', 'http://[2001:db8::1]:9000'])('supports HTTP origin %s without a development bypass', (origin) => {
+    expect(JSON.parse(encodeEnrollmentMaterial(origin, fixture)).platformUrl).toBe(origin)
   })
 })

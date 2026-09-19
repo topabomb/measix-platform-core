@@ -91,7 +91,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
              no visual effect there. On narrow screens it toggles the overlay. -->
         <q-btn
           flat round dense icon="menu"
-          :aria-label="$t('nav.system')"
+          :aria-label="$t('nav.menu')"
           @click="drawerOpen = !drawerOpen"
         />
         <q-toolbar-title class="text-weight-bold" style="min-width: 0">MEASIX Admin</q-toolbar-title>

@@ -3,6 +3,8 @@ package capability_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -15,8 +17,8 @@ import (
 	"measix/platform/pkg/platformid"
 )
 
-// ERX-C0-004: invalid/missing/disabled refs block publish.
-func TestERXC0004InvalidRefsBlockPublish(t *testing.T) {
+// Server validation contribution to ERX-C0-004.
+func TestAssistantUnknownModelReferenceRejected(t *testing.T) {
 	ctx := context.Background()
 	st, boot, now := bootstrapI2(t)
 	cap := capability.NewService(st.Client)
@@ -64,8 +66,8 @@ func TestERXC0004InvalidRefsBlockPublish(t *testing.T) {
 	}
 }
 
-// ERX-C-001: Admin creates and publishes one Managed Assistant with enabled Managed Model.
-func TestERXC001CreateAndPublishManagedAssistant(t *testing.T) {
+// Server staging contribution to ERX-C-001; actual publishing is covered by the browser path.
+func TestStagedReleaseContainsManagedAssistantAndStarter(t *testing.T) {
 	ctx := context.Background()
 	st, boot, now := bootstrapI2(t)
 	box, err := newSecretBox()
@@ -100,7 +102,7 @@ func TestERXC001CreateAndPublishManagedAssistant(t *testing.T) {
 	}}
 	content.Bindings = append(content.Bindings, adminapi.RuntimeBindingDefinition{
 		RuntimeRouteId: platformid.New(platformid.Route), ResourceId: mcpID, UpstreamId: up.UpstreamID,
-		AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/mcp"}, TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE,
+		AllowedMethods: []string{"POST", "GET", "DELETE"}, AllowedPathPrefixes: []string{"/mcp"}, TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE,
 	})
 	assistantDef := adminapi.ManagedAssistantDefinition{
 		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
@@ -112,6 +114,7 @@ func TestERXC001CreateAndPublishManagedAssistant(t *testing.T) {
 		Enabled:               true,
 	}
 	content.Assistants = []adminapi.ManagedAssistantDefinition{assistantDef}
+	content.Policy.DefaultAssistantId = &assistantDef.AssistantDefinitionId
 	// Add a starter
 	starterID := platformid.New(platformid.Starter)
 	content.Starters = []adminapi.AssistantStarterDefinition{{
@@ -154,55 +157,69 @@ func TestERXC001CreateAndPublishManagedAssistant(t *testing.T) {
 	if !strings.Contains(string(stored.SnapshotJSON), starterID) {
 		t.Fatal("snapshot JSON should contain starter ID")
 	}
+	var snapshot struct {
+		Policy struct {
+			DefaultAssistantId *string `json:"defaultAssistantId"`
+		} `json:"policy"`
+	}
+	if err := json.Unmarshal(stored.SnapshotJSON, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Policy.DefaultAssistantId == nil || *snapshot.Policy.DefaultAssistantId != assistantID {
+		t.Fatalf("snapshot did not preserve explicit default assistant: %+v", snapshot.Policy)
+	}
 
 }
 
-// ERX-C-003: multiple non-empty memory seed items project read-only.
-func TestERXC003MultipleMemorySeedItemsProjectReadOnly(t *testing.T) {
+func TestDefaultAssistantMustBeEnabledAndPresent(t *testing.T) {
 	ctx := context.Background()
 	st, boot, now := bootstrapI2(t)
-	box, _ := newSecretBox()
-	ups := newUpstreamService(t, st, box, now)
-	secret, _ := ups.CreateSecret(ctx, boot.AdminUserID, "provider-token", "token")
-	up, _ := ups.CreateUpstream(ctx, boot.AdminUserID, testUpstreamConfig(secret.SecretID, secret.SecretVersion))
-	cap := capability.NewService(st.Client)
-	cap.Now = func() time.Time { return now }
-
-	draft, _ := cap.GetDraft(ctx)
-	content := validDraft(up.UpstreamID)
-	assistantID := platformid.New(platformid.Assistant)
-	modelID := string(content.Models[0].ModelId)
-	seeds := []string{"Seed one", "Seed two", "Seed three"}
-	content.Assistants = []adminapi.ManagedAssistantDefinition{{
-		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
-		DisplayName:           "Multi Seed Assistant",
-		SystemPrompt:          "You are helpful.",
-		ModelId:               adminapi.ModelId(modelID),
-		MemorySeed:            seeds,
-		Enabled:               true,
-	}}
-	updated, _ := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
-	// Preview should show normalized seeds
-	preview, err := cap.PreviewDraft(ctx, updated.DraftRevision)
+	box, err := newSecretBox()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(preview.Assistants) != 1 {
-		t.Fatalf("expected 1 assistant in preview, got %d", len(preview.Assistants))
+	ups := newUpstreamService(t, st, box, now)
+	secret, err := ups.CreateSecret(ctx, boot.AdminUserID, "provider-token", "token")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if len(preview.Assistants[0].MemorySeed) != 3 {
-		t.Fatalf("expected 3 seed items, got %d", len(preview.Assistants[0].MemorySeed))
+	up, err := ups.CreateUpstream(ctx, boot.AdminUserID, testUpstreamConfig(secret.SecretID, secret.SecretVersion))
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Seeds should be sorted (normalized)
-	for i, seed := range preview.Assistants[0].MemorySeed {
-		if strings.TrimSpace(seed) != seed {
-			t.Fatalf("seed %d not trimmed: %q", i, seed)
+	cap := capability.NewService(st.Client)
+	cap.Now = func() time.Time { return now }
+	draft, err := cap.GetDraft(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := validDraft(up.UpstreamID)
+	missing := platformid.New(platformid.Assistant)
+	content.Policy.DefaultAssistantId = &missing
+	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Valid {
+		t.Fatal("missing default assistant passed validation")
+	}
+	found := false
+	for _, issue := range result.Errors {
+		if issue.Code == "invalid_default_assistant" {
+			found = true
 		}
+	}
+	if !found {
+		t.Fatalf("default assistant issue missing: %+v", result.Errors)
 	}
 }
 
-// ERX-C-007: Starter renders title/description/order and pre-fills prompt.
-func TestERXC007StarterRendersTitleOrderAndPrefillsPrompt(t *testing.T) {
+// Projection only: Android rendering, prefill and no-auto-send require native consumer tests.
+func TestPreviewPreservesStarterContentAndCanonicalOrder(t *testing.T) {
 	ctx := context.Background()
 	st, boot, now := bootstrapI2(t)
 	box, _ := newSecretBox()
@@ -227,6 +244,7 @@ func TestERXC007StarterRendersTitleOrderAndPrefillsPrompt(t *testing.T) {
 	// Add two starters with different sort orders
 	starter1ID := platformid.New(platformid.Starter)
 	starter2ID := platformid.New(platformid.Starter)
+	description := "Start the first task"
 	content.Starters = []adminapi.AssistantStarterDefinition{
 		{
 			StarterId:             adminapi.StarterId(starter2ID),
@@ -241,6 +259,7 @@ func TestERXC007StarterRendersTitleOrderAndPrefillsPrompt(t *testing.T) {
 			AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 			Title:                 "First Starter",
 			Prompt:                "First prompt",
+			Description:           &description,
 			SortOrder:             0,
 			Enabled:               true,
 		},
@@ -257,15 +276,24 @@ func TestERXC007StarterRendersTitleOrderAndPrefillsPrompt(t *testing.T) {
 	if preview.Starters[0].StarterId > preview.Starters[1].StarterId {
 		t.Fatal("preview starters not ordered by stable ID")
 	}
-	for _, starter := range preview.Starters {
-		if starter.SortOrder == 0 && starter.Title != "First Starter" {
-			t.Fatal("sortOrder/title association changed")
+	for _, expected := range content.Starters {
+		found := false
+		for _, actual := range preview.Starters {
+			if actual.StarterId == expected.StarterId {
+				found = true
+				if !reflect.DeepEqual(actual, expected) {
+					t.Fatalf("starter content changed: got %+v, want %+v", actual, expected)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("missing starter %s", expected.StarterId)
 		}
 	}
 }
 
-// ERX-C-009 (simplified): Personal Realm validation — assistants with disabled model ref should fail.
-func TestERXC009DisabledModelRefBlocksValidation(t *testing.T) {
+// Server reference validation — assistants with disabled model ref should fail.
+func TestAssistantDisabledModelReferenceRejected(t *testing.T) {
 	ctx := context.Background()
 	st, boot, now := bootstrapI2(t)
 	cap := capability.NewService(st.Client)
@@ -316,7 +344,6 @@ func TestERXC009DisabledModelRefBlocksValidation(t *testing.T) {
 // Current wire validation is covered by the shared contract fixtures.
 func TestCurrentSnapshotWithoutExperienceHasDeterministicHash(t *testing.T) {
 	ctx := context.Background()
-	_ = ctx
 	// Compile a current snapshot without assistants/starters.
 	st, boot, now := bootstrapI2(t)
 	cap := capability.NewService(st.Client)

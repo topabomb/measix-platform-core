@@ -23,5 +23,8 @@ func (Session) Fields() []ent.Field {
 		field.Time("created_at"),
 		field.Time("last_used_at").Optional().Nillable(),
 		field.Time("revoked_at").Optional().Nillable(),
+		field.Int64("applied_managed_generation").Optional().Nillable(),
+		field.String("applied_snapshot_hash").Optional().Nillable(),
+		field.Time("applied_reported_at").Optional().Nillable(),
 	}
 }

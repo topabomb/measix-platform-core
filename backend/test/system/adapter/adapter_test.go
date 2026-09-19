@@ -62,6 +62,9 @@ func TestCAPC4002ChatStreamingSSE(t *testing.T) {
 	if !bytes.Contains([]byte(joined.String()), []byte("[DONE]")) {
 		t.Fatalf("missing [DONE] sentinel: %s", joined.String())
 	}
+	if !strings.Contains(joined.String(), `"finish_reason":"stop"`) {
+		t.Fatalf("missing finish_reason before [DONE]: %s", joined.String())
+	}
 }
 
 func TestCAPC4010TTSBinary(t *testing.T) {

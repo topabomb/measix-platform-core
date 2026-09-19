@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
-import { apiFetch } from '../api/client'
+import { apiFetch, createCandidateId } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -62,7 +62,7 @@ async function refresh() {
 
 function addRule() {
   rules.value.push({
-    pricingRuleId: `prc_${crypto.randomUUID()}`,
+    pricingRuleId: createCandidateId('prc'),
     meter: 'INPUT_TOKENS',
     unitSize: '1000',
     unitPrice: '',

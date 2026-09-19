@@ -102,13 +102,43 @@ func (e AdminUserSummaryRole) Valid() bool {
 
 // Defines values for AsrDefinitionClientProtocol.
 const (
-	OPENAIAUDIOTRANSCRIPTIONS AsrDefinitionClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	DASHSCOPEHTTPASR            AsrDefinitionClientProtocol = "DASHSCOPE_HTTP_ASR"
+	DASHSCOPEREALTIMEASR        AsrDefinitionClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	OPENAIAUDIOTRANSCRIPTIONS   AsrDefinitionClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	OPENAIREALTIMETRANSCRIPTION AsrDefinitionClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
 )
 
 // Valid indicates whether the value is a known member of the AsrDefinitionClientProtocol enum.
 func (e AsrDefinitionClientProtocol) Valid() bool {
 	switch e {
+	case DASHSCOPEHTTPASR:
+		return true
+	case DASHSCOPEREALTIMEASR:
+		return true
 	case OPENAIAUDIOTRANSCRIPTIONS:
+		return true
+	case OPENAIREALTIMETRANSCRIPTION:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AsrDefinitionSampleRate.
+const (
+	N16000 AsrDefinitionSampleRate = 16000
+	N24000 AsrDefinitionSampleRate = 24000
+	N8000  AsrDefinitionSampleRate = 8000
+)
+
+// Valid indicates whether the value is a known member of the AsrDefinitionSampleRate enum.
+func (e AsrDefinitionSampleRate) Valid() bool {
+	switch e {
+	case N16000:
+		return true
+	case N24000:
+		return true
+	case N8000:
 		return true
 	default:
 		return false
@@ -127,6 +157,30 @@ func (e CreateUserRequestRole) Valid() bool {
 	case CreateUserRequestRoleADMIN:
 		return true
 	case CreateUserRequestRoleMEMBER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeviceApplicationState.
+const (
+	DeviceApplicationStateAPPLIED     DeviceApplicationState = "APPLIED"
+	DeviceApplicationStatePENDING     DeviceApplicationState = "PENDING"
+	DeviceApplicationStateUNKNOWN     DeviceApplicationState = "UNKNOWN"
+	DeviceApplicationStateUNPUBLISHED DeviceApplicationState = "UNPUBLISHED"
+)
+
+// Valid indicates whether the value is a known member of the DeviceApplicationState enum.
+func (e DeviceApplicationState) Valid() bool {
+	switch e {
+	case DeviceApplicationStateAPPLIED:
+		return true
+	case DeviceApplicationStatePENDING:
+		return true
+	case DeviceApplicationStateUNKNOWN:
+		return true
+	case DeviceApplicationStateUNPUBLISHED:
 		return true
 	default:
 		return false
@@ -348,13 +402,22 @@ func (e PricingMeter) Valid() bool {
 
 // Defines values for ProviderDefinitionClientProtocol.
 const (
+	ANTHROPICMESSAGES     ProviderDefinitionClientProtocol = "ANTHROPIC_MESSAGES"
+	GOOGLEGENERATECONTENT ProviderDefinitionClientProtocol = "GOOGLE_GENERATE_CONTENT"
 	OPENAICHATCOMPLETIONS ProviderDefinitionClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	OPENAIRESPONSES       ProviderDefinitionClientProtocol = "OPENAI_RESPONSES"
 )
 
 // Valid indicates whether the value is a known member of the ProviderDefinitionClientProtocol enum.
 func (e ProviderDefinitionClientProtocol) Valid() bool {
 	switch e {
+	case ANTHROPICMESSAGES:
+		return true
+	case GOOGLEGENERATECONTENT:
+		return true
 	case OPENAICHATCOMPLETIONS:
+		return true
+	case OPENAIRESPONSES:
 		return true
 	default:
 		return false
@@ -430,6 +493,7 @@ const (
 	RuntimeBindingDefinitionTransportPolicyHTTPMULTIPART       RuntimeBindingDefinitionTransportPolicy = "HTTP_MULTIPART"
 	RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE RuntimeBindingDefinitionTransportPolicy = "HTTP_REQUEST_RESPONSE"
 	RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE    RuntimeBindingDefinitionTransportPolicy = "HTTP_STREAMING_SSE"
+	RuntimeBindingDefinitionTransportPolicyWEBSOCKET           RuntimeBindingDefinitionTransportPolicy = "WEBSOCKET"
 )
 
 // Valid indicates whether the value is a known member of the RuntimeBindingDefinitionTransportPolicy enum.
@@ -442,6 +506,8 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 	case RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE:
 		return true
 	case RuntimeBindingDefinitionTransportPolicyHTTPSTREAMINGSSE:
+		return true
+	case RuntimeBindingDefinitionTransportPolicyWEBSOCKET:
 		return true
 	default:
 		return false
@@ -489,13 +555,22 @@ func (e SystemStatusSpoolState) Valid() bool {
 
 // Defines values for TtsDefinitionClientProtocol.
 const (
-	OPENAIAUDIOSPEECH TtsDefinitionClientProtocol = "OPENAI_AUDIO_SPEECH"
+	GEMINIGENERATECONTENTTTS TtsDefinitionClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	MIMOCHATCOMPLETIONSTTS   TtsDefinitionClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	OPENAIAUDIOSPEECH        TtsDefinitionClientProtocol = "OPENAI_AUDIO_SPEECH"
+	SYSTEMTTS                TtsDefinitionClientProtocol = "SYSTEM_TTS"
 )
 
 // Valid indicates whether the value is a known member of the TtsDefinitionClientProtocol enum.
 func (e TtsDefinitionClientProtocol) Valid() bool {
 	switch e {
+	case GEMINIGENERATECONTENTTTS:
+		return true
+	case MIMOCHATCOMPLETIONSTTS:
+		return true
 	case OPENAIAUDIOSPEECH:
+		return true
+	case SYSTEMTTS:
 		return true
 	default:
 		return false
@@ -607,6 +682,7 @@ const (
 	UpstreamConfigTransportCapabilitiesHTTPMULTIPART       UpstreamConfigTransportCapabilities = "HTTP_MULTIPART"
 	UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE UpstreamConfigTransportCapabilities = "HTTP_REQUEST_RESPONSE"
 	UpstreamConfigTransportCapabilitiesHTTPSTREAMINGSSE    UpstreamConfigTransportCapabilities = "HTTP_STREAMING_SSE"
+	UpstreamConfigTransportCapabilitiesWEBSOCKET           UpstreamConfigTransportCapabilities = "WEBSOCKET"
 )
 
 // Valid indicates whether the value is a known member of the UpstreamConfigTransportCapabilities enum.
@@ -619,6 +695,8 @@ func (e UpstreamConfigTransportCapabilities) Valid() bool {
 	case UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE:
 		return true
 	case UpstreamConfigTransportCapabilitiesHTTPSTREAMINGSSE:
+		return true
+	case UpstreamConfigTransportCapabilitiesWEBSOCKET:
 		return true
 	default:
 		return false
@@ -974,17 +1052,25 @@ type AdminUserSummaryRole string
 
 // AsrDefinition defines model for AsrDefinition.
 type AsrDefinition struct {
-	AsrId            AsrId                       `json:"asrId"`
-	ClientProtocol   AsrDefinitionClientProtocol `json:"clientProtocol"`
-	DisplayName      string                      `json:"displayName"`
-	Enabled          bool                        `json:"enabled"`
-	Language         *string                     `json:"language,omitempty"`
-	RuntimePath      string                      `json:"runtimePath"`
-	UpstreamModelKey string                      `json:"upstreamModelKey"`
+	AsrId             AsrId                       `json:"asrId"`
+	ClientProtocol    AsrDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName       string                      `json:"displayName"`
+	Enabled           bool                        `json:"enabled"`
+	Language          *string                     `json:"language,omitempty"`
+	PrefixPaddingMs   *int                        `json:"prefixPaddingMs,omitempty"`
+	Prompt            *string                     `json:"prompt,omitempty"`
+	RuntimePath       string                      `json:"runtimePath"`
+	SampleRate        *AsrDefinitionSampleRate    `json:"sampleRate,omitempty"`
+	SilenceDurationMs *int                        `json:"silenceDurationMs,omitempty"`
+	UpstreamModelKey  string                      `json:"upstreamModelKey"`
+	VadThreshold      *float64                    `json:"vadThreshold,omitempty"`
 }
 
 // AsrDefinitionClientProtocol defines model for AsrDefinition.ClientProtocol.
 type AsrDefinitionClientProtocol string
+
+// AsrDefinitionSampleRate defines model for AsrDefinition.SampleRate.
+type AsrDefinitionSampleRate int
 
 // AsrId defines model for AsrId.
 type AsrId = string
@@ -1013,6 +1099,9 @@ type CreateEnrollmentResponse struct {
 	Code         string       `json:"code"`
 	EnrollmentId EnrollmentId `json:"enrollmentId"`
 	ExpiresAt    time.Time    `json:"expiresAt"`
+
+	// PlatformUrl Configured public HTTP or HTTPS platform origin; never inferred from the request.
+	PlatformUrl string `json:"platformUrl"`
 }
 
 // CreateEnterpriseUpdateRequest defines model for CreateEnterpriseUpdateRequest.
@@ -1050,13 +1139,25 @@ type DeploymentId = string
 
 // Device defines model for Device.
 type Device struct {
-	AppVersion     *string         `json:"appVersion,omitempty"`
-	DeviceId       DeviceId        `json:"deviceId"`
-	InstallationId *InstallationId `json:"installationId,omitempty"`
-	LastSeenAt     *time.Time      `json:"lastSeenAt,omitempty"`
-	Status         DeviceStatus    `json:"status"`
-	UserId         UserId          `json:"userId"`
+	AppVersion *string `json:"appVersion,omitempty"`
+
+	// ApplicationState Last report of the current valid session, not an online or runtime admission assertion.
+	ApplicationState         DeviceApplicationState `json:"applicationState"`
+	AppliedManagedGeneration *int                   `json:"appliedManagedGeneration,omitempty"`
+	AppliedReportedAt        *time.Time             `json:"appliedReportedAt,omitempty"`
+	DeviceId                 DeviceId               `json:"deviceId"`
+
+	// DeviceName Device name supplied during enrollment; display metadata, not authorization identity.
+	DeviceName              string          `json:"deviceName"`
+	InstallationId          *InstallationId `json:"installationId,omitempty"`
+	LastSeenAt              *time.Time      `json:"lastSeenAt,omitempty"`
+	Status                  DeviceStatus    `json:"status"`
+	TargetManagedGeneration int             `json:"targetManagedGeneration"`
+	UserId                  UserId          `json:"userId"`
 }
+
+// DeviceApplicationState Last report of the current valid session, not an online or runtime admission assertion.
+type DeviceApplicationState string
 
 // DeviceStatus defines model for Device.Status.
 type DeviceStatus string
@@ -1201,14 +1302,15 @@ type ManagedPolicy struct {
 	AllowLocalAsr bool `json:"allowLocalAsr"`
 
 	// AllowLocalAssistants Allows user assistants; referenced resources remain independently governed.
-	AllowLocalAssistants bool     `json:"allowLocalAssistants"`
-	AllowLocalMcp        bool     `json:"allowLocalMcp"`
-	AllowLocalProviders  bool     `json:"allowLocalProviders"`
-	AllowLocalTts        bool     `json:"allowLocalTts"`
-	DefaultAsrId         *AsrId   `json:"defaultAsrId,omitempty"`
-	DefaultModelId       *ModelId `json:"defaultModelId,omitempty"`
-	DefaultTtsId         *TtsId   `json:"defaultTtsId,omitempty"`
-	PolicyId             PolicyId `json:"policyId"`
+	AllowLocalAssistants bool                   `json:"allowLocalAssistants"`
+	AllowLocalMcp        bool                   `json:"allowLocalMcp"`
+	AllowLocalProviders  bool                   `json:"allowLocalProviders"`
+	AllowLocalTts        bool                   `json:"allowLocalTts"`
+	DefaultAsrId         *AsrId                 `json:"defaultAsrId,omitempty"`
+	DefaultAssistantId   *AssistantDefinitionId `json:"defaultAssistantId,omitempty"`
+	DefaultModelId       *ModelId               `json:"defaultModelId,omitempty"`
+	DefaultTtsId         *TtsId                 `json:"defaultTtsId,omitempty"`
+	PolicyId             PolicyId               `json:"policyId"`
 }
 
 // McpDefinition defines model for McpDefinition.
@@ -1378,6 +1480,13 @@ type ReplaceSecretRequest struct {
 	Value                 string `json:"value"`
 }
 
+// RequestCompletenessCounts Counts of whole requests within the same summary filter; sum equals requestCount.
+type RequestCompletenessCounts struct {
+	Exact   int `json:"exact"`
+	Partial int `json:"partial"`
+	Unknown int `json:"unknown"`
+}
+
 // RequestId defines model for RequestId.
 type RequestId = string
 
@@ -1389,25 +1498,28 @@ type RequestUsagePage struct {
 
 // RequestUsageView defines model for RequestUsageView.
 type RequestUsageView struct {
-	CompletedAt        time.Time      `json:"completedAt"`
-	ControlRevision    int            `json:"controlRevision"`
-	DeploymentId       DeploymentId   `json:"deploymentId"`
-	DeviceId           *DeviceId      `json:"deviceId,omitempty"`
-	DurationMs         int            `json:"durationMs"`
-	ErrorClass         *string        `json:"errorClass,omitempty"`
-	Forwarded          bool           `json:"forwarded"`
-	HttpStatus         int            `json:"httpStatus"`
-	InteractionId      *InteractionId `json:"interactionId,omitempty"`
-	ManagedGeneration  int            `json:"managedGeneration"`
-	RequestBytes       int            `json:"requestBytes"`
-	RequestId          RequestId      `json:"requestId"`
-	ResourceId         string         `json:"resourceId,omitempty"`
-	ResponseBytes      int            `json:"responseBytes"`
-	RuntimeRouteId     RuntimeRouteId `json:"runtimeRouteId,omitempty"`
-	StartedAt          time.Time      `json:"startedAt"`
-	UpstreamHttpStatus *int           `json:"upstreamHttpStatus,omitempty"`
-	UpstreamId         UpstreamId     `json:"upstreamId,omitempty"`
-	UserId             UserId         `json:"userId"`
+	CompletedAt       time.Time      `json:"completedAt"`
+	ControlRevision   int            `json:"controlRevision"`
+	DeploymentId      DeploymentId   `json:"deploymentId"`
+	DeviceId          *DeviceId      `json:"deviceId,omitempty"`
+	DurationMs        int            `json:"durationMs"`
+	ErrorClass        *string        `json:"errorClass,omitempty"`
+	Forwarded         bool           `json:"forwarded"`
+	HttpStatus        int            `json:"httpStatus"`
+	InteractionId     *InteractionId `json:"interactionId,omitempty"`
+	ManagedGeneration int            `json:"managedGeneration"`
+	RequestBytes      int            `json:"requestBytes"`
+	RequestId         RequestId      `json:"requestId"`
+
+	// ResourceDisplayName Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found.
+	ResourceDisplayName string         `json:"resourceDisplayName,omitempty"`
+	ResourceId          string         `json:"resourceId,omitempty"`
+	ResponseBytes       int            `json:"responseBytes"`
+	RuntimeRouteId      RuntimeRouteId `json:"runtimeRouteId,omitempty"`
+	StartedAt           time.Time      `json:"startedAt"`
+	UpstreamHttpStatus  *int           `json:"upstreamHttpStatus,omitempty"`
+	UpstreamId          UpstreamId     `json:"upstreamId,omitempty"`
+	UserId              UserId         `json:"userId"`
 }
 
 // ResourceDiff defines model for ResourceDiff.
@@ -1445,6 +1557,12 @@ type Secret struct {
 // SecretId defines model for SecretId.
 type SecretId = string
 
+// SecretPage defines model for SecretPage.
+type SecretPage struct {
+	Items      []Secret `json:"items"`
+	NextCursor *string  `json:"nextCursor,omitempty"`
+}
+
 // SecretRef defines model for SecretRef.
 type SecretRef struct {
 	SecretId      SecretId `json:"secretId"`
@@ -1467,23 +1585,33 @@ type StarterId = string
 
 // SystemStatus defines model for SystemStatus.
 type SystemStatus struct {
-	ActiveManagedGeneration      int                       `json:"activeManagedGeneration"`
-	AppliedBundleHash            *Sha256Hash               `json:"appliedBundleHash,omitempty"`
-	AppliedControlRevision       *int                      `json:"appliedControlRevision,omitempty"`
-	BuildVersion                 string                    `json:"buildVersion"`
-	DbHealth                     string                    `json:"dbHealth"`
-	DesiredBundleHash            *Sha256Hash               `json:"desiredBundleHash,omitempty"`
-	DesiredControlRevision       int                       `json:"desiredControlRevision"`
-	LastRelaySeenAt              *time.Time                `json:"lastRelaySeenAt,omitempty"`
-	LatestActivation             *Activation               `json:"latestActivation,omitempty"`
-	ManagedStateRevision         int                       `json:"managedStateRevision"`
-	OldestPendingAgeSeconds      *int                      `json:"oldestPendingAgeSeconds,omitempty"`
+	ActiveManagedGeneration int         `json:"activeManagedGeneration"`
+	AppliedBundleHash       *Sha256Hash `json:"appliedBundleHash,omitempty"`
+	AppliedControlRevision  *int        `json:"appliedControlRevision,omitempty"`
+	BuildVersion            string      `json:"buildVersion"`
+	CurrentActivation       *Activation `json:"currentActivation,omitempty"`
+	DbHealth                string      `json:"dbHealth"`
+	DesiredBundleHash       *Sha256Hash `json:"desiredBundleHash,omitempty"`
+	DesiredControlRevision  int         `json:"desiredControlRevision"`
+	LastActivation          *Activation `json:"lastActivation,omitempty"`
+	LastRelaySeenAt         *time.Time  `json:"lastRelaySeenAt,omitempty"`
+	ManagedStateRevision    int         `json:"managedStateRevision"`
+	OldestPendingAgeSeconds *int        `json:"oldestPendingAgeSeconds,omitempty"`
+
+	// PublicOrigin Explicit public HTTP or HTTPS platform origin; absent when deployment configuration is incomplete.
+	PublicOrigin *string `json:"publicOrigin,omitempty"`
+
+	// RelayBuildVersion Running Relay build identity from a successful private status read. Omitted when unavailable; never copied from Hub.
+	RelayBuildVersion            *string                   `json:"relayBuildVersion,omitempty"`
 	RelayReady                   bool                      `json:"relayReady"`
 	RequestUsageIngestLagSeconds *int                      `json:"requestUsageIngestLagSeconds,omitempty"`
 	RuntimeStatus                SystemStatusRuntimeStatus `json:"runtimeStatus"`
 	SchemaIdentity               string                    `json:"schemaIdentity"`
 	SemanticOrphanCount          *int                      `json:"semanticOrphanCount,omitempty"`
-	SpoolPendingCount            *int                      `json:"spoolPendingCount,omitempty"`
+
+	// SemanticUnknownRequestCount Number of retained requests with no linked semantic records or at least one UNKNOWN record. Counts requests once, excludes unlinked provider records, and uses the same completeness rule as Usage. Omission means unavailable, not zero.
+	SemanticUnknownRequestCount *int `json:"semanticUnknownRequestCount,omitempty"`
+	SpoolPendingCount           *int `json:"spoolPendingCount,omitempty"`
 
 	// SpoolState Omitted when Relay spool status is unavailable; omission does not mean OK.
 	SpoolState *SystemStatusSpoolState `json:"spoolState,omitempty"`
@@ -1505,13 +1633,16 @@ type TimeoutPolicy struct {
 
 // TtsDefinition defines model for TtsDefinition.
 type TtsDefinition struct {
-	ClientProtocol   TtsDefinitionClientProtocol `json:"clientProtocol"`
-	DisplayName      string                      `json:"displayName"`
-	Enabled          bool                        `json:"enabled"`
-	RuntimePath      string                      `json:"runtimePath"`
-	TtsId            TtsId                       `json:"ttsId"`
-	UpstreamModelKey string                      `json:"upstreamModelKey"`
-	Voice            string                      `json:"voice"`
+	ClientProtocol    TtsDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName       string                      `json:"displayName"`
+	Enabled           bool                        `json:"enabled"`
+	Pitch             *float64                    `json:"pitch,omitempty"`
+	RuntimePath       string                      `json:"runtimePath,omitempty"`
+	SpeechRate        *float64                    `json:"speechRate,omitempty"`
+	TtsId             TtsId                       `json:"ttsId"`
+	UpstreamModelKey  string                      `json:"upstreamModelKey,omitempty"`
+	Voice             string                      `json:"voice,omitempty"`
+	VoiceDesignPrompt string                      `json:"voiceDesignPrompt,omitempty"`
 }
 
 // TtsDefinitionClientProtocol defines model for TtsDefinition.ClientProtocol.
@@ -1601,10 +1732,13 @@ type UpstreamPage struct {
 
 // UpstreamTestResult defines model for UpstreamTestResult.
 type UpstreamTestResult struct {
-	LatencyMs            *int     `json:"latencyMs,omitempty"`
-	Reachable            bool     `json:"reachable"`
-	VerifiedCapabilities []string `json:"verifiedCapabilities"`
-	Warnings             []string `json:"warnings"`
+	// HttpStatus Observed HTTP response status; omitted when no response was received.
+	HttpStatus *int `json:"httpStatus,omitempty"`
+	LatencyMs  *int `json:"latencyMs,omitempty"`
+
+	// Reachable A response was received by an unauthenticated HEAD probe of the saved candidate base URL. Does not verify authentication or capability support.
+	Reachable bool     `json:"reachable"`
+	Warnings  []string `json:"warnings"`
 }
 
 // UsageSummary defines model for UsageSummary.
@@ -1617,9 +1751,12 @@ type UsageSummary struct {
 	ForwardedRequestCount int       `json:"forwardedRequestCount"`
 	From                  time.Time `json:"from"`
 	RequestBytes          int       `json:"requestBytes"`
-	RequestCount          int       `json:"requestCount"`
-	ResponseBytes         int       `json:"responseBytes"`
-	SemanticMeters        []struct {
+
+	// RequestCompleteness Counts of whole requests within the same summary filter; sum equals requestCount.
+	RequestCompleteness RequestCompletenessCounts `json:"requestCompleteness"`
+	RequestCount        int                       `json:"requestCount"`
+	ResponseBytes       int                       `json:"responseBytes"`
+	SemanticMeters      []struct {
 		Confidence UsageSummarySemanticMetersConfidence `json:"confidence"`
 
 		// Meter Standard meters per architecture s0-control-protocol §13.
@@ -1762,6 +1899,12 @@ type ListReleasesParams struct {
 type RepublishReleaseParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListSecretsParams defines parameters for ListSecrets.
+type ListSecretsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // CreateSecretParams defines parameters for CreateSecret.
@@ -1999,6 +2142,9 @@ type ServerInterface interface {
 	// (POST /api/admin/v1/releases/{releaseId}:republish)
 	RepublishRelease(w http.ResponseWriter, r *http.Request, releaseId ReleaseId, params RepublishReleaseParams)
 
+	// (GET /api/admin/v1/secrets)
+	ListSecrets(w http.ResponseWriter, r *http.Request, params ListSecretsParams)
+
 	// (POST /api/admin/v1/secrets)
 	CreateSecret(w http.ResponseWriter, r *http.Request, params CreateSecretParams)
 
@@ -2166,6 +2312,11 @@ func (_ Unimplemented) GetRelease(w http.ResponseWriter, r *http.Request, releas
 
 // (POST /api/admin/v1/releases/{releaseId}:republish)
 func (_ Unimplemented) RepublishRelease(w http.ResponseWriter, r *http.Request, releaseId ReleaseId, params RepublishReleaseParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/secrets)
+func (_ Unimplemented) ListSecrets(w http.ResponseWriter, r *http.Request, params ListSecretsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3101,6 +3252,52 @@ func (siw *ServerInterfaceWrapper) RepublishRelease(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RepublishRelease(w, r, releaseId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSecrets operation middleware
+func (siw *ServerInterfaceWrapper) ListSecrets(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSecretsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSecrets(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4596,6 +4793,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/upstreams/{upstreamId}:apply", wrapper.ApplyUpstream)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/secrets", wrapper.ListSecrets)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/secrets", wrapper.CreateSecret)

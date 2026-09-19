@@ -63,6 +63,40 @@
   },
   {
     "body": {
+      "input": {
+        "messages": [
+          {
+            "content": [
+              {
+                "input_audio": {
+                  "data": "data:audio/wav;base64,\u003crecording\u003e"
+                },
+                "type": "input_audio"
+              }
+            ],
+            "role": "user"
+          }
+        ]
+      },
+      "model": "gpt-4o-transcribe",
+      "parameters": {
+        "format": "wav"
+      }
+    },
+    "contentType": "application/json",
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token",
+      "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000",
+      "X-Measix-Managed-Generation": "42"
+    },
+    "method": "POST",
+    "protocol": "OPENAI_REALTIME_TRANSCRIPTION",
+    "resourceId": "asr_22222222-2222-4222-8222-222222222222",
+    "responseKind": "JSON_OUTPUT_TEXT",
+    "url": "https://platform.example.invalid/runtime/v1/resources/asr_22222222-2222-4222-8222-222222222222/v1/realtime"
+  },
+  {
+    "body": {
       "id": 1,
       "jsonrpc": "2.0",
       "method": "tools/list"

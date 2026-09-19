@@ -10,6 +10,21 @@ Admin is a static Quasar SPA. Supply `--admin-assets-dir <console/dist/spa>` (or
 
 `npm start`, `concurrently`, `go run`, and Node/Go harness process orchestration are development/test tools, not a production supervisor. See [development](development.md) for local startup; Relay usage delivery uses the private Hub listener.
 
+### One public origin
+
+The checked-in [Caddyfile](../deploy/Caddyfile) routes Discovery, Admin, Client control and Portal to Hub, `/runtime/v1` to Relay, and rejects `/internal` and its children. With its loopback defaults, start Hub public on `127.0.0.1:9004` (private `9001`), Relay public on `127.0.0.1:9002` (private `9003`), then run from the repository root:
+
+```text
+caddy validate --config deploy/Caddyfile --adapter caddyfile
+caddy run --config deploy/Caddyfile --adapter caddyfile
+```
+
+Clients use `http://127.0.0.1:9000`; they resolve `clientApiBase` and `runtimeApiBase` from `/.well-known/measix`, never the internal component ports. For remote Portal, also set Hub `--public-origin http://127.0.0.1:9000 --portal-assets-dir ../../measix-enterprise-portal/dist` when running from `backend/`, with the independent Portal remote build present. Admin assets remain `--admin-assets-dir ../console/dist/spa`.
+
+For a device deployment, set `MEASIX_PUBLIC_ADDRESS` to the device-reachable HTTP or HTTPS origin and `MEASIX_BIND` to the intended ingress interface. Set Hub `--public-origin` to that same origin. For example, `http://192.168.31.235:9000` is a valid LAN deployment; IP addresses, domain names and custom ports are supported. HTTP does not require DNS or certificates. HTTPS termination belongs to the ingress when selected. `MEASIX_HUB_UPSTREAM` and `MEASIX_RELAY_UPSTREAM` override the private backend addresses. Expose only the public ingress; loopback on Android refers to the device, not this computer. The application does not configure router forwarding or firewall rules; verify the selected address from the device network.
+
+Use Caddy's native [WebSocket and streaming proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#streaming). No body buffering, retry or `flush_interval -1` override is required; SSE is flushed automatically, and forcing negative flush intervals disables upstream cancellation on client disconnect. The Caddy administration API is disabled. This recipe is ingress configuration, not the S0.3 production supervisor/package. Local HTTP evidence does not qualify public TLS or device connectivity.
+
 ## 2. Configuration actually implemented
 
 Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/config.go`. CLI flags override environment defaults; duration environment values are parsed before flags, so an invalid environment duration can fail loading even with a valid flag. All options are startup configuration; there is no hot reload.
@@ -21,7 +36,7 @@ Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/
 | `--listen` | `HUB_LISTEN_ADDR` | `:8080` |
 | `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8081`; keep private |
 | `--admin-assets-dir` | `HUB_ADMIN_ASSETS_DIR` | Optional production SPA directory |
-| `--portal-origin` | `HUB_PORTAL_ORIGIN` | Approved HTTPS platform origin; loopback HTTP only for development |
+| `--public-origin` | `HUB_PUBLIC_ORIGIN` | Public HTTP/HTTPS platform origin; IP/domain and optional port |
 | `--portal-assets-dir` | `HUB_PORTAL_ASSETS_DIR` | Optional independent Portal dist; requires approved origin |
 | `--db` | `HUB_DB_PATH` | Required SQLite path |
 | `--master-key-file` | `HUB_MASTER_KEY_FILE` | Required AES-256 key file; secret |

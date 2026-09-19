@@ -17,6 +17,8 @@ import (
 	"measix/platform/internal/relay/metering"
 )
 
+var buildVersion = "dev"
+
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if err := run(os.Args[1:], log); err != nil {
@@ -47,7 +49,7 @@ func run(args []string, log *slog.Logger) error {
 	recorder.Log = log
 	sender := metering.NewSender(spool, cfg.HubUsageURL, serviceToken)
 	sender.BatchSize = cfg.UsageBatchSize
-	a := app.NewWithMetering(serviceToken, spool, recorder)
+	a := app.New(serviceToken, buildVersion, spool, recorder)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()

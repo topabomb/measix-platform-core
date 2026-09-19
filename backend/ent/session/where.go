@@ -129,6 +129,21 @@ func RevokedAt(v time.Time) predicate.Session {
 	return predicate.Session(sql.FieldEQ(FieldRevokedAt, v))
 }
 
+// AppliedManagedGeneration applies equality check predicate on the "applied_managed_generation" field. It's identical to AppliedManagedGenerationEQ.
+func AppliedManagedGeneration(v int64) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldAppliedManagedGeneration, v))
+}
+
+// AppliedSnapshotHash applies equality check predicate on the "applied_snapshot_hash" field. It's identical to AppliedSnapshotHashEQ.
+func AppliedSnapshotHash(v string) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedReportedAt applies equality check predicate on the "applied_reported_at" field. It's identical to AppliedReportedAtEQ.
+func AppliedReportedAt(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldAppliedReportedAt, v))
+}
+
 // UserIDEQ applies the EQ predicate on the "user_id" field.
 func UserIDEQ(v string) predicate.Session {
 	return predicate.Session(sql.FieldEQ(FieldUserID, v))
@@ -852,6 +867,181 @@ func RevokedAtIsNil() predicate.Session {
 // RevokedAtNotNil applies the NotNil predicate on the "revoked_at" field.
 func RevokedAtNotNil() predicate.Session {
 	return predicate.Session(sql.FieldNotNull(FieldRevokedAt))
+}
+
+// AppliedManagedGenerationEQ applies the EQ predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationEQ(v int64) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldAppliedManagedGeneration, v))
+}
+
+// AppliedManagedGenerationNEQ applies the NEQ predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationNEQ(v int64) predicate.Session {
+	return predicate.Session(sql.FieldNEQ(FieldAppliedManagedGeneration, v))
+}
+
+// AppliedManagedGenerationIn applies the In predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationIn(vs ...int64) predicate.Session {
+	return predicate.Session(sql.FieldIn(FieldAppliedManagedGeneration, vs...))
+}
+
+// AppliedManagedGenerationNotIn applies the NotIn predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationNotIn(vs ...int64) predicate.Session {
+	return predicate.Session(sql.FieldNotIn(FieldAppliedManagedGeneration, vs...))
+}
+
+// AppliedManagedGenerationGT applies the GT predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationGT(v int64) predicate.Session {
+	return predicate.Session(sql.FieldGT(FieldAppliedManagedGeneration, v))
+}
+
+// AppliedManagedGenerationGTE applies the GTE predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationGTE(v int64) predicate.Session {
+	return predicate.Session(sql.FieldGTE(FieldAppliedManagedGeneration, v))
+}
+
+// AppliedManagedGenerationLT applies the LT predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationLT(v int64) predicate.Session {
+	return predicate.Session(sql.FieldLT(FieldAppliedManagedGeneration, v))
+}
+
+// AppliedManagedGenerationLTE applies the LTE predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationLTE(v int64) predicate.Session {
+	return predicate.Session(sql.FieldLTE(FieldAppliedManagedGeneration, v))
+}
+
+// AppliedManagedGenerationIsNil applies the IsNil predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationIsNil() predicate.Session {
+	return predicate.Session(sql.FieldIsNull(FieldAppliedManagedGeneration))
+}
+
+// AppliedManagedGenerationNotNil applies the NotNil predicate on the "applied_managed_generation" field.
+func AppliedManagedGenerationNotNil() predicate.Session {
+	return predicate.Session(sql.FieldNotNull(FieldAppliedManagedGeneration))
+}
+
+// AppliedSnapshotHashEQ applies the EQ predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashEQ(v string) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashNEQ applies the NEQ predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashNEQ(v string) predicate.Session {
+	return predicate.Session(sql.FieldNEQ(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashIn applies the In predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashIn(vs ...string) predicate.Session {
+	return predicate.Session(sql.FieldIn(FieldAppliedSnapshotHash, vs...))
+}
+
+// AppliedSnapshotHashNotIn applies the NotIn predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashNotIn(vs ...string) predicate.Session {
+	return predicate.Session(sql.FieldNotIn(FieldAppliedSnapshotHash, vs...))
+}
+
+// AppliedSnapshotHashGT applies the GT predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashGT(v string) predicate.Session {
+	return predicate.Session(sql.FieldGT(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashGTE applies the GTE predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashGTE(v string) predicate.Session {
+	return predicate.Session(sql.FieldGTE(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashLT applies the LT predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashLT(v string) predicate.Session {
+	return predicate.Session(sql.FieldLT(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashLTE applies the LTE predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashLTE(v string) predicate.Session {
+	return predicate.Session(sql.FieldLTE(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashContains applies the Contains predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashContains(v string) predicate.Session {
+	return predicate.Session(sql.FieldContains(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashHasPrefix applies the HasPrefix predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashHasPrefix(v string) predicate.Session {
+	return predicate.Session(sql.FieldHasPrefix(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashHasSuffix applies the HasSuffix predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashHasSuffix(v string) predicate.Session {
+	return predicate.Session(sql.FieldHasSuffix(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashIsNil applies the IsNil predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashIsNil() predicate.Session {
+	return predicate.Session(sql.FieldIsNull(FieldAppliedSnapshotHash))
+}
+
+// AppliedSnapshotHashNotNil applies the NotNil predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashNotNil() predicate.Session {
+	return predicate.Session(sql.FieldNotNull(FieldAppliedSnapshotHash))
+}
+
+// AppliedSnapshotHashEqualFold applies the EqualFold predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashEqualFold(v string) predicate.Session {
+	return predicate.Session(sql.FieldEqualFold(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedSnapshotHashContainsFold applies the ContainsFold predicate on the "applied_snapshot_hash" field.
+func AppliedSnapshotHashContainsFold(v string) predicate.Session {
+	return predicate.Session(sql.FieldContainsFold(FieldAppliedSnapshotHash, v))
+}
+
+// AppliedReportedAtEQ applies the EQ predicate on the "applied_reported_at" field.
+func AppliedReportedAtEQ(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldEQ(FieldAppliedReportedAt, v))
+}
+
+// AppliedReportedAtNEQ applies the NEQ predicate on the "applied_reported_at" field.
+func AppliedReportedAtNEQ(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldNEQ(FieldAppliedReportedAt, v))
+}
+
+// AppliedReportedAtIn applies the In predicate on the "applied_reported_at" field.
+func AppliedReportedAtIn(vs ...time.Time) predicate.Session {
+	return predicate.Session(sql.FieldIn(FieldAppliedReportedAt, vs...))
+}
+
+// AppliedReportedAtNotIn applies the NotIn predicate on the "applied_reported_at" field.
+func AppliedReportedAtNotIn(vs ...time.Time) predicate.Session {
+	return predicate.Session(sql.FieldNotIn(FieldAppliedReportedAt, vs...))
+}
+
+// AppliedReportedAtGT applies the GT predicate on the "applied_reported_at" field.
+func AppliedReportedAtGT(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldGT(FieldAppliedReportedAt, v))
+}
+
+// AppliedReportedAtGTE applies the GTE predicate on the "applied_reported_at" field.
+func AppliedReportedAtGTE(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldGTE(FieldAppliedReportedAt, v))
+}
+
+// AppliedReportedAtLT applies the LT predicate on the "applied_reported_at" field.
+func AppliedReportedAtLT(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldLT(FieldAppliedReportedAt, v))
+}
+
+// AppliedReportedAtLTE applies the LTE predicate on the "applied_reported_at" field.
+func AppliedReportedAtLTE(v time.Time) predicate.Session {
+	return predicate.Session(sql.FieldLTE(FieldAppliedReportedAt, v))
+}
+
+// AppliedReportedAtIsNil applies the IsNil predicate on the "applied_reported_at" field.
+func AppliedReportedAtIsNil() predicate.Session {
+	return predicate.Session(sql.FieldIsNull(FieldAppliedReportedAt))
+}
+
+// AppliedReportedAtNotNil applies the NotNil predicate on the "applied_reported_at" field.
+func AppliedReportedAtNotNil() predicate.Session {
+	return predicate.Session(sql.FieldNotNull(FieldAppliedReportedAt))
 }
 
 // And groups predicates with the AND operator between them.

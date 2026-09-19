@@ -101,6 +101,8 @@ func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
 	}
 	var snapshot clientapi.ManagedSnapshot
 	read("snapshot-v4.json", &snapshot)
+	var asrSnapshot clientapi.ManagedSnapshot
+	read("snapshot-v4-asr.json", &asrSnapshot)
 	var examples []struct {
 		ResourceID, Protocol, Method, URL, ContentType, ResponseKind string
 		Headers                                                      map[string]string
@@ -111,8 +113,9 @@ func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
 	resources[snapshot.Models[0].ModelId] = snapshot.Models[0].RuntimePath
 	resources[snapshot.Tts[0].TtsId] = snapshot.Tts[0].RuntimePath
 	resources[snapshot.Asr[0].AsrId] = snapshot.Asr[0].RuntimePath
+	resources[asrSnapshot.Asr[1].AsrId] = asrSnapshot.Asr[1].RuntimePath
 	resources[snapshot.Mcp[0].McpServerId] = snapshot.Mcp[0].RuntimePath
-	if len(examples) != 4 {
+	if len(examples) != 5 {
 		t.Fatal("missing Runtime profile")
 	}
 	for _, example := range examples {

@@ -13,6 +13,7 @@ import ReleasesPage from './ReleasesPage.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { useSessionStore } from '../stores/session'
+import { useActivationStore } from '../stores/activation'
 import * as client from '../api/client'
 
 function mountReleases() {
@@ -65,6 +66,14 @@ const RELEASE = {
 }
 
 describe('ReleasesPage', () => {
+  it('labels a completed operation without presenting it as pending', async () => {
+    const { wrapper, pinia } = mountReleases()
+    useActivationStore(pinia).accept({ activationId: 'act_1', kind: 'PUBLISH', state: 'COMPLETED', desiredControlRevision: 5, createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z' })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Latest configuration operation')
+    expect(wrapper.text()).not.toContain('In progress or awaiting confirmation')
+    expect(wrapper.find('[data-cy="release-activation-details"]').attributes('open')).toBeUndefined()
+  })
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string, init?: RequestInit) => {
@@ -77,10 +86,12 @@ describe('ReleasesPage', () => {
     const { wrapper } = mountReleases()
     await flushPromises()
     const text = wrapper.text()
-    expect(text).toContain('Generation 3')
-    expect(text).toContain('+2')
-    expect(text).toContain('2026-08-01T00:00:00Z')
-    expect(text).toContain('admin')
+    expect(text).toContain('Version 3')
+    expect(text).toContain('2 added')
+    expect(text).not.toContain('+2 added')
+    expect(text).toContain('2026')
+    expect(text).not.toContain('rls_001')
+    expect(text).not.toContain('sha256:abc')
   })
 
   it('opens a release detail dialog with snapshot hash and activation history', async () => {
@@ -107,7 +118,9 @@ describe('ReleasesPage', () => {
     const { wrapper } = mountReleases()
     await flushPromises()
 
-    const republishBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '') === 'Republish')
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+    const republishBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '') === 'Republish this version')
     expect(republishBtn).toBeTruthy()
     await republishBtn!.trigger('click')
     await flushPromises()

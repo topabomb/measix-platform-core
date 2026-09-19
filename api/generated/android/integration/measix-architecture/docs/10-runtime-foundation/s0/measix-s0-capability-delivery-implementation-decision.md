@@ -169,7 +169,7 @@ Display Name、`OPENAI_AUDIO_SPEECH`、Upstream Model Key、Voice(required)、Up
 
 ### ASR
 
-Display Name、`OPENAI_AUDIO_TRANSCRIPTIONS`、Upstream Model Key、optional Language、Upstream/runtimePath、Enabled；无 Realtime/WebSocket/VAD controls。
+按 Admin Console Product Requirements §9.3 展示文件转写与实时识别选择、公共字段和折叠录音参数；精确字段约束由 Control Protocol §10.6 维护。
 
 ### MCP
 

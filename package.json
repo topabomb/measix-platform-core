@@ -11,6 +11,9 @@
     "start:console": "pnpm -C console dev",
     "install:console": "pnpm -C console install",
     "dev": "npm run start",
+    "device:real": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-real-device-preset.ps1",
+    "device:real:reset": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-real-device-preset.ps1 -Reset",
+    "device:real:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-real-device-preset.ps1",
     "build": "pnpm -C console build",
     "build:backend": "cd backend && go build ./...",
     "typecheck": "pnpm -C console typecheck",
@@ -35,7 +38,8 @@
     "schema:replay": "node scripts/checks.mjs schema-replay",
     "schema:status": "atlas migrate status --dir file://backend/migrations",
     "ci": "make ci",
-    "test:tooling": "node --test scripts/*.test.mjs"
+    "test:tooling": "node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs scripts/replay-freeze.test.mjs scripts/adapter-identity.test.mjs scripts/harness-cleanup.test.mjs scripts/harness-path.test.mjs",
+    "test:public-origin": "node --test scripts/public-origin.test.mjs"
   },
   "packageManager": "pnpm@11.0.0",
   "engines": {

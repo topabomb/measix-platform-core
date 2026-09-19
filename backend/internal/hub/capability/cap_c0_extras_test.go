@@ -136,6 +136,57 @@ func TestHUBCAP004RouteUpstreamValidation(t *testing.T) {
 		}
 	})
 
+	t.Run("resource path outside the route allowlist is rejected", func(t *testing.T) {
+		cap := capability.NewService(st.Client)
+		draft, err := cap.GetDraft(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		content := validDraft(up.UpstreamID)
+		content.Bindings[0].AllowedPathPrefixes = []string{"/other"}
+		updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !findError(result.Errors, "runtime_path_not_allowed") {
+			t.Fatalf("expected runtime_path_not_allowed, got %+v", result.Errors)
+		}
+	})
+
+	t.Run("MCP route requires its Streamable HTTP methods", func(t *testing.T) {
+		cap := capability.NewService(st.Client)
+		draft, err := cap.GetDraft(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		content := validDraft(up.UpstreamID)
+		id := platformid.New(platformid.MCP)
+		content.Mcp = append(content.Mcp, adminapi.McpDefinition{
+			McpServerId: id, DisplayName: "MCP test", ClientProtocol: adminapi.MCPSTREAMABLEHTTP,
+			AuthOwnership: adminapi.McpDefinitionAuthOwnershipNONE, RuntimePath: "/mcp", Enabled: true,
+		})
+		content.Bindings = append(content.Bindings, adminapi.RuntimeBindingDefinition{
+			RuntimeRouteId: platformid.New(platformid.Route), ResourceId: id, UpstreamId: up.UpstreamID,
+			AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/mcp"},
+			TransportPolicy: adminapi.RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE,
+		})
+		updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !findError(result.Errors, "incomplete_mcp_methods") {
+			t.Fatalf("expected incomplete_mcp_methods, got %+v", result.Errors)
+		}
+	})
+
 	t.Run("disabled upstream is rejected", func(t *testing.T) {
 		if _, err := st.Client.Upstream.UpdateOneID(up.UpstreamID).SetStatus("DISABLED").Save(ctx); err != nil {
 			t.Fatal(err)

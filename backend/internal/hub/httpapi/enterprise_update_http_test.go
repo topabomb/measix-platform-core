@@ -25,6 +25,7 @@ func setupFullHandler(t *testing.T) (http.Handler, *identity.Service, *enterpris
 	st := testutil.OpenStore(t)
 	now := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
 	idSvc := testutil.NewIdentityService(t, st, now)
+	idSvc.PublicOrigin = "https://platform.example"
 	boot, err := idSvc.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple")
 	if err != nil {
 		t.Fatal(err)

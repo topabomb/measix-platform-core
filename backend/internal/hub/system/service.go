@@ -11,6 +11,7 @@ import (
 	"measix/platform/internal/hub/maintenance"
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/hub/store"
+	"measix/platform/internal/hub/usage"
 )
 
 type Service struct {
@@ -30,15 +31,18 @@ type Status struct {
 	DesiredControlRevision       int
 	DesiredBundleHash            *string
 	RelayReady                   bool
+	RelayBuildVersion            *string
 	AppliedControlRevision       *int
 	AppliedBundleHash            *string
 	LastRelaySeenAt              *time.Time
-	LatestActivation             *runtimecontrol.ActivationResult
+	CurrentActivation            *runtimecontrol.ActivationResult
+	LastActivation               *runtimecontrol.ActivationResult
 	SpoolState                   *string
 	SpoolPendingCount            *int
 	OldestPendingAgeSeconds      *int
 	RequestUsageIngestLagSeconds *int
 	SemanticOrphanCount          *int
+	SemanticUnknownRequestCount  *int
 }
 
 func New(store *store.Store, control *runtimecontrol.Service, buildVersion string) *Service {
@@ -72,6 +76,7 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 			now := s.Now().UTC()
 			result.LastRelaySeenAt = &now
 			result.RelayReady = status.Ready
+			result.RelayBuildVersion = &status.BuildVersion
 			result.SpoolPendingCount = status.SpoolPendingCount
 			result.OldestPendingAgeSeconds = status.OldestPendingAgeSeconds
 			if status.SpoolState != nil {
@@ -87,7 +92,7 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		}
 	}
 	if s.RuntimeControl != nil {
-		result.LatestActivation, err = s.RuntimeControl.LatestActivation(ctx)
+		result.CurrentActivation, result.LastActivation, err = s.RuntimeControl.ActivationStatus(ctx)
 		if err != nil {
 			return result, err
 		}
@@ -107,6 +112,11 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		return result, err
 	}
 	result.SemanticOrphanCount = &orphan
+	unknown, err := usage.NewService(s.Store.Client).UnknownRequestCount(ctx)
+	if err != nil {
+		return result, err
+	}
+	result.SemanticUnknownRequestCount = &unknown
 	return result, nil
 }
 

@@ -58,6 +58,8 @@ HTTP CRUD 成功不是组件完成证据；关键不变量必须跨真实 persis
 
 Clock/random 可以注入 deterministic test source，但 production generator/crypto contract 需有独立 compatibility test。
 
+公共入口与应用报告还须验证 Control Protocol 对应约定：显式 origin 生成 Enrollment/Portal 地址且不受 Host/Forwarded 影响；HTTP/IP 与 HTTPS 的 Cookie、Origin/CSRF、认证和快照均可用。应用报告仅接受当前有效 Session 的合法发布/hash，重复成功、倒退拒绝、过期/撤销拒绝；下载/304/Applied header 不产生报告；新 Session、其他设备及进程重启不混淆报告归属。发布后的设备状态由当前目标与报告计算，报告不续 Session，也不改变 Runtime 准入。
+
 ## 4. Draft / Validation / Snapshot scenarios
 
 - `HUB-CAP-001` draftRevision optimistic concurrency；

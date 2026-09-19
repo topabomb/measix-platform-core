@@ -407,7 +407,7 @@ Runtime API 固定为：
 
 S0 必须支持：普通 HTTP、HTTP streaming/SSE passthrough、TTS binary、ASR multipart/binary、cancellation。
 
-S0 **不实现 WebSocket tunnel**；出现明确 realtime Provider/client 需求后再增加，不保留无实现价值的 skeleton。
+当前首个可用版本按 Android 已有实时 ASR 需求增加受管 WebSocket 传输，沿用相同身份、generation、资源授权和服务器凭据边界。具体参数及连接约束见 Control Protocol §10.6；不引入通用协议转换。
 
 Relay 不解析 Provider-specific SSE body，也不自行推算 semantic usage。
 

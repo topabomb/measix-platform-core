@@ -489,14 +489,15 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 		return DraftPreview{}, err
 	}
 	// Compile the snapshot using the same canonical projection as Publish.
-	// The placeholder releaseId/generation/publishedAt are used only for hash computation;
-	// they do NOT appear in the returned projectionHash as the final snapshotHash.
+	// Use stable placeholders so the same saved draft has the same preview hash
+	// across reads. Publish supplies its real release ID, generation and timestamp,
+	// so the preview hash is not the final snapshot hash.
 	snapshot, hash, err := s.CompileSnapshot(SnapshotInput{
 		DeploymentID:      deployment.ID,
-		ReleaseID:         platformid.New(platformid.Release),
+		ReleaseID:         "rel_00000000-0000-4000-8000-000000000000",
 		ManagedGeneration: 1,
 		Content:           draft.Content,
-		PublishedAt:       s.Now().UTC(),
+		PublishedAt:       time.Unix(0, 0).UTC(),
 	})
 	if err != nil {
 		return DraftPreview{}, err
@@ -523,6 +524,7 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 			DefaultModelId:       snapshot.Policy.DefaultModelId,
 			DefaultTtsId:         snapshot.Policy.DefaultTtsId,
 			DefaultAsrId:         snapshot.Policy.DefaultAsrId,
+			DefaultAssistantId:   snapshot.Policy.DefaultAssistantId,
 		},
 		Assistants: projectionToAdminAssistants(snapshot.Assistants),
 		Starters:   projectionToAdminStarters(snapshot.Starters),
@@ -630,9 +632,13 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 	}
 	resources := map[string]bool{}
+	runtimePaths := map[string]string{}
+	deviceResources := map[string]bool{}
+	asrProtocols := map[string]adminapi.AsrDefinitionClientProtocol{}
 	resourceKinds := map[string]adminapi.ValidationIssueResourceKind{}
 	for i, model := range content.Models {
 		resources[model.ModelId] = model.Enabled
+		runtimePaths[model.ModelId] = model.RuntimePath
 		resourceKinds[model.ModelId] = kindModel
 		if strings.TrimSpace(model.DisplayName) == "" {
 			addError("missing_display_name", fmt.Sprintf("models[%d].displayName", i), "model displayName is required", &kindModel, ptrStr(model.ModelId), ptrStr("displayName"))
@@ -670,6 +676,9 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for i, value := range content.Tts {
 		resources[value.TtsId] = value.Enabled
+		if value.ClientProtocol != adminapi.SYSTEMTTS {
+			runtimePaths[value.TtsId] = value.RuntimePath
+		}
 		resourceKinds[value.TtsId] = kindTTS
 		if strings.TrimSpace(value.DisplayName) == "" {
 			addError("missing_display_name", fmt.Sprintf("tts[%d].displayName", i), "TTS displayName is required", &kindTTS, ptrStr(value.TtsId), ptrStr("displayName"))
@@ -677,10 +686,31 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		if !value.ClientProtocol.Valid() {
 			addError("invalid_client_protocol", fmt.Sprintf("tts[%d].clientProtocol", i), "unsupported TTS client protocol", &kindTTS, ptrStr(value.TtsId), ptrStr("clientProtocol"))
 		}
+		if value.ClientProtocol == adminapi.SYSTEMTTS {
+			deviceResources[value.TtsId] = true
+			if value.SpeechRate == nil || !(*value.SpeechRate > 0) || value.Pitch == nil || !(*value.Pitch > 0) {
+				addError("invalid_system_tts_settings", fmt.Sprintf("tts[%d]", i), "system TTS requires positive speechRate and pitch", &kindTTS, ptrStr(value.TtsId), nil)
+			}
+			if value.UpstreamModelKey != "" || value.Voice != "" || value.RuntimePath != "" || value.VoiceDesignPrompt != "" {
+				addError("system_tts_cloud_fields", fmt.Sprintf("tts[%d]", i), "system TTS must not contain cloud execution fields", &kindTTS, ptrStr(value.TtsId), nil)
+			}
+			continue
+		}
+		if value.SpeechRate != nil || value.Pitch != nil {
+			addError("cloud_tts_system_fields", fmt.Sprintf("tts[%d]", i), "cloud TTS must not contain system speech settings", &kindTTS, ptrStr(value.TtsId), nil)
+		}
+		isMiMo := value.ClientProtocol == adminapi.MIMOCHATCOMPLETIONSTTS
+		voiceDesign := isMiMo && strings.Contains(strings.ToLower(value.UpstreamModelKey), "voicedesign")
+		if !isMiMo && value.VoiceDesignPrompt != "" {
+			addError("unexpected_voice_design_prompt", fmt.Sprintf("tts[%d].voiceDesignPrompt", i), "voiceDesignPrompt is only supported by MiMo TTS", &kindTTS, ptrStr(value.TtsId), ptrStr("voiceDesignPrompt"))
+		}
+		if voiceDesign && (strings.TrimSpace(value.VoiceDesignPrompt) == "" || value.Voice != "") {
+			addError("invalid_voice_design", fmt.Sprintf("tts[%d]", i), "MiMo voice design requires a description and no preset voice", &kindTTS, ptrStr(value.TtsId), ptrStr("voiceDesignPrompt"))
+		}
 		if strings.TrimSpace(value.UpstreamModelKey) == "" {
 			addError("missing_tts_model_key", fmt.Sprintf("tts[%d].upstreamModelKey", i), "TTS requires a non-empty upstreamModelKey", &kindTTS, ptrStr(value.TtsId), ptrStr("upstreamModelKey"))
 		}
-		if value.Enabled && strings.TrimSpace(value.Voice) == "" {
+		if value.Enabled && !voiceDesign && strings.TrimSpace(value.Voice) == "" {
 			addError("missing_tts_voice", fmt.Sprintf("tts[%d].voice", i), "enabled TTS requires a non-empty voice", &kindTTS, ptrStr(value.TtsId), ptrStr("voice"))
 		}
 		if !validRuntimePath(value.RuntimePath) {
@@ -688,7 +718,12 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 	}
 	for i, value := range content.Asr {
+		asrProtocols[value.AsrId] = value.ClientProtocol
+		if field, message := validateASRSettings(value); field != "" {
+			addError("invalid_asr_settings", fmt.Sprintf("asr[%d].%s", i, field), message, &kindASR, ptrStr(value.AsrId), ptrStr(field))
+		}
 		resources[value.AsrId] = value.Enabled
+		runtimePaths[value.AsrId] = value.RuntimePath
 		resourceKinds[value.AsrId] = kindASR
 		if strings.TrimSpace(value.DisplayName) == "" {
 			addError("missing_display_name", fmt.Sprintf("asr[%d].displayName", i), "ASR displayName is required", &kindASR, ptrStr(value.AsrId), ptrStr("displayName"))
@@ -708,6 +743,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for i, value := range content.Mcp {
 		resources[value.McpServerId] = value.Enabled
+		runtimePaths[value.McpServerId] = value.RuntimePath
 		resourceKinds[value.McpServerId] = kindMCP
 		if strings.TrimSpace(value.DisplayName) == "" {
 			addError("missing_display_name", fmt.Sprintf("mcp[%d].displayName", i), "MCP displayName is required", &kindMCP, ptrStr(value.McpServerId), ptrStr("displayName"))
@@ -777,6 +813,20 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	bound := map[string]bool{}
 	for i, binding := range content.Bindings {
 		path := fmt.Sprintf("bindings[%d]", i)
+		if protocol, isASR := asrProtocols[binding.ResourceId]; isASR {
+			expectedTransport := adminapi.RuntimeBindingDefinitionTransportPolicyWEBSOCKET
+			expectedMethod := "GET"
+			if protocol == adminapi.OPENAIAUDIOTRANSCRIPTIONS {
+				expectedTransport = adminapi.RuntimeBindingDefinitionTransportPolicyHTTPMULTIPART
+				expectedMethod = "POST"
+			} else if protocol == adminapi.DASHSCOPEHTTPASR {
+				expectedTransport = adminapi.RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE
+				expectedMethod = "POST"
+			}
+			if binding.TransportPolicy != expectedTransport || len(binding.AllowedMethods) != 1 || binding.AllowedMethods[0] != expectedMethod {
+				addError("invalid_asr_transport", path+".transportPolicy", "ASR transport and method must match clientProtocol", &kindBinding, ptrStr(binding.ResourceId), ptrStr("transportPolicy"))
+			}
+		}
 		if _, ok := resources[binding.ResourceId]; !ok {
 			addError("missing_resource", path+".resourceId", "binding references an unknown runtime resource", &kindBinding, ptrStr(binding.ResourceId), ptrStr("resourceId"))
 		} else if bound[binding.ResourceId] {
@@ -795,6 +845,9 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 				addError("invalid_method", path+".allowedMethods", "method policy contains an unsupported method", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedMethods"))
 			}
 		}
+		if resourceKinds[binding.ResourceId] == kindMCP && !hasMethods(binding.AllowedMethods, "POST", "GET", "DELETE") {
+			addError("incomplete_mcp_methods", path+".allowedMethods", "MCP Streamable HTTP binding must allow POST, GET, and DELETE", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedMethods"))
+		}
 		if len(binding.AllowedPathPrefixes) == 0 {
 			addError("missing_path_policy", path+".allowedPathPrefixes", "at least one path prefix is required", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedPathPrefixes"))
 		}
@@ -802,6 +855,9 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			if !validRuntimePath(prefix) {
 				addError("invalid_path_prefix", path+".allowedPathPrefixes", "path prefix must be normalized and absolute", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedPathPrefixes"))
 			}
+		}
+		if runtimePath, ok := runtimePaths[binding.ResourceId]; ok && validRuntimePath(runtimePath) && !runtimePathAllowed(runtimePath, binding.AllowedPathPrefixes) {
+			addError("runtime_path_not_allowed", path+".allowedPathPrefixes", "resource runtimePath must be covered by its binding path policy", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedPathPrefixes"))
 		}
 		row, err := s.Client.Upstream.Get(ctx, binding.UpstreamId)
 		if ent.IsNotFound(err) {
@@ -824,7 +880,10 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 	}
 	for resourceID, enabled := range resources {
-		if enabled && !bound[resourceID] {
+		if deviceResources[resourceID] && bound[resourceID] {
+			addError("system_tts_binding", "bindings", "system TTS must not have a runtime binding", &kindTTS, ptrStr(resourceID), ptrStr("upstreamId"))
+		}
+		if enabled && !deviceResources[resourceID] && !bound[resourceID] {
 			kind := resourceKinds[resourceID]
 			addError("missing_binding", "bindings", "enabled resource has no runtime binding", &kind, ptrStr(resourceID), ptrStr("upstreamId"))
 		}
@@ -843,6 +902,9 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		if enabled, ok := resources[*content.Policy.DefaultAsrId]; !ok || !enabled {
 			addError("invalid_default_asr", "policy.defaultAsrId", "default ASR must reference an enabled ASR", &kindPolicy, content.Policy.DefaultAsrId, ptrStr("defaultAsrId"))
 		}
+	}
+	if content.Policy.DefaultAssistantId != nil && !assistantIds[string(*content.Policy.DefaultAssistantId)] {
+		addError("invalid_default_assistant", "policy.defaultAssistantId", "default assistant must reference an enabled assistant", &kindPolicy, ptrStr(string(*content.Policy.DefaultAssistantId)), ptrStr("defaultAssistantId"))
 	}
 	sort.Slice(result.Errors, func(i, j int) bool {
 		if result.Errors[i].Path == result.Errors[j].Path {
@@ -923,6 +985,31 @@ func validateCandidateIDs(content adminapi.ManagedDraftContent) error {
 
 func validRuntimePath(value string) bool {
 	return strings.HasPrefix(value, "/") && !strings.Contains(value, "..") && !strings.Contains(value, "//")
+}
+
+func runtimePathAllowed(path string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if path == prefix || (strings.HasSuffix(prefix, "/") && strings.HasPrefix(path, prefix)) || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMethods(methods []string, required ...string) bool {
+	for _, candidate := range required {
+		found := false
+		for _, method := range methods {
+			if method == candidate {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func validMethod(value string) bool {

@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -26,13 +27,17 @@ type proxyResult struct {
 	ErrorClass     string
 }
 
-func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string, result *proxyResult) {
+func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string, result *proxyResult, maxRequestBytes int64) {
 	target := targetURL(upstream.BaseURL, runtimePath, r.URL.RawQuery)
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(request *httputil.ProxyRequest) {
 			request.Out.URL = target
 			request.Out.Host = ""
 			sanitizeOutboundHeaders(request.Out.Header)
+			if route.TransportPolicy == relaycontrolapi.WEBSOCKET {
+				request.Out.Header.Set("Connection", "Upgrade")
+				request.Out.Header.Set("Upgrade", "websocket")
+			}
 			request.Out.Header.Set("X-Measix-Request-Id", requestID)
 			applyUpstreamAuth(request.Out, upstream.Auth)
 		},
@@ -44,7 +49,24 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 			if response.StatusCode >= 300 && response.StatusCode < 400 && response.Header.Get("Location") != "" {
 				return errUpstreamRedirect
 			}
+			if response.StatusCode == http.StatusSwitchingProtocols {
+				if route.TransportPolicy != relaycontrolapi.WEBSOCKET || !strings.EqualFold(response.Header.Get("Upgrade"), "websocket") {
+					return errors.New("unexpected protocol upgrade")
+				}
+				conn, ok := response.Body.(io.ReadWriteCloser)
+				if !ok {
+					return errors.New("upgrade body is not bidirectional")
+				}
+				observer := w.(*responseObserver)
+				observer.status = http.StatusSwitchingProtocols
+				observer.tunnel = newUpgradedStream(conn, time.Duration(route.TimeoutPolicy.IdleMs)*time.Millisecond, maxRequestBytes)
+				response.Body = observer.tunnel
+			}
 			sanitizeResponseHeaders(response.Header)
+			if response.StatusCode == http.StatusSwitchingProtocols {
+				response.Header.Set("Connection", "Upgrade")
+				response.Header.Set("Upgrade", "websocket")
+			}
 			response.Header.Set("X-Measix-Request-Id", requestID)
 			return nil
 		},
@@ -91,6 +113,19 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 		}
 	}()
 	proxy.ServeHTTP(w, request)
+	if observer, ok := w.(*responseObserver); ok && observer.tunnel != nil {
+		if observer.tunnel.timedOut.Load() {
+			result.ErrorClass = "UPSTREAM_TIMEOUT"
+		}
+		if observer.tunnel.exceeded.Load() {
+			result.ErrorClass = "REQUEST_TOO_LARGE"
+		}
+		if errors.Is(request.Context().Err(), context.DeadlineExceeded) {
+			result.ErrorClass = "UPSTREAM_TIMEOUT"
+		} else if errors.Is(request.Context().Err(), context.Canceled) {
+			result.ErrorClass = "CLIENT_CANCELLED"
+		}
+	}
 }
 
 func (h *Handler) transportFor(policy relaycontrolapi.TimeoutPolicy) http.RoundTripper {

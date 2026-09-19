@@ -50,7 +50,7 @@ const router = useRouter()
     <div v-if="$slots.actions" class="row items-center q-gutter-sm gt-xs">
       <slot name="actions" />
     </div>
-    <q-btn-dropdown v-if="$slots.actions" flat round dense icon="more_vert" class="xs">
+    <q-btn-dropdown v-if="$slots.actions" flat dense no-caps auto-close :label="$t('common.actions')" icon="more_vert" class="xs">
       <q-list>
         <slot name="actions" />
       </q-list>

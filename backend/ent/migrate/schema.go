@@ -376,6 +376,9 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
+		{Name: "applied_managed_generation", Type: field.TypeInt64, Nullable: true},
+		{Name: "applied_snapshot_hash", Type: field.TypeString, Nullable: true},
+		{Name: "applied_reported_at", Type: field.TypeTime, Nullable: true},
 	}
 	// SessionsTable holds the schema information for the "sessions" table.
 	SessionsTable = &schema.Table{

@@ -50,21 +50,21 @@ real Adapter qualification evidence relevant to claimed profile
 
 禁止把 floating `platform-core latest` 作为 integration contract。
 
-若 S0.3 Freeze 未 Green，S0.4 不开始。若 frozen v5 无法表达 required Android execution semantic，必须按 compatibility/versioning 规则回到 architecture/Control Protocol 处理，不能在 Android 本地发明 field/fallback。
+若 S0.3 Freeze 未 Green，正式 S0.4 阶段不开始。这不阻止按 Foundation Contract §3 对当前 S0.1/S0.2 合同开展真实平台适配与联调；当前 v4 消费不以 Gateway 为前置。若 frozen v5 无法表达 required Android execution semantic，必须回到 architecture/Control Protocol 修改唯一现行合同，不能在 Android 本地发明 field/fallback 或旧版本兼容分支。
 
 ## 3. Required Managed Profile
 
 S0.4 只要求消费 S0.3 已 Frozen、并继承 S0.1/S0.2 baseline 的 required profile：
 
 ```text
-Model  → OPENAI_CHAT_COMPLETIONS
-TTS    → OPENAI_AUDIO_SPEECH
-ASR    → OPENAI_AUDIO_TRANSCRIPTIONS
+Model  → 当前四种模型线协议，见 Control Protocol §10
+TTS    → OpenAI / Gemini / MiMo / 设备系统朗读，见 Control Protocol §10
+ASR    → HTTP 文件转写 / OpenAI 实时识别 / DashScope 实时识别，见 Control Protocol §10.6
 Direct MCP → MCP_STREAMABLE_HTTP
 Gateway    → MCP_STREAMABLE_HTTP with fixed discover_tools/invoke_tool surface
 ```
 
-不要求：native Anthropic/Google/Gemini、OpenAI Responses、Realtime/WebSocket managed runtime、Embedding、standalone Image Generation 等 future profile。
+本次 S0.1/S0.2 扩展包含上述模型、语音与实时识别协议。Gateway 仍按 S0.3 推进；Embedding、standalone Image Generation 等不属于本次范围。
 
 未来 profile 只有在 server contract + Adapter qualification + Android compatibility 都明确后增量加入。
 
@@ -247,6 +247,8 @@ validated managed-state metadata needed for recovery
 
 任何失败保持 Last Known Good，不产生 metadata/payload half commit。
 
+原子保存并应用成功后，向 Control Protocol「当前公共入口与设备应用报告」的接口报告 generation/hash。报告属于当前平台母 Session，不能跨 Session 复用；报告失败不回滚已应用配置，也不自动重放模型/工具操作。下次同步检查时重试当前已应用状态的报告。状态查询的 Applied header 不是应用回执，服务端确认报告也不替代 Runtime guard。
+
 `managedGeneration=0` 表示 server 尚无 active Release；Client 可以 BOUND，但不得伪造 generation-0 Snapshot。
 
 ## 10. Managed State Guard
@@ -270,6 +272,8 @@ network/5xx              → CONTROL_UNAVAILABLE / fail closed for new Managed r
 ```
 
 S0.4 不使用 TTL cache 跳过 correctness preflight。
+
+进入已绑定企业空间及应用恢复前台时检查 Managed State，发现新配置后使用同一个同步 owner 下载并原子应用；手动同步与 Portal refresh 复用该 owner。前台检查失败应呈现可重试状态，保留历史及完整已应用配置用于显示；不得全局锁住个人空间。前台检查不能代替每次新的顶层 Managed Runtime interaction 的 authoritative preflight。本轮采用这些检查触发点，不依赖后台定时器或推送服务。
 
 并发 interactions 可以共享 single-flight preflight/snapshot sync network work，但每个 interaction 成功后必须拥有独立 immutable context。
 
@@ -297,8 +301,8 @@ Validator 至少阻止：
 - unsupported schema/protocol 被 silent fallback；
 - broken Provider/default/resource references；
 - invalid runtimePath / arbitrary host；
-- TTS missing voice；
-- unsupported Managed realtime ASR config；
+- TTS 缺少所选协议要求的参数；
+- ASR 参数与所选协议不一致，或缺少实时录音必填参数；
 - unsupported MCP auth ownership；
 - Secret/Upstream/internal route server-only material 泄漏；
 - hash/deployment mismatch。
@@ -375,7 +379,7 @@ TEXT/IMAGE input、TEXT output、TOOL/REASONING 只按 Snapshot 声明的 capabi
 
 ### 15.3 ASR
 
-`OPENAI_AUDIO_TRANSCRIPTIONS`：使用 HTTP multipart file + model + optional language；不要求/伪造 realtime WebSocket/VAD/sample-rate config。Local realtime ASR 继续作为 Local capability。
+`OPENAI_AUDIO_TRANSCRIPTIONS` 使用 HTTP multipart file + model + optional language；`DASHSCOPE_HTTP_ASR` 使用 DashScope JSON 音频 Data URI + model + format，从 `output.text` 读取结果。两者都不携带实时参数，不能共享请求或响应解析器。OpenAI/DashScope 实时识别按 Control Protocol §10.6 读取企业录音参数，将平台 Runtime origin 转为 ws/wss，使用资源路径和规定 query，握手发送平台凭据与 generation；不得使用个人端点或凭据兜底。复用现有录音/转写展示能力，但企业配置与个人配置的所有权保持隔离。
 
 ### 15.4 Direct Managed MCP
 
@@ -466,9 +470,6 @@ S0.4 不实现：
 
 - 第二套 Enterprise Chat/Conversation Runtime；
 - server-side Conversation persistence；
-- native Anthropic/Google/Gemini required support；
-- OpenAI Responses required support；
-- Managed Realtime/WebSocket ASR；
 - Embedding/Image Generation standalone Managed API；
 - MDM uninstall/disconnect enforcement；
 - FCM correctness dependency；

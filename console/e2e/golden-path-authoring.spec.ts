@@ -122,7 +122,9 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
       code: await codeField.inputValue(),
       expiresAt: expect.any(String),
     })
-    expect(Date.parse(material.expiresAt)).toBeGreaterThan(Date.now())
+    const enrollmentRemainingMillis = Date.parse(material.expiresAt) - Date.now()
+    expect(enrollmentRemainingMillis).toBeGreaterThan(55 * 60 * 1000)
+    expect(enrollmentRemainingMillis).toBeLessThanOrEqual(60 * 60 * 1000)
     await expect(page.locator('[data-cy="copy-enrollment-material"]')).toBeVisible()
 
     await page.keyboard.press('Escape')

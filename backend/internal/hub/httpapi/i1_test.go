@@ -204,6 +204,29 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 	}
 }
 
+func TestEnrollmentExpiryUsesEnrollmentProblemCode(t *testing.T) {
+	h, svc, _, ctx, adminID := setupFullHandler(t)
+	grant, err := svc.CreateEnrollment(ctx, adminID, adminID, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.Now = func() time.Time { return grant.ExpiresAt }
+	response := doJSON(t, h, http.MethodPost, "/api/client/v1/enrollments/exchange", nil, map[string]any{
+		"code": grant.Code, "installationId": platformid.New(platformid.Installation),
+		"platform": "ANDROID", "deviceName": "expired-device", "appVersion": "1.0.0",
+	})
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("expired enrollment status=%d body=%s", response.Code, response.Body.String())
+	}
+	var problem struct {
+		Code string `json:"code"`
+	}
+	decodeJSON(t, response, &problem)
+	if problem.Code != "enrollment_expired" {
+		t.Fatalf("expired enrollment code=%q, want enrollment_expired", problem.Code)
+	}
+}
+
 func doJSON(t *testing.T, h http.Handler, method, path string, headers map[string]string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	var data []byte

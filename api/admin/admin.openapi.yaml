@@ -1742,8 +1742,8 @@ components:
         expiresInSeconds:
           type: integer
           minimum: 60
-          maximum: 3600
-          default: 600
+          maximum: 86400
+          default: 3600
     CreateEnrollmentResponse:
       type: object
       additionalProperties: false

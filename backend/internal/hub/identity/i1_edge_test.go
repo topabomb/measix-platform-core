@@ -73,6 +73,35 @@ func TestHUBID003EnrollmentExpiryAndCredentialDigestOnly(t *testing.T) {
 	}
 }
 
+func TestHUBID003EnrollmentTTLContract(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newService(t)
+	boot, err := s.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := s.CreateUser(ctx, "ttl-user", "TTL User", "MEMBER")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := s.Now().UTC()
+	defaultGrant, err := s.CreateEnrollment(ctx, u.ID, boot.AdminUserID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := now.Add(time.Hour); !defaultGrant.ExpiresAt.Equal(want) {
+		t.Fatalf("default expiry=%s, want %s", defaultGrant.ExpiresAt, want)
+	}
+	if _, err := s.CreateEnrollment(ctx, u.ID, boot.AdminUserID, 24*time.Hour); err != nil {
+		t.Fatalf("24 hour enrollment rejected: %v", err)
+	}
+	for _, ttl := range []time.Duration{time.Minute - time.Second, 24*time.Hour + time.Second} {
+		if _, err := s.CreateEnrollment(ctx, u.ID, boot.AdminUserID, ttl); !errors.Is(err, identity.ErrInvalidInput) {
+			t.Fatalf("ttl %s err=%v, want ErrInvalidInput", ttl, err)
+		}
+	}
+}
+
 func TestHUBID005RefreshCredentialDigestOnly(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newService(t)

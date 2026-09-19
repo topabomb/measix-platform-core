@@ -769,7 +769,7 @@ export interface components {
             newPassword: string;
         };
         CreateEnrollmentRequest: {
-            /** @default 600 */
+            /** @default 3600 */
             expiresInSeconds: number;
         };
         CreateEnrollmentResponse: {

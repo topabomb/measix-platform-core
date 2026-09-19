@@ -228,7 +228,7 @@ async function createEnrollment() {
   error.value = undefined
   try {
     const grant = await apiFetch<Enrollment>(`/api/admin/v1/users/${encodeURIComponent(selected.value.userId)}/enrollments`, {
-      method: 'POST', body: JSON.stringify({ expiresInSeconds: 600 }),
+      method: 'POST', body: JSON.stringify({}),
     }, session.csrfToken)
     // Loopback HTTP is supported for isolated local deployments; other origins require HTTPS.
     enrollmentMaterial.value = encodeEnrollmentMaterial(grant.platformUrl, grant)

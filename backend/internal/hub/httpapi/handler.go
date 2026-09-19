@@ -304,6 +304,8 @@ func (h *clientHandler) ExchangeEnrollment(w http.ResponseWriter, r *http.Reques
 
 func writeEnrollmentError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, identity.ErrExpired):
+		writeProblem(w, http.StatusUnauthorized, "enrollment_expired", "Enrollment code expired")
 	case errors.Is(err, identity.ErrAlreadyUsed):
 		writeProblem(w, http.StatusConflict, "enrollment_already_used", "Enrollment code already used")
 	case errors.Is(err, identity.ErrConflict):

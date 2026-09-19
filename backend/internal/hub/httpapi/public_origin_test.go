@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"net/http"
 	"testing"
+	"time"
 )
 
 func TestAdminCookieUsesConfiguredPublicScheme(t *testing.T) {
@@ -36,16 +37,21 @@ func TestEnrollmentUsesConfiguredPublicOrigin(t *testing.T) {
 		UserID string `json:"userId"`
 	}
 	decodeJSON(t, created, &user)
-	grant := doJSON(t, h, http.MethodPost, "/api/admin/v1/users/"+user.UserID+"/enrollments", headers, map[string]any{"expiresInSeconds": 600})
+	issuedAt := id.Now().UTC()
+	grant := doJSON(t, h, http.MethodPost, "/api/admin/v1/users/"+user.UserID+"/enrollments", headers, map[string]any{})
 	if grant.Code != 201 {
 		t.Fatalf("grant status: %d", grant.Code)
 	}
 	var material struct {
-		PlatformURL string `json:"platformUrl"`
+		PlatformURL string    `json:"platformUrl"`
+		ExpiresAt   time.Time `json:"expiresAt"`
 	}
 	decodeJSON(t, grant, &material)
 	if material.PlatformURL != id.PublicOrigin {
 		t.Fatalf("public origin = %q", material.PlatformURL)
+	}
+	if want := issuedAt.Add(time.Hour); !material.ExpiresAt.Equal(want) {
+		t.Fatalf("default expiry = %s, want %s", material.ExpiresAt, want)
 	}
 }
 

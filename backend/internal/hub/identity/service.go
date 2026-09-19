@@ -15,6 +15,12 @@ import (
 	"measix/platform/pkg/platformid"
 )
 
+const (
+	minimumEnrollmentTTL = time.Minute
+	defaultEnrollmentTTL = time.Hour
+	maximumEnrollmentTTL = 24 * time.Hour
+)
+
 var (
 	ErrInvalidInput      = errors.New("invalid identity input")
 	ErrRefreshConflict   = errors.New("refresh conflict")
@@ -148,9 +154,9 @@ func (s *Service) SetPassword(ctx context.Context, userID, password string) erro
 
 func (s *Service) CreateEnrollment(ctx context.Context, userID, createdBy string, ttl time.Duration) (EnrollmentGrant, error) {
 	if ttl == 0 {
-		ttl = 10 * time.Minute
+		ttl = defaultEnrollmentTTL
 	}
-	if ttl < time.Minute || ttl > time.Hour {
+	if ttl < minimumEnrollmentTTL || ttl > maximumEnrollmentTTL {
 		return EnrollmentGrant{}, ErrInvalidInput
 	}
 	u, err := s.GetUser(ctx, userID)

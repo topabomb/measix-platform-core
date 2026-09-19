@@ -33,7 +33,7 @@ Root repository 的 npm orchestration、实际开发命令与 system harness 生
 
 `ResourcesPage` 使用统一配置工作台组织 Overview、Models、TTS、ASR、MCP、Assistants 和 Policy。桌面显示固定分区导航，窄屏使用同一 section state 的选择器；Policy 直接编辑当前五项必填用户配置准入开关。新草稿五项默认 false；不存在旧策略采用按钮或缺字段补齐逻辑，非当前旧草稿随旧开发数据库清理。服务端在 HTTP 边界独立校验五项必填 Boolean 与 Assistants/Starters 数组。
 
-`UsersPage` 的二维码和复制按钮共用 `api/enrollment.ts` 生成的完整接入资料，平台 origin 取自 Admin 接入响应中的 `platformUrl`，不读取浏览器地址；裸注册码仅供显示排查。资料只在当前对话框内存中保存，关闭清理，不能放入 URL、日志或持久缓存。Client OpenAPI 定义原生消费的资料，`generated-client.ts` 仅提供其生成类型；Admin 仍只请求 Admin HTTP API。HTTP/HTTPS、域名/IP 均可使用。复制和 UUID 生成复用 Quasar 的 `copyToClipboard`、`uid`，支持普通 HTTP 上没有 Async Clipboard / randomUUID 的浏览器环境。
+`UsersPage` 的二维码和复制按钮共用 `api/enrollment.ts` 生成的完整接入资料，平台 origin 取自 Admin 接入响应中的 `platformUrl`，不读取浏览器地址；裸注册码仅供显示排查。普通生成向 Admin API 提交空请求对象，由 Hub 应用协议默认时长，浏览器不维护第二份默认值。资料只在当前对话框内存中保存，关闭清理，不能放入 URL、日志或持久缓存。Client OpenAPI 定义原生消费的资料，`generated-client.ts` 仅提供其生成类型；Admin 仍只请求 Admin HTTP API。HTTP/HTTPS、域名/IP 均可使用。复制和 UUID 生成复用 Quasar 的 `copyToClipboard`、`uid`，支持普通 HTTP 上没有 Async Clipboard / randomUUID 的浏览器环境。
 
 `console/src/` 当前以这些职责组织：
 

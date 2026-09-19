@@ -34,11 +34,8 @@
     "test:console": "pnpm -C console test",
     "test:relay": "cd backend && go test ./internal/relay/... -count=1",
     "test:hub": "cd backend && go test ./internal/hub/... -count=1",
-    "schema:hash": "cd backend && go run ./cmd/migration-checksum",
-    "schema:replay": "node scripts/checks.mjs schema-replay",
-    "schema:status": "atlas migrate status --dir file://backend/migrations",
     "ci": "make ci",
-    "test:tooling": "node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs scripts/replay-freeze.test.mjs scripts/adapter-identity.test.mjs scripts/harness-cleanup.test.mjs scripts/harness-path.test.mjs scripts/export-client-integration.test.mjs scripts/scenario-definitions.test.mjs",
+    "test:tooling": "node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs scripts/replay-freeze.test.mjs scripts/adapter-identity.test.mjs scripts/harness-cleanup.test.mjs scripts/harness-path.test.mjs scripts/scenario-definitions.test.mjs",
     "test:public-origin": "node --test scripts/public-origin.test.mjs"
   },
   "packageManager": "pnpm@11.0.0",

@@ -18,7 +18,7 @@
 
 样例由 `cmd/generate-client-fixtures` 调用真实 Snapshot compiler 生成，输入是公开的资源投影配方，bindings 为空，不是可直接发布的运营草稿（真正发布需管理员配置私有 Upstream/Secret/Binding）。合成令牌、接入码、时间和 ID 只用于测试，不能用于服务器登录。Canonical hash 由 core 当前 `capability.HashSnapshot` 复算验证；客户端按 Control Protocol §10.13 校验 ETag/body.snapshotHash 一致性，不另造 JSON canonicalization。文件 SHA-256 与 Snapshot hash 是不同概念。
 
-独立包 `api/generated/android/integration` 只含本说明、可执行 OpenAPI 与客户端消费的 schema/fixtures；不含架构文档正文，也不含 Core 测试源码。把整个目录复制出去即可执行 `node verify.mjs --verify .`，不需要任何兄弟仓库。manifest 摘要覆盖原始文件字节，任何漏文件、额外文件、修改或非法路径均失败。包是工作树候选，不能将 sourceHash 当成 Git commit。
+独立包 `api/generated/android/integration` 只含本说明、可执行 OpenAPI 与客户端消费的 schema/fixtures；不含架构文档正文，也不含 Core 测试源码。它由 `scripts/export-client-integration.mjs` 从本仓库源文件直接复制生成，可整体取用；需要追溯来源时看本仓库，不要直接编辑包内文件。
 
 ## Android 消费模型映射
 
@@ -121,7 +121,7 @@ Android 维护方按以下顺序实施，本批不修改 Android 仓库：
 3. 统一平台 Runtime owner：从 Discovery 和稳定资源 ID 组装 URL；HTTP 与 WebSocket 都使用平台令牌、generation 和 interaction 上下文。供应商密钥仅由 Relay 注入，客户端不添加或持久化这些密钥。处理 typed 428、撤销、刷新和取消。
 4. 四模型分别验收文本流及工具往返；四 TTS 验收播放、停止和切换；三 ASR 验收录音、转写和取消。SYSTEM_TTS 在个人 TTS 禁止时仍能作为企业默认服务运行。工具结果保留 ID/签名，不重发已执行工具。
 5. Direct MCP 使用企业资源和助手 mcpServerIds；初始化、通知、发现、调用、会话头与 GET/DELETE 按当前协议。Firecrawl 可先使用官方免密钥 `/v2/mcp`、authOwnership=NONE；企业 Bearer 方案由服务端配置。Gateway 不在本批范围。
-6. 复用现有 Portal/退出 owner 完成远端站点、媒体、旧文档接收器清理；用导出 manifest/sourceHash 关联真实 Hub、设备和原生构建证据。进程死亡、WebView、相机/麦克风和播放体验由 Android 设备验收，浏览器与本地协议测试不替代。
+6. 复用现有 Portal/退出 owner 完成远端站点、媒体、旧文档接收器清理。进程死亡、WebView、相机/麦克风和播放体验由 Android 设备验收，浏览器与本地协议测试不替代。
 
 ## 公共 HTTP/IP 与应用报告：本次适配顺序
 

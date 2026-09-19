@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -255,17 +254,6 @@ func TestHUBDB003CurrentSchemaNotRewrittenOnRestart(t *testing.T) {
 	// Verify the current schema identity is stable.
 	if maintenance.CurrentSchemaIdentity != migrations.CurrentIdentity() {
 		t.Fatalf("CurrentSchemaIdentity does not match embedded current schema: %s", maintenance.CurrentSchemaIdentity)
-	}
-
-	// Verify the Atlas checksum file exists and is not empty.
-	_, file, _, _ := runtime.Caller(0)
-	atlasSumPath := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../migrations/atlas.sum"))
-	atlasSumData, err := os.ReadFile(atlasSumPath)
-	if err != nil {
-		t.Fatalf("atlas.sum file missing: %v", err)
-	}
-	if len(strings.TrimSpace(string(atlasSumData))) == 0 {
-		t.Fatal("atlas.sum file is empty")
 	}
 }
 

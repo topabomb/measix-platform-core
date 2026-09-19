@@ -18,7 +18,7 @@
 | Android | HEAD `87ae6056f`；0.0.20 本地来源与消费者已实现。真实接入 roadmap 仍为后续工作；LocalEnterpriseSource 对 Platform 材料返回 platform_enrollment_not_supported |
 | architecture | HEAD `50bcf595196e8684895f5ed0626291985844308d` 加工作树修订；当前 S0.2 目标 Snapshot v4，v5/Gateway 属后续阶段 |
 | core | HEAD `95e8e815d3f9505d2eda08c15101f77f3e8f0380` 加工作树修订；CurrentSnapshotSchemaVersion=4；认证、刷新轮换、Snapshot、Feed、Portal 均已有实现和相关测试源码 |
-| Portal | 尚无提交基线；local 包 sourceHash `b29533489820a58eb489d3df3c9f2e09245e413988a40fff6ccae0ea0936049c`，Bridge v3/localReadVersion=2；近期 Android 使用相同构建身份，实际消费和最新设备记录需随最终候选重新关联 |
+| Portal | 尚无提交基线；Bridge v3/localReadVersion=2；近期 Android 使用相同构建身份，实际消费和最新设备记录需随最终候选重新关联 |
 
 Android 参考入口：
 
@@ -99,7 +99,7 @@ Android 参考入口：
 ### C5 扩展 Android 可消费的导出包
 
 - [x] 复用现有 generate-android-wire 与资料 owner，包含 Client OpenAPI、当前版本校验输入、v4 资料、身份/状态时序、428、enrollment、Feed、Portal 及全部 schema 引用依赖。
-- [x] 输出文件清单、schema/profile 版本、源文件摘要、生成器信息；区分原始字节摘要与现有 CRLF 规范化 sourceHash。
+- [x] 输出 schema/profile 版本与生成器信息；包内容由生成脚本从源文件直接复制，不维护摘要清单。
 - [x] 在独立临时目录验证包不依赖 sibling checkout，重复生成稳定；篡改、缺文件、未列出文件与错误版本可检测。
 - 验收：Android agent 取得一个包即可定位所有输入及预期结果。该包不是 Portal 静态包，也不产生第二套协议真源。
 

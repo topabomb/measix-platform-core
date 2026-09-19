@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { gitCommit, gitDirty, writeMetaJson } from './lib/harness.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const GENERATED = ['backend/go.mod', 'backend/go.sum', 'backend/ent', 'backend/internal/wire', 'backend/migrations/atlas.sum', 'api/generated/android', 'api/fixtures/client-integration', 'api/portal/client-feed.schemas.json', 'console/pnpm-lock.yaml', 'console/src/api/generated.ts', 'console/src/api/generated-client.ts']
+const GENERATED = ['backend/go.mod', 'backend/go.sum', 'backend/ent', 'backend/internal/wire', 'api/generated/android', 'api/fixtures/client-integration', 'api/portal/client-feed.schemas.json', 'console/pnpm-lock.yaml', 'console/src/api/generated.ts', 'console/src/api/generated-client.ts']
 export function commandResult(result) {
   const output = String(result.stdout ?? '') + String(result.stderr ?? '') + (result.error?.message ?? '')
   const exitCode = Number.isInteger(result.status) ? result.status : 1
@@ -26,17 +25,6 @@ function checked(command, args, cwd) {
   if (result.output) process.stdout.write(result.output)
   return result
 }
-export function replayCurrentSchema({ temporaryRoot = tmpdir(), run: execute = checked } = {}) {
-  const directory = mkdtempSync(join(resolve(temporaryRoot), 'measix-current-schema-'))
-  const databaseUrl = 'sqlite://' + join(directory, 'hub.db').replaceAll('\\', '/')
-  try {
-    for (const operation of ['apply', 'status']) {
-      execute('atlas', ['migrate', operation, '--dir', 'file://backend/migrations', '--url', databaseUrl], ROOT)
-    }
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
-}
 export function generate() {
   const backend = join(ROOT, 'backend')
   checked('node', ['scripts/generate-portal-contract.mjs'])
@@ -50,7 +38,6 @@ export function generate() {
   checked('go', ['mod', 'tidy'], backend)
   checked('pnpm', ['install', '--frozen-lockfile'], join(ROOT, 'console'))
   checked('pnpm', ['generate:api'], join(ROOT, 'console'))
-  checked('go', ['run', './cmd/migration-checksum'], backend)
 }
 function formatCheck() {
   const files = requireSuccess(run('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'backend'])).output.split('\0').filter(f => f.endsWith('.go') && existsSync(join(ROOT, f)))
@@ -86,8 +73,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       case 'fmt': requireSuccess(formatCheck()); break
       case 'drift': requireSuccess(driftCheck()); break
       case 'static': collectStatic(); break
-      case 'schema-replay': replayCurrentSchema(); break
-      default: throw new Error('Usage: node scripts/checks.mjs generate|fmt|drift|static|schema-replay')
+      default: throw new Error('Usage: node scripts/checks.mjs generate|fmt|drift|static')
     }
   } catch (error) { console.error(error.message); process.exitCode = 1 }
 }

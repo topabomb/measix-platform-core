@@ -54,6 +54,6 @@
 
 运行中的统一预览入口为 Caddy 2.11.4，9000；Hub 为 control-hub-diagnostics.exe，9004/9001；Relay 为 runtime-relay-asr.exe，9002/9003。此前脚本直连 Relay 的证据仅证明组件链路；现已改为从 9000 的 Discovery 解析 Client/Runtime 基址，重新通过四模型、三云端 TTS、两种实时 ASR 和真实 Firecrawl initialize/通知/list/scrape 验证。系统 TTS 核对下发参数，不冒充设备播音。新 Firecrawl requestId 为 `req_811800c1-f28f-4f75-9520-b9dea302f6d5`。具体接线见 [operations](operations.md#one-public-origin)。
 
-[Android 接入说明](android-platform-integration.md) 按平台 source、原子快照、Runtime owner、四模型/四 TTS/三 ASR、Direct MCP、Portal 生命周期给出实施顺序及共享样例。导出包包含 72 个内容文件，sourceHash 以 manifest 为准。Android 当前个人/本地能力不等于平台接入；本轮未修改或编译 Android，也未提供设备消费完成声明。
+[Android 接入说明](android-platform-integration.md) 按平台 source、原子快照、Runtime owner、四模型/四 TTS/三 ASR、Direct MCP、Portal 生命周期给出实施顺序及共享样例。Android 当前个人/本地能力不等于平台接入；本轮未修改或编译 Android，也未提供设备消费完成声明。
 
 正式阶段 Freeze 仍需对应门禁与精确来源/构建/证据链，包含独立 clean-source rebuild/replay。当前本机脏工作树和 deterministic 上游通过不替代该结论。两份错误嵌套生成文件 `backend/backend/internal/wire/{adminapi,clientapi}/*.gen.go` 已由用户手工删除，现场核验均不存在，原清理阻碍已解除。

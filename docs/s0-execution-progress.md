@@ -11,7 +11,8 @@
 - **浏览器 harness**：Phase B 四类能力流量失败现在是门禁失败而非 WARNING；用量等待登录失败不再静默返回；Playwright 报告缺失或无法解析时不再把陈旧产物当作本次证据。删除与 `e2e-harness.mjs` Phase A–D 完全重复、产物不被冻结证据消费、仍走旧直连 Relay 拓扑且无任何调用方的 `scripts/candidate-orchestrator.mjs`。
 - **运行态呈现**："尚未发布配置"不再被头部健康指示器当成 Relay 故障（`unconfigured` 独立一档）；bundle 哈希缺失不再被判定为"未收敛"（契约中该字段可选，缺失应显示为 unknown）；轮询补上并发与乱序保护；补齐缺失的 `status.NOT_READY` 文案。
 - **测试质量**：`SystemPage`/`OverviewPage` 基线改为契约合法的 `dbHealth: OK` 与真 64 位十六进制哈希，并补齐"已收敛"分支覆盖；`HealthIndicator` 不再 mock 整个 composable；资格脚本的 cancel/客户端超时改为可证伪断言，adapter 身份不再由被测上游的 `server`/`via` 响应头决定。
-- **交付包收敛（高内聚低耦合）**：Android 导出不再内嵌 29 份架构文档正文，只保留客户端实际消费的 Client OpenAPI、Portal Bridge 契约、共享 fixtures、428 样例与接入说明；`api/fixtures/problem` 由整目录改为显式文件（Admin 专用的 `stale-draft-revision` 不再交付）。架构文档按文档名与章节引用，权威仍在其自有仓库。导出因此**不再依赖任何兄弟仓库**：在架构仓库不可见的条件下完整 `generate` 链已实测通过，`make clean-replay` 之外的门禁不再需要第二个仓库。新增测试固定该边界（包内不得出现 `measix-architecture/**`、说明的本地链接必须在包内可解析）；`export-client-integration.test.mjs` 与 `scenario-definitions.test.mjs` 首次接入 CI 工具测试集。
+- **交付包收敛（高内聚低耦合）**：Android 导出不再内嵌 29 份架构文档正文，只保留客户端实际消费的 Client OpenAPI、Portal Bridge 契约、共享 fixtures、428 样例与接入说明；`api/fixtures/problem` 由整目录改为显式文件（Admin 专用的 `stale-draft-revision` 不再交付）。架构文档按文档名与章节引用，权威仍在其自有仓库。导出因此不再依赖任何兄弟仓库。
+- **校验层做减法**：移除 `atlas.sum` 与维护它的 `cmd/migration-checksum`、`make schema`/`schema-replay`、CI 的 Atlas 安装步骤；CI 不再执行 `make generate` 与 `generated-drift`（两者保留为本地命令）。导出包不再生成 `manifest.json`/`sourceHash`/`verify.mjs` 自校验层，包内容由生成脚本直接从源文件复制。`make ci` 现在只跑测试。这些比较曾需要工作区与生成环境逐字节一致（本地 41 个文件违反 `.gitattributes` 的 LF 规则即导致两次 CI 失败），维护成本高于其收益；相应的迁移验证改由真实 SQL 的 Go 测试承担。
 
 ## 最新真实供应商实验与 Android 交接
 
@@ -33,7 +34,7 @@
 
 最新验证（2026-09-18）：完整 `go test ./...`、`go vet ./...` 通过；Admin 21 文件 128 项测试、typecheck 和生产构建通过；Portal 8 文件 103 项测试、remote/local 构建、交付测试及真实 Hub/本地包 6 项浏览器回归通过。`TestPublicHTTPAndHTTPSControlLifecycle` 用真实 HTTP/受信测试证书的 HTTPS 连接验证登录、接入、Snapshot、应用报告和 Portal 换票/Cookie/CSRF；`TestRealtimeASRWebSocketAdmissionAndFrames` 验证 ws/wss，未关闭证书验证。报告跨 Session、过期、回退、错误 hash、不续期和下载不算应用均有回归；Hub 实际重启后的管理页面仍显示第 2 次发布的已应用报告。HTTPS 的证据是自动化协议连接测试，不冒充 HTTPS 浏览器人工操作或 Android 真机验收。
 
-2026-09-18 的交付包为 [android-integration-TzTeNh](../../measix-enterprise-portal/.artifacts/android-integration-TzTeNh/manifest.json)，当时 150 个文件已逐一校验摘要及清单，内含 Core 独立资料包 72 文件也通过独立校验。当时的 Portal sourceHash 为 `577379e9d5e78f05eda1916fc074418cdc1119d1cb407bc03544b3630d1d513a`，Core 资料 sourceHash 为 `1ec5190a4ab8df11375af82832a9e0700a0dcacd18584a4aa0654988cb1a2590`。交接说明已消除 wss-only 的旧描述；HTTP 使用 ws，HTTPS 使用 wss，端口保留。这些是当时工作树/交付内容身份，不是正式冻结提交；最新交接包应以本轮重新生成的 manifest 为准。
+2026-09-18 曾生成一个 Portal 交接包，内含本仓库导出的 Core 资料，交接说明已消除 wss-only 的旧描述；HTTP 使用 ws，HTTPS 使用 wss，端口保留。当时按摘要清单逐文件比对，该机制现已移除，包内容由生成脚本从源文件复制。
 
 Android 工作树已有其他维护方新增的 PlatformControlClient/Mapper/reportApplied，本轮只读核对，未修改 Android。七项上游交付审计完成；正式阶段 Freeze、供应商生成质量和 Android 真机验收不由本轮测试替代。
 
@@ -53,7 +54,7 @@ MEASIX 从未发布。Snapshot v4、Bridge v3、local-read v2、Enrollment forma
 | Core current-only cleanup | 删除旧的本地 diff 路径猜测、772 行重复 E2E、不可工作的 `freeze-gate` wrapper、旧 browser/schema 命令别名和迁移措辞；schema 工具只接受一份当前 SQL并拒绝增量历史 |
 | Portal | 继续使用独立仓库和同一当前 Feed/Bridge 合同；远端与 bundled local 生产构建重新生成。Portal 不拥有 Managed 配置编辑，Core Admin 不复制 Portal 工作台 |
 
-Android 集成导出只含客户端实际消费的内容：可执行 Client OpenAPI、Portal Bridge 契约、共享 fixtures、428 问题样例与接入说明；不内嵌架构文档正文，也不含 Core 测试源码。文件清单与 sourceHash 以 `api/generated/android/integration/manifest.json` 为准，不在本文重复固定数量。导出校验拒绝错误协议版本、漏文件、多余文件、篡改和路径逃逸；收包方复制目录后 `node verify.mjs --verify .` 不需要任何兄弟仓库。
+Android 集成导出只含客户端实际消费的内容：可执行 Client OpenAPI、Portal Bridge 契约、共享 fixtures、428 问题样例与接入说明；不内嵌架构文档正文，也不含 Core 测试源码。它由 `scripts/export-client-integration.mjs` 从本仓库源文件直接复制生成，不含摘要清单或独立校验器。
 
 ## 本轮验证
 
@@ -63,7 +64,7 @@ Android 集成导出只含客户端实际消费的内容：可执行 Client Open
 | Core candidate systems | `go test -tags=candidate ./test/system/scenarios/ -count=1 -timeout 15m` 通过；真实 Hub/Relay/SQLite + deterministic Adapter |
 | Core Admin | 21 个 Vitest 文件、138 项测试通过；`vue-tsc --noEmit` 与 Quasar production build 通过 |
 | Core browser | `node scripts/e2e-harness.mjs` 通过 Admin authoring/publish、四类 runtime traffic、usage/system 和 topology security；System 页面在干净 Chromium 中没有页面脚本异常 |
-| Current schema | Atlas 对独立空库执行 apply/status：一份 SQL、37 statements、Pending 0；tooling 8 项测试通过 |
+| Current schema | 空库应用唯一一份 SQL 的 Go 测试通过（应用、业务读写、重复初始化、失败事务回滚） |
 | Portal | 8 个 Vitest 文件、102 项测试和 2 项交付测试通过；format、remote/local production build 通过；6 项 Playwright（5 项 local + 1 项真实 Hub 生命周期）通过 |
 
 Windows 当前 Go 环境未启用 CGO，`go test -race` 在测试启动前被 Go 拒绝。当前协议扩展后的全量 Go 测试、vet、Admin 测试与完整浏览器 harness 已运行；candidate system 最新运行通过（207.9 秒）。Portal 最新 102 项单元测试、2 项交付测试、两种生产构建及 6 项浏览器测试（5 项 bundled local + 1 项真实 Hub 生命周期）通过。没有执行 Android 编译/设备测试、付费模型/语音供应商 qualification、独立 clean-source rebuild/replay 或最终 Freeze。Firecrawl 官方免密钥 MCP 已完成真实调用，不能替代其他供应商证据。
@@ -145,7 +146,7 @@ S0.3 的 Enterprise Tool Gateway、Snapshot v5、真实生产 supervisor/package
 | 三种 ASR | HTTP multipart、OpenAI/DashScope WebSocket 参数、事件、取消和关闭握手 | 合成音频与转写；不声明真实识别准确率 |
 | Firecrawl Direct MCP | 真实免密钥服务 initialize、通知、工具列表与公开页面抓取；助手引用 | 不包含 Gateway 或付费账户资格 |
 | 助手、记忆种子、入口、策略、动态、Portal | 当前 Snapshot/Feed/Bridge、编译/发布测试、Portal 单元与真实 Hub 浏览器回归 | 本域记忆、聊天隔离和硬件属于 Android |
-| 可独立交给 Android 的协议与静态包 | 接入说明的六步实施清单；Portal 交接包内含本仓库导出的 Client 资料，文件清单以 `api/generated/android/integration/manifest.json` 为准；逐文件比对包及现存源码无差异 | sourceHash 是工作树身份；不是冻结提交 |
+| 可独立交给 Android 的协议与静态包 | 接入说明的六步实施清单；Portal 交接包内含本仓库导出的 Client 资料，包内容由 `scripts/export-client-integration.mjs` 从本仓库源文件复制 | 包不是冻结提交，设备验收仍由 Android 完成 |
 | 当前唯一版本、清除无意义旁路 | 单一初始化 SQL、严格当前 Snapshot、删除旧 diff/重复流程/误导测试命名 | 两份误生成的 `backend/backend/internal/wire/{adminapi,clientapi}/*.gen.go` 已由用户删除，重新检查均不存在；正常生成源码保留 |
 
 下一步交接应直接使用 [Android 实施清单](android-platform-integration.md#验证职责与交接清单)，而不是让 Android 猜测资源协议或上游密钥。Android 维护方正在独立接入 Platform source，应使用当前工作区实现核对交接，不能把本轮上游交付说成 Android 已接通。正式阶段 Freeze 与设备验收继续按原门禁执行。
@@ -158,4 +159,4 @@ S0.3 的 Enterprise Tool Gateway、Snapshot v5、真实生产 supervisor/package
 
 接入说明新增个人空间体验边界与逐项阻碍处理：手机可信 HTTPS、真实上游配置、五项 allowLocal 策略、辅助模型选择、认证/428 恢复、10 MiB 请求/连接限制。现场读取 generation 9 确认四模型/四 TTS/三 ASR、一个助手、两个入口、两个 MCP，五项 allowLocal 均为 false；这是隔离测试配置，不是可忽略的实际产品默认。新增四协议图片输入与历史消息逐字节转发测试通过，连同供应商、工具和 WebSocket 相关回归通过；它证明 Relay 不剥离图片，不证明模型视觉能力或设备编码。
 
-资料同步后的最新交付目录为 [android-integration-RxyrgW](../../measix-enterprise-portal/.artifacts/android-integration-RxyrgW/manifest.json)，150 文件摘要验证通过；Core 72 文件 sourceHash 为 `950a41fa33b94148095894a1f1962faeb21e5e2035c31aa37baa5e1c87d90371`。Portal 页面/Bridge 无变化，沿用同一已验证生产构建；本轮变化是架构说明、接入指南及新增 Relay 回归。导出独立验证与篡改测试通过，Android 未修改。
+资料同步后另生成过一个 Portal 交接包，内含本仓库导出的 Core 资料。Portal 页面/Bridge 无变化，沿用同一已验证生产构建；本轮变化是架构说明、接入指南及新增 Relay 回归。Android 未修改。

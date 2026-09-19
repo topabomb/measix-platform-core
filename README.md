@@ -13,7 +13,7 @@ Current source contains the Hub and Relay Go binaries plus the Admin SPA. The S0
 
 ## Repository ownership
 
-This repository owns executable OpenAPI/fixtures, generated artifacts, Go services, Admin Console code, the SQLite/Ent/Atlas current schema, tests, CI and operations.
+This repository owns executable OpenAPI/fixtures, generated artifacts, Go services, Admin Console code, the SQLite/Ent current schema, tests, CI and operations.
 
 Product semantics, stage scope, stable IDs, cross-component behavior and required stage scenarios are owned by `topabomb/measix-architecture`.
 

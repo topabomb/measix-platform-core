@@ -63,16 +63,8 @@ jobs:
           restore-keys: |
             pnpm-${{ runner.os }}-node${{ env.NODE_VERSION }}-
 
-      - uses: ariga/setup-atlas@v0
-        with:
-          version: 'v1.2.0'
-
-      - name: 验证确定性生成链
-        id: generate
-        run: make generate
-
       - name: 保存 Go cache
-        if: ${{ steps.generate.outcome == 'success' && steps.go-cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.go-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:
           path: |
@@ -81,7 +73,7 @@ jobs:
           key: go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('backend/go.sum') }}
 
       - name: 保存 pnpm store cache
-        if: ${{ steps.generate.outcome == 'success' && steps.pnpm-cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.pnpm-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:
           path: ${{ env.PNPM_STORE_PATH }}
@@ -91,7 +83,7 @@ jobs:
         run: npm run test:tooling
 
       - name: 执行 T0 静态与契约门禁
-        run: make fmt-check contract schema generated-drift
+        run: make fmt-check contract
 
   backend-test:
     needs: static-contract

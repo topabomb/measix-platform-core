@@ -1,22 +1,22 @@
 # Database initialization
 
-MEASIX 尚未发布，当前结构是唯一支持的数据库版本。旧开发数据库或配置直接删除、重新初始化；不提供增量迁移、旧策略收养、版本回填或兼容恢复。目录名沿用 migrations 以便 Atlas 使用，不代表存在需要支持的历史版本。
+MEASIX 尚未发布，当前结构是唯一支持的数据库版本。旧开发数据库或配置直接删除、重新初始化；不提供增量迁移、旧策略收养、版本回填或兼容恢复。目录名沿用 migrations，不代表存在需要支持的历史版本。
 
 ## 当前结构与职责
 
-- Ent schema 定义业务结构，`backend/migrations/202609120001_current.sql` 是唯一完整初始化 SQL，`atlas.sum` 校验其内容。
+- Ent schema 定义业务结构，`backend/migrations/202609120001_current.sql` 是唯一完整初始化 SQL。
 - `migrations.CurrentSQL()` 要求恰好一份 SQL；测试使用同一来源。
 - Hub 启动不运行 ORM AutoMigrate，不静默修改已有 schema。Relay 本地 spool 独立于 `hub.db`。
-- 正式初始化使用 Atlas apply/status；开发 helper `go run ./cmd/devmigrate --db ../.data/hub.db` 仅用于独立开发数据库。它校验当前 SQL 和本地初始化记录，重复执行当前版本幂等，SQL 与初始化记录在同一事务中提交。非当前结构需清理相应旧数据库后重建，不修复或收养历史。
-- `maintenance.Check` 校验 Ent 所需表/列及 SQLite integrity/foreign keys；它不是 Atlas ledger 检查，不比较全部索引或列类型。System/backup 报告 binary expected revision。
+- 开发 helper `go run ./cmd/devmigrate --db ../.data/hub.db` 仅用于独立开发数据库。它读取当前 SQL、校验本地初始化记录，重复执行当前版本幂等，SQL 与初始化记录在同一事务中提交。非当前结构需清理相应旧数据库后重建，不修复或收养历史。
+- `maintenance.Check` 校验 Ent 所需表/列及 SQLite integrity/foreign keys，不比较全部索引或列类型。System/backup 报告 binary expected revision。
 
 ## 修改与验证
 
-修改 Ent schema 后，同步更新完整初始化 SQL、生成代码和 checksum。检查唯一约束、外键、默认值、NULL、索引和事务语义，不增加旧数据回填脚本。
+修改 Ent schema 后，同步更新完整初始化 SQL 与生成代码。检查唯一约束、外键、默认值、NULL、索引和事务语义，不增加旧数据回填脚本。
 
-执行 `go run ./cmd/migration-checksum`；空库应用真实 SQL，验证当前业务读写、重复初始化和失败事务回滚。当前版本备份/恢复、完整性检查仍需保留，旧版本升级测试删除。
+验证方式是执行真实 SQL 的 Go 测试（空库应用、当前业务读写、重复初始化和失败事务回滚），而不是维护一份独立的摘要文件。当前版本备份/恢复与完整性检查仍需保留，旧版本升级测试删除。
 
-`node scripts/checks.mjs schema-replay` 使用独立临时数据库执行 Atlas apply/status，结束后清理。无 Atlas CLI 时 Go SQL 测试不能冒充 Atlas CLI gate。SQLite 连接配置由 `common/sqliteutil` 统一维护。
+SQLite 连接配置由 `common/sqliteutil` 统一维护。
 
 ## 旧开发文件处理
 

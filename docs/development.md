@@ -4,7 +4,7 @@ This document owns executable local workflows, not platform semantics. Toolchain
 
 ## 1. Environment and source layout
 
-Use the repository-pinned Go/Node/pnpm toolchains. Atlas and GNU Make with a POSIX shell are required for the complete Make/CI workflow. Native PowerShell can run the direct Go/Node/pnpm commands below; it is not a POSIX Make recipe executor.
+Use the repository-pinned Go/Node/pnpm toolchains. GNU Make with a POSIX shell is required for the complete Make/CI workflow. Native PowerShell can run the direct Go/Node/pnpm commands below; it is not a POSIX Make recipe executor.
 
 Current layout:
 
@@ -13,7 +13,7 @@ api/                   four OpenAPI documents, fixtures, Android export
 backend/cmd/           Hub, Relay, development/export utilities
 backend/internal/      common, generated wire, Hub and Relay implementation
 backend/ent/           schema and generated persistence code
-backend/migrations/    single current initialization SQL and Atlas checksum
+backend/migrations/    single current initialization SQL
 backend/test/system/   Go harness, deterministic adapter/client, tagged scenarios
 console/src/           Admin UI
 console/e2e/           browser assertions
@@ -65,7 +65,7 @@ pnpm -C console build
 
 Ordinary `go test ./...` does not execute build-tagged smoke/candidate scenarios. Build, unit and component tests do not prove browser, real Adapter, Android or Freeze acceptance.
 
-From either PowerShell or POSIX, `node scripts/checks.mjs generate` owns regeneration; `fmt`, `drift` and `static` are sibling commands. `node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs` validates failure/pin rules. In POSIX, `make ci` regenerates first and serializes prerequisites; `generated-drift` alone remains only a diff check. Generation intentionally can change derived files: inspect and commit source plus expected outputs together, never hand-edit generated types.
+From either PowerShell or POSIX, `node scripts/checks.mjs generate` owns regeneration; `fmt`, `drift` and `static` are sibling commands. `node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs` validates failure/pin rules. These are local tools: `make ci` runs tests only and does not regenerate or compare generated files, so run `make generate` yourself after changing contracts or fixtures and commit the derived output with the source. Generation intentionally can change derived files: inspect and commit source plus expected outputs together, never hand-edit generated types.
 
 ## 4. API and database changes
 

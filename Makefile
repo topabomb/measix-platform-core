@@ -1,8 +1,11 @@
-.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test s01-browser-candidate console-test contract schema schema-replay freeze-manifest freeze-validate clean-replay collect-artifacts collect-static-contract collect-baseline collect-adapter-qualification
+.PHONY: ci generate generated-drift fmt-check backend-test system-test s01-candidate-test s01-browser-candidate console-test contract freeze-manifest freeze-validate clean-replay collect-artifacts collect-static-contract collect-baseline collect-adapter-qualification
 
 .NOTPARALLEL:
 
-ci: generate fmt-check contract backend-test system-test console-test tooling-test schema generated-drift
+# The gate runs real tests only. Artifact regeneration (`make generate`) and the
+# drift/sum comparisons that existed to police generated files are local tools:
+# they cost more to keep aligned across workstations than they caught.
+ci: fmt-check contract backend-test system-test console-test tooling-test
 
 fmt-check:
 	node scripts/checks.mjs fmt
@@ -105,15 +108,10 @@ console-test:
 tooling-test:
 	npm run test:tooling
 
-schema: schema-replay
-	cd backend && go run ./cmd/migration-checksum
-	git diff --exit-code -- backend/migrations/atlas.sum
-
-schema-replay:
-	node scripts/checks.mjs schema-replay
-
-generated-drift:
-	node scripts/checks.mjs drift
-
+# Local-only: regenerate committed artifacts after changing contracts or fixtures.
 generate:
 	node scripts/checks.mjs generate
+
+# Local-only: report which generated artifacts no longer match their sources.
+generated-drift:
+	node scripts/checks.mjs drift

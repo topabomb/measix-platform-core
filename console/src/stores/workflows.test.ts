@@ -3,7 +3,6 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useSessionStore } from './session'
 import { useDraftStore } from './draft'
 import { useActivationStore } from './activation'
-import { useOperationalApplyStore } from './operationalApply'
 import { setUnauthorizedHandler } from '../api/client'
 import type { components } from '../api/generated'
 
@@ -159,15 +158,5 @@ describe('ActivationStore', () => {
     store.accept({ activationId: 'act_00000000-0000-4000-8000-000000000001', kind: 'PUBLISH', state: 'COMPLETED', desiredControlRevision: 9, createdAt: '2026-08-19T10:00:00Z', updatedAt: '2026-08-19T10:00:01Z' })
     expect(store.succeeded).toBe(true)
     expect(store.retryKey).toBe(key)
-  })
-})
-
-describe('OperationalApplyStore', () => {
-  it('keeps candidate and active revisions distinct while apply is pending', () => {
-    const store = useOperationalApplyStore()
-    store.observe({ upstreamId: 'ups_00000000-0000-4000-8000-000000000001', name: 'adapter', configRevision: 5, activeConfigRevision: 3, status: 'APPLYING' })
-    expect(store.candidateRevision).toBe(5)
-    expect(store.activeRevision).toBe(3)
-    expect(store.pending).toBe(true)
   })
 })

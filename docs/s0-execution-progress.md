@@ -11,6 +11,7 @@
 - **浏览器 harness**：Phase B 四类能力流量失败现在是门禁失败而非 WARNING；用量等待登录失败不再静默返回；Playwright 报告缺失或无法解析时不再把陈旧产物当作本次证据。删除与 `e2e-harness.mjs` Phase A–D 完全重复、产物不被冻结证据消费、仍走旧直连 Relay 拓扑且无任何调用方的 `scripts/candidate-orchestrator.mjs`。
 - **运行态呈现**："尚未发布配置"不再被头部健康指示器当成 Relay 故障（`unconfigured` 独立一档）；bundle 哈希缺失不再被判定为"未收敛"（契约中该字段可选，缺失应显示为 unknown）；轮询补上并发与乱序保护；补齐缺失的 `status.NOT_READY` 文案。
 - **测试质量**：`SystemPage`/`OverviewPage` 基线改为契约合法的 `dbHealth: OK` 与真 64 位十六进制哈希，并补齐"已收敛"分支覆盖；`HealthIndicator` 不再 mock 整个 composable；资格脚本的 cancel/客户端超时改为可证伪断言，adapter 身份不再由被测上游的 `server`/`via` 响应头决定。
+- **死代码与死文案**：删除只被自身测试引用、任何页面都未使用的 `console/src/stores/operationalApply.ts` 及其专属测试块；删除 64 个中英文均未引用的 i18n 键（en/zh 各 773 → 709，删除后仍逐键对称）。判定用真实语言模块的键集而非文本推断，因为该文件缩进不统一（`experience` 块为 1/2/4 空格混用），按缩进解析会得出错误结论。
 - **交付包收敛（高内聚低耦合）**：Android 导出不再内嵌 29 份架构文档正文，只保留客户端实际消费的 Client OpenAPI、Portal Bridge 契约、共享 fixtures、428 样例与接入说明；`api/fixtures/problem` 由整目录改为显式文件（Admin 专用的 `stale-draft-revision` 不再交付）。架构文档按文档名与章节引用，权威仍在其自有仓库。导出因此不再依赖任何兄弟仓库。
 - **校验层做减法**：移除 `atlas.sum` 与维护它的 `cmd/migration-checksum`、`make schema`/`schema-replay`、CI 的 Atlas 安装步骤；CI 不再执行 `make generate` 与 `generated-drift`（两者保留为本地命令）。导出包不再生成 `manifest.json`/`sourceHash`/`verify.mjs` 自校验层，包内容由生成脚本直接从源文件复制。`make ci` 现在只跑测试。这些比较曾需要工作区与生成环境逐字节一致（本地 41 个文件违反 `.gitattributes` 的 LF 规则即导致两次 CI 失败），维护成本高于其收益；相应的迁移验证改由真实 SQL 的 Go 测试承担。
 
@@ -62,7 +63,7 @@ Android 集成导出只含客户端实际消费的内容：可执行 Client Open
 | --- | --- |
 | Core backend | `go test ./... -count=1` 通过；`go vet ./...` 通过 |
 | Core candidate systems | `go test -tags=candidate ./test/system/scenarios/ -count=1 -timeout 15m` 通过；真实 Hub/Relay/SQLite + deterministic Adapter |
-| Core Admin | 21 个 Vitest 文件、138 项测试通过；`vue-tsc --noEmit` 与 Quasar production build 通过 |
+| Core Admin | 21 个 Vitest 文件、137 项测试通过；`vue-tsc --noEmit` 与 Quasar production build 通过 |
 | Core browser | `node scripts/e2e-harness.mjs` 通过 Admin authoring/publish、四类 runtime traffic、usage/system 和 topology security；System 页面在干净 Chromium 中没有页面脚本异常 |
 | Current schema | 空库应用唯一一份 SQL 的 Go 测试通过（应用、业务读写、重复初始化、失败事务回滚） |
 | Portal | 8 个 Vitest 文件、102 项测试和 2 项交付测试通过；format、remote/local production build 通过；6 项 Playwright（5 项 local + 1 项真实 Hub 生命周期）通过 |
@@ -105,7 +106,7 @@ S0.3 的 Enterprise Tool Gateway、Snapshot v5、真实生产 supervisor/package
 
 已将重复的 runtime-only 回放替换为固定 Core/architecture 提交的独立检出、锁定依赖安装、契约再生成、生产构建摘要核对和完整测试回放。失败停止并保留日志，不覆盖候选或既有证据；正式清单单独生成，校验候选字节摘要、重建 facts、全部必需步骤及其日志摘要。真实临时 Git 仓库测试验证工作树修改/私有文件不会进入检出，失败命令不会执行后续步骤。工具功能测试通过不代表本工作树已完成正式 C7；当前尚无满足全部固定来源及真实四能力 qualification 条件的新候选，完整 clean-source gate 未执行。具体命令见 [release](release.md)。
 
-测试上游身份摘要现覆盖完整 Go adapter/client 目录和浏览器测试上游源码，修复新增协议文件变化不影响旧三文件摘要的问题。工具测试共 16 项通过；检出测试额外验证源仓库 HEAD 已前进时仍取指定旧提交。删除约 600 行重复回放流程，复用完整浏览器 harness；本轮没有改变客户端 wire，也没有修改 Android。
+测试上游身份摘要现覆盖完整 Go adapter/client 目录和浏览器测试上游源码，修复新增协议文件变化不影响旧三文件摘要的问题。工具测试共 15 项通过；检出测试额外验证源仓库 HEAD 已前进时仍取指定旧提交。删除约 600 行重复回放流程，复用完整浏览器 harness；本轮没有改变客户端 wire，也没有修改 Android。
 
 ## S0.2 责任与交付复核
 

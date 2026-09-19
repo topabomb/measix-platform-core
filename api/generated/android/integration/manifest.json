@@ -3,7 +3,7 @@
   "snapshotSchemaVersion": 4,
   "bridgeVersion": 3,
   "localReadVersion": 2,
-  "sourceHash": "e6a20301cad14e6e0e1aa5981baedc6070200f0206962e3e3f0f2473f6bed78b",
+  "sourceHash": "e8d7213fae8717a8674f672a4f510237ee372f2fc884dfabe5ea7c892d682d52",
   "artifacts": {
     "measix-platform-core/api/fixtures/client-integration/bootstrap.json": "8e2ae3985f5224d4cbd2f0429f560070b3c3fe2908765e2fc18b30cabfedd840",
     "measix-platform-core/api/fixtures/client-integration/cases.json": "1a40f29be101faa14abb00af482d91d1723fe9fa0822c4f08471339a54b09c71",
@@ -33,19 +33,19 @@
     "measix-platform-core/api/fixtures/portal/local-context.json": "713fb7ee660c71b733adaf85e76ed9d3426b1f7c503dbd98715ad8870d0bb177",
     "measix-platform-core/api/fixtures/portal/native-vectors.json": "c0028a97e055df7870b0f4cd85f4d91a4e84c2b2f4ea2ef3cd7f5e602b25b74b",
     "measix-platform-core/api/fixtures/portal/session.json": "35605c0de9b7ff36edb65596b574025c87c8f0ef2313d0e232a046a8c3cbdb8c",
-    "measix-platform-core/api/fixtures/problem/managed-snapshot-required.json": "6e1aa871678ef4edca618c54d586fa6f742744545c3b4e17f19a0557a994a045",
-    "measix-platform-core/api/generated/android/client-control.openapi.yaml": "f154f15fb429bdbdc90139e77454df2374b5c3177787bd0b0818dba5ef139df3",
+    "measix-platform-core/api/fixtures/problem/managed-snapshot-required.json": "b86271cf56aa8a1e09aa17f7767ae12f3272b589a0a540327558584d75dffd15",
+    "measix-platform-core/api/generated/android/client-control.openapi.yaml": "25de7a694f306fe91ef49074ebc1255fd5ee1347a9e9041b1396eb1b101f1cf5",
     "measix-platform-core/api/generated/android/portal/cases.json": "11fd406efd93d48a4a24ee5100dcd890c9d124486c612c3ad683e6cab3cb82e8",
-    "measix-platform-core/api/generated/android/portal/client-feed.schemas.json": "685d6f017e2627f703bcdc7581201745a3167391490ccf281a3fddc765724412",
+    "measix-platform-core/api/generated/android/portal/client-feed.schemas.json": "27607302adf7c12940faf6881a4c6a244e80efde3795e2a6643970ba204f8294",
     "measix-platform-core/api/generated/android/portal/feed-vectors.json": "6c4545ffeb986bed9ee2b08226f239502262f843d99a6f3b78300a128629765e",
     "measix-platform-core/api/generated/android/portal/local-context.json": "713fb7ee660c71b733adaf85e76ed9d3426b1f7c503dbd98715ad8870d0bb177",
     "measix-platform-core/api/generated/android/portal/local-v1.json": "7f9b81d153b3b5394d54e74a1778138dabb486b7d423cba1e45c90babcf9e2b1",
-    "measix-platform-core/api/generated/android/portal/manifest.json": "0004b84b3b644a4e965727518748cd8e387d67dd7827a97620e8d1a55b386768",
+    "measix-platform-core/api/generated/android/portal/manifest.json": "5537ce6f9c437590ae57861e8a198deb789ded39b37f09c99d7d5a62b8e1bda5",
     "measix-platform-core/api/generated/android/portal/native-vectors.json": "c0028a97e055df7870b0f4cd85f4d91a4e84c2b2f4ea2ef3cd7f5e602b25b74b",
     "measix-platform-core/api/generated/android/portal/platform-v1.json": "3ac391412640d571dd03220fbfd88487e1d1e47a6b1d6f8a86ee09ae821d340a",
     "measix-platform-core/api/generated/android/portal/portal-contract.openapi.json": "f4748cccb1b74235df2d4bc4e6ae82bccfd9625ae5b9de3fb493dfa64e17a8aa",
     "measix-platform-core/docs/android-platform-integration.md": "3b9a25d494ab486dcb376f3998a4dc31bf290e4603d5520ef24aeea9ed799a34",
     "README.md": "fc9da99bdf0ac859829c2b5814c090e6c20a5020d9a723192e243251052f5a27",
-    "verify.mjs": "b49d1088063b46b51ff1a0b6f29d55d6ab1aeb6ff6cc54c2c7249f34c50841ba"
+    "verify.mjs": "b4b0c862ccbb40c059bbfd8157bea1cac6a66fd8de08c4ddac23b98b97f355a3"
   }
 }

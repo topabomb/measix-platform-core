@@ -4,16 +4,21 @@
 
 ## 权威与资料入口
 
-- [Control Protocol](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md)：§8 认证、§10 配置、§11 Runtime；协议语义有异议时回到此处。
-- [Experience Contract](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-enterprise-realm-experience-contract-spec.md)：企业配置与用户数据边界。
-- [阶段索引](../../measix-architecture/docs/measix-stage-document-index.md)：S0.2 范围与下游测试入口。
+语义权威在 `topabomb/measix-architecture`，本包不复制其正文，只按文档名与章节引用：
+
+- **Control Protocol**：§8 认证、§10 配置、§11 Runtime。协议语义有异议时以它为准。
+- **Enterprise Realm / Experience Contract**：企业配置与用户数据边界。
+- **阶段阅读清单 `measix-stage-document-index.md`**：S0.2 范围与下游测试入口。
+
+本包内的可执行与样例资料：
+
 - [Android 可执行 OpenAPI](../api/generated/android/client-control.openapi.yaml)：已展开外部依赖；HTTP 请求、响应、enum 的唯一可执行结构来源。
 - [共享接入资料](../api/fixtures/client-integration/cases.json)、[HTTP 时序示例](../api/fixtures/client-integration/http-examples.json)、[完整 Snapshot](../api/fixtures/client-integration/snapshot-v4.json)、[全部禁止策略](../api/fixtures/client-integration/snapshot-v4-denied.json)、[语义反例](../api/fixtures/client-integration/reference-cases.json)。
 - [接入材料正反例](../api/fixtures/enrollment/cases.json)、[原生 Bridge 正反例](../api/fixtures/portal/native-vectors.json)、[Feed 正反例](../api/fixtures/portal/feed-vectors.json)。
 
-资料由 `cmd/generate-client-fixtures` 调用真实 Snapshot compiler 生成，输入 `api/fixtures/draft/s02-client-profile.json` 是公开资源投影配方，bindings 为空，不是可直接发布的运营草稿。真正发布还需管理员配置私有 Upstream/Secret/Binding 并通过发布验证。合成令牌、接入码、时间和 ID 只用于测试，不能用于服务器登录。Canonical hash 由 core 当前 `capability.HashSnapshot` 复算验证；客户端按 Control Protocol §10.13 校验 ETag/body.snapshotHash 一致性，不另造 JSON canonicalization。文件 SHA-256 与 Snapshot hash 是不同概念。
+样例由 `cmd/generate-client-fixtures` 调用真实 Snapshot compiler 生成，输入是公开的资源投影配方，bindings 为空，不是可直接发布的运营草稿（真正发布需管理员配置私有 Upstream/Secret/Binding）。合成令牌、接入码、时间和 ID 只用于测试，不能用于服务器登录。Canonical hash 由 core 当前 `capability.HashSnapshot` 复算验证；客户端按 Control Protocol §10.13 校验 ETag/body.snapshotHash 一致性，不另造 JSON canonicalization。文件 SHA-256 与 Snapshot hash 是不同概念。
 
-独立包 `api/generated/android/integration` 包含本说明、所需 schema/fixtures 和架构文档。把整个目录复制出去即可执行 `node verify.mjs --verify .`；不需要兄弟仓库。manifest 摘要覆盖原始文件字节，任何漏文件、额外文件、修改或非法路径均失败。包是工作树候选，不能将 sourceHash 当成 Git commit。
+独立包 `api/generated/android/integration` 只含本说明、可执行 OpenAPI 与客户端消费的 schema/fixtures；不含架构文档正文，也不含 Core 测试源码。把整个目录复制出去即可执行 `node verify.mjs --verify .`，不需要任何兄弟仓库。manifest 摘要覆盖原始文件字节，任何漏文件、额外文件、修改或非法路径均失败。包是工作树候选，不能将 sourceHash 当成 Git commit。
 
 ## Android 消费模型映射
 
@@ -99,17 +104,15 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 
 Direct MCP 的平台路由允许 `POST`、`GET`、`DELETE` 到 Snapshot 给出的同一 `runtimePath`；Android 保留上游会话 header。GET 事件流是服务端可选能力，上游返回 405 应按“不提供该流”处理；不应收到 Core 的 `ROUTE_POLICY_DENIED` 403。会话终止时的 DELETE 结果依上游会话状态处理，不把无 Session ID 时的 400 误判为平台拦截。
 
-第 5 版百炼 HTTP ASR 的协议客户端和按当前 Android 编码构造的已知有效 WAV 请求都返回 200。模拟器另一次约 631.5 KiB 的录音请求由 Relay 转发后收到百炼 400、响应 `{}`；这不是 Core 拒绝。相同 WAV 结构、24 kHz 单声道、8 秒纯静音 PCM 的对照请求也复现 400，而语言提示有无均不影响有声样本成功。设备维护方应核查这次录音期间 RMS、WAV 头、实际采样率/声道/时长和 PCM 非零样本数；用有声录音复测，必要时同一录音直连与 Relay 对照，再将设备级识别计为通过。当前不能仅凭平台编码单测或已知有效样本 200 推断所有设备录音可用。
+`DASHSCOPE_HTTP_ASR` 的协议客户端请求与按当前 Android 编码构造的有效 WAV 均已返回 200，但**设备录音是否普遍可用尚未确认**：一次模拟器录音经 Relay 转发后收到上游 400（同结构的纯静音 PCM 也能复现 400），这不是 Core 拒绝。设备维护方需核查录音的 RMS、WAV 头、实际采样率/声道/时长与非零样本数，用有声录音复测后再把设备级识别计为通过；不能仅凭平台编码单测或已知有效样本 200 推断所有设备录音可用。
 
 完整 428 body 使用 [现行 Problem 样例](../api/fixtures/problem/managed-snapshot-required.json)。这些是请求构造示例，不声称合成 profile 已取得真实供应商资格认证。
 
 ## 验证职责与交接清单
 
-共享样例 `snapshot-v4-speech.json` 经真实编译器输出四种语音服务（含 MiMo 标准/音色设计），默认选择系统朗读、个人 TTS 准入关闭；`snapshot-v4-asr.json` 覆盖四种 ASR，新增 `DASHSCOPE_HTTP_ASR` 的明确请求示例在 `runtime-examples.json`。模型的 Responses/Gemini/Claude 样例分别独立生成。Android 应对所有样例补候选校验、映射和执行分派测试，再做设备消费验收；上游资料更新不表示原生接线已经完成。
+共享样例覆盖当前全部能力：`snapshot-v4.json`（基础）、`snapshot-v4-responses/gemini/claude.json`（三种模型协议）、`snapshot-v4-speech.json`（四种 TTS，默认系统朗读、个人 TTS 准入关闭）、`snapshot-v4-asr.json`（四种 ASR）、`snapshot-v4-denied.json`（全部策略禁止）。请求构造示例见 `http-examples.json` 与 `runtime-examples.json`。Android 应对全部样例补候选校验、映射和执行分派测试，再做设备消费验收；上游资料更新本身不表示原生接线已完成。
 
-2026-09-19 只读核对 Android 工作树：`PlatformWire.kt` 和 `PlatformSnapshotMapper.kt` 已识别 `DASHSCOPE_HTTP_ASR`，`EnterpriseSpeechDefinition.kt` 已分派到文件识别，`FileTranscription.kt` 构造 WAV Data URI 并解析 `output.text`，`PlatformSpeechProtocolTest.kt` 有平台路由请求样例。这些是源码与自动化测试证据，仍需维护方消费本次更新的共享包，执行设备上第 5 版同步/回报 applied，并实际验证 DeepSeek/Qwen 模型、MiMo TTS、百炼 ASR 与 Firecrawl MCP。`policy.defaultAssistantId` 已在 Android Mapper 映射至 EnterpriseDefaults.assistantId；无用户选择时的实际进入空间/会话行为仍须设备确认。Core 不修改 Android 仓库。
-
-上游已具备的测试入口：`contract` 读取同一共享 schema/fixtures 并复算 Snapshot hash；`httpapi.TestClientIntegrationPendingSnapshotAndLogout` 使用真实身份/SQLite/HTTP 验证 pending、应用后状态、200/304、404 与撤销；`identity` 验证轮换幂等、并发、重建服务后的恢复、idle 与退出隔离；`relay` 验证 generation barrier、transport、取消和流式转发。`scripts/export-client-integration.test.mjs` 把包复制到独立目录执行摘要校验并注入篡改/多余路径。
+上游协议证据入口在 Core 源码仓库，不在本包内：`contract` 复算 Snapshot hash；`httpapi/client_integration_test.go` 用真实身份/SQLite/HTTP 验证 pending、应用后状态、200/304 与撤销；`identity` 验证轮换幂等、并发与退出隔离；`relay` 的 `model_tool_roundtrip_test.go`、`provider_protocol_test.go`、`mcp_session_test.go`、`websocket_test.go` 覆盖四协议工具往返与 429、供应商认证边界、完整 MCP 会话以及握手/帧/超时/取消/准入。这些是上游证据，不替代 Android 设备验收；供应商付费账户权限与真实生成质量另行验证。
 
 Android 维护方按以下顺序实施，本批不修改 Android 仓库：
 
@@ -119,8 +122,6 @@ Android 维护方按以下顺序实施，本批不修改 Android 仓库：
 4. 四模型分别验收文本流及工具往返；四 TTS 验收播放、停止和切换；三 ASR 验收录音、转写和取消。SYSTEM_TTS 在个人 TTS 禁止时仍能作为企业默认服务运行。工具结果保留 ID/签名，不重发已执行工具。
 5. Direct MCP 使用企业资源和助手 mcpServerIds；初始化、通知、发现、调用、会话头与 GET/DELETE 按当前协议。Firecrawl 可先使用官方免密钥 `/v2/mcp`、authOwnership=NONE；企业 Bearer 方案由服务端配置。Gateway 不在本批范围。
 6. 复用现有 Portal/退出 owner 完成远端站点、媒体、旧文档接收器清理；用导出 manifest/sourceHash 关联真实 Hub、设备和原生构建证据。进程死亡、WebView、相机/麦克风和播放体验由 Android 设备验收，浏览器与本地协议测试不替代。
-
-Core 源码仓库中的可复用验证入口包括 `relay/model_tool_roundtrip_test.go`（四协议工具往返原样转发与 429）、`provider_protocol_test.go`（供应商认证边界）、`mcp_session_test.go`（完整会话）、`websocket_test.go`（握手、帧、超时、取消与准入）。独立资料包交付协议、样例与 Portal 资源，不包含这些测试源码或运行环境。供应商付费账户权限、真实生成质量及 Android 真机消费必须分别验证。
 
 ## 公共 HTTP/IP 与应用报告：本次适配顺序
 

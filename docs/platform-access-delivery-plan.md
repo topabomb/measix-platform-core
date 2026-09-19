@@ -22,6 +22,6 @@
 | 应用报告 | `identity/applied.go`、当前 Session schema/初始化 SQL、Admin/Client OpenAPI；同一环境两次页面发布观察未知→已应用→待更新→已应用，Hub 重启后报告仍在；自动回归覆盖不续期、重复、错误 hash、回退、撤销、新 Session 和过期 |
 | 管理界面 | HTTP/IP 真实页面创建成员、生成材料、创建/测试/应用上游、编辑全部资源类别/助手/种子/入口/策略/默认项，再验证、审查、发布；System/Users/Releases 组件测试及重建后页面复验 |
 | 唯一实现 | 旧 Portal origin 配置和命令别名已移除；只有一份当前初始化 SQL，无增量转换。旧错误生成目录无源码；清理过时 Android 状态/包记录与 wss-only 交接描述；源码搜索无历史兼容路径，框架 `legacy: false` 不是业务兼容 |
-| 交接与构建 | 全量 Go/vet、Admin 128、Portal 103、生产 Portal 6 项浏览器回归；生成代码/正反例与当前源同步。独立包 150 文件摘要、Core 72 文件独立校验及接入说明 13 个本地链接验证通过；Android 顺序、字段、报告和网络要求见 `android-platform-integration.md` |
+| 交接与构建 | 全量 Go/vet、Admin、Portal 单元与生产浏览器回归；生成代码/正反例与当前源同步。交接包逐文件摘要校验与接入说明本地链接检查通过（文件清单以 `api/generated/android/integration/manifest.json` 为准，不在本文固定数量）；Android 顺序、字段、报告和网络要求见 `android-platform-integration.md` |
 
 验证范围：管理员人工浏览器操作使用普通 HTTP/IP；HTTPS 使用真实 TLS 协议测试，未绕过证书验证。上游资源执行使用确定性的合成服务，不表示真实厂商生成质量；Android 保持只读，其原子提交、自动同步和硬件执行由维护方完成设备验收。正式阶段门禁中要求的 HTTPS 浏览器人工证据及 clean-source/Freeze 仍按各自门禁收集，不由本轮协议测试冒充。

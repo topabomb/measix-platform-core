@@ -6,15 +6,21 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(import.meta.dirname, '..')
 const PARENT = resolve(ROOT, '..')
 const OUTPUT = resolve(ROOT, 'api/generated/android/integration')
+// Only materials the client actually consumes: the executable control contract,
+// the Portal bridge contract, the shared fixtures and the handoff guide. The
+// architecture documents stay authoritative in their own repository and are
+// referenced by name; vendoring them here would duplicate authority and force
+// this export to track a second repository.
+// `problem` is a single file because the other problem fixture belongs to the
+// Admin API, which no client calls.
 const INPUTS = [
   'measix-platform-core/api/generated/android/client-control.openapi.yaml',
   'measix-platform-core/api/generated/android/portal',
   'measix-platform-core/api/fixtures/client-integration',
   'measix-platform-core/api/fixtures/enrollment',
   'measix-platform-core/api/fixtures/portal',
-  'measix-platform-core/api/fixtures/problem',
+  'measix-platform-core/api/fixtures/problem/managed-snapshot-required.json',
   'measix-platform-core/docs/android-platform-integration.md',
-  'measix-architecture/docs',
 ]
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 function files(path) {

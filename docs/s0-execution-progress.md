@@ -11,6 +11,7 @@
 - **浏览器 harness**：Phase B 四类能力流量失败现在是门禁失败而非 WARNING；用量等待登录失败不再静默返回；Playwright 报告缺失或无法解析时不再把陈旧产物当作本次证据。删除与 `e2e-harness.mjs` Phase A–D 完全重复、产物不被冻结证据消费、仍走旧直连 Relay 拓扑且无任何调用方的 `scripts/candidate-orchestrator.mjs`。
 - **运行态呈现**："尚未发布配置"不再被头部健康指示器当成 Relay 故障（`unconfigured` 独立一档）；bundle 哈希缺失不再被判定为"未收敛"（契约中该字段可选，缺失应显示为 unknown）；轮询补上并发与乱序保护；补齐缺失的 `status.NOT_READY` 文案。
 - **测试质量**：`SystemPage`/`OverviewPage` 基线改为契约合法的 `dbHealth: OK` 与真 64 位十六进制哈希，并补齐"已收敛"分支覆盖；`HealthIndicator` 不再 mock 整个 composable；资格脚本的 cancel/客户端超时改为可证伪断言，adapter 身份不再由被测上游的 `server`/`via` 响应头决定。
+- **交付包收敛（高内聚低耦合）**：Android 导出不再内嵌 29 份架构文档正文，只保留客户端实际消费的 Client OpenAPI、Portal Bridge 契约、共享 fixtures、428 样例与接入说明；`api/fixtures/problem` 由整目录改为显式文件（Admin 专用的 `stale-draft-revision` 不再交付）。架构文档按文档名与章节引用，权威仍在其自有仓库。导出因此**不再依赖任何兄弟仓库**：在架构仓库不可见的条件下完整 `generate` 链已实测通过，`make clean-replay` 之外的门禁不再需要第二个仓库。新增测试固定该边界（包内不得出现 `measix-architecture/**`、说明的本地链接必须在包内可解析）；`export-client-integration.test.mjs` 与 `scenario-definitions.test.mjs` 首次接入 CI 工具测试集。
 
 ## 最新真实供应商实验与 Android 交接
 
@@ -52,7 +53,7 @@ MEASIX 从未发布。Snapshot v4、Bridge v3、local-read v2、Enrollment forma
 | Core current-only cleanup | 删除旧的本地 diff 路径猜测、772 行重复 E2E、不可工作的 `freeze-gate` wrapper、旧 browser/schema 命令别名和迁移措辞；schema 工具只接受一份当前 SQL并拒绝增量历史 |
 | Portal | 继续使用独立仓库和同一当前 Feed/Bridge 合同；远端与 bundled local 生产构建重新生成。Portal 不拥有 Managed 配置编辑，Core Admin 不复制 Portal 工作台 |
 
-Android 集成导出包含 72 个内容文件及 manifest，当前 sourceHash 以 `api/generated/android/integration/manifest.json` 为准。导出校验拒绝错误协议版本、漏文件、多余文件、篡改和路径逃逸。
+Android 集成导出只含客户端实际消费的内容：可执行 Client OpenAPI、Portal Bridge 契约、共享 fixtures、428 问题样例与接入说明；不内嵌架构文档正文，也不含 Core 测试源码。文件清单与 sourceHash 以 `api/generated/android/integration/manifest.json` 为准，不在本文重复固定数量。导出校验拒绝错误协议版本、漏文件、多余文件、篡改和路径逃逸；收包方复制目录后 `node verify.mjs --verify .` 不需要任何兄弟仓库。
 
 ## 本轮验证
 
@@ -144,7 +145,7 @@ S0.3 的 Enterprise Tool Gateway、Snapshot v5、真实生产 supervisor/package
 | 三种 ASR | HTTP multipart、OpenAI/DashScope WebSocket 参数、事件、取消和关闭握手 | 合成音频与转写；不声明真实识别准确率 |
 | Firecrawl Direct MCP | 真实免密钥服务 initialize、通知、工具列表与公开页面抓取；助手引用 | 不包含 Gateway 或付费账户资格 |
 | 助手、记忆种子、入口、策略、动态、Portal | 当前 Snapshot/Feed/Bridge、编译/发布测试、Portal 单元与真实 Hub 浏览器回归 | 本域记忆、聊天隔离和硬件属于 Android |
-| 可独立交给 Android 的协议与静态包 | 接入说明的六步实施清单；150 文件 Portal 包、内含 72 文件 Core 资料；再次逐文件比对包及现存源码无差异 | sourceHash 是工作树身份；不是冻结提交 |
+| 可独立交给 Android 的协议与静态包 | 接入说明的六步实施清单；Portal 交接包内含本仓库导出的 Client 资料，文件清单以 `api/generated/android/integration/manifest.json` 为准；逐文件比对包及现存源码无差异 | sourceHash 是工作树身份；不是冻结提交 |
 | 当前唯一版本、清除无意义旁路 | 单一初始化 SQL、严格当前 Snapshot、删除旧 diff/重复流程/误导测试命名 | 两份误生成的 `backend/backend/internal/wire/{adminapi,clientapi}/*.gen.go` 已由用户删除，重新检查均不存在；正常生成源码保留 |
 
 下一步交接应直接使用 [Android 实施清单](android-platform-integration.md#验证职责与交接清单)，而不是让 Android 猜测资源协议或上游密钥。Android 维护方正在独立接入 Platform source，应使用当前工作区实现核对交接，不能把本轮上游交付说成 Android 已接通。正式阶段 Freeze 与设备验收继续按原门禁执行。

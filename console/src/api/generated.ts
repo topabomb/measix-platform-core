@@ -1463,7 +1463,7 @@ export interface components {
             timezone: string;
             /**
              * Format: uri
-             * @description Canonical external HTTP or HTTPS origin advertised to clients. It may be changed at runtime; changing it revokes Portal sessions but does not configure DNS, TLS or ingress and does not migrate already-enrolled client authorities.
+             * @description Canonical external HTTP or HTTPS enterprise address advertised to clients. It may be changed at runtime without changing Deployment, User, Device or Android Session identity. Changing it revokes only existing Portal browser sessions and does not configure DNS, TLS or ingress.
              */
             publicOrigin: string;
             /** Format: date-time */
@@ -1473,7 +1473,10 @@ export interface components {
             /** Format: date-time */
             expectedUpdatedAt: string;
             name: string;
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description Operator-supplied HTTP or HTTPS enterprise address. Core canonicalizes it before comparison and persistence; a value equivalent to the current canonical origin is a no-op.
+             */
             publicOrigin: string;
         };
         Health: {

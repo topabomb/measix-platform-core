@@ -52,8 +52,12 @@ type RuntimeOptions struct {
 
 func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) {
 	cfg := options.Config
-	if cfg.PublicOrigin != "" && identity.ValidatePublicOrigin(cfg.PublicOrigin) != nil {
-		return nil, fmt.Errorf("invalid platform public origin")
+	if cfg.PublicOrigin != "" {
+		canonicalOrigin, err := identity.CanonicalPublicOrigin(cfg.PublicOrigin)
+		if err != nil {
+			return nil, fmt.Errorf("invalid platform public origin")
+		}
+		cfg.PublicOrigin = canonicalOrigin
 	}
 	if cfg.PortalAssetsDir != "" {
 		info, err := fs.Stat(os.DirFS(cfg.PortalAssetsDir), "index.html")

@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -13,20 +14,50 @@ import (
 	"measix/platform/internal/wire/clientapi"
 )
 
-// ValidatePublicOrigin accepts one canonical origin, never a request-controlled URL.
-func ValidatePublicOrigin(raw string) error {
-	u, err := url.Parse(raw)
-	if err != nil || u.Hostname() == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.ForceQuery || strings.Contains(raw, "#") || u.Opaque != "" {
-		return ErrInvalidInput
+// CanonicalPublicOrigin validates an operator-supplied public address and
+// returns the one value persisted and projected by Core.
+func CanonicalPublicOrigin(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Hostname() == "" || strings.HasSuffix(u.Host, ":") || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Opaque != "" {
+		return "", ErrInvalidInput
 	}
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return ErrInvalidInput
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "https" && scheme != "http" {
+		return "", ErrInvalidInput
 	}
-	if port := u.Port(); port != "" {
+	port := u.Port()
+	if port != "" {
 		number, err := strconv.Atoi(port)
 		if err != nil || number < 1 || number > 65535 {
-			return ErrInvalidInput
+			return "", ErrInvalidInput
 		}
+		if (scheme == "http" && number == 80) || (scheme == "https" && number == 443) {
+			port = ""
+		} else {
+			port = strconv.Itoa(number)
+		}
+	}
+	hostname := strings.ToLower(u.Hostname())
+	if ip := net.ParseIP(hostname); ip != nil {
+		hostname = ip.String()
+	} else if strings.Contains(hostname, ":") {
+		return "", ErrInvalidInput
+	}
+	host := hostname
+	if strings.Contains(hostname, ":") {
+		host = "[" + hostname + "]"
+	}
+	if port != "" {
+		host = net.JoinHostPort(hostname, port)
+	}
+	return scheme + "://" + host, nil
+}
+
+// ValidatePublicOrigin accepts only the canonical value used by runtime state.
+func ValidatePublicOrigin(raw string) error {
+	canonical, err := CanonicalPublicOrigin(raw)
+	if err != nil || canonical != raw {
+		return ErrInvalidInput
 	}
 	return nil
 }

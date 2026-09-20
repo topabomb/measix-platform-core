@@ -8,6 +8,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import SettingsPage from './SettingsPage.vue'
 import { useSessionStore } from '../stores/session'
 import * as client from '../api/client'
+import en from '../i18n/locales/en'
 
 function mountPage() {
   const pinia = createPinia()
@@ -84,6 +85,10 @@ describe('SettingsPage', () => {
     await flushPromises()
 
     expect(wrapper.findComponent(QDialog).props('modelValue')).toBe(true)
+    expect(wrapper.text()).toContain('Enterprise address')
+    expect(en.settings.confirmOriginClients).toContain('identity, user, device and Android session stay unchanged')
+    expect(en.settings.confirmOriginClients).not.toContain('not migrated')
+    expect(en.settings.confirmOriginClients).not.toContain('re-enroll')
     expect(vi.mocked(client.apiFetch).mock.calls.filter(entry => (entry[1] as RequestInit | undefined)?.method === 'PUT')).toHaveLength(0)
   })
 })

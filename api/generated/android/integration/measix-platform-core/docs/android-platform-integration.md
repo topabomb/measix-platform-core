@@ -48,7 +48,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 
 | 平台字段/事实 | 当前 Android 模型处理 |
 | --- | --- |
-| 已验证的 HTTP/HTTPS origin + deploymentId | 绑定 EnterpriseAuthority。规范化 origin（scheme/host/port），保存可信平台来源；sourceNamespace 使用现有 `platform:` 命名空间机制。展示名、令牌轮换不改变来源；另一个 origin 不能因同名/同 deploymentId 自动合并 |
+| deploymentId + userId | `deploymentId` 是企业身份，`deploymentId + userId` 是企业用户数据范围。HTTP/HTTPS origin 只由当前 Enterprise Session 作为可变连接参数持有，不参与 Realm、配置 scope、资源引用或本机数据归属。修改地址时必须在候选 origin 上核对同一 deploymentId 和当前 Session 的 userId/deviceId/sessionId；不同 deploymentId 明确拒绝 |
 | userId/deviceId/sessionId | 用户域归属与认证会话分别保存；重登可以同 user/device，但必须采用服务端新 Session，不复活旧文档或旧任务 |
 | managedGeneration / releaseId / snapshotHash | generation 映射 EnterpriseConfiguration.generation；同时保存用于一致性验证的 release/hash，整个候选验证后原子替换 |
 | Provider.providerId/displayName/clientProtocol/enabled | 适配层保留 Provider 与协议元信息；现有 EnterpriseModel 没有完整 Provider 表，不能丢失后猜测协议。禁用 Provider 下的资源不可执行 |
@@ -61,7 +61,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | ASR.asrId/displayName/upstreamModelKey/language/clientProtocol | 保留资源身份、模型及可选语言；按 clientProtocol 分派 OpenAI multipart、DashScope HTTP JSON、OpenAI Realtime 或 DashScope Realtime。实时参数按当前协议映射，不把 WebSocket 转成文件上传 |
 | MCP.mcpServerId/displayName/enabled/authOwnership | EnterpriseMcpResource.id/name/enabled；适配层保留 MCP_STREAMABLE_HTTP、runtimePath 和实际 authOwnership（ENTERPRISE_MANAGED 或 NONE）；均使用 Relay，无 OAuth/上游凭据下发 |
 | Assistant.assistantDefinitionId/displayName/description/modelId/systemPrompt/mcpServerIds/enabled | EnterpriseAssistant 对应字段；缺省 description 可展示为空字符串；引用的 modelId 是平台稳定 ID，不是请求模型名 |
-| Assistant.memorySeed[] | 按作者顺序转换为只读 Seed。内部 ID 从当前 authority、助手 ID、generation、索引确定；空数组有效，条目不得为空白。不按内容去重、不建立可变 Assistant Memory 副本，配置替换时整体换代 |
+| Assistant.memorySeed[] | 按作者顺序转换为只读 Seed。内部 ID 从 deploymentId、助手 ID、generation、索引确定；空数组有效，条目不得为空白。不按内容去重、不建立可变 Assistant Memory 副本，配置替换时整体换代 |
 | Starter.starterId/assistantDefinitionId/title/prompt/description/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击只进入原生输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
 | policy 五项 allowLocal* | EnterprisePolicy 五项必填 Boolean；缺失/null/错误类型均拒绝。只控制本企业域内用户原配置准入，不复制用户定义、端点和密钥 |
 | defaultModelId/defaultTtsId/defaultAsrId/defaultAssistantId | defaults.chatModelId/ttsId/asrId/assistantId；显式无效引用不回退首项。没有用户已选助手时采用 defaultAssistantId；用户已选助手失效时呈现选择与修复入口，不静默改选默认助手。未提供的默认值保持未指定，由既有本域选择规则处理 |

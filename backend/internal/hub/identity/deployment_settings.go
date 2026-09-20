@@ -32,10 +32,11 @@ func (s *Service) DeploymentSettings(ctx context.Context) (DeploymentSettingsVie
 // and the fixed budget timezone remain startup-owned settings.
 func (s *Service) UpdateDeploymentSettings(ctx context.Context, name, publicOrigin string, expectedUpdatedAt time.Time, actorUserID string) (DeploymentSettingsView, error) {
 	name = strings.TrimSpace(name)
-	publicOrigin = strings.TrimSpace(publicOrigin)
-	if name == "" || utf8.RuneCountInString(name) > 120 || ValidatePublicOrigin(publicOrigin) != nil || expectedUpdatedAt.IsZero() || actorUserID == "" {
+	canonicalOrigin, originErr := CanonicalPublicOrigin(publicOrigin)
+	if name == "" || utf8.RuneCountInString(name) > 120 || originErr != nil || expectedUpdatedAt.IsZero() || actorUserID == "" {
 		return DeploymentSettingsView{}, ErrInvalidInput
 	}
+	publicOrigin = canonicalOrigin
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
 		return DeploymentSettingsView{}, err

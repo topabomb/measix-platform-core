@@ -106,6 +106,36 @@ func TestPublicOriginPolicy(t *testing.T) {
 	}
 }
 
+func TestCanonicalPublicOrigin(t *testing.T) {
+	for _, test := range []struct {
+		raw  string
+		want string
+	}{
+		{raw: " HTTPS://Core.Example.COM:443/ ", want: "https://core.example.com"},
+		{raw: "http://Core.Example.COM:80/", want: "http://core.example.com"},
+		{raw: "http://Core.Example.COM:080/", want: "http://core.example.com"},
+		{raw: "https://Core.Example.COM:9443", want: "https://core.example.com:9443"},
+		{raw: "https://Core.Example.COM:09443", want: "https://core.example.com:9443"},
+		{raw: "http://[2001:DB8::1]:80/", want: "http://[2001:db8::1]"},
+		{raw: "http://[2001:0DB8:0000:0000:0000:0000:0000:0001]/", want: "http://[2001:db8::1]"},
+	} {
+		t.Run(test.raw, func(t *testing.T) {
+			got, err := identity.CanonicalPublicOrigin(test.raw)
+			if err != nil || got != test.want {
+				t.Fatalf("CanonicalPublicOrigin(%q) = %q, %v; want %q", test.raw, got, err, test.want)
+			}
+			if err := identity.ValidatePublicOrigin(got); err != nil {
+				t.Fatalf("canonical origin rejected: %v", err)
+			}
+		})
+	}
+	for _, raw := range []string{"", "http://platform.example:", "http://platform.example/path", "https://user@platform.example", "https://platform.example?x=1", "https://platform.example#x"} {
+		if got, err := identity.CanonicalPublicOrigin(raw); err == nil {
+			t.Fatalf("unsafe origin %q canonicalized to %q", raw, got)
+		}
+	}
+}
+
 func TestPortalGrantRequiresServedStaticArtifact(t *testing.T) {
 	ctx := context.Background()
 	st := testutil.OpenStore(t)

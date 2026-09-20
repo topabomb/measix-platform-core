@@ -1770,7 +1770,7 @@ type DeploymentSettings struct {
 	// Name Human-facing enterprise name shown to enrolled users and Portal sessions.
 	Name string `json:"name"`
 
-	// PublicOrigin Canonical external HTTP or HTTPS origin advertised to clients. It may be changed at runtime; changing it revokes Portal sessions but does not configure DNS, TLS or ingress and does not migrate already-enrolled client authorities.
+	// PublicOrigin Canonical external HTTP or HTTPS enterprise address advertised to clients. It may be changed at runtime without changing Deployment, User, Device or Android Session identity. Changing it revokes only existing Portal browser sessions and does not configure DNS, TLS or ingress.
 	PublicOrigin string `json:"publicOrigin"`
 
 	// Timezone Fixed deployment IANA timezone. Changing it at runtime would alter natural budget periods and is intentionally not mutable in this API.
@@ -2394,7 +2394,9 @@ type TtsId = string
 type UpdateDeploymentSettingsRequest struct {
 	ExpectedUpdatedAt time.Time `json:"expectedUpdatedAt"`
 	Name              string    `json:"name"`
-	PublicOrigin      string    `json:"publicOrigin"`
+
+	// PublicOrigin Operator-supplied HTTP or HTTPS enterprise address. Core canonicalizes it before comparison and persistence; a value equivalent to the current canonical origin is a no-op.
+	PublicOrigin string `json:"publicOrigin"`
 }
 
 // UpdateEnterpriseUpdateRequest defines model for UpdateEnterpriseUpdateRequest.

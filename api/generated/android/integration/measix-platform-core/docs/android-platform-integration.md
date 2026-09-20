@@ -26,7 +26,7 @@
 
 可以开始当前 v4 的真实平台适配与联调，依据 Foundation Contract §3；无需等待 Gateway 或把正式 S0.4 Freeze 当成 Runtime 开关。当前 Hub/Relay 没有“尚未 Freeze 禁止调用”的分支。正式阶段通过仍须完整门禁，不能用本地联调替代。
 
-企业域复用 Android 现有聊天、流式输出、推理展示、工具循环、图片理解、朗读、录音转写、助手、对话和本域记忆 owner。平台改变资源来源、认证、准入和归属，不应另造一个删减的聊天运行器。图片理解须同时满足资源声明 IMAGE、上游模型支持和原生编码；平台不提供图片生成或 Embedding 资源，亦不提供云端对话/附件同步。个人原配置和数据不被企业配置覆盖。
+企业域复用 Android 现有聊天、流式输出、推理展示、工具循环、图片理解、图片生成、朗读、录音转写、助手、对话和本域记忆 owner。平台改变资源来源、认证、准入和归属，不应另造一个删减的聊天或媒体运行器。图片理解须同时满足模型资源声明 IMAGE、上游模型支持和原生编码；图片生成使用独立 `img_*` 资源和现有 `ImageGenerationCoordinator` / `GeneratedMediaStore`，不伪装为聊天 Model。平台不提供 Embedding 资源，也不提供云端对话/附件同步。个人原配置和数据不被企业配置覆盖。
 
 | 可能阻止使用的条件 | 本轮明确的处理方式 |
 | --- | --- |
@@ -34,7 +34,7 @@
 | 手机不能访问开发电脑的 127.0.0.1 | 配置手机可达的 HTTP 或 HTTPS 统一公共入口（域名或 IP 均可），Hub PublicOrigin 保持相同；Discovery/Client/Runtime/Portal 都从该 origin 访问。具体 ingress 配置由 Core operations 文档维护 |
 | 当前预览上游是合成服务 | 它只证明协议和转发；真实使用须在 Admin 配置实际供应商/CLIProxyAPI 地址、模型、凭据并应用、发布。客户端不接收企业密钥，不能把合成回复当成真实生成 |
 | 五项 allowLocal* 为 false | 这是禁止企业域使用用户自带配置，不是禁用企业下发的资源。需要混用时由管理员启用对应策略并发布，不能由客户端越权绕过 |
-| 辅助功能没有选中的可用资源 | title/fast/compress 等槽位沿用本域选择规则；不要引用个人域中已被策略禁止的资源，也不要要求 Snapshot 存在未定义的额外默认字段。选择合适的可用企业模型；图片生成没有企业模型时明确不可用 |
+| 辅助功能没有选中的可用资源 | title/fast/compress 等槽位沿用本域选择规则；不要引用个人域中已被策略禁止的资源，也不要要求 Snapshot 存在未定义的额外默认字段。图片生成使用可选 `policy.defaultImageGenerationId`；未设置、资源禁用或显式引用失效时明确不可用，不静默切换到另一资源 |
 | 401、403、428 或配置尚未发布 | 按认证/撤销/原子同步语义恢复并给出可理解状态。仅有明确未转发保证的请求可重新准入；不能自动重发已执行工具。管理员先发布一个有效 Release 并确认 Relay 已应用 |
 | 大图片、长录音、供应商限流或超时 | 当前 Hub 编译 Runtime 请求上限为 10 MiB；HTTP 按请求体、WebSocket 按连接累计客户端帧字节计数，base64/JSON 也计入。客户端应在编码后控制大小，采用有界录音会话，超限明确提示重新录制/压缩；不得静默截断或无限重试。Upstream 路由超时需按实际供应商配置，429/供应商容量限制不能靠协议适配消除 |
 
@@ -55,6 +55,8 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | Model.modelId / upstreamModelKey | 前者是稳定平台资源 ID，映射 EnterpriseModel.id；后者映射其请求模型名 modelId，写到请求 body 的 model。不能互换 |
 | Model.displayName/modalities/capabilities | name 与显式 enum 映射。S0.2 为 CHAT；不映射成图片生成/附件等未声明 profile。未知 enum 拒绝候选，不能默认为普通文本模型 |
 | Provider.clientProtocol + Model.runtimePath | 保存在平台运行适配配置中，决定公开 Relay URL 与请求 profile；不塞入本地私有 binding，也不向用户存储注入企业上游地址/密钥 |
+| ImageGeneration.imageId/displayName/upstreamModelKey | 保持独立 `img_*` 企业资源身份；Android 只在统一图片选择目录中投影为 IMAGE 项，请求 body 的 `model` 使用 upstreamModelKey。不得并入 Provider/Model 表或借用 `mdl_*` |
+| ImageGeneration.clientProtocol/runtimePath/maxImagesPerRequest/allowedSizes | 当前只接受 `OPENAI_IMAGES_GENERATIONS` 同步 text-to-image。执行固定到该资源的 Relay 路径，发出 `model/prompt/n/size`；Android 在排队与每次外部请求前复验数量和尺寸，禁止参考图、编辑、mask、multipart、partial、stream 与异步任务 |
 | TTS.ttsId/displayName/clientProtocol | 保留企业资源身份，按 Control Protocol §10.5 显式分派四种语音执行方式。现有企业 OpenAI 专用通道需扩展，不能按模型名猜协议 |
 | 云端 TTS.upstreamModelKey/voice/runtimePath/voiceDesignPrompt | 分别保留模型、预置音色、Relay 路径与 MiMo 描述。音色设计无 voice；Gemini JSON 内联 PCM，MiMo SSE 音频增量，OpenAI 二进制音频，各用对应编码/解码 |
 | SYSTEM_TTS.speechRate/pitch | 仅设备执行，无上游绑定、Runtime URL 或企业服务器密钥。仍为企业资源，可在 allowLocalTts=false 时作为 defaultTtsId；缺少可用设备引擎须明确报错，不切换云端 |
@@ -65,7 +67,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | Starter.starterId/assistantDefinitionId/title/prompt/description/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击只进入原生输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
 | policy 五项 allowLocal* | EnterprisePolicy 五项必填 Boolean；缺失/null/错误类型均拒绝。只控制本企业域内用户原配置准入，不复制用户定义、端点和密钥 |
 | defaultModelId/defaultTtsId/defaultAsrId/defaultAssistantId | defaults.chatModelId/ttsId/asrId/assistantId；显式无效引用不回退首项。没有用户已选助手时采用 defaultAssistantId；用户已选助手失效时呈现选择与修复入口，不静默改选默认助手。未提供的默认值保持未指定，由既有本域选择规则处理 |
-| defaults.fastModelId/titleModelId/imageGenerationModelId/attachmentInspectionModelId/suggestionModelId/compressModelId | v4 无对应的企业强制字段。保留本域偏好和功能已有选择规则，不把 defaultModelId 批量写入所有槽位 |
+| defaults.fastModelId/titleModelId/attachmentInspectionModelId/suggestionModelId/compressModelId | v4 无对应的企业强制字段。保留本域偏好和功能已有选择规则，不把 defaultModelId 批量写入所有槽位。图片生成由独立 `defaultImageGenerationId` 映射既有本域 `imageGenerationModelId` 选择槽位 |
 | allowAsSubAssistant/allowedSubAssistantIds、gateways | v4 不下发企业子助手关系或 Gateway；平台适配输出 false/空集合。用户自有子助手仍按现有五项准入和执行权限处理，不扩展 wire |
 
 ## 认证、同步与恢复时序
@@ -93,6 +95,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | OPENAI_RESPONSES | 同一资源 URL 规则，runtimePath 通常为 `/v1/responses` | POST JSON + SSE；完整 input、store=false；回传 function_call_output.call_id 及相关 reasoning items，终止事件 response.completed |
 | GOOGLE_GENERATE_CONTENT | runtimePath 通常为 `/v1beta/models/{upstreamModelKey}:streamGenerateContent`，追加 `?alt=sse` | contents/parts、functionCall/functionResponse；保留模型返回的调用 ID 和 thoughtSignature；解析 candidates |
 | ANTHROPIC_MESSAGES | runtimePath 通常为 `/v1/messages` | messages、独立 system、max_tokens、stream=true；tool_use/tool_result 配对；anthropic-version 公开协议头；解析命名 SSE 直至 message_stop |
+| OPENAI_IMAGES_GENERATIONS | `/runtime/v1/resources/img_ffffffff-ffff-4fff-8fff-ffffffffffff/v1/images/generations` | 同步 JSON `{"model":"gpt-image-1","prompt":"...","n":1,"size":"1024x1024"}`；响应只接受 `b64_json` 或安全 HTTPS URL，下载不携带平台 Bearer/Cookie，并在交给 `GeneratedMediaStore` 前执行有界读取与图片签名校验 |
 | OPENAI_AUDIO_SPEECH | `/runtime/v1/resources/tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc/v1/audio/speech` | JSON `{"model":"tts-1","voice":"alloy","input":"你好"}`；读取二进制音频，不当 JSON/SSE 解析 |
 | GEMINI_GENERATE_CONTENT_TTS | runtimePath 中的 `:generateContent` 路径 | responseModalities=AUDIO，speechConfig 设置下发 voice；解码 inlineData 中的 PCM 和采样率 |
 | MIMO_CHAT_COMPLETIONS_TTS | runtimePath 通常为 `/v1/chat/completions` | 按当前 Android MiMo 编码器构造 audio/messages，分别消费标准 voice 或 voiceDesignPrompt；读取 SSE 音频增量 |

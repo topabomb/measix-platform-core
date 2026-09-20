@@ -18,7 +18,7 @@ Admin 的用户删除采用精确用户名和原因确认、deny-first 状态机
 
 - **冻结证据链**：`CAP-C7-001` 不再因"清单文件存在"即判 PASS，改为校验清单自身的固定提交身份、干净来源、四个 OpenAPI/构建/fixture 哈希与完整证据 pin；`make clean-replay` 不再缺 `--manifest`，注释与 [release](release.md) 一致。
 - **清理与回放**：`cleanupEnvironment` 改为同步执行（原先 3 秒延迟定时器在失败路径被 `process.exit` 丢弃，残留进程与临时目录）；`replay-freeze` 的工作区移到 `.artifacts/replay/`（终稿校验要回读其日志），并补入 `contract`、`system`（adapter/client）两个阶段。
-- **浏览器 harness**：Phase B 四类能力流量失败现在是门禁失败而非 WARNING；用量等待登录失败不再静默返回；Playwright 报告缺失或无法解析时不再把陈旧产物当作本次证据。删除与 `e2e-harness.mjs` Phase A–D 完全重复、产物不被冻结证据消费、仍走旧直连 Relay 拓扑且无任何调用方的 `scripts/candidate-orchestrator.mjs`。
+- **浏览器 harness**：Phase B 五类能力流量失败现在是门禁失败而非 WARNING；用量等待登录失败不再静默返回；Playwright 报告缺失或无法解析时不再把陈旧产物当作本次证据。删除与 `e2e-harness.mjs` Phase A–D 完全重复、产物不被冻结证据消费、仍走旧直连 Relay 拓扑且无任何调用方的 `scripts/candidate-orchestrator.mjs`。
 - **运行态呈现**："尚未发布配置"不再被头部健康指示器当成 Relay 故障（`unconfigured` 独立一档）；bundle 哈希缺失不再被判定为"未收敛"（契约中该字段可选，缺失应显示为 unknown）；轮询补上并发与乱序保护；补齐缺失的 `status.NOT_READY` 文案。
 - **测试质量**：`SystemPage`/`OverviewPage` 基线改为契约合法的 `dbHealth: OK` 与真 64 位十六进制哈希，并补齐"已收敛"分支覆盖；`HealthIndicator` 不再 mock 整个 composable；资格脚本的 cancel/客户端超时改为可证伪断言，adapter 身份不再由被测上游的 `server`/`via` 响应头决定。
 - **死代码与死文案**：删除只被自身测试引用、任何页面都未使用的 `console/src/stores/operationalApply.ts` 及其专属测试块；删除 64 个中英文均未引用的 i18n 键（en/zh 各 773 → 709，删除后仍逐键对称）。判定用真实语言模块的键集而非文本推断，因为该文件缩进不统一（`experience` 块为 1/2/4 空格混用），按缩进解析会得出错误结论。

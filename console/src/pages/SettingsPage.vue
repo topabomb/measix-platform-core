@@ -34,11 +34,20 @@ function canonicalPublicOrigin(value: string): string | undefined {
   const trimmed = value.trim()
   try {
     const url = new URL(trimmed)
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) return undefined
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash || !validEnterpriseHostname(url.hostname)) return undefined
     return url.origin
   } catch {
     return undefined
   }
+}
+
+function validEnterpriseHostname(hostname: string): boolean {
+  if (hostname.startsWith('[') && hostname.endsWith(']')) return true
+  if (!hostname || hostname.length > 253) return false
+  return hostname.split('.').every(label =>
+    label.length >= 1 && label.length <= 63 &&
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label),
+  )
 }
 
 async function refresh() {

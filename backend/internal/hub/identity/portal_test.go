@@ -129,7 +129,17 @@ func TestCanonicalPublicOrigin(t *testing.T) {
 			}
 		})
 	}
-	for _, raw := range []string{"", "http://platform.example:", "http://platform.example/path", "https://user@platform.example", "https://platform.example?x=1", "https://platform.example#x"} {
+	for _, raw := range []string{
+		"",
+		"http://platform.example:",
+		"http://platform.example/path",
+		"https://user@platform.example",
+		"https://platform.example?x=1",
+		"https://platform.example#x",
+		"https://under_score.example",
+		"https://例子.example",
+		"http://[fe80::1%25eth0]",
+	} {
 		if got, err := identity.CanonicalPublicOrigin(raw); err == nil {
 			t.Fatalf("unsafe origin %q canonicalized to %q", raw, got)
 		}

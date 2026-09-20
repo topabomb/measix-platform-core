@@ -64,6 +64,8 @@ css/          thin MEASIX semantic styling
 
 `SettingsPage` 是部署级设置入口，不是任意 JSON/环境变量编辑器。当前可变项是会投影给 Client/Portal 的企业显示名称和 canonical public origin（界面名称为“企业地址”）：使用 `expectedUpdatedAt` 防止覆盖，并在同一事务记录 operator、名称与 origin 的 before/after 审计。修改 public origin 会立即影响新接入资料、Portal grant/同源校验和 Cookie Secure 策略，并只撤销现有 Portal 浏览器 session；Deployment、User、Device 和 Android Session 身份保持不变，客户端可直接改用同一 Deployment 的新地址。它不会配置 DNS、TLS、Caddy，因此界面使用一处简洁影响确认而不把编辑表单放进对话框。部署时区在当前版本固定，因为预算自然周期和企业日期边界依赖它；listen/storage/key、Relay、Portal 来源和 token/reconcile 参数仍属于启动或信任配置，只读展示并指向部署运维流程。
 
+企业地址的页面预校验与 Hub 写边界遵循同一 Control Protocol host 语义：DNS host 在线协议中使用 ASCII/IDNA 形式，拒绝下划线、尾点和非法 label；浏览器可将用户输入的国际化域名转为 Punycode 后提交，Hub 不接受未编码 Unicode host。
+
 Usage 顶层只常驻时间、用户和上游等高频条件，其余资源类型、状态、完整性、协议、额度健康与精确资源 ID 收进带生效数量的“更多筛选”；汇总、请求、核对、定价保持独立页签。用户额度卡片把来源/模式/状态/修订/在途保留为紧凑摘要，只在存在累计用量或有限规则时展开对应内容，审计仍按需加载。定价只有本地规则相对已加载 revision 发生变化时才能保存。
 
 当前实现已有 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/Resources/Upstreams/Releases/Usage/System/EnterpriseUpdates 等 route-level pages。

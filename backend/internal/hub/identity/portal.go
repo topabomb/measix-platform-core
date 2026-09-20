@@ -40,7 +40,7 @@ func CanonicalPublicOrigin(raw string) (string, error) {
 	hostname := strings.ToLower(u.Hostname())
 	if ip := net.ParseIP(hostname); ip != nil {
 		hostname = ip.String()
-	} else if strings.Contains(hostname, ":") {
+	} else if strings.Contains(hostname, ":") || !validPublicHostname(hostname) {
 		return "", ErrInvalidInput
 	}
 	host := hostname
@@ -51,6 +51,23 @@ func CanonicalPublicOrigin(raw string) (string, error) {
 		host = net.JoinHostPort(hostname, port)
 	}
 	return scheme + "://" + host, nil
+}
+
+func validPublicHostname(hostname string) bool {
+	if len(hostname) == 0 || len(hostname) > 253 {
+		return false
+	}
+	for _, label := range strings.Split(hostname, ".") {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		for _, character := range label {
+			if (character < 'a' || character > 'z') && (character < '0' || character > '9') && character != '-' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // ValidatePublicOrigin accepts only the canonical value used by runtime state.

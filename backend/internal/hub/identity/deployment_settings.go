@@ -27,7 +27,7 @@ func (s *Service) DeploymentSettings(ctx context.Context) (DeploymentSettingsVie
 	return DeploymentSettingsView{DeploymentID: row.ID, Name: row.Name, Timezone: row.Timezone, PublicOrigin: row.PublicOrigin, UpdatedAt: row.UpdatedAt}, nil
 }
 
-// UpdateDeploymentSettings changes the business identity and the canonical
+// UpdateDeploymentSettings changes the display profile and the canonical
 // public address projected to clients. Listener, storage, keys, Portal source
 // and the fixed budget timezone remain startup-owned settings.
 func (s *Service) UpdateDeploymentSettings(ctx context.Context, name, publicOrigin string, expectedUpdatedAt time.Time, actorUserID string) (DeploymentSettingsView, error) {

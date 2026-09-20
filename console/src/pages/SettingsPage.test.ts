@@ -91,4 +91,13 @@ describe('SettingsPage', () => {
     expect(en.settings.confirmOriginClients).not.toContain('re-enroll')
     expect(vi.mocked(client.apiFetch).mock.calls.filter(entry => (entry[1] as RequestInit | undefined)?.method === 'PUT')).toHaveLength(0)
   })
+
+  it('rejects a host that Android cannot consume before saving', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.findAllComponents(QInput)[1]!.setValue('https://under_score.example')
+
+    expect(wrapper.findAllComponents(QInput)[1]!.props('error')).toBe(true)
+    expect(wrapper.get('[data-cy="settings-save"]').attributes('disabled')).toBeDefined()
+  })
 })

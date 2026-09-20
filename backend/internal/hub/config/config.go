@@ -79,9 +79,8 @@ func Load(args []string) (Config, error) {
 	if cfg.AccessTokenTTL <= 0 || cfg.AccessTokenTTL > 10*time.Minute || cfg.ReconcileInterval <= 0 {
 		return Config{}, errors.New("invalid hub TTL/reconcile configuration")
 	}
-	if (cfg.PublicOrigin != "" && identity.ValidatePublicOrigin(cfg.PublicOrigin) != nil) ||
-		((cfg.PortalAssetsDir != "" || cfg.PortalUpstreamURL != "") && cfg.PublicOrigin == "") {
-		return Config{}, errors.New("invalid public origin or missing origin for Portal assets")
+	if cfg.PublicOrigin != "" && identity.ValidatePublicOrigin(cfg.PublicOrigin) != nil {
+		return Config{}, errors.New("invalid public origin")
 	}
 	if cfg.PortalUpstreamURL != "" {
 		parsed, err := portalstatic.ParseUpstream(cfg.PortalUpstreamURL)

@@ -24,12 +24,12 @@ function select(value: string) {
 <template>
   <nav class="configuration-section-nav" data-cy="configuration-section-nav" :aria-label="title">
     <q-card flat bordered class="configuration-section-nav__desktop">
-      <q-card-section>
+      <q-card-section class="q-pa-sm">
         <div class="text-subtitle2">{{ title }}</div>
         <div class="text-caption text-grey-7">{{ subtitle }}</div>
       </q-card-section>
       <q-separator />
-      <q-list padding>
+      <q-list dense>
         <q-item
           v-for="item in items"
           :key="item.id"
@@ -90,8 +90,13 @@ function select(value: string) {
 }
 
 .configuration-section-nav__desktop .q-item {
-  min-height: 64px;
-  border-radius: 10px;
+  min-height: 44px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.configuration-section-nav__desktop :deep(.q-item__section--avatar) {
+  min-width: 30px;
 }
 
 .configuration-section-nav__mobile {

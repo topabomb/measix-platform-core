@@ -17,7 +17,7 @@ func TestPortalParentLifetimeAndRestart(t *testing.T) {
 			ctx := context.Background()
 			st := testutil.OpenStore(t)
 			s := testutil.NewIdentityService(t, st, time.Now().UTC())
-			s.PublicOrigin = "https://platform.example"
+			s.SetPublicOrigin("https://platform.example")
 			boot, err := s.Bootstrap(ctx, "Enterprise", "admin", "Admin", "correct horse battery staple")
 			if err != nil {
 				t.Fatal(err)
@@ -67,7 +67,7 @@ func TestPortalParentLifetimeAndRestart(t *testing.T) {
 			defer reopened.Close()
 			s.Client = reopened.Client
 			restarted := identity.New(reopened.Client, s.Signer, s.CSRFKey)
-			restarted.PublicOrigin = s.PublicOrigin
+			restarted.SetPublicOrigin(s.PublicOrigin())
 			restarted.Now = s.Now
 			if _, _, err := restarted.ExchangePortalGrant(ctx, ticket.Ticket); err == nil {
 				t.Fatal("restart allowed replay")
@@ -110,7 +110,7 @@ func TestPortalGrantRequiresServedStaticArtifact(t *testing.T) {
 	ctx := context.Background()
 	st := testutil.OpenStore(t)
 	s := testutil.NewIdentityService(t, st, time.Now().UTC())
-	s.PublicOrigin = "https://platform.example"
+	s.SetPublicOrigin("https://platform.example")
 	s.PortalStaticAvailable = false
 	boot, err := s.Bootstrap(ctx, "Enterprise", "admin", "Admin", "correct horse battery staple")
 	if err != nil {

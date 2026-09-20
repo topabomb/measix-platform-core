@@ -3,11 +3,13 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
-import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import DetailWorkspace from '../components/DetailWorkspace.vue'
+import CursorPager from '../components/CursorPager.vue'
+import { useCursorPager } from '../composables/useCursorPager'
 import { useActivationStore } from '../stores/activation'
 import { useSessionStore } from '../stores/session'
 
@@ -20,35 +22,21 @@ type ResourceDiff = components['schemas']['ResourceDiff']
 
 const session = useSessionStore()
 const detailRelease = ref<Release>()
-const detailOpen = ref(false)
 const activation = useActivationStore()
-const releases = ref<Release[]>([])
-const nextCursor = ref<string>()
-async function loadMore() {
-  if (!nextCursor.value || loading.value) return
-  loading.value = true
-  try {
-    const page = await apiFetch<ReleasePage>(cursorPath('/api/admin/v1/releases?limit=200', nextCursor.value))
-    releases.value.push(...page.items)
-    nextCursor.value = page.nextCursor
-  } catch (cause) { error.value = cause } finally { loading.value = false }
-}
-
-const loading = ref(false)
-const error = ref<unknown>()
+const listPath = ref('/api/admin/v1/releases?limit=50')
+const {
+  items: releases,
+  nextCursor,
+  pageNumber,
+  loading,
+  error,
+  reset: resetReleases,
+  nextPage,
+  previousPage,
+} = useCursorPager<Release, ReleasePage>(listPath, path => apiFetch<ReleasePage>(path))
 
 async function refresh() {
-  loading.value = true
-  error.value = undefined
-  try {
-    const page = await apiFetch<ReleasePage>('/api/admin/v1/releases?limit=200')
-    releases.value = page.items
-    nextCursor.value = page.nextCursor
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    loading.value = false
-  }
+  await resetReleases()
 }
 
 async function republish(release: Release) {
@@ -67,7 +55,7 @@ async function republish(release: Release) {
       await activation.pollUntilSettled(result.activationId, { timeoutMs: 60_000 })
     }
     await refresh()
-    detailOpen.value = false
+    detailRelease.value = undefined
   } catch (cause) {
     error.value = cause
   }
@@ -75,7 +63,6 @@ async function republish(release: Release) {
 
 function showDetail(release: Release) {
   detailRelease.value = release
-  detailOpen.value = true
 }
 
 function diffText(diff: Release['diffSummary']): string {
@@ -122,16 +109,12 @@ onMounted(refresh)
       </div>
       <details class="text-caption text-grey-7" data-cy="release-activation-details"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ activation.activation.activationId }} · {{ activation.activation.kind }}</details>
     </q-banner>
+    <DetailWorkspace :detail-open="Boolean(detailRelease)" list-width="minmax(300px, 400px)">
+      <template #list>
     <LoadingState v-if="loading && !releases.length" />
     <q-card v-else flat bordered>
       <q-card-section class="row items-center justify-between q-py-xs">
-        <div>
-          <div class="text-subtitle2">{{ $t('releases.title') }}</div>
-          <div class="text-caption text-grey-7">
-            {{ $t('common.loadedCount', { count: releases.length }) }}
-            <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
-          </div>
-        </div>
+        <div class="text-subtitle2">{{ $t('releases.title') }}</div>
       </q-card-section>
       <q-separator />
       <q-list separator>
@@ -150,13 +133,13 @@ onMounted(refresh)
         </q-item>
         <q-item v-if="!releases.length"><q-item-section class="text-grey-7">{{ $t('releases.noReleases') }}</q-item-section></q-item>
       </q-list>
-      <q-card-actions v-if="nextCursor" class="justify-center">
-        <q-btn outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" />
-      </q-card-actions>
+      <q-separator />
+      <CursorPager :page="pageNumber" :count="releases.length" :has-next="Boolean(nextCursor)" :loading="loading" @previous="previousPage" @next="nextPage" />
     </q-card>
 
-    <q-dialog v-model="detailOpen">
-      <q-card v-if="detailRelease" class="app-dialog">
+      </template>
+      <template #detail>
+      <q-card v-if="detailRelease" flat bordered data-cy="release-detail">
         <q-card-section class="row items-center justify-between">
           <div>
             <div class="text-h6">{{ $t('releases.versionLabel', { generation: detailRelease.managedGeneration }) }}</div>
@@ -165,7 +148,7 @@ onMounted(refresh)
           <StatusChip :value="detailRelease.status" />
         </q-card-section>
         <q-separator />
-        <q-card-section class="app-dialog__body">
+        <q-card-section>
           <div class="text-subtitle2">{{ $t('releases.diff') }}</div>
           <q-markup-table flat dense v-if="detailRelease.diffSummary.details?.length">
             <thead><tr><th>{{ $t('resources.relationship.kind') }}</th><th class="text-right">{{ $t('resources.review.added') }}</th><th class="text-right">{{ $t('resources.review.changed') }}</th><th class="text-right">{{ $t('resources.review.removed') }}</th></tr></thead>
@@ -202,10 +185,11 @@ onMounted(refresh)
         </q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn flat :label="$t('common.close')" color="primary" v-close-popup />
+          <q-btn flat icon="arrow_back" :label="$t('common.close')" color="primary" @click="detailRelease = undefined" />
           <q-btn outline color="primary" :label="$t('releases.republish')" :disable="!session.csrfToken" @click="republish(detailRelease)" />
         </q-card-actions>
       </q-card>
-    </q-dialog>
+      </template>
+    </DetailWorkspace>
   </q-page>
 </template>

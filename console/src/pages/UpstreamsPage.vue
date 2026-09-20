@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, toRaw } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, ApiProblem } from '../api/client'
-import { cursorPath, fetchAllPages } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import DetailWorkspace from '../components/DetailWorkspace.vue'
+import CursorPager from '../components/CursorPager.vue'
+import PagedEntityPicker, { type EntityPickerOption } from '../components/PagedEntityPicker.vue'
+import { useCursorPager } from '../composables/useCursorPager'
+import { fetchSecretPickerPage, resolveSecretPickerOption } from '../api/entityPickerSources'
 import { useActivationStore } from '../stores/activation'
 import { useSessionStore } from '../stores/session'
 
@@ -22,23 +26,21 @@ type Secret = components['schemas']['Secret']
 
 const session = useSessionStore()
 const activation = useActivationStore()
-const upstreams = ref<Upstream[]>([])
-const nextCursor = ref<string>()
-async function loadMore() {
-  if (!nextCursor.value || loading.value) return
-  loading.value = true
-  try {
-    const page = await apiFetch<UpstreamPage>(cursorPath('/api/admin/v1/upstreams?limit=200', nextCursor.value))
-    upstreams.value.push(...page.items)
-    nextCursor.value = page.nextCursor
-  } catch (cause) { error.value = cause } finally { loading.value = false }
-}
+const listPath = ref('/api/admin/v1/upstreams?limit=50')
+const search = ref('')
+const {
+  items: upstreams,
+  nextCursor,
+  pageNumber,
+  loading,
+  error,
+  reset: resetUpstreams,
+  nextPage,
+  previousPage,
+} = useCursorPager<Upstream, UpstreamPage>(listPath, path => apiFetch<UpstreamPage>(path))
 
 const selected = ref<Upstream>()
-const loading = ref(false)
-const error = ref<unknown>()
 const createOpen = ref(false)
-const detailOpen = ref(false)
 const testing = ref(false)
 const applyConfirmOpen = ref(false)
 const applying = ref(false)
@@ -63,16 +65,31 @@ const replacingSecret = ref(false)
 const replaceSecretId = ref<string>()
 const replaceExpectedVersion = ref<number>()
 
-const secrets = ref<Secret[]>([])
-const selectedSecretId = ref('')
+const selectedSecretId = ref<string>()
+const selectedSecret = ref<Secret>()
 const justCreatedSecret = ref<Secret>()
-const secretOptions = computed(() => secrets.value.map(secret => ({
-  label: `${secret.name} (v${secret.secretVersion})`, value: secret.secretId,
-})))
-const selectedSecret = computed(() => secrets.value.find(secret => secret.secretId === selectedSecretId.value))
+const secretNames = ref<Record<string, string>>({})
 function secretDisplayName(id: string | undefined): string {
   if (!id) return '—'
-  return secrets.value.find(secret => secret.secretId === id)?.name ?? id
+  return secretNames.value[id] ?? id
+}
+
+function secretFromOption(option: EntityPickerOption | undefined): Secret | undefined {
+  const version = Number(option?.metadata?.secretVersion)
+  if (!option || !Number.isInteger(version) || version < 1) return undefined
+  return { secretId: option.value, name: option.label, secretVersion: version }
+}
+
+const selectedSecretOption = computed<EntityPickerOption | undefined>(() => selectedSecret.value ? {
+  value: selectedSecret.value.secretId,
+  label: selectedSecret.value.name,
+  caption: `v${selectedSecret.value.secretVersion}`,
+  metadata: { secretVersion: selectedSecret.value.secretVersion },
+} : undefined)
+
+function selectCreateSecret(option: EntityPickerOption | undefined) {
+  selectedSecret.value = secretFromOption(option)
+  if (selectedSecret.value) secretNames.value[selectedSecret.value.secretId] = selectedSecret.value.name
 }
 
 const AUTH_TYPES = ['NONE', 'BEARER', 'STATIC_HEADER', 'BASIC'] as const
@@ -105,19 +122,17 @@ const headerName = ref('')
 const username = ref('')
 
 async function refresh() {
-  loading.value = true
-  error.value = undefined
-  try {
-    const page = await apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=200')
-    upstreams.value = page.items
-    nextCursor.value = page.nextCursor
-    secrets.value = await fetchAllPages<Secret>('/api/admin/v1/secrets?limit=200')
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    loading.value = false
-  }
+  const query = new URLSearchParams({ limit: '50' })
+  if (search.value.trim()) query.set('query', search.value.trim())
+  listPath.value = `/api/admin/v1/upstreams?${query.toString()}`
+  await resetUpstreams()
 }
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { void refresh() }, 300)
+})
 
 function inlineSecretRef(): { secretId: string; secretVersion: number } | undefined {
   if (!selectedSecret.value) return undefined
@@ -158,7 +173,8 @@ async function createUpstream() {
     }, session.csrfToken)
     createOpen.value = false
     createForm.value = emptyConfig()
-    selectedSecretId.value = ''
+    selectedSecretId.value = undefined
+    selectedSecret.value = undefined
     justCreatedSecret.value = undefined
     headerName.value = ''
     username.value = ''
@@ -178,8 +194,9 @@ async function createSecret() {
       method: 'POST',
       body: JSON.stringify({ name: secretName.value.trim(), value: secretValue.value }),
     }, session.csrfToken)
-    secrets.value = [...secrets.value.filter(secret => secret.secretId !== created.secretId), created]
     selectedSecretId.value = created.secretId
+    selectedSecret.value = created
+    secretNames.value[created.secretId] = created.name
     justCreatedSecret.value = created
     secretOpen.value = false
     secretName.value = ''
@@ -196,9 +213,16 @@ async function createSecret() {
 function openUpstream(upstream: Upstream) {
   selected.value = upstream
   testResult.value = undefined
-  detailOpen.value = true
   editMode.value = false
   conflictRevision.value = undefined
+  const auth = upstream.config?.auth
+  if (!auth) return
+  const secretId = auth.type === 'BASIC' ? auth.passwordSecretRef?.secretId : ('secretRef' in auth ? auth.secretRef?.secretId : undefined)
+  if (secretId && !secretNames.value[secretId]) {
+    void resolveSecretPickerOption(secretId).then(option => {
+      if (option) secretNames.value[secretId] = option.label
+    }).catch(cause => { error.value = cause })
+  }
 }
 
 function startEdit() {
@@ -223,8 +247,8 @@ const editSecretId = computed(() => {
   return ''
 })
 
-function selectEditSecret(secretId: string) {
-  const secret = secrets.value.find(item => item.secretId === secretId)
+function selectEditSecret(option: EntityPickerOption | undefined) {
+  const secret = secretFromOption(option)
   if (!secret) return
   const ref = { secretId: secret.secretId, secretVersion: secret.secretVersion }
   const auth = editForm.value.auth
@@ -292,7 +316,8 @@ async function replaceSecret() {
         value: secretValue.value,
       }),
     }, session.csrfToken)
-    secrets.value = secrets.value.map(secret => secret.secretId === updated.secretId ? updated : secret)
+    secretNames.value[updated.secretId] = updated.name
+    if (selectedSecret.value?.secretId === updated.secretId) selectedSecret.value = updated
     const auth = editForm.value.auth
     if (auth && 'secretRef' in auth && auth.secretRef?.secretId === updated.secretId) {
       auth.secretRef = { secretId: updated.secretId, secretVersion: updated.secretVersion }
@@ -375,6 +400,9 @@ const candidateVsActive = computed(() => {
 })
 
 onMounted(refresh)
+onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+})
 </script>
 
 <template>
@@ -404,16 +432,15 @@ onMounted(refresh)
       <div v-if="activation.activation.errorCode" class="text-caption text-negative">{{ activation.activation.errorCode }}</div>
       <div v-if="activation.pending" class="text-caption text-grey-7">{{ $t('upstreams.activationRecoveryHint') }}</div>
     </q-banner>
+    <DetailWorkspace :detail-open="Boolean(selected)" list-width="minmax(300px, 400px)">
+      <template #list>
     <LoadingState v-if="loading && !upstreams.length" />
     <q-card v-else flat bordered>
       <q-card-section class="row items-center justify-between q-py-xs">
-        <div>
-          <div class="text-subtitle2">{{ $t('upstreams.title') }}</div>
-          <div class="text-caption text-grey-7">
-            {{ $t('common.loadedCount', { count: upstreams.length }) }}
-            <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
-          </div>
-        </div>
+        <div class="text-subtitle2">{{ $t('upstreams.title') }}</div>
+        <q-input v-model="search" outlined dense clearable :label="$t('common.search')" data-cy="upstream-search" style="width: 100%; max-width: 260px">
+          <template #prepend><q-icon name="search" /></template>
+        </q-input>
       </q-card-section>
       <q-separator />
       <q-list separator>
@@ -437,9 +464,8 @@ onMounted(refresh)
         </q-item>
         <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">{{ $t('upstreams.noUpstreams') }}</q-item-section></q-item>
       </q-list>
-      <q-card-actions v-if="nextCursor" class="justify-center">
-        <q-btn outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" />
-      </q-card-actions>
+      <q-separator />
+      <CursorPager :page="pageNumber" :count="upstreams.length" :has-next="Boolean(nextCursor)" :loading="loading" @previous="previousPage" @next="nextPage" />
     </q-card>
 
     <!-- Create upstream dialog -->
@@ -454,7 +480,16 @@ onMounted(refresh)
           <div class="text-subtitle2">{{ $t('upstreams.auth') }}</div>
           <q-select v-model="createForm.auth.type" outlined emit-value map-options :label="$t('upstreams.authMode')" :options="authOptions" />
           <template v-if="createForm.auth.type !== 'NONE'">
-            <q-select v-model="selectedSecretId" outlined emit-value map-options :label="$t('upstreams.existingSecret')" :options="secretOptions" data-cy="create-secret-picker" />
+            <PagedEntityPicker
+              v-model="selectedSecretId"
+              :label="$t('upstreams.existingSecret')"
+              :empty-label="$t('upstreams.noSecretBound')"
+              :fetch-page="fetchSecretPickerPage"
+              :resolve-option="resolveSecretPickerOption"
+              :selected-option="selectedSecretOption"
+              data-cy="create-secret-picker"
+              @selected="selectCreateSecret"
+            />
             <div v-if="selectedSecret" class="row items-center q-gutter-xs">
               <q-icon name="vpn_key" color="positive" />
               <div class="col">
@@ -495,9 +530,9 @@ onMounted(refresh)
       </q-card>
     </q-dialog>
 
-    <!-- Upstream detail + editor dialog -->
-    <q-dialog v-model="detailOpen">
-      <q-card v-if="selected" class="app-dialog app-dialog--lg">
+      </template>
+      <template #detail>
+      <q-card v-if="selected" flat bordered data-cy="upstream-detail">
         <q-card-section class="row items-start justify-between">
           <div>
             <div class="text-h6">{{ selected.name }}</div>
@@ -510,7 +545,7 @@ onMounted(refresh)
         </q-card-section>
         <q-separator />
 
-        <q-card-section class="app-dialog__body">
+        <q-card-section>
           <!-- Candidate vs Active banner -->
           <q-banner v-if="candidateVsActive?.pending" class="bg-orange-1 q-mb-xs rounded-borders">
             <div class="text-body2">{{ candidateVsActive.active === null ? $t('upstreams.notAppliedHint') : $t('upstreams.unappliedChangesHint') }}</div>
@@ -579,7 +614,15 @@ onMounted(refresh)
               <div class="text-subtitle2">{{ $t('upstreams.auth') }}</div>
               <q-select v-model="editForm.auth.type" outlined emit-value map-options :label="$t('upstreams.authMode')" :options="authOptions" @update:model-value="markEditDirty" />
               <template v-if="editForm.auth.type !== 'NONE'">
-                <q-select :model-value="editSecretId" outlined emit-value map-options :label="$t('upstreams.existingSecret')" :options="secretOptions" data-cy="edit-secret-picker" @update:model-value="selectEditSecret" />
+                <PagedEntityPicker
+                  :model-value="editSecretId"
+                  :label="$t('upstreams.existingSecret')"
+                  :empty-label="$t('upstreams.noSecretBound')"
+                  :fetch-page="fetchSecretPickerPage"
+                  :resolve-option="resolveSecretPickerOption"
+                  data-cy="edit-secret-picker"
+                  @selected="selectEditSecret"
+                />
                 <div v-if="'secretRef' in editForm.auth && editForm.auth.secretRef" class="row items-center q-gutter-xs">
                   <q-input :model-value="editForm.auth.secretRef?.secretId" outlined readonly :label="$t('upstreams.secretRef')" class="col" />
                   <q-input :model-value="String(editForm.auth.secretRef?.secretVersion ?? '')" outlined dense readonly :label="$t('upstreams.secretVersion')" class="col-3" />
@@ -629,9 +672,10 @@ onMounted(refresh)
             </q-markup-table>
           </div>
         </q-card-section>
-        <q-card-actions align="right"><q-btn flat :label="$t('common.close')" v-close-popup /></q-card-actions>
+        <q-card-actions align="right"><q-btn flat icon="arrow_back" :label="$t('common.close')" @click="selected = undefined; editMode = false" /></q-card-actions>
       </q-card>
-    </q-dialog>
+      </template>
+    </DetailWorkspace>
 
     <q-dialog v-model="applyConfirmOpen">
       <q-card class="app-dialog app-dialog--sm">

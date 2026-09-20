@@ -138,6 +138,25 @@ func TestERXUPD003FeedRevisionChangesButIndependentFromGeneration(t *testing.T) 
 	}
 }
 
+func TestAdminListFiltersByTextAndStatusBeforePaging(t *testing.T) {
+	svc, ctx, adminID := setupService(t)
+	maintenance, err := svc.Create(ctx, adminID, "Database maintenance", "Storage will be read-only", "PLAIN", "MAINTENANCE", "WARNING")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Publish(ctx, maintenance.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Create(ctx, adminID, "Welcome", "New handbook", "PLAIN", "NOTICE", "INFO"); err != nil {
+		t.Fatal(err)
+	}
+
+	items, _, err := svc.ListFiltered(ctx, "STORAGE", "PUBLISHED", 50, "")
+	if err != nil || len(items) != 1 || items[0].ID != maintenance.ID {
+		t.Fatalf("items=%v err=%v", items, err)
+	}
+}
+
 // ERX-UPD-004: Client sees only PUBLISHED items ordered newest-first.
 func TestERXUPD004OnlyPublishedOrderedNewestFirst(t *testing.T) {
 	svc, ctx, adminID := setupService(t)

@@ -41,7 +41,7 @@ func TestPublicHTTPAndHTTPSControlLifecycle(t *testing.T) {
 				server.Start()
 			}
 			defer server.Close()
-			identity.PublicOrigin = server.URL
+			identity.SetPublicOrigin(server.URL)
 			client := server.Client()
 			client.Jar, _ = cookiejar.New(nil)
 			client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }

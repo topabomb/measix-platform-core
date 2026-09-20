@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
-import { cursorPath } from '../api/pagination'
 import type { MeterQuantity, PricingMeter, UsageDistribution, UsageTrend, UserUsagePage } from '../api/usageBudget'
 import { clientProtocols } from '../api/usageBudget'
 import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
@@ -14,23 +13,24 @@ import ProblemBanner from '../components/ProblemBanner.vue'
 import UsageRequestList from '../components/UsageRequestList.vue'
 import PricingPanel from './PricingPanel.vue'
 import UsageReconciliationPanel from '../components/UsageReconciliationPanel.vue'
+import PagedEntityPicker, { type EntityPickerOption } from '../components/PagedEntityPicker.vue'
+import CursorPager from '../components/CursorPager.vue'
+import { fetchUpstreamPickerPage, fetchUserPickerPage, resolveUpstreamPickerOption, resolveUserPickerOption } from '../api/entityPickerSources'
+import { useCursorPager } from '../composables/useCursorPager'
 
 const { t: $t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
 type UsageSummary = components['schemas']['UsageSummary']
-type User = components['schemas']['User']
-type UserPage = components['schemas']['UserPage']
 
-const activeTab = ref<'summary' | 'reconciliation' | 'pricing'>('summary')
+const activeTab = ref<'summary' | 'requests' | 'reconciliation' | 'pricing'>('summary')
+const requestList = ref<{ refresh: () => Promise<void> }>()
 const summary = ref<UsageSummary>()
 const trend = ref<UsageTrend>()
 const distribution = ref<UsageDistribution>()
-const usageUsers = ref<UserUsagePage>()
 const error = ref<unknown>()
 const loading = ref(false)
-const loadingMoreUsers = ref(false)
 const lastSuccessfulAt = ref<Date>()
 let summarySequence = 0
 
@@ -68,42 +68,32 @@ const completenesses = ['EXACT', 'PARTIAL', 'UNKNOWN']
 const budgetStatuses = ['EXHAUSTED', 'NEAR_LIMIT', 'PENDING_RECONCILIATION']
 const pageSizes = [25, 50, 100, 200]
 const pageSize = ref(50)
+const usageUsersPath = ref('/api/admin/v1/usage/users?limit=25')
+const {
+  items: usageUserItems,
+  nextCursor: usageUsersNextCursor,
+  pageNumber: usageUsersPage,
+  loading: usageUsersLoading,
+  error: usageUsersError,
+  reset: resetUsageUsers,
+  nextPage: nextUsageUsersPage,
+  previousPage: previousUsageUsersPage,
+} = useCursorPager<UserUsagePage['items'][number], UserUsagePage>(usageUsersPath, async path => {
+  const page = await apiFetch<UserUsagePage>(path)
+  return { ...page, items: (page.items ?? []).filter(item => item.budget?.items) }
+})
 
-// Users are chosen, not typed: requiring an operator to know a usr_ identifier by
-// heart is what made per-user filtering unusable.
-const userOptions = ref<{ label: string; value: string }[]>([])
-const loadingUsers = ref(false)
-let userSearchTimer: ReturnType<typeof setTimeout> | undefined
-
-async function loadUsers(term: string, keep?: string) {
-  loadingUsers.value = true
-  try {
-    const query = new URLSearchParams({ limit: '50' })
-    if (term.trim()) query.set('query', term.trim())
-    const page = await apiFetch<UserPage>(`/api/admin/v1/users?${query.toString()}`)
-    const options = page.items.map((user: User) => ({
-      label: user.username ? `${user.displayName} (${user.username})` : user.displayName,
-      value: user.userId,
-    }))
-    // A selection reached through a link must stay visible even when it is not in
-    // the first page of results, so fall back to showing its identifier.
-    if (keep && !options.some(option => option.value === keep)) {
-      options.unshift({ label: keep, value: keep })
-    }
-    userOptions.value = options
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    loadingUsers.value = false
-  }
-}
-
-function onUserFilter(term: string, update: (callback: () => void) => void) {
-  if (userSearchTimer) clearTimeout(userSearchTimer)
-  userSearchTimer = setTimeout(() => {
-    void loadUsers(term, userId.value).then(() => update(() => {}))
-  }, 250)
-}
+const selectedUserOption = ref<EntityPickerOption>()
+const selectedUpstreamOption = ref<EntityPickerOption>()
+const advancedFiltersOpen = ref(false)
+const advancedFilterCount = computed(() => [
+  resourceId.value,
+  resourceKind.value,
+  status.value,
+  completeness.value,
+  clientProtocol.value,
+  budgetStatus.value,
+].filter(Boolean).length)
 
 const activeFilters = computed(() => {
   const parts: string[] = []
@@ -113,12 +103,11 @@ const activeFilters = computed(() => {
     if (toISO.value) parts.push(`${$t('usage.filters.endTime')} ${new Date(toISO.value).toLocaleString()}`)
   }
   if (userId.value) {
-    const option = userOptions.value.find(candidate => candidate.value === userId.value)
-    parts.push(`${$t('usage.filters.user')} ${option?.label ?? userId.value}`)
+    parts.push(`${$t('usage.filters.user')} ${selectedUserOption.value?.label ?? userId.value}`)
   }
   if (resourceId.value) parts.push(`${$t('usage.filters.resource')} ${resourceId.value}`)
   if (resourceKind.value) parts.push(`${$t('usage.filters.resourceKind')} ${resourceKind.value}`)
-  if (upstreamId.value) parts.push(`${$t('usage.filters.upstream')} ${upstreamId.value}`)
+  if (upstreamId.value) parts.push(`${$t('usage.filters.upstream')} ${selectedUpstreamOption.value?.label ?? upstreamId.value}`)
   if (status.value) parts.push(`${$t('status.' + status.value)}`)
   if (completeness.value) parts.push(`${$t('usage.filters.completeness')} ${$t('status.' + completeness.value)}`)
   if (clientProtocol.value) parts.push(`${$t('usage.filters.protocol')} ${clientProtocol.value}`)
@@ -177,11 +166,12 @@ async function refresh() {
     userQuery.delete('userId')
     userQuery.set('limit', '25')
     if (budgetStatus.value) userQuery.set('budgetStatus', budgetStatus.value)
-    const [summaryResult, trendResult, distributionResult, usersResult] = await Promise.all([
+    usageUsersPath.value = `/api/admin/v1/usage/users?${userQuery.toString()}`
+    const [summaryResult, trendResult, distributionResult] = await Promise.all([
       apiFetch<UsageSummary>(`/api/admin/v1/usage/summary?${encoded}`),
       apiFetch<UsageTrend>(`/api/admin/v1/usage/trend?${encoded}`),
       apiFetch<UsageDistribution>(`/api/admin/v1/usage/distribution?${encoded}`),
-      apiFetch<UserUsagePage>(`/api/admin/v1/usage/users?${userQuery.toString()}`),
+      resetUsageUsers(),
     ])
     if (sequence !== summarySequence) return
     summary.value = summaryResult
@@ -192,16 +182,17 @@ async function refresh() {
       Boolean(item.resourceKind && item.clientProtocol && Array.isArray(item.semanticMeters)))
       ? distributionResult
       : { from: summaryResult.from, to: summaryResult.to, items: [] }
-    usageUsers.value = {
-      ...usersResult,
-      items: Array.isArray(usersResult.items) ? usersResult.items.filter(item => item.budget?.items) : [],
-    }
     lastSuccessfulAt.value = new Date()
   } catch (cause) {
     if (sequence === summarySequence) error.value = cause
   } finally {
     if (sequence === summarySequence) loading.value = false
   }
+}
+
+async function refreshCurrent() {
+  if (activeTab.value === 'requests') await requestList.value?.refresh()
+  else if (activeTab.value === 'summary') await refresh()
 }
 
 // The summary aggregates server-side, so free-text identifiers wait for typing to
@@ -212,11 +203,12 @@ let textTimer: ReturnType<typeof setTimeout> | undefined
 const textFilters = computed(() => `${resourceId.value ?? ''}\u0000${upstreamId.value ?? ''}`)
 watch(textFilters, () => {
   if (textTimer) clearTimeout(textTimer)
-  textTimer = setTimeout(() => { void refresh() }, 300)
+  textTimer = setTimeout(() => { if (activeTab.value === 'summary') void refresh() }, 300)
 })
 watch([fromISO, toISO, userId, resourceKind, status, completeness, clientProtocol, budgetStatus, pageSize, allTime], () => {
-  void refresh()
+  if (activeTab.value === 'summary') void refresh()
 })
+watch(activeTab, tab => { if (tab === 'summary') void refresh() })
 
 // Keeping the filters in the URL makes a per-user view linkable, back-navigable
 // and refresh-stable, which is what an operator sends to a colleague.
@@ -273,25 +265,6 @@ function userBudgetStatus(page: UserUsagePage['items'][number]): string {
   return $t('budgets.status.AVAILABLE')
 }
 
-async function loadMoreUsageUsers() {
-  const cursor = usageUsers.value?.nextCursor
-  if (!cursor || loadingMoreUsers.value) return
-  loadingMoreUsers.value = true
-  try {
-    const encoded = filterQuery.value.replace(/^&/, '')
-    const query = new URLSearchParams(encoded)
-    query.delete('userId')
-    query.set('limit', '25')
-    if (budgetStatus.value) query.set('budgetStatus', budgetStatus.value)
-    const page = await apiFetch<UserUsagePage>(cursorPath(`/api/admin/v1/usage/users?${query.toString()}`, cursor))
-    if (usageUsers.value) usageUsers.value = { items: [...usageUsers.value.items, ...page.items], nextCursor: page.nextCursor }
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    loadingMoreUsers.value = false
-  }
-}
-
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return '—'
   if (n < 1024) return `${n} B`
@@ -338,6 +311,7 @@ onMounted(async () => {
   if (typeof initial.budgetStatus === 'string' && budgetStatuses.includes(initial.budgetStatus)) budgetStatus.value = initial.budgetStatus
   if (typeof initial.tab === 'string' && initial.tab === 'pricing') activeTab.value = 'pricing'
   if (typeof initial.tab === 'string' && initial.tab === 'reconciliation') activeTab.value = 'reconciliation'
+  if (typeof initial.tab === 'string' && initial.tab === 'requests') activeTab.value = 'requests'
   const size = Number(initial.pageSize)
   if (pageSizes.includes(size)) pageSize.value = size
   if (typeof initial.from === 'string' && typeof initial.to === 'string') {
@@ -346,13 +320,12 @@ onMounted(async () => {
   } else {
     applyRange(1)
   }
-  await Promise.all([refresh(), loadUsers('', userId.value)])
+  if (activeTab.value === 'summary') await refresh()
 })
 
 onBeforeUnmount(() => {
   summarySequence++
   if (textTimer) clearTimeout(textTimer)
-  if (userSearchTimer) clearTimeout(userSearchTimer)
 })
 </script>
 
@@ -360,11 +333,12 @@ onBeforeUnmount(() => {
   <q-page class="admin-page" data-cy="usage-page">
     <PageHeader :title="$t('usage.title')" :subtitle="$t('usage.subtitle')">
       <template #actions>
-        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
+        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refreshCurrent" />
       </template>
     </PageHeader>
     <q-tabs v-model="activeTab" class="q-mb-xs" dense align="left">
       <q-tab name="summary" :label="$t('usage.summary')" icon="insights" />
+      <q-tab name="requests" :label="$t('usage.requests')" icon="receipt_long" />
       <q-tab name="reconciliation" :label="$t('usage.reconciliation.tab')" icon="rule" />
       <q-tab name="pricing" :label="$t('pricing.title')" icon="sell" />
     </q-tabs>
@@ -373,10 +347,7 @@ onBeforeUnmount(() => {
     <UsageReconciliationPanel v-else-if="activeTab === 'reconciliation'" />
 
     <template v-else>
-      <!-- Filter grid: every control is an equal cell, so wrapping always lands
-           in whole columns instead of stranding one or two controls on a
-           ragged second line — fixed pixel widths cannot do that. -->
-      <div class="usage-filters q-mb-xs">
+      <div class="usage-filters usage-filters--primary q-mb-xs">
         <q-input v-model="fromLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.startTime')" :disable="allTime" />
         <q-input v-model="toLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.endTime')" :disable="allTime" />
         <q-btn-dropdown dense outline no-caps class="usage-filters__cell-btn" :label="$t('usage.filters.quickRange')" :no-icon-animation="true">
@@ -390,23 +361,35 @@ onBeforeUnmount(() => {
         <!-- The user picker filters like the others; it is not a companion of
              the date range. No hint: it made this one control stand taller
              than the whole row. -->
-        <q-select v-model="userId" :options="userOptions" :label="$t('usage.filters.user')" :placeholder="$t('usage.filters.anyUser')" :loading="loadingUsers" outlined dense clearable use-input emit-value map-options @filter="onUserFilter" data-cy="usage-user-filter" />
+        <PagedEntityPicker
+          v-model="userId"
+          :label="$t('usage.filters.user')"
+          :empty-label="$t('usage.filters.anyUser')"
+          :fetch-page="fetchUserPickerPage"
+          :resolve-option="resolveUserPickerOption"
+          data-cy="usage-user-filter"
+          @selected="selectedUserOption = $event"
+        />
+        <PagedEntityPicker
+          v-model="upstreamId"
+          :label="$t('usage.filters.upstream')"
+          :empty-label="$t('common.all')"
+          :fetch-page="fetchUpstreamPickerPage"
+          :resolve-option="resolveUpstreamPickerOption"
+          data-cy="usage-upstream-filter"
+          @selected="selectedUpstreamOption = $event"
+        />
+        <q-btn outline dense no-caps align="left" class="usage-filters__cell-btn" icon="tune" :label="$t('usage.filters.more', { count: advancedFilterCount })" :aria-expanded="advancedFiltersOpen" data-cy="usage-more-filters" @click="advancedFiltersOpen = !advancedFiltersOpen" />
+        <q-btn flat dense align="left" class="usage-filters__cell-btn" icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" />
+      </div>
+      <div v-show="advancedFiltersOpen" class="usage-filters usage-filters--advanced q-mb-xs" data-cy="usage-advanced-filters">
         <q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable />
         <q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable />
         <q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable />
         <q-select v-model="clientProtocol" outlined dense :label="$t('usage.filters.protocol')" :options="clientProtocols" clearable data-cy="usage-protocol-filter" />
         <q-select v-model="budgetStatus" outlined dense :label="$t('usage.filters.budgetStatus')" :options="budgetStatuses.map(value => ({ label: $t('budgets.status.' + value), value }))" emit-value map-options clearable data-cy="usage-budget-status-filter" />
-        <q-btn flat dense align="left" class="usage-filters__cell-btn" icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" />
+        <q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." />
       </div>
-      <!-- Its own collapsed disclosure: an optional raw-identifier path, not a
-           stray line trailing the filter row. -->
-      <details class="q-mb-xs" data-cy="usage-identity-filters">
-        <summary class="text-caption text-grey-7 cursor-pointer">{{ $t('usage.filters.byIdentity') }}</summary>
-        <div class="row q-col-gutter-xs q-mt-xs">
-          <div class="col-12 col-sm-6"><q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." /></div>
-          <div class="col-12 col-sm-6"><q-input v-model="upstreamId" outlined dense :label="$t('usage.filters.upstream')" placeholder="ups_..." /></div>
-        </div>
-      </details>
       <ProblemBanner :error="error" class="q-mb-xs" />
       <q-banner v-if="loading && summary" class="bg-blue-1 q-mb-xs" data-cy="usage-refreshing">
         {{ $t('usage.refreshing', { time: lastSuccessfulAt?.toLocaleString() ?? '—' }) }}
@@ -415,6 +398,7 @@ onBeforeUnmount(() => {
         {{ $t('usage.stale', { time: lastSuccessfulAt?.toLocaleString() ?? '—' }) }}
       </q-banner>
 
+      <template v-if="activeTab === 'summary'">
       <LoadingState v-if="loading && !summary" />
       <div v-else-if="summary" class="row q-col-gutter-xs q-mb-xs">
         <div class="col-xs-12 col-sm-6 col-md-3">
@@ -527,8 +511,9 @@ onBeforeUnmount(() => {
             <div class="text-subtitle2">{{ $t('usage.users.title') }}</div>
             <div class="text-caption text-grey-7">{{ $t('usage.users.hint') }}</div>
           </q-card-section>
-          <q-list v-if="usageUsers?.items.length" dense separator class="usage-analysis__list">
-            <q-item v-for="item in usageUsers.items" :key="item.userId">
+          <ProblemBanner :error="usageUsersError" class="card-inset q-mb-xs" />
+          <q-list v-if="usageUserItems.length" dense separator class="usage-analysis__list">
+            <q-item v-for="item in usageUserItems" :key="item.userId">
               <q-item-section>
                 <q-item-label>{{ item.userDisplayName }}</q-item-label>
                 <q-item-label caption>{{ $t('usage.users.requests', { count: item.requestCount }) }} · {{ userBudgetStatus(item) }}</q-item-label>
@@ -538,14 +523,21 @@ onBeforeUnmount(() => {
               </q-item-section>
             </q-item>
           </q-list>
-          <q-card-section v-else class="text-grey-7">{{ $t('usage.users.empty') }}</q-card-section>
-          <q-card-actions v-if="usageUsers?.nextCursor" align="center">
-            <q-btn outline dense no-caps :label="$t('common.loadMore')" :loading="loadingMoreUsers" data-cy="usage-users-load-more" @click="loadMoreUsageUsers" />
-          </q-card-actions>
+          <q-card-section v-else-if="!usageUsersLoading" class="text-grey-7">{{ $t('usage.users.empty') }}</q-card-section>
+          <CursorPager
+            :page="usageUsersPage"
+            :count="usageUserItems.length"
+            :has-next="Boolean(usageUsersNextCursor)"
+            :loading="usageUsersLoading"
+            @previous="previousUsageUsersPage"
+            @next="nextUsageUsersPage"
+          />
         </q-card>
       </div>
 
-      <UsageRequestList :query="filterQuery" :page-size="pageSize" allow-filter-resource @filter-resource="value => { resourceId = value }">
+      </template>
+
+      <UsageRequestList v-else ref="requestList" :query="filterQuery" :page-size="pageSize" allow-filter-resource @filter-resource="value => { resourceId = value }">
         <template #toolbar>
           <q-select v-model="pageSize" :options="pageSizes" :label="$t('usage.pageSize')" outlined dense emit-value map-options style="width: 150px" data-cy="usage-page-size" />
         </template>
@@ -560,7 +552,7 @@ onBeforeUnmount(() => {
    one line of same-shaped controls. */
 .usage-filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 4px;
   align-items: end;
 }

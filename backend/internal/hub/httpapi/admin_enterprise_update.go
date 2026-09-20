@@ -17,7 +17,7 @@ func (h *fullAdminHandler) ListEnterpriseUpdates(w http.ResponseWriter, r *http.
 	if !valid {
 		return
 	}
-	items, feedRevision, err := h.services.EnterpriseUpdate.List(r.Context(), limit+1, after)
+	items, feedRevision, err := h.services.EnterpriseUpdate.ListFiltered(r.Context(), valueOrEmptyString(params.Query), valueOrEmptyString(strPtr(params.Status)), limit+1, after)
 	if errors.Is(err, enterpriseupdate.ErrInvalidInput) {
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid enterprise update")
 		return

@@ -39,7 +39,7 @@ func (h *fullAdminHandler) ListSecrets(w http.ResponseWriter, r *http.Request, p
 	if !valid {
 		return
 	}
-	rows, err := h.services.Upstream.ListSecrets(r.Context(), limit+1, after)
+	rows, err := h.services.Upstream.ListSecrets(r.Context(), valueOrEmptyString(params.Query), limit+1, after)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
@@ -79,6 +79,23 @@ func (h *fullAdminHandler) ReplaceSecret(w http.ResponseWriter, r *http.Request,
 	writeJSON(w, http.StatusOK, adminapi.Secret{SecretId: view.SecretID, Name: view.Name, SecretVersion: view.SecretVersion})
 }
 
+func (h *fullAdminHandler) GetSecret(w http.ResponseWriter, r *http.Request, secretID adminapi.SecretId) {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	view, err := h.services.Upstream.GetSecret(r.Context(), secretID)
+	if errors.Is(err, upstream.ErrNotFound) {
+		writeProblem(w, http.StatusNotFound, "secret_not_found", "Secret not found")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, adminapi.Secret{SecretId: view.SecretID, Name: view.Name, SecretVersion: view.SecretVersion})
+}
+
 func (h *fullAdminHandler) ListUpstreams(w http.ResponseWriter, r *http.Request, params adminapi.ListUpstreamsParams) {
 	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
@@ -88,7 +105,7 @@ func (h *fullAdminHandler) ListUpstreams(w http.ResponseWriter, r *http.Request,
 	if !valid {
 		return
 	}
-	rows, err := h.services.Upstream.ListUpstreams(r.Context(), limit+1, after)
+	rows, err := h.services.Upstream.ListUpstreams(r.Context(), valueOrEmptyString(params.Query), limit+1, after)
 	if err != nil {
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return

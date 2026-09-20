@@ -1,9 +1,10 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import {
   Quasar, QLayout, QPage, QPageContainer, QCard, QCardSection, QCardActions,
   QInput, QBtn, QBanner, QSelect, QDialog, QSeparator, QList, QItem,
   QItemSection, QItemLabel, QChip, QSpinner, QIcon, QMarkupTable, ClosePopup,
+  QBtnDropdown, QTab, QTabs, QBreadcrumbs, QBreadcrumbsEl,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -14,11 +15,6 @@ import StatusChip from '../components/StatusChip.vue'
 import * as client from '../api/client'
 
 vi.mock('qrcode', () => ({ default: { toCanvas: vi.fn().mockResolvedValue(undefined) } }))
-
-// Dialogs are teleported to the document, so a wrapper that is never unmounted
-// leaves its dialog behind for the next test to find. Unmounting after each test
-// keeps those document-level queries honest.
-enableAutoUnmount(afterEach)
 
 const userA = { userId: 'usr_A', username: 'ana.ops', displayName: 'Ana Ruiz', role: 'MEMBER', status: 'ACTIVE' }
 const userB = { userId: 'usr_B', username: 'ben.ops', displayName: 'Ben Okafor', role: 'MEMBER', status: 'ACTIVE' }
@@ -43,6 +39,7 @@ function mountUsersPage() {
             QLayout, QPage, QPageContainer, QCard, QCardSection, QCardActions, QInput, QBtn,
             QBanner, QSelect, QDialog, QSeparator, QList, QItem, QItemSection, QItemLabel,
             QChip, QSpinner, QIcon, QMarkupTable, PageHeader, StatusChip,
+            QBtnDropdown, QTab, QTabs, QBreadcrumbs, QBreadcrumbsEl,
           },
           directives: { ClosePopup },
         }], pinia, router],
@@ -75,9 +72,11 @@ describe('UsersPage per-user usage and list safety', () => {
     await flushPromises()
     await wrapper.get('[data-cy="user-row"]').trigger('click')
     await flushPromises()
+    await wrapper.findAllComponents(QTab).find(tab => tab.props('name') === 'usage')!.trigger('click')
+    await flushPromises()
 
     const summaryPath = paths.find(path => path.includes('/usage/summary'))
-    expect(summaryPath, 'the dialog must ask for this user\'s usage').toBeTruthy()
+    expect(summaryPath, 'the usage section must ask for this user\'s usage').toBeTruthy()
     expect(summaryPath).toContain('userId=usr_A')
     // An explicit window keeps the aggregate bounded; unbounded it would read the
     // whole history on every open.
@@ -112,12 +111,12 @@ describe('UsersPage per-user usage and list safety', () => {
 
     releaseB({ items: [device('dev_B', 'Ben phone')], nextCursor: undefined })
     await flushPromises()
-    expect(document.querySelector('[data-cy="user-devices"]')?.textContent).toContain('Ben phone')
+    expect(wrapper.get('[data-cy="user-devices"]').text()).toContain('Ben phone')
 
     // A's late response resolves last and must still be discarded.
     releaseA({ items: [device('dev_A', 'Ana phone')], nextCursor: undefined })
     await flushPromises()
-    const shown = document.querySelector('[data-cy="user-devices"]')?.textContent ?? ''
+    const shown = wrapper.get('[data-cy="user-devices"]').text()
     expect(shown).toContain('Ben phone')
     expect(shown).not.toContain('Ana phone')
   })

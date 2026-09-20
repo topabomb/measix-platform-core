@@ -49,6 +49,33 @@ func testConfig(secretID string, secretVersion int) adminapi.UpstreamConfig {
 	}
 }
 
+func TestPagedPickersSearchUpstreamsAndSecretsByName(t *testing.T) {
+	ctx := context.Background()
+	svc, st, adminID, _ := newUpstreamService(t)
+	defer st.Close()
+
+	for _, name := range []string{"DeepSeek production", "Qwen laboratory", "Shared speech"} {
+		secretView, err := svc.CreateSecret(ctx, adminID, name+" credential", "value")
+		if err != nil {
+			t.Fatal(err)
+		}
+		config := testConfig(secretView.SecretID, secretView.SecretVersion)
+		config.Name = name
+		if _, err := svc.CreateUpstream(ctx, adminID, config); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	upstreams, err := svc.ListUpstreams(ctx, "PRODUCTION", 50, "")
+	if err != nil || len(upstreams) != 1 || upstreams[0].Name != "DeepSeek production" {
+		t.Fatalf("upstreams=%v err=%v", upstreams, err)
+	}
+	secrets, err := svc.ListSecrets(ctx, "speech", 50, "")
+	if err != nil || len(secrets) != 1 || secrets[0].Name != "Shared speech credential" {
+		t.Fatalf("secrets=%v err=%v", secrets, err)
+	}
+}
+
 // HUB-UPS-001: candidate config revision must be separate from active
 // config revision. CreateUpstream sets ConfigRevision=1 but
 // ActiveConfigRevision is nil.

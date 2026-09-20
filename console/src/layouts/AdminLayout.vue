@@ -26,22 +26,38 @@ const $q = useQuasar()
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
-const drawerOpen = ref(false)
+const drawerOpen = ref(!$q.screen.lt.md)
+const drawerMini = ref(false)
 const navItems = visibleNavItems()
+const deliveryNavItems = navItems.filter(item => item.group === 'configuration')
+const diagnosticNavItems = navItems.filter(item => item.group === 'operations')
 
 // Close the overlay drawer after navigating — but ONLY on narrow screens.
 // On wide screens the drawer is persistent (managed by Quasar show-if-above).
 watch(
   () => route?.fullPath,
   () => {
-    // $q.screen.lt.sm means viewport < 600px; but our breakpoint is 1023px.
-    // Use $q.screen size to approximate: below breakpoint = overlay mode.
-    // Quasar's $q.screen.lt.lg means < 1024px, which matches breakpoint 1023.
-    if ($q.screen.lt.lg) {
+    // Quasar's md breakpoint starts at 1024px, matching the drawer's 1023px
+    // breakpoint. lg starts at 1440px and would incorrectly hide the drawer on
+    // common 1280/1366px desktop displays.
+    if ($q.screen.lt.md) {
       drawerOpen.value = false
     }
   },
 )
+
+watch(
+  () => $q.screen.lt.md,
+  narrow => {
+    if (narrow) drawerOpen.value = false
+    else drawerOpen.value = true
+  },
+)
+
+function toggleNavigation() {
+  if ($q.screen.lt.md) drawerOpen.value = !drawerOpen.value
+  else drawerMini.value = !drawerMini.value
+}
 
 async function logout() {
   await session.logout()
@@ -58,6 +74,7 @@ const NAV_I18N_KEYS: Record<string, string> = {
   Upstreams: 'nav.upstreams',
   Releases: 'nav.releases',
   EnterpriseUpdates: 'nav.enterpriseUpdates',
+  Settings: 'nav.settings',
   Usage: 'nav.usage',
   System: 'nav.system',
 }
@@ -86,17 +103,11 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
   <q-layout view="hHh Lpr fFf" class="admin-shell">
     <q-header bordered class="bg-white text-dark">
       <q-toolbar>
-        <!-- Hamburger toggle — always visible. On wide screens the drawer is
-             persistent (managed by Quasar show-if-above), so this button has
-             no visual effect there. On narrow screens it toggles the overlay. -->
-        <!-- Shown only where the drawer is an overlay (< 1024px). Above the
-             breakpoint Quasar keeps the drawer persistent, so a toggle there
-             would have no effect. -->
         <q-btn
-          flat round dense icon="menu"
-          class="lt-lg"
-          :aria-label="$t('nav.menu')"
-          @click="drawerOpen = !drawerOpen"
+          flat round dense
+          :icon="$q.screen.lt.md ? 'menu' : (drawerMini ? 'menu_open' : 'menu')"
+          :aria-label="$q.screen.lt.md ? $t('nav.menu') : $t(drawerMini ? 'nav.expand' : 'nav.collapse')"
+          @click="toggleNavigation"
         />
         <q-toolbar-title class="text-weight-bold" style="min-width: 0">MEASIX Admin</q-toolbar-title>
 
@@ -155,20 +166,39 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
       show-if-above
       :breakpoint="1023"
       bordered
-      :width="240"
+      :width="196"
+      :mini-width="56"
+      :mini="!$q.screen.lt.md && drawerMini"
     >
-      <q-list padding>
-        <q-item-label header>{{ $t('nav.runtimeFoundation') }}</q-item-label>
+      <q-list class="admin-nav q-py-xs">
+        <q-item-label v-if="!drawerMini || $q.screen.lt.md" header>{{ $t('nav.configDelivery') }}</q-item-label>
         <q-item
-          v-for="item in navItems"
+          v-for="item in deliveryNavItems"
           :key="item.id"
           clickable
           :to="item.path"
           exact
           active-class="bg-grey-2 text-primary"
+          dense
         >
           <q-item-section avatar><q-icon :name="item.icon" /></q-item-section>
           <q-item-section>{{ navLabel(item.id) }}</q-item-section>
+          <q-tooltip v-if="drawerMini && !$q.screen.lt.md" anchor="center right" self="center left">{{ navLabel(item.id) }}</q-tooltip>
+        </q-item>
+        <q-separator class="q-my-xs" />
+        <q-item-label v-if="!drawerMini || $q.screen.lt.md" header>{{ $t('nav.operationsDiagnostics') }}</q-item-label>
+        <q-item
+          v-for="item in diagnosticNavItems"
+          :key="item.id"
+          clickable
+          :to="item.path"
+          exact
+          active-class="bg-grey-2 text-primary"
+          dense
+        >
+          <q-item-section avatar><q-icon :name="item.icon" /></q-item-section>
+          <q-item-section>{{ navLabel(item.id) }}</q-item-section>
+          <q-tooltip v-if="drawerMini && !$q.screen.lt.md" anchor="center right" self="center left">{{ navLabel(item.id) }}</q-tooltip>
         </q-item>
       </q-list>
     </q-drawer>
@@ -183,3 +213,19 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
     </q-page-container>
   </q-layout>
 </template>
+
+<style scoped>
+.admin-nav :deep(.q-item) {
+  min-height: 38px;
+  padding: 4px 12px;
+}
+
+.admin-nav :deep(.q-item__section--avatar) {
+  min-width: 32px;
+}
+
+.admin-nav :deep(.q-item__label--header) {
+  min-height: 30px;
+  padding: 6px 12px;
+}
+</style>

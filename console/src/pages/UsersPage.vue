@@ -11,8 +11,11 @@ import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import DetailWorkspace from '../components/DetailWorkspace.vue'
+import CursorPager from '../components/CursorPager.vue'
 import UsageRequestList from '../components/UsageRequestList.vue'
 import UserBudgetPanel from '../components/UserBudgetPanel.vue'
+import { useCursorPager } from '../composables/useCursorPager'
 import { useActivationStore } from '../stores/activation'
 import QRCode from 'qrcode'
 import { useSessionStore } from '../stores/session'
@@ -30,35 +33,29 @@ type UsageSummary = components['schemas']['UsageSummary']
 
 const session = useSessionStore()
 const activation = useActivationStore()
-const users = ref<User[]>([])
-const nextCursor = ref<string>()
-const listPath = ref('/api/admin/v1/users?limit=200')
+const listPath = ref('/api/admin/v1/users?limit=50')
 // A paginated list without a search box is the worst of both: an operator can
 // only reach an account by paging through all of them in creation order.
 const search = ref('')
-let listSequence = 0
-
-async function loadMore() {
-  if (!nextCursor.value || loading.value) return
-  const current = listSequence
-  loading.value = true
-  try {
-    const page = await apiFetch<UserPage>(cursorPath(listPath.value, nextCursor.value))
-    if (current !== listSequence) return
-    users.value.push(...page.items)
-    nextCursor.value = page.nextCursor
-  } catch (cause) { if (current === listSequence) error.value = cause } finally { if (current === listSequence) loading.value = false }
-}
+const {
+  items: users,
+  nextCursor,
+  pageNumber,
+  loading,
+  error,
+  reset: resetUsers,
+  nextPage,
+  previousPage,
+} = useCursorPager<User, UserPage>(listPath, path => apiFetch<UserPage>(path))
 
 const devices = ref<Device[]>([])
-const devicesTruncated = ref(false)
+const devicesNextCursor = ref<string>()
+const devicesPath = ref('')
 const loadingDevices = ref(false)
 let deviceSequence = 0
 const selected = ref<User>()
-const loading = ref(false)
-const error = ref<unknown>()
+const activeUserSection = ref<'devices' | 'budgets' | 'usage'>('devices')
 const createOpen = ref(false)
-const detailOpen = ref(false)
 const enrollmentOpen = ref(false)
 const deleteOpen = ref(false)
 const deleteForm = ref({ confirmationUsername: '', reason: '' })
@@ -70,22 +67,10 @@ const createForm = ref({ username: '', displayName: '', role: 'MEMBER' as 'ADMIN
 const canMutate = computed(() => Boolean(session.csrfToken))
 
 async function refresh() {
-  const current = ++listSequence
-  loading.value = true
-  error.value = undefined
-  try {
-    const query = new URLSearchParams({ limit: '200' })
-    if (search.value.trim()) query.set('query', search.value.trim())
-    listPath.value = `/api/admin/v1/users?${query.toString()}`
-    const page = await apiFetch<UserPage>(listPath.value)
-    if (current !== listSequence) return
-    users.value = page.items
-    nextCursor.value = page.nextCursor
-  } catch (cause) {
-    if (current === listSequence) error.value = cause
-  } finally {
-    if (current === listSequence) loading.value = false
-  }
+  const query = new URLSearchParams({ limit: '50' })
+  if (search.value.trim()) query.set('query', search.value.trim())
+  listPath.value = `/api/admin/v1/users?${query.toString()}`
+  await resetUsers()
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
@@ -109,10 +94,10 @@ async function createUser() {
 
 async function openUser(user: User) {
   selected.value = user
-  detailOpen.value = true
+  activeUserSection.value = 'devices'
   error.value = undefined
   applyUsagePeriod()
-  await Promise.all([loadDevices(user), loadUsage()])
+  await loadDevices(user)
 }
 
 // The previous user's devices are cleared and every response is checked against
@@ -122,12 +107,13 @@ async function loadDevices(user: User) {
   const current = ++deviceSequence
   loadingDevices.value = true
   devices.value = []
-  devicesTruncated.value = false
+  devicesNextCursor.value = undefined
   try {
-    const page = await apiFetch<DevicePage>(`/api/admin/v1/users/${encodeURIComponent(user.userId)}/devices?limit=200`)
+    devicesPath.value = `/api/admin/v1/users/${encodeURIComponent(user.userId)}/devices?limit=50`
+    const page = await apiFetch<DevicePage>(devicesPath.value)
     if (current !== deviceSequence) return
     devices.value = page.items
-    devicesTruncated.value = Boolean(page.nextCursor)
+    devicesNextCursor.value = page.nextCursor
   } catch (cause) {
     if (current === deviceSequence) error.value = cause
   } finally {
@@ -183,6 +169,10 @@ async function loadUsage() {
 watch(usagePeriod, () => {
   applyUsagePeriod()
   void loadUsage()
+})
+
+watch(activeUserSection, section => {
+  if (section === 'usage') void loadUsage()
 })
 
 function viewAllUsage() {
@@ -261,6 +251,22 @@ async function runSecurity(path: string) {
   }
 }
 
+async function loadMoreDevices() {
+  if (!devicesNextCursor.value || loadingDevices.value) return
+  const current = deviceSequence
+  loadingDevices.value = true
+  try {
+    const page = await apiFetch<DevicePage>(cursorPath(devicesPath.value, devicesNextCursor.value))
+    if (current !== deviceSequence) return
+    devices.value.push(...page.items)
+    devicesNextCursor.value = page.nextCursor
+  } catch (cause) {
+    if (current === deviceSequence) error.value = cause
+  } finally {
+    if (current === deviceSequence) loadingDevices.value = false
+  }
+}
+
 function beginDeleteUser() {
   if (!selected.value) return
   deleteForm.value = { confirmationUsername: '', reason: '' }
@@ -283,7 +289,6 @@ async function deleteUser() {
     activation.accept(result)
     if (result.state === 'APPLYING' || result.state === 'UNKNOWN') await activation.pollUntilSettled(result.activationId, { timeoutMs: 60_000 })
     deleteOpen.value = false
-    detailOpen.value = false
     selected.value = undefined
     await refresh()
   } catch (cause) {
@@ -317,11 +322,12 @@ async function copyEnrollment() {
 
 onMounted(refresh)
 onBeforeUnmount(() => {
-  listSequence++
   deviceSequence++
   usageSequence++
   if (searchTimer) clearTimeout(searchTimer)
 })
+
+defineExpose({ beginDeleteUser })
 </script>
 
 <template>
@@ -337,19 +343,15 @@ onBeforeUnmount(() => {
       <div class="row items-center justify-between"><span>{{ $t('users.securityActivation', { id: activation.activation.activationId }) }}</span><StatusChip :value="activation.activation.state" /></div>
       <div v-if="activation.activation.errorCode" class="text-caption">{{ activation.activation.errorCode }}</div>
     </q-banner>
+    <DetailWorkspace :detail-open="Boolean(selected)" list-width="minmax(300px, 380px)">
+      <template #list>
     <LoadingState v-if="loading && !users.length" />
     <!-- One list card shape for the whole console: a header row naming what is
          listed and how much of it is loaded, the rows, then paging at the
          bottom of the card instead of below it. -->
     <q-card v-else flat bordered>
       <q-card-section class="row items-center justify-between q-py-xs">
-        <div>
-          <div class="text-subtitle2">{{ $t('users.title') }}</div>
-          <div class="text-caption text-grey-7">
-            {{ $t('common.loadedCount', { count: users.length }) }}
-            <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
-          </div>
-        </div>
+        <div class="text-subtitle2">{{ $t('users.title') }}</div>
         <!-- Search belongs to the list it filters, not to a row above it. The
              debounce is the 300ms timer below; Quasar's own debounce is off. -->
         <q-input v-model="search" outlined dense clearable :label="$t('users.search')" data-cy="user-search" style="width: 100%; max-width: 280px">
@@ -364,9 +366,8 @@ onBeforeUnmount(() => {
         </q-item>
         <q-item v-if="!users.length"><q-item-section class="text-grey-7">{{ search.trim() ? $t('users.noMatches') : $t('users.noUsers') }}</q-item-section></q-item>
       </q-list>
-      <q-card-actions v-if="nextCursor" class="justify-center">
-        <q-btn outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" />
-      </q-card-actions>
+      <q-separator />
+      <CursorPager :page="pageNumber" :count="users.length" :has-next="Boolean(nextCursor)" :loading="loading" @previous="previousPage" @next="nextPage" />
     </q-card>
 
     <q-dialog v-model="createOpen">
@@ -384,18 +385,37 @@ onBeforeUnmount(() => {
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="detailOpen">
-      <!-- Bounded and internally scrollable: this dialog carries the devices and
-           the usage for one account, and it must not push its own actions off
-           screen when either grows. -->
-      <q-card v-if="selected" class="app-dialog app-dialog--lg">
-        <q-card-section class="row items-start justify-between"><div><div class="text-h6">{{ selected.displayName }}</div><div class="text-caption">{{ selected.username }} · {{ $t(`roles.${selected.role}`) }}</div><details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selected.userId }}</details></div><StatusChip :value="selected.status" /></q-card-section>
+      </template>
+      <template #detail>
+      <q-card v-if="selected" flat bordered data-cy="user-detail">
+        <q-card-section class="row items-start no-wrap q-gutter-xs q-py-xs">
+          <q-btn flat round dense icon="arrow_back" :aria-label="$t('common.close')" @click="selected = undefined" />
+          <div class="col"><div class="text-subtitle1 text-weight-medium">{{ selected.displayName }}</div><div class="text-caption">{{ selected.username }} · {{ $t(`roles.${selected.role}`) }}</div><details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selected.userId }}</details></div>
+          <StatusChip :value="selected.status" />
+        </q-card-section>
         <q-separator />
-        <!-- The body scrolls inside the card so the dialog actions stay visible
-             however long the device list or the usage block grows. -->
-        <div class="app-dialog__body">
-        <q-card-section><div class="row q-gutter-xs"><q-btn outline no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /><q-btn outline color="negative" :label="$t('users.deleteUser')" :disable="selected.userId === session.session?.user.userId" data-cy="delete-user-btn" @click="beginDeleteUser" /></div></q-card-section>
-        <q-card-section><div class="text-subtitle2 q-mb-xs">{{ $t('users.devices') }}</div>
+        <q-card-section class="row items-center q-gutter-xs q-py-xs">
+          <q-btn unelevated no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" />
+          <q-btn-dropdown outline dense no-caps :label="$t('common.actions')">
+            <q-list dense>
+              <q-item clickable v-close-popup @click="toggleUser">
+                <q-item-section avatar><q-icon :name="selected.status === 'ACTIVE' ? 'block' : 'check_circle'" /></q-item-section>
+                <q-item-section>{{ selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable') }}</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup :disable="selected.userId === session.session?.user.userId" data-cy="delete-user-btn" @click="beginDeleteUser">
+                <q-item-section avatar><q-icon name="delete" color="negative" /></q-item-section>
+                <q-item-section class="text-negative">{{ $t('users.deleteUser') }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+        </q-card-section>
+        <q-tabs v-model="activeUserSection" dense align="left" active-color="primary" class="user-detail-tabs" data-cy="user-detail-tabs">
+          <q-tab name="devices" :label="$t('users.devices')" />
+          <q-tab name="budgets" :label="$t('budgets.title')" />
+          <q-tab name="usage" :label="$t('users.usage')" />
+        </q-tabs>
+        <q-separator />
+        <q-card-section v-if="activeUserSection === 'devices'"><div class="text-subtitle2 q-mb-xs">{{ $t('users.devices') }}</div>
           <div v-if="loadingDevices" class="text-caption text-grey-7 q-mb-xs" data-cy="devices-loading">{{ $t('common.loading') }}</div>
           <q-list bordered separator data-cy="user-devices">
           <q-item v-for="device in devices" :key="device.deviceId">
@@ -418,12 +438,14 @@ onBeforeUnmount(() => {
           </q-item>
           <q-item v-if="!devices.length && !loadingDevices"><q-item-section class="text-grey-7">{{ $t('users.noDevices') }}</q-item-section></q-item>
         </q-list>
-        <div v-if="devicesTruncated" class="text-caption text-grey-7 q-mt-xs">{{ $t('users.devicesTruncated', { count: devices.length }) }}</div>
+        <div v-if="devicesNextCursor" class="row justify-center q-mt-xs">
+          <q-btn flat color="primary" :label="$t('common.loadMore')" :loading="loadingDevices" data-cy="load-more-devices" @click="loadMoreDevices" />
+        </div>
         </q-card-section>
-        <q-card-section>
+        <q-card-section v-else-if="activeUserSection === 'budgets'">
           <UserBudgetPanel :user-id="selected.userId" />
         </q-card-section>
-        <q-card-section data-cy="user-usage">
+        <q-card-section v-else data-cy="user-usage">
           <div class="row items-center justify-between q-mb-xs">
             <div class="text-subtitle2">{{ $t('users.usage') }}</div>
             <q-select v-model="usagePeriod" :options="periodOptions" :label="$t('users.usagePeriod')" outlined dense emit-value map-options data-cy="user-usage-period" style="width: 180px" />
@@ -440,11 +462,9 @@ onBeforeUnmount(() => {
           <UsageRequestList :query="usageQuery" :page-size="25" max-height="none" :show-user="false" />
           <div class="q-mt-xs"><q-btn flat color="primary" no-caps :label="$t('users.viewAllUsage')" data-cy="view-all-usage" @click="viewAllUsage" /></div>
         </q-card-section>
-        </div>
-        <q-separator />
-        <q-card-actions align="right"><q-btn flat :label="$t('common.close')" v-close-popup /></q-card-actions>
       </q-card>
-    </q-dialog>
+      </template>
+    </DetailWorkspace>
 
     <q-dialog v-model="deleteOpen">
       <q-card v-if="selected" class="app-dialog app-dialog--sm" data-cy="delete-user-dialog">

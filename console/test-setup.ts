@@ -4,7 +4,9 @@
  *
  * This mirrors the Quasar boot file (src/boot/i18n.ts) used at runtime.
  */
-import { config } from '@vue/test-utils'
+import { config, enableAutoUnmount } from '@vue/test-utils'
+import { afterEach } from 'vitest'
 import { i18n } from './src/i18n'
 
 config.global.plugins = [i18n]
+enableAutoUnmount(afterEach)

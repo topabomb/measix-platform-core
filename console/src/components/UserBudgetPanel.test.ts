@@ -69,7 +69,7 @@ describe('UserBudgetPanel', () => {
     const text = wrapper.text()
     expect(text).toContain('Deployment default')
     expect(text).toContain('User override')
-    expect(text).toContain('Explicitly unlimited')
+    expect(text).toContain('inherits the global setting')
     expect(text).toContain('5K tokens')
     expect(text).toContain('12.5K tokens')
     expect(text).toContain('1.2K chars')

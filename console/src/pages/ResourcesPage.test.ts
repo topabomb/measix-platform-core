@@ -233,6 +233,23 @@ describe('ResourcesPage', () => {
     expect(wrapper.get('[data-cy="config-section-policy"]').text()).toContain('Local allowed 5/5')
   })
 
+  it('exposes one shared list/detail state for narrow resource navigation', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="add-provider-btn"]').trigger('click')
+    await flushPromises()
+    await switchTab(wrapper, 'models')
+    await wrapper.get('[data-cy="add-model-btn"]').trigger('click')
+    await flushPromises()
+    const split = wrapper.get('.resource-split')
+    expect(split.classes()).toContain('resource-split--selected')
+    const back = wrapper.get('.resource-detail-back')
+    expect(back.text()).toContain('Back to list')
+    await back.trigger('click')
+    expect(split.classes()).not.toContain('resource-split--selected')
+  })
+
   it('keeps draft editing available and retries when upstream discovery fails', async () => {
     let upstreamAttempts = 0
     vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
@@ -546,18 +563,18 @@ describe('ResourcesPage', () => {
     }
     await flushPromises()
 
-    // Click "Review & Publish" to open the structured review dialog
+    // Click "Review & Publish" to open the structured review workspace.
     const reviewBtn = findAddBtn(wrapper, 'Review & Publish')
     expect(reviewBtn).toBeTruthy()
     await reviewBtn!.trigger('click')
     await flushPromises()
 
-    expect(document.querySelector('[data-cy="review-change-count"]')?.textContent).toContain('1')
-    expect(document.querySelector('[data-cy="review-resource-table"]')?.textContent).toContain('Provider')
-    expect(document.querySelector('[data-cy="review-resource-table"]')?.textContent).not.toContain('Model')
-    expect(document.querySelector('[data-cy="review-preview-btn"]')).not.toBeNull()
+    expect(wrapper.get('[data-cy="review-change-count"]').text()).toContain('1')
+    expect(wrapper.get('[data-cy="review-resource-table"]').text()).toContain('Provider')
+    expect(wrapper.get('[data-cy="review-resource-table"]').text()).not.toContain('Model')
+    expect(wrapper.find('[data-cy="review-preview-btn"]').exists()).toBe(true)
 
-    // The review dialog opens; find the actual Publish button inside
+    // The review workspace opens; find the actual Publish button inside.
     const publishBtn = wrapper.findAllComponents(QBtn).find(
       (b) => String(b.props('label') ?? '').startsWith('Publish'),
     )
@@ -590,7 +607,7 @@ describe('ResourcesPage', () => {
     await flushPromises()
     await wrapper.get('[data-cy="draft-review-btn"]').trigger('click')
     await flushPromises()
-    expect(document.querySelector('[data-cy="review-no-changes"]')?.textContent).toContain('already published')
+    expect(wrapper.get('[data-cy="review-no-changes"]').text()).toContain('already published')
     const publishButton = wrapper.findAllComponents(QBtn).find(button => button.attributes('data-cy') === 'draft-publish-btn')
     expect(publishButton?.props('disable')).toBe(true)
     wrapper.unmount()
@@ -634,7 +651,7 @@ describe('ResourcesPage', () => {
     )
     expect(previewCallAfter).toBeDefined()
 
-    const body = document.body.innerHTML
+    const body = wrapper.get('[data-cy="snapshot-preview-surface"]').text()
     expect(body).toContain('sha256:abc123')
     expect(body).toContain('Snapshot Preview')
     expect(body).toContain('Policy ID')
@@ -644,29 +661,29 @@ describe('ResourcesPage', () => {
     const assistantsSection = wrapper.findAllComponents(QExpansionItem).find(item => String(item.props('label')).startsWith('Assistants'))!
     await assistantsSection.trigger('click')
     await flushPromises()
-    const assistantSummary = document.querySelector('[data-cy="preview-assistant-summary"]')
-    expect(assistantSummary?.textContent).toContain('Friendly Model')
-    expect(assistantSummary?.textContent).toContain('Tools')
-    expect(assistantSummary?.textContent).not.toContain('mdl_1')
-    expect(document.querySelector('[data-cy="preview-assistant-description"]')?.textContent).toContain('Helps field engineers')
+    const assistantSummary = wrapper.get('[data-cy="preview-assistant-summary"]')
+    expect(assistantSummary.text()).toContain('Friendly Model')
+    expect(assistantSummary.text()).toContain('Tools')
+    expect(assistantSummary.text()).not.toContain('mdl_1')
+    expect(wrapper.get('[data-cy="preview-assistant-description"]').text()).toContain('Helps field engineers')
     const sections = wrapper.findAllComponents(QExpansionItem)
     await sections.find(item => item.props('label') === 'Policy')!.trigger('click')
     await flushPromises()
-    const policy = document.querySelector('[data-cy="preview-policy-summary"]')!
-    expect(policy.textContent).toContain('Allowed')
-    expect(policy.textContent).toContain('Not allowed')
-    expect(policy.textContent).toContain('Friendly Voice')
-    expect(policy.textContent).toContain('Not selected')
-    expect(policy.textContent).toContain('Unavailable resource: mdl_missing')
-    expect(policy.textContent).not.toMatch(/true|false|pol_draft|tts_1/)
+    const policy = wrapper.get('[data-cy="preview-policy-summary"]')
+    expect(policy.text()).toContain('Allowed')
+    expect(policy.text()).toContain('Not allowed')
+    expect(policy.text()).toContain('Friendly Voice')
+    expect(policy.text()).toContain('Not selected')
+    expect(policy.text()).toContain('Unavailable resource: mdl_missing')
+    expect(policy.text()).not.toMatch(/true|false|pol_draft|tts_1/)
     await sections.find(item => String(item.props('label')).startsWith('Models ('))!.trigger('click')
     await flushPromises()
-    const model = document.querySelector('[data-cy="preview-model-summary"]')!
-    expect(model.textContent).toContain('Friendly Provider')
-    expect(model.textContent).toContain('Disabled')
+    const model = wrapper.get('[data-cy="preview-model-summary"]')
+    expect(model.text()).toContain('Friendly Provider')
+    expect(model.text()).toContain('Disabled')
     await sections.find(item => String(item.props('label')).startsWith('Starters ('))!.trigger('click')
     await flushPromises()
-    expect(document.querySelector('[data-cy="preview-starter-description"]')?.textContent).toContain('Start a safety inspection')
+    expect(wrapper.get('[data-cy="preview-starter-description"]').text()).toContain('Start a safety inspection')
     wrapper.unmount()
   })
 })

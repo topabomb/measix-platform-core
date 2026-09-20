@@ -70,6 +70,20 @@ func (_u *DeploymentUpdate) SetNillableTimezone(v *string) *DeploymentUpdate {
 	return _u
 }
 
+// SetPublicOrigin sets the "public_origin" field.
+func (_u *DeploymentUpdate) SetPublicOrigin(v string) *DeploymentUpdate {
+	_u.mutation.SetPublicOrigin(v)
+	return _u
+}
+
+// SetNillablePublicOrigin sets the "public_origin" field if the given value is not nil.
+func (_u *DeploymentUpdate) SetNillablePublicOrigin(v *string) *DeploymentUpdate {
+	if v != nil {
+		_u.SetPublicOrigin(*v)
+	}
+	return _u
+}
+
 // SetFeedRevision sets the "feed_revision" field.
 func (_u *DeploymentUpdate) SetFeedRevision(v int64) *DeploymentUpdate {
 	_u.mutation.ResetFeedRevision()
@@ -169,6 +183,9 @@ func (_u *DeploymentUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.Timezone(); ok {
 		_spec.SetField(deployment.FieldTimezone, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.PublicOrigin(); ok {
+		_spec.SetField(deployment.FieldPublicOrigin, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.FeedRevision(); ok {
 		_spec.SetField(deployment.FieldFeedRevision, field.TypeInt64, value)
 	}
@@ -239,6 +256,20 @@ func (_u *DeploymentUpdateOne) SetTimezone(v string) *DeploymentUpdateOne {
 func (_u *DeploymentUpdateOne) SetNillableTimezone(v *string) *DeploymentUpdateOne {
 	if v != nil {
 		_u.SetTimezone(*v)
+	}
+	return _u
+}
+
+// SetPublicOrigin sets the "public_origin" field.
+func (_u *DeploymentUpdateOne) SetPublicOrigin(v string) *DeploymentUpdateOne {
+	_u.mutation.SetPublicOrigin(v)
+	return _u
+}
+
+// SetNillablePublicOrigin sets the "public_origin" field if the given value is not nil.
+func (_u *DeploymentUpdateOne) SetNillablePublicOrigin(v *string) *DeploymentUpdateOne {
+	if v != nil {
+		_u.SetPublicOrigin(*v)
 	}
 	return _u
 }
@@ -371,6 +402,9 @@ func (_u *DeploymentUpdateOne) sqlSave(ctx context.Context) (_node *Deployment, 
 	}
 	if value, ok := _u.mutation.Timezone(); ok {
 		_spec.SetField(deployment.FieldTimezone, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PublicOrigin(); ok {
+		_spec.SetField(deployment.FieldPublicOrigin, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.FeedRevision(); ok {
 		_spec.SetField(deployment.FieldFeedRevision, field.TypeInt64, value)

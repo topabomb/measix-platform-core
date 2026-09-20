@@ -1763,6 +1763,21 @@ type DeleteUserRequest struct {
 // DeploymentId defines model for DeploymentId.
 type DeploymentId = string
 
+// DeploymentSettings defines model for DeploymentSettings.
+type DeploymentSettings struct {
+	DeploymentId DeploymentId `json:"deploymentId"`
+
+	// Name Human-facing enterprise name shown to enrolled users and Portal sessions.
+	Name string `json:"name"`
+
+	// PublicOrigin Canonical external HTTP or HTTPS origin advertised to clients. It may be changed at runtime; changing it revokes Portal sessions but does not configure DNS, TLS or ingress and does not migrate already-enrolled client authorities.
+	PublicOrigin string `json:"publicOrigin"`
+
+	// Timezone Fixed deployment IANA timezone. Changing it at runtime would alter natural budget periods and is intentionally not mutable in this API.
+	Timezone  string    `json:"timezone"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 // Device defines model for Device.
 type Device struct {
 	AppVersion *string `json:"appVersion,omitempty"`
@@ -2375,6 +2390,13 @@ type TtsDefinitionClientProtocol string
 // TtsId defines model for TtsId.
 type TtsId = string
 
+// UpdateDeploymentSettingsRequest defines model for UpdateDeploymentSettingsRequest.
+type UpdateDeploymentSettingsRequest struct {
+	ExpectedUpdatedAt time.Time `json:"expectedUpdatedAt"`
+	Name              string    `json:"name"`
+	PublicOrigin      string    `json:"publicOrigin"`
+}
+
 // UpdateEnterpriseUpdateRequest defines model for UpdateEnterpriseUpdateRequest.
 type UpdateEnterpriseUpdateRequest struct {
 	Category      EnterpriseUpdateCategory      `json:"category"`
@@ -2601,6 +2623,11 @@ type ValidationIssueResourceKind string
 // ValidationIssueSeverity defines model for ValidationIssue.Severity.
 type ValidationIssueSeverity string
 
+// UpdateDeploymentSettingsParams defines parameters for UpdateDeploymentSettings.
+type UpdateDeploymentSettingsParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // RevokeDeviceParams defines parameters for RevokeDevice.
 type RevokeDeviceParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
@@ -2632,6 +2659,10 @@ type ValidateDraftParams struct {
 type ListEnterpriseUpdatesParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Query Case-insensitive partial match on title or rendered content source.
+	Query  *string                 `form:"query,omitempty" json:"query,omitempty"`
+	Status *EnterpriseUpdateStatus `form:"status,omitempty" json:"status,omitempty"`
 }
 
 // CreateEnterpriseUpdateParams defines parameters for CreateEnterpriseUpdate.
@@ -2675,6 +2706,9 @@ type RepublishReleaseParams struct {
 type ListSecretsParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Query Case-insensitive partial match on Secret metadata name. Secret values are never searched or returned.
+	Query *string `form:"query,omitempty" json:"query,omitempty"`
 }
 
 // CreateSecretParams defines parameters for CreateSecret.
@@ -2696,6 +2730,9 @@ type LogoutAdminParams struct {
 type ListUpstreamsParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Query Case-insensitive partial match on the human-readable upstream name.
+	Query *string `form:"query,omitempty" json:"query,omitempty"`
 }
 
 // CreateUpstreamParams defines parameters for CreateUpstream.
@@ -2913,6 +2950,9 @@ type SetPasswordParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// UpdateDeploymentSettingsJSONRequestBody defines body for UpdateDeploymentSettings for application/json ContentType.
+type UpdateDeploymentSettingsJSONRequestBody = UpdateDeploymentSettingsRequest
+
 // PutDraftJSONRequestBody defines body for PutDraft for application/json ContentType.
 type PutDraftJSONRequestBody = PutDraftRequest
 
@@ -2976,6 +3016,12 @@ type ServerInterface interface {
 	// (GET /api/admin/v1/activations/{activationId})
 	GetActivation(w http.ResponseWriter, r *http.Request, activationId ActivationId)
 
+	// (GET /api/admin/v1/deployment/settings)
+	GetDeploymentSettings(w http.ResponseWriter, r *http.Request)
+
+	// (PUT /api/admin/v1/deployment/settings)
+	UpdateDeploymentSettings(w http.ResponseWriter, r *http.Request, params UpdateDeploymentSettingsParams)
+
 	// (POST /api/admin/v1/devices/{deviceId}:revoke)
 	RevokeDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceId, params RevokeDeviceParams)
 
@@ -3032,6 +3078,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/secrets)
 	CreateSecret(w http.ResponseWriter, r *http.Request, params CreateSecretParams)
+
+	// (GET /api/admin/v1/secrets/{secretId})
+	GetSecret(w http.ResponseWriter, r *http.Request, secretId SecretId)
 
 	// (POST /api/admin/v1/secrets/{secretId}:replace)
 	ReplaceSecret(w http.ResponseWriter, r *http.Request, secretId SecretId, params ReplaceSecretParams)
@@ -3142,6 +3191,16 @@ func (_ Unimplemented) GetActivation(w http.ResponseWriter, r *http.Request, act
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (GET /api/admin/v1/deployment/settings)
+func (_ Unimplemented) GetDeploymentSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/admin/v1/deployment/settings)
+func (_ Unimplemented) UpdateDeploymentSettings(w http.ResponseWriter, r *http.Request, params UpdateDeploymentSettingsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (POST /api/admin/v1/devices/{deviceId}:revoke)
 func (_ Unimplemented) RevokeDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceId, params RevokeDeviceParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -3234,6 +3293,11 @@ func (_ Unimplemented) ListSecrets(w http.ResponseWriter, r *http.Request, param
 
 // (POST /api/admin/v1/secrets)
 func (_ Unimplemented) CreateSecret(w http.ResponseWriter, r *http.Request, params CreateSecretParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/secrets/{secretId})
+func (_ Unimplemented) GetSecret(w http.ResponseWriter, r *http.Request, secretId SecretId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3428,6 +3492,65 @@ func (siw *ServerInterfaceWrapper) GetActivation(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetActivation(w, r, activationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDeploymentSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetDeploymentSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDeploymentSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDeploymentSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDeploymentSettings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateDeploymentSettingsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDeploymentSettings(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3762,6 +3885,32 @@ func (siw *ServerInterfaceWrapper) ListEnterpriseUpdates(w http.ResponseWriter, 
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
 		}
 		return
 	}
@@ -4253,6 +4402,19 @@ func (siw *ServerInterfaceWrapper) ListSecrets(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListSecrets(w, r, params)
 	}))
@@ -4300,6 +4462,32 @@ func (siw *ServerInterfaceWrapper) CreateSecret(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateSecret(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSecret operation middleware
+func (siw *ServerInterfaceWrapper) GetSecret(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "secretId" -------------
+	var secretId SecretId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "secretId", chi.URLParam(r, "secretId"), &secretId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "secretId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSecret(w, r, secretId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4495,6 +4683,19 @@ func (siw *ServerInterfaceWrapper) ListUpstreams(w http.ResponseWriter, r *http.
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
 		}
 		return
 	}
@@ -6579,6 +6780,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/admin/v1/secrets/{secretId}:replace", wrapper.ReplaceSecret)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/secrets/{secretId}", wrapper.GetSecret)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/usage/summary", wrapper.UsageSummary)
 	})
 	r.Group(func(r chi.Router) {
@@ -6610,6 +6814,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/system/status", wrapper.SystemStatus)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/deployment/settings", wrapper.GetDeploymentSettings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/admin/v1/deployment/settings", wrapper.UpdateDeploymentSettings)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/system/health", wrapper.SystemHealth)

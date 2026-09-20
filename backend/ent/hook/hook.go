@@ -140,6 +140,18 @@ func (f DeploymentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeploymentMutation", m)
 }
 
+// The DeploymentSettingAuditFunc type is an adapter to allow the use of ordinary
+// function as DeploymentSettingAudit mutator.
+type DeploymentSettingAuditFunc func(context.Context, *ent.DeploymentSettingAuditMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DeploymentSettingAuditFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DeploymentSettingAuditMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeploymentSettingAuditMutation", m)
+}
+
 // The DeviceFunc type is an adapter to allow the use of ordinary
 // function as Device mutator.
 type DeviceFunc func(context.Context, *ent.DeviceMutation) (ent.Value, error)

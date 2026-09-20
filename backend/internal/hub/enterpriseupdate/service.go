@@ -92,6 +92,10 @@ func (s *Service) Get(ctx context.Context, id string) (UpdateView, error) {
 }
 
 func (s *Service) List(ctx context.Context, limit int, after string) ([]UpdateView, int64, error) {
+	return s.ListFiltered(ctx, "", "", limit, after)
+}
+
+func (s *Service) ListFiltered(ctx context.Context, search, status string, limit int, after string) ([]UpdateView, int64, error) {
 	if limit < 1 || limit > 201 {
 		limit = 50
 	}
@@ -104,7 +108,14 @@ func (s *Service) List(ctx context.Context, limit int, after string) ([]UpdateVi
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := tx.EnterpriseUpdate.Query().Where(enterpriseupdate.IDGT(after)).Order(ent.Asc(enterpriseupdate.FieldID)).Limit(limit).All(ctx)
+	query := tx.EnterpriseUpdate.Query().Where(enterpriseupdate.IDGT(after))
+	if term := strings.TrimSpace(search); term != "" {
+		query = query.Where(enterpriseupdate.Or(enterpriseupdate.TitleContainsFold(term), enterpriseupdate.ContentContainsFold(term)))
+	}
+	if value := strings.TrimSpace(status); value != "" {
+		query = query.Where(enterpriseupdate.StatusEQ(value))
+	}
+	rows, err := query.Order(ent.Asc(enterpriseupdate.FieldID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

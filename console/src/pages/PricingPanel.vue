@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, createCandidateId } from '../api/client'
@@ -19,7 +19,9 @@ const saving = ref(false)
 const error = ref<unknown>()
 const revision = ref<number>()
 const rules = ref<PricingRule[]>([])
+const savedRules = ref('[]')
 const usageCost = ref<UsageSummary['cost']>()
+const dirty = computed(() => JSON.stringify(rules.value) !== savedRules.value)
 
 // One option per meter value. A meter is scoped by the rule's resourceId, not
 // by a static kind — AUDIO_SECONDS and REQUESTS are used by more than one
@@ -43,6 +45,7 @@ async function refresh() {
     ])
     revision.value = set.pricingRevision
     rules.value = set.rules ?? []
+    savedRules.value = JSON.stringify(rules.value)
     if (usage) usageCost.value = usage.cost
   } catch (cause) {
     error.value = cause
@@ -67,7 +70,7 @@ function removeRule(index: number) {
 }
 
 async function save() {
-  if (revision.value === undefined) return
+  if (revision.value === undefined || !dirty.value) return
   saving.value = true
   error.value = undefined
   try {
@@ -77,6 +80,7 @@ async function save() {
     }, session.csrfToken)
     revision.value = set.pricingRevision
     rules.value = set.rules ?? []
+    savedRules.value = JSON.stringify(rules.value)
   } catch (cause) {
     error.value = cause
   } finally {
@@ -116,7 +120,7 @@ onMounted(refresh)
       <div class="row items-center q-gutter-xs">
         <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
         <q-btn outline dense icon="add" :label="$t('pricing.addRule')" @click="addRule" data-cy="pricing-add-rule-btn" />
-        <q-btn dense color="primary" icon="save" :label="$t('common.save')" :disable="revision === undefined" :loading="saving" @click="save" data-cy="pricing-save-btn" />
+        <q-btn dense color="primary" icon="save" :label="$t('common.save')" :disable="revision === undefined || !dirty" :loading="saving" @click="save" data-cy="pricing-save-btn" />
       </div>
     </q-card-section>
     <q-separator />

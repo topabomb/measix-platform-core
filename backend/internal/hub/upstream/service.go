@@ -94,8 +94,12 @@ func (s *Service) CreateSecret(ctx context.Context, createdBy, name, value strin
 	return SecretView{SecretID: id, Name: name, SecretVersion: 1}, nil
 }
 
-func (s *Service) ListSecrets(ctx context.Context, limit int, after string) ([]SecretView, error) {
-	rows, err := s.Client.Secret.Query().Where(secret.IDGT(after)).Order(ent.Asc(secret.FieldID)).Limit(limit).All(ctx)
+func (s *Service) ListSecrets(ctx context.Context, search string, limit int, after string) ([]SecretView, error) {
+	query := s.Client.Secret.Query().Where(secret.IDGT(after))
+	if term := strings.TrimSpace(search); term != "" {
+		query = query.Where(secret.NameContainsFold(term))
+	}
+	rows, err := query.Order(ent.Asc(secret.FieldID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +108,17 @@ func (s *Service) ListSecrets(ctx context.Context, limit int, after string) ([]S
 		views = append(views, SecretView{SecretID: row.ID, Name: row.Name, SecretVersion: int(row.LatestSecretVersion)})
 	}
 	return views, nil
+}
+
+func (s *Service) GetSecret(ctx context.Context, secretID string) (SecretView, error) {
+	row, err := s.Client.Secret.Get(ctx, secretID)
+	if ent.IsNotFound(err) {
+		return SecretView{}, ErrNotFound
+	}
+	if err != nil {
+		return SecretView{}, err
+	}
+	return SecretView{SecretID: row.ID, Name: row.Name, SecretVersion: int(row.LatestSecretVersion)}, nil
 }
 
 func (s *Service) ReplaceSecret(ctx context.Context, createdBy, secretID string, expectedVersion int, value string) (SecretView, error) {
@@ -217,8 +232,12 @@ func (s *Service) CreateUpstream(ctx context.Context, createdBy string, config a
 	return UpstreamView{UpstreamID: id, Name: config.Name, ConfigRevision: 1, Status: "INACTIVE", Config: config}, nil
 }
 
-func (s *Service) ListUpstreams(ctx context.Context, limit int, after string) ([]UpstreamView, error) {
-	rows, err := s.Client.Upstream.Query().Where(upstream.IDGT(after)).Order(ent.Asc(upstream.FieldID)).Limit(limit).All(ctx)
+func (s *Service) ListUpstreams(ctx context.Context, search string, limit int, after string) ([]UpstreamView, error) {
+	query := s.Client.Upstream.Query().Where(upstream.IDGT(after))
+	if term := strings.TrimSpace(search); term != "" {
+		query = query.Where(upstream.NameContainsFold(term))
+	}
+	rows, err := query.Order(ent.Asc(upstream.FieldID)).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -17,6 +17,7 @@ import (
 	"measix/platform/ent/deletedcredential"
 	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/deployment"
+	"measix/platform/ent/deploymentsettingaudit"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enrollment"
 	"measix/platform/ent/enterpriseupdate"
@@ -65,6 +66,7 @@ const (
 	TypeDeletedCredential      = "DeletedCredential"
 	TypeDeletedPrincipal       = "DeletedPrincipal"
 	TypeDeployment             = "Deployment"
+	TypeDeploymentSettingAudit = "DeploymentSettingAudit"
 	TypeDevice                 = "Device"
 	TypeEnrollment             = "Enrollment"
 	TypeEnterpriseUpdate       = "EnterpriseUpdate"
@@ -9459,6 +9461,7 @@ type DeploymentMutation struct {
 	name             *string
 	status           *string
 	timezone         *string
+	public_origin    *string
 	feed_revision    *int64
 	addfeed_revision *int64
 	created_at       *time.Time
@@ -9681,6 +9684,42 @@ func (m *DeploymentMutation) ResetTimezone() {
 	m.timezone = nil
 }
 
+// SetPublicOrigin sets the "public_origin" field.
+func (m *DeploymentMutation) SetPublicOrigin(s string) {
+	m.public_origin = &s
+}
+
+// PublicOrigin returns the value of the "public_origin" field in the mutation.
+func (m *DeploymentMutation) PublicOrigin() (r string, exists bool) {
+	v := m.public_origin
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublicOrigin returns the old "public_origin" field's value of the Deployment entity.
+// If the Deployment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentMutation) OldPublicOrigin(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublicOrigin is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublicOrigin requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublicOrigin: %w", err)
+	}
+	return oldValue.PublicOrigin, nil
+}
+
+// ResetPublicOrigin resets all changes to the "public_origin" field.
+func (m *DeploymentMutation) ResetPublicOrigin() {
+	m.public_origin = nil
+}
+
 // SetFeedRevision sets the "feed_revision" field.
 func (m *DeploymentMutation) SetFeedRevision(i int64) {
 	m.feed_revision = &i
@@ -9843,7 +9882,7 @@ func (m *DeploymentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DeploymentMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.name != nil {
 		fields = append(fields, deployment.FieldName)
 	}
@@ -9852,6 +9891,9 @@ func (m *DeploymentMutation) Fields() []string {
 	}
 	if m.timezone != nil {
 		fields = append(fields, deployment.FieldTimezone)
+	}
+	if m.public_origin != nil {
+		fields = append(fields, deployment.FieldPublicOrigin)
 	}
 	if m.feed_revision != nil {
 		fields = append(fields, deployment.FieldFeedRevision)
@@ -9876,6 +9918,8 @@ func (m *DeploymentMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case deployment.FieldTimezone:
 		return m.Timezone()
+	case deployment.FieldPublicOrigin:
+		return m.PublicOrigin()
 	case deployment.FieldFeedRevision:
 		return m.FeedRevision()
 	case deployment.FieldCreatedAt:
@@ -9897,6 +9941,8 @@ func (m *DeploymentMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldStatus(ctx)
 	case deployment.FieldTimezone:
 		return m.OldTimezone(ctx)
+	case deployment.FieldPublicOrigin:
+		return m.OldPublicOrigin(ctx)
 	case deployment.FieldFeedRevision:
 		return m.OldFeedRevision(ctx)
 	case deployment.FieldCreatedAt:
@@ -9932,6 +9978,13 @@ func (m *DeploymentMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTimezone(v)
+		return nil
+	case deployment.FieldPublicOrigin:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublicOrigin(v)
 		return nil
 	case deployment.FieldFeedRevision:
 		v, ok := value.(int64)
@@ -10027,6 +10080,9 @@ func (m *DeploymentMutation) ResetField(name string) error {
 	case deployment.FieldTimezone:
 		m.ResetTimezone()
 		return nil
+	case deployment.FieldPublicOrigin:
+		m.ResetPublicOrigin()
+		return nil
 	case deployment.FieldFeedRevision:
 		m.ResetFeedRevision()
 		return nil
@@ -10086,6 +10142,662 @@ func (m *DeploymentMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *DeploymentMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Deployment edge %s", name)
+}
+
+// DeploymentSettingAuditMutation represents an operation that mutates the DeploymentSettingAudit nodes in the graph.
+type DeploymentSettingAuditMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *int
+	deployment_id     *string
+	actor_user_id     *string
+	old_name          *string
+	new_name          *string
+	old_public_origin *string
+	new_public_origin *string
+	created_at        *time.Time
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*DeploymentSettingAudit, error)
+	predicates        []predicate.DeploymentSettingAudit
+}
+
+var _ ent.Mutation = (*DeploymentSettingAuditMutation)(nil)
+
+// deploymentsettingauditOption allows management of the mutation configuration using functional options.
+type deploymentsettingauditOption func(*DeploymentSettingAuditMutation)
+
+// newDeploymentSettingAuditMutation creates new mutation for the DeploymentSettingAudit entity.
+func newDeploymentSettingAuditMutation(c config, op Op, opts ...deploymentsettingauditOption) *DeploymentSettingAuditMutation {
+	m := &DeploymentSettingAuditMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDeploymentSettingAudit,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDeploymentSettingAuditID sets the ID field of the mutation.
+func withDeploymentSettingAuditID(id int) deploymentsettingauditOption {
+	return func(m *DeploymentSettingAuditMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DeploymentSettingAudit
+		)
+		m.oldValue = func(ctx context.Context) (*DeploymentSettingAudit, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DeploymentSettingAudit.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDeploymentSettingAudit sets the old DeploymentSettingAudit of the mutation.
+func withDeploymentSettingAudit(node *DeploymentSettingAudit) deploymentsettingauditOption {
+	return func(m *DeploymentSettingAuditMutation) {
+		m.oldValue = func(context.Context) (*DeploymentSettingAudit, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DeploymentSettingAuditMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DeploymentSettingAuditMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DeploymentSettingAudit entities.
+func (m *DeploymentSettingAuditMutation) SetID(id int) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DeploymentSettingAuditMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DeploymentSettingAuditMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DeploymentSettingAudit.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetDeploymentID sets the "deployment_id" field.
+func (m *DeploymentSettingAuditMutation) SetDeploymentID(s string) {
+	m.deployment_id = &s
+}
+
+// DeploymentID returns the value of the "deployment_id" field in the mutation.
+func (m *DeploymentSettingAuditMutation) DeploymentID() (r string, exists bool) {
+	v := m.deployment_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeploymentID returns the old "deployment_id" field's value of the DeploymentSettingAudit entity.
+// If the DeploymentSettingAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentSettingAuditMutation) OldDeploymentID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeploymentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeploymentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeploymentID: %w", err)
+	}
+	return oldValue.DeploymentID, nil
+}
+
+// ResetDeploymentID resets all changes to the "deployment_id" field.
+func (m *DeploymentSettingAuditMutation) ResetDeploymentID() {
+	m.deployment_id = nil
+}
+
+// SetActorUserID sets the "actor_user_id" field.
+func (m *DeploymentSettingAuditMutation) SetActorUserID(s string) {
+	m.actor_user_id = &s
+}
+
+// ActorUserID returns the value of the "actor_user_id" field in the mutation.
+func (m *DeploymentSettingAuditMutation) ActorUserID() (r string, exists bool) {
+	v := m.actor_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorUserID returns the old "actor_user_id" field's value of the DeploymentSettingAudit entity.
+// If the DeploymentSettingAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentSettingAuditMutation) OldActorUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorUserID: %w", err)
+	}
+	return oldValue.ActorUserID, nil
+}
+
+// ResetActorUserID resets all changes to the "actor_user_id" field.
+func (m *DeploymentSettingAuditMutation) ResetActorUserID() {
+	m.actor_user_id = nil
+}
+
+// SetOldName sets the "old_name" field.
+func (m *DeploymentSettingAuditMutation) SetOldName(s string) {
+	m.old_name = &s
+}
+
+// OldName returns the value of the "old_name" field in the mutation.
+func (m *DeploymentSettingAuditMutation) OldName() (r string, exists bool) {
+	v := m.old_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOldName returns the old "old_name" field's value of the DeploymentSettingAudit entity.
+// If the DeploymentSettingAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentSettingAuditMutation) OldOldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOldName: %w", err)
+	}
+	return oldValue.OldName, nil
+}
+
+// ResetOldName resets all changes to the "old_name" field.
+func (m *DeploymentSettingAuditMutation) ResetOldName() {
+	m.old_name = nil
+}
+
+// SetNewName sets the "new_name" field.
+func (m *DeploymentSettingAuditMutation) SetNewName(s string) {
+	m.new_name = &s
+}
+
+// NewName returns the value of the "new_name" field in the mutation.
+func (m *DeploymentSettingAuditMutation) NewName() (r string, exists bool) {
+	v := m.new_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNewName returns the old "new_name" field's value of the DeploymentSettingAudit entity.
+// If the DeploymentSettingAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentSettingAuditMutation) OldNewName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNewName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNewName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNewName: %w", err)
+	}
+	return oldValue.NewName, nil
+}
+
+// ResetNewName resets all changes to the "new_name" field.
+func (m *DeploymentSettingAuditMutation) ResetNewName() {
+	m.new_name = nil
+}
+
+// SetOldPublicOrigin sets the "old_public_origin" field.
+func (m *DeploymentSettingAuditMutation) SetOldPublicOrigin(s string) {
+	m.old_public_origin = &s
+}
+
+// OldPublicOrigin returns the value of the "old_public_origin" field in the mutation.
+func (m *DeploymentSettingAuditMutation) OldPublicOrigin() (r string, exists bool) {
+	v := m.old_public_origin
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOldPublicOrigin returns the old "old_public_origin" field's value of the DeploymentSettingAudit entity.
+// If the DeploymentSettingAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentSettingAuditMutation) OldOldPublicOrigin(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOldPublicOrigin is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOldPublicOrigin requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOldPublicOrigin: %w", err)
+	}
+	return oldValue.OldPublicOrigin, nil
+}
+
+// ResetOldPublicOrigin resets all changes to the "old_public_origin" field.
+func (m *DeploymentSettingAuditMutation) ResetOldPublicOrigin() {
+	m.old_public_origin = nil
+}
+
+// SetNewPublicOrigin sets the "new_public_origin" field.
+func (m *DeploymentSettingAuditMutation) SetNewPublicOrigin(s string) {
+	m.new_public_origin = &s
+}
+
+// NewPublicOrigin returns the value of the "new_public_origin" field in the mutation.
+func (m *DeploymentSettingAuditMutation) NewPublicOrigin() (r string, exists bool) {
+	v := m.new_public_origin
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNewPublicOrigin returns the old "new_public_origin" field's value of the DeploymentSettingAudit entity.
+// If the DeploymentSettingAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentSettingAuditMutation) OldNewPublicOrigin(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNewPublicOrigin is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNewPublicOrigin requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNewPublicOrigin: %w", err)
+	}
+	return oldValue.NewPublicOrigin, nil
+}
+
+// ResetNewPublicOrigin resets all changes to the "new_public_origin" field.
+func (m *DeploymentSettingAuditMutation) ResetNewPublicOrigin() {
+	m.new_public_origin = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DeploymentSettingAuditMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DeploymentSettingAuditMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DeploymentSettingAudit entity.
+// If the DeploymentSettingAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentSettingAuditMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DeploymentSettingAuditMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the DeploymentSettingAuditMutation builder.
+func (m *DeploymentSettingAuditMutation) Where(ps ...predicate.DeploymentSettingAudit) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DeploymentSettingAuditMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DeploymentSettingAuditMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DeploymentSettingAudit, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DeploymentSettingAuditMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DeploymentSettingAuditMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DeploymentSettingAudit).
+func (m *DeploymentSettingAuditMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DeploymentSettingAuditMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.deployment_id != nil {
+		fields = append(fields, deploymentsettingaudit.FieldDeploymentID)
+	}
+	if m.actor_user_id != nil {
+		fields = append(fields, deploymentsettingaudit.FieldActorUserID)
+	}
+	if m.old_name != nil {
+		fields = append(fields, deploymentsettingaudit.FieldOldName)
+	}
+	if m.new_name != nil {
+		fields = append(fields, deploymentsettingaudit.FieldNewName)
+	}
+	if m.old_public_origin != nil {
+		fields = append(fields, deploymentsettingaudit.FieldOldPublicOrigin)
+	}
+	if m.new_public_origin != nil {
+		fields = append(fields, deploymentsettingaudit.FieldNewPublicOrigin)
+	}
+	if m.created_at != nil {
+		fields = append(fields, deploymentsettingaudit.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DeploymentSettingAuditMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case deploymentsettingaudit.FieldDeploymentID:
+		return m.DeploymentID()
+	case deploymentsettingaudit.FieldActorUserID:
+		return m.ActorUserID()
+	case deploymentsettingaudit.FieldOldName:
+		return m.OldName()
+	case deploymentsettingaudit.FieldNewName:
+		return m.NewName()
+	case deploymentsettingaudit.FieldOldPublicOrigin:
+		return m.OldPublicOrigin()
+	case deploymentsettingaudit.FieldNewPublicOrigin:
+		return m.NewPublicOrigin()
+	case deploymentsettingaudit.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DeploymentSettingAuditMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case deploymentsettingaudit.FieldDeploymentID:
+		return m.OldDeploymentID(ctx)
+	case deploymentsettingaudit.FieldActorUserID:
+		return m.OldActorUserID(ctx)
+	case deploymentsettingaudit.FieldOldName:
+		return m.OldOldName(ctx)
+	case deploymentsettingaudit.FieldNewName:
+		return m.OldNewName(ctx)
+	case deploymentsettingaudit.FieldOldPublicOrigin:
+		return m.OldOldPublicOrigin(ctx)
+	case deploymentsettingaudit.FieldNewPublicOrigin:
+		return m.OldNewPublicOrigin(ctx)
+	case deploymentsettingaudit.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DeploymentSettingAudit field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DeploymentSettingAuditMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case deploymentsettingaudit.FieldDeploymentID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeploymentID(v)
+		return nil
+	case deploymentsettingaudit.FieldActorUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorUserID(v)
+		return nil
+	case deploymentsettingaudit.FieldOldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOldName(v)
+		return nil
+	case deploymentsettingaudit.FieldNewName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNewName(v)
+		return nil
+	case deploymentsettingaudit.FieldOldPublicOrigin:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOldPublicOrigin(v)
+		return nil
+	case deploymentsettingaudit.FieldNewPublicOrigin:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNewPublicOrigin(v)
+		return nil
+	case deploymentsettingaudit.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DeploymentSettingAudit field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DeploymentSettingAuditMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DeploymentSettingAuditMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DeploymentSettingAuditMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown DeploymentSettingAudit numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DeploymentSettingAuditMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DeploymentSettingAuditMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DeploymentSettingAuditMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown DeploymentSettingAudit nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DeploymentSettingAuditMutation) ResetField(name string) error {
+	switch name {
+	case deploymentsettingaudit.FieldDeploymentID:
+		m.ResetDeploymentID()
+		return nil
+	case deploymentsettingaudit.FieldActorUserID:
+		m.ResetActorUserID()
+		return nil
+	case deploymentsettingaudit.FieldOldName:
+		m.ResetOldName()
+		return nil
+	case deploymentsettingaudit.FieldNewName:
+		m.ResetNewName()
+		return nil
+	case deploymentsettingaudit.FieldOldPublicOrigin:
+		m.ResetOldPublicOrigin()
+		return nil
+	case deploymentsettingaudit.FieldNewPublicOrigin:
+		m.ResetNewPublicOrigin()
+		return nil
+	case deploymentsettingaudit.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DeploymentSettingAudit field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DeploymentSettingAuditMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DeploymentSettingAuditMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DeploymentSettingAuditMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DeploymentSettingAuditMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DeploymentSettingAuditMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DeploymentSettingAuditMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DeploymentSettingAuditMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DeploymentSettingAudit unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DeploymentSettingAuditMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DeploymentSettingAudit edge %s", name)
 }
 
 // DeviceMutation represents an operation that mutates the Device nodes in the graph.

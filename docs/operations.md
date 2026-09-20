@@ -21,13 +21,15 @@ caddy run --config deploy/Caddyfile --adapter caddyfile
 
 Clients use `http://127.0.0.1:9000`; they resolve `clientApiBase` and `runtimeApiBase` from `/.well-known/measix`, never the internal component ports. For the standard Portal, also set Hub `--public-origin http://127.0.0.1:9000 --portal-assets-dir ../../measix-enterprise-portal/dist` when running from `backend/`. To use an independently deployed enterprise Portal, set `--portal-upstream-url http://portal.example/` instead; Android still opens Hub `/portal/`. Admin assets remain `--admin-assets-dir ../console/dist/spa`.
 
-For a device deployment, set `MEASIX_PUBLIC_ADDRESS` to the device-reachable HTTP or HTTPS origin and `MEASIX_BIND` to the intended ingress interface. Set Hub `--public-origin` to that same origin. For example, `http://192.168.31.235:9000` is a valid LAN deployment; IP addresses, domain names and custom ports are supported. HTTP does not require DNS or certificates. HTTPS termination belongs to the ingress when selected. `MEASIX_HUB_UPSTREAM` and `MEASIX_RELAY_UPSTREAM` override the private backend addresses. Expose only the public ingress; loopback on Android refers to the device, not this computer. The application does not configure router forwarding or firewall rules; verify the selected address from the device network.
+For a device deployment, set `MEASIX_PUBLIC_ADDRESS` to the device-reachable HTTP or HTTPS origin and `MEASIX_BIND` to the intended ingress interface. Set Hub `--public-origin` to that same origin for the first startup. For example, `http://192.168.31.235:9000` is a valid LAN deployment; IP addresses, domain names and custom ports are supported. HTTP does not require DNS or certificates. HTTPS termination belongs to the ingress when selected. `MEASIX_HUB_UPSTREAM` and `MEASIX_RELAY_UPSTREAM` override the private backend addresses. Expose only the public ingress; loopback on Android refers to the device, not this computer. The application does not configure router forwarding or firewall rules; verify the selected address from the device network.
+
+The first successful Hub startup persists `--public-origin` into Deployment settings. Afterwards Admin **Global settings** is authoritative and can change it without restarting Hub; the startup flag remains a seed for a clean database, not an override of a reviewed Admin change. For a Caddy deployment, set the persisted value to the external address such as `https://core.example.com`, while Hub may continue listening on a private HTTP address. Configure and verify DNS, TLS and Caddy before saving: Core does not provision them. A change affects new enrollment material, Portal URLs/origin checks and Secure-cookie policy; it revokes existing Portal sessions. Existing Android authorities retain the old origin and require an explicit re-enrollment/migration plan if the old entry point is removed.
 
 Use Caddy's native [WebSocket and streaming proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#streaming). No body buffering, retry or `flush_interval -1` override is required; SSE is flushed automatically, and forcing negative flush intervals disables upstream cancellation on client disconnect. The Caddy administration API is disabled. This recipe is ingress configuration, not the S0.3 production supervisor/package. Local HTTP evidence does not qualify public TLS or device connectivity.
 
 ## 2. Configuration actually implemented
 
-Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/config.go`. CLI flags override environment defaults; duration environment values are parsed before flags, so an invalid environment duration can fail loading even with a valid flag. All options are startup configuration; there is no hot reload.
+Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/config.go`. CLI flags override environment defaults; duration environment values are parsed before flags, so an invalid environment duration can fail loading even with a valid flag. All options except the persisted public origin are startup configuration; there is no general-purpose config hot reload.
 
 ### Control Hub
 
@@ -36,7 +38,7 @@ Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/
 | `--listen` | `HUB_LISTEN_ADDR` | `:8080` |
 | `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8081`; keep private |
 | `--admin-assets-dir` | `HUB_ADMIN_ASSETS_DIR` | Optional production SPA directory |
-| `--public-origin` | `HUB_PUBLIC_ORIGIN` | Public HTTP/HTTPS platform origin; IP/domain and optional port |
+| `--public-origin` | `HUB_PUBLIC_ORIGIN` | Initial public HTTP/HTTPS platform origin seed; later changes are persisted through Admin Global settings |
 | `--portal-assets-dir` | `HUB_PORTAL_ASSETS_DIR` | Standard `measix-enterprise-portal/dist`; requires approved origin |
 | `--portal-upstream-url` | `HUB_PORTAL_UPSTREAM_URL` | Optional custom enterprise HTTP/HTTPS static site; takes precedence over assets and does not fall back |
 | `--db` | `HUB_DB_PATH` | Required SQLite path |

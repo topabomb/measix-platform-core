@@ -311,6 +311,7 @@ var (
 		{Name: "name", Type: field.TypeString},
 		{Name: "status", Type: field.TypeString},
 		{Name: "timezone", Type: field.TypeString, Default: "UTC"},
+		{Name: "public_origin", Type: field.TypeString, Default: ""},
 		{Name: "feed_revision", Type: field.TypeInt64, Default: 0},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -320,6 +321,30 @@ var (
 		Name:       "deployments",
 		Columns:    DeploymentsColumns,
 		PrimaryKey: []*schema.Column{DeploymentsColumns[0]},
+	}
+	// DeploymentSettingAuditsColumns holds the columns for the "deployment_setting_audits" table.
+	DeploymentSettingAuditsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "deployment_id", Type: field.TypeString},
+		{Name: "actor_user_id", Type: field.TypeString},
+		{Name: "old_name", Type: field.TypeString},
+		{Name: "new_name", Type: field.TypeString},
+		{Name: "old_public_origin", Type: field.TypeString, Default: ""},
+		{Name: "new_public_origin", Type: field.TypeString, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// DeploymentSettingAuditsTable holds the schema information for the "deployment_setting_audits" table.
+	DeploymentSettingAuditsTable = &schema.Table{
+		Name:       "deployment_setting_audits",
+		Columns:    DeploymentSettingAuditsColumns,
+		PrimaryKey: []*schema.Column{DeploymentSettingAuditsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "deploymentsettingaudit_deployment_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{DeploymentSettingAuditsColumns[1], DeploymentSettingAuditsColumns[7]},
+			},
+		},
 	}
 	// DevicesColumns holds the columns for the "devices" table.
 	DevicesColumns = []*schema.Column{
@@ -837,6 +862,7 @@ var (
 		DeletedCredentialsTable,
 		DeletedPrincipalsTable,
 		DeploymentsTable,
+		DeploymentSettingAuditsTable,
 		DevicesTable,
 		EnrollmentsTable,
 		EnterpriseUpdatesTable,

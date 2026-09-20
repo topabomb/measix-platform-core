@@ -17,6 +17,7 @@ import (
 	"measix/platform/ent/deletedcredential"
 	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/deployment"
+	"measix/platform/ent/deploymentsettingaudit"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enrollment"
 	"measix/platform/ent/enterpriseupdate"
@@ -114,6 +115,7 @@ func checkColumn(t, c string) error {
 			deletedcredential.Table:      deletedcredential.ValidColumn,
 			deletedprincipal.Table:       deletedprincipal.ValidColumn,
 			deployment.Table:             deployment.ValidColumn,
+			deploymentsettingaudit.Table: deploymentsettingaudit.ValidColumn,
 			device.Table:                 device.ValidColumn,
 			enrollment.Table:             enrollment.ValidColumn,
 			enterpriseupdate.Table:       enterpriseupdate.ValidColumn,

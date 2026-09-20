@@ -13,6 +13,7 @@ func (Deployment) Fields() []ent.Field {
 		field.String("name"),
 		field.String("status"),
 		field.String("timezone").Default("UTC"),
+		field.String("public_origin").Default(""),
 		field.Int64("feed_revision").Default(0),
 		field.Time("created_at"),
 		field.Time("updated_at"),

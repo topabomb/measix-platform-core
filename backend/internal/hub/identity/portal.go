@@ -36,7 +36,8 @@ func (s *Service) CreatePortalGrant(ctx context.Context, token string) (clientap
 	if err != nil {
 		return clientapi.PortalGrant{}, err
 	}
-	if !s.PortalStaticAvailable || s.PublicOrigin == "" || ValidatePublicOrigin(s.PublicOrigin) != nil {
+	publicOrigin := s.PublicOrigin()
+	if !s.PortalStaticAvailable || publicOrigin == "" || ValidatePublicOrigin(publicOrigin) != nil {
 		return clientapi.PortalGrant{}, ErrPortalUnavailable
 	}
 	now := s.Now().UTC()
@@ -58,9 +59,9 @@ func (s *Service) CreatePortalGrant(ctx context.Context, token string) (clientap
 	if _, err = s.Client.PortalSession.Delete().Where(portalsession.ExpiresAtLTE(now)).Exec(ctx); err != nil {
 		return clientapi.PortalGrant{}, err
 	}
-	_, err = s.Client.PortalSession.Create().SetID(id).SetSessionID(p.SessionID).SetOrigin(s.PublicOrigin).
+	_, err = s.Client.PortalSession.Create().SetID(id).SetSessionID(p.SessionID).SetOrigin(publicOrigin).
 		SetTicketDigest(security.DigestToken(ticket)).SetGrantExpiresAt(expiry).SetExpiresAt(expiry).Save(ctx)
-	return clientapi.PortalGrant{ExchangeUrl: s.PublicOrigin + "/portal/session/exchange", Ticket: ticket, ExpiresAt: expiry}, err
+	return clientapi.PortalGrant{ExchangeUrl: publicOrigin + "/portal/session/exchange", Ticket: ticket, ExpiresAt: expiry}, err
 }
 
 // portalParent checks live parent state, independent of an expired/rotated
@@ -81,11 +82,12 @@ func (s *Service) portalParent(ctx context.Context, sessionID string) (AccessPri
 }
 
 func (s *Service) ExchangePortalGrant(ctx context.Context, ticket string) (string, time.Time, error) {
-	if s.PublicOrigin == "" || len(ticket) < 32 || len(ticket) > 128 {
+	publicOrigin := s.PublicOrigin()
+	if publicOrigin == "" || len(ticket) < 32 || len(ticket) > 128 {
 		return "", time.Time{}, ErrCredential
 	}
 	now := s.Now().UTC()
-	row, err := s.Client.PortalSession.Query().Where(portalsession.TicketDigestEQ(security.DigestToken(ticket)), portalsession.OriginEQ(s.PublicOrigin), portalsession.ConsumedEQ(false), portalsession.RevokedEQ(false), portalsession.GrantExpiresAtGT(now)).Only(ctx)
+	row, err := s.Client.PortalSession.Query().Where(portalsession.TicketDigestEQ(security.DigestToken(ticket)), portalsession.OriginEQ(publicOrigin), portalsession.ConsumedEQ(false), portalsession.RevokedEQ(false), portalsession.GrantExpiresAtGT(now)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return "", time.Time{}, ErrCredential
 	}
@@ -112,10 +114,11 @@ func (s *Service) ExchangePortalGrant(ctx context.Context, ticket string) (strin
 }
 
 func (s *Service) AuthenticatePortal(ctx context.Context, cookie string) (clientapi.PortalSession, error) {
-	if cookie == "" || s.PublicOrigin == "" {
+	publicOrigin := s.PublicOrigin()
+	if cookie == "" || publicOrigin == "" {
 		return clientapi.PortalSession{}, ErrCredential
 	}
-	row, err := s.Client.PortalSession.Query().Where(portalsession.CookieDigestEQ(security.DigestToken(cookie)), portalsession.ConsumedEQ(true), portalsession.RevokedEQ(false), portalsession.OriginEQ(s.PublicOrigin), portalsession.ExpiresAtGT(s.Now().UTC())).Only(ctx)
+	row, err := s.Client.PortalSession.Query().Where(portalsession.CookieDigestEQ(security.DigestToken(cookie)), portalsession.ConsumedEQ(true), portalsession.RevokedEQ(false), portalsession.OriginEQ(publicOrigin), portalsession.ExpiresAtGT(s.Now().UTC())).Only(ctx)
 	if ent.IsNotFound(err) {
 		return clientapi.PortalSession{}, ErrCredential
 	}

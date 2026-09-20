@@ -34,6 +34,8 @@ type Tx struct {
 	DeletedPrincipal *DeletedPrincipalClient
 	// Deployment is the client for interacting with the Deployment builders.
 	Deployment *DeploymentClient
+	// DeploymentSettingAudit is the client for interacting with the DeploymentSettingAudit builders.
+	DeploymentSettingAudit *DeploymentSettingAuditClient
 	// Device is the client for interacting with the Device builders.
 	Device *DeviceClient
 	// Enrollment is the client for interacting with the Enrollment builders.
@@ -216,6 +218,7 @@ func (tx *Tx) init() {
 	tx.DeletedCredential = NewDeletedCredentialClient(tx.config)
 	tx.DeletedPrincipal = NewDeletedPrincipalClient(tx.config)
 	tx.Deployment = NewDeploymentClient(tx.config)
+	tx.DeploymentSettingAudit = NewDeploymentSettingAuditClient(tx.config)
 	tx.Device = NewDeviceClient(tx.config)
 	tx.Enrollment = NewEnrollmentClient(tx.config)
 	tx.EnterpriseUpdate = NewEnterpriseUpdateClient(tx.config)

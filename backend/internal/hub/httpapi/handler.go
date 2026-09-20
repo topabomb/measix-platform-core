@@ -52,7 +52,7 @@ func (h *adminHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Value:    result.CookieSecret,
 		Path:     "/",
 		Expires:  result.ExpiresAt,
-		Secure:   strings.HasPrefix(h.identity.PublicOrigin, "https://"),
+		Secure:   strings.HasPrefix(h.identity.PublicOrigin(), "https://"),
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 	})
@@ -96,7 +96,7 @@ func (h *adminHandler) LogoutAdmin(w http.ResponseWriter, r *http.Request, param
 		writeIdentityError(w, err)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: "/", MaxAge: -1, Secure: strings.HasPrefix(h.identity.PublicOrigin, "https://"), HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: "/", MaxAge: -1, Secure: strings.HasPrefix(h.identity.PublicOrigin(), "https://"), HttpOnly: true, SameSite: http.SameSiteStrictMode})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -198,7 +198,8 @@ func (h *adminHandler) CreateEnrollment(w http.ResponseWriter, r *http.Request, 
 		writeIdentityError(w, err)
 		return
 	}
-	if identity.ValidatePublicOrigin(h.identity.PublicOrigin) != nil {
+	publicOrigin := h.identity.PublicOrigin()
+	if identity.ValidatePublicOrigin(publicOrigin) != nil {
 		writeProblem(w, http.StatusServiceUnavailable, "platform_origin_unconfigured", "Configure the platform public origin before issuing enrollment material")
 		return
 	}
@@ -216,7 +217,7 @@ func (h *adminHandler) CreateEnrollment(w http.ResponseWriter, r *http.Request, 
 		writeIdentityError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, adminapi.CreateEnrollmentResponse{EnrollmentId: grant.EnrollmentID, Code: grant.Code, ExpiresAt: grant.ExpiresAt, PlatformUrl: h.identity.PublicOrigin})
+	writeJSON(w, http.StatusCreated, adminapi.CreateEnrollmentResponse{EnrollmentId: grant.EnrollmentID, Code: grant.Code, ExpiresAt: grant.ExpiresAt, PlatformUrl: publicOrigin})
 }
 
 func (h *adminHandler) ListDevices(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.ListDevicesParams) {

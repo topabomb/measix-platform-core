@@ -5,6 +5,7 @@ import {
   QCard, QCardSection, QCardActions, QInput, QBtn, QBanner,
   QSelect, QDialog, QSeparator, QList, QItem, QItemSection, QItemLabel,
   QChip, QSpinner, QIcon, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown,
+  QTab, QTabs,
   ClosePopup,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
@@ -48,6 +49,7 @@ function mountUsersPage() {
             QInput, QBtn, QBanner, QSelect, QDialog, QSeparator, QList, QItem,
             QItemSection, QItemLabel, QChip, QSpinner, QIcon, PageHeader, StatusChip,
             QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown,
+            QTab, QTabs,
           },
           directives: { ClosePopup },
         }], pinia, router],
@@ -174,7 +176,8 @@ describe('UsersPage', () => {
     await flushPromises()
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
-    ;(document.querySelector('[data-cy="delete-user-btn"]') as HTMLButtonElement).click()
+    const page = wrapper.findComponent(UsersPage)
+    ;(page.vm as unknown as { beginDeleteUser: () => void }).beginDeleteUser()
     await flushPromises()
 
     const confirm = document.querySelector('[data-cy="confirm-delete-user"]') as HTMLButtonElement
@@ -213,19 +216,15 @@ describe('UsersPage', () => {
     setupSession(pinia)
     await flushPromises()
 
-    // Open user detail — the dialog is teleported to document.body
+    // Open the persistent user detail workspace.
     const userRow = wrapper.findComponent(QItem)
     expect(userRow.exists()).toBe(true)
     await userRow.trigger('click')
     await flushPromises()
 
-    // Click generate enrollment — the button is inside the teleported dialog
-    const enrollBtn = [...document.querySelectorAll('button')].find((b) =>
-      (b.textContent ?? '').includes('enrollment') || (b.textContent ?? '').includes('Enrollment'),
-    )
-    expect(enrollBtn).toBeTruthy()
-    expect(enrollBtn!.textContent).toContain('Generate Android enrollment material')
-    enrollBtn!.click()
+    const enrollBtn = wrapper.get('[data-cy="generate-enrollment-btn"]')
+    expect(enrollBtn.text()).toContain('Generate Android enrollment material')
+    await enrollBtn.trigger('click')
     await flushPromises()
 
     const codeDetails = document.querySelector('[data-cy="enrollment-code-details"]') as HTMLDetailsElement
@@ -285,12 +284,7 @@ describe('UsersPage', () => {
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
 
-    // The enrollment button is inside the teleported detail dialog
-    const enrollBtn = [...document.querySelectorAll('button')].find((b) =>
-      (b.textContent ?? '').includes('enrollment') || (b.textContent ?? '').includes('Enrollment'),
-    )
-    expect(enrollBtn).toBeTruthy()
-    enrollBtn!.click()
+    await wrapper.get('[data-cy="generate-enrollment-btn"]').trigger('click')
     await flushPromises()
 
     const body = document.body.innerHTML
@@ -322,11 +316,7 @@ describe('UsersPage', () => {
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
 
-    const enrollBtn = [...document.querySelectorAll('button')].find((b) =>
-      (b.textContent ?? '').includes('enrollment') || (b.textContent ?? '').includes('Enrollment'),
-    )
-    expect(enrollBtn).toBeTruthy()
-    enrollBtn!.click()
+    await wrapper.get('[data-cy="generate-enrollment-btn"]').trigger('click')
     await flushPromises()
 
     // QRCode.toCanvas should have been called with the enrollment code
@@ -361,12 +351,7 @@ describe('UsersPage', () => {
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
 
-    // The enrollment button is inside the teleported detail dialog
-    const enrollBtn = [...document.querySelectorAll('button')].find((b) =>
-      (b.textContent ?? '').includes('enrollment') || (b.textContent ?? '').includes('Enrollment'),
-    )
-    expect(enrollBtn).toBeTruthy()
-    enrollBtn!.click()
+    await wrapper.get('[data-cy="generate-enrollment-btn"]').trigger('click')
     await flushPromises()
 
     const body = document.body.innerHTML
@@ -408,15 +393,16 @@ describe('UsersPage', () => {
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
 
-    const body = document.body.innerHTML
+    const detail = wrapper.get('[data-cy="user-detail"]')
+    const body = detail.text()
     expect(body).toContain('dev_001')
     expect(body).toContain('Office phone')
     expect(body).toContain('dev_002')
     expect(body).toContain('Reported applied')
     expect(body).toContain('Application status unknown')
-    const identities = document.querySelectorAll('details[data-cy="device-identity"]')
+    const identities = detail.findAll('details[data-cy="device-identity"]')
     expect(identities).toHaveLength(2)
-    expect(identities[0]?.hasAttribute('open')).toBe(false)
+    expect(identities[0]?.element.hasAttribute('open')).toBe(false)
     // StatusChip renders status via i18n ("Active" / "Revoked")
     expect(body.toLowerCase()).toContain('active')
     expect(body.toLowerCase()).toContain('revoked')

@@ -23,6 +23,8 @@ type Deployment struct {
 	Status string `json:"status,omitempty"`
 	// Timezone holds the value of the "timezone" field.
 	Timezone string `json:"timezone,omitempty"`
+	// PublicOrigin holds the value of the "public_origin" field.
+	PublicOrigin string `json:"public_origin,omitempty"`
 	// FeedRevision holds the value of the "feed_revision" field.
 	FeedRevision int64 `json:"feed_revision,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -39,7 +41,7 @@ func (*Deployment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case deployment.FieldFeedRevision:
 			values[i] = new(sql.NullInt64)
-		case deployment.FieldID, deployment.FieldName, deployment.FieldStatus, deployment.FieldTimezone:
+		case deployment.FieldID, deployment.FieldName, deployment.FieldStatus, deployment.FieldTimezone, deployment.FieldPublicOrigin:
 			values[i] = new(sql.NullString)
 		case deployment.FieldCreatedAt, deployment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -81,6 +83,12 @@ func (_m *Deployment) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field timezone", values[i])
 			} else if value.Valid {
 				_m.Timezone = value.String
+			}
+		case deployment.FieldPublicOrigin:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field public_origin", values[i])
+			} else if value.Valid {
+				_m.PublicOrigin = value.String
 			}
 		case deployment.FieldFeedRevision:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -144,6 +152,9 @@ func (_m *Deployment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("timezone=")
 	builder.WriteString(_m.Timezone)
+	builder.WriteString(", ")
+	builder.WriteString("public_origin=")
+	builder.WriteString(_m.PublicOrigin)
 	builder.WriteString(", ")
 	builder.WriteString("feed_revision=")
 	builder.WriteString(fmt.Sprintf("%v", _m.FeedRevision))

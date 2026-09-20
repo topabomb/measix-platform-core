@@ -79,6 +79,11 @@ func Timezone(v string) predicate.Deployment {
 	return predicate.Deployment(sql.FieldEQ(FieldTimezone, v))
 }
 
+// PublicOrigin applies equality check predicate on the "public_origin" field. It's identical to PublicOriginEQ.
+func PublicOrigin(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEQ(FieldPublicOrigin, v))
+}
+
 // FeedRevision applies equality check predicate on the "feed_revision" field. It's identical to FeedRevisionEQ.
 func FeedRevision(v int64) predicate.Deployment {
 	return predicate.Deployment(sql.FieldEQ(FieldFeedRevision, v))
@@ -287,6 +292,71 @@ func TimezoneEqualFold(v string) predicate.Deployment {
 // TimezoneContainsFold applies the ContainsFold predicate on the "timezone" field.
 func TimezoneContainsFold(v string) predicate.Deployment {
 	return predicate.Deployment(sql.FieldContainsFold(FieldTimezone, v))
+}
+
+// PublicOriginEQ applies the EQ predicate on the "public_origin" field.
+func PublicOriginEQ(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEQ(FieldPublicOrigin, v))
+}
+
+// PublicOriginNEQ applies the NEQ predicate on the "public_origin" field.
+func PublicOriginNEQ(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldNEQ(FieldPublicOrigin, v))
+}
+
+// PublicOriginIn applies the In predicate on the "public_origin" field.
+func PublicOriginIn(vs ...string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldIn(FieldPublicOrigin, vs...))
+}
+
+// PublicOriginNotIn applies the NotIn predicate on the "public_origin" field.
+func PublicOriginNotIn(vs ...string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldNotIn(FieldPublicOrigin, vs...))
+}
+
+// PublicOriginGT applies the GT predicate on the "public_origin" field.
+func PublicOriginGT(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldGT(FieldPublicOrigin, v))
+}
+
+// PublicOriginGTE applies the GTE predicate on the "public_origin" field.
+func PublicOriginGTE(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldGTE(FieldPublicOrigin, v))
+}
+
+// PublicOriginLT applies the LT predicate on the "public_origin" field.
+func PublicOriginLT(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldLT(FieldPublicOrigin, v))
+}
+
+// PublicOriginLTE applies the LTE predicate on the "public_origin" field.
+func PublicOriginLTE(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldLTE(FieldPublicOrigin, v))
+}
+
+// PublicOriginContains applies the Contains predicate on the "public_origin" field.
+func PublicOriginContains(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldContains(FieldPublicOrigin, v))
+}
+
+// PublicOriginHasPrefix applies the HasPrefix predicate on the "public_origin" field.
+func PublicOriginHasPrefix(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldHasPrefix(FieldPublicOrigin, v))
+}
+
+// PublicOriginHasSuffix applies the HasSuffix predicate on the "public_origin" field.
+func PublicOriginHasSuffix(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldHasSuffix(FieldPublicOrigin, v))
+}
+
+// PublicOriginEqualFold applies the EqualFold predicate on the "public_origin" field.
+func PublicOriginEqualFold(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEqualFold(FieldPublicOrigin, v))
+}
+
+// PublicOriginContainsFold applies the ContainsFold predicate on the "public_origin" field.
+func PublicOriginContainsFold(v string) predicate.Deployment {
+	return predicate.Deployment(sql.FieldContainsFold(FieldPublicOrigin, v))
 }
 
 // FeedRevisionEQ applies the EQ predicate on the "feed_revision" field.

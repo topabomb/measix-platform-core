@@ -6,6 +6,7 @@ import {
   QSelect, QToggle, QDialog, QSeparator,
   QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip, QSpinner,
   QIcon, QToolbarTitle, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown,
+  QBadge, QField, QSpace,
   ClosePopup,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
@@ -16,6 +17,7 @@ import PageHeader from '../components/PageHeader.vue'
 import { useSessionStore } from '../stores/session'
 import { useActivationStore } from '../stores/activation'
 import * as client from '../api/client'
+import PagedEntityPicker, { type EntityPickerOption } from '../components/PagedEntityPicker.vue'
 
 /**
  * UpstreamsPage is a route-level page that expects to be rendered inside a
@@ -48,7 +50,8 @@ function mountUpstreamsPage() {
             QLayout, QPage, QPageContainer, QCard, QCardSection, QCardActions,
             QInput, QBtn, QBanner, QSelect, QToggle, QDialog, QSeparator,
             QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip,
-            QSpinner, QIcon, QToolbarTitle, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, PageHeader,
+            QSpinner, QIcon, QToolbarTitle, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown,
+            QBadge, QField, QSpace, PageHeader,
           },
           directives: { ClosePopup },
         }], pinia, router],
@@ -117,7 +120,7 @@ describe('UpstreamsPage', () => {
   it('reuses a secret listed after page reload when creating an upstream', async () => {
     const secret = { secretId: 'sec_existing', name: 'Existing key', secretVersion: 3 }
     const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
-      if (path === '/api/admin/v1/secrets?limit=200') return { items: [secret] }
+      if (path === '/api/admin/v1/secrets?limit=50') return { items: [secret] }
       if (path === '/api/admin/v1/upstreams' && init?.method === 'POST') {
         return { upstreamId: 'ups_created', name: 'Example', configRevision: 1, status: 'INACTIVE' }
       }
@@ -132,9 +135,9 @@ describe('UpstreamsPage', () => {
     expect(wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Auth mode')!.props('options')).toContainEqual({ label: 'Bearer token', value: 'BEARER' })
     expect(wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Usage capability level')!.props('options')).toContainEqual({ label: 'Request facts only (Level 0)', value: 'LEVEL_0' })
     await flushPromises()
-    const picker = wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Existing secret')
-    expect(picker?.props('options')).toContainEqual({ label: 'Existing key (v3)', value: secret.secretId })
-    await picker!.setValue(secret.secretId)
+    const picker = wrapper.findComponent(PagedEntityPicker)
+    ;(picker.vm as unknown as { choose: (option: EntityPickerOption) => void }).choose({ value: secret.secretId, label: secret.name, caption: 'v3', metadata: { secretVersion: 3 } })
+    await flushPromises()
     await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Name')!.setValue('Example')
     await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Base URL')!.setValue('https://example.test')
     await wrapper.findAllComponents(QBtn).find(button => button.attributes('data-cy') === 'upstream-form-submit')!.trigger('click')
@@ -159,8 +162,9 @@ describe('UpstreamsPage', () => {
       },
     }
     const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
-      if (path === '/api/admin/v1/secrets?limit=200') return { items: [secret] }
-      if (path === '/api/admin/v1/upstreams?limit=200') return { items: [upstream] }
+      if (path === '/api/admin/v1/secrets?limit=50') return { items: [secret] }
+      if (path === '/api/admin/v1/upstreams?limit=50') return { items: [upstream] }
+      if (path === '/api/admin/v1/secrets/sec_previous') return { secretId: 'sec_previous', name: 'Previous', secretVersion: 1 }
       if (path === '/api/admin/v1/upstreams/ups_existing' && init?.method === 'PUT') return { ...upstream, configRevision: 2, config: JSON.parse(init.body as string).config }
       return {}
     })
@@ -170,9 +174,9 @@ describe('UpstreamsPage', () => {
     await wrapper.findComponent(QItem).trigger('click')
     await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'Edit connection')!.trigger('click')
     await flushPromises()
-    const picker = wrapper.findAllComponents(QSelect).find(select => select.props('label') === 'Existing secret')
-    expect(picker?.props('options')).toContainEqual({ label: 'Existing key (v3)', value: secret.secretId })
-    await picker!.setValue(secret.secretId)
+    const picker = wrapper.findComponent(PagedEntityPicker)
+    ;(picker.vm as unknown as { choose: (option: EntityPickerOption) => void }).choose({ value: secret.secretId, label: secret.name, caption: 'v3', metadata: { secretVersion: 3 } })
+    await flushPromises()
     await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'Save pending changes')!.trigger('click')
     await flushPromises()
     const call = fetchSpy.mock.calls.find(([path, init]) => path === '/api/admin/v1/upstreams/ups_existing' && init?.method === 'PUT')
@@ -353,9 +357,8 @@ describe('UpstreamsPage', () => {
     // Open the upstream detail row.
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
-    const advanced = document.querySelector('[data-cy="upstream-detail-advanced"]')
-    expect(advanced).not.toBeNull()
-    expect(advanced).not.toHaveProperty('open', true)
+    const advanced = wrapper.get('[data-cy="upstream-detail-advanced"]')
+    expect(advanced.element).not.toHaveProperty('open', true)
 
     const btns = wrapper.findAllComponents(QBtn)
     const testBtn = btns.find((b) => String(b.props('label') ?? '') === 'Test connection')
@@ -366,9 +369,9 @@ describe('UpstreamsPage', () => {
     const testCall = fetchSpy.mock.calls.find((c) => c[0].includes(':test'))
     expect(testCall).toBeTruthy()
     expect(testCall![1]!.method).toBe('POST')
-    expect(document.querySelector('[data-cy="upstream-test-http-status"]')?.textContent).toBe('401')
-    expect(document.body.textContent).toContain('This checks connectivity only')
-    expect(document.body.textContent).not.toContain('Verified capabilities')
+    expect(wrapper.get('[data-cy="upstream-test-http-status"]').text()).toBe('401')
+    expect(wrapper.text()).toContain('This checks connectivity only')
+    expect(wrapper.text()).not.toContain('Verified capabilities')
   })
 
   it('applies an upstream with an Idempotency-Key and surfaces the activation', async () => {

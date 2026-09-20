@@ -94,15 +94,15 @@ describe('ReleasesPage', () => {
     expect(text).not.toContain('sha256:abc')
   })
 
-  it('opens a release detail dialog with snapshot hash and activation history', async () => {
+  it('opens a release detail workspace with snapshot hash and activation history', async () => {
     const { wrapper } = mountReleases()
     await flushPromises()
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
-    const body = document.body.innerHTML
-    expect(body).toContain('sha256:abc')
-    expect(body).toContain('act_1')
-    expect(body.toLowerCase()).toContain('completed')
+    const detail = wrapper.get('[data-cy="release-detail"]')
+    expect(detail.text()).toContain('sha256:abc')
+    expect(detail.text()).toContain('act_1')
+    expect(detail.text().toLowerCase()).toContain('completed')
   })
 
   it('republishes with an Idempotency-Key and surfaces the activation', async () => {

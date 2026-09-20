@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"measix/platform/ent"
@@ -39,7 +40,8 @@ var (
 )
 
 type Service struct {
-	PublicOrigin          string
+	publicOriginMu        sync.RWMutex
+	publicOrigin          string
 	PortalStaticAvailable bool
 	BootstrapTimezone     string
 	Client                *ent.Client
@@ -47,6 +49,21 @@ type Service struct {
 	CSRFKey               []byte
 	Now                   func() time.Time
 	Random                func(int) (string, error)
+}
+
+// PublicOrigin returns the deployment-owned canonical address advertised to
+// clients. It is mutable at runtime, so every request takes a consistent
+// snapshot instead of racing with an Admin settings update.
+func (s *Service) PublicOrigin() string {
+	s.publicOriginMu.RLock()
+	defer s.publicOriginMu.RUnlock()
+	return s.publicOrigin
+}
+
+func (s *Service) SetPublicOrigin(value string) {
+	s.publicOriginMu.Lock()
+	s.publicOrigin = value
+	s.publicOriginMu.Unlock()
 }
 
 func New(client *ent.Client, signer *security.AccessSigner, csrfKey []byte) *Service {

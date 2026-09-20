@@ -69,6 +69,15 @@ describe('PricingPanel', () => {
     expect(wrapper.text()).toContain('INPUT_TOKENS')
   })
 
+  it('enables save only after the local pricing set changes', async () => {
+    const { wrapper } = mountPanel()
+    await flushPromises()
+    expect(wrapper.get('[data-cy="pricing-save-btn"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-cy="pricing-add-rule-btn"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-cy="pricing-save-btn"]').attributes('disabled')).toBeUndefined()
+  })
+
   it('adds a rule then saves with expectedPricingRevision and CSRF', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {

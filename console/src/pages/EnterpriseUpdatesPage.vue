@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onBeforeUnmount, onMounted, ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
-import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
+import DetailWorkspace from '../components/DetailWorkspace.vue'
+import CursorPager from '../components/CursorPager.vue'
 import { useSessionStore } from '../stores/session'
 import { renderContent } from '../composables/useMarkdown'
+import { useCursorPager } from '../composables/useCursorPager'
 
 const { t: $t, locale } = useI18n()
 
@@ -20,21 +22,25 @@ type EnterpriseUpdateSeverity = components['schemas']['EnterpriseUpdateSeverity'
 type EnterpriseUpdateContentFormat = components['schemas']['EnterpriseUpdateContentFormat']
 
 const session = useSessionStore()
-const updates = ref<EnterpriseUpdate[]>([])
-const nextCursor = ref<string>()
-async function loadMore() {
-  if (!nextCursor.value || loading.value) return
-  loading.value = true
-  try {
-    const page = await apiFetch<EnterpriseUpdatePage>(cursorPath('/api/admin/v1/enterprise-updates?limit=200', nextCursor.value))
-    updates.value.push(...page.items)
-    nextCursor.value = page.nextCursor
-  } catch (cause) { error.value = cause } finally { loading.value = false }
-}
-
 const feedRevision = ref(0)
-const loading = ref(false)
-const error = ref<unknown>()
+const listPath = ref('/api/admin/v1/enterprise-updates?limit=50')
+const search = ref('')
+const statusFilter = ref<string>()
+const updateStatuses = ['DRAFT', 'PUBLISHED', 'WITHDRAWN']
+const {
+  items: updates,
+  nextCursor,
+  pageNumber,
+  loading,
+  error,
+  reset: resetUpdates,
+  nextPage,
+  previousPage,
+} = useCursorPager<EnterpriseUpdate, EnterpriseUpdatePage>(
+  listPath,
+  path => apiFetch<EnterpriseUpdatePage>(path),
+  page => { feedRevision.value = page.feedRevision },
+)
 
 const CATEGORIES: EnterpriseUpdateCategory[] = ['ANNOUNCEMENT', 'MAINTENANCE', 'NOTICE']
 const SEVERITIES: EnterpriseUpdateSeverity[] = ['INFO', 'WARNING', 'CRITICAL']
@@ -87,19 +93,19 @@ const detailHtml = computed(() => {
 })
 
 async function refresh() {
-  loading.value = true
-  error.value = undefined
-  try {
-    const page = await apiFetch<EnterpriseUpdatePage>('/api/admin/v1/enterprise-updates?limit=200')
-    updates.value = page.items
-    nextCursor.value = page.nextCursor
-    feedRevision.value = page.feedRevision
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    loading.value = false
-  }
+  const query = new URLSearchParams({ limit: '50' })
+  if (search.value.trim()) query.set('query', search.value.trim())
+  if (statusFilter.value) query.set('status', statusFilter.value)
+  listPath.value = `/api/admin/v1/enterprise-updates?${query.toString()}`
+  await resetUpdates()
 }
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { void refresh() }, 300)
+})
+watch(statusFilter, () => { void refresh() })
 
 function openCreate() {
   createTitle.value = ''
@@ -214,6 +220,9 @@ async function withdraw(item: EnterpriseUpdate) {
 }
 
 onMounted(refresh)
+onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+})
 </script>
 
 <template>
@@ -229,15 +238,15 @@ onMounted(refresh)
       <div>{{ $t('enterpriseUpdates.separatePublishHint') }}</div>
       <details v-if="feedRevision" class="text-caption text-grey-7"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ $t('enterpriseUpdates.feedRevision') }}: {{ feedRevision }}</details>
     </q-banner>
+    <DetailWorkspace :detail-open="createOpen || editOpen || detailOpen" list-width="minmax(320px, 420px)">
+      <template #list>
     <LoadingState v-if="loading && !updates.length" />
     <q-card v-else flat bordered>
       <q-card-section class="row items-center justify-between q-py-xs">
-        <div>
-          <div class="text-subtitle2">{{ $t('enterpriseUpdates.title') }}</div>
-          <div class="text-caption text-grey-7">
-            {{ $t('common.loadedCount', { count: updates.length }) }}
-            <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
-          </div>
+        <div class="text-subtitle2">{{ $t('enterpriseUpdates.title') }}</div>
+        <div class="row q-gutter-xs items-center update-list-filters">
+          <q-input v-model="search" outlined dense clearable :label="$t('common.search')" data-cy="enterprise-update-search"><template #prepend><q-icon name="search" /></template></q-input>
+          <q-select v-model="statusFilter" outlined dense clearable emit-value map-options :label="$t('common.status')" :options="updateStatuses.map(value => ({ label: $t('status.' + value), value }))" data-cy="enterprise-update-status-filter" />
         </div>
       </q-card-section>
       <q-separator />
@@ -265,65 +274,58 @@ onMounted(refresh)
         </q-item>
         <q-item v-if="!updates.length"><q-item-section class="text-grey-7">{{ $t('enterpriseUpdates.noUpdates') }}</q-item-section></q-item>
       </q-list>
-      <q-card-actions v-if="nextCursor" class="justify-center">
-        <q-btn outline :label="$t('common.loadMore')" :loading="loading" @click="loadMore" data-cy="load-more" />
-      </q-card-actions>
+      <q-separator />
+      <CursorPager :page="pageNumber" :count="updates.length" :has-next="Boolean(nextCursor)" :loading="loading" @previous="previousPage" @next="nextPage" />
     </q-card>
 
-    <!-- Create Dialog -->
-    <q-dialog v-model="createOpen">
-      <q-card class="app-dialog">
+      </template>
+      <template #detail>
+    <q-card v-if="createOpen" flat bordered data-cy="enterprise-update-editor">
         <q-card-section>
           <div class="text-h6">{{ $t('enterpriseUpdates.createTitle') }}</div>
         </q-card-section>
         <q-separator />
-        <q-card-section class="app-dialog__body">
+        <q-card-section>
           <q-input v-model="createTitle" :label="$t('enterpriseUpdates.titleLabel')" outlined dense class="q-mb-xs" />
-          <div class="row q-gutter-xs q-mb-xs">
-            <q-select v-model="createContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="formatOptions" outlined dense emit-value map-options class="col" />
-            <q-select v-model="createCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="categoryOptions" outlined dense emit-value map-options class="col" />
-            <q-select v-model="createSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="severityOptions" outlined dense emit-value map-options class="col" />
+          <div class="row q-col-gutter-xs q-mb-xs">
+            <div class="col-12 col-sm"><q-select v-model="createContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="formatOptions" outlined dense emit-value map-options /></div>
+            <div class="col-12 col-sm"><q-select v-model="createCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="categoryOptions" outlined dense emit-value map-options /></div>
+            <div class="col-12 col-sm"><q-select v-model="createSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="severityOptions" outlined dense emit-value map-options /></div>
           </div>
           <q-input v-model="createContent" :label="$t('enterpriseUpdates.contentLabel')" type="textarea" outlined dense :input-style="{ minHeight: '150px' }" />
           <div v-if="createContentFormat === 'MARKDOWN'" class="text-caption text-grey-7 q-mt-xs">{{ $t('enterpriseUpdates.markdownHint') }}</div>
         </q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn flat :label="$t('common.cancel')" color="primary" v-close-popup />
+          <q-btn flat icon="arrow_back" :label="$t('common.cancel')" color="primary" @click="createOpen = false" />
           <q-btn unelevated color="primary" :label="$t('common.create')" :loading="creating" @click="submitCreate" />
         </q-card-actions>
       </q-card>
-    </q-dialog>
 
-    <!-- Edit Dialog -->
-    <q-dialog v-model="editOpen">
-      <q-card class="app-dialog">
+    <q-card v-if="editOpen" flat bordered data-cy="enterprise-update-editor">
         <q-card-section>
           <div class="text-h6">{{ $t('enterpriseUpdates.editTitle') }}</div>
           <div class="text-caption text-grey-7">{{ editItem?.enterpriseUpdateId }}</div>
         </q-card-section>
         <q-separator />
-        <q-card-section class="app-dialog__body">
+        <q-card-section>
           <q-input v-model="editTitle" :label="$t('enterpriseUpdates.titleLabel')" outlined dense class="q-mb-xs" />
-          <div class="row q-gutter-xs q-mb-xs">
-            <q-select v-model="editContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="formatOptions" outlined dense emit-value map-options class="col" />
-            <q-select v-model="editCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="categoryOptions" outlined dense emit-value map-options class="col" />
-            <q-select v-model="editSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="severityOptions" outlined dense emit-value map-options class="col" />
+          <div class="row q-col-gutter-xs q-mb-xs">
+            <div class="col-12 col-sm"><q-select v-model="editContentFormat" :label="$t('enterpriseUpdates.contentFormatLabel')" :options="formatOptions" outlined dense emit-value map-options /></div>
+            <div class="col-12 col-sm"><q-select v-model="editCategory" :label="$t('enterpriseUpdates.categoryLabel')" :options="categoryOptions" outlined dense emit-value map-options /></div>
+            <div class="col-12 col-sm"><q-select v-model="editSeverity" :label="$t('enterpriseUpdates.severityLabel')" :options="severityOptions" outlined dense emit-value map-options /></div>
           </div>
           <q-input v-model="editContent" :label="$t('enterpriseUpdates.contentLabel')" type="textarea" outlined dense :input-style="{ minHeight: '150px' }" />
           <div v-if="editContentFormat === 'MARKDOWN'" class="text-caption text-grey-7 q-mt-xs">{{ $t('enterpriseUpdates.markdownHint') }}</div>
         </q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn flat :label="$t('common.cancel')" color="primary" v-close-popup />
+          <q-btn flat icon="arrow_back" :label="$t('common.cancel')" color="primary" @click="editOpen = false" />
           <q-btn unelevated color="primary" :label="$t('common.save')" :loading="editing" @click="submitEdit" />
         </q-card-actions>
       </q-card>
-    </q-dialog>
 
-    <!-- Detail Dialog -->
-    <q-dialog v-model="detailOpen">
-      <q-card class="app-dialog">
+    <q-card v-if="detailOpen" flat bordered data-cy="enterprise-update-detail">
         <q-card-section v-if="detailItem">
           <div class="text-h6">{{ detailItem.title }}</div>
           <div class="row q-gutter-xs q-mt-xs">
@@ -337,18 +339,19 @@ onMounted(refresh)
           <details class="text-caption text-grey-7"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ detailItem.enterpriseUpdateId }} · {{ detailItem.contentFormat }}</details>
         </q-card-section>
         <q-separator />
-        <q-card-section v-if="detailItem" class="app-dialog__body">
+        <q-card-section v-if="detailItem">
           <div v-if="detailItem.contentFormat === 'MARKDOWN'" class="markdown-body" v-html="detailHtml" />
           <div v-else class="text-body2" style="white-space: pre-wrap;">{{ detailItem.content }}</div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat :label="$t('common.close')" v-close-popup />
+          <q-btn flat icon="arrow_back" :label="$t('common.close')" @click="detailOpen = false; detailItem = null" />
           <q-btn v-if="detailItem?.status === 'DRAFT'" outline color="primary" icon="edit" :label="$t('common.edit')" @click="editOpen = true; openEdit(detailItem!); detailOpen = false" />
           <q-btn v-if="detailItem?.status === 'DRAFT'" outline color="positive" icon="publish" :label="$t('enterpriseUpdates.publish')" @click="publish(detailItem!); detailOpen = false" />
           <q-btn v-if="detailItem?.status === 'PUBLISHED'" outline color="warning" icon="unpublished" :label="$t('enterpriseUpdates.withdraw')" @click="withdraw(detailItem!); detailOpen = false" />
         </q-card-actions>
       </q-card>
-    </q-dialog>
+      </template>
+    </DetailWorkspace>
   </q-page>
 </template>
 
@@ -363,4 +366,9 @@ onMounted(refresh)
 .markdown-body :deep(blockquote) { border-left: 3px solid #ccc; margin: 0.5em 0; padding-left: 1em; color: #666; }
 .markdown-body :deep(a) { color: #1976d2; text-decoration: underline; }
 .markdown-body :deep(hr) { border: none; border-top: 1px solid #ccc; margin: 1em 0; }
+.update-list-filters { flex: 1 1 320px; max-width: 520px; }
+.update-list-filters > * { flex: 1 1 150px; min-width: 0; }
+@media (max-width: 599px) {
+  .update-list-filters { flex-basis: 100%; max-width: none; }
+}
 </style>

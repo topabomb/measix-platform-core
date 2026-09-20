@@ -31,7 +31,7 @@ func TestPortalCloseMissingCSRFIsForbidden(t *testing.T) {
 
 func TestPortalExchangeAcceptsNativeOpaqueOriginButRejectsCrossSite(t *testing.T) {
 	h, id, _, ctx, _ := setupFullHandler(t)
-	id.PublicOrigin = "http://192.168.1.20:9000"
+	id.SetPublicOrigin("http://192.168.1.20:9000")
 	admin, csrf := loginAdmin(t, h)
 	token := enrollClient(t, h, admin, csrf)
 	exchange := func(ticket, fetchSite string) *httptest.ResponseRecorder {
@@ -69,7 +69,7 @@ func TestPortalSessionLifecycleAndIsolation(t *testing.T) {
 
 func testPortalSessionLifecycle(t *testing.T, origin string) {
 	h, id, updates, ctx, _ := setupFullHandler(t)
-	id.PublicOrigin = origin
+	id.SetPublicOrigin(origin)
 	admin, csrf := loginAdmin(t, h)
 	token := enrollClient(t, h, admin, csrf)
 	principal, err := id.AuthenticateAccess(ctx, token)
@@ -131,7 +131,7 @@ func testPortalSessionLifecycle(t *testing.T, origin string) {
 	if got := doJSON(t, h, "GET", "/api/client/v1/enterprise/updates", map[string]string{"Cookie": cookie}, nil); got.Code != 200 {
 		t.Fatalf("feed %d %s", got.Code, got.Body)
 	}
-	if got := doJSON(t, h, "DELETE", "/api/portal/v1/session", map[string]string{"Cookie": cookie, "Origin": id.PublicOrigin, "X-CSRF-Token": "wrong"}, nil); got.Code != 403 {
+	if got := doJSON(t, h, "DELETE", "/api/portal/v1/session", map[string]string{"Cookie": cookie, "Origin": id.PublicOrigin(), "X-CSRF-Token": "wrong"}, nil); got.Code != 403 {
 		t.Fatalf("CSRF accepted: %d", got.Code)
 	}
 	if got := doJSON(t, h, "DELETE", "/api/portal/v1/session", map[string]string{"Cookie": cookie, "X-CSRF-Token": session.CsrfToken}, nil); got.Code != 403 {
@@ -142,7 +142,7 @@ func testPortalSessionLifecycle(t *testing.T, origin string) {
 	if got := exchange(grant.Ticket, ""); got.Code != 401 {
 		t.Fatal("recreated handler allowed replay")
 	}
-	if got := doJSON(t, h, "DELETE", "/api/portal/v1/session", map[string]string{"Cookie": cookie, "Origin": id.PublicOrigin, "X-CSRF-Token": session.CsrfToken}, nil); got.Code != 204 {
+	if got := doJSON(t, h, "DELETE", "/api/portal/v1/session", map[string]string{"Cookie": cookie, "Origin": id.PublicOrigin(), "X-CSRF-Token": session.CsrfToken}, nil); got.Code != 204 {
 		t.Fatalf("close %d %s", got.Code, got.Body)
 	}
 	if got := doJSON(t, h, "GET", "/api/portal/v1/session", map[string]string{"Cookie": cookie}, nil); got.Code != 401 {
@@ -196,7 +196,7 @@ func testPortalSessionLifecycle(t *testing.T, origin string) {
 
 func TestPortalExpiryAndOriginValidation(t *testing.T) {
 	h, id, _, ctx, _ := setupFullHandler(t)
-	id.PublicOrigin = "https://platform.example"
+	id.SetPublicOrigin("https://platform.example")
 	admin, csrf := loginAdmin(t, h)
 	token := enrollClient(t, h, admin, csrf)
 	now := id.Now()

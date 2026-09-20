@@ -235,22 +235,15 @@ describe('SystemPage', () => {
     expect(wrapper.text()).toContain('health probe unavailable')
   })
 
-  it('summarizes upstream configuration state without presenting it as a live probe', async () => {
-    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+  it('does not enumerate the upstream dataset from the system overview', async () => {
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
       if (path === '/api/admin/v1/system/status') return { ...BASE, appliedControlRevision: 5, appliedBundleHash: BUNDLE_HASH }
       if (path === '/api/admin/v1/system/health') return { live: true, ready: true }
-      if (path.startsWith('/api/admin/v1/upstreams')) return { items: [
-        { upstreamId: 'ups_a', name: 'Configured', status: 'ACTIVE' },
-        { upstreamId: 'ups_b', name: 'Failed apply', status: 'DEGRADED' },
-      ], nextCursor: undefined }
       return {}
     })
     const { wrapper } = mountSystem()
     await flushPromises()
-    const summary = wrapper.find('[data-cy="system-upstream-status"]')
-    expect(summary.exists()).toBe(true)
-    expect(summary.text()).toMatch(/active/i)
-    expect(summary.text()).toMatch(/degraded/i)
-    expect(summary.text()).toMatch(/not a live/i)
+    expect(wrapper.find('[data-cy="system-upstream-status"]').exists()).toBe(false)
+    expect(fetch.mock.calls.some(([path]) => String(path).startsWith('/api/admin/v1/upstreams'))).toBe(false)
   })
 })

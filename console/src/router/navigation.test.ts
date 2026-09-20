@@ -11,6 +11,7 @@ describe('navigation registry', () => {
       'Upstreams',
       'Releases',
       'EnterpriseUpdates',
+      'Settings',
       'Usage',
       'System',
     ])

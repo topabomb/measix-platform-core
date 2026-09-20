@@ -6,6 +6,7 @@ import {
   QItemSection, QItemLabel, QChip, QSpinner, QIcon, QToolbarTitle,
   QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, QTab, QTabs, QSeparator,
   QMenu, QDialog, QCardActions, QMarkupTable, ClosePopup,
+  QField, QSpace, QBadge,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -40,6 +41,7 @@ function mountUsagePage() {
             QChip, QSpinner, QIcon, QToolbarTitle, QBreadcrumbs, QBreadcrumbsEl,
             QBtnDropdown, QTab, QTabs, QSeparator, QMenu, QDialog, QCardActions,
   QMarkupTable, PageHeader, PricingPanel,
+            QField, QSpace, QBadge,
           },
           directives: { ClosePopup },
         }], pinia, router],
@@ -47,6 +49,13 @@ function mountUsagePage() {
     },
   )
   return { wrapper }
+}
+
+async function openRequests(wrapper: ReturnType<typeof mountUsagePage>['wrapper']) {
+  const tab = wrapper.findAllComponents(QTab).find(item => item.props('name') === 'requests')
+  expect(tab).toBeTruthy()
+  await tab!.trigger('click')
+  await flushPromises()
 }
 
 describe('UsagePage', () => {
@@ -94,6 +103,7 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
+    await openRequests(wrapper)
     const kind = wrapper.findAllComponents(QSelect).find(input => input.props('label') === 'Resource kind')!
     await kind.setValue('MODEL')
     await kind.setValue('TTS')
@@ -120,7 +130,8 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
-    await wrapper.get('[data-cy="load-more"]').trigger('click')
+    await openRequests(wrapper)
+    await wrapper.get('[aria-label="Next page"]').trigger('click')
     const kind = wrapper.findAllComponents(QSelect).find(input => input.props('label') === 'Resource kind')!
     await kind.setValue('TTS')
     await flushPromises()
@@ -128,7 +139,7 @@ describe('UsagePage', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Filtered speech')
     expect(wrapper.text()).not.toContain('Unfiltered old model')
-    expect(wrapper.find('[data-cy="load-more"]').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="Next page"]').attributes('disabled')).toBeDefined()
     wrapper.unmount()
   })
 
@@ -145,6 +156,7 @@ describe('UsagePage', () => {
   it('distinguishes the start and end of the usage time filter', async () => {
     const { wrapper } = mountUsagePage()
     await flushPromises()
+    await openRequests(wrapper)
     const labels = wrapper.findAllComponents(QInput).map(input => input.props('label'))
     expect(labels).toContain('Start time')
     expect(labels).toContain('End time')
@@ -199,6 +211,7 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
+    await openRequests(wrapper)
     const text = wrapper.text()
     expect(text).toContain('Model')
     expect(text).toContain('TTS')
@@ -229,6 +242,7 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
+    await openRequests(wrapper)
     const text = wrapper.text()
     expect(text).toContain('UPSTREAM_TIMEOUT')
     expect(text).toContain('1234')
@@ -268,6 +282,20 @@ describe('UsagePage', () => {
 
   // ---- Task B: Filters (§14 Filter) ----
 
+  it('keeps lower-frequency filters collapsed and reports their active count', async () => {
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    const advanced = wrapper.get('[data-cy="usage-advanced-filters"]')
+    expect((advanced.element as HTMLElement).style.display).toBe('none')
+    const more = wrapper.get('[data-cy="usage-more-filters"]')
+    expect(more.text()).toContain('(0)')
+    await more.trigger('click')
+    const kind = wrapper.findAllComponents(QSelect).find(select => String(select.props('label')).toLowerCase().includes('kind'))
+    await kind!.setValue('MODEL')
+    await flushPromises()
+    expect(more.text()).toContain('(1)')
+  })
+
   it('sends the completeness filter in the query string', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string) => {
@@ -282,6 +310,7 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
+    await openRequests(wrapper)
 
     const completenessSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label')).includes('completeness'))
     expect(completenessSelect).toBeTruthy()
@@ -307,6 +336,7 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
+    await openRequests(wrapper)
 
     const kindSelect = wrapper.findAllComponents(QSelect).find((s) => String(s.props('label')).includes('kind') || String(s.props('label')).includes('Kind'))
     await kindSelect!.setValue('MODEL')
@@ -326,7 +356,7 @@ describe('UsagePage', () => {
 
   // ---- Task C: Request Detail (§14 Request Detail) ----
 
-  it('opens a request detail dialog showing identity, generation, status and duration', async () => {
+  it('opens a request detail workspace showing identity, generation, status and duration', async () => {
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
@@ -351,25 +381,26 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
+    await openRequests(wrapper)
 
     const firstRow = wrapper.find('[data-cy="usage-row"]')
     expect(firstRow.exists()).toBe(true)
     await firstRow.trigger('click')
     await flushPromises()
 
-    const text = document.body.innerHTML
+    const text = wrapper.get('[data-cy="usage-detail"]').text()
     expect(text).toContain('req_abc')
     expect(text).toContain('usr_x')
     expect(text).toContain('dev_1')
     expect(text).toContain('Generation 2')
     expect(text).toContain('45 ms')
     expect(text).toContain('Desired Revision')
-    expect(text).toContain('>5<')
+    expect(text).toContain('5')
     expect(text).toContain('OPENAI_RESPONSES')
     expect(text).toContain('Reconciliation required')
     expect(text).toContain('10,000 tokens')
     expect(text).toContain('Revision 7')
-    expect(document.querySelector('[data-cy="usage-detail"]')?.textContent).not.toContain('Unknown cost')
+    expect(wrapper.get('[data-cy="usage-detail"]').text()).not.toContain('Unknown cost')
   })
 
   it('request detail never shows prompt, body or secret content', async () => {
@@ -388,9 +419,10 @@ describe('UsagePage', () => {
     })
     const { wrapper } = mountUsagePage()
     await flushPromises()
+    await openRequests(wrapper)
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
-    const text = document.body.innerHTML
+    const text = wrapper.get('[data-cy="usage-detail"]').text()
     expect(text).not.toContain('prompt')
     expect(text).not.toContain('secret')
     expect(text).not.toContain('Authorization')
@@ -482,7 +514,14 @@ describe('UsagePage', () => {
     await flushPromises()
     expect(paths.some(path => path.includes('/usage/trend') && path.includes('clientProtocol=OPENAI_RESPONSES'))).toBe(true)
     expect(paths.some(path => path.includes('/usage/distribution') && path.includes('clientProtocol=OPENAI_RESPONSES'))).toBe(true)
+    expect(paths.some(path => path.includes('/usage/requests'))).toBe(false)
+
+    await openRequests(wrapper)
     expect(paths.some(path => path.includes('/usage/requests') && path.includes('clientProtocol=OPENAI_RESPONSES'))).toBe(true)
+
+    const summaryTab = wrapper.findAllComponents(QTab).find(item => item.props('name') === 'summary')!
+    await summaryTab.trigger('click')
+    await flushPromises()
 
     const budgetHealth = wrapper.findAllComponents(QSelect).find(input => input.props('label') === 'Budget health')!
     await budgetHealth.setValue('EXHAUSTED')

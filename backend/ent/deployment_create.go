@@ -46,6 +46,20 @@ func (_c *DeploymentCreate) SetNillableTimezone(v *string) *DeploymentCreate {
 	return _c
 }
 
+// SetPublicOrigin sets the "public_origin" field.
+func (_c *DeploymentCreate) SetPublicOrigin(v string) *DeploymentCreate {
+	_c.mutation.SetPublicOrigin(v)
+	return _c
+}
+
+// SetNillablePublicOrigin sets the "public_origin" field if the given value is not nil.
+func (_c *DeploymentCreate) SetNillablePublicOrigin(v *string) *DeploymentCreate {
+	if v != nil {
+		_c.SetPublicOrigin(*v)
+	}
+	return _c
+}
+
 // SetFeedRevision sets the "feed_revision" field.
 func (_c *DeploymentCreate) SetFeedRevision(v int64) *DeploymentCreate {
 	_c.mutation.SetFeedRevision(v)
@@ -117,6 +131,10 @@ func (_c *DeploymentCreate) defaults() {
 		v := deployment.DefaultTimezone
 		_c.mutation.SetTimezone(v)
 	}
+	if _, ok := _c.mutation.PublicOrigin(); !ok {
+		v := deployment.DefaultPublicOrigin
+		_c.mutation.SetPublicOrigin(v)
+	}
 	if _, ok := _c.mutation.FeedRevision(); !ok {
 		v := deployment.DefaultFeedRevision
 		_c.mutation.SetFeedRevision(v)
@@ -133,6 +151,9 @@ func (_c *DeploymentCreate) check() error {
 	}
 	if _, ok := _c.mutation.Timezone(); !ok {
 		return &ValidationError{Name: "timezone", err: errors.New(`ent: missing required field "Deployment.timezone"`)}
+	}
+	if _, ok := _c.mutation.PublicOrigin(); !ok {
+		return &ValidationError{Name: "public_origin", err: errors.New(`ent: missing required field "Deployment.public_origin"`)}
 	}
 	if _, ok := _c.mutation.FeedRevision(); !ok {
 		return &ValidationError{Name: "feed_revision", err: errors.New(`ent: missing required field "Deployment.feed_revision"`)}
@@ -189,6 +210,10 @@ func (_c *DeploymentCreate) createSpec() (*Deployment, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Timezone(); ok {
 		_spec.SetField(deployment.FieldTimezone, field.TypeString, value)
 		_node.Timezone = value
+	}
+	if value, ok := _c.mutation.PublicOrigin(); ok {
+		_spec.SetField(deployment.FieldPublicOrigin, field.TypeString, value)
+		_node.PublicOrigin = value
 	}
 	if value, ok := _c.mutation.FeedRevision(); ok {
 		_spec.SetField(deployment.FieldFeedRevision, field.TypeInt64, value)

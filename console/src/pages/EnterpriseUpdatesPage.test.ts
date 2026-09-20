@@ -76,7 +76,7 @@ describe('EnterpriseUpdatesPage', () => {
     expect(wrapper.text()).not.toContain('eup_1')
     await wrapper.findComponent(QItem).trigger('click')
     await flushPromises()
-    expect(document.querySelector('.q-dialog')?.textContent).toContain('Published')
+    expect(wrapper.get('[data-cy="enterprise-update-detail"]').text()).toContain('Published')
     wrapper.unmount()
   })
 })

@@ -17,6 +17,8 @@ const (
 	FieldStatus = "status"
 	// FieldTimezone holds the string denoting the timezone field in the database.
 	FieldTimezone = "timezone"
+	// FieldPublicOrigin holds the string denoting the public_origin field in the database.
+	FieldPublicOrigin = "public_origin"
 	// FieldFeedRevision holds the string denoting the feed_revision field in the database.
 	FieldFeedRevision = "feed_revision"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -33,6 +35,7 @@ var Columns = []string{
 	FieldName,
 	FieldStatus,
 	FieldTimezone,
+	FieldPublicOrigin,
 	FieldFeedRevision,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -51,6 +54,8 @@ func ValidColumn(column string) bool {
 var (
 	// DefaultTimezone holds the default value on creation for the "timezone" field.
 	DefaultTimezone string
+	// DefaultPublicOrigin holds the default value on creation for the "public_origin" field.
+	DefaultPublicOrigin string
 	// DefaultFeedRevision holds the default value on creation for the "feed_revision" field.
 	DefaultFeedRevision int64
 )
@@ -76,6 +81,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByTimezone orders the results by the timezone field.
 func ByTimezone(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTimezone, opts...).ToFunc()
+}
+
+// ByPublicOrigin orders the results by the public_origin field.
+func ByPublicOrigin(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPublicOrigin, opts...).ToFunc()
 }
 
 // ByFeedRevision orders the results by the feed_revision field.

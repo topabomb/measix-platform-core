@@ -10,7 +10,7 @@ func TestAdminCookieUsesConfiguredPublicScheme(t *testing.T) {
 	for _, origin := range []string{"http://192.168.1.20:9000", "https://platform.example"} {
 		t.Run(origin, func(t *testing.T) {
 			h, id, _, _, _ := setupFullHandler(t)
-			id.PublicOrigin = origin
+			id.SetPublicOrigin(origin)
 			response := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", map[string]string{"X-Forwarded-Proto": "https"}, map[string]any{"username": "admin", "password": "correct horse battery staple"})
 			if response.Code != 200 {
 				t.Fatalf("login: %d", response.Code)
@@ -29,7 +29,7 @@ func TestAdminCookieUsesConfiguredPublicScheme(t *testing.T) {
 
 func TestEnrollmentUsesConfiguredPublicOrigin(t *testing.T) {
 	h, id, _, _, _ := setupFullHandler(t)
-	id.PublicOrigin = "http://192.168.1.20:9000"
+	id.SetPublicOrigin("http://192.168.1.20:9000")
 	cookie, csrf := loginAdmin(t, h)
 	headers := map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf}
 	created := doJSON(t, h, http.MethodPost, "/api/admin/v1/users", headers, map[string]any{"username": "origin-user", "displayName": "Origin User", "role": "MEMBER"})
@@ -47,7 +47,7 @@ func TestEnrollmentUsesConfiguredPublicOrigin(t *testing.T) {
 		ExpiresAt   time.Time `json:"expiresAt"`
 	}
 	decodeJSON(t, grant, &material)
-	if material.PlatformURL != id.PublicOrigin {
+	if material.PlatformURL != id.PublicOrigin() {
 		t.Fatalf("public origin = %q", material.PlatformURL)
 	}
 	if want := issuedAt.Add(time.Hour); !material.ExpiresAt.Equal(want) {
@@ -58,7 +58,7 @@ func TestEnrollmentUsesConfiguredPublicOrigin(t *testing.T) {
 func TestEnrollmentWithoutPublicOriginDoesNotIssueCredential(t *testing.T) {
 	h, id, _, ctx, adminID := setupFullHandler(t)
 	cookie, csrf := loginAdmin(t, h)
-	id.PublicOrigin = ""
+	id.SetPublicOrigin("")
 	before, err := id.Client.Enrollment.Query().Count(ctx)
 	if err != nil {
 		t.Fatal(err)

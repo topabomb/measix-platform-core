@@ -12,6 +12,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'upstreams', name: 'Upstreams', component: () => import('../pages/UpstreamsPage.vue') },
       { path: 'releases', name: 'Releases', component: () => import('../pages/ReleasesPage.vue') },
       { path: 'enterprise-updates', name: 'EnterpriseUpdates', component: () => import('../pages/EnterpriseUpdatesPage.vue') },
+      { path: 'settings', name: 'Settings', component: () => import('../pages/SettingsPage.vue') },
       { path: 'usage', name: 'Usage', component: () => import('../pages/UsagePage.vue') },
       { path: 'system', name: 'System', component: () => import('../pages/SystemPage.vue') }
     ]

@@ -10,6 +10,7 @@ import (
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/budgetsettlement"
 	"measix/platform/ent/deployment"
+	"measix/platform/ent/deploymentsettingaudit"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enterpriseupdate"
 	"measix/platform/ent/portalsession"
@@ -110,10 +111,24 @@ func init() {
 	deploymentDescTimezone := deploymentFields[3].Descriptor()
 	// deployment.DefaultTimezone holds the default value on creation for the timezone field.
 	deployment.DefaultTimezone = deploymentDescTimezone.Default.(string)
+	// deploymentDescPublicOrigin is the schema descriptor for public_origin field.
+	deploymentDescPublicOrigin := deploymentFields[4].Descriptor()
+	// deployment.DefaultPublicOrigin holds the default value on creation for the public_origin field.
+	deployment.DefaultPublicOrigin = deploymentDescPublicOrigin.Default.(string)
 	// deploymentDescFeedRevision is the schema descriptor for feed_revision field.
-	deploymentDescFeedRevision := deploymentFields[4].Descriptor()
+	deploymentDescFeedRevision := deploymentFields[5].Descriptor()
 	// deployment.DefaultFeedRevision holds the default value on creation for the feed_revision field.
 	deployment.DefaultFeedRevision = deploymentDescFeedRevision.Default.(int64)
+	deploymentsettingauditFields := schema.DeploymentSettingAudit{}.Fields()
+	_ = deploymentsettingauditFields
+	// deploymentsettingauditDescOldPublicOrigin is the schema descriptor for old_public_origin field.
+	deploymentsettingauditDescOldPublicOrigin := deploymentsettingauditFields[5].Descriptor()
+	// deploymentsettingaudit.DefaultOldPublicOrigin holds the default value on creation for the old_public_origin field.
+	deploymentsettingaudit.DefaultOldPublicOrigin = deploymentsettingauditDescOldPublicOrigin.Default.(string)
+	// deploymentsettingauditDescNewPublicOrigin is the schema descriptor for new_public_origin field.
+	deploymentsettingauditDescNewPublicOrigin := deploymentsettingauditFields[6].Descriptor()
+	// deploymentsettingaudit.DefaultNewPublicOrigin holds the default value on creation for the new_public_origin field.
+	deploymentsettingaudit.DefaultNewPublicOrigin = deploymentsettingauditDescNewPublicOrigin.Default.(string)
 	deviceFields := schema.Device{}.Fields()
 	_ = deviceFields
 	// deviceDescName is the schema descriptor for name field.

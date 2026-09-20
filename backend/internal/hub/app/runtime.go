@@ -56,18 +56,12 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 		return nil, fmt.Errorf("invalid platform public origin")
 	}
 	if cfg.PortalAssetsDir != "" {
-		if cfg.PublicOrigin == "" {
-			return nil, fmt.Errorf("Portal assets require approved origin")
-		}
 		info, err := fs.Stat(os.DirFS(cfg.PortalAssetsDir), "index.html")
 		if err != nil || info.IsDir() {
 			return nil, fmt.Errorf("Portal assets require index.html")
 		}
 	}
 	if cfg.PortalUpstreamURL != "" {
-		if cfg.PublicOrigin == "" {
-			return nil, fmt.Errorf("Portal upstream requires approved origin")
-		}
 		if _, err := portalstatic.ParseUpstream(cfg.PortalUpstreamURL); err != nil {
 			return nil, err
 		}
@@ -112,6 +106,20 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 		return closeOnError(fmt.Errorf("normal Hub startup requires exactly one ACTIVE Deployment; run bootstrap-admin first"))
 	}
 	deployment := deployments[0]
+	effectivePublicOrigin := deployment.PublicOrigin
+	if effectivePublicOrigin == "" && cfg.PublicOrigin != "" {
+		deployment, err = st.Client.Deployment.UpdateOneID(deployment.ID).SetPublicOrigin(cfg.PublicOrigin).Save(ctx)
+		if err != nil {
+			return closeOnError(fmt.Errorf("seed public origin: %w", err))
+		}
+		effectivePublicOrigin = deployment.PublicOrigin
+	}
+	if effectivePublicOrigin != "" && identity.ValidatePublicOrigin(effectivePublicOrigin) != nil {
+		return closeOnError(fmt.Errorf("invalid persisted platform public origin"))
+	}
+	if (cfg.PortalAssetsDir != "" || cfg.PortalUpstreamURL != "") && effectivePublicOrigin == "" {
+		return closeOnError(fmt.Errorf("Portal requires approved origin"))
+	}
 	publicKey := privateKey.Public().(ed25519.PublicKey)
 	kid := keyID(publicKey)
 	signer, err := security.NewAccessSigner(privateKey, deployment.ID, kid, cfg.AccessTokenTTL)
@@ -121,7 +129,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	csrfMaterial := append([]byte("measix:admin-csrf:"), masterKey...)
 	csrfDigest := sha256.Sum256(csrfMaterial)
 	identityService := identity.New(st.Client, signer, csrfDigest[:])
-	identityService.PublicOrigin = cfg.PublicOrigin
+	identityService.SetPublicOrigin(effectivePublicOrigin)
 	box, err := security.NewSecretBox(masterKey, 1)
 	if err != nil {
 		return closeOnError(err)
@@ -158,10 +166,6 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	usageService := usage.NewService(st.Client, budgetService)
 	systemService := system.New(st, runtimeControl, options.BuildVersion)
 	systemService.PortalMode = portalMode
-	if portalHandler != nil {
-		value := strings.TrimSuffix(cfg.PublicOrigin, "/") + "/portal/"
-		systemService.PortalURL = &value
-	}
 	systemService.PortalUpstream = portalUpstream
 	services := httpapi.Services{
 		Identity: identityService, Capability: capabilityService, Upstream: upstreamService,

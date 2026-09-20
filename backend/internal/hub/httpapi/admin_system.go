@@ -43,11 +43,15 @@ func (h *fullAdminHandler) SystemStatus(w http.ResponseWriter, r *http.Request) 
 		RequestUsageIngestLagSeconds: status.RequestUsageIngestLagSeconds, SemanticOrphanCount: status.SemanticOrphanCount,
 		SpoolPendingCount: status.SpoolPendingCount, OldestPendingAgeSeconds: status.OldestPendingAgeSeconds,
 		SemanticUnknownRequestCount: status.SemanticUnknownRequestCount,
-		PortalMode:                  adminapi.SystemStatusPortalMode(status.PortalMode), PortalUrl: status.PortalURL,
-		PortalUpstreamUrl: status.PortalUpstream,
+		PortalMode:                  adminapi.SystemStatusPortalMode(status.PortalMode),
+		PortalUpstreamUrl:           status.PortalUpstream,
 	}
-	if h.identity.PublicOrigin != "" {
-		wire.PublicOrigin = &h.identity.PublicOrigin
+	if publicOrigin := h.identity.PublicOrigin(); publicOrigin != "" {
+		wire.PublicOrigin = &publicOrigin
+		if status.PortalMode != "UNAVAILABLE" {
+			portalURL := publicOrigin + "/portal/"
+			wire.PortalUrl = &portalURL
+		}
 	}
 	if status.SpoolState != nil {
 		value := adminapi.SystemStatusSpoolState(*status.SpoolState)

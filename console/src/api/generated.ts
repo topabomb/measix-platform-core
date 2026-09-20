@@ -438,6 +438,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/secrets/{secretId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns Secret metadata only. Credential values and encrypted payloads are never returned. */
+        get: operations["getSecret"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/usage/summary": {
         parameters: {
             query?: never;
@@ -591,6 +608,22 @@ export interface paths {
         };
         get: operations["systemStatus"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/deployment/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getDeploymentSettings"];
+        put: operations["updateDeploymentSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1422,6 +1455,27 @@ export interface components {
             /** @description Number of retained requests with no linked semantic records or at least one UNKNOWN record. Counts requests once, excludes unlinked provider records, and uses the same completeness rule as Usage. Omission means unavailable, not zero. */
             semanticUnknownRequestCount?: number;
         };
+        DeploymentSettings: {
+            deploymentId: components["schemas"]["DeploymentId"];
+            /** @description Human-facing enterprise name shown to enrolled users and Portal sessions. */
+            name: string;
+            /** @description Fixed deployment IANA timezone. Changing it at runtime would alter natural budget periods and is intentionally not mutable in this API. */
+            timezone: string;
+            /**
+             * Format: uri
+             * @description Canonical external HTTP or HTTPS origin advertised to clients. It may be changed at runtime; changing it revokes Portal sessions but does not configure DNS, TLS or ingress and does not migrate already-enrolled client authorities.
+             */
+            publicOrigin: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        UpdateDeploymentSettingsRequest: {
+            /** Format: date-time */
+            expectedUpdatedAt: string;
+            name: string;
+            /** Format: uri */
+            publicOrigin: string;
+        };
         Health: {
             live: boolean;
             ready: boolean;
@@ -2227,6 +2281,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string;
+                /** @description Case-insensitive partial match on the human-readable upstream name. */
+                query?: string;
             };
             header?: never;
             path?: never;
@@ -2401,6 +2457,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string;
+                /** @description Case-insensitive partial match on Secret metadata name. Secret values are never searched or returned. */
+                query?: string;
             };
             header?: never;
             path?: never;
@@ -2481,6 +2539,31 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    getSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                secretId: components["schemas"]["SecretId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Secret"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     usageSummary: {
@@ -2811,6 +2894,58 @@ export interface operations {
             403: components["responses"]["Problem"];
         };
     };
+    getDeploymentSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current deployment-wide business settings. Infrastructure and trust settings are intentionally excluded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentSettings"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    updateDeploymentSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDeploymentSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated deployment-wide business settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentSettings"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
     systemHealth: {
         parameters: {
             query?: never;
@@ -2836,6 +2971,9 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string;
+                /** @description Case-insensitive partial match on title or rendered content source. */
+                query?: string;
+                status?: components["schemas"]["EnterpriseUpdateStatus"];
             };
             header?: never;
             path?: never;

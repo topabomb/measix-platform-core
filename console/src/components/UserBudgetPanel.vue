@@ -191,6 +191,7 @@ watch(() => props.userId, () => {
         <div v-if="view" class="text-caption text-grey-7">
           {{ $t('budgets.timezone', { timezone: view.timezone }) }} · {{ $t('budgets.asOf', { time: new Date(view.asOf).toLocaleString() }) }}
         </div>
+        <div v-if="view" class="text-caption text-grey-7">{{ $t('budgets.sourceHint') }}</div>
       </div>
       <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="load" />
     </div>
@@ -207,7 +208,7 @@ watch(() => props.userId, () => {
     <div v-else-if="view" class="budget-grid">
       <q-card v-for="capabilityName in capabilities" :key="capabilityName" flat bordered class="budget-card" :data-cy="`budget-${capabilityName}`">
         <template v-if="capability(capabilityName)">
-          <q-card-section class="q-pb-xs">
+          <q-card-section class="q-pa-sm">
             <div class="row items-start justify-between no-wrap">
               <div>
                 <div class="text-subtitle2">{{ $t(`usage.kind.${capabilityName}`) }}</div>
@@ -221,30 +222,22 @@ watch(() => props.userId, () => {
               </div>
               <q-btn flat dense icon="edit" :aria-label="$t('budgets.edit')" :disable="!canMutate" @click="beginEdit(capability(capabilityName)!)" />
             </div>
-            <div v-if="capability(capabilityName)!.source === 'DEFAULT'" class="text-caption text-grey-7 q-mt-xs">
-              {{ $t('budgets.defaultHint') }}
-            </div>
-            <div v-else-if="capability(capabilityName)!.mode === 'UNLIMITED'" class="text-caption text-grey-7 q-mt-xs">
-              {{ $t('budgets.explicitUnlimitedHint') }}
-            </div>
-            <div class="text-caption text-grey-7 q-mt-xs">
+            <div class="text-caption text-grey-7 q-mt-xs budget-meta">
               {{ $t('budgets.revision', { revision: capability(capabilityName)!.revision }) }} ·
               {{ $t('budgets.inFlight', { count: capability(capabilityName)!.inFlightRequests }) }}
             </div>
-            <div class="usage-history q-mt-sm" data-cy="budget-usage-history">
-              <div class="text-caption text-weight-medium">{{ $t('budgets.usageHistory') }}</div>
-              <div class="text-caption text-grey-7">{{ $t('budgets.usageHistoryHint') }}</div>
-              <div v-if="capability(capabilityName)!.usageMeters.length" class="row q-col-gutter-sm q-mt-xs">
+            <div v-if="capability(capabilityName)!.usageMeters.length" class="usage-history q-mt-xs" data-cy="budget-usage-history">
+              <div class="text-caption text-grey-7">{{ $t('budgets.usageHistory') }} · {{ $t('budgets.usageHistoryHint') }}</div>
+              <div class="row q-col-gutter-sm q-mt-xs">
                 <div v-for="meter in capability(capabilityName)!.usageMeters" :key="meter.meter" class="col-auto">
                   <span class="text-weight-medium">{{ compactQuantity(meter.quantity, meter.meter) }}</span>
                   <span class="text-caption text-grey-7"> · {{ meterLabel(meter.meter) }}</span>
                 </div>
               </div>
-              <div v-else class="text-caption text-grey-7 q-mt-xs">{{ $t('budgets.noRecordedUsage') }}</div>
             </div>
           </q-card-section>
 
-          <q-separator />
+          <q-separator v-if="editing === capabilityName || capability(capabilityName)!.mode === 'LIMITED'" />
           <q-card-section v-if="editing === capabilityName" class="q-gutter-xs" data-cy="budget-editor">
             <div class="budget-mode-actions">
               <q-btn :outline="editMode !== 'UNLIMITED'" :color="editMode === 'UNLIMITED' ? 'primary' : undefined" no-caps :label="$t('budgets.mode.UNLIMITED')" @click="editMode = 'UNLIMITED'; editLimits = []" />
@@ -266,10 +259,7 @@ watch(() => props.userId, () => {
             </div>
           </q-card-section>
 
-          <q-card-section v-else-if="capability(capabilityName)!.mode === 'UNLIMITED'" class="text-grey-7">
-            {{ $t('budgets.noLimit') }}
-          </q-card-section>
-          <q-card-section v-else class="q-gutter-xs">
+          <q-card-section v-else-if="capability(capabilityName)!.mode === 'LIMITED'" class="q-pa-sm q-gutter-xs">
             <div v-for="limit in capability(capabilityName)!.limits" :key="`${limit.period}:${limit.meter}`" class="budget-limit" data-cy="budget-limit">
               <div class="row items-center justify-between no-wrap">
                 <div class="text-weight-medium">{{ meterLabel(limit.meter) }} · {{ $t(`budgets.period.${limit.period}`) }}</div>
@@ -329,6 +319,10 @@ watch(() => props.userId, () => {
 
 .budget-card {
   min-width: 0;
+}
+
+.budget-meta {
+  line-height: 1.25;
 }
 
 .budget-mode-actions {

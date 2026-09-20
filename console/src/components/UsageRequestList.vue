@@ -8,10 +8,12 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
-import { cursorPath } from '../api/pagination'
 import type { MeterQuantity, PricingMeter, RequestUsageS02 } from '../api/usageBudget'
 import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 import ProblemBanner from './ProblemBanner.vue'
+import DetailWorkspace from './DetailWorkspace.vue'
+import CursorPager from './CursorPager.vue'
+import { useCursorPager } from '../composables/useCursorPager'
 
 type RequestUsage = components['schemas']['RequestUsageView'] & Partial<RequestUsageS02>
 type RequestUsagePage = { items: RequestUsage[], nextCursor?: string }
@@ -36,44 +38,25 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ filterResource: [string] }>()
 
 const { t: $t, locale } = useI18n()
-const items = ref<RequestUsage[]>([])
-const nextCursor = ref<string>()
-const loading = ref(false)
-const error = ref<unknown>()
 const selected = ref<RequestUsage>()
-const detailOpen = ref(false)
+const requestBasePath = ref(`/api/admin/v1/usage/requests?limit=${props.pageSize}${props.query}`)
+const {
+  items,
+  nextCursor,
+  pageNumber,
+  loading,
+  error,
+  reset,
+  nextPage,
+  previousPage,
+} = useCursorPager<RequestUsage, RequestUsagePage>(requestBasePath, path => apiFetch<RequestUsagePage>(path), () => {
+  selected.value = undefined
+})
 
-// A response that arrives after the filters changed describes a list the operator
-// is no longer looking at, so it is discarded rather than merged.
-let sequence = 0
-
-function requestPath(cursor?: string): string {
-  const base = `/api/admin/v1/usage/requests?limit=${props.pageSize}${props.query}`
-  return cursor ? cursorPath(base, cursor) : base
-}
-
-async function load(more: boolean) {
-  if (more && (!nextCursor.value || loading.value)) return
-  const current = ++sequence
-  loading.value = true
-  error.value = undefined
-  if (!more) {
-    items.value = []
-    nextCursor.value = undefined
-  }
-  try {
-    const page = await apiFetch<RequestUsagePage>(requestPath(more ? nextCursor.value : undefined))
-    if (current !== sequence) return
-    items.value = more ? [...items.value, ...page.items] : page.items
-    nextCursor.value = page.nextCursor
-  } catch (cause) {
-    if (current === sequence) error.value = cause
-  } finally {
-    if (current === sequence) loading.value = false
-  }
-}
-
-watch(() => [props.query, props.pageSize], () => { void load(false) }, { immediate: true })
+watch(() => [props.query, props.pageSize], () => {
+  requestBasePath.value = `/api/admin/v1/usage/requests?limit=${props.pageSize}${props.query}`
+  void reset()
+}, { immediate: true })
 
 const loaded = computed(() => items.value.length)
 
@@ -84,7 +67,6 @@ function identity(req: RequestUsage): string {
 
 function openDetail(req: RequestUsage) {
   selected.value = req
-  detailOpen.value = true
 }
 
 function kindOf(resourceId: string | undefined): string | undefined {
@@ -146,10 +128,12 @@ function meterValue(item: MeterQuantity, compact: boolean): string {
   return formatMeter(item.quantity, item.meter, locale.value, unitLabels.value, compact)
 }
 
-defineExpose({ refresh: () => load(false) })
+defineExpose({ refresh: reset })
 </script>
 
 <template>
+  <DetailWorkspace :detail-open="Boolean(selected)" list-width="minmax(420px, 58%)">
+    <template #list>
   <q-card flat bordered>
     <q-card-section class="row items-center justify-between q-py-xs">
       <div class="text-subtitle2">{{ $t('usage.requests') }}</div>
@@ -157,11 +141,7 @@ defineExpose({ refresh: () => load(false) })
         <!-- View controls for this list (page size and the like) belong next to
              the count they affect, not among the query filters above. -->
         <slot name="toolbar" />
-        <div class="text-caption text-grey-7">
-          {{ $t('common.loadedCount', { count: loaded }) }}
-          <template v-if="nextCursor"> · {{ $t('common.hasMore') }}</template>
-          <template v-else-if="loaded"> · {{ $t('common.allLoaded') }}</template>
-        </div>
+        <div class="text-caption text-grey-7">{{ $t('common.loadedCount', { count: loaded }) }}</div>
       </div>
     </q-card-section>
     <div class="text-caption text-grey-7 card-inset">{{ $t('usage.windowHint') }}</div>
@@ -199,18 +179,24 @@ defineExpose({ refresh: () => load(false) })
         <q-item v-if="!items.length && !loading"><q-item-section class="text-grey-7">{{ $t('usage.noRequests') }}</q-item-section></q-item>
       </q-list>
     </div>
-    <q-card-actions class="justify-center">
-      <q-btn v-if="nextCursor" outline :label="$t('common.loadMore')" :loading="loading" data-cy="load-more" @click="load(true)" />
-      <span v-else-if="loading" class="text-caption text-grey-7">{{ $t('common.loading') }}</span>
-    </q-card-actions>
+    <CursorPager
+      :page="pageNumber"
+      :count="items.length"
+      :has-next="Boolean(nextCursor)"
+      :loading="loading"
+      @previous="previousPage"
+      @next="nextPage"
+    />
 
-    <q-dialog v-model="detailOpen" data-cy="usage-detail">
-      <q-card class="app-dialog">
+  </q-card>
+    </template>
+    <template #detail>
+      <q-card v-if="selected" flat bordered data-cy="usage-detail">
         <q-card-section>
           <div class="text-h6">{{ $t('usage.detail.title') }}</div>
           <div class="text-caption text-grey-7">{{ selected?.requestId }}</div>
         </q-card-section>
-        <q-card-section v-if="selected" class="app-dialog__body">
+        <q-card-section>
           <q-markup-table flat dense>
             <tbody>
               <tr><td class="text-grey-7">{{ $t('usage.detail.requestId') }}</td><td>{{ selected.requestId }}</td></tr>
@@ -256,12 +242,12 @@ defineExpose({ refresh: () => load(false) })
           <div class="text-caption text-grey-7 q-mt-xs">{{ $t('usage.detail.secretHint') }}</div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn v-if="allowFilterResource && selected?.resourceId" flat :label="$t('usage.filterThisResource')" data-cy="filter-this-resource" @click="emit('filterResource', selected!.resourceId!); detailOpen = false" />
-          <q-btn flat :label="$t('common.close')" v-close-popup />
+          <q-btn v-if="allowFilterResource && selected?.resourceId" flat :label="$t('usage.filterThisResource')" data-cy="filter-this-resource" @click="emit('filterResource', selected!.resourceId!); selected = undefined" />
+          <q-btn flat icon="arrow_back" :label="$t('common.close')" @click="selected = undefined" />
         </q-card-actions>
       </q-card>
-    </q-dialog>
-  </q-card>
+    </template>
+  </DetailWorkspace>
 </template>
 
 <style scoped>

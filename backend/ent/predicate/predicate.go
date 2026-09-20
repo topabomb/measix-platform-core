@@ -39,6 +39,9 @@ type DeletedPrincipal func(*sql.Selector)
 // Deployment is the predicate function for deployment builders.
 type Deployment func(*sql.Selector)
 
+// DeploymentSettingAudit is the predicate function for deploymentsettingaudit builders.
+type DeploymentSettingAudit func(*sql.Selector)
+
 // Device is the predicate function for device builders.
 type Device func(*sql.Selector)
 

@@ -22,6 +22,7 @@ import (
 	"measix/platform/ent/deletedcredential"
 	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/deployment"
+	"measix/platform/ent/deploymentsettingaudit"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enrollment"
 	"measix/platform/ent/enterpriseupdate"
@@ -76,6 +77,8 @@ type Client struct {
 	DeletedPrincipal *DeletedPrincipalClient
 	// Deployment is the client for interacting with the Deployment builders.
 	Deployment *DeploymentClient
+	// DeploymentSettingAudit is the client for interacting with the DeploymentSettingAudit builders.
+	DeploymentSettingAudit *DeploymentSettingAuditClient
 	// Device is the client for interacting with the Device builders.
 	Device *DeviceClient
 	// Enrollment is the client for interacting with the Enrollment builders.
@@ -138,6 +141,7 @@ func (c *Client) init() {
 	c.DeletedCredential = NewDeletedCredentialClient(c.config)
 	c.DeletedPrincipal = NewDeletedPrincipalClient(c.config)
 	c.Deployment = NewDeploymentClient(c.config)
+	c.DeploymentSettingAudit = NewDeploymentSettingAuditClient(c.config)
 	c.Device = NewDeviceClient(c.config)
 	c.Enrollment = NewEnrollmentClient(c.config)
 	c.EnterpriseUpdate = NewEnterpriseUpdateClient(c.config)
@@ -261,6 +265,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		DeletedCredential:      NewDeletedCredentialClient(cfg),
 		DeletedPrincipal:       NewDeletedPrincipalClient(cfg),
 		Deployment:             NewDeploymentClient(cfg),
+		DeploymentSettingAudit: NewDeploymentSettingAuditClient(cfg),
 		Device:                 NewDeviceClient(cfg),
 		Enrollment:             NewEnrollmentClient(cfg),
 		EnterpriseUpdate:       NewEnterpriseUpdateClient(cfg),
@@ -311,6 +316,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		DeletedCredential:      NewDeletedCredentialClient(cfg),
 		DeletedPrincipal:       NewDeletedPrincipalClient(cfg),
 		Deployment:             NewDeploymentClient(cfg),
+		DeploymentSettingAudit: NewDeploymentSettingAuditClient(cfg),
 		Device:                 NewDeviceClient(cfg),
 		Enrollment:             NewEnrollmentClient(cfg),
 		EnterpriseUpdate:       NewEnterpriseUpdateClient(cfg),
@@ -362,11 +368,12 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.Activation, c.BudgetAllocation, c.BudgetAudit, c.BudgetBucket, c.BudgetLimit,
 		c.BudgetReconciliation, c.BudgetRequest, c.BudgetSettlement,
-		c.DeletedCredential, c.DeletedPrincipal, c.Deployment, c.Device, c.Enrollment,
-		c.EnterpriseUpdate, c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease,
-		c.ManagedState, c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret,
-		c.SecretVersion, c.SemanticUsage, c.Session, c.Upstream,
-		c.UpstreamConfigRevision, c.UsageDetail, c.UsageEvent, c.User, c.UserBudget,
+		c.DeletedCredential, c.DeletedPrincipal, c.Deployment,
+		c.DeploymentSettingAudit, c.Device, c.Enrollment, c.EnterpriseUpdate,
+		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
+		c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion,
+		c.SemanticUsage, c.Session, c.Upstream, c.UpstreamConfigRevision,
+		c.UsageDetail, c.UsageEvent, c.User, c.UserBudget,
 	} {
 		n.Use(hooks...)
 	}
@@ -378,11 +385,12 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.Activation, c.BudgetAllocation, c.BudgetAudit, c.BudgetBucket, c.BudgetLimit,
 		c.BudgetReconciliation, c.BudgetRequest, c.BudgetSettlement,
-		c.DeletedCredential, c.DeletedPrincipal, c.Deployment, c.Device, c.Enrollment,
-		c.EnterpriseUpdate, c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease,
-		c.ManagedState, c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret,
-		c.SecretVersion, c.SemanticUsage, c.Session, c.Upstream,
-		c.UpstreamConfigRevision, c.UsageDetail, c.UsageEvent, c.User, c.UserBudget,
+		c.DeletedCredential, c.DeletedPrincipal, c.Deployment,
+		c.DeploymentSettingAudit, c.Device, c.Enrollment, c.EnterpriseUpdate,
+		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
+		c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion,
+		c.SemanticUsage, c.Session, c.Upstream, c.UpstreamConfigRevision,
+		c.UsageDetail, c.UsageEvent, c.User, c.UserBudget,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -413,6 +421,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.DeletedPrincipal.mutate(ctx, m)
 	case *DeploymentMutation:
 		return c.Deployment.mutate(ctx, m)
+	case *DeploymentSettingAuditMutation:
+		return c.DeploymentSettingAudit.mutate(ctx, m)
 	case *DeviceMutation:
 		return c.Device.mutate(ctx, m)
 	case *EnrollmentMutation:
@@ -1950,6 +1960,139 @@ func (c *DeploymentClient) mutate(ctx context.Context, m *DeploymentMutation) (V
 		return (&DeploymentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Deployment mutation op: %q", m.Op())
+	}
+}
+
+// DeploymentSettingAuditClient is a client for the DeploymentSettingAudit schema.
+type DeploymentSettingAuditClient struct {
+	config
+}
+
+// NewDeploymentSettingAuditClient returns a client for the DeploymentSettingAudit from the given config.
+func NewDeploymentSettingAuditClient(c config) *DeploymentSettingAuditClient {
+	return &DeploymentSettingAuditClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `deploymentsettingaudit.Hooks(f(g(h())))`.
+func (c *DeploymentSettingAuditClient) Use(hooks ...Hook) {
+	c.hooks.DeploymentSettingAudit = append(c.hooks.DeploymentSettingAudit, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `deploymentsettingaudit.Intercept(f(g(h())))`.
+func (c *DeploymentSettingAuditClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DeploymentSettingAudit = append(c.inters.DeploymentSettingAudit, interceptors...)
+}
+
+// Create returns a builder for creating a DeploymentSettingAudit entity.
+func (c *DeploymentSettingAuditClient) Create() *DeploymentSettingAuditCreate {
+	mutation := newDeploymentSettingAuditMutation(c.config, OpCreate)
+	return &DeploymentSettingAuditCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DeploymentSettingAudit entities.
+func (c *DeploymentSettingAuditClient) CreateBulk(builders ...*DeploymentSettingAuditCreate) *DeploymentSettingAuditCreateBulk {
+	return &DeploymentSettingAuditCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DeploymentSettingAuditClient) MapCreateBulk(slice any, setFunc func(*DeploymentSettingAuditCreate, int)) *DeploymentSettingAuditCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DeploymentSettingAuditCreateBulk{err: fmt.Errorf("calling to DeploymentSettingAuditClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DeploymentSettingAuditCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DeploymentSettingAuditCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DeploymentSettingAudit.
+func (c *DeploymentSettingAuditClient) Update() *DeploymentSettingAuditUpdate {
+	mutation := newDeploymentSettingAuditMutation(c.config, OpUpdate)
+	return &DeploymentSettingAuditUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DeploymentSettingAuditClient) UpdateOne(_m *DeploymentSettingAudit) *DeploymentSettingAuditUpdateOne {
+	mutation := newDeploymentSettingAuditMutation(c.config, OpUpdateOne, withDeploymentSettingAudit(_m))
+	return &DeploymentSettingAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DeploymentSettingAuditClient) UpdateOneID(id int) *DeploymentSettingAuditUpdateOne {
+	mutation := newDeploymentSettingAuditMutation(c.config, OpUpdateOne, withDeploymentSettingAuditID(id))
+	return &DeploymentSettingAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DeploymentSettingAudit.
+func (c *DeploymentSettingAuditClient) Delete() *DeploymentSettingAuditDelete {
+	mutation := newDeploymentSettingAuditMutation(c.config, OpDelete)
+	return &DeploymentSettingAuditDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DeploymentSettingAuditClient) DeleteOne(_m *DeploymentSettingAudit) *DeploymentSettingAuditDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DeploymentSettingAuditClient) DeleteOneID(id int) *DeploymentSettingAuditDeleteOne {
+	builder := c.Delete().Where(deploymentsettingaudit.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DeploymentSettingAuditDeleteOne{builder}
+}
+
+// Query returns a query builder for DeploymentSettingAudit.
+func (c *DeploymentSettingAuditClient) Query() *DeploymentSettingAuditQuery {
+	return &DeploymentSettingAuditQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDeploymentSettingAudit},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DeploymentSettingAudit entity by its id.
+func (c *DeploymentSettingAuditClient) Get(ctx context.Context, id int) (*DeploymentSettingAudit, error) {
+	return c.Query().Where(deploymentsettingaudit.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DeploymentSettingAuditClient) GetX(ctx context.Context, id int) *DeploymentSettingAudit {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DeploymentSettingAuditClient) Hooks() []Hook {
+	return c.hooks.DeploymentSettingAudit
+}
+
+// Interceptors returns the client interceptors.
+func (c *DeploymentSettingAuditClient) Interceptors() []Interceptor {
+	return c.inters.DeploymentSettingAudit
+}
+
+func (c *DeploymentSettingAuditClient) mutate(ctx context.Context, m *DeploymentSettingAuditMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DeploymentSettingAuditCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DeploymentSettingAuditUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DeploymentSettingAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DeploymentSettingAuditDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DeploymentSettingAudit mutation op: %q", m.Op())
 	}
 }
 
@@ -4618,19 +4761,19 @@ type (
 	hooks struct {
 		Activation, BudgetAllocation, BudgetAudit, BudgetBucket, BudgetLimit,
 		BudgetReconciliation, BudgetRequest, BudgetSettlement, DeletedCredential,
-		DeletedPrincipal, Deployment, Device, Enrollment, EnterpriseUpdate,
-		IdempotencyRecord, ManagedDraft, ManagedRelease, ManagedState, PortalSession,
-		PricingRule, RequestUsage, Secret, SecretVersion, SemanticUsage, Session,
-		Upstream, UpstreamConfigRevision, UsageDetail, UsageEvent, User,
-		UserBudget []ent.Hook
+		DeletedPrincipal, Deployment, DeploymentSettingAudit, Device, Enrollment,
+		EnterpriseUpdate, IdempotencyRecord, ManagedDraft, ManagedRelease,
+		ManagedState, PortalSession, PricingRule, RequestUsage, Secret, SecretVersion,
+		SemanticUsage, Session, Upstream, UpstreamConfigRevision, UsageDetail,
+		UsageEvent, User, UserBudget []ent.Hook
 	}
 	inters struct {
 		Activation, BudgetAllocation, BudgetAudit, BudgetBucket, BudgetLimit,
 		BudgetReconciliation, BudgetRequest, BudgetSettlement, DeletedCredential,
-		DeletedPrincipal, Deployment, Device, Enrollment, EnterpriseUpdate,
-		IdempotencyRecord, ManagedDraft, ManagedRelease, ManagedState, PortalSession,
-		PricingRule, RequestUsage, Secret, SecretVersion, SemanticUsage, Session,
-		Upstream, UpstreamConfigRevision, UsageDetail, UsageEvent, User,
-		UserBudget []ent.Interceptor
+		DeletedPrincipal, Deployment, DeploymentSettingAudit, Device, Enrollment,
+		EnterpriseUpdate, IdempotencyRecord, ManagedDraft, ManagedRelease,
+		ManagedState, PortalSession, PricingRule, RequestUsage, Secret, SecretVersion,
+		SemanticUsage, Session, Upstream, UpstreamConfigRevision, UsageDetail,
+		UsageEvent, User, UserBudget []ent.Interceptor
 	}
 )

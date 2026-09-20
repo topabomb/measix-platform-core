@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
-import { fetchAllPages } from '../api/pagination'
 import { hasPublishedConfiguration, isManagedRuntimeConverged } from '../api/systemStatus'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -12,25 +11,16 @@ import PageHeader from '../components/PageHeader.vue'
 
 const { t: $t } = useI18n()
 
+const activeTab = ref<'overview' | 'runtime' | 'metering'>('overview')
+
 type SystemStatus = components['schemas']['SystemStatus']
 type SystemHealth = components['schemas']['Health']
-type Upstream = components['schemas']['Upstream']
 
 const status = ref<SystemStatus>()
 const health = ref<SystemHealth>()
-const upstreams = ref<Upstream[]>()
 const loading = ref(false)
 const error = ref<unknown>()
 const healthError = ref<unknown>()
-const upstreamError = ref<unknown>()
-const upstreamStates: Upstream['status'][] = ['ACTIVE', 'DEGRADED', 'APPLYING', 'INACTIVE', 'DISABLED']
-const upstreamCounts = computed(() => {
-  const counts = new Map<Upstream['status'], number>()
-  for (const upstream of upstreams.value ?? []) {
-    counts.set(upstream.status, (counts.get(upstream.status) ?? 0) + 1)
-  }
-  return counts
-})
 
 const noPublishedConfiguration = computed(() => !!status.value && !hasPublishedConfiguration(status.value))
 const converged = computed(() => isManagedRuntimeConverged(status.value))
@@ -39,12 +29,10 @@ async function refresh() {
   loading.value = true
   error.value = undefined
   healthError.value = undefined
-  upstreamError.value = undefined
   try {
-    const [systemResult, healthResult, upstreamResult] = await Promise.allSettled([
+    const [systemResult, healthResult] = await Promise.allSettled([
       apiFetch<SystemStatus>('/api/admin/v1/system/status'),
       apiFetch<SystemHealth>('/api/admin/v1/system/health'),
-      fetchAllPages<Upstream>('/api/admin/v1/upstreams?limit=200'),
     ])
     if (systemResult.status === 'fulfilled') status.value = systemResult.value
     else {
@@ -55,11 +43,6 @@ async function refresh() {
     else {
       health.value = undefined
       healthError.value = healthResult.reason
-    }
-    if (upstreamResult.status === 'fulfilled') upstreams.value = upstreamResult.value
-    else {
-      upstreams.value = undefined
-      upstreamError.value = upstreamResult.reason
     }
   } finally {
     loading.value = false
@@ -76,6 +59,11 @@ onMounted(refresh)
         <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
       </template>
     </PageHeader>
+    <q-tabs v-model="activeTab" dense align="left" class="q-mb-xs">
+      <q-tab name="overview" icon="dashboard" :label="$t('system.tabs.overview')" />
+      <q-tab name="runtime" icon="sync_alt" :label="$t('system.tabs.runtime')" />
+      <q-tab name="metering" icon="monitoring" :label="$t('system.tabs.metering')" />
+    </q-tabs>
     <ProblemBanner :error="error" class="q-mb-xs" />
     <q-banner v-if="noPublishedConfiguration" data-cy="system-setup-state" class="bg-amber-1 text-warning q-mb-xs rounded-borders">
       {{ $t('system.noPublishedConfiguration') }} {{ $t('system.setupGuidance') }}
@@ -86,7 +74,8 @@ onMounted(refresh)
     </q-banner>
     <LoadingState v-if="loading && !status" />
     <template v-else-if="status">
-      <q-card flat bordered class="q-mb-xs" data-cy="platform-public-origin">
+      <div v-show="activeTab === 'overview'" class="system-overview-grid q-mb-xs">
+      <q-card flat bordered data-cy="platform-public-origin">
         <q-card-section>
           <div class="text-subtitle1">{{ $t('system.publicOrigin') }}</div>
           <div v-if="status.publicOrigin" class="text-body1 text-break q-mt-xs">{{ status.publicOrigin }}</div>
@@ -94,7 +83,7 @@ onMounted(refresh)
           <div class="text-caption text-grey-7 q-mt-xs">{{ $t('system.publicOriginHint') }}</div>
         </q-card-section>
       </q-card>
-      <q-card flat bordered class="q-mb-xs" data-cy="portal-status">
+      <q-card flat bordered data-cy="portal-status">
         <q-card-section>
           <div class="row items-center q-gutter-sm">
             <div class="text-subtitle1">{{ $t('system.portal') }}</div>
@@ -105,8 +94,9 @@ onMounted(refresh)
           <div class="text-caption text-grey-7 q-mt-xs">{{ $t('system.portalHint') }}</div>
         </q-card-section>
       </q-card>
+      </div>
       <div class="row q-col-gutter-xs q-mb-xs">
-        <div class="col-xs-12 col-sm-6 col-md-3">
+        <div v-show="activeTab === 'overview'" class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('system.hubVersion') }}</div>
@@ -114,7 +104,7 @@ onMounted(refresh)
             </q-card-section>
           </q-card>
         </div>
-        <div class="col-xs-12 col-sm-6 col-md-3">
+        <div v-show="activeTab === 'overview'" class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('system.dbHealth') }}</div>
@@ -123,7 +113,7 @@ onMounted(refresh)
             </q-card-section>
           </q-card>
         </div>
-        <div class="col-xs-12 col-sm-6 col-md-3">
+        <div v-show="activeTab === 'overview'" class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('overview.managedRuntime') }}</div>
@@ -132,7 +122,7 @@ onMounted(refresh)
             </q-card-section>
           </q-card>
         </div>
-        <div class="col-xs-12 col-sm-6 col-md-3">
+        <div v-show="activeTab === 'overview'" class="col-xs-12 col-sm-6 col-md-3">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('system.relayReady') }}</div>
@@ -146,10 +136,10 @@ onMounted(refresh)
           </q-card>
         </div>
       <!-- Metering & spool state -->
-        <div class="col-12 col-md-6">
+        <div v-show="activeTab === 'metering'" class="col-12">
           <q-card flat bordered>
             <q-card-section class="text-subtitle2">{{ $t('system.meteringSpool') }}</q-card-section>
-            <q-list separator>
+            <q-list separator class="system-metering-list">
               <q-item>
                 <q-item-section>{{ $t('system.semanticUnknown') }}<q-item-label caption>{{ $t('system.semanticUnknownHint') }}</q-item-label></q-item-section>
                 <q-item-section side data-cy="semantic-unknown-count">{{ status.semanticUnknownRequestCount ?? '—' }}</q-item-section>
@@ -164,7 +154,7 @@ onMounted(refresh)
             </q-list>
           </q-card>
         </div>
-        <div class="col-12 col-md-6">
+        <div v-show="activeTab === 'runtime'" class="col-12 col-md-6">
           <q-card flat bordered>
             <q-card-section class="text-subtitle2">{{ $t('system.runtimeStatus') }}</q-card-section>
             <q-list separator>
@@ -184,7 +174,7 @@ onMounted(refresh)
           </q-card>
         </div>
       <!-- In-flight and completed operations are independent observations. -->
-        <div v-for="operation in [{ key: 'currentActivation', value: status.currentActivation }, { key: 'lastActivation', value: status.lastActivation }]" :key="operation.key" class="col-12 col-md-6" :data-cy="operation.key">
+        <div v-for="operation in [{ key: 'currentActivation', value: status.currentActivation }, { key: 'lastActivation', value: status.lastActivation }]" v-show="activeTab === 'runtime'" :key="operation.key" class="col-12 col-md-6" :data-cy="operation.key">
           <q-card flat bordered>
             <q-card-section class="text-subtitle2">{{ $t(`system.${operation.key}`) }}</q-card-section>
             <q-list separator>
@@ -216,7 +206,7 @@ onMounted(refresh)
     </template>
 
     <ProblemBanner :error="healthError" class="q-mb-xs" />
-    <q-card v-if="health" flat bordered>
+    <q-card v-if="health" v-show="activeTab === 'overview'" flat bordered>
       <q-card-section><div class="text-subtitle2">{{ $t('system.hubHealth') }}</div></q-card-section>
       <q-markup-table flat dense>
         <tbody>
@@ -227,26 +217,31 @@ onMounted(refresh)
         </tbody>
       </q-markup-table>
     </q-card>
-    <q-card flat bordered class="q-mt-xs" data-cy="system-upstream-status">
-      <q-card-section>
-        <div class="text-subtitle2">{{ $t('system.upstreamConfiguration') }}</div>
-        <div class="text-caption text-grey-7">{{ $t('system.upstreamStatusNote') }}</div>
-      </q-card-section>
-      <ProblemBanner :error="upstreamError" class="card-inset q-mb-xs" />
-      <q-list v-if="upstreams" separator>
-        <q-item v-if="!upstreams.length"><q-item-section class="text-grey-7">{{ $t('upstreams.noUpstreams') }}</q-item-section></q-item>
-        <q-item v-for="upstreamState in upstreamStates" :key="upstreamState">
-          <q-item-section><div class="row items-center"><StatusChip :value="upstreamState" /></div></q-item-section>
-          <q-item-section side>{{ upstreamCounts.get(upstreamState) ?? 0 }}</q-item-section>
-        </q-item>
-      </q-list>
-      <q-card-actions align="right"><q-btn flat :to="{ name: 'Upstreams' }" :label="$t('nav.upstreams')" /></q-card-actions>
-    </q-card>
   </q-page>
 </template>
 
 <style scoped>
+.system-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.system-metering-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.system-metering-list :deep(.q-item) {
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
+}
+
 .schema-identity {
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .system-overview-grid,
+  .system-metering-list { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

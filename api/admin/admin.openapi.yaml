@@ -647,6 +647,11 @@ paths:
       parameters: &id009
       - *id004
       - *id005
+      - name: query
+        in: query
+        description: Case-insensitive partial match on the human-readable upstream name.
+        schema:
+          type: string
     post:
       operationId: createUpstream
       responses:
@@ -792,6 +797,11 @@ paths:
       parameters:
       - *id004
       - *id005
+      - name: query
+        in: query
+        description: Case-insensitive partial match on Secret metadata name. Secret values are never searched or returned.
+        schema:
+          type: string
     post:
       operationId: createSecret
       responses:
@@ -848,6 +858,29 @@ paths:
         schema:
           $ref: '#/components/schemas/SecretId'
       - *id001
+  /api/admin/v1/secrets/{secretId}:
+    get:
+      operationId: getSecret
+      description: Returns Secret metadata only. Credential values and encrypted payloads are never returned.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Secret'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - name: secretId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/SecretId'
   /api/admin/v1/usage/summary:
     get:
       operationId: usageSummary
@@ -1151,6 +1184,45 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
+  /api/admin/v1/deployment/settings:
+    get:
+      operationId: getDeploymentSettings
+      responses:
+        '200':
+          description: Current deployment-wide business settings. Infrastructure and trust settings are intentionally excluded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentSettings'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: updateDeploymentSettings
+      responses:
+        '200':
+          description: Updated deployment-wide business settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentSettings'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeploymentSettingsRequest'
+      parameters:
+      - *id001
   /api/admin/v1/system/health:
     get:
       operationId: systemHealth
@@ -1175,7 +1247,18 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
-      parameters: *id006
+      parameters:
+      - *id004
+      - *id005
+      - name: query
+        in: query
+        description: Case-insensitive partial match on title or rendered content source.
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/EnterpriseUpdateStatus'
     post:
       operationId: createEnterpriseUpdate
       responses:
@@ -3350,6 +3433,48 @@ components:
           type: integer
           minimum: 0
           description: Number of retained requests with no linked semantic records or at least one UNKNOWN record. Counts requests once, excludes unlinked provider records, and uses the same completeness rule as Usage. Omission means unavailable, not zero.
+    DeploymentSettings:
+      type: object
+      additionalProperties: false
+      required: [deploymentId, name, timezone, publicOrigin, updatedAt]
+      properties:
+        deploymentId:
+          $ref: '#/components/schemas/DeploymentId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Human-facing enterprise name shown to enrolled users and Portal sessions.
+        timezone:
+          type: string
+          minLength: 1
+          description: Fixed deployment IANA timezone. Changing it at runtime would alter natural budget periods and is intentionally not mutable in this API.
+        publicOrigin:
+          type: string
+          format: uri
+          minLength: 1
+          maxLength: 1024
+          description: Canonical external HTTP or HTTPS origin advertised to clients. It may be changed at runtime; changing it revokes Portal sessions but does not configure DNS, TLS or ingress and does not migrate already-enrolled client authorities.
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateDeploymentSettingsRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedUpdatedAt, name, publicOrigin]
+      properties:
+        expectedUpdatedAt:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        publicOrigin:
+          type: string
+          format: uri
+          minLength: 1
+          maxLength: 1024
     Health:
       type: object
       additionalProperties: false

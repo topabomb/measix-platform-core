@@ -8,13 +8,14 @@ import { useDraftStore, ttsTransport, asrTransport, isRealtimeAsr, type AsrProto
 import { useSessionStore } from '../stores/session'
 import { useActivationStore } from '../stores/activation'
 import ManagedExperienceEditor from '../components/ManagedExperienceEditor.vue'
-import { fetchAllPages } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
 import ConfigurationSectionNav, { type ConfigurationSection } from '../components/ConfigurationSectionNav.vue'
 import { useResourceDiff } from '../composables/useResourceDiff'
+import PagedEntityPicker from '../components/PagedEntityPicker.vue'
+import { fetchUpstreamPickerPage, resolveUpstreamPickerOption } from '../api/entityPickerSources'
 
 type Activation = components['schemas']['Activation']
 type ModelDefinition = components['schemas']['ModelDefinition']
@@ -25,6 +26,7 @@ type ProviderDefinition = components['schemas']['ProviderDefinition']
 type ManagedPolicy = components['schemas']['ManagedPolicy']
 type PolicyFlagKey = 'allowLocalProviders' | 'allowLocalTts' | 'allowLocalAsr' | 'allowLocalMcp' | 'allowLocalAssistants'
 type Upstream = components['schemas']['Upstream']
+type UpstreamPage = components['schemas']['UpstreamPage']
 type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
 type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
 type DraftPreviewResponse = components['schemas']['DraftPreviewResponse']
@@ -132,6 +134,17 @@ function setPolicyFlag(key: PolicyFlagKey, value: boolean) {
 
 // Selected resource for editor/detail mode
 const selectedResourceId = ref<string>()
+const collectionQuery = ref('')
+
+function matchesCollection(value: string, id: string): boolean {
+  const term = collectionQuery.value.trim().toLocaleLowerCase()
+  return !term || value.toLocaleLowerCase().includes(term) || id.toLocaleLowerCase().includes(term)
+}
+
+const filteredModels = computed(() => draft.localContent?.models.filter(item => matchesCollection(item.displayName, item.modelId)) ?? [])
+const filteredTts = computed(() => draft.localContent?.tts.filter(item => matchesCollection(item.displayName, item.ttsId)) ?? [])
+const filteredAsr = computed(() => draft.localContent?.asr.filter(item => matchesCollection(item.displayName, item.asrId)) ?? [])
+const filteredMcp = computed(() => draft.localContent?.mcp.filter(item => matchesCollection(item.displayName, item.mcpServerId)) ?? [])
 
 const INPUT_MODS = ['TEXT', 'IMAGE'] as const
 const OUTPUT_MODS = ['TEXT'] as const
@@ -143,18 +156,6 @@ const relationshipKindFilter = ref<string>('all')
 const up = (id?: string) => upstreams.value.find((u) => u.upstreamId === id)
 const upstreamLabel = (id?: string) => (id ? up(id)?.name ?? id : '—')
 const upstreamStatus = (id?: string) => up(id)?.status
-
-/** Upstream picker options showing Name + status, not just bare ID. */
-const upstreamOptions = computed(() =>
-  upstreams.value
-    .slice()
-    .sort((a, b) => (a.status === 'ACTIVE' ? -1 : 0) - (b.status === 'ACTIVE' ? -1 : 0))
-    .map((u) => ({
-      label: `${u.name} (${$t(`status.${u.status}`)})`,
-      value: u.upstreamId,
-      status: u.status,
-    })),
-)
 
 /** Selected model for the Models tab editor. */
 const selectedModel = computed(() =>
@@ -298,7 +299,8 @@ async function refresh(force = false) {
   if (!force && !confirmDiscard()) return
   error.value = undefined
   try {
-    await Promise.all([draft.load(), loadUpstreams()])
+    await draft.load()
+    await loadUpstreams()
   } catch (cause) {
     error.value = cause
   }
@@ -308,7 +310,13 @@ async function loadUpstreams() {
   upstreamsLoading.value = true
   upstreamError.value = undefined
   try {
-    upstreams.value = await fetchAllPages<Upstream>('/api/admin/v1/upstreams?limit=200')
+    const page = await apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=50')
+    const known = new Map(page.items.map(item => [item.upstreamId, item]))
+    const referenced = new Set(draft.localContent?.bindings.map(binding => binding.upstreamId).filter(Boolean) ?? [])
+    await Promise.all([...referenced].filter(id => !known.has(id)).map(async id => {
+      known.set(id, await apiFetch<Upstream>(`/api/admin/v1/upstreams/${encodeURIComponent(id)}`))
+    }))
+    upstreams.value = [...known.values()]
   } catch (cause) {
     upstreamError.value = cause
   } finally {
@@ -525,9 +533,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     <PageHeader :title="$t('nav.resources')" :subtitle="$t('resources.subtitle')">
       <template #actions>
         <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="draft.loading" @click="refresh()" />
-        <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate || draft.dirty" :loading="previewing" @click="previewSnapshot" data-cy="draft-preview-btn" />
-        <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || draft.loading || draft.dirty" @click="validate" data-cy="draft-validate-btn" />
         <q-btn outline color="primary" :label="$t('common.save')" :disable="!canMutate || !draft.dirty" :loading="draft.saving" @click="save" data-cy="draft-save-btn" />
+        <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || draft.loading || draft.dirty" @click="validate" data-cy="draft-validate-btn" />
+        <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate || draft.dirty" :loading="previewing" @click="previewSnapshot" data-cy="draft-preview-btn" />
         <q-btn color="positive" icon="rocket_launch" :label="$t('resources.draft.review')" :disable="!canMutate || draft.dirty" :loading="reviewing" @click="openReview" data-cy="draft-review-btn" />
       </template>
     </PageHeader>
@@ -576,7 +584,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </q-card-section>
       </q-card>
 
-      <div class="configuration-workbench">
+      <div v-if="!reviewOpen && !previewOpen" class="configuration-workbench">
         <ConfigurationSectionNav
           v-model="activeTab"
           :title="$t('resources.navigation.title')"
@@ -682,16 +690,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
       <!-- ===== Models: Collection → Editor ===== -->
       <template v-if="activeTab === 'models'">
-        <div class="row q-col-gutter-xs">
+        <div class="row q-col-gutter-xs resource-split" :class="{ 'resource-split--selected': Boolean(selectedModel) }">
           <!-- Collection -->
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-4 resource-split__collection">
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
                 <div class="text-subtitle2">{{ $t('resources.tabs.models') }}</div>
                 <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-model-btn" :disable="!draft.localContent.providers.length" @click="addModel()" />
               </q-card-section>
+              <q-card-section class="q-pa-xs"><q-input v-model="collectionQuery" dense outlined clearable :label="$t('common.search')"><template #prepend><q-icon name="search" /></template></q-input></q-card-section>
               <q-list separator>
-                <q-item v-for="model in draft.localContent.models" :key="model.modelId"
+                <q-item v-for="model in filteredModels" :key="model.modelId"
                   :active="selectedResourceId === model.modelId" clickable @click="selectModel(model.modelId)">
                   <q-item-section>
                     <q-item-label>{{ model.displayName }}</q-item-label>
@@ -714,10 +723,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </div>
 
           <!-- Model Editor -->
-          <div class="col-12 col-md-8">
+          <div class="col-12 col-md-8 resource-split__detail">
             <q-card v-if="selectedModel" flat bordered>
               <!-- Header: Identity -->
               <q-card-section class="row items-start justify-between">
+                <q-btn class="resource-detail-back" flat dense no-caps icon="arrow_back" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
                 <div>
                   <div class="text-h6">{{ selectedModel.displayName }}</div>
                   <div class="text-caption">{{ modelProtocols.find(option => option.value === draft.localContent!.providers.find(p => p.providerId === selectedModel!.providerId)?.clientProtocol)?.label }}</div>
@@ -762,7 +772,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.model.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <q-select :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" :disable="upstreamsLoading || !!upstreamError" emit-value map-options class="col" data-cy="model-upstream-select" data-field="upstreamId" @update:model-value="(v: string) => draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="model-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
                   <q-input :model-value="selectedModel.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="model-runtime-path" @update:model-value="v => draft.setRuntimePath(selectedModel!.modelId, String(v ?? ''))" />
                 </div>
                 <div v-if="draft.localContent.providers.find(provider => provider.providerId === selectedModel!.providerId)?.clientProtocol === 'GOOGLE_GENERATE_CONTENT'" class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.model.geminiPathHint') }}</div>
@@ -805,15 +815,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
       <!-- ===== TTS: Collection → Editor ===== -->
       <template v-if="activeTab === 'tts'">
-        <div class="row q-col-gutter-xs">
-          <div class="col-12 col-md-4">
+        <div class="row q-col-gutter-xs resource-split" :class="{ 'resource-split--selected': Boolean(selectedTts) }">
+          <div class="col-12 col-md-4 resource-split__collection">
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
                 <div class="text-subtitle2">{{ $t('resources.tabs.tts') }}</div>
                 <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-tts-btn" @click="draft.addTts(); selectedResourceId = draft.localContent?.tts[draft.localContent.tts.length - 1]?.ttsId" />
               </q-card-section>
+              <q-card-section class="q-pa-xs"><q-input v-model="collectionQuery" dense outlined clearable :label="$t('common.search')"><template #prepend><q-icon name="search" /></template></q-input></q-card-section>
               <q-list separator>
-                <q-item v-for="tts in draft.localContent.tts" :key="tts.ttsId"
+                <q-item v-for="tts in filteredTts" :key="tts.ttsId"
                   :active="selectedResourceId === tts.ttsId" clickable @click="selectTts(tts.ttsId)">
                   <q-item-section>
                     <q-item-label>{{ tts.displayName }}</q-item-label>
@@ -832,9 +843,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </q-card>
           </div>
 
-          <div class="col-12 col-md-8">
+          <div class="col-12 col-md-8 resource-split__detail">
             <q-card v-if="selectedTts" flat bordered>
               <q-card-section class="row items-start justify-between">
+                <q-btn class="resource-detail-back" flat dense no-caps icon="arrow_back" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
                 <div>
                   <div class="text-h6">{{ selectedTts.displayName }}</div>
                   <details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selectedTts.ttsId }} · {{ selectedTts.clientProtocol }}</details>
@@ -881,7 +893,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section v-if="selectedTts.clientProtocol !== 'SYSTEM_TTS'">
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.tts.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <q-select :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" :disable="upstreamsLoading || !!upstreamError" emit-value map-options class="col" data-cy="tts-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedTts!.ttsId, v, ttsTransport(selectedTts!.clientProtocol))" />
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="tts-upstream-select" @update:model-value="(v) => v && draft.setBinding(selectedTts!.ttsId, v, ttsTransport(selectedTts!.clientProtocol))" />
                   <q-input :model-value="selectedTts.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="tts-runtime-path" @update:model-value="v => draft.setRuntimePath(selectedTts!.ttsId, String(v ?? ''))" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.tts.cloudHint') }}</div>
@@ -917,15 +929,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
       <!-- ===== ASR: Collection → Editor ===== -->
       <template v-if="activeTab === 'asr'">
-        <div class="row q-col-gutter-xs">
-          <div class="col-12 col-md-4">
+        <div class="row q-col-gutter-xs resource-split" :class="{ 'resource-split--selected': Boolean(selectedAsr) }">
+          <div class="col-12 col-md-4 resource-split__collection">
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
                 <div class="text-subtitle2">{{ $t('resources.tabs.asr') }}</div>
                 <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-asr-btn" @click="draft.addAsr(); selectedResourceId = draft.localContent?.asr[draft.localContent.asr.length - 1]?.asrId" />
               </q-card-section>
+              <q-card-section class="q-pa-xs"><q-input v-model="collectionQuery" dense outlined clearable :label="$t('common.search')"><template #prepend><q-icon name="search" /></template></q-input></q-card-section>
               <q-list separator>
-                <q-item v-for="asr in draft.localContent.asr" :key="asr.asrId"
+                <q-item v-for="asr in filteredAsr" :key="asr.asrId"
                   :active="selectedResourceId === asr.asrId" clickable @click="selectAsr(asr.asrId)">
                   <q-item-section>
                     <q-item-label>{{ asr.displayName }}</q-item-label>
@@ -943,9 +956,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </q-card>
           </div>
 
-          <div class="col-12 col-md-8">
+          <div class="col-12 col-md-8 resource-split__detail">
             <q-card v-if="selectedAsr" flat bordered>
               <q-card-section class="row items-start justify-between">
+                <q-btn class="resource-detail-back" flat dense no-caps icon="arrow_back" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
                 <div>
                   <div class="text-h6">{{ selectedAsr.displayName }}</div>
                   <details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selectedAsr.asrId }} · {{ selectedAsr.clientProtocol }}</details>
@@ -991,7 +1005,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.asr.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <q-select :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" :disable="upstreamsLoading || !!upstreamError" emit-value map-options class="col" data-cy="asr-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedAsr!.asrId, v, asrTransport(selectedAsr!.clientProtocol))" />
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="asr-upstream-select" @update:model-value="(v) => v && draft.setBinding(selectedAsr!.asrId, v, asrTransport(selectedAsr!.clientProtocol))" />
                   <q-input :model-value="selectedAsr.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="asr-runtime-path" @update:model-value="v => draft.setRuntimePath(selectedAsr!.asrId, String(v ?? ''))" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.asr.bindingHint') }}</div>
@@ -1027,15 +1041,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
       <!-- ===== MCP: Collection → Editor ===== -->
       <template v-if="activeTab === 'mcp'">
-        <div class="row q-col-gutter-xs">
-          <div class="col-12 col-md-4">
+        <div class="row q-col-gutter-xs resource-split" :class="{ 'resource-split--selected': Boolean(selectedMcp) }">
+          <div class="col-12 col-md-4 resource-split__collection">
             <q-card flat bordered>
               <q-card-section class="row items-center justify-between">
                 <div class="text-subtitle2">{{ $t('resources.tabs.mcp') }} <span class="text-caption text-grey-7">· {{ $t('resources.mcp.transport') }}</span></div>
                 <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-mcp-btn" @click="draft.addMcp(); selectedResourceId = draft.localContent?.mcp[draft.localContent.mcp.length - 1]?.mcpServerId" />
               </q-card-section>
+              <q-card-section class="q-pa-xs"><q-input v-model="collectionQuery" dense outlined clearable :label="$t('common.search')"><template #prepend><q-icon name="search" /></template></q-input></q-card-section>
               <q-list separator>
-                <q-item v-for="mcp in draft.localContent.mcp" :key="mcp.mcpServerId"
+                <q-item v-for="mcp in filteredMcp" :key="mcp.mcpServerId"
                   :active="selectedResourceId === mcp.mcpServerId" clickable @click="selectMcp(mcp.mcpServerId)">
                   <q-item-section>
                     <q-item-label>{{ mcp.displayName }}</q-item-label>
@@ -1053,9 +1068,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </q-card>
           </div>
 
-          <div class="col-12 col-md-8">
+          <div class="col-12 col-md-8 resource-split__detail">
             <q-card v-if="selectedMcp" flat bordered>
               <q-card-section class="row items-start justify-between">
+                <q-btn class="resource-detail-back" flat dense no-caps icon="arrow_back" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
                 <div>
                   <div class="text-h6">{{ selectedMcp.displayName }}</div>
                   <details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selectedMcp.mcpServerId }} · {{ $t('resources.mcp.protocolBadge') }}</details>
@@ -1090,7 +1106,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.mcp.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <q-select :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId ?? ''" dense outlined :label="$t('resources.model.upstream')" :options="upstreamOptions" :disable="upstreamsLoading || !!upstreamError" emit-value map-options class="col" data-cy="mcp-upstream-select" @update:model-value="(v: string) => draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="mcp-upstream-select" @update:model-value="(v) => v && draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
                   <q-input :model-value="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="mcp-runtime-path" @update:model-value="v => draft.setRuntimePath(selectedMcp!.mcpServerId, String(v ?? ''))" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.mcp.transportSummary') }}</div>
@@ -1184,12 +1200,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </q-card>
       </template>
 
-      <!-- Shared validation summary (below all tabs) -->
-      <q-card flat bordered class="q-mt-xs" data-cy="draft-validation-summary">
-        <q-card-section>
+      <!-- Validation only occupies space after the operator explicitly runs it. -->
+      <q-card v-if="draft.validationResult" flat bordered class="q-mt-xs" data-cy="draft-validation-summary">
+        <q-card-section class="q-py-xs">
           <div class="text-subtitle2">{{ $t('resources.model.validation') }}</div>
-          <div v-if="!draft.validationResult" class="text-body2 text-grey-7 q-mt-xs">{{ $t('resources.dirtyHint') }}</div>
-          <div v-else>
+          <div>
             <q-banner v-if="draft.validationResult.errors.length === 0 && draft.validationResult.warnings.length === 0" class="bg-green-1 q-mt-xs rounded-borders">
               {{ $t('resources.valid') }}
             </q-banner>
@@ -1212,9 +1227,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </section>
       </div>
 
-      <!-- Review & Publish Dialog (structured diff, not a simple confirm) -->
-      <q-dialog v-model="reviewOpen" persistent>
-        <q-card class="app-dialog app-dialog--lg">
+      <!-- Review is a first-class work surface, not a modal confirmation. -->
+        <q-card v-if="reviewOpen && !previewOpen" flat bordered data-cy="publish-review-surface">
           <q-card-section class="row items-center justify-between">
             <div>
               <div class="text-h6">{{ $t('resources.review.title') }}</div>
@@ -1227,7 +1241,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </q-card-section>
           <q-separator />
 
-          <q-card-section v-if="preview" class="app-dialog__body">
+          <q-card-section v-if="preview">
             <q-banner v-if="unchangedPublishedDraft" data-cy="review-no-changes" class="bg-blue-1 q-mb-xs rounded-borders">
               {{ $t('resources.review.alreadyPublished') }}
             </q-banner>
@@ -1303,7 +1317,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <q-separator />
           <q-card-actions align="right">
             <q-btn flat no-caps color="primary" :label="$t('resources.review.inspectFinalContent')" @click="previewOpen = true" data-cy="review-preview-btn" />
-            <q-btn flat :label="$t('common.cancel')" v-close-popup :disable="publishing" />
+            <q-btn flat icon="arrow_back" :label="$t('common.cancel')" :disable="publishing" @click="reviewOpen = false" />
             <q-btn
               color="positive"
               icon="rocket_launch"
@@ -1315,13 +1329,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             />
           </q-card-actions>
         </q-card>
-      </q-dialog>
 
-      <!-- Snapshot Preview Dialog -->
-      <q-dialog v-model="previewOpen">
-        <q-card class="app-dialog app-dialog--lg">
+      <!-- Canonical client preview replaces the editor while open. -->
+        <q-card v-if="previewOpen" flat bordered data-cy="snapshot-preview-surface">
           <q-card-section class="text-h6">{{ $t('resources.preview.title') }}</q-card-section>
-          <q-card-section v-if="preview" class="app-dialog__body">
+          <q-card-section v-if="preview">
             <div class="text-body2 q-mb-xs">{{ $t('resources.preview.intro') }}</div>
             <details class="text-caption text-grey-7 q-mb-xs"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>
               {{ $t('resources.preview.hash') }}: <code style="overflow-wrap: anywhere">{{ preview.projectionHash }}</code><br>
@@ -1439,10 +1451,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </q-expansion-item>
           </q-card-section>
           <q-card-actions align="right">
-            <q-btn flat :label="$t('common.close')" v-close-popup />
+            <q-btn flat icon="arrow_back" :label="$t('common.close')" @click="previewOpen = false" />
           </q-card-actions>
         </q-card>
-      </q-dialog>
     </template>
     <div v-else class="text-body2 text-grey-7">{{ $t('resources.noDraft') }}</div>
   </q-page>
@@ -1451,7 +1462,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 <style scoped>
 .configuration-workbench {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(196px, 232px) minmax(0, 1fr);
   gap: 4px;
   align-items: start;
 }
@@ -1461,17 +1472,30 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 
 .settings-list {
-  border-radius: 12px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
 .settings-list .q-item {
-  min-height: 68px;
+  min-height: 52px;
+}
+
+.resource-detail-back {
+  display: none;
 }
 
 @media (max-width: 899px) {
   .configuration-workbench {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resource-split:not(.resource-split--selected) .resource-split__detail,
+  .resource-split--selected .resource-split__collection {
+    display: none;
+  }
+
+  .resource-detail-back {
+    display: inline-flex;
   }
 }
 

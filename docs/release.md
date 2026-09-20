@@ -125,7 +125,7 @@ Pin the exact platform-core SHA/build and run all requirements in `measix-s0-cap
 - real Hub↔Relay control/runtime paths;
 - deterministic Test Client using public Client Control + Runtime APIs;
 - deterministic Test Adapter for stable success/failure/no-forward evidence;
-- required Model/TTS/ASR/MCP profile scenarios;
+- required Model/Image Generation/TTS/ASR/MCP profile scenarios;
 - Snapshot Preview/Release equivalence;
 - Usage/Pricing/UNKNOWN/PARTIAL visibility;
 - recovery/security/generation scenarios;

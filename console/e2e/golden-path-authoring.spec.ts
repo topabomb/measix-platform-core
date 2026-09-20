@@ -423,6 +423,10 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
       await expect(toggle).toHaveAttribute('aria-checked', 'true')
     }
     await selectOption(page, 'policy-default-image-generation', 'E2E Image Generation')
+    const imageDefault = page.locator('[data-cy="policy-default-image-generation"]')
+    await imageDefault.click()
+    await page.keyboard.press('Backspace')
+    await expect(imageDefault).not.toContainText('E2E Image Generation')
 
     // S0.2 typed experience authoring shares this same Draft and Publish.
     await page.click('[data-cy="config-section-assistants"]')
@@ -513,7 +517,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     expect(projection.assistants).toHaveLength(1)
     expect(projection.imageGenerators).toHaveLength(1)
     expect(projection.imageGenerators[0]).toMatchObject({ displayName: 'E2E Image Generation', upstreamModelKey: 'image-1', maxImagesPerRequest: 4 })
-    expect(projection.policy.defaultImageGenerationId).toBe(projection.imageGenerators[0].imageId)
+    expect(projection.policy.defaultImageGenerationId).toBeUndefined()
     expect(projection.assistants[0].memorySeed).toEqual(['z authored first', 'a authored second'])
     expect(projection.starters).toHaveLength(1)
     expect(projection.starters[0].assistantDefinitionId).toBe(projection.assistants[0].assistantDefinitionId)
@@ -611,6 +615,33 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.waitForTimeout(500)
   })
 
+  await test.step('set image default in the UI → preview → publish second generation', async () => {
+    await page.goto('/admin/resources')
+    await expect(page.locator('[data-cy="resources-page"]')).toBeVisible({ timeout: 10_000 })
+    await page.click('[data-cy="config-section-policy"]')
+    await selectOption(page, 'policy-default-image-generation', 'E2E Image Generation')
+
+    const saveBtn = page.locator('[data-cy="draft-save-btn"]')
+    await expect(saveBtn).toBeEnabled({ timeout: 5_000 })
+    await saveBtn.click()
+    await expect(page.locator('.q-badge').filter({ hasText: /dirty/i })).not.toBeVisible({ timeout: 10_000 })
+
+    const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/admin/v1/draft:preview') && r.request().method() === 'POST')
+    await page.click('[data-cy="draft-preview-btn"]')
+    const previewResponse = await responsePromise
+    expect(previewResponse.status()).toBe(200)
+    const projection = await previewResponse.json()
+    expect(projection.policy.defaultImageGenerationId).toBe(projection.imageGenerators[0].imageId)
+    await page.locator('[data-cy="snapshot-preview-surface"]').getByRole('button', { name: 'Close', exact: true }).click()
+
+    await page.click('[data-cy="draft-review-btn"]')
+    await expect(page.locator('[data-cy="publish-review-surface"]')).toBeVisible({ timeout: 10_000 })
+    page.once('dialog', dialog => dialog.accept())
+    await page.click('[data-cy="draft-publish-btn"]')
+    await expect(page.locator('text=/COMPLETED|completed/i')).toBeVisible({ timeout: 60_000 })
+    await page.keyboard.press('Escape')
+  })
+
   // ========================================================================
   // Phase 8: Reload — verify state persists
   // ========================================================================
@@ -642,5 +673,6 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
       await expect(toggle).toBeVisible({ timeout: 5_000 })
       await expect(toggle).toHaveAttribute('aria-checked', 'true')
     }
+    await expect(page.locator('[data-cy="policy-default-image-generation"]')).toContainText('E2E Image Generation')
   })
 })

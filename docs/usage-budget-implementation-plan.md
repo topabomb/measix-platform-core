@@ -11,7 +11,7 @@
 - `hub/usage` 负责语义计量、归属、查询与结算；`hub/budget` 负责规则、自然周期计数、原子占用、幂等结算和待核对状态，不以查询聚合代替准入计数器。
 - Admin 的 Usage 与 Users 页面提供筛选、趋势、请求详情、五类能力的用户额度、限额模板、能力覆盖、审计与待核对处置；正式删除用户使用精确用户名、原因、幂等状态机和不可逆凭据 tombstone。
 - Portal 在受限本人 Session 下提供首页摘要及“我的用量与额度”，复用 Core 投影，不持有预算真源。
-- Android 消费当前 Client OpenAPI，在企业空间展示本人额度，并在 Model、TTS、ASR、Realtime ASR 与 MCP 的平台运行时边界统一解析结构化 Problem；固定 Portal 深链不开放任意 URL。
+- Android 消费当前 Client OpenAPI，在企业空间展示本人额度，并在 Model、Image Generation、TTS、ASR、Realtime ASR 与 MCP 的平台运行时边界统一解析结构化 Problem；固定 Portal 深链不开放任意 URL。
 
 只支持当前合同。本文描述已落地的 owner、事务和验证边界；本轮运行证据继续维护在 `docs/s0-execution-progress.md`。
 

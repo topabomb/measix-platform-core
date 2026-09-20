@@ -2,18 +2,224 @@ package relay_test
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/pkg/platformid"
 )
+
+func TestRuntimeProxyPreservesCompressedResponseBytes(t *testing.T) {
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if _, err := writer.Write([]byte(`{"result":"transparent"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	want := append([]byte(nil), compressed.Bytes()...)
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Content-Length", fmt.Sprint(len(want)))
+		_, _ = w.Write(want)
+	}))
+	defer upstream.Close()
+
+	fixture, resourceID := singleRouteFixture(t, upstream.URL, "runtime-secret")
+	defer fixture.close()
+	request := fixture.request(t, nil, http.MethodPost, resourceID, "/v1/chat/completions", strings.NewReader(`{"model":"test"}`), "application/json")
+	clientTransport := http.DefaultTransport.(*http.Transport).Clone()
+	clientTransport.DisableCompression = true
+	response, err := (&http.Client{Transport: clientTransport}).Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	got, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Header.Get("Content-Encoding") != "gzip" {
+		t.Fatalf("Content-Encoding = %q, want gzip", response.Header.Get("Content-Encoding"))
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("compressed response changed: got %d bytes, want %d", len(got), len(want))
+	}
+}
+
+func TestRuntimeProxyEnforcesHTTPStreamIdleTimeout(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: first\n\n"))
+		w.(http.Flusher).Flush()
+		time.Sleep(500 * time.Millisecond)
+		_, _ = w.Write([]byte("data: too-late\n\n"))
+	}))
+	defer upstream.Close()
+
+	fixture, resourceID := singleRouteFixtureWithIdle(t, upstream.URL, "runtime-secret", 100)
+	defer fixture.close()
+	request := fixture.request(t, nil, http.MethodPost, resourceID, "/v1/chat/completions", strings.NewReader(`{"model":"test","stream":true}`), "application/json")
+	started := time.Now()
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, readErr := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if readErr == nil {
+		t.Fatal("idle upstream stream completed without an idle-timeout error")
+	}
+	if elapsed := time.Since(started); elapsed >= 400*time.Millisecond {
+		t.Fatalf("idle timeout took %v, want substantially less than upstream's 500ms stall", elapsed)
+	}
+}
+
+func TestRuntimeProxyIdleTimeoutAllowsActiveLongStream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		for index := range 6 {
+			_, _ = fmt.Fprintf(w, "data: %d\n\n", index)
+			w.(http.Flusher).Flush()
+			time.Sleep(50 * time.Millisecond)
+		}
+	}))
+	defer upstream.Close()
+
+	fixture, resourceID := singleRouteFixtureWithIdle(t, upstream.URL, "runtime-secret", 100)
+	defer fixture.close()
+	request := fixture.request(t, nil, http.MethodPost, resourceID, "/v1/chat/completions", strings.NewReader(`{"model":"test","stream":true}`), "application/json")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, readErr := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if readErr != nil {
+		t.Fatalf("active long stream was interrupted: %v", readErr)
+	}
+	if !bytes.Contains(body, []byte("data: 5")) {
+		t.Fatalf("active long stream was truncated: %q", body)
+	}
+}
+
+func TestRuntimeRelayReusesUpstreamConnectionsAcrossHundredUserBursts(t *testing.T) {
+	const concurrency = 100
+	type barrier struct {
+		entered atomic.Int64
+		ready   chan struct{}
+		release chan struct{}
+	}
+	newBarrier := func() *barrier { return &barrier{ready: make(chan struct{}), release: make(chan struct{})} }
+	first, second := newBarrier(), newBarrier()
+	var phase atomic.Int64
+	phase.Store(1)
+	var connections atomic.Int64
+
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		current := first
+		if phase.Load() == 2 {
+			current = second
+		}
+		if current.entered.Add(1) == concurrency {
+			close(current.ready)
+		}
+		<-current.release
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+	}))
+	upstream.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			connections.Add(1)
+		}
+	}
+	upstream.Start()
+	defer upstream.Close()
+
+	fixture, resourceID := singleRouteFixture(t, upstream.URL, "runtime-secret")
+	defer fixture.close()
+	tokens := make([]string, concurrency)
+	for index := range tokens {
+		tokens[index] = fixture.signer.sign(t, platformid.New(platformid.User), platformid.New(platformid.Device), platformid.New(platformid.Session))
+	}
+	clientTransport := http.DefaultTransport.(*http.Transport).Clone()
+	clientTransport.MaxIdleConns = 256
+	clientTransport.MaxIdleConnsPerHost = 128
+	client := &http.Client{Transport: clientTransport, Timeout: 10 * time.Second}
+
+	runWave := func(current *barrier) time.Duration {
+		t.Helper()
+		started := time.Now()
+		resultErrors := make(chan error, concurrency)
+		var group sync.WaitGroup
+		group.Add(concurrency)
+		for index := range concurrency {
+			index := index
+			go func() {
+				defer group.Done()
+				request, err := http.NewRequest(http.MethodPost, fixture.server.URL+"/runtime/v1/resources/"+resourceID+"/v1/chat/completions", strings.NewReader(`{"model":"test"}`))
+				if err == nil {
+					request.Header.Set("Authorization", "Bearer "+tokens[index])
+					request.Header.Set("X-Measix-Managed-Generation", "1")
+					request.Header.Set("X-Measix-Interaction-Id", platformid.New(platformid.Interaction))
+					request.Header.Set("Content-Type", "application/json")
+					var response *http.Response
+					response, err = client.Do(request)
+					if response != nil {
+						_, readErr := io.Copy(io.Discard, response.Body)
+						closeErr := response.Body.Close()
+						if err == nil {
+							err = errors.Join(readErr, closeErr)
+						}
+						if err == nil && response.StatusCode != http.StatusOK {
+							err = fmt.Errorf("runtime status %d", response.StatusCode)
+						}
+					}
+				}
+				resultErrors <- err
+			}()
+		}
+		select {
+		case <-current.ready:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("only %d/%d requests reached upstream", current.entered.Load(), concurrency)
+		}
+		close(current.release)
+		group.Wait()
+		close(resultErrors)
+		for err := range resultErrors {
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		return time.Since(started)
+	}
+
+	firstDuration := runWave(first)
+	phase.Store(2)
+	secondDuration := runWave(second)
+	if got := connections.Load(); got > concurrency+5 {
+		t.Fatalf("two 100-user bursts opened %d upstream connections; want reuse after the first burst", got)
+	}
+	t.Logf("100-user relay burst: first=%v (%.1f req/s), warm=%v (%.1f req/s), upstream connections=%d",
+		firstDuration, concurrency/firstDuration.Seconds(), secondDuration, concurrency/secondDuration.Seconds(), connections.Load())
+}
 
 func TestRLYI4TransportsStreamWithoutProtocolTranslation(t *testing.T) {
 	var gotAuth string

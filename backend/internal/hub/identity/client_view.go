@@ -46,23 +46,11 @@ func (s *Service) ManagedState(ctx context.Context) (ManagedStateView, error) {
 }
 
 func (s *Service) BootstrapView(ctx context.Context, accessToken string) (BootstrapView, error) {
-	principal, err := s.AuthenticateAccess(ctx, accessToken)
+	principal, u, d, se, err := s.authenticateAccessDetails(ctx, accessToken)
 	if err != nil {
 		return BootstrapView{}, err
 	}
 	deployment, err := s.Client.Deployment.Get(ctx, principal.DeploymentID)
-	if err != nil {
-		return BootstrapView{}, err
-	}
-	u, err := s.Client.User.Get(ctx, principal.UserID)
-	if err != nil {
-		return BootstrapView{}, err
-	}
-	d, err := s.Client.Device.Get(ctx, principal.DeviceID)
-	if err != nil {
-		return BootstrapView{}, err
-	}
-	se, err := s.Client.Session.Get(ctx, principal.SessionID)
 	if err != nil {
 		return BootstrapView{}, err
 	}

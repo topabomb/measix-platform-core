@@ -27,12 +27,29 @@ type Handler struct {
 	transports    sync.Map
 }
 
+const (
+	runtimeMaxIdleConnections        = 256
+	runtimeMaxIdleConnectionsPerHost = 128
+)
+
 func NewHandler(store *control.Store, recorder UsageRecorder, budgetClient relaybudget.Client) http.Handler {
 	base, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		base = &http.Transport{}
 	}
-	return &Handler{store: store, recorder: recorder, budget: budgetClient, baseTransport: base.Clone()}
+	base = base.Clone()
+	// Runtime responses are protocol payloads. Automatic gzip negotiation would
+	// make net/http decompress and rewrite the provider response before the
+	// Relay can forward it, violating byte-transparent transport.
+	base.DisableCompression = true
+	base.ForceAttemptHTTP2 = true
+	if base.MaxIdleConns < runtimeMaxIdleConnections {
+		base.MaxIdleConns = runtimeMaxIdleConnections
+	}
+	if base.MaxIdleConnsPerHost < runtimeMaxIdleConnectionsPerHost {
+		base.MaxIdleConnsPerHost = runtimeMaxIdleConnectionsPerHost
+	}
+	return &Handler{store: store, recorder: recorder, budget: budgetClient, baseTransport: base}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

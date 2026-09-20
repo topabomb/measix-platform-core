@@ -13,6 +13,11 @@ import (
 
 var ErrUnavailable = errors.New("budget service unavailable")
 
+const (
+	defaultMaxIdleConnections        = 256
+	defaultMaxIdleConnectionsPerHost = 128
+)
+
 type Client interface {
 	Admit(context.Context, usageingestapi.BudgetAdmissionRequest) (usageingestapi.BudgetAdmissionDecision, *usageingestapi.Problem, error)
 	Start(context.Context, string, usageingestapi.BudgetLifecycleEvent) error
@@ -29,7 +34,19 @@ func NewHTTPClient(baseURL, token string, client *http.Client) (*HTTPClient, err
 		return nil, fmt.Errorf("budget client requires Hub URL and service credential")
 	}
 	if client == nil {
-		client = &http.Client{Timeout: 10 * time.Second}
+		transport, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			transport = &http.Transport{}
+		}
+		transport = transport.Clone()
+		transport.ForceAttemptHTTP2 = true
+		if transport.MaxIdleConns < defaultMaxIdleConnections {
+			transport.MaxIdleConns = defaultMaxIdleConnections
+		}
+		if transport.MaxIdleConnsPerHost < defaultMaxIdleConnectionsPerHost {
+			transport.MaxIdleConnsPerHost = defaultMaxIdleConnectionsPerHost
+		}
+		client = &http.Client{Transport: transport, Timeout: 10 * time.Second}
 	}
 	generated, err := usageingestapi.NewClientWithResponses(baseURL,
 		usageingestapi.WithHTTPClient(client),

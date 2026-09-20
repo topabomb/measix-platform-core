@@ -263,6 +263,10 @@ func (f *runtimeFixture) request(t *testing.T, ctx context.Context, method, reso
 }
 
 func singleRouteFixture(t *testing.T, upstreamURL, token string) (*runtimeFixture, string) {
+	return singleRouteFixtureWithIdle(t, upstreamURL, token, 30000)
+}
+
+func singleRouteFixtureWithIdle(t *testing.T, upstreamURL, token string, idleMs int) (*runtimeFixture, string) {
 	t.Helper()
 	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -288,7 +292,7 @@ func singleRouteFixture(t *testing.T, upstreamURL, token string) (*runtimeFixtur
 			AllowedMethods:      []string{"POST"},
 			AllowedPathPrefixes: []string{"/v1/chat/completions"},
 			TransportPolicy:     relaycontrolapi.HTTPSTREAMINGSSE,
-			TimeoutPolicy:       relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000},
+			TimeoutPolicy:       relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: idleMs},
 		}},
 		Upstreams: []relaycontrolapi.RuntimeUpstreamSpec{{
 			UpstreamId:            upstreamID,

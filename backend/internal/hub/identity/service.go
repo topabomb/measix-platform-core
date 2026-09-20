@@ -317,65 +317,76 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 }
 
 func (s *Service) AuthenticateAccess(ctx context.Context, token string) (AccessPrincipal, error) {
+	p, _, _, _, err := s.authenticateAccessDetails(ctx, token)
+	return p, err
+}
+
+func (s *Service) authenticateAccessDetails(ctx context.Context, token string) (AccessPrincipal, *ent.User, *ent.Device, *ent.Session, error) {
 	claims, err := s.Signer.Verify(token)
 	if err != nil {
-		return AccessPrincipal{}, ErrCredential
+		return AccessPrincipal{}, nil, nil, nil, ErrCredential
 	}
 	p := AccessPrincipal{DeploymentID: claims.DeploymentID, UserID: claims.Subject, DeviceID: claims.DeviceID, SessionID: claims.SessionID}
-	if err := s.validateAccessPrincipal(ctx, p); err != nil {
-		return AccessPrincipal{}, err
+	u, d, se, err := s.accessPrincipalDetails(ctx, p)
+	if err != nil {
+		return AccessPrincipal{}, nil, nil, nil, err
 	}
-	return p, nil
+	return p, u, d, se, nil
 }
 
 func (s *Service) validateAccessPrincipal(ctx context.Context, p AccessPrincipal) error {
+	_, _, _, err := s.accessPrincipalDetails(ctx, p)
+	return err
+}
+
+func (s *Service) accessPrincipalDetails(ctx context.Context, p AccessPrincipal) (*ent.User, *ent.Device, *ent.Session, error) {
 	deleted, err := s.Client.DeletedPrincipal.Query().Where(deletedprincipal.IDEQ(p.UserID)).Exist(ctx)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	if deleted {
-		return ErrIdentityDeleted
+		return nil, nil, nil, ErrIdentityDeleted
 	}
 	se, err := s.Client.Session.Get(ctx, p.SessionID)
 	if ent.IsNotFound(err) {
-		return ErrRevoked
+		return nil, nil, nil, ErrRevoked
 	}
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	if se.Channel != "ANDROID" || se.UserID != p.UserID || se.DeviceID == nil || *se.DeviceID != p.DeviceID {
-		return ErrCredential
+		return nil, nil, nil, ErrCredential
 	}
 	u, err := s.Client.User.Get(ctx, p.UserID)
 	if ent.IsNotFound(err) {
-		return ErrRevoked
+		return nil, nil, nil, ErrRevoked
 	}
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	if u.Status != "ACTIVE" {
-		return ErrUserDisabled
+		return nil, nil, nil, ErrUserDisabled
 	}
 	d, err := s.Client.Device.Get(ctx, p.DeviceID)
 	if ent.IsNotFound(err) {
-		return ErrRevoked
+		return nil, nil, nil, ErrRevoked
 	}
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	if d.UserID != u.ID {
-		return ErrCredential
+		return nil, nil, nil, ErrCredential
 	}
 	if d.Status != "ACTIVE" {
-		return ErrDeviceRevoked
+		return nil, nil, nil, ErrDeviceRevoked
 	}
 	if !s.Now().UTC().Before(se.ExpiresAt) {
-		return ErrExpired
+		return nil, nil, nil, ErrExpired
 	}
 	if se.Status != "ACTIVE" {
-		return ErrRevoked
+		return nil, nil, nil, ErrRevoked
 	}
-	return nil
+	return u, d, se, nil
 }
 
 func (s *Service) Logout(ctx context.Context, refreshToken string) error {

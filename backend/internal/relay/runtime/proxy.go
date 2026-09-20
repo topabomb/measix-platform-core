@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"measix/platform/internal/relay/control"
@@ -19,12 +21,93 @@ var errUpstreamRedirect = errors.New("upstream redirect is not allowed")
 type transportKey struct {
 	connectMs        int
 	responseHeaderMs int
-	idleMs           int
 }
 
 type proxyResult struct {
 	UpstreamStatus *int
 	ErrorClass     string
+	IdleTimedOut   atomic.Bool
+}
+
+type idleReadCloser struct {
+	body       io.ReadCloser
+	timeout    time.Duration
+	timedOut   *atomic.Bool
+	mu         sync.Mutex
+	timer      *time.Timer
+	generation uint64
+	closed     bool
+}
+
+func newIdleReadCloser(body io.ReadCloser, timeout time.Duration, timedOut *atomic.Bool) io.ReadCloser {
+	reader := &idleReadCloser{body: body, timeout: timeout, timedOut: timedOut}
+	reader.reset()
+	return reader
+}
+
+func (r *idleReadCloser) Read(value []byte) (int, error) {
+	n, err := r.body.Read(value)
+	if n > 0 {
+		r.reset()
+	}
+	if err != nil {
+		r.stopTimer()
+	}
+	return n, err
+}
+
+func (r *idleReadCloser) Close() error {
+	return r.close()
+}
+
+func (r *idleReadCloser) reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return
+	}
+	r.generation++
+	generation := r.generation
+	if r.timer != nil {
+		r.timer.Stop()
+	}
+	r.timer = time.AfterFunc(r.timeout, func() { r.expire(generation) })
+}
+
+func (r *idleReadCloser) expire(generation uint64) {
+	r.mu.Lock()
+	if r.closed || generation != r.generation {
+		r.mu.Unlock()
+		return
+	}
+	r.closed = true
+	if r.timedOut != nil {
+		r.timedOut.Store(true)
+	}
+	r.mu.Unlock()
+	_ = r.body.Close()
+}
+
+func (r *idleReadCloser) stopTimer() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.timer != nil {
+		r.timer.Stop()
+	}
+}
+
+func (r *idleReadCloser) close() error {
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return nil
+	}
+	r.closed = true
+	if r.timer != nil {
+		r.timer.Stop()
+	}
+	r.mu.Unlock()
+	return r.body.Close()
 }
 
 func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string, result *proxyResult, maxRequestBytes int64) {
@@ -61,8 +144,11 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 				observer.status = http.StatusSwitchingProtocols
 				observer.tunnel = newUpgradedStream(conn, time.Duration(route.TimeoutPolicy.IdleMs)*time.Millisecond, maxRequestBytes, observer.observation, response.Header.Get("Sec-WebSocket-Extensions"))
 				response.Body = observer.tunnel
-			} else if observer, ok := w.(*responseObserver); ok && observer.observation != nil {
-				observer.observation.configureResponse(response)
+			} else {
+				response.Body = newIdleReadCloser(response.Body, time.Duration(route.TimeoutPolicy.IdleMs)*time.Millisecond, &result.IdleTimedOut)
+				if observer, ok := w.(*responseObserver); ok && observer.observation != nil {
+					observer.observation.configureResponse(response)
+				}
 			}
 			sanitizeResponseHeaders(response.Header)
 			if response.StatusCode == http.StatusSwitchingProtocols {
@@ -101,13 +187,17 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 		if cause := recover(); cause != nil {
 			result.ErrorClass = "INTERNAL_ERROR"
 			if cause == http.ErrAbortHandler {
-				switch request.Context().Err() {
-				case context.Canceled:
-					result.ErrorClass = "CLIENT_CANCELLED"
-				case context.DeadlineExceeded:
+				if result.IdleTimedOut.Load() {
 					result.ErrorClass = "UPSTREAM_TIMEOUT"
-				default:
-					result.ErrorClass = "UPSTREAM_UNAVAILABLE"
+				} else {
+					switch request.Context().Err() {
+					case context.Canceled:
+						result.ErrorClass = "CLIENT_CANCELLED"
+					case context.DeadlineExceeded:
+						result.ErrorClass = "UPSTREAM_TIMEOUT"
+					default:
+						result.ErrorClass = "UPSTREAM_UNAVAILABLE"
+					}
 				}
 			}
 			// Preserve net/http's connection abort; a truncated 200 is not success.
@@ -115,6 +205,9 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 		}
 	}()
 	proxy.ServeHTTP(w, request)
+	if result.IdleTimedOut.Load() {
+		result.ErrorClass = "UPSTREAM_TIMEOUT"
+	}
 	if observer, ok := w.(*responseObserver); ok && observer.tunnel != nil {
 		if observer.tunnel.timedOut.Load() {
 			result.ErrorClass = "UPSTREAM_TIMEOUT"
@@ -131,7 +224,7 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 }
 
 func (h *Handler) transportFor(policy relaycontrolapi.TimeoutPolicy) http.RoundTripper {
-	key := transportKey{connectMs: policy.ConnectMs, responseHeaderMs: policy.ResponseHeaderMs, idleMs: policy.IdleMs}
+	key := transportKey{connectMs: policy.ConnectMs, responseHeaderMs: policy.ResponseHeaderMs}
 	if cached, ok := h.transports.Load(key); ok {
 		return cached.(http.RoundTripper)
 	}
@@ -139,7 +232,6 @@ func (h *Handler) transportFor(policy relaycontrolapi.TimeoutPolicy) http.RoundT
 	dialer := &net.Dialer{Timeout: time.Duration(policy.ConnectMs) * time.Millisecond, KeepAlive: 30 * time.Second}
 	transport.DialContext = dialer.DialContext
 	transport.ResponseHeaderTimeout = time.Duration(policy.ResponseHeaderMs) * time.Millisecond
-	transport.IdleConnTimeout = time.Duration(policy.IdleMs) * time.Millisecond
 	actual, _ := h.transports.LoadOrStore(key, transport)
 	return actual.(http.RoundTripper)
 }

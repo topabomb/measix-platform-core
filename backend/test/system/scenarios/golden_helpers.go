@@ -114,6 +114,9 @@ func (g *goldenPathTest) createEnrollment(ctx context.Context, admin *harness.Ad
 	if err != nil {
 		g.t.Fatalf("create enrollment: %v", err)
 	}
+	if resp.StatusCode != http.StatusCreated {
+		g.t.Fatalf("create enrollment status: %d body: %s", resp.StatusCode, harness.ReadBody(resp))
+	}
 	var result struct {
 		Code string `json:"code"`
 	}
@@ -293,7 +296,7 @@ func (g *goldenPathTest) buildDraftContent(
 			},
 			{
 				"runtimeRouteId": routeMCP, "resourceId": mcpID, "upstreamId": upstreamID,
-				"allowedMethods": []string{"POST"}, "allowedPathPrefixes": []string{"/mcp"},
+				"allowedMethods": []string{"POST", "GET", "DELETE"}, "allowedPathPrefixes": []string{"/mcp"},
 				"transportPolicy": "HTTP_REQUEST_RESPONSE",
 				"timeoutPolicy":   map[string]interface{}{"connectMs": 1000, "responseHeaderMs": 5000, "idleMs": 30000},
 			},

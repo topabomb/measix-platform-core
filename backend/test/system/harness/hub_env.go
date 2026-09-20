@@ -178,6 +178,7 @@ func (e *HubEnv) StartHub(ctx context.Context) error {
 		"--db", e.DBPath,
 		"--master-key-file", e.MasterKeyFile,
 		"--jwt-private-key-file", e.JWTKeyFile,
+		"--public-origin", e.HubBaseURL,
 		"--relay-internal-url", e.RelayIntBaseURL,
 		"--relay-service-token-file", e.RelayTokenFile,
 		"--reconcile-interval", "2s",

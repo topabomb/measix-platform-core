@@ -116,7 +116,7 @@ Direct MCP 的平台路由允许 `POST`、`GET`、`DELETE` 到 Snapshot 给出�
 
 Android 维护方按以下顺序实施，本批不修改 Android 仓库：
 
-1. 独立 Platform source：解析完整接入材料、Discovery、Enrollment、安全令牌存储与单一刷新 owner；与本地来源明确分派，不能把个人或本地企业包的可用性当成平台接入已完成。
+1. 唯一 Platform source：解析完整接入材料、Discovery、Enrollment、安全令牌存储与单一刷新 owner；生产实现不存在本地企业来源或第二套接入分支，不能把个人配置的可用性当成平台接入已完成。
 2. 原子消费当前 Snapshot：完整 Provider/Model、四种 TTS、四种 ASR、MCP、五项策略、Assistant/Memory/Starter 映射；未知值、非法条件字段和失效引用拒绝整个候选，不改写成另一协议。切换企业/个人时资源和任务隔离。
 3. 统一平台 Runtime owner：从 Discovery 和稳定资源 ID 组装 URL；HTTP 与 WebSocket 都使用平台令牌、generation 和 interaction 上下文。供应商密钥仅由 Relay 注入，客户端不添加或持久化这些密钥。处理 typed 428、撤销、刷新和取消。
 4. 四模型分别验收文本流及工具往返；四 TTS 验收播放、停止和切换；三 ASR 验收录音、转写和取消。SYSTEM_TTS 在个人 TTS 禁止时仍能作为企业默认服务运行。工具结果保留 ID/签名，不重发已执行工具。

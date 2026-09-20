@@ -31,6 +31,12 @@ func (s *Service) DeploymentSettings(ctx context.Context) (DeploymentSettingsVie
 // public address projected to clients. Listener, storage, keys, Portal source
 // and the fixed budget timezone remain startup-owned settings.
 func (s *Service) UpdateDeploymentSettings(ctx context.Context, name, publicOrigin string, expectedUpdatedAt time.Time, actorUserID string) (DeploymentSettingsView, error) {
+	// Keep the committed row and the process-local origin projection in the
+	// same update order. The database CAS alone cannot prevent a later commit
+	// from being followed by an earlier request's delayed SetPublicOrigin.
+	s.deploymentSettingsMu.Lock()
+	defer s.deploymentSettingsMu.Unlock()
+
 	name = strings.TrimSpace(name)
 	canonicalOrigin, originErr := CanonicalPublicOrigin(publicOrigin)
 	if name == "" || utf8.RuneCountInString(name) > 120 || originErr != nil || expectedUpdatedAt.IsZero() || actorUserID == "" {

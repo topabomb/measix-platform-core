@@ -40,6 +40,7 @@ var (
 )
 
 type Service struct {
+	deploymentSettingsMu  sync.Mutex
 	publicOriginMu        sync.RWMutex
 	publicOrigin          string
 	PortalStaticAvailable bool

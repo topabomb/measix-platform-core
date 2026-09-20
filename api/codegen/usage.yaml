@@ -3,5 +3,6 @@ output: backend/internal/wire/usageingestapi/usage.gen.go
 generate:
   models: true
   chi-server: true
+  client: true
 output-options:
   skip-prune: true

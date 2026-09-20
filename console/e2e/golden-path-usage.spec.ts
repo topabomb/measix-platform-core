@@ -47,10 +47,26 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     // Timeout is longer because usage ingestion may be delayed.
     const usageRows = page.locator('[data-cy="usage-row"]')
     await expect(usageRows.first()).toBeVisible({ timeout: 30_000 })
-    // This adapter emits no semantic meters: every recorded request is UNKNOWN.
+    // The four exercised protocol profiles must all reach the ledger. Profiles
+    // with a semantic parser may be EXACT/PARTIAL while opaque responses remain
+    // UNKNOWN, so assert the total instead of encoding parser implementation
+    // details into the system test.
+    const requestCount = Number.parseInt(await page.locator('[data-cy="usage-request-count"]').innerText(), 10)
+    expect(requestCount).toBeGreaterThanOrEqual(4)
     const completeness = page.locator('[data-cy="request-completeness"]')
-    const unknownText = await completeness.locator('.q-chip').last().innerText()
-    expect(Number.parseInt(unknownText, 10)).toBeGreaterThanOrEqual(4)
+    const completenessCounts = await completeness.locator('.q-chip').allInnerTexts()
+    expect(completenessCounts.reduce((sum, text) => sum + Number.parseInt(text, 10), 0)).toBeGreaterThanOrEqual(4)
+
+    const budgetFilter = page.locator('[data-cy="usage-budget-status-filter"]')
+    await expect(budgetFilter).toBeVisible()
+    const filteredUsers = page.waitForResponse(response =>
+      response.url().includes('/api/admin/v1/usage/users') &&
+      response.url().includes('budgetStatus=PENDING_RECONCILIATION'),
+    )
+    await budgetFilter.click()
+    await page.getByRole('option', { name: 'Pending reconciliation' }).click()
+    expect((await filteredUsers).ok()).toBe(true)
+    await page.screenshot({ path: '../.artifacts/admin-usage-summary.png', fullPage: true })
 
     // Verify multiple resource kinds are represented.
     const allRowTexts: string[] = []
@@ -76,6 +92,13 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     const detailText = await detailPanel.textContent()
     expect(detailText).toMatch(/req_[a-f0-9-]+/)
     expect(detailText).toMatch(/mdl_|tts_|asr_|mcp_/)
+
+    await page.keyboard.press('Escape')
+    await page.getByRole('tab', { name: 'Reconciliation' }).click()
+    const reconciliation = page.locator('[data-cy="usage-reconciliation-panel"]')
+    await expect(reconciliation).toBeVisible()
+    await expect(reconciliation.locator('[data-cy="reconciliation-row"]').first()).toBeVisible({ timeout: 10_000 })
+    await page.screenshot({ path: '../.artifacts/admin-usage-reconciliation.png', fullPage: true })
   })
 
   // ========================================================================
@@ -100,11 +123,11 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
       expect(relayText).toMatch(/READY|DEGRADED|NOT_READY|OFFLINE/i)
       await expect(page.locator('[data-cy="system-convergence-status"]')).toBeVisible()
       await expect(page.locator('[data-cy="system-upstream-status"]')).toBeVisible()
-      // The deterministic adapter produces request usage but no semantic meters.
-      // Verify the real Hub ledger count reaches the rendered diagnostics.
+      // The opaque profiles intentionally exercise the reconciliation path.
+      // Verify that their incomplete records reach the rendered diagnostics.
       const unknownCount = page.locator('[data-cy="semantic-unknown-count"]')
       await expect(unknownCount).toHaveText(/^\d+$/)
-      expect(Number(await unknownCount.textContent())).toBeGreaterThanOrEqual(4)
+      expect(Number(await unknownCount.textContent())).toBeGreaterThanOrEqual(1)
       expect(pageErrors).toEqual([])
     } finally {
       page.off('pageerror', recordPageError)

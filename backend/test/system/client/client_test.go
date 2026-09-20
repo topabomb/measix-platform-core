@@ -17,10 +17,43 @@ import (
 	relayruntime "measix/platform/internal/relay/runtime"
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/internal/wire/relaystate"
+	"measix/platform/internal/wire/usageingestapi"
 	"measix/platform/pkg/platformid"
 	"measix/platform/test/system/adapter"
 	"measix/platform/test/system/client"
 )
+
+type allowBudgetClient struct{}
+
+type discardUsageRecorder struct{}
+
+func (discardUsageRecorder) PersistAdmission(usageingestapi.BudgetAdmissionRequest, string) error {
+	return nil
+}
+
+func (discardUsageRecorder) MarkStarted(string, time.Time) error { return nil }
+func (discardUsageRecorder) AbortAdmission(string) error         { return nil }
+func (discardUsageRecorder) RecordDenied(usageingestapi.BudgetAdmissionRequest, string, usageingestapi.UsageSettlement) error {
+	return nil
+}
+func (discardUsageRecorder) Record(usageingestapi.UsageSettlement) error {
+	return nil
+}
+
+func (allowBudgetClient) Admit(_ context.Context, input usageingestapi.BudgetAdmissionRequest) (usageingestapi.BudgetAdmissionDecision, *usageingestapi.Problem, error) {
+	return usageingestapi.BudgetAdmissionDecision{
+		RequestId: input.RequestId, Allowed: true, Code: usageingestapi.ALLOWED, Mode: usageingestapi.UNLIMITED,
+		Source: usageingestapi.DEFAULT, BlockingLimits: []usageingestapi.BudgetLimitState{}, AsOf: input.AdmittedAt,
+	}, nil, nil
+}
+
+func (allowBudgetClient) Start(context.Context, string, usageingestapi.BudgetLifecycleEvent) error {
+	return nil
+}
+
+func (allowBudgetClient) Release(context.Context, string, usageingestapi.BudgetReleaseRequest) error {
+	return nil
+}
 
 // TestClient must only use the client-facing runtime topology
 // (/runtime/v1/resources/{resourceId}{runtimePath} + generation + interaction headers)
@@ -208,15 +241,16 @@ func TestCAPC4041InvalidJWTReturns401NoForward(t *testing.T) {
 		t.Fatal("expected 401")
 	}
 	problem, ok := err.(client.ProblemError)
-	if !ok || problem.Status != 401 {
-		t.Fatalf("expected 401 problem, got %v", err)
+	if !ok || problem.Status != 401 || problem.Code != "invalid_session" {
+		t.Fatalf("expected 401 invalid_session, got %v", err)
 	}
 	if fact := env.adapter.LastRequest("/v1/chat/completions"); fact != nil {
 		t.Fatalf("adapter received body despite invalid JWT")
 	}
 }
 
-// CAP-C4-042: a revoked session must be rejected (401) before any upstream forward.
+// CAP-C4-042: a revoked session must be rejected with its stable authorization
+// reason before any upstream forward.
 func TestCAPC4042RevokedSessionRejectedNoForward(t *testing.T) {
 	env := newEnv(t)
 	defer env.close()
@@ -224,14 +258,33 @@ func TestCAPC4042RevokedSessionRejectedNoForward(t *testing.T) {
 	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
 	_, _, err := c.ChatCompletion(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{}`)
 	if err == nil {
-		t.Fatal("expected 401 for revoked session")
+		t.Fatal("expected 403 for revoked session")
 	}
 	problem, ok := err.(client.ProblemError)
-	if !ok || problem.Status != 401 || problem.Code != "invalid_session" {
-		t.Fatalf("expected 401 invalid_session, got %v", err)
+	if !ok || problem.Status != 403 || problem.Code != "session_revoked" {
+		t.Fatalf("expected 403 session_revoked, got %v", err)
 	}
 	if fact := env.adapter.LastRequest("/v1/chat/completions"); fact != nil {
 		t.Fatalf("adapter received body despite revoked session: %+v", fact)
+	}
+}
+
+// CAP-C4-042: a revoked device must retain its own stable reason.
+func TestCAPC4042RevokedDeviceRejectedNoForward(t *testing.T) {
+	env := newEnv(t)
+	defer env.close()
+	env.revokeDevice()
+	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
+	_, _, err := c.ChatCompletion(context.Background(), env.resourceIDs.model, "/v1/chat/completions", `{}`)
+	if err == nil {
+		t.Fatal("expected 403 for revoked device")
+	}
+	problem, ok := err.(client.ProblemError)
+	if !ok || problem.Status != 403 || problem.Code != "device_revoked" {
+		t.Fatalf("expected 403 device_revoked, got %v", err)
+	}
+	if fact := env.adapter.LastRequest("/v1/chat/completions"); fact != nil {
+		t.Fatalf("adapter received body despite revoked device: %+v", fact)
 	}
 }
 
@@ -330,6 +383,11 @@ func (e *env) revokeSession() {
 	e.applyState()
 }
 
+func (e *env) revokeDevice() {
+	e.state.PrincipalState.RevokedDeviceIds = append(e.state.PrincipalState.RevokedDeviceIds, e.deviceID)
+	e.applyState()
+}
+
 // disableUser marks the signed user disabled and re-applies control state.
 func (e *env) disableUser() {
 	e.state.PrincipalState.DisabledUserIds = append(e.state.PrincipalState.DisabledUserIds, e.userID)
@@ -384,10 +442,10 @@ func newEnv(t *testing.T) *env {
 		AuthKeys:                []relaycontrolapi.PublicJwk{signer.publicJWK()},
 		PrincipalState:          relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{
-			{ResourceId: ids.model, RuntimeRouteId: modelRoute},
-			{ResourceId: ids.tts, RuntimeRouteId: ttsRoute},
-			{ResourceId: ids.asr, RuntimeRouteId: asrRoute},
-			{ResourceId: ids.mcp, RuntimeRouteId: mcpRoute},
+			{ResourceId: ids.model, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMODEL, ClientProtocol: relaycontrolapi.OPENAICHATCOMPLETIONS, RuntimeRouteId: modelRoute, LlmProfile: &relaycontrolapi.RuntimeLlmProfile{}},
+			{ResourceId: ids.tts, ResourceKind: relaycontrolapi.ResourceRouteResourceKindTTS, ClientProtocol: relaycontrolapi.OPENAIAUDIOSPEECH, RuntimeRouteId: ttsRoute},
+			{ResourceId: ids.asr, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.OPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: relaycontrolapi.N1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
+			{ResourceId: ids.mcp, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMCP, ClientProtocol: relaycontrolapi.MCPSTREAMABLEHTTP, RuntimeRouteId: mcpRoute},
 		},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{
 			{RuntimeRouteId: modelRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
@@ -411,7 +469,7 @@ func newEnv(t *testing.T) *env {
 	if _, err := store.Apply(state); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(relayruntime.NewHandler(store))
+	srv := httptest.NewServer(relayruntime.NewHandler(store, discardUsageRecorder{}, allowBudgetClient{}))
 	return &env{
 		adapter: ad, relayURL: srv.URL, token: token, generation: 1, interactionID: interactionID,
 		resourceIDs: ids, srv: srv, store: store, state: state,

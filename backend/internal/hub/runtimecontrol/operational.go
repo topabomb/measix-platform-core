@@ -223,6 +223,7 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: defaultMaxRequestBytes},
 	}
 	upstreamSpecs := map[string]relaycontrolapi.RuntimeUpstreamSpec{}
+	profiles := meterProfiles(content)
 	ensureUpstream := func(id string) (adminapi.UpstreamConfig, error) {
 		row, err := s.Client.Upstream.Get(ctx, id)
 		if err != nil {
@@ -259,7 +260,35 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 		if binding.TimeoutPolicy != nil {
 			timeout = *binding.TimeoutPolicy
 		}
-		state.ResourceRoutes = append(state.ResourceRoutes, relaycontrolapi.ResourceRoute{ResourceId: binding.ResourceId, RuntimeRouteId: binding.RuntimeRouteId})
+		profile, ok := profiles[binding.ResourceId]
+		if !ok || profile.kind == "" || profile.protocol == "" {
+			return relaycontrolapi.RuntimeControlState{}, fmt.Errorf("resource %s has no production usage profile", binding.ResourceId)
+		}
+		resourceRoute := relaycontrolapi.ResourceRoute{
+			ResourceId: binding.ResourceId, RuntimeRouteId: binding.RuntimeRouteId,
+			ResourceKind:   relaycontrolapi.ResourceRouteResourceKind(profile.kind),
+			ClientProtocol: relaycontrolapi.ResourceRouteClientProtocol(profile.protocol),
+		}
+		if !resourceRoute.ResourceKind.Valid() || !resourceRoute.ClientProtocol.Valid() {
+			return relaycontrolapi.RuntimeControlState{}, fmt.Errorf("resource %s has invalid production usage profile", binding.ResourceId)
+		}
+		if profile.audio != nil {
+			rates := make([]relaycontrolapi.RuntimeAudioProfileSampleRates, len(profile.audio.sampleRates))
+			for index, rate := range profile.audio.sampleRates {
+				rates[index] = relaycontrolapi.RuntimeAudioProfileSampleRates(rate)
+			}
+			resourceRoute.AudioProfile = &relaycontrolapi.RuntimeAudioProfile{
+				Encoding: relaycontrolapi.RuntimeAudioProfileEncoding(profile.audio.encoding),
+				Channels: relaycontrolapi.RuntimeAudioProfileChannels(1), SampleRates: rates,
+			}
+		}
+		if profile.llm != nil {
+			resourceRoute.LlmProfile = &relaycontrolapi.RuntimeLlmProfile{
+				GeminiThoughtsMayBeAbsent:       profile.llm.geminiThoughtsMayBeAbsent,
+				AnthropicCacheFieldsMayBeAbsent: profile.llm.anthropicCacheFieldsMayBeAbsent,
+			}
+		}
+		state.ResourceRoutes = append(state.ResourceRoutes, resourceRoute)
 		route := relaycontrolapi.RuntimeRouteSpec{
 			RuntimeRouteId: binding.RuntimeRouteId, UpstreamId: binding.UpstreamId,
 			AllowedMethods: append([]string(nil), binding.AllowedMethods...), AllowedPathPrefixes: append([]string(nil), binding.AllowedPathPrefixes...),
@@ -290,6 +319,10 @@ func (s *Service) principalState(ctx context.Context) (relaycontrolapi.Principal
 	if err != nil {
 		return relaycontrolapi.PrincipalState{}, err
 	}
+	deletedUsers, err := s.Client.DeletedPrincipal.Query().All(ctx)
+	if err != nil {
+		return relaycontrolapi.PrincipalState{}, err
+	}
 	revokedDevices, err := s.Client.Device.Query().Where(device.StatusEQ("REVOKED")).All(ctx)
 	if err != nil {
 		return relaycontrolapi.PrincipalState{}, err
@@ -298,9 +331,12 @@ func (s *Service) principalState(ctx context.Context) (relaycontrolapi.Principal
 	if err != nil {
 		return relaycontrolapi.PrincipalState{}, err
 	}
-	principal := relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}}
+	principal := relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, DeletedUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}}
 	for _, value := range disabledUsers {
 		principal.DisabledUserIds = append(principal.DisabledUserIds, value.ID)
+	}
+	for _, value := range deletedUsers {
+		principal.DeletedUserIds = append(principal.DeletedUserIds, value.ID)
 	}
 	for _, value := range revokedDevices {
 		principal.RevokedDeviceIds = append(principal.RevokedDeviceIds, value.ID)
@@ -309,6 +345,7 @@ func (s *Service) principalState(ctx context.Context) (relaycontrolapi.Principal
 		principal.RevokedSessionIds = append(principal.RevokedSessionIds, value.ID)
 	}
 	sort.Strings(principal.DisabledUserIds)
+	sort.Strings(principal.DeletedUserIds)
 	sort.Strings(principal.RevokedDeviceIds)
 	sort.Strings(principal.RevokedSessionIds)
 	return principal, nil

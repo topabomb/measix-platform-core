@@ -11,7 +11,6 @@ import (
 
 	"measix/platform/ent"
 	"measix/platform/ent/pricingrule"
-	"measix/platform/ent/semanticusage"
 	"measix/platform/pkg/platformid"
 )
 
@@ -30,20 +29,6 @@ const (
 	CostPartial CostState = "PARTIAL"
 	CostKnown   CostState = "KNOWN"
 )
-
-type SemanticInput struct {
-	RequestID       *string
-	UpstreamID      string
-	ResourceID      string
-	SourceEventID   string
-	Meter           string
-	QuantityDecimal string
-	Completeness    Completeness
-	ProviderCost    string
-	Currency        string
-	Source          string
-	OccurredAt      time.Time
-}
 
 type PricingRuleInput struct {
 	ResourceID       *string
@@ -70,75 +55,6 @@ type CostResult struct {
 	AmountDecimal string
 	Currency      string
 	PricingRuleID string
-}
-
-func (s *Service) RecordSemantic(ctx context.Context, input SemanticInput) (string, bool, error) {
-	if s.Client == nil || platformid.Validate(platformid.Upstream, input.UpstreamID) != nil || !validMeter(input.Meter) || strings.TrimSpace(input.Source) == "" || input.OccurredAt.IsZero() || !validCompleteness(input.Completeness) {
-		return "", false, ErrInvalidBatch
-	}
-	if input.ResourceID != "" && !runtimeResourceID(input.ResourceID) {
-		return "", false, ErrInvalidBatch
-	}
-	if input.RequestID != nil && platformid.Validate(platformid.Request, *input.RequestID) != nil {
-		return "", false, ErrInvalidBatch
-	}
-	quantity, ok := decimalRat(input.QuantityDecimal)
-	if !ok || quantity.Sign() < 0 {
-		return "", false, ErrInvalidBatch
-	}
-	if input.ProviderCost != "" {
-		providerCost, ok := decimalRat(input.ProviderCost)
-		if !ok || providerCost.Sign() < 0 || strings.TrimSpace(input.Currency) == "" {
-			return "", false, ErrInvalidBatch
-		}
-	}
-
-	if input.SourceEventID != "" {
-		existing, err := s.Client.SemanticUsage.Query().Where(
-			semanticusage.UpstreamIDEQ(input.UpstreamID),
-			semanticusage.SourceEventIDEQ(input.SourceEventID),
-		).Only(ctx)
-		if err == nil {
-			return existing.ID, true, nil
-		}
-		if !ent.IsNotFound(err) {
-			return "", false, err
-		}
-	}
-
-	id := platformid.New(platformid.UsageEvent)
-	builder := s.Client.SemanticUsage.Create().
-		SetID(id).
-		SetNillableRequestID(input.RequestID).
-		SetUpstreamID(input.UpstreamID).
-		SetMeter(strings.TrimSpace(input.Meter)).
-		SetQuantityDecimal(input.QuantityDecimal).
-		SetCompleteness(string(input.Completeness)).
-		SetSource(strings.TrimSpace(input.Source)).
-		SetOccurredAt(input.OccurredAt.UTC())
-	if input.ResourceID != "" {
-		builder.SetResourceID(input.ResourceID)
-	}
-	if input.SourceEventID != "" {
-		builder.SetSourceEventID(input.SourceEventID)
-	}
-	if input.ProviderCost != "" {
-		builder.SetProviderCost(input.ProviderCost).SetCurrency(strings.TrimSpace(input.Currency))
-	}
-	row, err := builder.Save(ctx)
-	if err != nil {
-		if input.SourceEventID != "" && ent.IsConstraintError(err) {
-			existing, lookupErr := s.Client.SemanticUsage.Query().Where(
-				semanticusage.UpstreamIDEQ(input.UpstreamID),
-				semanticusage.SourceEventIDEQ(input.SourceEventID),
-			).Only(ctx)
-			if lookupErr == nil {
-				return existing.ID, true, nil
-			}
-		}
-		return "", false, err
-	}
-	return row.ID, false, nil
 }
 
 func (s *Service) CreatePricingRule(ctx context.Context, input PricingRuleInput) (string, error) {
@@ -263,7 +179,7 @@ func validCompleteness(value Completeness) bool {
 //	INPUT_TOKENS, OUTPUT_TOKENS, CACHED_TOKENS, CHARACTERS, AUDIO_SECONDS, REQUESTS
 func validMeter(value string) bool {
 	switch strings.TrimSpace(value) {
-	case "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "CHARACTERS", "AUDIO_SECONDS", "REQUESTS":
+	case "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_SECONDS", "REQUESTS":
 		return true
 	}
 	return false

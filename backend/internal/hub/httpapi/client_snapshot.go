@@ -4,8 +4,10 @@ import (
 	"errors"
 	"net/http"
 
+	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/enterpriseupdate"
+	"measix/platform/internal/hub/usage"
 	"measix/platform/internal/wire/clientapi"
 )
 
@@ -13,12 +15,14 @@ type fullClientHandler struct {
 	*clientHandler
 	capability       *capability.Service
 	enterpriseUpdate *enterpriseupdate.Service
+	budget           *budget.Service
+	usage            *usage.Service
 }
 
 func (h *fullClientHandler) GetManagedSnapshot(w http.ResponseWriter, r *http.Request, generation int, params clientapi.GetManagedSnapshotParams) {
 	token, ok := bearerToken(r)
 	if !ok {
-		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+		writeProblem(w, http.StatusUnauthorized, "unauthenticated", "Unauthenticated")
 		return
 	}
 	if _, err := h.identity.AuthenticateAccess(r.Context(), token); err != nil {

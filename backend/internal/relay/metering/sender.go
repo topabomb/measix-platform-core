@@ -71,9 +71,9 @@ func (s *Sender) Run(ctx context.Context, interval time.Duration) error {
 }
 
 func (s *Sender) sendRows(ctx context.Context, rows []Row) error {
-	batch := usageingestapi.UsageBatch{Events: make([]usageingestapi.RequestUsageEvent, 0, len(rows))}
+	batch := usageingestapi.UsageSettlementBatch{Events: make([]usageingestapi.UsageSettlement, 0, len(rows))}
 	for _, row := range rows {
-		var event usageingestapi.RequestUsageEvent
+		var event usageingestapi.UsageSettlement
 		if err := json.Unmarshal(row.Payload, &event); err != nil || event.RequestId != row.RequestID {
 			_ = s.failRows(ctx, []Row{row}, "poison_spool_payload", false)
 			return fmt.Errorf("invalid persisted usage payload for %s", row.RequestID)
@@ -120,7 +120,7 @@ func (s *Sender) sendRows(ctx context.Context, rows []Row) error {
 	var ack usageingestapi.UsageBatchAck
 	decoder := json.NewDecoder(io.LimitReader(response.Body, 1<<20))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&ack); err != nil || ack.AcceptedCount < 0 || ack.DuplicateCount < 0 || ack.AcceptedCount+ack.DuplicateCount != len(rows) || decoder.Decode(&struct{}{}) != io.EOF {
+	if err := decoder.Decode(&ack); err != nil || ack.AcceptedCount < 0 || ack.DuplicateCount < 0 || ack.DiscardedCount < 0 || ack.AcceptedCount+ack.DuplicateCount+ack.DiscardedCount != len(rows) || decoder.Decode(&struct{}{}) != io.EOF {
 		_ = s.failRows(ctx, rows, "invalid_hub_ack", false)
 		if err != nil {
 			return err

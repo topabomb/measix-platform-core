@@ -18,15 +18,15 @@ type SemanticUsage struct {
 	// ID of the ent.
 	ID string `json:"id,omitempty"`
 	// RequestID holds the value of the "request_id" field.
-	RequestID *string `json:"request_id,omitempty"`
-	// UpstreamID holds the value of the "upstream_id" field.
-	UpstreamID string `json:"upstream_id,omitempty"`
-	// ResourceID holds the value of the "resource_id" field.
-	ResourceID *string `json:"resource_id,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
+	// SettlementRevision holds the value of the "settlement_revision" field.
+	SettlementRevision int64 `json:"settlement_revision,omitempty"`
 	// SourceEventID holds the value of the "source_event_id" field.
-	SourceEventID *string `json:"source_event_id,omitempty"`
+	SourceEventID string `json:"source_event_id,omitempty"`
 	// Meter holds the value of the "meter" field.
 	Meter string `json:"meter,omitempty"`
+	// QuantityUnits holds the value of the "quantity_units" field.
+	QuantityUnits int64 `json:"quantity_units,omitempty"`
 	// QuantityDecimal holds the value of the "quantity_decimal" field.
 	QuantityDecimal string `json:"quantity_decimal,omitempty"`
 	// Completeness holds the value of the "completeness" field.
@@ -47,7 +47,9 @@ func (*SemanticUsage) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case semanticusage.FieldID, semanticusage.FieldRequestID, semanticusage.FieldUpstreamID, semanticusage.FieldResourceID, semanticusage.FieldSourceEventID, semanticusage.FieldMeter, semanticusage.FieldQuantityDecimal, semanticusage.FieldCompleteness, semanticusage.FieldProviderCost, semanticusage.FieldCurrency, semanticusage.FieldSource:
+		case semanticusage.FieldSettlementRevision, semanticusage.FieldQuantityUnits:
+			values[i] = new(sql.NullInt64)
+		case semanticusage.FieldID, semanticusage.FieldRequestID, semanticusage.FieldSourceEventID, semanticusage.FieldMeter, semanticusage.FieldQuantityDecimal, semanticusage.FieldCompleteness, semanticusage.FieldProviderCost, semanticusage.FieldCurrency, semanticusage.FieldSource:
 			values[i] = new(sql.NullString)
 		case semanticusage.FieldOccurredAt:
 			values[i] = new(sql.NullTime)
@@ -76,34 +78,31 @@ func (_m *SemanticUsage) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field request_id", values[i])
 			} else if value.Valid {
-				_m.RequestID = new(string)
-				*_m.RequestID = value.String
+				_m.RequestID = value.String
 			}
-		case semanticusage.FieldUpstreamID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field upstream_id", values[i])
+		case semanticusage.FieldSettlementRevision:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_revision", values[i])
 			} else if value.Valid {
-				_m.UpstreamID = value.String
-			}
-		case semanticusage.FieldResourceID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field resource_id", values[i])
-			} else if value.Valid {
-				_m.ResourceID = new(string)
-				*_m.ResourceID = value.String
+				_m.SettlementRevision = value.Int64
 			}
 		case semanticusage.FieldSourceEventID:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field source_event_id", values[i])
 			} else if value.Valid {
-				_m.SourceEventID = new(string)
-				*_m.SourceEventID = value.String
+				_m.SourceEventID = value.String
 			}
 		case semanticusage.FieldMeter:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field meter", values[i])
 			} else if value.Valid {
 				_m.Meter = value.String
+			}
+		case semanticusage.FieldQuantityUnits:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field quantity_units", values[i])
+			} else if value.Valid {
+				_m.QuantityUnits = value.Int64
 			}
 		case semanticusage.FieldQuantityDecimal:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -179,26 +178,20 @@ func (_m *SemanticUsage) String() string {
 	var builder strings.Builder
 	builder.WriteString("SemanticUsage(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
-	if v := _m.RequestID; v != nil {
-		builder.WriteString("request_id=")
-		builder.WriteString(*v)
-	}
+	builder.WriteString("request_id=")
+	builder.WriteString(_m.RequestID)
 	builder.WriteString(", ")
-	builder.WriteString("upstream_id=")
-	builder.WriteString(_m.UpstreamID)
+	builder.WriteString("settlement_revision=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SettlementRevision))
 	builder.WriteString(", ")
-	if v := _m.ResourceID; v != nil {
-		builder.WriteString("resource_id=")
-		builder.WriteString(*v)
-	}
-	builder.WriteString(", ")
-	if v := _m.SourceEventID; v != nil {
-		builder.WriteString("source_event_id=")
-		builder.WriteString(*v)
-	}
+	builder.WriteString("source_event_id=")
+	builder.WriteString(_m.SourceEventID)
 	builder.WriteString(", ")
 	builder.WriteString("meter=")
 	builder.WriteString(_m.Meter)
+	builder.WriteString(", ")
+	builder.WriteString("quantity_units=")
+	builder.WriteString(fmt.Sprintf("%v", _m.QuantityUnits))
 	builder.WriteString(", ")
 	builder.WriteString("quantity_decimal=")
 	builder.WriteString(_m.QuantityDecimal)

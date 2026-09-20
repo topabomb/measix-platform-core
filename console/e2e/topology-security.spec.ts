@@ -26,7 +26,7 @@ test.describe('Browser Topology Security', () => {
     // --- Part 1: SPA proxy (same-origin as browser) blocks /internal/* ---
     // /internal/* must NOT be reachable from the public origin (SPA proxy)
     const internalPaths = [
-      '/internal/v1/usage/request-events:batch',
+      '/internal/v1/usage/settlements:batch',
       '/internal/v1/something',
       '/internal/live',
       '/internal/ready',

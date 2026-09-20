@@ -17,7 +17,7 @@ func (h *fullClientHandler) CreatePortalGrant(w http.ResponseWriter, r *http.Req
 	w.Header().Set("Cache-Control", "no-store")
 	token, ok := bearerToken(r)
 	if !ok {
-		writeProblem(w, 401, "unauthorized", "Unauthorized")
+		writeProblem(w, 401, "unauthenticated", "Unauthenticated")
 		return
 	}
 	grant, err := h.identity.CreatePortalGrant(r.Context(), token)
@@ -74,7 +74,7 @@ func (h *fullClientHandler) ExchangePortalGrant(w http.ResponseWriter, r *http.R
 	}
 	cookie, expiry, err := h.identity.ExchangePortalGrant(r.Context(), r.PostForm.Get("ticket"))
 	if err != nil {
-		writeProblem(w, 401, "unauthorized", "Invalid or expired grant")
+		writeProblem(w, 401, "unauthenticated", "Invalid or expired grant")
 		return
 	}
 	h.setPortalCookie(w, cookie, expiry)
@@ -84,7 +84,7 @@ func (h *fullClientHandler) ExchangePortalGrant(w http.ResponseWriter, r *http.R
 
 func (h *fullClientHandler) authenticatePortal(w http.ResponseWriter, r *http.Request) (clientapi.PortalSession, bool) {
 	if _, err := r.Cookie(portalCookie); err != nil || h.identity.PublicOrigin == "" {
-		writeProblem(w, 401, "unauthorized", "Unauthorized")
+		writeProblem(w, 401, "unauthenticated", "Unauthenticated")
 		return clientapi.PortalSession{}, false
 	}
 	if !h.portalOriginAllowed(r, false) {
@@ -93,13 +93,13 @@ func (h *fullClientHandler) authenticatePortal(w http.ResponseWriter, r *http.Re
 	}
 	cookie, err := r.Cookie(portalCookie)
 	if err != nil {
-		writeProblem(w, 401, "unauthorized", "Unauthorized")
+		writeProblem(w, 401, "unauthenticated", "Unauthenticated")
 		return clientapi.PortalSession{}, false
 	}
 	session, err := h.identity.AuthenticatePortal(r.Context(), cookie.Value)
 	if err != nil {
 		h.setPortalCookie(w, "", time.Time{})
-		writeProblem(w, 401, "unauthorized", "Portal session expired or revoked")
+		writeProblem(w, 401, "unauthenticated", "Portal session expired or revoked")
 		return clientapi.PortalSession{}, false
 	}
 	return session, true
@@ -138,7 +138,7 @@ func (h *fullClientHandler) authenticateFeed(w http.ResponseWriter, r *http.Requ
 	if r.Header.Get("Authorization") != "" {
 		token, ok := bearerToken(r)
 		if !ok {
-			writeProblem(w, 401, "unauthorized", "Unauthorized")
+			writeProblem(w, 401, "unauthenticated", "Unauthenticated")
 			return false
 		}
 		if _, err := h.identity.AuthenticateAccess(r.Context(), token); err != nil {

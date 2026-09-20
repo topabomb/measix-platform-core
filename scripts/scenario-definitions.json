@@ -558,8 +558,8 @@
     "name": "Model request usage",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBI5RequestUsageBatchIsIdempotent",
-      "TestHUBI5RequestUsageRejectsInvalidIdentity"
+      "TestLLMFixedExamplesJSON",
+      "TestSettlementLedgerIsAtomicIdempotentAndConvertsAudioOnce"
     ],
     "required": true
   },
@@ -568,7 +568,7 @@
     "name": "TTS request usage",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBI5SemanticUsageDedupeAndCompleteness"
+      "TestTTSCharacterTargetsUseUnicodeCodePoints"
     ],
     "required": true
   },
@@ -577,7 +577,7 @@
     "name": "ASR request usage",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBI5SemanticUsageDedupeAndCompleteness"
+      "TestWAVScannerArbitraryChunksUnknownChunkAndPadding"
     ],
     "required": true
   },
@@ -586,7 +586,7 @@
     "name": "MCP request usage",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBI5SemanticUsageDedupeAndCompleteness"
+      "TestMCPOnlyCountsRequest"
     ],
     "required": true
   },
@@ -605,7 +605,7 @@
     "name": "Duplicate delivery",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBI5RequestUsageBatchIsIdempotent"
+      "TestSettlementLedgerIsAtomicIdempotentAndConvertsAudioOnce"
     ],
     "required": true
   },
@@ -641,7 +641,7 @@
     "name": "Pricing known",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBI5PricingUsesSpecificEffectiveRuleAndDecimalArithmetic"
+      "TestPricingUsesSpecificEffectiveRuleAndDecimalArithmetic"
     ],
     "required": true
   },
@@ -659,7 +659,7 @@
     "name": "Effective pricing",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBI5PricingUsesSpecificEffectiveRuleAndDecimalArithmetic"
+      "TestPricingUsesSpecificEffectiveRuleAndDecimalArithmetic"
     ],
     "required": true
   },
@@ -1300,7 +1300,7 @@
     "name": "Invalid batch not partially committed",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBUSG002InvalidBatchDoesNotPartiallyCommit"
+      "TestInvalidSettlementBatchDoesNotPartiallyCommit"
     ],
     "required": true
   },
@@ -1327,7 +1327,7 @@
     "name": "Decimal arithmetic no float errors",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestHUBUSG007DecimalArithmeticNoFloatErrors"
+      "TestPricingUsesSpecificEffectiveRuleAndDecimalArithmetic"
     ],
     "required": true
   },
@@ -2002,7 +2002,7 @@
     "name": "Runtime writes captured request usage",
     "artifact": "backend-test.json",
     "testNames": [
-      "TestRLYI5RuntimeWritesCapturedRequestUsage"
+      "TestRuntimeWritesCapturedUsageSettlement"
     ],
     "required": true
   },

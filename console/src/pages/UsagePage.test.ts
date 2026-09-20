@@ -62,7 +62,7 @@ describe('UsagePage', () => {
           forwardedRequestCount: 10,
           requestBytes: 2048,
           responseBytes: 4096,
-          semanticMeters: [{ confidence: 'EXACT', meter: 'prompt_tokens', quantity: '100' }],
+          semanticMeters: [{ confidence: 'EXACT', meter: 'INPUT_TOKENS', quantity: '100' }],
           cost: { status: 'KNOWN', amount: '0.0420', currency: 'USD' },
         }
       }
@@ -338,10 +338,13 @@ describe('UsagePage', () => {
       return {
         items: [{
           requestId: 'req_abc', interactionId: 'int_1', deploymentId: 'dep_1', userId: 'usr_x',
-          deviceId: 'dev_1', resourceId: 'mdl_aaa', runtimeRouteId: 'rte_1', upstreamId: 'ups_a',
+          deviceId: 'dev_1', resourceId: 'mdl_aaa', resourceKind: 'MODEL', clientProtocol: 'OPENAI_RESPONSES', runtimeRouteId: 'rte_1', upstreamId: 'ups_a',
           managedGeneration: 2, controlRevision: 5, startedAt: '2026-08-01T00:00:00Z',
           completedAt: '2026-08-01T00:00:01Z', forwarded: true, httpStatus: 200,
           upstreamHttpStatus: 200, requestBytes: 100, responseBytes: 200, durationMs: 45,
+          requestCompleteness: 'PARTIAL', settlementState: 'RECONCILIATION_REQUIRED',
+          semanticMeters: [{ meter: 'TOTAL_TOKENS', quantity: '10000', confidence: 'PARTIAL' }],
+          budget: { capability: 'MODEL', mode: 'LIMITED', revision: 7, asOf: '2026-08-01T00:00:01Z', blockers: [{ period: 'DAY', meter: 'TOTAL_TOKENS', limit: '10000', used: '9000', reserved: '1000', remaining: '0', overage: '0', scopeStart: '2026-08-01T00:00:00Z', resetAt: '2026-08-02T00:00:00Z' }] },
         }],
         nextCursor: undefined,
       }
@@ -349,7 +352,7 @@ describe('UsagePage', () => {
     const { wrapper } = mountUsagePage()
     await flushPromises()
 
-    const firstRow = wrapper.findComponent(QItem)
+    const firstRow = wrapper.find('[data-cy="usage-row"]')
     expect(firstRow.exists()).toBe(true)
     await firstRow.trigger('click')
     await flushPromises()
@@ -362,6 +365,10 @@ describe('UsagePage', () => {
     expect(text).toContain('45 ms')
     expect(text).toContain('Desired Revision')
     expect(text).toContain('>5<')
+    expect(text).toContain('OPENAI_RESPONSES')
+    expect(text).toContain('Reconciliation required')
+    expect(text).toContain('10,000 tokens')
+    expect(text).toContain('Revision 7')
     expect(document.querySelector('[data-cy="usage-detail"]')?.textContent).not.toContain('Unknown cost')
   })
 
@@ -429,13 +436,58 @@ describe('UsagePage', () => {
     const { wrapper } = mountUsagePage()
     await flushPromises()
     const text = wrapper.text()
-    expect(text).toContain('INPUT_TOKENS')
-    expect(text).toContain('1000')
-    expect(text).toContain('OUTPUT_TOKENS')
-    expect(text).toContain('CHARACTERS')
+    expect(text).toContain('Input tokens')
+    expect(text).toContain('1K tokens')
+    expect(text).toContain('Output tokens')
+    expect(text).toContain('500 tokens')
+    expect(text).toContain('Characters')
     // Three meter groups do not turn two unknown requests into three requests.
     expect(text).toContain('0 exact')
     expect(text).toContain('0 partial')
     expect(text).toContain('2 unknown')
+  })
+
+  it('loads server-side trend, distribution and user aggregates and applies the protocol filter', async () => {
+    const paths: string[] = []
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      paths.push(path)
+      if (path.includes('/usage/summary')) return {
+        from: '2026-09-19T00:00:00Z', to: '2026-09-20T00:00:00Z', requestCount: 2,
+        forwardedRequestCount: 2, requestCompleteness: { exact: 2, partial: 0, unknown: 0 },
+        requestBytes: 0, responseBytes: 0, semanticMeters: [], cost: { status: 'UNKNOWN' },
+      }
+      if (path.includes('/usage/trend')) return {
+        from: '2026-09-19T00:00:00Z', to: '2026-09-20T00:00:00Z', timezone: 'Asia/Shanghai',
+        points: [{ date: '2026-09-19', requestCount: 2, forwardedRequestCount: 2, semanticMeters: [{ meter: 'TOTAL_TOKENS', quantity: '10000', confidence: 'EXACT' }] }],
+      }
+      if (path.includes('/usage/distribution')) return {
+        from: '2026-09-19T00:00:00Z', to: '2026-09-20T00:00:00Z',
+        items: [{ resourceKind: 'ASR', clientProtocol: 'OPENAI_REALTIME_TRANSCRIPTION', requestCount: 1, semanticMeters: [{ meter: 'AUDIO_SECONDS', quantity: '120', confidence: 'EXACT' }] }],
+      }
+      if (path.includes('/usage/users')) return {
+        items: [{ userId: 'usr_1', userDisplayName: 'Ada', requestCount: 2, semanticMeters: [], budget: { userId: 'usr_1', timezone: 'Asia/Shanghai', asOf: '2026-09-20T00:00:00Z', items: [{ capability: 'MODEL', mode: 'LIMITED', source: 'EXPLICIT', revision: 1, effectiveFrom: '2026-09-01T00:00:00Z', asOf: '2026-09-20T00:00:00Z', inFlightRequests: 0, limits: [], usageMeters: [], status: 'EXHAUSTED' }] } }],
+      }
+      return { items: [], nextCursor: undefined }
+    })
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('10K tokens')
+    expect(wrapper.text()).toContain('2 min')
+    expect(wrapper.text()).toContain('OPENAI_REALTIME_TRANSCRIPTION')
+    expect(wrapper.text()).toContain('Ada')
+    expect(wrapper.text()).toContain('Exhausted')
+
+    const protocol = wrapper.findAllComponents(QSelect).find(input => input.props('label') === 'Protocol')!
+    await protocol.setValue('OPENAI_RESPONSES')
+    await flushPromises()
+    expect(paths.some(path => path.includes('/usage/trend') && path.includes('clientProtocol=OPENAI_RESPONSES'))).toBe(true)
+    expect(paths.some(path => path.includes('/usage/distribution') && path.includes('clientProtocol=OPENAI_RESPONSES'))).toBe(true)
+    expect(paths.some(path => path.includes('/usage/requests') && path.includes('clientProtocol=OPENAI_RESPONSES'))).toBe(true)
+
+    const budgetHealth = wrapper.findAllComponents(QSelect).find(input => input.props('label') === 'Budget health')!
+    await budgetHealth.setValue('EXHAUSTED')
+    await flushPromises()
+    expect(paths.some(path => path.includes('/usage/users') && path.includes('budgetStatus=EXHAUSTED'))).toBe(true)
+    expect(paths.some(path => path.includes('/usage/summary') && path.includes('budgetStatus='))).toBe(false)
   })
 })

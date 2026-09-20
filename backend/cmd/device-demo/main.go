@@ -22,6 +22,7 @@ import (
 	hubapp "measix/platform/internal/hub/app"
 	"measix/platform/internal/hub/config"
 	relayapp "measix/platform/internal/relay/app"
+	relaybudget "measix/platform/internal/relay/budget"
 	"measix/platform/internal/relay/metering"
 )
 
@@ -74,7 +75,11 @@ func run(args []string, log *slog.Logger) error {
 	defer spool.Close()
 	recorder := metering.NewRecorder(spool)
 	recorder.Log = log
-	relay := relayapp.New(serviceToken, buildVersion, spool, recorder)
+	budgetClient, err := relaybudget.NewHTTPClient("http://"+opt.hubInternalListen, serviceToken, nil)
+	if err != nil {
+		return err
+	}
+	relay := relayapp.New(serviceToken, buildVersion, spool, recorder, budgetClient)
 
 	hubCfg := config.Config{
 		PublicOrigin: opt.publicOrigin, ListenAddr: opt.listen, InternalListenAddr: opt.hubInternalListen,
@@ -92,7 +97,7 @@ func run(args []string, log *slog.Logger) error {
 	defer hub.Close()
 
 	public := publicHandler(hub.Handler, relay.Public)
-	sender := metering.NewSender(spool, "http://"+opt.hubInternalListen+"/internal/v1/usage/request-events:batch", serviceToken)
+	sender := metering.NewSender(spool, "http://"+opt.hubInternalListen+"/internal/v1/usage/settlements:batch", serviceToken)
 	group, runCtx := errgroup.WithContext(ctx)
 	group.Go(func() error { return server.New(opt.listen, public).Run(runCtx, log) })
 	group.Go(func() error { return server.New(opt.hubInternalListen, hub.InternalHandler).Run(runCtx, log) })

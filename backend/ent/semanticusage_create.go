@@ -26,31 +26,9 @@ func (_c *SemanticUsageCreate) SetRequestID(v string) *SemanticUsageCreate {
 	return _c
 }
 
-// SetNillableRequestID sets the "request_id" field if the given value is not nil.
-func (_c *SemanticUsageCreate) SetNillableRequestID(v *string) *SemanticUsageCreate {
-	if v != nil {
-		_c.SetRequestID(*v)
-	}
-	return _c
-}
-
-// SetUpstreamID sets the "upstream_id" field.
-func (_c *SemanticUsageCreate) SetUpstreamID(v string) *SemanticUsageCreate {
-	_c.mutation.SetUpstreamID(v)
-	return _c
-}
-
-// SetResourceID sets the "resource_id" field.
-func (_c *SemanticUsageCreate) SetResourceID(v string) *SemanticUsageCreate {
-	_c.mutation.SetResourceID(v)
-	return _c
-}
-
-// SetNillableResourceID sets the "resource_id" field if the given value is not nil.
-func (_c *SemanticUsageCreate) SetNillableResourceID(v *string) *SemanticUsageCreate {
-	if v != nil {
-		_c.SetResourceID(*v)
-	}
+// SetSettlementRevision sets the "settlement_revision" field.
+func (_c *SemanticUsageCreate) SetSettlementRevision(v int64) *SemanticUsageCreate {
+	_c.mutation.SetSettlementRevision(v)
 	return _c
 }
 
@@ -60,17 +38,15 @@ func (_c *SemanticUsageCreate) SetSourceEventID(v string) *SemanticUsageCreate {
 	return _c
 }
 
-// SetNillableSourceEventID sets the "source_event_id" field if the given value is not nil.
-func (_c *SemanticUsageCreate) SetNillableSourceEventID(v *string) *SemanticUsageCreate {
-	if v != nil {
-		_c.SetSourceEventID(*v)
-	}
-	return _c
-}
-
 // SetMeter sets the "meter" field.
 func (_c *SemanticUsageCreate) SetMeter(v string) *SemanticUsageCreate {
 	_c.mutation.SetMeter(v)
+	return _c
+}
+
+// SetQuantityUnits sets the "quantity_units" field.
+func (_c *SemanticUsageCreate) SetQuantityUnits(v int64) *SemanticUsageCreate {
+	_c.mutation.SetQuantityUnits(v)
 	return _c
 }
 
@@ -166,11 +142,20 @@ func (_c *SemanticUsageCreate) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *SemanticUsageCreate) check() error {
-	if _, ok := _c.mutation.UpstreamID(); !ok {
-		return &ValidationError{Name: "upstream_id", err: errors.New(`ent: missing required field "SemanticUsage.upstream_id"`)}
+	if _, ok := _c.mutation.RequestID(); !ok {
+		return &ValidationError{Name: "request_id", err: errors.New(`ent: missing required field "SemanticUsage.request_id"`)}
+	}
+	if _, ok := _c.mutation.SettlementRevision(); !ok {
+		return &ValidationError{Name: "settlement_revision", err: errors.New(`ent: missing required field "SemanticUsage.settlement_revision"`)}
+	}
+	if _, ok := _c.mutation.SourceEventID(); !ok {
+		return &ValidationError{Name: "source_event_id", err: errors.New(`ent: missing required field "SemanticUsage.source_event_id"`)}
 	}
 	if _, ok := _c.mutation.Meter(); !ok {
 		return &ValidationError{Name: "meter", err: errors.New(`ent: missing required field "SemanticUsage.meter"`)}
+	}
+	if _, ok := _c.mutation.QuantityUnits(); !ok {
+		return &ValidationError{Name: "quantity_units", err: errors.New(`ent: missing required field "SemanticUsage.quantity_units"`)}
 	}
 	if _, ok := _c.mutation.QuantityDecimal(); !ok {
 		return &ValidationError{Name: "quantity_decimal", err: errors.New(`ent: missing required field "SemanticUsage.quantity_decimal"`)}
@@ -221,23 +206,23 @@ func (_c *SemanticUsageCreate) createSpec() (*SemanticUsage, *sqlgraph.CreateSpe
 	}
 	if value, ok := _c.mutation.RequestID(); ok {
 		_spec.SetField(semanticusage.FieldRequestID, field.TypeString, value)
-		_node.RequestID = &value
+		_node.RequestID = value
 	}
-	if value, ok := _c.mutation.UpstreamID(); ok {
-		_spec.SetField(semanticusage.FieldUpstreamID, field.TypeString, value)
-		_node.UpstreamID = value
-	}
-	if value, ok := _c.mutation.ResourceID(); ok {
-		_spec.SetField(semanticusage.FieldResourceID, field.TypeString, value)
-		_node.ResourceID = &value
+	if value, ok := _c.mutation.SettlementRevision(); ok {
+		_spec.SetField(semanticusage.FieldSettlementRevision, field.TypeInt64, value)
+		_node.SettlementRevision = value
 	}
 	if value, ok := _c.mutation.SourceEventID(); ok {
 		_spec.SetField(semanticusage.FieldSourceEventID, field.TypeString, value)
-		_node.SourceEventID = &value
+		_node.SourceEventID = value
 	}
 	if value, ok := _c.mutation.Meter(); ok {
 		_spec.SetField(semanticusage.FieldMeter, field.TypeString, value)
 		_node.Meter = value
+	}
+	if value, ok := _c.mutation.QuantityUnits(); ok {
+		_spec.SetField(semanticusage.FieldQuantityUnits, field.TypeInt64, value)
+		_node.QuantityUnits = value
 	}
 	if value, ok := _c.mutation.QuantityDecimal(); ok {
 		_spec.SetField(semanticusage.FieldQuantityDecimal, field.TypeString, value)

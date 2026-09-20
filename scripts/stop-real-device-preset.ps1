@@ -13,13 +13,15 @@ if ($state.executable -ne (Join-Path $dataRoot 'bin\measix-device-demo.exe')) {
 try {
     $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($state.pid)" -ErrorAction SilentlyContinue
     if ($null -ne $process -and $process.ExecutablePath -eq $state.executable) {
-        Stop-Process -Id $state.pid
+        # The process can exit after the ownership check and before the signal.
+        # Treat that race as an already-completed stop, not as a launcher failure.
+        Stop-Process -Id $state.pid -ErrorAction SilentlyContinue
         # Bounded wait: Wait-Process without -Timeout can block forever, and a
         # process that ignores the request must still be escalated.
         Wait-Process -Id $state.pid -Timeout 10 -ErrorAction SilentlyContinue
         $stillRunning = Get-Process -Id $state.pid -ErrorAction SilentlyContinue
         if ($null -ne $stillRunning) {
-            Stop-Process -Id $state.pid -Force
+            Stop-Process -Id $state.pid -Force -ErrorAction SilentlyContinue
             Wait-Process -Id $state.pid -Timeout 10 -ErrorAction SilentlyContinue
             Write-Output "Force-stopped real-device preset PID $($state.pid)."
         } else {

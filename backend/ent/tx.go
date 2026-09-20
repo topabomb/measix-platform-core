@@ -14,6 +14,24 @@ type Tx struct {
 	config
 	// Activation is the client for interacting with the Activation builders.
 	Activation *ActivationClient
+	// BudgetAllocation is the client for interacting with the BudgetAllocation builders.
+	BudgetAllocation *BudgetAllocationClient
+	// BudgetAudit is the client for interacting with the BudgetAudit builders.
+	BudgetAudit *BudgetAuditClient
+	// BudgetBucket is the client for interacting with the BudgetBucket builders.
+	BudgetBucket *BudgetBucketClient
+	// BudgetLimit is the client for interacting with the BudgetLimit builders.
+	BudgetLimit *BudgetLimitClient
+	// BudgetReconciliation is the client for interacting with the BudgetReconciliation builders.
+	BudgetReconciliation *BudgetReconciliationClient
+	// BudgetRequest is the client for interacting with the BudgetRequest builders.
+	BudgetRequest *BudgetRequestClient
+	// BudgetSettlement is the client for interacting with the BudgetSettlement builders.
+	BudgetSettlement *BudgetSettlementClient
+	// DeletedCredential is the client for interacting with the DeletedCredential builders.
+	DeletedCredential *DeletedCredentialClient
+	// DeletedPrincipal is the client for interacting with the DeletedPrincipal builders.
+	DeletedPrincipal *DeletedPrincipalClient
 	// Deployment is the client for interacting with the Deployment builders.
 	Deployment *DeploymentClient
 	// Device is the client for interacting with the Device builders.
@@ -48,8 +66,14 @@ type Tx struct {
 	Upstream *UpstreamClient
 	// UpstreamConfigRevision is the client for interacting with the UpstreamConfigRevision builders.
 	UpstreamConfigRevision *UpstreamConfigRevisionClient
+	// UsageDetail is the client for interacting with the UsageDetail builders.
+	UsageDetail *UsageDetailClient
+	// UsageEvent is the client for interacting with the UsageEvent builders.
+	UsageEvent *UsageEventClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// UserBudget is the client for interacting with the UserBudget builders.
+	UserBudget *UserBudgetClient
 
 	// lazily loaded.
 	client     *Client
@@ -182,6 +206,15 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.Activation = NewActivationClient(tx.config)
+	tx.BudgetAllocation = NewBudgetAllocationClient(tx.config)
+	tx.BudgetAudit = NewBudgetAuditClient(tx.config)
+	tx.BudgetBucket = NewBudgetBucketClient(tx.config)
+	tx.BudgetLimit = NewBudgetLimitClient(tx.config)
+	tx.BudgetReconciliation = NewBudgetReconciliationClient(tx.config)
+	tx.BudgetRequest = NewBudgetRequestClient(tx.config)
+	tx.BudgetSettlement = NewBudgetSettlementClient(tx.config)
+	tx.DeletedCredential = NewDeletedCredentialClient(tx.config)
+	tx.DeletedPrincipal = NewDeletedPrincipalClient(tx.config)
 	tx.Deployment = NewDeploymentClient(tx.config)
 	tx.Device = NewDeviceClient(tx.config)
 	tx.Enrollment = NewEnrollmentClient(tx.config)
@@ -199,7 +232,10 @@ func (tx *Tx) init() {
 	tx.Session = NewSessionClient(tx.config)
 	tx.Upstream = NewUpstreamClient(tx.config)
 	tx.UpstreamConfigRevision = NewUpstreamConfigRevisionClient(tx.config)
+	tx.UsageDetail = NewUsageDetailClient(tx.config)
+	tx.UsageEvent = NewUsageEventClient(tx.config)
 	tx.User = NewUserClient(tx.config)
+	tx.UserBudget = NewUserBudgetClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

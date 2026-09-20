@@ -13,14 +13,14 @@ const (
 	FieldID = "id"
 	// FieldRequestID holds the string denoting the request_id field in the database.
 	FieldRequestID = "request_id"
-	// FieldUpstreamID holds the string denoting the upstream_id field in the database.
-	FieldUpstreamID = "upstream_id"
-	// FieldResourceID holds the string denoting the resource_id field in the database.
-	FieldResourceID = "resource_id"
+	// FieldSettlementRevision holds the string denoting the settlement_revision field in the database.
+	FieldSettlementRevision = "settlement_revision"
 	// FieldSourceEventID holds the string denoting the source_event_id field in the database.
 	FieldSourceEventID = "source_event_id"
 	// FieldMeter holds the string denoting the meter field in the database.
 	FieldMeter = "meter"
+	// FieldQuantityUnits holds the string denoting the quantity_units field in the database.
+	FieldQuantityUnits = "quantity_units"
 	// FieldQuantityDecimal holds the string denoting the quantity_decimal field in the database.
 	FieldQuantityDecimal = "quantity_decimal"
 	// FieldCompleteness holds the string denoting the completeness field in the database.
@@ -41,10 +41,10 @@ const (
 var Columns = []string{
 	FieldID,
 	FieldRequestID,
-	FieldUpstreamID,
-	FieldResourceID,
+	FieldSettlementRevision,
 	FieldSourceEventID,
 	FieldMeter,
+	FieldQuantityUnits,
 	FieldQuantityDecimal,
 	FieldCompleteness,
 	FieldProviderCost,
@@ -76,14 +76,9 @@ func ByRequestID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequestID, opts...).ToFunc()
 }
 
-// ByUpstreamID orders the results by the upstream_id field.
-func ByUpstreamID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUpstreamID, opts...).ToFunc()
-}
-
-// ByResourceID orders the results by the resource_id field.
-func ByResourceID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldResourceID, opts...).ToFunc()
+// BySettlementRevision orders the results by the settlement_revision field.
+func BySettlementRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettlementRevision, opts...).ToFunc()
 }
 
 // BySourceEventID orders the results by the source_event_id field.
@@ -94,6 +89,11 @@ func BySourceEventID(opts ...sql.OrderTermOption) OrderOption {
 // ByMeter orders the results by the meter field.
 func ByMeter(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMeter, opts...).ToFunc()
+}
+
+// ByQuantityUnits orders the results by the quantity_units field.
+func ByQuantityUnits(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldQuantityUnits, opts...).ToFunc()
 }
 
 // ByQuantityDecimal orders the results by the quantity_decimal field.

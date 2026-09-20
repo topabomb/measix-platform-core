@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/enterpriseupdate"
 	"measix/platform/internal/hub/identity"
@@ -21,6 +22,7 @@ type Services struct {
 	Upstream         *upstream.Service
 	RuntimeControl   *runtimecontrol.Service
 	Usage            *usage.Service
+	Budget           *budget.Service
 	System           *system.Service
 	EnterpriseUpdate *enterpriseupdate.Service
 	BuildVersion     string
@@ -36,7 +38,10 @@ func RegisterFull(router chi.Router, services Services) {
 		adminHandler: &adminHandler{identity: services.Identity},
 		services:     services,
 	}
-	client := &fullClientHandler{clientHandler: &clientHandler{identity: services.Identity}, capability: services.Capability, enterpriseUpdate: services.EnterpriseUpdate}
+	client := &fullClientHandler{
+		clientHandler: &clientHandler{identity: services.Identity}, capability: services.Capability,
+		enterpriseUpdate: services.EnterpriseUpdate, budget: services.Budget, usage: services.Usage,
+	}
 	adminapi.HandlerFromMux(admin, router)
 	clientapi.HandlerWithOptions(client, clientapi.ChiServerOptions{BaseRouter: router, ErrorHandlerFunc: clientBindingError})
 }

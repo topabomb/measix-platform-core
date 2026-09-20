@@ -63,9 +63,9 @@ func testRealtimeASRWebSocketAdmissionAndFrames(t *testing.T, secure bool) {
 	fixture.server.Close()
 	recorder := &captureUsageRecorder{}
 	if secure {
-		fixture.server = httptest.NewTLSServer(relayruntime.NewHandlerWithRecorder(fixture.store, recorder))
+		fixture.server = httptest.NewTLSServer(relayruntime.NewHandler(fixture.store, recorder, &allowBudgetClient{}))
 	} else {
-		fixture.server = httptest.NewServer(relayruntime.NewHandlerWithRecorder(fixture.store, recorder))
+		fixture.server = httptest.NewServer(relayruntime.NewHandler(fixture.store, recorder, &allowBudgetClient{}))
 	}
 	defer fixture.close()
 	req := fixture.request(t, nil, "GET", resourceID, "/v1/realtime?intent=transcription", nil, "")
@@ -156,7 +156,7 @@ func testRealtimeASRWebSocketAdmissionAndFrames(t *testing.T, secure bool) {
 			bounded := newRuntimeFixture(t, state, key)
 			bounded.server.Close()
 			records := &captureUsageRecorder{}
-			bounded.server = httptest.NewServer(relayruntime.NewHandlerWithRecorder(bounded.store, records))
+			bounded.server = httptest.NewServer(relayruntime.NewHandler(bounded.store, records, &allowBudgetClient{}))
 			defer bounded.close()
 			request := bounded.request(t, nil, "GET", resourceID, "/v1/realtime?intent=transcription", nil, "")
 			stream, _, err := dialer.Dial(strings.Replace(request.URL.String(), "http://", "ws://", 1), request.Header)

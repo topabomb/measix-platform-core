@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"measix/platform/ent"
+	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enrollment"
 	"measix/platform/ent/session"
@@ -29,9 +30,12 @@ var (
 	ErrCredential        = errors.New("invalid credential")
 	ErrExpired           = errors.New("credential expired")
 	ErrRevoked           = errors.New("identity revoked")
+	ErrUserDisabled      = errors.New("user disabled")
+	ErrDeviceRevoked     = errors.New("device revoked")
 	ErrAlreadyUsed       = errors.New("enrollment already used")
 	ErrNotAuthorized     = errors.New("not authorized")
 	ErrPortalUnavailable = errors.New("portal unavailable")
+	ErrIdentityDeleted   = errors.New("enterprise identity deleted")
 )
 
 type Service struct {
@@ -164,7 +168,7 @@ func (s *Service) CreateEnrollment(ctx context.Context, userID, createdBy string
 		return EnrollmentGrant{}, err
 	}
 	if u.Status != "ACTIVE" {
-		return EnrollmentGrant{}, ErrRevoked
+		return EnrollmentGrant{}, ErrUserDisabled
 	}
 	code, err := s.Random(16)
 	if err != nil {
@@ -218,7 +222,7 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 		return rollback(err)
 	}
 	if u.Status != "ACTIVE" {
-		return rollback(ErrRevoked)
+		return rollback(ErrUserDisabled)
 	}
 	existing, queryErr := tx.Device.Query().Where(device.InstallationIDEQ(installationID)).Only(ctx)
 	if queryErr != nil && !ent.IsNotFound(queryErr) {
@@ -229,7 +233,7 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 			return rollback(ErrConflict)
 		}
 		if existing.Status != "ACTIVE" {
-			return rollback(ErrRevoked)
+			return rollback(ErrDeviceRevoked)
 		}
 	}
 	refreshToken, err := s.Random(32)
@@ -308,6 +312,13 @@ func (s *Service) AuthenticateAccess(ctx context.Context, token string) (AccessP
 }
 
 func (s *Service) validateAccessPrincipal(ctx context.Context, p AccessPrincipal) error {
+	deleted, err := s.Client.DeletedPrincipal.Query().Where(deletedprincipal.IDEQ(p.UserID)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if deleted {
+		return ErrIdentityDeleted
+	}
 	se, err := s.Client.Session.Get(ctx, p.SessionID)
 	if ent.IsNotFound(err) {
 		return ErrRevoked
@@ -315,13 +326,7 @@ func (s *Service) validateAccessPrincipal(ctx context.Context, p AccessPrincipal
 	if err != nil {
 		return err
 	}
-	if !s.Now().UTC().Before(se.ExpiresAt) {
-		return ErrExpired
-	}
-	if se.Status != "ACTIVE" || se.Channel != "ANDROID" {
-		return ErrRevoked
-	}
-	if se.UserID != p.UserID || se.DeviceID == nil || *se.DeviceID != p.DeviceID {
+	if se.Channel != "ANDROID" || se.UserID != p.UserID || se.DeviceID == nil || *se.DeviceID != p.DeviceID {
 		return ErrCredential
 	}
 	u, err := s.Client.User.Get(ctx, p.UserID)
@@ -332,7 +337,7 @@ func (s *Service) validateAccessPrincipal(ctx context.Context, p AccessPrincipal
 		return err
 	}
 	if u.Status != "ACTIVE" {
-		return ErrRevoked
+		return ErrUserDisabled
 	}
 	d, err := s.Client.Device.Get(ctx, p.DeviceID)
 	if ent.IsNotFound(err) {
@@ -341,7 +346,16 @@ func (s *Service) validateAccessPrincipal(ctx context.Context, p AccessPrincipal
 	if err != nil {
 		return err
 	}
-	if d.Status != "ACTIVE" || d.UserID != u.ID {
+	if d.UserID != u.ID {
+		return ErrCredential
+	}
+	if d.Status != "ACTIVE" {
+		return ErrDeviceRevoked
+	}
+	if !s.Now().UTC().Before(se.ExpiresAt) {
+		return ErrExpired
+	}
+	if se.Status != "ACTIVE" {
 		return ErrRevoked
 	}
 	return nil

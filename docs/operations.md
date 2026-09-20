@@ -49,6 +49,8 @@ Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/
 
 Android sessions have a seven-day rolling idle deadline, renewed only by refresh. Refresh rotates credentials and requires a stable per-command `Idempotency-Key`; the same old credential/key recovers the identical encrypted response for two minutes without extending the lease twice. Rotation recovery survives Hub restart using master-key-derived encryption. Persist client pending refresh input/key before sending; a different key conflicts, and an expired recovery window requires re-enrollment. Old fixed-TTL and absolute Discovery URL flags were removed; Discovery returns same-origin paths.
 
+Admin user deletion is a deny-first destructive workflow, not ordinary disable/logout. The operator must enter the exact username and a reason. Hub first blocks new Client, Runtime and refresh operations, then completes the durable full purge of the user's devices, sessions, configuration, budgets, usage and Portal-private state. Audit keeps only the required non-reversible subject summary; credential digests are stored as irreversible tombstones so every old access/runtime or refresh credential returns `401 enterprise_identity_deleted` instead of entering refresh/retry or becoming a generic invalid credential. A failed purge remains visible and retryable; only `COMPLETED` means deletion succeeded. Reusing the username later creates a different principal ID with no inherited state; issue a new one-time enrollment. Because deletion removes the old Device, the same installation may bind the fresh principal, while all old credentials remain terminally rejected.
+
 Logout revokes the durable Android session and clears rotation recovery. The existing Hub reconciler projects pending session denies through a SECURITY_CHANGE Activation; HTTP 204 is not Relay acknowledgement. Previously issued access may remain usable until the deny applies or its short expiry. Disable/revoke also invalidate sessions; enabling a user does not resurrect credentials. A new administrator-issued enrollment may replace sessions on the same ACTIVE installation/user, but cannot revive a revoked device or transfer another user's installation.
 
 ### Runtime Relay
@@ -58,7 +60,7 @@ Logout revokes the durable Android session and clears rotation recovery. The exi
 | `--public-listen` | `RELAY_PUBLIC_LISTEN_ADDR` | `:8090` |
 | `--internal-listen` | `RELAY_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8091`; must differ from public listen string |
 | `--spool` | `RELAY_SPOOL_PATH` | `relay-spool.db`; nonempty |
-| `--hub-usage-url` | `HUB_USAGE_URL` | Required; Hub **private** usage-ingest endpoint |
+| `--hub-internal-url` | `RELAY_HUB_INTERNAL_URL` | Required Hub **private** API base for budget admission, lifecycle, and durable usage settlement |
 | `--hub-service-token-file` | `RELAY_HUB_SERVICE_TOKEN_FILE` | Required token file; secret |
 | `--usage-batch-size` | `RELAY_USAGE_BATCH_SIZE` | `100`; range `1..200` |
 | `--usage-flush-interval` | `RELAY_USAGE_FLUSH_INTERVAL` | `1s`; positive |

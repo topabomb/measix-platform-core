@@ -298,7 +298,7 @@ export function startHubAndRelay(env, opts = {}) {
     '--public-listen', `127.0.0.1:${env.relayPubPort}`,
     '--internal-listen', `127.0.0.1:${env.relayIntPort}`,
     '--spool', env.spoolPath,
-    '--hub-usage-url', `${env.hubInternalBaseURL}/internal/v1/usage/request-events:batch`,
+    '--hub-internal-url', env.hubInternalBaseURL,
     '--hub-service-token-file', env.relayTokenFile,
   ], { cwd: env.envRoot, stdio: stdioOpt })
 

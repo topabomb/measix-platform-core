@@ -237,6 +237,8 @@ MEASIX is unpublished. Only the current protocol and initialization schema are s
 
 ## 8. Change boundary
 
+S0.2 的生产协议计量与用户额度按 [实施方案](docs/usage-budget-implementation-plan.md) 推进，阶段语义由其引用的架构补充合同拥有。拟增加 Relay 只读计量模块和小型 Hub 预算准入；保持 Relay 不依赖 Hub domain/Ent、Hub 不承载 Runtime body。此为待实现约定，不表示当前生产代码已具备额度能力。
+
 Update `measix-architecture` first when a change alters:
 
 - platform terminology or stable identifier meaning;

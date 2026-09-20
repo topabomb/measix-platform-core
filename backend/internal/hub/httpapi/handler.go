@@ -304,6 +304,8 @@ func (h *clientHandler) ExchangeEnrollment(w http.ResponseWriter, r *http.Reques
 
 func writeEnrollmentError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, identity.ErrIdentityDeleted):
+		writeProblem(w, http.StatusUnauthorized, "enterprise_identity_deleted", "Enterprise identity was deleted")
 	case errors.Is(err, identity.ErrExpired):
 		writeProblem(w, http.StatusUnauthorized, "enrollment_expired", "Enrollment code expired")
 	case errors.Is(err, identity.ErrAlreadyUsed):
@@ -345,7 +347,7 @@ func (h *clientHandler) LogoutSession(w http.ResponseWriter, r *http.Request) {
 func (h *clientHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 	token, ok := bearerToken(r)
 	if !ok {
-		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+		writeProblem(w, http.StatusUnauthorized, "unauthenticated", "Unauthenticated")
 		return
 	}
 	view, err := h.identity.BootstrapView(r.Context(), token)
@@ -371,7 +373,7 @@ func (h *clientHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 func (h *clientHandler) GetManagedState(w http.ResponseWriter, r *http.Request, params clientapi.GetManagedStateParams) {
 	token, ok := bearerToken(r)
 	if !ok {
-		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+		writeProblem(w, http.StatusUnauthorized, "unauthenticated", "Unauthenticated")
 		return
 	}
 	if _, err := h.identity.AuthenticateAccess(r.Context(), token); err != nil {
@@ -479,16 +481,22 @@ func decodeStrictJSON(r *http.Request, target any) error {
 
 func writeIdentityError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, identity.ErrIdentityDeleted):
+		writeProblem(w, http.StatusUnauthorized, "enterprise_identity_deleted", "Enterprise identity was deleted")
 	case errors.Is(err, identity.ErrExpired):
 		writeProblem(w, http.StatusUnauthorized, "session_expired", "Session expired")
 	case errors.Is(err, identity.ErrRevoked):
 		writeProblem(w, http.StatusForbidden, "session_revoked", "Session revoked")
+	case errors.Is(err, identity.ErrUserDisabled):
+		writeProblem(w, http.StatusForbidden, "user_disabled", "User disabled")
+	case errors.Is(err, identity.ErrDeviceRevoked):
+		writeProblem(w, http.StatusForbidden, "device_revoked", "Device revoked")
 	case errors.Is(err, identity.ErrRefreshConflict):
 		writeProblem(w, http.StatusConflict, "refresh_conflict", "Refresh conflict")
 	case errors.Is(err, identity.ErrCredential):
 		writeProblem(w, http.StatusUnauthorized, "invalid_credential", "Invalid credential")
 	case errors.Is(err, identity.ErrNotAuthorized):
-		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+		writeProblem(w, http.StatusUnauthorized, "unauthenticated", "Unauthenticated")
 	case errors.Is(err, identity.ErrNotFound):
 		writeProblem(w, http.StatusNotFound, "not_found", "Not found")
 	case errors.Is(err, identity.ErrConflict), errors.Is(err, identity.ErrAlreadyUsed):

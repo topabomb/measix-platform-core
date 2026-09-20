@@ -78,7 +78,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 6. Snapshot HTTP 200 返回 JSON 与带引号的 ETag；If-None-Match 命中返回无 body 的 304。仅当同一来源、身份及 generation 的已验证缓存存在时才能复用。Portal 数据使用独立的同源 Core HTTP Session/Feed，不经过原生 Bridge 伪造 HTTP 语义。
 7. 每个 Session 的 refresh 串行化。先持久化本次 Idempotency-Key；不确定响应只用同一旧 refreshToken + 同一 key 重试。服务端短恢复窗内返回完全相同的轮换结果；原子提交新令牌后才开启下一次刷新。旧 token + 新 key / 新 token + 旧 key 为 409 refresh_conflict。恢复窗已过按明确失败重新接入，不循环重试。
 8. Runtime 请求冻结 authority/session/generation/resource；`428 managed_snapshot_required` 且 forwarded=false 表示未转发，进入配置同步与重新准入，不能绕过 generation barrier 或盲重放已经发生 I/O 的业务。
-9. Client logout 是 `POST sessions/logout`，JSON body 携带当前 refreshToken；不是 access-token-only 请求。成功 204。母 Session 撤销后 Client 查询返回 403 session_revoked，正确 ETag 也不能绕过授权。401 认证过期/失效与 403 撤销、资源禁止分别处理。
+9. Client logout 是 `POST sessions/logout`，JSON body 携带当前 refreshToken；不是 access-token-only 请求。成功 204。Client/Refresh/Runtime 对已知 User disabled、Device revoked、Session revoked 分别返回 403 `user_disabled`、`device_revoked`、`session_revoked`，正确 ETag 也不能绕过授权；缺失认证为 401 `unauthenticated`，坏 credential/JWT 仍是 401 类认证失败。Android 将三种 403 都交给同一授权撤销生命周期，但保留原 code 用于明确诊断。
 10. 原生确认取消保留原状态；确认后由持久 owner 完成退出。先撤销旧文档交付、取消/等待原生采集与写入，再清理 Realm/Portal 站点数据和媒体。站点清理失败可重试，完成前不得展示新 Realm。旧接收器、旧媒体句柄、旧请求不能写回新页面。
 
 ## Runtime 请求示例

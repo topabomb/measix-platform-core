@@ -72,11 +72,15 @@ func (_c *RequestUsageCreate) SetResourceID(v string) *RequestUsageCreate {
 	return _c
 }
 
-// SetNillableResourceID sets the "resource_id" field if the given value is not nil.
-func (_c *RequestUsageCreate) SetNillableResourceID(v *string) *RequestUsageCreate {
-	if v != nil {
-		_c.SetResourceID(*v)
-	}
+// SetResourceKind sets the "resource_kind" field.
+func (_c *RequestUsageCreate) SetResourceKind(v string) *RequestUsageCreate {
+	_c.mutation.SetResourceKind(v)
+	return _c
+}
+
+// SetClientProtocol sets the "client_protocol" field.
+func (_c *RequestUsageCreate) SetClientProtocol(v string) *RequestUsageCreate {
+	_c.mutation.SetClientProtocol(v)
 	return _c
 }
 
@@ -86,25 +90,9 @@ func (_c *RequestUsageCreate) SetRuntimeRouteID(v string) *RequestUsageCreate {
 	return _c
 }
 
-// SetNillableRuntimeRouteID sets the "runtime_route_id" field if the given value is not nil.
-func (_c *RequestUsageCreate) SetNillableRuntimeRouteID(v *string) *RequestUsageCreate {
-	if v != nil {
-		_c.SetRuntimeRouteID(*v)
-	}
-	return _c
-}
-
 // SetUpstreamID sets the "upstream_id" field.
 func (_c *RequestUsageCreate) SetUpstreamID(v string) *RequestUsageCreate {
 	_c.mutation.SetUpstreamID(v)
-	return _c
-}
-
-// SetNillableUpstreamID sets the "upstream_id" field if the given value is not nil.
-func (_c *RequestUsageCreate) SetNillableUpstreamID(v *string) *RequestUsageCreate {
-	if v != nil {
-		_c.SetUpstreamID(*v)
-	}
 	return _c
 }
 
@@ -190,6 +178,30 @@ func (_c *RequestUsageCreate) SetNillableErrorClass(v *string) *RequestUsageCrea
 	return _c
 }
 
+// SetRequestCompleteness sets the "request_completeness" field.
+func (_c *RequestUsageCreate) SetRequestCompleteness(v string) *RequestUsageCreate {
+	_c.mutation.SetRequestCompleteness(v)
+	return _c
+}
+
+// SetSettlementState sets the "settlement_state" field.
+func (_c *RequestUsageCreate) SetSettlementState(v string) *RequestUsageCreate {
+	_c.mutation.SetSettlementState(v)
+	return _c
+}
+
+// SetSettlementRevision sets the "settlement_revision" field.
+func (_c *RequestUsageCreate) SetSettlementRevision(v int64) *RequestUsageCreate {
+	_c.mutation.SetSettlementRevision(v)
+	return _c
+}
+
+// SetBudgetRevision sets the "budget_revision" field.
+func (_c *RequestUsageCreate) SetBudgetRevision(v int64) *RequestUsageCreate {
+	_c.mutation.SetBudgetRevision(v)
+	return _c
+}
+
 // SetIngestedAt sets the "ingested_at" field.
 func (_c *RequestUsageCreate) SetIngestedAt(v time.Time) *RequestUsageCreate {
 	_c.mutation.SetIngestedAt(v)
@@ -245,6 +257,21 @@ func (_c *RequestUsageCreate) check() error {
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "RequestUsage.user_id"`)}
 	}
+	if _, ok := _c.mutation.ResourceID(); !ok {
+		return &ValidationError{Name: "resource_id", err: errors.New(`ent: missing required field "RequestUsage.resource_id"`)}
+	}
+	if _, ok := _c.mutation.ResourceKind(); !ok {
+		return &ValidationError{Name: "resource_kind", err: errors.New(`ent: missing required field "RequestUsage.resource_kind"`)}
+	}
+	if _, ok := _c.mutation.ClientProtocol(); !ok {
+		return &ValidationError{Name: "client_protocol", err: errors.New(`ent: missing required field "RequestUsage.client_protocol"`)}
+	}
+	if _, ok := _c.mutation.RuntimeRouteID(); !ok {
+		return &ValidationError{Name: "runtime_route_id", err: errors.New(`ent: missing required field "RequestUsage.runtime_route_id"`)}
+	}
+	if _, ok := _c.mutation.UpstreamID(); !ok {
+		return &ValidationError{Name: "upstream_id", err: errors.New(`ent: missing required field "RequestUsage.upstream_id"`)}
+	}
 	if _, ok := _c.mutation.ManagedGeneration(); !ok {
 		return &ValidationError{Name: "managed_generation", err: errors.New(`ent: missing required field "RequestUsage.managed_generation"`)}
 	}
@@ -271,6 +298,18 @@ func (_c *RequestUsageCreate) check() error {
 	}
 	if _, ok := _c.mutation.DurationMs(); !ok {
 		return &ValidationError{Name: "duration_ms", err: errors.New(`ent: missing required field "RequestUsage.duration_ms"`)}
+	}
+	if _, ok := _c.mutation.RequestCompleteness(); !ok {
+		return &ValidationError{Name: "request_completeness", err: errors.New(`ent: missing required field "RequestUsage.request_completeness"`)}
+	}
+	if _, ok := _c.mutation.SettlementState(); !ok {
+		return &ValidationError{Name: "settlement_state", err: errors.New(`ent: missing required field "RequestUsage.settlement_state"`)}
+	}
+	if _, ok := _c.mutation.SettlementRevision(); !ok {
+		return &ValidationError{Name: "settlement_revision", err: errors.New(`ent: missing required field "RequestUsage.settlement_revision"`)}
+	}
+	if _, ok := _c.mutation.BudgetRevision(); !ok {
+		return &ValidationError{Name: "budget_revision", err: errors.New(`ent: missing required field "RequestUsage.budget_revision"`)}
 	}
 	if _, ok := _c.mutation.IngestedAt(); !ok {
 		return &ValidationError{Name: "ingested_at", err: errors.New(`ent: missing required field "RequestUsage.ingested_at"`)}
@@ -331,6 +370,14 @@ func (_c *RequestUsageCreate) createSpec() (*RequestUsage, *sqlgraph.CreateSpec)
 		_spec.SetField(requestusage.FieldResourceID, field.TypeString, value)
 		_node.ResourceID = value
 	}
+	if value, ok := _c.mutation.ResourceKind(); ok {
+		_spec.SetField(requestusage.FieldResourceKind, field.TypeString, value)
+		_node.ResourceKind = value
+	}
+	if value, ok := _c.mutation.ClientProtocol(); ok {
+		_spec.SetField(requestusage.FieldClientProtocol, field.TypeString, value)
+		_node.ClientProtocol = value
+	}
 	if value, ok := _c.mutation.RuntimeRouteID(); ok {
 		_spec.SetField(requestusage.FieldRuntimeRouteID, field.TypeString, value)
 		_node.RuntimeRouteID = value
@@ -382,6 +429,22 @@ func (_c *RequestUsageCreate) createSpec() (*RequestUsage, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.ErrorClass(); ok {
 		_spec.SetField(requestusage.FieldErrorClass, field.TypeString, value)
 		_node.ErrorClass = &value
+	}
+	if value, ok := _c.mutation.RequestCompleteness(); ok {
+		_spec.SetField(requestusage.FieldRequestCompleteness, field.TypeString, value)
+		_node.RequestCompleteness = value
+	}
+	if value, ok := _c.mutation.SettlementState(); ok {
+		_spec.SetField(requestusage.FieldSettlementState, field.TypeString, value)
+		_node.SettlementState = value
+	}
+	if value, ok := _c.mutation.SettlementRevision(); ok {
+		_spec.SetField(requestusage.FieldSettlementRevision, field.TypeInt64, value)
+		_node.SettlementRevision = value
+	}
+	if value, ok := _c.mutation.BudgetRevision(); ok {
+		_spec.SetField(requestusage.FieldBudgetRevision, field.TypeInt64, value)
+		_node.BudgetRevision = value
 	}
 	if value, ok := _c.mutation.IngestedAt(); ok {
 		_spec.SetField(requestusage.FieldIngestedAt, field.TypeTime, value)

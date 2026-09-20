@@ -32,7 +32,7 @@ Install dependencies from the root and console lockfiles. `npm run setup` invoke
 ```text
 go run ./cmd/control-hub run --listen 127.0.0.1:8080 --internal-listen 127.0.0.1:8081 --db ../.data/hub.db --master-key-file ../.secrets/master.key --jwt-private-key-file ../.secrets/jwt-ed25519.seed --relay-internal-url http://127.0.0.1:8091 --relay-service-token-file ../.secrets/relay-service.token
 
-go run ./cmd/runtime-relay --public-listen 127.0.0.1:8090 --internal-listen 127.0.0.1:8091 --spool ../.data/relay-spool.db --hub-usage-url http://127.0.0.1:8081/internal/v1/usage/request-events:batch --hub-service-token-file ../.secrets/relay-service.token
+go run ./cmd/runtime-relay --public-listen 127.0.0.1:8090 --internal-listen 127.0.0.1:8091 --spool ../.data/relay-spool.db --hub-internal-url http://127.0.0.1:8081 --hub-service-token-file ../.secrets/relay-service.token
 ```
 
 In another terminal from the repository root:

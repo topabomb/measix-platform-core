@@ -84,6 +84,16 @@ func ResourceID(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldEQ(FieldResourceID, v))
 }
 
+// ResourceKind applies equality check predicate on the "resource_kind" field. It's identical to ResourceKindEQ.
+func ResourceKind(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldResourceKind, v))
+}
+
+// ClientProtocol applies equality check predicate on the "client_protocol" field. It's identical to ClientProtocolEQ.
+func ClientProtocol(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldClientProtocol, v))
+}
+
 // RuntimeRouteID applies equality check predicate on the "runtime_route_id" field. It's identical to RuntimeRouteIDEQ.
 func RuntimeRouteID(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldEQ(FieldRuntimeRouteID, v))
@@ -147,6 +157,26 @@ func DurationMs(v int64) predicate.RequestUsage {
 // ErrorClass applies equality check predicate on the "error_class" field. It's identical to ErrorClassEQ.
 func ErrorClass(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldEQ(FieldErrorClass, v))
+}
+
+// RequestCompleteness applies equality check predicate on the "request_completeness" field. It's identical to RequestCompletenessEQ.
+func RequestCompleteness(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldRequestCompleteness, v))
+}
+
+// SettlementState applies equality check predicate on the "settlement_state" field. It's identical to SettlementStateEQ.
+func SettlementState(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldSettlementState, v))
+}
+
+// SettlementRevision applies equality check predicate on the "settlement_revision" field. It's identical to SettlementRevisionEQ.
+func SettlementRevision(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldSettlementRevision, v))
+}
+
+// BudgetRevision applies equality check predicate on the "budget_revision" field. It's identical to BudgetRevisionEQ.
+func BudgetRevision(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldBudgetRevision, v))
 }
 
 // IngestedAt applies equality check predicate on the "ingested_at" field. It's identical to IngestedAtEQ.
@@ -554,16 +584,6 @@ func ResourceIDHasSuffix(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldHasSuffix(FieldResourceID, v))
 }
 
-// ResourceIDIsNil applies the IsNil predicate on the "resource_id" field.
-func ResourceIDIsNil() predicate.RequestUsage {
-	return predicate.RequestUsage(sql.FieldIsNull(FieldResourceID))
-}
-
-// ResourceIDNotNil applies the NotNil predicate on the "resource_id" field.
-func ResourceIDNotNil() predicate.RequestUsage {
-	return predicate.RequestUsage(sql.FieldNotNull(FieldResourceID))
-}
-
 // ResourceIDEqualFold applies the EqualFold predicate on the "resource_id" field.
 func ResourceIDEqualFold(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldEqualFold(FieldResourceID, v))
@@ -572,6 +592,136 @@ func ResourceIDEqualFold(v string) predicate.RequestUsage {
 // ResourceIDContainsFold applies the ContainsFold predicate on the "resource_id" field.
 func ResourceIDContainsFold(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldContainsFold(FieldResourceID, v))
+}
+
+// ResourceKindEQ applies the EQ predicate on the "resource_kind" field.
+func ResourceKindEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldResourceKind, v))
+}
+
+// ResourceKindNEQ applies the NEQ predicate on the "resource_kind" field.
+func ResourceKindNEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNEQ(FieldResourceKind, v))
+}
+
+// ResourceKindIn applies the In predicate on the "resource_kind" field.
+func ResourceKindIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIn(FieldResourceKind, vs...))
+}
+
+// ResourceKindNotIn applies the NotIn predicate on the "resource_kind" field.
+func ResourceKindNotIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotIn(FieldResourceKind, vs...))
+}
+
+// ResourceKindGT applies the GT predicate on the "resource_kind" field.
+func ResourceKindGT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGT(FieldResourceKind, v))
+}
+
+// ResourceKindGTE applies the GTE predicate on the "resource_kind" field.
+func ResourceKindGTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGTE(FieldResourceKind, v))
+}
+
+// ResourceKindLT applies the LT predicate on the "resource_kind" field.
+func ResourceKindLT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLT(FieldResourceKind, v))
+}
+
+// ResourceKindLTE applies the LTE predicate on the "resource_kind" field.
+func ResourceKindLTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLTE(FieldResourceKind, v))
+}
+
+// ResourceKindContains applies the Contains predicate on the "resource_kind" field.
+func ResourceKindContains(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContains(FieldResourceKind, v))
+}
+
+// ResourceKindHasPrefix applies the HasPrefix predicate on the "resource_kind" field.
+func ResourceKindHasPrefix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasPrefix(FieldResourceKind, v))
+}
+
+// ResourceKindHasSuffix applies the HasSuffix predicate on the "resource_kind" field.
+func ResourceKindHasSuffix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasSuffix(FieldResourceKind, v))
+}
+
+// ResourceKindEqualFold applies the EqualFold predicate on the "resource_kind" field.
+func ResourceKindEqualFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEqualFold(FieldResourceKind, v))
+}
+
+// ResourceKindContainsFold applies the ContainsFold predicate on the "resource_kind" field.
+func ResourceKindContainsFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContainsFold(FieldResourceKind, v))
+}
+
+// ClientProtocolEQ applies the EQ predicate on the "client_protocol" field.
+func ClientProtocolEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldClientProtocol, v))
+}
+
+// ClientProtocolNEQ applies the NEQ predicate on the "client_protocol" field.
+func ClientProtocolNEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNEQ(FieldClientProtocol, v))
+}
+
+// ClientProtocolIn applies the In predicate on the "client_protocol" field.
+func ClientProtocolIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIn(FieldClientProtocol, vs...))
+}
+
+// ClientProtocolNotIn applies the NotIn predicate on the "client_protocol" field.
+func ClientProtocolNotIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotIn(FieldClientProtocol, vs...))
+}
+
+// ClientProtocolGT applies the GT predicate on the "client_protocol" field.
+func ClientProtocolGT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGT(FieldClientProtocol, v))
+}
+
+// ClientProtocolGTE applies the GTE predicate on the "client_protocol" field.
+func ClientProtocolGTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGTE(FieldClientProtocol, v))
+}
+
+// ClientProtocolLT applies the LT predicate on the "client_protocol" field.
+func ClientProtocolLT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLT(FieldClientProtocol, v))
+}
+
+// ClientProtocolLTE applies the LTE predicate on the "client_protocol" field.
+func ClientProtocolLTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLTE(FieldClientProtocol, v))
+}
+
+// ClientProtocolContains applies the Contains predicate on the "client_protocol" field.
+func ClientProtocolContains(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContains(FieldClientProtocol, v))
+}
+
+// ClientProtocolHasPrefix applies the HasPrefix predicate on the "client_protocol" field.
+func ClientProtocolHasPrefix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasPrefix(FieldClientProtocol, v))
+}
+
+// ClientProtocolHasSuffix applies the HasSuffix predicate on the "client_protocol" field.
+func ClientProtocolHasSuffix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasSuffix(FieldClientProtocol, v))
+}
+
+// ClientProtocolEqualFold applies the EqualFold predicate on the "client_protocol" field.
+func ClientProtocolEqualFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEqualFold(FieldClientProtocol, v))
+}
+
+// ClientProtocolContainsFold applies the ContainsFold predicate on the "client_protocol" field.
+func ClientProtocolContainsFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContainsFold(FieldClientProtocol, v))
 }
 
 // RuntimeRouteIDEQ applies the EQ predicate on the "runtime_route_id" field.
@@ -627,16 +777,6 @@ func RuntimeRouteIDHasPrefix(v string) predicate.RequestUsage {
 // RuntimeRouteIDHasSuffix applies the HasSuffix predicate on the "runtime_route_id" field.
 func RuntimeRouteIDHasSuffix(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldHasSuffix(FieldRuntimeRouteID, v))
-}
-
-// RuntimeRouteIDIsNil applies the IsNil predicate on the "runtime_route_id" field.
-func RuntimeRouteIDIsNil() predicate.RequestUsage {
-	return predicate.RequestUsage(sql.FieldIsNull(FieldRuntimeRouteID))
-}
-
-// RuntimeRouteIDNotNil applies the NotNil predicate on the "runtime_route_id" field.
-func RuntimeRouteIDNotNil() predicate.RequestUsage {
-	return predicate.RequestUsage(sql.FieldNotNull(FieldRuntimeRouteID))
 }
 
 // RuntimeRouteIDEqualFold applies the EqualFold predicate on the "runtime_route_id" field.
@@ -702,16 +842,6 @@ func UpstreamIDHasPrefix(v string) predicate.RequestUsage {
 // UpstreamIDHasSuffix applies the HasSuffix predicate on the "upstream_id" field.
 func UpstreamIDHasSuffix(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldHasSuffix(FieldUpstreamID, v))
-}
-
-// UpstreamIDIsNil applies the IsNil predicate on the "upstream_id" field.
-func UpstreamIDIsNil() predicate.RequestUsage {
-	return predicate.RequestUsage(sql.FieldIsNull(FieldUpstreamID))
-}
-
-// UpstreamIDNotNil applies the NotNil predicate on the "upstream_id" field.
-func UpstreamIDNotNil() predicate.RequestUsage {
-	return predicate.RequestUsage(sql.FieldNotNull(FieldUpstreamID))
 }
 
 // UpstreamIDEqualFold applies the EqualFold predicate on the "upstream_id" field.
@@ -1177,6 +1307,216 @@ func ErrorClassEqualFold(v string) predicate.RequestUsage {
 // ErrorClassContainsFold applies the ContainsFold predicate on the "error_class" field.
 func ErrorClassContainsFold(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldContainsFold(FieldErrorClass, v))
+}
+
+// RequestCompletenessEQ applies the EQ predicate on the "request_completeness" field.
+func RequestCompletenessEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessNEQ applies the NEQ predicate on the "request_completeness" field.
+func RequestCompletenessNEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNEQ(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessIn applies the In predicate on the "request_completeness" field.
+func RequestCompletenessIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIn(FieldRequestCompleteness, vs...))
+}
+
+// RequestCompletenessNotIn applies the NotIn predicate on the "request_completeness" field.
+func RequestCompletenessNotIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotIn(FieldRequestCompleteness, vs...))
+}
+
+// RequestCompletenessGT applies the GT predicate on the "request_completeness" field.
+func RequestCompletenessGT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGT(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessGTE applies the GTE predicate on the "request_completeness" field.
+func RequestCompletenessGTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGTE(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessLT applies the LT predicate on the "request_completeness" field.
+func RequestCompletenessLT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLT(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessLTE applies the LTE predicate on the "request_completeness" field.
+func RequestCompletenessLTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLTE(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessContains applies the Contains predicate on the "request_completeness" field.
+func RequestCompletenessContains(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContains(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessHasPrefix applies the HasPrefix predicate on the "request_completeness" field.
+func RequestCompletenessHasPrefix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasPrefix(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessHasSuffix applies the HasSuffix predicate on the "request_completeness" field.
+func RequestCompletenessHasSuffix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasSuffix(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessEqualFold applies the EqualFold predicate on the "request_completeness" field.
+func RequestCompletenessEqualFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEqualFold(FieldRequestCompleteness, v))
+}
+
+// RequestCompletenessContainsFold applies the ContainsFold predicate on the "request_completeness" field.
+func RequestCompletenessContainsFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContainsFold(FieldRequestCompleteness, v))
+}
+
+// SettlementStateEQ applies the EQ predicate on the "settlement_state" field.
+func SettlementStateEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldSettlementState, v))
+}
+
+// SettlementStateNEQ applies the NEQ predicate on the "settlement_state" field.
+func SettlementStateNEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNEQ(FieldSettlementState, v))
+}
+
+// SettlementStateIn applies the In predicate on the "settlement_state" field.
+func SettlementStateIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIn(FieldSettlementState, vs...))
+}
+
+// SettlementStateNotIn applies the NotIn predicate on the "settlement_state" field.
+func SettlementStateNotIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotIn(FieldSettlementState, vs...))
+}
+
+// SettlementStateGT applies the GT predicate on the "settlement_state" field.
+func SettlementStateGT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGT(FieldSettlementState, v))
+}
+
+// SettlementStateGTE applies the GTE predicate on the "settlement_state" field.
+func SettlementStateGTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGTE(FieldSettlementState, v))
+}
+
+// SettlementStateLT applies the LT predicate on the "settlement_state" field.
+func SettlementStateLT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLT(FieldSettlementState, v))
+}
+
+// SettlementStateLTE applies the LTE predicate on the "settlement_state" field.
+func SettlementStateLTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLTE(FieldSettlementState, v))
+}
+
+// SettlementStateContains applies the Contains predicate on the "settlement_state" field.
+func SettlementStateContains(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContains(FieldSettlementState, v))
+}
+
+// SettlementStateHasPrefix applies the HasPrefix predicate on the "settlement_state" field.
+func SettlementStateHasPrefix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasPrefix(FieldSettlementState, v))
+}
+
+// SettlementStateHasSuffix applies the HasSuffix predicate on the "settlement_state" field.
+func SettlementStateHasSuffix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasSuffix(FieldSettlementState, v))
+}
+
+// SettlementStateEqualFold applies the EqualFold predicate on the "settlement_state" field.
+func SettlementStateEqualFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEqualFold(FieldSettlementState, v))
+}
+
+// SettlementStateContainsFold applies the ContainsFold predicate on the "settlement_state" field.
+func SettlementStateContainsFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContainsFold(FieldSettlementState, v))
+}
+
+// SettlementRevisionEQ applies the EQ predicate on the "settlement_revision" field.
+func SettlementRevisionEQ(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldSettlementRevision, v))
+}
+
+// SettlementRevisionNEQ applies the NEQ predicate on the "settlement_revision" field.
+func SettlementRevisionNEQ(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNEQ(FieldSettlementRevision, v))
+}
+
+// SettlementRevisionIn applies the In predicate on the "settlement_revision" field.
+func SettlementRevisionIn(vs ...int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIn(FieldSettlementRevision, vs...))
+}
+
+// SettlementRevisionNotIn applies the NotIn predicate on the "settlement_revision" field.
+func SettlementRevisionNotIn(vs ...int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotIn(FieldSettlementRevision, vs...))
+}
+
+// SettlementRevisionGT applies the GT predicate on the "settlement_revision" field.
+func SettlementRevisionGT(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGT(FieldSettlementRevision, v))
+}
+
+// SettlementRevisionGTE applies the GTE predicate on the "settlement_revision" field.
+func SettlementRevisionGTE(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGTE(FieldSettlementRevision, v))
+}
+
+// SettlementRevisionLT applies the LT predicate on the "settlement_revision" field.
+func SettlementRevisionLT(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLT(FieldSettlementRevision, v))
+}
+
+// SettlementRevisionLTE applies the LTE predicate on the "settlement_revision" field.
+func SettlementRevisionLTE(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLTE(FieldSettlementRevision, v))
+}
+
+// BudgetRevisionEQ applies the EQ predicate on the "budget_revision" field.
+func BudgetRevisionEQ(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldBudgetRevision, v))
+}
+
+// BudgetRevisionNEQ applies the NEQ predicate on the "budget_revision" field.
+func BudgetRevisionNEQ(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNEQ(FieldBudgetRevision, v))
+}
+
+// BudgetRevisionIn applies the In predicate on the "budget_revision" field.
+func BudgetRevisionIn(vs ...int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIn(FieldBudgetRevision, vs...))
+}
+
+// BudgetRevisionNotIn applies the NotIn predicate on the "budget_revision" field.
+func BudgetRevisionNotIn(vs ...int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotIn(FieldBudgetRevision, vs...))
+}
+
+// BudgetRevisionGT applies the GT predicate on the "budget_revision" field.
+func BudgetRevisionGT(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGT(FieldBudgetRevision, v))
+}
+
+// BudgetRevisionGTE applies the GTE predicate on the "budget_revision" field.
+func BudgetRevisionGTE(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGTE(FieldBudgetRevision, v))
+}
+
+// BudgetRevisionLT applies the LT predicate on the "budget_revision" field.
+func BudgetRevisionLT(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLT(FieldBudgetRevision, v))
+}
+
+// BudgetRevisionLTE applies the LTE predicate on the "budget_revision" field.
+func BudgetRevisionLTE(v int64) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLTE(FieldBudgetRevision, v))
 }
 
 // IngestedAtEQ applies the EQ predicate on the "ingested_at" field.

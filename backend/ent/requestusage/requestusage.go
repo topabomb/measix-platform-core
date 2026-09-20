@@ -23,6 +23,10 @@ const (
 	FieldDeviceID = "device_id"
 	// FieldResourceID holds the string denoting the resource_id field in the database.
 	FieldResourceID = "resource_id"
+	// FieldResourceKind holds the string denoting the resource_kind field in the database.
+	FieldResourceKind = "resource_kind"
+	// FieldClientProtocol holds the string denoting the client_protocol field in the database.
+	FieldClientProtocol = "client_protocol"
 	// FieldRuntimeRouteID holds the string denoting the runtime_route_id field in the database.
 	FieldRuntimeRouteID = "runtime_route_id"
 	// FieldUpstreamID holds the string denoting the upstream_id field in the database.
@@ -49,6 +53,14 @@ const (
 	FieldDurationMs = "duration_ms"
 	// FieldErrorClass holds the string denoting the error_class field in the database.
 	FieldErrorClass = "error_class"
+	// FieldRequestCompleteness holds the string denoting the request_completeness field in the database.
+	FieldRequestCompleteness = "request_completeness"
+	// FieldSettlementState holds the string denoting the settlement_state field in the database.
+	FieldSettlementState = "settlement_state"
+	// FieldSettlementRevision holds the string denoting the settlement_revision field in the database.
+	FieldSettlementRevision = "settlement_revision"
+	// FieldBudgetRevision holds the string denoting the budget_revision field in the database.
+	FieldBudgetRevision = "budget_revision"
 	// FieldIngestedAt holds the string denoting the ingested_at field in the database.
 	FieldIngestedAt = "ingested_at"
 	// Table holds the table name of the requestusage in the database.
@@ -64,6 +76,8 @@ var Columns = []string{
 	FieldUserID,
 	FieldDeviceID,
 	FieldResourceID,
+	FieldResourceKind,
+	FieldClientProtocol,
 	FieldRuntimeRouteID,
 	FieldUpstreamID,
 	FieldManagedGeneration,
@@ -77,6 +91,10 @@ var Columns = []string{
 	FieldResponseBytes,
 	FieldDurationMs,
 	FieldErrorClass,
+	FieldRequestCompleteness,
+	FieldSettlementState,
+	FieldSettlementRevision,
+	FieldBudgetRevision,
 	FieldIngestedAt,
 }
 
@@ -126,6 +144,16 @@ func ByDeviceID(opts ...sql.OrderTermOption) OrderOption {
 // ByResourceID orders the results by the resource_id field.
 func ByResourceID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldResourceID, opts...).ToFunc()
+}
+
+// ByResourceKind orders the results by the resource_kind field.
+func ByResourceKind(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResourceKind, opts...).ToFunc()
+}
+
+// ByClientProtocol orders the results by the client_protocol field.
+func ByClientProtocol(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldClientProtocol, opts...).ToFunc()
 }
 
 // ByRuntimeRouteID orders the results by the runtime_route_id field.
@@ -191,6 +219,26 @@ func ByDurationMs(opts ...sql.OrderTermOption) OrderOption {
 // ByErrorClass orders the results by the error_class field.
 func ByErrorClass(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldErrorClass, opts...).ToFunc()
+}
+
+// ByRequestCompleteness orders the results by the request_completeness field.
+func ByRequestCompleteness(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestCompleteness, opts...).ToFunc()
+}
+
+// BySettlementState orders the results by the settlement_state field.
+func BySettlementState(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettlementState, opts...).ToFunc()
+}
+
+// BySettlementRevision orders the results by the settlement_revision field.
+func BySettlementRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettlementRevision, opts...).ToFunc()
+}
+
+// ByBudgetRevision orders the results by the budget_revision field.
+func ByBudgetRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBudgetRevision, opts...).ToFunc()
 }
 
 // ByIngestedAt orders the results by the ingested_at field.

@@ -397,6 +397,7 @@ async function waitForUsageIngestion(minRequests, maxWaitSeconds) {
       if (count >= minRequests) return
     }
   }
+  throw new Error(`usage ingestion did not reach ${minRequests} requests within ${maxWaitSeconds}s`)
 }
 
 try {
@@ -418,7 +419,7 @@ try {
 
   // Phase C: Wait for usage ingestion
   log('Phase C: Waiting for usage ingestion...')
-  await waitForUsageIngestion(2, 30)
+  await waitForUsageIngestion(4, 30)
   log('Phase C PASSED')
 
   // Phase D: Usage verification

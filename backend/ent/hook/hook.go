@@ -20,6 +20,114 @@ func (f ActivationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ActivationMutation", m)
 }
 
+// The BudgetAllocationFunc type is an adapter to allow the use of ordinary
+// function as BudgetAllocation mutator.
+type BudgetAllocationFunc func(context.Context, *ent.BudgetAllocationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetAllocationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetAllocationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetAllocationMutation", m)
+}
+
+// The BudgetAuditFunc type is an adapter to allow the use of ordinary
+// function as BudgetAudit mutator.
+type BudgetAuditFunc func(context.Context, *ent.BudgetAuditMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetAuditFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetAuditMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetAuditMutation", m)
+}
+
+// The BudgetBucketFunc type is an adapter to allow the use of ordinary
+// function as BudgetBucket mutator.
+type BudgetBucketFunc func(context.Context, *ent.BudgetBucketMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetBucketFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetBucketMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetBucketMutation", m)
+}
+
+// The BudgetLimitFunc type is an adapter to allow the use of ordinary
+// function as BudgetLimit mutator.
+type BudgetLimitFunc func(context.Context, *ent.BudgetLimitMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetLimitFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetLimitMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetLimitMutation", m)
+}
+
+// The BudgetReconciliationFunc type is an adapter to allow the use of ordinary
+// function as BudgetReconciliation mutator.
+type BudgetReconciliationFunc func(context.Context, *ent.BudgetReconciliationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetReconciliationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetReconciliationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetReconciliationMutation", m)
+}
+
+// The BudgetRequestFunc type is an adapter to allow the use of ordinary
+// function as BudgetRequest mutator.
+type BudgetRequestFunc func(context.Context, *ent.BudgetRequestMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetRequestFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetRequestMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetRequestMutation", m)
+}
+
+// The BudgetSettlementFunc type is an adapter to allow the use of ordinary
+// function as BudgetSettlement mutator.
+type BudgetSettlementFunc func(context.Context, *ent.BudgetSettlementMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetSettlementFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetSettlementMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetSettlementMutation", m)
+}
+
+// The DeletedCredentialFunc type is an adapter to allow the use of ordinary
+// function as DeletedCredential mutator.
+type DeletedCredentialFunc func(context.Context, *ent.DeletedCredentialMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DeletedCredentialFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DeletedCredentialMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeletedCredentialMutation", m)
+}
+
+// The DeletedPrincipalFunc type is an adapter to allow the use of ordinary
+// function as DeletedPrincipal mutator.
+type DeletedPrincipalFunc func(context.Context, *ent.DeletedPrincipalMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DeletedPrincipalFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DeletedPrincipalMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeletedPrincipalMutation", m)
+}
+
 // The DeploymentFunc type is an adapter to allow the use of ordinary
 // function as Deployment mutator.
 type DeploymentFunc func(context.Context, *ent.DeploymentMutation) (ent.Value, error)
@@ -224,6 +332,30 @@ func (f UpstreamConfigRevisionFunc) Mutate(ctx context.Context, m ent.Mutation) 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UpstreamConfigRevisionMutation", m)
 }
 
+// The UsageDetailFunc type is an adapter to allow the use of ordinary
+// function as UsageDetail mutator.
+type UsageDetailFunc func(context.Context, *ent.UsageDetailMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UsageDetailFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UsageDetailMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UsageDetailMutation", m)
+}
+
+// The UsageEventFunc type is an adapter to allow the use of ordinary
+// function as UsageEvent mutator.
+type UsageEventFunc func(context.Context, *ent.UsageEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UsageEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UsageEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UsageEventMutation", m)
+}
+
 // The UserFunc type is an adapter to allow the use of ordinary
 // function as User mutator.
 type UserFunc func(context.Context, *ent.UserMutation) (ent.Value, error)
@@ -234,6 +366,18 @@ func (f UserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserMutation", m)
+}
+
+// The UserBudgetFunc type is an adapter to allow the use of ordinary
+// function as UserBudget mutator.
+type UserBudgetFunc func(context.Context, *ent.UserBudgetMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UserBudgetFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UserBudgetMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserBudgetMutation", m)
 }
 
 // Condition is a hook condition function.

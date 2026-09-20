@@ -20,6 +20,7 @@ type SpoolStatus struct {
 }
 
 type SpoolStatusProvider func(context.Context) (SpoolStatus, error)
+type ApplyHook func(context.Context, relaycontrolapi.RuntimeControlState) error
 
 type handler struct {
 	relaycontrolapi.Unimplemented
@@ -27,11 +28,16 @@ type handler struct {
 	serviceToken string
 	buildVersion string
 	spoolStatus  SpoolStatusProvider
+	applyHook    ApplyHook
 }
 
-func NewHandler(store *Store, serviceToken, buildVersion string, statusProvider SpoolStatusProvider) http.Handler {
+func NewHandler(store *Store, serviceToken, buildVersion string, statusProvider SpoolStatusProvider, applyHooks ...ApplyHook) http.Handler {
+	var applyHook ApplyHook
+	if len(applyHooks) > 0 {
+		applyHook = applyHooks[0]
+	}
 	router := chi.NewRouter()
-	relaycontrolapi.HandlerFromMux(&handler{store: store, serviceToken: serviceToken, buildVersion: buildVersion, spoolStatus: statusProvider}, router)
+	relaycontrolapi.HandlerFromMux(&handler{store: store, serviceToken: serviceToken, buildVersion: buildVersion, spoolStatus: statusProvider, applyHook: applyHook}, router)
 	return router
 }
 
@@ -56,6 +62,12 @@ func (h *handler) ApplyControlState(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusUnprocessableEntity, "invalid_runtime_control", "Invalid runtime control")
 		}
 		return
+	}
+	if h.applyHook != nil {
+		if err := h.applyHook(r.Context(), input); err != nil {
+			writeProblem(w, http.StatusServiceUnavailable, "control_apply_incomplete", "Runtime control cleanup incomplete")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, ack)
 }

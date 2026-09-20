@@ -201,8 +201,8 @@ func seedUserData(t *testing.T, db *sql.DB) (userID, upstreamID, releaseID strin
 	}
 
 	// Insert a request usage
-	_, err = db.ExecContext(ctx, `INSERT INTO request_usages (request_id, deployment_id, user_id, resource_id, runtime_route_id, upstream_id, managed_generation, control_revision, started_at, completed_at, forwarded, http_status, request_bytes, response_bytes, duration_ms, ingested_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		"req_test_001", "dep_test_001", userID, "res_test_001", "rt_main", upstreamID, 1, 1, now, now.Add(100*time.Millisecond), 1, 200, 100, 200, 100, now)
+	_, err = db.ExecContext(ctx, `INSERT INTO request_usages (request_id, deployment_id, user_id, resource_id, resource_kind, client_protocol, runtime_route_id, upstream_id, managed_generation, control_revision, started_at, completed_at, forwarded, http_status, request_bytes, response_bytes, duration_ms, request_completeness, settlement_state, settlement_revision, budget_revision, ingested_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"req_test_001", "dep_test_001", userID, "mdl_test_001", "MODEL", "OPENAI_CHAT_COMPLETIONS", "rte_test_001", upstreamID, 1, 1, now, now.Add(100*time.Millisecond), 1, 200, 100, 200, 100, "EXACT", "SETTLED", 1, 0, now)
 	if err != nil {
 		t.Fatalf("insert request_usage: %v", err)
 	}

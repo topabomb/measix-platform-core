@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"measix/platform/internal/common/health"
+	"measix/platform/internal/relay/budget"
 	"measix/platform/internal/relay/control"
 	"measix/platform/internal/relay/metering"
 	relayruntime "measix/platform/internal/relay/runtime"
@@ -20,7 +21,7 @@ type App struct {
 	Spool            *metering.Spool
 }
 
-func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *metering.Recorder) *App {
+func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *metering.Recorder, budgetClient budget.Client) *App {
 	h := &health.State{}
 	store := control.NewStore(nil)
 
@@ -30,7 +31,7 @@ func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *met
 		h.SetReady(store.Current() != nil)
 		h.Ready(w, r)
 	})
-	pub.Handle("/runtime/v1/resources/*", relayruntime.NewHandlerWithRecorder(store, recorder))
+	pub.Handle("/runtime/v1/resources/*", relayruntime.NewHandler(store, recorder, budgetClient))
 
 	internal := chi.NewRouter()
 	internal.Get("/live", h.Live)
@@ -53,7 +54,13 @@ func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *met
 			return control.SpoolStatus{State: state, PendingCount: stats.PendingCount, OldestAgeSeconds: oldest}, nil
 		}
 	}
-	internal.Mount("/", control.NewHandler(store, serviceToken, buildVersion, statusProvider))
+	var applyHook control.ApplyHook
+	if spool != nil {
+		applyHook = func(ctx context.Context, state relaycontrolapi.RuntimeControlState) error {
+			return spool.PurgeUsers(ctx, state.PrincipalState.DeletedUserIds)
+		}
+	}
+	internal.Mount("/", control.NewHandler(store, serviceToken, buildVersion, statusProvider, applyHook))
 
 	return &App{Public: pub, Internal: internal, Health: h, Control: store, Recorder: recorder, Spool: spool}
 }

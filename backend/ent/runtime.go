@@ -3,17 +3,107 @@
 package ent
 
 import (
+	"measix/platform/ent/budgetallocation"
+	"measix/platform/ent/budgetaudit"
+	"measix/platform/ent/budgetbucket"
+	"measix/platform/ent/budgetlimit"
+	"measix/platform/ent/budgetrequest"
+	"measix/platform/ent/budgetsettlement"
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enterpriseupdate"
 	"measix/platform/ent/portalsession"
 	"measix/platform/ent/schema"
+	"measix/platform/ent/usageevent"
+	"measix/platform/ent/userbudget"
 )
 
 // The init function reads all schema descriptors with runtime code
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	budgetallocationFields := schema.BudgetAllocation{}.Fields()
+	_ = budgetallocationFields
+	// budgetallocationDescReservedQuantity is the schema descriptor for reserved_quantity field.
+	budgetallocationDescReservedQuantity := budgetallocationFields[7].Descriptor()
+	// budgetallocation.DefaultReservedQuantity holds the default value on creation for the reserved_quantity field.
+	budgetallocation.DefaultReservedQuantity = budgetallocationDescReservedQuantity.Default.(int64)
+	// budgetallocation.ReservedQuantityValidator is a validator for the "reserved_quantity" field. It is called by the builders before save.
+	budgetallocation.ReservedQuantityValidator = budgetallocationDescReservedQuantity.Validators[0].(func(int64) error)
+	// budgetallocationDescReservationReleased is the schema descriptor for reservation_released field.
+	budgetallocationDescReservationReleased := budgetallocationFields[8].Descriptor()
+	// budgetallocation.DefaultReservationReleased holds the default value on creation for the reservation_released field.
+	budgetallocation.DefaultReservationReleased = budgetallocationDescReservationReleased.Default.(bool)
+	// budgetallocationDescSettledQuantity is the schema descriptor for settled_quantity field.
+	budgetallocationDescSettledQuantity := budgetallocationFields[9].Descriptor()
+	// budgetallocation.DefaultSettledQuantity holds the default value on creation for the settled_quantity field.
+	budgetallocation.DefaultSettledQuantity = budgetallocationDescSettledQuantity.Default.(int64)
+	// budgetallocation.SettledQuantityValidator is a validator for the "settled_quantity" field. It is called by the builders before save.
+	budgetallocation.SettledQuantityValidator = budgetallocationDescSettledQuantity.Validators[0].(func(int64) error)
+	// budgetallocationDescResolved is the schema descriptor for resolved field.
+	budgetallocationDescResolved := budgetallocationFields[10].Descriptor()
+	// budgetallocation.DefaultResolved holds the default value on creation for the resolved field.
+	budgetallocation.DefaultResolved = budgetallocationDescResolved.Default.(bool)
+	budgetauditFields := schema.BudgetAudit{}.Fields()
+	_ = budgetauditFields
+	// budgetauditDescBudgetRevision is the schema descriptor for budget_revision field.
+	budgetauditDescBudgetRevision := budgetauditFields[4].Descriptor()
+	// budgetaudit.DefaultBudgetRevision holds the default value on creation for the budget_revision field.
+	budgetaudit.DefaultBudgetRevision = budgetauditDescBudgetRevision.Default.(int64)
+	// budgetaudit.BudgetRevisionValidator is a validator for the "budget_revision" field. It is called by the builders before save.
+	budgetaudit.BudgetRevisionValidator = budgetauditDescBudgetRevision.Validators[0].(func(int64) error)
+	budgetbucketFields := schema.BudgetBucket{}.Fields()
+	_ = budgetbucketFields
+	// budgetbucketDescSettledQuantity is the schema descriptor for settled_quantity field.
+	budgetbucketDescSettledQuantity := budgetbucketFields[6].Descriptor()
+	// budgetbucket.DefaultSettledQuantity holds the default value on creation for the settled_quantity field.
+	budgetbucket.DefaultSettledQuantity = budgetbucketDescSettledQuantity.Default.(int64)
+	// budgetbucket.SettledQuantityValidator is a validator for the "settled_quantity" field. It is called by the builders before save.
+	budgetbucket.SettledQuantityValidator = budgetbucketDescSettledQuantity.Validators[0].(func(int64) error)
+	// budgetbucketDescReservedQuantity is the schema descriptor for reserved_quantity field.
+	budgetbucketDescReservedQuantity := budgetbucketFields[7].Descriptor()
+	// budgetbucket.DefaultReservedQuantity holds the default value on creation for the reserved_quantity field.
+	budgetbucket.DefaultReservedQuantity = budgetbucketDescReservedQuantity.Default.(int64)
+	// budgetbucket.ReservedQuantityValidator is a validator for the "reserved_quantity" field. It is called by the builders before save.
+	budgetbucket.ReservedQuantityValidator = budgetbucketDescReservedQuantity.Validators[0].(func(int64) error)
+	budgetlimitFields := schema.BudgetLimit{}.Fields()
+	_ = budgetlimitFields
+	// budgetlimitDescLimitQuantity is the schema descriptor for limit_quantity field.
+	budgetlimitDescLimitQuantity := budgetlimitFields[5].Descriptor()
+	// budgetlimit.LimitQuantityValidator is a validator for the "limit_quantity" field. It is called by the builders before save.
+	budgetlimit.LimitQuantityValidator = budgetlimitDescLimitQuantity.Validators[0].(func(int64) error)
+	budgetrequestFields := schema.BudgetRequest{}.Fields()
+	_ = budgetrequestFields
+	// budgetrequestDescManagedGeneration is the schema descriptor for managed_generation field.
+	budgetrequestDescManagedGeneration := budgetrequestFields[10].Descriptor()
+	// budgetrequest.ManagedGenerationValidator is a validator for the "managed_generation" field. It is called by the builders before save.
+	budgetrequest.ManagedGenerationValidator = budgetrequestDescManagedGeneration.Validators[0].(func(int64) error)
+	// budgetrequestDescControlRevision is the schema descriptor for control_revision field.
+	budgetrequestDescControlRevision := budgetrequestFields[11].Descriptor()
+	// budgetrequest.ControlRevisionValidator is a validator for the "control_revision" field. It is called by the builders before save.
+	budgetrequest.ControlRevisionValidator = budgetrequestDescControlRevision.Validators[0].(func(int64) error)
+	// budgetrequestDescBudgetRevision is the schema descriptor for budget_revision field.
+	budgetrequestDescBudgetRevision := budgetrequestFields[13].Descriptor()
+	// budgetrequest.DefaultBudgetRevision holds the default value on creation for the budget_revision field.
+	budgetrequest.DefaultBudgetRevision = budgetrequestDescBudgetRevision.Default.(int64)
+	// budgetrequestDescLastSettlementRevision is the schema descriptor for last_settlement_revision field.
+	budgetrequestDescLastSettlementRevision := budgetrequestFields[21].Descriptor()
+	// budgetrequest.DefaultLastSettlementRevision holds the default value on creation for the last_settlement_revision field.
+	budgetrequest.DefaultLastSettlementRevision = budgetrequestDescLastSettlementRevision.Default.(int64)
+	// budgetrequest.LastSettlementRevisionValidator is a validator for the "last_settlement_revision" field. It is called by the builders before save.
+	budgetrequest.LastSettlementRevisionValidator = budgetrequestDescLastSettlementRevision.Validators[0].(func(int64) error)
+	// budgetrequestDescLastLifecycleRevision is the schema descriptor for last_lifecycle_revision field.
+	budgetrequestDescLastLifecycleRevision := budgetrequestFields[22].Descriptor()
+	// budgetrequest.DefaultLastLifecycleRevision holds the default value on creation for the last_lifecycle_revision field.
+	budgetrequest.DefaultLastLifecycleRevision = budgetrequestDescLastLifecycleRevision.Default.(int64)
+	// budgetrequest.LastLifecycleRevisionValidator is a validator for the "last_lifecycle_revision" field. It is called by the builders before save.
+	budgetrequest.LastLifecycleRevisionValidator = budgetrequestDescLastLifecycleRevision.Validators[0].(func(int64) error)
+	budgetsettlementFields := schema.BudgetSettlement{}.Fields()
+	_ = budgetsettlementFields
+	// budgetsettlementDescRevision is the schema descriptor for revision field.
+	budgetsettlementDescRevision := budgetsettlementFields[2].Descriptor()
+	// budgetsettlement.RevisionValidator is a validator for the "revision" field. It is called by the builders before save.
+	budgetsettlement.RevisionValidator = budgetsettlementDescRevision.Validators[0].(func(int64) error)
 	deploymentFields := schema.Deployment{}.Fields()
 	_ = deploymentFields
 	// deploymentDescTimezone is the schema descriptor for timezone field.
@@ -54,4 +144,16 @@ func init() {
 	portalsessionDescRevoked := portalsessionFields[8].Descriptor()
 	// portalsession.DefaultRevoked holds the default value on creation for the revoked field.
 	portalsession.DefaultRevoked = portalsessionDescRevoked.Default.(bool)
+	usageeventFields := schema.UsageEvent{}.Fields()
+	_ = usageeventFields
+	// usageeventDescRevision is the schema descriptor for revision field.
+	usageeventDescRevision := usageeventFields[2].Descriptor()
+	// usageevent.RevisionValidator is a validator for the "revision" field. It is called by the builders before save.
+	usageevent.RevisionValidator = usageeventDescRevision.Validators[0].(func(int64) error)
+	userbudgetFields := schema.UserBudget{}.Fields()
+	_ = userbudgetFields
+	// userbudgetDescRevision is the schema descriptor for revision field.
+	userbudgetDescRevision := userbudgetFields[5].Descriptor()
+	// userbudget.RevisionValidator is a validator for the "revision" field. It is called by the builders before save.
+	userbudget.RevisionValidator = userbudgetDescRevision.Validators[0].(func(int64) error)
 }

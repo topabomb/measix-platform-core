@@ -62,7 +62,7 @@ export interface paths {
         get: operations["getUser"];
         put: operations["updateUser"];
         post?: never;
-        delete?: never;
+        delete: operations["deleteUser"];
         options?: never;
         head?: never;
         patch?: never;
@@ -140,6 +140,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listDevices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/users/{userId}/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserBudgets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/users/{userId}/budgets/{capability}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["putUserBudget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/users/{userId}/budgets/{capability}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listUserBudgetAudit"];
         put?: never;
         post?: never;
         delete?: never;
@@ -406,6 +454,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/usage/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["usageTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/usage/distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["usageDistribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/usage/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listUsageUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/usage/reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listUsageReconciliations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/usage/reconciliations/{requestId}:resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resolveUsageReconciliation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/usage/requests": {
         parameters: {
             query?: never;
@@ -585,6 +713,7 @@ export interface components {
             type: string;
             title: string;
             status: number;
+            /** @description Stable machine-readable reason. Authentication uses unauthenticated; destructive user lifecycle values include delete_confirmation_mismatch, cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight. */
             code: string;
             detail?: string;
             requestId?: components["schemas"]["RequestId"];
@@ -592,6 +721,7 @@ export interface components {
             targetManagedGeneration?: number;
             currentDraftRevision?: number;
             forwarded?: boolean;
+            budget?: components["schemas"]["BudgetContext"];
         };
         ValidationIssue: {
             code: string;
@@ -764,6 +894,10 @@ export interface components {
             displayName: string;
             /** @enum {string} */
             role: "ADMIN" | "MEMBER";
+        };
+        DeleteUserRequest: {
+            confirmationUsername: string;
+            reason: string;
         };
         SetPasswordRequest: {
             newPassword: string;
@@ -981,6 +1115,169 @@ export interface components {
             items: components["schemas"]["Release"][];
             nextCursor?: string;
         };
+        /** @enum {string} */
+        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP";
+        /** @enum {string} */
+        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
+        /** @enum {string} */
+        BudgetCapability: "MODEL" | "TTS" | "ASR" | "MCP";
+        /** @enum {string} */
+        BudgetMode: "UNLIMITED" | "LIMITED";
+        /** @enum {string} */
+        BudgetSource: "DEFAULT" | "EXPLICIT";
+        /** @enum {string} */
+        BudgetPeriod: "DAY" | "WEEK" | "MONTH" | "LIFETIME";
+        /** @enum {string} */
+        BudgetStatus: "AVAILABLE" | "EXHAUSTED" | "PENDING_RECONCILIATION";
+        BudgetLimitDefinition: {
+            period: components["schemas"]["BudgetPeriod"];
+            meter: components["schemas"]["PricingMeter"];
+            limit: string;
+        };
+        BudgetLimitState: {
+            period: components["schemas"]["BudgetPeriod"];
+            meter: components["schemas"]["PricingMeter"];
+            limit: string;
+            used: string;
+            reserved: string;
+            remaining: string;
+            overage: string;
+            /** Format: date-time */
+            scopeStart: string;
+            /** Format: date-time */
+            resetAt?: string;
+        };
+        BudgetCapabilityView: {
+            capability: components["schemas"]["BudgetCapability"];
+            resourceId?: string;
+            mode: components["schemas"]["BudgetMode"];
+            source: components["schemas"]["BudgetSource"];
+            revision: number;
+            /** Format: date-time */
+            effectiveFrom: string;
+            /** Format: date-time */
+            asOf: string;
+            inFlightRequests: number;
+            limits: components["schemas"]["BudgetLimitState"][];
+            /** @description Retained cumulative usage history for this capability. It remains available for unlimited budgets and is independent of the current-window used and reserved values in limits. */
+            usageMeters: components["schemas"]["MeterQuantity"][];
+            status: components["schemas"]["BudgetStatus"];
+        };
+        UserBudgetView: {
+            userId: components["schemas"]["UserId"];
+            timezone: string;
+            items: components["schemas"]["BudgetCapabilityView"][];
+            /** Format: date-time */
+            asOf: string;
+        };
+        PutBudgetRequest: {
+            expectedRevision: number;
+            mode: components["schemas"]["BudgetMode"];
+            limits: components["schemas"]["BudgetLimitDefinition"][];
+            reason: string;
+        };
+        BudgetAuditItem: {
+            auditId: string;
+            userId: components["schemas"]["UserId"];
+            capability: components["schemas"]["BudgetCapability"];
+            previousRevision: number;
+            revision: number;
+            mode: components["schemas"]["BudgetMode"];
+            limits: components["schemas"]["BudgetLimitDefinition"][];
+            changedBy: string;
+            reason: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        BudgetAuditPage: {
+            items: components["schemas"]["BudgetAuditItem"][];
+            nextCursor?: string;
+        };
+        MeterQuantity: {
+            meter: components["schemas"]["PricingMeter"];
+            quantity: string;
+            /** @enum {string} */
+            confidence: "EXACT" | "PARTIAL" | "UNKNOWN";
+        };
+        BudgetContext: {
+            capability: components["schemas"]["BudgetCapability"];
+            mode: components["schemas"]["BudgetMode"];
+            revision: number;
+            blockers: components["schemas"]["BudgetLimitState"][];
+            /** Format: date-time */
+            resetAt?: string;
+            /** Format: date-time */
+            asOf: string;
+        };
+        UsageTrendPoint: {
+            /** Format: date */
+            date: string;
+            requestCount: number;
+            forwardedRequestCount: number;
+            semanticMeters: components["schemas"]["MeterQuantity"][];
+        };
+        UsageTrend: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            timezone: string;
+            points: components["schemas"]["UsageTrendPoint"][];
+        };
+        UsageDistributionItem: {
+            resourceKind: components["schemas"]["ResourceKind"];
+            clientProtocol: components["schemas"]["UsageClientProtocol"];
+            resourceId?: string;
+            resourceDisplayName?: string;
+            requestCount: number;
+            semanticMeters: components["schemas"]["MeterQuantity"][];
+        };
+        UsageDistribution: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            items: components["schemas"]["UsageDistributionItem"][];
+        };
+        UserUsageView: {
+            userId: components["schemas"]["UserId"];
+            userDisplayName: string;
+            requestCount: number;
+            semanticMeters: components["schemas"]["MeterQuantity"][];
+            budget: components["schemas"]["UserBudgetView"];
+        };
+        UserUsagePage: {
+            items: components["schemas"]["UserUsageView"][];
+            nextCursor?: string;
+        };
+        ReconciliationView: {
+            requestId: components["schemas"]["RequestId"];
+            userId: components["schemas"]["UserId"];
+            capability: components["schemas"]["BudgetCapability"];
+            /** @enum {string} */
+            state: "PENDING" | "RESOLVED";
+            reservation: components["schemas"]["MeterQuantity"][];
+            observed: components["schemas"]["MeterQuantity"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            resolvedAt?: string;
+            resolvedBy?: string;
+            resolutionReason?: string;
+        };
+        ReconciliationPage: {
+            items: components["schemas"]["ReconciliationView"][];
+            nextCursor?: string;
+        };
+        ResolveReconciliationRequest: {
+            /** @enum {string} */
+            expectedState: "PENDING";
+            /** @enum {string} */
+            action: "ACCEPT_OBSERVED" | "RELEASE_UNCERTAIN";
+            reason: string;
+        };
         UsageSummary: {
             /** Format: date-time */
             from: string;
@@ -991,12 +1288,7 @@ export interface components {
             requestCompleteness: components["schemas"]["RequestCompletenessCounts"];
             requestBytes: number;
             responseBytes: number;
-            semanticMeters: {
-                meter: components["schemas"]["PricingMeter"];
-                quantity: string;
-                /** @enum {string} */
-                confidence: "EXACT" | "PARTIAL" | "UNKNOWN";
-            }[];
+            semanticMeters: components["schemas"]["MeterQuantity"][];
             cost: {
                 /** @enum {string} */
                 status: "KNOWN" | "PARTIAL" | "UNKNOWN";
@@ -1017,6 +1309,8 @@ export interface components {
             userId: components["schemas"]["UserId"];
             deviceId?: components["schemas"]["DeviceId"];
             resourceId?: string;
+            resourceKind: components["schemas"]["ResourceKind"];
+            clientProtocol: components["schemas"]["UsageClientProtocol"];
             /** @description Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found. */
             resourceDisplayName?: string;
             /** @description Display name resolved from the users table. Always present, because a usage row cannot exist without its user. Display metadata, not authorization identity. */
@@ -1038,20 +1332,26 @@ export interface components {
             responseBytes: number;
             durationMs: number;
             errorClass?: string;
+            /** @enum {string} */
+            requestCompleteness: "EXACT" | "PARTIAL" | "UNKNOWN";
+            /** @enum {string} */
+            settlementState: "NOT_REQUIRED" | "PENDING" | "SETTLED" | "RECONCILIATION_REQUIRED";
+            semanticMeters: components["schemas"]["MeterQuantity"][];
+            budget?: components["schemas"]["BudgetContext"];
         };
         RequestUsagePage: {
             items: components["schemas"]["RequestUsageView"][];
             nextCursor?: string;
         };
         /**
-         * @description Standard meters per architecture s0-control-protocol §13.
-         *     MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+         * @description Standard meters per the S0.2 production usage and user budget contract.
+         *     MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
          *     TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
          *     ASR    → AUDIO_SECONDS + REQUESTS
          *     MCP    → REQUESTS
          * @enum {string}
          */
-        PricingMeter: "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS" | "REQUESTS";
+        PricingMeter: "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "TOTAL_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS" | "REQUESTS";
         PricingRule: {
             pricingRuleId: components["schemas"]["PricingRuleId"];
             resourceId?: string;
@@ -1372,6 +1672,40 @@ export interface operations {
             409: components["responses"]["Problem"];
         };
     };
+    deleteUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": components["schemas"]["IdempotencyKey"];
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Deletion accepted; runtime denial is applied before user-owned data is purged. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Activation"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
     disableUser: {
         parameters: {
             query?: never;
@@ -1514,6 +1848,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DevicePage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getUserBudgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Effective per-capability budget state for this user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBudgetView"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    putUserBudget: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+                capability: components["schemas"]["BudgetCapability"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutBudgetRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated effective budget state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetCapabilityView"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listUserBudgetAudit: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+                capability: components["schemas"]["BudgetCapability"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Immutable budget configuration and reconciliation audit history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetAuditPage"];
                 };
             };
             401: components["responses"]["Problem"];
@@ -2072,6 +2494,7 @@ export interface operations {
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
                 completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
             };
             header?: never;
             path?: never;
@@ -2093,6 +2516,166 @@ export interface operations {
             403: components["responses"]["Problem"];
         };
     };
+    usageTrend: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                userId?: string;
+                resourceId?: string;
+                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                upstreamId?: string;
+                status?: "SUCCESS" | "ERROR" | "BLOCKED";
+                completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily aggregates in the deployment timezone. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageTrend"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    usageDistribution: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                userId?: string;
+                resourceId?: string;
+                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                upstreamId?: string;
+                status?: "SUCCESS" | "ERROR" | "BLOCKED";
+                completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-side grouped usage distribution. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageDistribution"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    listUsageUsers: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+                from?: string;
+                to?: string;
+                resourceId?: string;
+                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                upstreamId?: string;
+                status?: "SUCCESS" | "ERROR" | "BLOCKED";
+                completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
+                /** @description Filter the user page by the effective cross-capability budget health. NEAR_LIMIT is an Admin-only 80 percent presentation threshold and does not affect admission. */
+                budgetStatus?: "EXHAUSTED" | "NEAR_LIMIT" | "PENDING_RECONCILIATION";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged per-user usage summaries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserUsagePage"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    listUsageReconciliations: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged requests whose admitted reservation and settlement require operator action. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationPage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    resolveUsageReconciliation: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                requestId: components["schemas"]["RequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveReconciliationRequest"];
+            };
+        };
+        responses: {
+            /** @description Resolved reconciliation record. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationView"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
     listUsageRequests: {
         parameters: {
             query?: {
@@ -2106,6 +2689,7 @@ export interface operations {
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
                 completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
             };
             header?: never;
             path?: never;

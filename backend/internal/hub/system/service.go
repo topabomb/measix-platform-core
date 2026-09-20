@@ -128,7 +128,7 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 }
 
 func semanticOrphanCount(ctx context.Context, client *ent.Client) (int, error) {
-	return client.SemanticUsage.Query().Where(semanticusage.RequestIDNotNil(), func(sel *sql.Selector) {
+	return client.SemanticUsage.Query().Where(func(sel *sql.Selector) {
 		request := sql.Table(requestusage.Table)
 		sel.Where(sql.Not(sql.Exists(sql.Select(request.C(requestusage.FieldID)).From(request).Where(sql.ColumnsEQ(request.C(requestusage.FieldRequestID), sel.C(semanticusage.FieldRequestID))))))
 	}).Count(ctx)

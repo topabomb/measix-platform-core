@@ -67,9 +67,11 @@ func TestI3ControlApplyAndRuntimeAdmission(t *testing.T) {
 			Use: relaycontrolapi.Sig, Kid: "i3-key", X: signer.PublicJWK()["x"],
 		}},
 		PrincipalState: relaycontrolapi.PrincipalState{
-			DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{},
+			DisabledUserIds: []string{}, DeletedUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{},
 		},
-		ResourceRoutes: []relaycontrolapi.ResourceRoute{{ResourceId: resourceID, RuntimeRouteId: routeID}},
+		ResourceRoutes: []relaycontrolapi.ResourceRoute{{
+			ResourceId: resourceID, RuntimeRouteId: routeID, ResourceKind: "MODEL", ClientProtocol: "OPENAI_CHAT_COMPLETIONS",
+		}},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{{
 			RuntimeRouteId: routeID, UpstreamId: upstreamID,
 			AllowedMethods: []string{http.MethodPost}, AllowedPathPrefixes: []string{"/v1/chat/completions"},
@@ -86,6 +88,7 @@ func TestI3ControlApplyAndRuntimeAdmission(t *testing.T) {
 		}},
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 	}
+	completeTestMeterProfiles(&state)
 	state.BundleHash, err = control.HashDescriptor(state)
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +114,7 @@ func TestI3ControlApplyAndRuntimeAdmission(t *testing.T) {
 		t.Fatalf("unexpected control status: status=%d body=%+v", statusResponse.StatusCode, status)
 	}
 
-	public := httptest.NewServer(relayruntime.NewHandler(store))
+	public := httptest.NewServer(relayruntime.NewHandler(store, &captureUsageRecorder{}, &allowBudgetClient{}))
 	defer public.Close()
 	accessToken, _, err := signer.Sign(userID, deviceID, sessionID)
 	if err != nil {
@@ -203,7 +206,7 @@ func minimalControlState(t *testing.T, revision, generation int) relaycontrolapi
 		ControlRevision: revision, ActiveManagedGeneration: generation,
 		DeploymentId:   platformid.New(platformid.Deployment),
 		AuthKeys:       []relaycontrolapi.PublicJwk{},
-		PrincipalState: relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
+		PrincipalState: relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, DeletedUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{}, Routes: []relaycontrolapi.RuntimeRouteSpec{}, Upstreams: []relaycontrolapi.RuntimeUpstreamSpec{},
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: 1 << 20},
 	}

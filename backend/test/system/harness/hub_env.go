@@ -211,7 +211,7 @@ func (e *HubEnv) StartRelay(ctx context.Context) error {
 		"--public-listen", fmt.Sprintf("127.0.0.1:%d", e.RelayPubPort),
 		"--internal-listen", fmt.Sprintf("127.0.0.1:%d", e.RelayIntPort),
 		"--spool", spoolPath,
-		"--hub-usage-url", fmt.Sprintf("%s/internal/v1/usage/request-events:batch", e.HubInternalBaseURL),
+		"--hub-internal-url", e.HubInternalBaseURL,
 		"--hub-service-token-file", e.RelayTokenFile,
 	)
 	if err != nil {

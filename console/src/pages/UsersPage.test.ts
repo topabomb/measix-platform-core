@@ -154,6 +154,45 @@ describe('UsersPage', () => {
     expect(body.role).toBeDefined()
   })
 
+  it('requires the exact username and a reason before permanently deleting a user', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') {
+        return { activationId: 'act_delete', kind: 'SECURITY_CHANGE', state: 'COMPLETED', controlRevision: 2, createdAt: '2026-09-20T00:00:00Z' }
+      }
+      if (path.includes('/devices')) return { items: [] }
+      if (path.includes('/usage/summary')) return { requestCount: 0, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0, semanticMeters: [], requestCompleteness: { exact: 0, partial: 0, unknown: 0 }, cost: { status: 'UNKNOWN' } }
+      if (path.endsWith('/budgets')) return { userId: 'usr_member', timezone: 'Asia/Shanghai', asOf: '2026-09-20T00:00:00Z', items: [] }
+      if (path.startsWith('/api/admin/v1/users')) return {
+        items: [{ userId: 'usr_member', username: 'member', displayName: 'Member User', role: 'MEMBER', status: 'ACTIVE' }],
+      }
+      return { items: [] }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+    ;(document.querySelector('[data-cy="delete-user-btn"]') as HTMLButtonElement).click()
+    await flushPromises()
+
+    const confirm = document.querySelector('[data-cy="confirm-delete-user"]') as HTMLButtonElement
+    expect(confirm.disabled).toBe(true)
+    const inputs = wrapper.findAllComponents(QInput)
+    await inputs.find(input => String(input.props('label')).includes('Type username'))!.setValue('member')
+    await inputs.find(input => input.props('label') === 'Deletion reason')!.setValue('Employment ended')
+    await flushPromises()
+    expect(confirm.disabled).toBe(false)
+    confirm.click()
+    await flushPromises()
+
+    const call = fetchSpy.mock.calls.find(([, init]) => init?.method === 'DELETE')!
+    expect(call[0]).toBe('/api/admin/v1/users/usr_member')
+    expect(JSON.parse(String(call[1]?.body))).toEqual({ confirmationUsername: 'member', reason: 'Employment ended' })
+    expect((call[1]?.headers as Record<string, string>)['Idempotency-Key']).toBeTruthy()
+  })
+
   it('generates an enrollment code and shows it in a dialog with copy button', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {

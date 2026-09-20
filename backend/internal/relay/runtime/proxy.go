@@ -59,8 +59,10 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 				}
 				observer := w.(*responseObserver)
 				observer.status = http.StatusSwitchingProtocols
-				observer.tunnel = newUpgradedStream(conn, time.Duration(route.TimeoutPolicy.IdleMs)*time.Millisecond, maxRequestBytes)
+				observer.tunnel = newUpgradedStream(conn, time.Duration(route.TimeoutPolicy.IdleMs)*time.Millisecond, maxRequestBytes, observer.observation, response.Header.Get("Sec-WebSocket-Extensions"))
 				response.Body = observer.tunnel
+			} else if observer, ok := w.(*responseObserver); ok && observer.observation != nil {
+				observer.observation.configureResponse(response)
 			}
 			sanitizeResponseHeaders(response.Header)
 			if response.StatusCode == http.StatusSwitchingProtocols {

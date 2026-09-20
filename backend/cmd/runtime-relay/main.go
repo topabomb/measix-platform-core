@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"measix/platform/internal/common/server"
 	"measix/platform/internal/relay/app"
+	relaybudget "measix/platform/internal/relay/budget"
 	"measix/platform/internal/relay/config"
 	"measix/platform/internal/relay/metering"
 )
@@ -47,9 +48,21 @@ func run(args []string, log *slog.Logger) error {
 	defer spool.Close()
 	recorder := metering.NewRecorder(spool)
 	recorder.Log = log
-	sender := metering.NewSender(spool, cfg.HubUsageURL, serviceToken)
+	sender := metering.NewSender(spool, strings.TrimRight(cfg.HubInternalURL, "/")+"/internal/v1/usage/settlements:batch", serviceToken)
 	sender.BatchSize = cfg.UsageBatchSize
-	a := app.New(serviceToken, buildVersion, spool, recorder)
+	budgetClient, err := relaybudget.NewHTTPClient(cfg.HubInternalURL, serviceToken, nil)
+	if err != nil {
+		return err
+	}
+	recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer recoveryCancel()
+	if err := metering.RecoverLifecycle(recoveryCtx, spool, budgetClient, recorder); err != nil {
+		return err
+	}
+	if err := sender.FlushOnce(recoveryCtx); err != nil {
+		return err
+	}
+	a := app.New(serviceToken, buildVersion, spool, recorder, budgetClient)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()

@@ -46,7 +46,7 @@ func TestPreviewDiffUsesLatestImmutableRelease(t *testing.T) {
 	content := draft.Content
 	content.Providers = append(content.Providers, adminapi.ProviderDefinition{
 		ProviderId: platformid.New(platformid.Provider), DisplayName: "New provider",
-		ClientProtocol: adminapi.OPENAICHATCOMPLETIONS, Enabled: true,
+		ClientProtocol: adminapi.ProviderDefinitionClientProtocolOPENAICHATCOMPLETIONS, Enabled: true,
 	})
 	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	if err != nil {

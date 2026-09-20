@@ -12,7 +12,7 @@ type Config struct {
 	PublicListenAddr    string
 	InternalListenAddr  string
 	SpoolPath           string
-	HubUsageURL         string
+	HubInternalURL      string
 	HubServiceTokenFile string
 	UsageBatchSize      int
 	UsageFlushInterval  time.Duration
@@ -37,7 +37,7 @@ func Load(args []string) (Config, error) {
 		PublicListenAddr:    env("RELAY_PUBLIC_LISTEN_ADDR", ":8090"),
 		InternalListenAddr:  env("RELAY_INTERNAL_LISTEN_ADDR", "127.0.0.1:8091"),
 		SpoolPath:           env("RELAY_SPOOL_PATH", "relay-spool.db"),
-		HubUsageURL:         env("HUB_USAGE_URL", ""),
+		HubInternalURL:      env("RELAY_HUB_INTERNAL_URL", ""),
 		HubServiceTokenFile: env("RELAY_HUB_SERVICE_TOKEN_FILE", ""),
 		UsageBatchSize:      batchSize,
 		UsageFlushInterval:  flushInterval,
@@ -46,7 +46,7 @@ func Load(args []string) (Config, error) {
 	fs.StringVar(&cfg.PublicListenAddr, "public-listen", cfg.PublicListenAddr, "public listen")
 	fs.StringVar(&cfg.InternalListenAddr, "internal-listen", cfg.InternalListenAddr, "internal listen")
 	fs.StringVar(&cfg.SpoolPath, "spool", cfg.SpoolPath, "usage spool path")
-	fs.StringVar(&cfg.HubUsageURL, "hub-usage-url", cfg.HubUsageURL, "Hub usage ingest URL")
+	fs.StringVar(&cfg.HubInternalURL, "hub-internal-url", cfg.HubInternalURL, "Hub private API base URL")
 	fs.StringVar(&cfg.HubServiceTokenFile, "hub-service-token-file", cfg.HubServiceTokenFile, "Hub internal service token file")
 	fs.IntVar(&cfg.UsageBatchSize, "usage-batch-size", cfg.UsageBatchSize, "usage batch size")
 	fs.DurationVar(&cfg.UsageFlushInterval, "usage-flush-interval", cfg.UsageFlushInterval, "usage flush interval")
@@ -57,7 +57,7 @@ func Load(args []string) (Config, error) {
 	if cfg.PublicListenAddr == cfg.InternalListenAddr {
 		return Config{}, errors.New("public and internal listeners must differ")
 	}
-	if cfg.SpoolPath == "" || cfg.HubUsageURL == "" || cfg.HubServiceTokenFile == "" {
+	if cfg.SpoolPath == "" || cfg.HubInternalURL == "" || cfg.HubServiceTokenFile == "" {
 		return Config{}, errors.New("missing required relay configuration")
 	}
 	if cfg.UsageBatchSize < 1 || cfg.UsageBatchSize > 200 || cfg.UsageFlushInterval <= 0 || cfg.ShutdownGrace <= 0 {

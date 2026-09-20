@@ -3,11 +3,211 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"time"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/hub/usage"
 	"measix/platform/internal/wire/adminapi"
 )
+
+func (h *fullAdminHandler) UsageTrend(w http.ResponseWriter, r *http.Request, params adminapi.UsageTrendParams) {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status), strPtr(params.ClientProtocol))
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
+		return
+	}
+	if params.Completeness != nil {
+		filter.Completeness = usage.Completeness(*params.Completeness)
+	}
+	trend, err := h.services.Usage.Trend(r.Context(), filter, h.services.Budget.Location)
+	if errors.Is(err, usage.ErrInvalidBatch) {
+		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", "Invalid usage filter")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	points := make([]adminapi.UsageTrendPoint, 0, len(trend.Points))
+	for _, point := range trend.Points {
+		points = append(points, adminapi.UsageTrendPoint{
+			Date: openapi_types.Date{Time: point.Date}, RequestCount: point.RequestCount,
+			ForwardedRequestCount: point.ForwardedRequestCount, SemanticMeters: adminMeterQuantities(point.Meters),
+		})
+	}
+	writeJSON(w, http.StatusOK, adminapi.UsageTrend{From: trend.From, To: trend.To, Timezone: trend.Timezone, Points: points})
+}
+
+func (h *fullAdminHandler) UsageDistribution(w http.ResponseWriter, r *http.Request, params adminapi.UsageDistributionParams) {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status), strPtr(params.ClientProtocol))
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
+		return
+	}
+	if params.Completeness != nil {
+		filter.Completeness = usage.Completeness(*params.Completeness)
+	}
+	distribution, err := h.services.Usage.Distribution(r.Context(), filter)
+	if errors.Is(err, usage.ErrInvalidBatch) {
+		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", "Invalid usage filter")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	items := make([]adminapi.UsageDistributionItem, 0, len(distribution.Items))
+	for _, item := range distribution.Items {
+		resourceID, resourceName := item.ResourceID, item.ResourceName
+		items = append(items, adminapi.UsageDistributionItem{
+			ResourceKind: adminapi.ResourceKind(item.ResourceKind), ClientProtocol: adminapi.UsageClientProtocol(item.ClientProtocol),
+			ResourceId: &resourceID, ResourceDisplayName: &resourceName, RequestCount: item.RequestCount,
+			SemanticMeters: adminMeterQuantities(item.Meters),
+		})
+	}
+	writeJSON(w, http.StatusOK, adminapi.UsageDistribution{From: distribution.From, To: distribution.To, Items: items})
+}
+
+func (h *fullAdminHandler) ListUsageUsers(w http.ResponseWriter, r *http.Request, params adminapi.ListUsageUsersParams) {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	limit := 50
+	if params.Limit != nil {
+		limit = *params.Limit
+	}
+	cursor := ""
+	if params.Cursor != nil {
+		cursor = *params.Cursor
+	}
+	filter, err := usageFilterFromParams(params.From, params.To, nil, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status), strPtr(params.ClientProtocol))
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
+		return
+	}
+	if params.Completeness != nil {
+		filter.Completeness = usage.Completeness(*params.Completeness)
+	}
+	page, err := h.services.Usage.ListUsers(r.Context(), filter, h.services.Budget, usage.UserBudgetFilter(valueOrEmptyString(strPtr(params.BudgetStatus))), limit, cursor)
+	if errors.Is(err, usage.ErrInvalidBatch) {
+		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", "Invalid usage filter or cursor")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	items := make([]adminapi.UserUsageView, 0, len(page.Items))
+	for _, item := range page.Items {
+		items = append(items, adminapi.UserUsageView{
+			UserId: item.UserID, UserDisplayName: item.DisplayName, RequestCount: item.RequestCount,
+			SemanticMeters: adminMeterQuantities(item.Meters),
+			Budget:         adminBudgetView(item.UserID, h.services.Budget.Location.String(), item.Budget, item.UsageMeters),
+		})
+	}
+	var next *string
+	if page.NextCursor != "" {
+		next = &page.NextCursor
+	}
+	writeJSON(w, http.StatusOK, adminapi.UserUsagePage{Items: items, NextCursor: next})
+}
+
+func (h *fullAdminHandler) ListUsageReconciliations(w http.ResponseWriter, r *http.Request, params adminapi.ListUsageReconciliationsParams) {
+	if _, err := h.authenticateAdmin(r, "", false); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	limit := 50
+	if params.Limit != nil {
+		limit = *params.Limit
+	}
+	cursor := ""
+	if params.Cursor != nil {
+		cursor = *params.Cursor
+	}
+	page, err := h.services.Budget.ListOpenReconciliations(r.Context(), budget.ReconciliationQuery{PageSize: limit, Cursor: cursor})
+	if errors.Is(err, budget.ErrInvalidConfiguration) {
+		writeProblem(w, http.StatusBadRequest, "invalid_reconciliation_query", "Invalid reconciliation query")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	items := make([]adminapi.ReconciliationView, 0, len(page.Items))
+	for _, item := range page.Items {
+		items = append(items, reconciliationWire(item, adminapi.ReconciliationViewStatePENDING, nil, nil, nil))
+	}
+	var next *string
+	if page.NextCursor != "" {
+		next = &page.NextCursor
+	}
+	writeJSON(w, http.StatusOK, adminapi.ReconciliationPage{Items: items, NextCursor: next})
+}
+
+func (h *fullAdminHandler) ResolveUsageReconciliation(w http.ResponseWriter, r *http.Request, requestID adminapi.RequestId, params adminapi.ResolveUsageReconciliationParams) {
+	principal, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	var request adminapi.ResolveReconciliationRequest
+	if decodeStrictJSON(r, &request) != nil || request.ExpectedState != adminapi.ResolveReconciliationRequestExpectedStatePENDING {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Expected state must be PENDING")
+		return
+	}
+	record, err := h.services.Budget.GetOpenReconciliation(r.Context(), requestID)
+	if errors.Is(err, budget.ErrReconciliationNotOpen) {
+		writeProblem(w, http.StatusConflict, "reconciliation_not_pending", "Reconciliation is no longer pending")
+		return
+	}
+	if errors.Is(err, budget.ErrInvalidConfiguration) || errors.Is(err, budget.ErrRequestNotFound) {
+		writeProblem(w, http.StatusNotFound, "reconciliation_not_found", "Reconciliation not found")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	action := budget.ResolutionReleaseUncertain
+	var meters []budget.MeterQuantity
+	if request.Action == adminapi.ACCEPTOBSERVED {
+		action = budget.ResolutionConfirmUsage
+		meters, err = reconciliationObserved(record.Allocations)
+	} else if request.Action != adminapi.RELEASEUNCERTAIN {
+		err = budget.ErrInvalidConfiguration
+	}
+	if err != nil {
+		writeProblem(w, http.StatusUnprocessableEntity, "invalid_reconciliation", "Persisted observed usage cannot be accepted")
+		return
+	}
+	if err := h.services.Budget.Resolve(r.Context(), budget.ResolveInput{
+		RequestID: requestID, Action: action, Revision: record.LastSettlementRevision + 1, Meters: meters,
+		ActorUserID: principal.UserID, Reason: request.Reason,
+	}); errors.Is(err, budget.ErrReconciliationNotOpen) || errors.Is(err, budget.ErrSettlementRevisionConflict) {
+		writeProblem(w, http.StatusConflict, "reconciliation_not_pending", "Reconciliation is no longer pending")
+		return
+	} else if errors.Is(err, budget.ErrInvalidConfiguration) || errors.Is(err, budget.ErrInvalidSettlement) {
+		writeProblem(w, http.StatusUnprocessableEntity, "invalid_reconciliation", "Invalid reconciliation resolution")
+		return
+	} else if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	resolvedAt, resolvedBy, reason := h.services.Budget.Now().UTC(), principal.UserID, request.Reason
+	writeJSON(w, http.StatusOK, reconciliationWire(record, adminapi.ReconciliationViewStateRESOLVED, &resolvedAt, &resolvedBy, &reason))
+}
 
 func (h *fullAdminHandler) ListUsageRequests(w http.ResponseWriter, r *http.Request, params adminapi.ListUsageRequestsParams) {
 	if _, err := h.authenticateAdmin(r, "", false); err != nil {
@@ -18,7 +218,7 @@ func (h *fullAdminHandler) ListUsageRequests(w http.ResponseWriter, r *http.Requ
 	if !valid {
 		return
 	}
-	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status))
+	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status), strPtr(params.ClientProtocol))
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
 		return
@@ -68,7 +268,7 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 		writeIdentityError(w, err)
 		return
 	}
-	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status))
+	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status), strPtr(params.ClientProtocol))
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
 		return
@@ -90,25 +290,19 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 		RequestCount: summary.RequestCount, ForwardedRequestCount: summary.ForwardedRequestCount,
 		RequestCompleteness: adminapi.RequestCompletenessCounts{Exact: summary.RequestCompleteness.Exact, Partial: summary.RequestCompleteness.Partial, Unknown: summary.RequestCompleteness.Unknown},
 		RequestBytes:        int(summary.RequestBytes), ResponseBytes: int(summary.ResponseBytes),
-		SemanticMeters: []struct {
-			Confidence adminapi.UsageSummarySemanticMetersConfidence `json:"confidence"`
-			Meter      adminapi.PricingMeter                         `json:"meter"`
-			Quantity   string                                        `json:"quantity"`
-		}{},
+		SemanticMeters: []adminapi.MeterQuantity{},
 	}
 	for _, meter := range summary.Meters {
-		confidence := adminapi.UsageSummarySemanticMetersConfidenceUNKNOWN
+		confidence := adminapi.MeterQuantityConfidenceUNKNOWN
 		switch meter.Confidence {
 		case usage.CompletenessComplete:
-			confidence = adminapi.UsageSummarySemanticMetersConfidenceEXACT
+			confidence = adminapi.MeterQuantityConfidenceEXACT
 		case usage.CompletenessPartial:
-			confidence = adminapi.UsageSummarySemanticMetersConfidencePARTIAL
+			confidence = adminapi.MeterQuantityConfidencePARTIAL
 		}
-		wire.SemanticMeters = append(wire.SemanticMeters, struct {
-			Confidence adminapi.UsageSummarySemanticMetersConfidence `json:"confidence"`
-			Meter      adminapi.PricingMeter                         `json:"meter"`
-			Quantity   string                                        `json:"quantity"`
-		}{Confidence: confidence, Meter: adminapi.PricingMeter(meter.Meter), Quantity: meter.Quantity})
+		wire.SemanticMeters = append(wire.SemanticMeters, adminapi.MeterQuantity{
+			Confidence: confidence, Meter: adminapi.PricingMeter(meter.Meter), Quantity: meter.Quantity,
+		})
 	}
 	wire.Cost.Status = adminapi.UsageSummaryCostStatusUNKNOWN
 	if summary.Cost.State == usage.CostKnown || summary.Cost.State == usage.CostPartial {
@@ -176,7 +370,7 @@ func (h *fullAdminHandler) PutPricing(w http.ResponseWriter, r *http.Request, pa
 	writeJSON(w, http.StatusOK, pricingSetWire(revision, rows))
 }
 
-func usageFilterFromParams(from, to *time.Time, userID, resourceID, resourceKind, upstreamID, status *string) (usage.Filter, error) {
+func usageFilterFromParams(from, to *time.Time, userID, resourceID, resourceKind, upstreamID, status, clientProtocol *string) (usage.Filter, error) {
 	filter := usage.Filter{From: from, To: to}
 	if userID != nil {
 		filter.UserID = *userID
@@ -193,6 +387,9 @@ func usageFilterFromParams(from, to *time.Time, userID, resourceID, resourceKind
 	if status != nil {
 		filter.Status = usage.RequestStatus(*status)
 	}
+	if clientProtocol != nil {
+		filter.ClientProtocol = *clientProtocol
+	}
 	return filter, nil
 }
 
@@ -204,17 +401,138 @@ func strPtr[T ~string](v *T) *string {
 	return &s
 }
 
+func valueOrEmptyString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 func requestUsageWire(row usage.RequestView) adminapi.RequestUsageView {
-	return adminapi.RequestUsageView{
+	semantic := make([]adminapi.MeterQuantity, 0, len(row.SemanticMeters))
+	for _, meter := range row.SemanticMeters {
+		semantic = append(semantic, adminapi.MeterQuantity{Meter: adminapi.PricingMeter(meter.Meter), Quantity: meter.Quantity, Confidence: adminMeterConfidence(meter.Confidence)})
+	}
+	result := adminapi.RequestUsageView{
 		RequestId: row.RequestID, InteractionId: row.InteractionID, DeploymentId: row.DeploymentID,
 		UserId: row.UserID, DeviceId: row.DeviceID, ResourceId: row.ResourceID, RuntimeRouteId: row.RuntimeRouteID,
+		ResourceKind: adminapi.ResourceKind(row.ResourceKind), ClientProtocol: adminapi.UsageClientProtocol(row.ClientProtocol),
 		ResourceDisplayName: row.ResourceDisplayName,
 		UserDisplayName:     row.UserDisplayName, DeviceName: row.DeviceName,
 		UpstreamId: row.UpstreamID, ManagedGeneration: row.ManagedGeneration, ControlRevision: row.ControlRevision,
 		StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, Forwarded: row.Forwarded,
 		HttpStatus: row.HTTPStatus, UpstreamHttpStatus: row.UpstreamHTTPStatus,
 		RequestBytes: row.RequestBytes, ResponseBytes: row.ResponseBytes, DurationMs: row.DurationMs, ErrorClass: row.ErrorClass,
+		RequestCompleteness: adminapi.RequestUsageViewRequestCompleteness(row.RequestCompleteness),
+		SettlementState:     adminapi.RequestUsageViewSettlementState(row.SettlementState), SemanticMeters: semantic,
 	}
+	if row.Budget != nil {
+		result.Budget = adminBudgetContext(*row.Budget)
+	}
+	return result
+}
+
+func adminMeterConfidence(value usage.Completeness) adminapi.MeterQuantityConfidence {
+	switch value {
+	case usage.CompletenessComplete:
+		return adminapi.MeterQuantityConfidenceEXACT
+	case usage.CompletenessPartial:
+		return adminapi.MeterQuantityConfidencePARTIAL
+	default:
+		return adminapi.MeterQuantityConfidenceUNKNOWN
+	}
+}
+
+func adminMeterQuantities(meters []usage.MeterSummary) []adminapi.MeterQuantity {
+	items := make([]adminapi.MeterQuantity, 0, len(meters))
+	for _, meter := range meters {
+		items = append(items, adminapi.MeterQuantity{
+			Meter: adminapi.PricingMeter(meter.Meter), Quantity: meter.Quantity,
+			Confidence: adminMeterConfidence(meter.Confidence),
+		})
+	}
+	return items
+}
+
+func reconciliationWire(record budget.ReconciliationRecord, state adminapi.ReconciliationViewState, resolvedAt *time.Time, resolvedBy, reason *string) adminapi.ReconciliationView {
+	reservationByMeter := make(map[budget.Meter]int64)
+	observedByMeter := make(map[budget.Meter]int64)
+	for _, allocation := range record.Allocations {
+		if allocation.Reserved > reservationByMeter[allocation.Meter] {
+			reservationByMeter[allocation.Meter] = allocation.Reserved
+		}
+		if allocation.Observed > observedByMeter[allocation.Meter] {
+			observedByMeter[allocation.Meter] = allocation.Observed
+		}
+	}
+	return adminapi.ReconciliationView{
+		RequestId: record.RequestID, UserId: record.UserID, Capability: adminapi.BudgetCapability(record.Capability), State: state,
+		Reservation: reconciliationMeterWire(reservationByMeter), Observed: reconciliationMeterWire(observedByMeter),
+		CreatedAt: record.OpenedAt, UpdatedAt: record.UpdatedAt, ResolvedAt: resolvedAt, ResolvedBy: resolvedBy, ResolutionReason: reason,
+	}
+}
+
+func reconciliationMeterWire(values map[budget.Meter]int64) []adminapi.MeterQuantity {
+	meters := make([]string, 0, len(values))
+	for meter := range values {
+		meters = append(meters, string(meter))
+	}
+	sort.Strings(meters)
+	items := make([]adminapi.MeterQuantity, 0, len(meters))
+	for _, name := range meters {
+		meter, divisor := budget.Meter(name), int64(1)
+		wireMeter := adminapi.PricingMeter(meter)
+		if meter == budget.MeterAudioMilliseconds {
+			wireMeter, divisor = adminapi.AUDIOSECONDS, 1000
+		}
+		items = append(items, adminapi.MeterQuantity{
+			Meter: wireMeter, Quantity: decimalUnits(values[meter], divisor), Confidence: adminapi.MeterQuantityConfidenceEXACT,
+		})
+	}
+	return items
+}
+
+func reconciliationObserved(allocations []budget.ReconciliationAllocation) ([]budget.MeterQuantity, error) {
+	quantities := make(map[budget.Meter]int64)
+	for _, allocation := range allocations {
+		if existing, ok := quantities[allocation.Meter]; ok && existing != allocation.Observed {
+			return nil, budget.ErrInvalidSettlement
+		}
+		quantities[allocation.Meter] = allocation.Observed
+	}
+	meters := make([]string, 0, len(quantities))
+	for meter := range quantities {
+		meters = append(meters, string(meter))
+	}
+	sort.Strings(meters)
+	items := make([]budget.MeterQuantity, 0, len(meters))
+	for _, name := range meters {
+		meter := budget.Meter(name)
+		items = append(items, budget.MeterQuantity{Meter: meter, Quantity: quantities[meter]})
+	}
+	return items, nil
+}
+
+func adminBudgetContext(decision budget.AdmissionDecision) *adminapi.BudgetContext {
+	blockers := make([]adminapi.BudgetLimitState, 0, len(decision.BlockingLimits))
+	for _, limit := range decision.BlockingLimits {
+		meter, divisor := adminapi.PricingMeter(limit.Meter), int64(1)
+		if limit.Meter == budget.MeterAudioMilliseconds {
+			meter, divisor = adminapi.AUDIOSECONDS, 1000
+		}
+		remaining := limit.Limit - limit.Used - limit.Reserved
+		overage := int64(0)
+		if remaining < 0 {
+			overage, remaining = -remaining, 0
+		}
+		blockers = append(blockers, adminapi.BudgetLimitState{
+			Meter: meter, Period: adminapi.BudgetPeriod(limit.Period), Limit: decimalUnits(limit.Limit, divisor),
+			Used: decimalUnits(limit.Used, divisor), Reserved: decimalUnits(limit.Reserved, divisor),
+			Remaining: decimalUnits(remaining, divisor), Overage: decimalUnits(overage, divisor),
+			ScopeStart: limit.ScopeStart, ResetAt: limit.ResetAt,
+		})
+	}
+	return &adminapi.BudgetContext{Capability: adminapi.BudgetCapability(decision.Capability), Mode: adminapi.BudgetMode(decision.Mode), Revision: int(decision.Revision), Blockers: blockers, ResetAt: decision.ResetAt, AsOf: decision.AsOf}
 }
 
 func pricingSetWire(revision int, rows []usage.PricingRuleRecord) adminapi.PricingSet {

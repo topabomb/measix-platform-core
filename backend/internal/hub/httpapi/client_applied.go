@@ -11,7 +11,7 @@ import (
 func (h *clientHandler) ReportManagedApplied(w http.ResponseWriter, r *http.Request) {
 	token, ok := bearerToken(r)
 	if !ok {
-		writeProblem(w, 401, "unauthorized", "Unauthorized")
+		writeProblem(w, 401, "unauthenticated", "Unauthenticated")
 		return
 	}
 	var report clientapi.ManagedAppliedReport

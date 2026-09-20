@@ -412,7 +412,7 @@ func TestRLYAUTH007RevokedDeviceSessionRejected(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusUnauthorized {
+		if resp.StatusCode != http.StatusForbidden {
 			t.Fatalf("revoked session not rejected: status=%d", resp.StatusCode)
 		}
 	})

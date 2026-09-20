@@ -80,6 +80,7 @@ async function selectOption(page: Page, selectCy: string, optionMatcher: string 
 }
 
 test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page }: { page: Page }) => {
+  const goldenUsername = `e2e-golden-${Date.now()}`
   // ========================================================================
   // Phase 1: Login as admin
   // ========================================================================
@@ -98,13 +99,26 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     const initialCount = await page.locator('[data-cy="user-row"]').count()
 
     await page.click('[data-cy="create-user-btn"]')
-    await page.fill('[data-cy="user-form-username"]', `e2e-golden-${Date.now()}`)
+    await page.fill('[data-cy="user-form-username"]', goldenUsername)
     await page.fill('[data-cy="user-form-display-name"]', 'E2E Golden Path User')
     await page.click('[data-cy="user-form-submit"]')
 
     await expect(page.locator('[data-cy="user-row"]')).toHaveCount(initialCount + 1)
 
-    await page.locator('[data-cy="user-row"]').last().click()
+    await page.locator('[data-cy="user-row"]').filter({ hasText: goldenUsername }).click()
+
+    const modelBudget = page.locator('[data-cy="budget-MODEL"]')
+    await expect(modelBudget).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('.budget-card[data-cy^="budget-"]')).toHaveCount(4)
+    await expect(modelBudget).toContainText('Deployment default')
+    await modelBudget.getByRole('button', { name: 'Edit budget' }).click()
+    await modelBudget.getByRole('button', { name: 'Limited', exact: true }).click()
+    await modelBudget.getByLabel('Limit', { exact: true }).fill('2')
+    await modelBudget.getByLabel('Reason for change').fill('Browser production budget verification')
+    await modelBudget.locator('[data-cy="save-budget"]').click()
+    await expect(modelBudget).toContainText('User override')
+    await expect(modelBudget).toContainText('2')
+    await page.screenshot({ path: '../.artifacts/admin-user-budget.png', fullPage: true })
 
     await page.click('[data-cy="generate-enrollment-btn"]')
     await expect(page.locator('[data-cy="enrollment-material-field"]')).toBeVisible({ timeout: 10_000 })
@@ -113,6 +127,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
 
     const codeField = page.locator('[data-cy="enrollment-code-field"]')
     await expect(codeField).not.toBeEmpty({ timeout: 10_000 })
+    const retiredEnrollmentCode = await codeField.inputValue()
     const materialField = page.locator('[data-cy="enrollment-material-field"]')
     const material = JSON.parse(await materialField.inputValue())
     expect(material).toEqual({
@@ -128,6 +143,42 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await expect(page.locator('[data-cy="copy-enrollment-material"]')).toBeVisible()
 
     await page.keyboard.press('Escape')
+
+    await page.locator('[data-cy="delete-user-btn"]').click()
+    const deleteConfirm = page.locator('[data-cy="confirm-delete-user"]')
+    await expect(deleteConfirm).toBeDisabled()
+    await page.locator('[data-cy="delete-user-confirmation"]').fill(`${goldenUsername}-wrong`)
+    await page.locator('[data-cy="delete-user-reason"]').fill('Remove isolated browser verification user')
+    await expect(deleteConfirm).toBeDisabled()
+    await page.locator('[data-cy="delete-user-confirmation"]').fill(goldenUsername)
+    await expect(deleteConfirm).toBeEnabled()
+    await deleteConfirm.click()
+    await expect(page.locator('[data-cy="user-row"]')).toHaveCount(initialCount)
+
+    await page.click('[data-cy="create-user-btn"]')
+    await page.fill('[data-cy="user-form-username"]', goldenUsername)
+    await page.fill('[data-cy="user-form-display-name"]', 'E2E Recreated User')
+    await page.click('[data-cy="user-form-submit"]')
+    await expect(page.locator('[data-cy="user-row"]')).toHaveCount(initialCount + 1)
+    await page.locator('[data-cy="user-row"]').filter({ hasText: goldenUsername }).click()
+
+    const freshModelBudget = page.locator('[data-cy="budget-MODEL"]')
+    await expect(freshModelBudget).toBeVisible({ timeout: 10_000 })
+    await expect(freshModelBudget).toContainText('Deployment default')
+    await expect(freshModelBudget).not.toContainText('User override')
+
+    await page.click('[data-cy="generate-enrollment-btn"]')
+    await expect(page.locator('[data-cy="enrollment-material-field"]')).toBeVisible({ timeout: 10_000 })
+    await page.locator('[data-cy="enrollment-code-details"] summary').click()
+    const freshEnrollmentCode = await page.locator('[data-cy="enrollment-code-field"]').inputValue()
+    expect(freshEnrollmentCode).not.toBe(retiredEnrollmentCode)
+    await page.keyboard.press('Escape')
+
+    await page.locator('[data-cy="delete-user-btn"]').click()
+    await page.locator('[data-cy="delete-user-confirmation"]').fill(goldenUsername)
+    await page.locator('[data-cy="delete-user-reason"]').fill('Remove recreated browser verification user')
+    await page.locator('[data-cy="confirm-delete-user"]').click()
+    await expect(page.locator('[data-cy="user-row"]')).toHaveCount(initialCount)
   })
 
   // ========================================================================

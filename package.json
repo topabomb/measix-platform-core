@@ -7,7 +7,7 @@
     "setup": "node scripts/dev-setup.mjs",
     "start": "concurrently -n hub,relay,console -c blue,magenta,green \"npm run start:hub\" \"npm run start:relay\" \"npm run start:console\"",
     "start:hub": "cd backend && go run ./cmd/control-hub run --listen :8080 --db ../.data/hub.db --master-key-file ../.secrets/master.key --jwt-private-key-file ../.secrets/jwt-ed25519.seed --relay-internal-url http://127.0.0.1:8091 --relay-service-token-file ../.secrets/relay-service.token",
-    "start:relay": "cd backend && go run ./cmd/runtime-relay --public-listen :8090 --internal-listen 127.0.0.1:8091 --spool ../.data/relay-spool.db --hub-usage-url http://127.0.0.1:8081/internal/v1/usage/request-events:batch --hub-service-token-file ../.secrets/relay-service.token",
+    "start:relay": "cd backend && go run ./cmd/runtime-relay --public-listen :8090 --internal-listen 127.0.0.1:8091 --spool ../.data/relay-spool.db --hub-internal-url http://127.0.0.1:8081 --hub-service-token-file ../.secrets/relay-service.token",
     "start:console": "pnpm -C console dev",
     "install:console": "pnpm -C console install",
     "dev": "npm run start",

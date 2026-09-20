@@ -15,7 +15,7 @@ import (
 func TestHUBUSG004UnknownPartialDoNotFabricateCost(t *testing.T) {
 	store := testutil.OpenStore(t)
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
-	_, upstreamID := seedUsageParents(t, store.Client, now)
+	_, _, upstreamID := seedUsageParents(t, store.Client, now)
 	resourceID := platformid.New(platformid.Model)
 	service := NewService(store.Client)
 
@@ -70,7 +70,7 @@ func TestHUBUSG004UnknownPartialDoNotFabricateCost(t *testing.T) {
 func TestHUBUSG006MissingMeterOrPriceGivesUnknownCost(t *testing.T) {
 	store := testutil.OpenStore(t)
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
-	_, upstreamID := seedUsageParents(t, store.Client, now)
+	_, _, upstreamID := seedUsageParents(t, store.Client, now)
 	resourceID := platformid.New(platformid.Model)
 	service := NewService(store.Client)
 
@@ -109,14 +109,37 @@ func TestHUBUSG006MissingMeterOrPriceGivesUnknownCost(t *testing.T) {
 
 // HUB-USG-007: decimal quantity/cost must have no binary floating point errors.
 // Use values that would produce rounding errors with float64.
-func TestHUBUSG007DecimalArithmeticNoFloatErrors(t *testing.T) {
+func TestPricingUsesSpecificEffectiveRuleAndDecimalArithmetic(t *testing.T) {
 	store := testutil.OpenStore(t)
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
-	_, upstreamID := seedUsageParents(t, store.Client, now)
+	_, _, upstreamID := seedUsageParents(t, store.Client, now)
 	resourceID := platformid.New(platformid.Model)
 	service := NewService(store.Client)
-
 	_, err := service.CreatePricingRule(context.Background(), PricingRuleInput{
+		UpstreamID: &upstreamID,
+		Meter:      "OUTPUT_TOKENS", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.001", Currency: "USD",
+		EffectiveFrom: now.Add(-24 * time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.CreatePricingRule(context.Background(), PricingRuleInput{
+		ResourceID: &resourceID, UpstreamID: &upstreamID,
+		Meter: "OUTPUT_TOKENS", UnitSizeDecimal: "1000", UnitPriceDecimal: "0.002", Currency: "USD",
+		EffectiveFrom: now.Add(-time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	specific, err := service.CalculateCost(context.Background(), CostInput{
+		UpstreamID: upstreamID, ResourceID: resourceID, Meter: "OUTPUT_TOKENS",
+		QuantityDecimal: "1500", Completeness: CompletenessComplete, OccurredAt: now,
+	})
+	if err != nil || specific.State != CostKnown || specific.AmountDecimal != "0.003" {
+		t.Fatalf("specific effective price not selected: result=%+v err=%v", specific, err)
+	}
+
+	_, err = service.CreatePricingRule(context.Background(), PricingRuleInput{
 		ResourceID: &resourceID, UpstreamID: &upstreamID,
 		Meter: "INPUT_TOKENS", UnitSizeDecimal: "3", UnitPriceDecimal: "0.1", Currency: "USD",
 		EffectiveFrom: now.Add(-time.Hour),

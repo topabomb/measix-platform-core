@@ -66,7 +66,7 @@ func TestHUBCAP002CandidateIDValidation(t *testing.T) {
 		providerID := content.Providers[0].ProviderId
 		content.Providers = append(content.Providers, adminapi.ProviderDefinition{
 			ProviderId:  providerID, // duplicate
-			DisplayName: "Duplicate", ClientProtocol: adminapi.OPENAICHATCOMPLETIONS, Enabled: true,
+			DisplayName: "Duplicate", ClientProtocol: adminapi.ProviderDefinitionClientProtocolOPENAICHATCOMPLETIONS, Enabled: true,
 		})
 		_, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 		if err == nil {

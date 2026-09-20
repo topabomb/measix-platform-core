@@ -14,7 +14,7 @@ import (
 )
 
 func TestRelayAppFailsClosedUntilControlApply(t *testing.T) {
-	a := app.New("relay-service-token", "relay-test-build", nil, nil)
+	a := app.New("relay-service-token", "relay-test-build", nil, nil, nil)
 
 	ready := httptest.NewRecorder()
 	a.Public.ServeHTTP(ready, httptest.NewRequest(http.MethodGet, "/ready", nil))
@@ -65,7 +65,7 @@ func TestRelayAppFailsClosedUntilControlApply(t *testing.T) {
 }
 
 func TestRelayInternalControlRequiresServiceCredential(t *testing.T) {
-	a := app.New("relay-service-token", "relay-test-build", nil, nil)
+	a := app.New("relay-service-token", "relay-test-build", nil, nil, nil)
 	request := httptest.NewRequest(http.MethodGet, "/internal/v1/control/status", nil)
 	response := httptest.NewRecorder()
 	a.Internal.ServeHTTP(response, request)
@@ -75,7 +75,7 @@ func TestRelayInternalControlRequiresServiceCredential(t *testing.T) {
 }
 
 func TestRelayStatusReportsOwnBuildBeforeControlApply(t *testing.T) {
-	a := app.New("relay-service-token", "relay-test-build", nil, nil)
+	a := app.New("relay-service-token", "relay-test-build", nil, nil, nil)
 	request := httptest.NewRequest(http.MethodGet, "/internal/v1/control/status", nil)
 	request.Header.Set("Authorization", "Bearer relay-service-token")
 	response := httptest.NewRecorder()

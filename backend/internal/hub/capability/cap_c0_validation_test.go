@@ -42,7 +42,7 @@ func TestCAPC0004TTSVoiceRequired(t *testing.T) {
 	content := validDraft(up.UpstreamID)
 	ttsID := platformid.New(platformid.TTS)
 	content.Tts = []adminapi.TtsDefinition{{
-		TtsId: ttsID, DisplayName: "Managed TTS", ClientProtocol: adminapi.OPENAIAUDIOSPEECH,
+		TtsId: ttsID, DisplayName: "Managed TTS", ClientProtocol: adminapi.TtsDefinitionClientProtocolOPENAIAUDIOSPEECH,
 		UpstreamModelKey: "tts-1", RuntimePath: "/v1/audio/speech", Enabled: true,
 		// voice intentionally empty — must be a validation error per CAP-C0-004
 	}}
@@ -161,7 +161,7 @@ func TestCAPC0007TTSUpstreamModelKeyRequired(t *testing.T) {
 	content := validDraft(up.UpstreamID)
 	ttsID := platformid.New(platformid.TTS)
 	content.Tts = []adminapi.TtsDefinition{{
-		TtsId: ttsID, DisplayName: "Managed TTS", ClientProtocol: adminapi.OPENAIAUDIOSPEECH,
+		TtsId: ttsID, DisplayName: "Managed TTS", ClientProtocol: adminapi.TtsDefinitionClientProtocolOPENAIAUDIOSPEECH,
 		UpstreamModelKey: "", Voice: "alloy", RuntimePath: "/v1/audio/speech", Enabled: true,
 		// upstreamModelKey intentionally empty — must be a validation error per CAP-C0-007
 	}}
@@ -265,10 +265,10 @@ func TestCurrentResourceTextAndModalitiesAreStrictlyValidated(t *testing.T) {
 	content.Models[0].UpstreamModelKey = ""
 	content.Models[0].InputModalities = nil
 	content.Models[0].OutputModalities = []adminapi.ModelDefinitionOutputModalities{}
-	content.Tts = []adminapi.TtsDefinition{{TtsId: platformid.New(platformid.TTS), DisplayName: " ", ClientProtocol: adminapi.OPENAIAUDIOSPEECH, UpstreamModelKey: "tts", Voice: "alloy", RuntimePath: "/tts"}}
+	content.Tts = []adminapi.TtsDefinition{{TtsId: platformid.New(platformid.TTS), DisplayName: " ", ClientProtocol: adminapi.TtsDefinitionClientProtocolOPENAIAUDIOSPEECH, UpstreamModelKey: "tts", Voice: "alloy", RuntimePath: "/tts"}}
 	language := " "
-	content.Asr = []adminapi.AsrDefinition{{AsrId: platformid.New(platformid.ASR), DisplayName: " ", ClientProtocol: adminapi.OPENAIAUDIOTRANSCRIPTIONS, UpstreamModelKey: "asr", Language: &language, RuntimePath: "/asr"}}
-	content.Mcp = []adminapi.McpDefinition{{McpServerId: platformid.New(platformid.MCP), DisplayName: " ", ClientProtocol: adminapi.MCPSTREAMABLEHTTP, AuthOwnership: adminapi.McpDefinitionAuthOwnershipNONE, RuntimePath: "/mcp"}}
+	content.Asr = []adminapi.AsrDefinition{{AsrId: platformid.New(platformid.ASR), DisplayName: " ", ClientProtocol: adminapi.AsrDefinitionClientProtocolOPENAIAUDIOTRANSCRIPTIONS, UpstreamModelKey: "asr", Language: &language, RuntimePath: "/asr"}}
+	content.Mcp = []adminapi.McpDefinition{{McpServerId: platformid.New(platformid.MCP), DisplayName: " ", ClientProtocol: adminapi.McpDefinitionClientProtocolMCPSTREAMABLEHTTP, AuthOwnership: adminapi.McpDefinitionAuthOwnershipNONE, RuntimePath: "/mcp"}}
 	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	if err != nil {
 		t.Fatal(err)

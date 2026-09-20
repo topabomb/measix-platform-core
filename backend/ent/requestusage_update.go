@@ -124,9 +124,31 @@ func (_u *RequestUsageUpdate) SetNillableResourceID(v *string) *RequestUsageUpda
 	return _u
 }
 
-// ClearResourceID clears the value of the "resource_id" field.
-func (_u *RequestUsageUpdate) ClearResourceID() *RequestUsageUpdate {
-	_u.mutation.ClearResourceID()
+// SetResourceKind sets the "resource_kind" field.
+func (_u *RequestUsageUpdate) SetResourceKind(v string) *RequestUsageUpdate {
+	_u.mutation.SetResourceKind(v)
+	return _u
+}
+
+// SetNillableResourceKind sets the "resource_kind" field if the given value is not nil.
+func (_u *RequestUsageUpdate) SetNillableResourceKind(v *string) *RequestUsageUpdate {
+	if v != nil {
+		_u.SetResourceKind(*v)
+	}
+	return _u
+}
+
+// SetClientProtocol sets the "client_protocol" field.
+func (_u *RequestUsageUpdate) SetClientProtocol(v string) *RequestUsageUpdate {
+	_u.mutation.SetClientProtocol(v)
+	return _u
+}
+
+// SetNillableClientProtocol sets the "client_protocol" field if the given value is not nil.
+func (_u *RequestUsageUpdate) SetNillableClientProtocol(v *string) *RequestUsageUpdate {
+	if v != nil {
+		_u.SetClientProtocol(*v)
+	}
 	return _u
 }
 
@@ -144,12 +166,6 @@ func (_u *RequestUsageUpdate) SetNillableRuntimeRouteID(v *string) *RequestUsage
 	return _u
 }
 
-// ClearRuntimeRouteID clears the value of the "runtime_route_id" field.
-func (_u *RequestUsageUpdate) ClearRuntimeRouteID() *RequestUsageUpdate {
-	_u.mutation.ClearRuntimeRouteID()
-	return _u
-}
-
 // SetUpstreamID sets the "upstream_id" field.
 func (_u *RequestUsageUpdate) SetUpstreamID(v string) *RequestUsageUpdate {
 	_u.mutation.SetUpstreamID(v)
@@ -161,12 +177,6 @@ func (_u *RequestUsageUpdate) SetNillableUpstreamID(v *string) *RequestUsageUpda
 	if v != nil {
 		_u.SetUpstreamID(*v)
 	}
-	return _u
-}
-
-// ClearUpstreamID clears the value of the "upstream_id" field.
-func (_u *RequestUsageUpdate) ClearUpstreamID() *RequestUsageUpdate {
-	_u.mutation.ClearUpstreamID()
 	return _u
 }
 
@@ -385,6 +395,76 @@ func (_u *RequestUsageUpdate) ClearErrorClass() *RequestUsageUpdate {
 	return _u
 }
 
+// SetRequestCompleteness sets the "request_completeness" field.
+func (_u *RequestUsageUpdate) SetRequestCompleteness(v string) *RequestUsageUpdate {
+	_u.mutation.SetRequestCompleteness(v)
+	return _u
+}
+
+// SetNillableRequestCompleteness sets the "request_completeness" field if the given value is not nil.
+func (_u *RequestUsageUpdate) SetNillableRequestCompleteness(v *string) *RequestUsageUpdate {
+	if v != nil {
+		_u.SetRequestCompleteness(*v)
+	}
+	return _u
+}
+
+// SetSettlementState sets the "settlement_state" field.
+func (_u *RequestUsageUpdate) SetSettlementState(v string) *RequestUsageUpdate {
+	_u.mutation.SetSettlementState(v)
+	return _u
+}
+
+// SetNillableSettlementState sets the "settlement_state" field if the given value is not nil.
+func (_u *RequestUsageUpdate) SetNillableSettlementState(v *string) *RequestUsageUpdate {
+	if v != nil {
+		_u.SetSettlementState(*v)
+	}
+	return _u
+}
+
+// SetSettlementRevision sets the "settlement_revision" field.
+func (_u *RequestUsageUpdate) SetSettlementRevision(v int64) *RequestUsageUpdate {
+	_u.mutation.ResetSettlementRevision()
+	_u.mutation.SetSettlementRevision(v)
+	return _u
+}
+
+// SetNillableSettlementRevision sets the "settlement_revision" field if the given value is not nil.
+func (_u *RequestUsageUpdate) SetNillableSettlementRevision(v *int64) *RequestUsageUpdate {
+	if v != nil {
+		_u.SetSettlementRevision(*v)
+	}
+	return _u
+}
+
+// AddSettlementRevision adds value to the "settlement_revision" field.
+func (_u *RequestUsageUpdate) AddSettlementRevision(v int64) *RequestUsageUpdate {
+	_u.mutation.AddSettlementRevision(v)
+	return _u
+}
+
+// SetBudgetRevision sets the "budget_revision" field.
+func (_u *RequestUsageUpdate) SetBudgetRevision(v int64) *RequestUsageUpdate {
+	_u.mutation.ResetBudgetRevision()
+	_u.mutation.SetBudgetRevision(v)
+	return _u
+}
+
+// SetNillableBudgetRevision sets the "budget_revision" field if the given value is not nil.
+func (_u *RequestUsageUpdate) SetNillableBudgetRevision(v *int64) *RequestUsageUpdate {
+	if v != nil {
+		_u.SetBudgetRevision(*v)
+	}
+	return _u
+}
+
+// AddBudgetRevision adds value to the "budget_revision" field.
+func (_u *RequestUsageUpdate) AddBudgetRevision(v int64) *RequestUsageUpdate {
+	_u.mutation.AddBudgetRevision(v)
+	return _u
+}
+
 // SetIngestedAt sets the "ingested_at" field.
 func (_u *RequestUsageUpdate) SetIngestedAt(v time.Time) *RequestUsageUpdate {
 	_u.mutation.SetIngestedAt(v)
@@ -464,20 +544,17 @@ func (_u *RequestUsageUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.ResourceID(); ok {
 		_spec.SetField(requestusage.FieldResourceID, field.TypeString, value)
 	}
-	if _u.mutation.ResourceIDCleared() {
-		_spec.ClearField(requestusage.FieldResourceID, field.TypeString)
+	if value, ok := _u.mutation.ResourceKind(); ok {
+		_spec.SetField(requestusage.FieldResourceKind, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ClientProtocol(); ok {
+		_spec.SetField(requestusage.FieldClientProtocol, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.RuntimeRouteID(); ok {
 		_spec.SetField(requestusage.FieldRuntimeRouteID, field.TypeString, value)
 	}
-	if _u.mutation.RuntimeRouteIDCleared() {
-		_spec.ClearField(requestusage.FieldRuntimeRouteID, field.TypeString)
-	}
 	if value, ok := _u.mutation.UpstreamID(); ok {
 		_spec.SetField(requestusage.FieldUpstreamID, field.TypeString, value)
-	}
-	if _u.mutation.UpstreamIDCleared() {
-		_spec.ClearField(requestusage.FieldUpstreamID, field.TypeString)
 	}
 	if value, ok := _u.mutation.ManagedGeneration(); ok {
 		_spec.SetField(requestusage.FieldManagedGeneration, field.TypeInt64, value)
@@ -538,6 +615,24 @@ func (_u *RequestUsageUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if _u.mutation.ErrorClassCleared() {
 		_spec.ClearField(requestusage.FieldErrorClass, field.TypeString)
+	}
+	if value, ok := _u.mutation.RequestCompleteness(); ok {
+		_spec.SetField(requestusage.FieldRequestCompleteness, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SettlementState(); ok {
+		_spec.SetField(requestusage.FieldSettlementState, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SettlementRevision(); ok {
+		_spec.SetField(requestusage.FieldSettlementRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedSettlementRevision(); ok {
+		_spec.AddField(requestusage.FieldSettlementRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.BudgetRevision(); ok {
+		_spec.SetField(requestusage.FieldBudgetRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedBudgetRevision(); ok {
+		_spec.AddField(requestusage.FieldBudgetRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.IngestedAt(); ok {
 		_spec.SetField(requestusage.FieldIngestedAt, field.TypeTime, value)
@@ -658,9 +753,31 @@ func (_u *RequestUsageUpdateOne) SetNillableResourceID(v *string) *RequestUsageU
 	return _u
 }
 
-// ClearResourceID clears the value of the "resource_id" field.
-func (_u *RequestUsageUpdateOne) ClearResourceID() *RequestUsageUpdateOne {
-	_u.mutation.ClearResourceID()
+// SetResourceKind sets the "resource_kind" field.
+func (_u *RequestUsageUpdateOne) SetResourceKind(v string) *RequestUsageUpdateOne {
+	_u.mutation.SetResourceKind(v)
+	return _u
+}
+
+// SetNillableResourceKind sets the "resource_kind" field if the given value is not nil.
+func (_u *RequestUsageUpdateOne) SetNillableResourceKind(v *string) *RequestUsageUpdateOne {
+	if v != nil {
+		_u.SetResourceKind(*v)
+	}
+	return _u
+}
+
+// SetClientProtocol sets the "client_protocol" field.
+func (_u *RequestUsageUpdateOne) SetClientProtocol(v string) *RequestUsageUpdateOne {
+	_u.mutation.SetClientProtocol(v)
+	return _u
+}
+
+// SetNillableClientProtocol sets the "client_protocol" field if the given value is not nil.
+func (_u *RequestUsageUpdateOne) SetNillableClientProtocol(v *string) *RequestUsageUpdateOne {
+	if v != nil {
+		_u.SetClientProtocol(*v)
+	}
 	return _u
 }
 
@@ -678,12 +795,6 @@ func (_u *RequestUsageUpdateOne) SetNillableRuntimeRouteID(v *string) *RequestUs
 	return _u
 }
 
-// ClearRuntimeRouteID clears the value of the "runtime_route_id" field.
-func (_u *RequestUsageUpdateOne) ClearRuntimeRouteID() *RequestUsageUpdateOne {
-	_u.mutation.ClearRuntimeRouteID()
-	return _u
-}
-
 // SetUpstreamID sets the "upstream_id" field.
 func (_u *RequestUsageUpdateOne) SetUpstreamID(v string) *RequestUsageUpdateOne {
 	_u.mutation.SetUpstreamID(v)
@@ -695,12 +806,6 @@ func (_u *RequestUsageUpdateOne) SetNillableUpstreamID(v *string) *RequestUsageU
 	if v != nil {
 		_u.SetUpstreamID(*v)
 	}
-	return _u
-}
-
-// ClearUpstreamID clears the value of the "upstream_id" field.
-func (_u *RequestUsageUpdateOne) ClearUpstreamID() *RequestUsageUpdateOne {
-	_u.mutation.ClearUpstreamID()
 	return _u
 }
 
@@ -919,6 +1024,76 @@ func (_u *RequestUsageUpdateOne) ClearErrorClass() *RequestUsageUpdateOne {
 	return _u
 }
 
+// SetRequestCompleteness sets the "request_completeness" field.
+func (_u *RequestUsageUpdateOne) SetRequestCompleteness(v string) *RequestUsageUpdateOne {
+	_u.mutation.SetRequestCompleteness(v)
+	return _u
+}
+
+// SetNillableRequestCompleteness sets the "request_completeness" field if the given value is not nil.
+func (_u *RequestUsageUpdateOne) SetNillableRequestCompleteness(v *string) *RequestUsageUpdateOne {
+	if v != nil {
+		_u.SetRequestCompleteness(*v)
+	}
+	return _u
+}
+
+// SetSettlementState sets the "settlement_state" field.
+func (_u *RequestUsageUpdateOne) SetSettlementState(v string) *RequestUsageUpdateOne {
+	_u.mutation.SetSettlementState(v)
+	return _u
+}
+
+// SetNillableSettlementState sets the "settlement_state" field if the given value is not nil.
+func (_u *RequestUsageUpdateOne) SetNillableSettlementState(v *string) *RequestUsageUpdateOne {
+	if v != nil {
+		_u.SetSettlementState(*v)
+	}
+	return _u
+}
+
+// SetSettlementRevision sets the "settlement_revision" field.
+func (_u *RequestUsageUpdateOne) SetSettlementRevision(v int64) *RequestUsageUpdateOne {
+	_u.mutation.ResetSettlementRevision()
+	_u.mutation.SetSettlementRevision(v)
+	return _u
+}
+
+// SetNillableSettlementRevision sets the "settlement_revision" field if the given value is not nil.
+func (_u *RequestUsageUpdateOne) SetNillableSettlementRevision(v *int64) *RequestUsageUpdateOne {
+	if v != nil {
+		_u.SetSettlementRevision(*v)
+	}
+	return _u
+}
+
+// AddSettlementRevision adds value to the "settlement_revision" field.
+func (_u *RequestUsageUpdateOne) AddSettlementRevision(v int64) *RequestUsageUpdateOne {
+	_u.mutation.AddSettlementRevision(v)
+	return _u
+}
+
+// SetBudgetRevision sets the "budget_revision" field.
+func (_u *RequestUsageUpdateOne) SetBudgetRevision(v int64) *RequestUsageUpdateOne {
+	_u.mutation.ResetBudgetRevision()
+	_u.mutation.SetBudgetRevision(v)
+	return _u
+}
+
+// SetNillableBudgetRevision sets the "budget_revision" field if the given value is not nil.
+func (_u *RequestUsageUpdateOne) SetNillableBudgetRevision(v *int64) *RequestUsageUpdateOne {
+	if v != nil {
+		_u.SetBudgetRevision(*v)
+	}
+	return _u
+}
+
+// AddBudgetRevision adds value to the "budget_revision" field.
+func (_u *RequestUsageUpdateOne) AddBudgetRevision(v int64) *RequestUsageUpdateOne {
+	_u.mutation.AddBudgetRevision(v)
+	return _u
+}
+
 // SetIngestedAt sets the "ingested_at" field.
 func (_u *RequestUsageUpdateOne) SetIngestedAt(v time.Time) *RequestUsageUpdateOne {
 	_u.mutation.SetIngestedAt(v)
@@ -1028,20 +1203,17 @@ func (_u *RequestUsageUpdateOne) sqlSave(ctx context.Context) (_node *RequestUsa
 	if value, ok := _u.mutation.ResourceID(); ok {
 		_spec.SetField(requestusage.FieldResourceID, field.TypeString, value)
 	}
-	if _u.mutation.ResourceIDCleared() {
-		_spec.ClearField(requestusage.FieldResourceID, field.TypeString)
+	if value, ok := _u.mutation.ResourceKind(); ok {
+		_spec.SetField(requestusage.FieldResourceKind, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ClientProtocol(); ok {
+		_spec.SetField(requestusage.FieldClientProtocol, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.RuntimeRouteID(); ok {
 		_spec.SetField(requestusage.FieldRuntimeRouteID, field.TypeString, value)
 	}
-	if _u.mutation.RuntimeRouteIDCleared() {
-		_spec.ClearField(requestusage.FieldRuntimeRouteID, field.TypeString)
-	}
 	if value, ok := _u.mutation.UpstreamID(); ok {
 		_spec.SetField(requestusage.FieldUpstreamID, field.TypeString, value)
-	}
-	if _u.mutation.UpstreamIDCleared() {
-		_spec.ClearField(requestusage.FieldUpstreamID, field.TypeString)
 	}
 	if value, ok := _u.mutation.ManagedGeneration(); ok {
 		_spec.SetField(requestusage.FieldManagedGeneration, field.TypeInt64, value)
@@ -1102,6 +1274,24 @@ func (_u *RequestUsageUpdateOne) sqlSave(ctx context.Context) (_node *RequestUsa
 	}
 	if _u.mutation.ErrorClassCleared() {
 		_spec.ClearField(requestusage.FieldErrorClass, field.TypeString)
+	}
+	if value, ok := _u.mutation.RequestCompleteness(); ok {
+		_spec.SetField(requestusage.FieldRequestCompleteness, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SettlementState(); ok {
+		_spec.SetField(requestusage.FieldSettlementState, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SettlementRevision(); ok {
+		_spec.SetField(requestusage.FieldSettlementRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedSettlementRevision(); ok {
+		_spec.AddField(requestusage.FieldSettlementRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.BudgetRevision(); ok {
+		_spec.SetField(requestusage.FieldBudgetRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedBudgetRevision(); ok {
+		_spec.AddField(requestusage.FieldBudgetRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.IngestedAt(); ok {
 		_spec.SetField(requestusage.FieldIngestedAt, field.TypeTime, value)

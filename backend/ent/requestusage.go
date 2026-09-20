@@ -29,6 +29,10 @@ type RequestUsage struct {
 	DeviceID *string `json:"device_id,omitempty"`
 	// ResourceID holds the value of the "resource_id" field.
 	ResourceID string `json:"resource_id,omitempty"`
+	// ResourceKind holds the value of the "resource_kind" field.
+	ResourceKind string `json:"resource_kind,omitempty"`
+	// ClientProtocol holds the value of the "client_protocol" field.
+	ClientProtocol string `json:"client_protocol,omitempty"`
 	// RuntimeRouteID holds the value of the "runtime_route_id" field.
 	RuntimeRouteID string `json:"runtime_route_id,omitempty"`
 	// UpstreamID holds the value of the "upstream_id" field.
@@ -55,6 +59,14 @@ type RequestUsage struct {
 	DurationMs int64 `json:"duration_ms,omitempty"`
 	// ErrorClass holds the value of the "error_class" field.
 	ErrorClass *string `json:"error_class,omitempty"`
+	// RequestCompleteness holds the value of the "request_completeness" field.
+	RequestCompleteness string `json:"request_completeness,omitempty"`
+	// SettlementState holds the value of the "settlement_state" field.
+	SettlementState string `json:"settlement_state,omitempty"`
+	// SettlementRevision holds the value of the "settlement_revision" field.
+	SettlementRevision int64 `json:"settlement_revision,omitempty"`
+	// BudgetRevision holds the value of the "budget_revision" field.
+	BudgetRevision int64 `json:"budget_revision,omitempty"`
 	// IngestedAt holds the value of the "ingested_at" field.
 	IngestedAt   time.Time `json:"ingested_at,omitempty"`
 	selectValues sql.SelectValues
@@ -67,9 +79,9 @@ func (*RequestUsage) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case requestusage.FieldForwarded:
 			values[i] = new(sql.NullBool)
-		case requestusage.FieldID, requestusage.FieldManagedGeneration, requestusage.FieldControlRevision, requestusage.FieldHTTPStatus, requestusage.FieldUpstreamHTTPStatus, requestusage.FieldRequestBytes, requestusage.FieldResponseBytes, requestusage.FieldDurationMs:
+		case requestusage.FieldID, requestusage.FieldManagedGeneration, requestusage.FieldControlRevision, requestusage.FieldHTTPStatus, requestusage.FieldUpstreamHTTPStatus, requestusage.FieldRequestBytes, requestusage.FieldResponseBytes, requestusage.FieldDurationMs, requestusage.FieldSettlementRevision, requestusage.FieldBudgetRevision:
 			values[i] = new(sql.NullInt64)
-		case requestusage.FieldRequestID, requestusage.FieldInteractionID, requestusage.FieldDeploymentID, requestusage.FieldUserID, requestusage.FieldDeviceID, requestusage.FieldResourceID, requestusage.FieldRuntimeRouteID, requestusage.FieldUpstreamID, requestusage.FieldErrorClass:
+		case requestusage.FieldRequestID, requestusage.FieldInteractionID, requestusage.FieldDeploymentID, requestusage.FieldUserID, requestusage.FieldDeviceID, requestusage.FieldResourceID, requestusage.FieldResourceKind, requestusage.FieldClientProtocol, requestusage.FieldRuntimeRouteID, requestusage.FieldUpstreamID, requestusage.FieldErrorClass, requestusage.FieldRequestCompleteness, requestusage.FieldSettlementState:
 			values[i] = new(sql.NullString)
 		case requestusage.FieldStartedAt, requestusage.FieldCompletedAt, requestusage.FieldIngestedAt:
 			values[i] = new(sql.NullTime)
@@ -131,6 +143,18 @@ func (_m *RequestUsage) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field resource_id", values[i])
 			} else if value.Valid {
 				_m.ResourceID = value.String
+			}
+		case requestusage.FieldResourceKind:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field resource_kind", values[i])
+			} else if value.Valid {
+				_m.ResourceKind = value.String
+			}
+		case requestusage.FieldClientProtocol:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field client_protocol", values[i])
+			} else if value.Valid {
+				_m.ClientProtocol = value.String
 			}
 		case requestusage.FieldRuntimeRouteID:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -212,6 +236,30 @@ func (_m *RequestUsage) assignValues(columns []string, values []any) error {
 				_m.ErrorClass = new(string)
 				*_m.ErrorClass = value.String
 			}
+		case requestusage.FieldRequestCompleteness:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field request_completeness", values[i])
+			} else if value.Valid {
+				_m.RequestCompleteness = value.String
+			}
+		case requestusage.FieldSettlementState:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_state", values[i])
+			} else if value.Valid {
+				_m.SettlementState = value.String
+			}
+		case requestusage.FieldSettlementRevision:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_revision", values[i])
+			} else if value.Valid {
+				_m.SettlementRevision = value.Int64
+			}
+		case requestusage.FieldBudgetRevision:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field budget_revision", values[i])
+			} else if value.Valid {
+				_m.BudgetRevision = value.Int64
+			}
 		case requestusage.FieldIngestedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field ingested_at", values[i])
@@ -276,6 +324,12 @@ func (_m *RequestUsage) String() string {
 	builder.WriteString("resource_id=")
 	builder.WriteString(_m.ResourceID)
 	builder.WriteString(", ")
+	builder.WriteString("resource_kind=")
+	builder.WriteString(_m.ResourceKind)
+	builder.WriteString(", ")
+	builder.WriteString("client_protocol=")
+	builder.WriteString(_m.ClientProtocol)
+	builder.WriteString(", ")
 	builder.WriteString("runtime_route_id=")
 	builder.WriteString(_m.RuntimeRouteID)
 	builder.WriteString(", ")
@@ -318,6 +372,18 @@ func (_m *RequestUsage) String() string {
 		builder.WriteString("error_class=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("request_completeness=")
+	builder.WriteString(_m.RequestCompleteness)
+	builder.WriteString(", ")
+	builder.WriteString("settlement_state=")
+	builder.WriteString(_m.SettlementState)
+	builder.WriteString(", ")
+	builder.WriteString("settlement_revision=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SettlementRevision))
+	builder.WriteString(", ")
+	builder.WriteString("budget_revision=")
+	builder.WriteString(fmt.Sprintf("%v", _m.BudgetRevision))
 	builder.WriteString(", ")
 	builder.WriteString("ingested_at=")
 	builder.WriteString(_m.IngestedAt.Format(time.ANSIC))

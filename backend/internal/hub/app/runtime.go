@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"measix/platform/internal/common/health"
 	"measix/platform/internal/hub/adminstatic"
+	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/config"
 	"measix/platform/internal/hub/enterpriseupdate"
@@ -150,7 +151,11 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	identityService.PortalStaticAvailable = portalHandler != nil
 	relayClient := runtimecontrol.NewHTTPRelayClient(cfg.RelayInternalURL, serviceCredential, client)
 	runtimeControl := runtimecontrol.NewService(st.Client, capabilityService, upstreamService, signer, relayClient)
-	usageService := usage.NewService(st.Client)
+	budgetService, err := budget.NewService(st.Client, deployment.Timezone)
+	if err != nil {
+		return closeOnError(fmt.Errorf("initialize budget service: %w", err))
+	}
+	usageService := usage.NewService(st.Client, budgetService)
 	systemService := system.New(st, runtimeControl, options.BuildVersion)
 	systemService.PortalMode = portalMode
 	if portalHandler != nil {
@@ -160,7 +165,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	systemService.PortalUpstream = portalUpstream
 	services := httpapi.Services{
 		Identity: identityService, Capability: capabilityService, Upstream: upstreamService,
-		RuntimeControl: runtimeControl, Usage: usageService, System: systemService,
+		RuntimeControl: runtimeControl, Usage: usageService, Budget: budgetService, System: systemService,
 		EnterpriseUpdate: enterpriseUpdateService, BuildVersion: options.BuildVersion,
 	}
 
@@ -184,7 +189,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	internalRouter := chi.NewRouter()
 	internalRouter.Get("/live", h.Live)
 	internalRouter.Get("/ready", h.Ready)
-	usageingestapi.HandlerFromMux(usage.NewHandler(usageService, serviceCredential), internalRouter)
+	usageingestapi.HandlerFromMux(usage.NewHandler(usageService, budgetService, serviceCredential), internalRouter)
 
 	// Relay connectivity is operational state. A failed startup reconcile leaves Runtime DEGRADED,
 	// while the fully initialized Admin/diagnostics surface remains available for recovery.

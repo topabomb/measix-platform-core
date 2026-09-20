@@ -69,6 +69,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/client/v1/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getClientBudgets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/v1/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPortalBudgets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/v1/usage/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPortalUsageSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/v1/usage/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPortalUsageTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/v1/usage/distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPortalUsageDistribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/v1/usage/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPortalUsageRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/v1/usage/requests/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPortalUsageRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/measix": {
         parameters: {
             query?: never;
@@ -279,11 +391,170 @@ export interface components {
         StarterId: string;
         EnterpriseUpdateId: string;
         Sha256Hash: string;
+        /** @enum {string} */
+        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP";
+        /** @enum {string} */
+        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
+        /** @enum {string} */
+        UsageMeter: "REQUESTS" | "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "TOTAL_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS";
+        /** @enum {string} */
+        UsageCompleteness: "EXACT" | "PARTIAL" | "UNKNOWN";
+        /** @enum {string} */
+        BudgetCapability: "MODEL" | "TTS" | "ASR" | "MCP";
+        /** @enum {string} */
+        BudgetMode: "UNLIMITED" | "LIMITED";
+        /** @enum {string} */
+        BudgetSource: "DEFAULT" | "EXPLICIT";
+        /** @enum {string} */
+        BudgetPeriod: "DAY" | "WEEK" | "MONTH" | "LIFETIME";
+        /** @enum {string} */
+        BudgetStatus: "AVAILABLE" | "EXHAUSTED" | "PENDING_RECONCILIATION";
+        MeterQuantity: {
+            meter: components["schemas"]["UsageMeter"];
+            quantity: string;
+            completeness: components["schemas"]["UsageCompleteness"];
+        };
+        BudgetLimitState: {
+            period: components["schemas"]["BudgetPeriod"];
+            meter: components["schemas"]["UsageMeter"];
+            limit: string;
+            used: string;
+            reserved: string;
+            remaining: string;
+            overage: string;
+            /** Format: date-time */
+            scopeStart: string;
+            /** Format: date-time */
+            resetAt?: string;
+        };
+        BudgetCapabilityView: {
+            capability: components["schemas"]["BudgetCapability"];
+            resourceId?: string;
+            mode: components["schemas"]["BudgetMode"];
+            source: components["schemas"]["BudgetSource"];
+            revision: number;
+            /** Format: date-time */
+            effectiveFrom: string;
+            /** Format: date-time */
+            asOf: string;
+            inFlightRequests: number;
+            limits: components["schemas"]["BudgetLimitState"][];
+            /** @description Retained cumulative usage history for this capability. It remains available for unlimited budgets and is independent of the current-window used and reserved values in limits. */
+            usageMeters: components["schemas"]["MeterQuantity"][];
+            status: components["schemas"]["BudgetStatus"];
+        };
+        UserBudgetView: {
+            userId: components["schemas"]["UserId"];
+            timezone: string;
+            items: components["schemas"]["BudgetCapabilityView"][];
+            /** Format: date-time */
+            asOf: string;
+        };
+        BudgetContext: {
+            capability: components["schemas"]["BudgetCapability"];
+            mode: components["schemas"]["BudgetMode"];
+            revision: number;
+            blockers: components["schemas"]["BudgetLimitState"][];
+            /** Format: date-time */
+            resetAt?: string;
+            /** Format: date-time */
+            asOf: string;
+        };
+        RuntimeBudgetContext: {
+            capability: components["schemas"]["BudgetCapability"];
+            resourceId?: string;
+            mode: components["schemas"]["BudgetMode"];
+            blockingLimits: components["schemas"]["RuntimeBudgetLimitState"][];
+            /** Format: date-time */
+            resetAt?: string | null;
+            /** Format: date-time */
+            asOf: string;
+        };
+        RuntimeBudgetLimitState: {
+            meter: components["schemas"]["UsageMeter"];
+            period: components["schemas"]["BudgetPeriod"];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            used: number;
+            /** Format: int64 */
+            reserved: number;
+            /** Format: date-time */
+            resetAt?: string | null;
+        };
+        UsageSummary: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            requestCount: number;
+            forwardedRequestCount: number;
+            requestBytes: number;
+            responseBytes: number;
+            semanticMeters: components["schemas"]["MeterQuantity"][];
+        };
+        UsageTrendPoint: {
+            /** Format: date */
+            date: string;
+            requestCount: number;
+            semanticMeters: components["schemas"]["MeterQuantity"][];
+        };
+        UsageTrend: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            timezone: string;
+            points: components["schemas"]["UsageTrendPoint"][];
+        };
+        UsageDistributionItem: {
+            resourceKind: components["schemas"]["ResourceKind"];
+            clientProtocol: components["schemas"]["UsageClientProtocol"];
+            resourceId?: string;
+            resourceDisplayName?: string;
+            requestCount: number;
+            semanticMeters: components["schemas"]["MeterQuantity"][];
+        };
+        UsageDistribution: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            items: components["schemas"]["UsageDistributionItem"][];
+        };
+        RequestUsageView: {
+            requestId: components["schemas"]["RequestId"];
+            interactionId?: components["schemas"]["InteractionId"];
+            resourceId?: string;
+            resourceDisplayName?: string;
+            resourceKind: components["schemas"]["ResourceKind"];
+            clientProtocol: components["schemas"]["UsageClientProtocol"];
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            completedAt: string;
+            forwarded: boolean;
+            httpStatus?: number;
+            requestBytes: number;
+            responseBytes: number;
+            durationMs: number;
+            errorClass?: string;
+            requestCompleteness: components["schemas"]["UsageCompleteness"];
+            /** @enum {string} */
+            settlementState: "NOT_REQUIRED" | "PENDING" | "SETTLED" | "RECONCILIATION_REQUIRED";
+            semanticMeters: components["schemas"]["MeterQuantity"][];
+            budget?: components["schemas"]["BudgetContext"];
+        };
+        RequestUsagePage: {
+            items: components["schemas"]["RequestUsageView"][];
+            nextCursor?: string;
+        };
         Problem: {
             /** @default about:blank */
             type: string;
             title: string;
             status: number;
+            /** @description Stable machine-readable reason. Authentication and lifecycle values include unauthenticated, invalid_credential, enrollment_expired, session_expired, enterprise_identity_deleted, user_disabled, device_revoked, session_revoked, enrollment_already_used, installation_user_conflict and refresh_conflict. */
             code: string;
             detail?: string;
             requestId?: components["schemas"]["RequestId"];
@@ -291,6 +562,7 @@ export interface components {
             targetManagedGeneration?: number;
             currentDraftRevision?: number;
             forwarded?: boolean;
+            budget?: components["schemas"]["RuntimeBudgetContext"];
         };
         ValidationIssue: {
             code: string;
@@ -681,6 +953,191 @@ export interface operations {
             };
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
+        };
+    };
+    getClientBudgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Effective budget state for the authenticated enterprise user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBudgetView"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getPortalBudgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Effective budget state for the restricted Portal session owner. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBudgetView"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getPortalUsageSummary: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                resourceKind?: components["schemas"]["ResourceKind"];
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage summary scoped to the Portal session owner. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSummary"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    getPortalUsageTrend: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                resourceKind?: components["schemas"]["ResourceKind"];
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily self-usage aggregates. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageTrend"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    getPortalUsageDistribution: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                resourceKind?: components["schemas"]["ResourceKind"];
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Self-usage distribution grouped by resource and protocol. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageDistribution"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    listPortalUsageRequests: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+                from?: string;
+                to?: string;
+                resourceKind?: components["schemas"]["ResourceKind"];
+                clientProtocol?: components["schemas"]["UsageClientProtocol"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paged self-usage request history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestUsagePage"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    getPortalUsageRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["schemas"]["RequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One request owned by the Portal session user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestUsageView"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     discover: {

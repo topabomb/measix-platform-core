@@ -682,7 +682,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	}
 	for i, value := range content.Tts {
 		resources[value.TtsId] = value.Enabled
-		if value.ClientProtocol != adminapi.SYSTEMTTS {
+		if value.ClientProtocol != adminapi.TtsDefinitionClientProtocolSYSTEMTTS {
 			runtimePaths[value.TtsId] = value.RuntimePath
 		}
 		resourceKinds[value.TtsId] = kindTTS
@@ -692,7 +692,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		if !value.ClientProtocol.Valid() {
 			addError("invalid_client_protocol", fmt.Sprintf("tts[%d].clientProtocol", i), "unsupported TTS client protocol", &kindTTS, ptrStr(value.TtsId), ptrStr("clientProtocol"))
 		}
-		if value.ClientProtocol == adminapi.SYSTEMTTS {
+		if value.ClientProtocol == adminapi.TtsDefinitionClientProtocolSYSTEMTTS {
 			deviceResources[value.TtsId] = true
 			if value.SpeechRate == nil || !(*value.SpeechRate > 0) || value.Pitch == nil || !(*value.Pitch > 0) {
 				addError("invalid_system_tts_settings", fmt.Sprintf("tts[%d]", i), "system TTS requires positive speechRate and pitch", &kindTTS, ptrStr(value.TtsId), nil)
@@ -705,7 +705,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		if value.SpeechRate != nil || value.Pitch != nil {
 			addError("cloud_tts_system_fields", fmt.Sprintf("tts[%d]", i), "cloud TTS must not contain system speech settings", &kindTTS, ptrStr(value.TtsId), nil)
 		}
-		isMiMo := value.ClientProtocol == adminapi.MIMOCHATCOMPLETIONSTTS
+		isMiMo := value.ClientProtocol == adminapi.TtsDefinitionClientProtocolMIMOCHATCOMPLETIONSTTS
 		voiceDesign := isMiMo && strings.Contains(strings.ToLower(value.UpstreamModelKey), "voicedesign")
 		if !isMiMo && value.VoiceDesignPrompt != "" {
 			addError("unexpected_voice_design_prompt", fmt.Sprintf("tts[%d].voiceDesignPrompt", i), "voiceDesignPrompt is only supported by MiMo TTS", &kindTTS, ptrStr(value.TtsId), ptrStr("voiceDesignPrompt"))
@@ -822,10 +822,10 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		if protocol, isASR := asrProtocols[binding.ResourceId]; isASR {
 			expectedTransport := adminapi.RuntimeBindingDefinitionTransportPolicyWEBSOCKET
 			expectedMethod := "GET"
-			if protocol == adminapi.OPENAIAUDIOTRANSCRIPTIONS {
+			if protocol == adminapi.AsrDefinitionClientProtocolOPENAIAUDIOTRANSCRIPTIONS {
 				expectedTransport = adminapi.RuntimeBindingDefinitionTransportPolicyHTTPMULTIPART
 				expectedMethod = "POST"
-			} else if protocol == adminapi.DASHSCOPEHTTPASR {
+			} else if protocol == adminapi.AsrDefinitionClientProtocolDASHSCOPEHTTPASR {
 				expectedTransport = adminapi.RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE
 				expectedMethod = "POST"
 			}

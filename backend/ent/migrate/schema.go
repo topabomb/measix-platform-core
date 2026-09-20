@@ -32,6 +32,279 @@ var (
 		Columns:    ActivationsColumns,
 		PrimaryKey: []*schema.Column{ActivationsColumns[0]},
 	}
+	// BudgetAllocationsColumns holds the columns for the "budget_allocations" table.
+	BudgetAllocationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "budget_limit_id", Type: field.TypeInt},
+		{Name: "budget_bucket_id", Type: field.TypeInt},
+		{Name: "scope_key", Type: field.TypeString},
+		{Name: "period", Type: field.TypeEnum, Enums: []string{"DAY", "WEEK", "MONTH", "LIFETIME"}},
+		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
+		{Name: "reserved_quantity", Type: field.TypeInt64, Default: 0},
+		{Name: "reservation_released", Type: field.TypeBool, Default: false},
+		{Name: "settled_quantity", Type: field.TypeInt64, Default: 0},
+		{Name: "resolved", Type: field.TypeBool, Default: false},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// BudgetAllocationsTable holds the schema information for the "budget_allocations" table.
+	BudgetAllocationsTable = &schema.Table{
+		Name:       "budget_allocations",
+		Columns:    BudgetAllocationsColumns,
+		PrimaryKey: []*schema.Column{BudgetAllocationsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgetallocation_request_id_scope_key_meter",
+				Unique:  true,
+				Columns: []*schema.Column{BudgetAllocationsColumns[1], BudgetAllocationsColumns[4], BudgetAllocationsColumns[6]},
+			},
+			{
+				Name:    "budgetallocation_budget_bucket_id",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetAllocationsColumns[3]},
+			},
+		},
+	}
+	// BudgetAuditsColumns holds the columns for the "budget_audits" table.
+	BudgetAuditsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "user_id", Type: field.TypeString},
+		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "TTS", "ASR", "MCP"}},
+		{Name: "user_budget_id", Type: field.TypeInt, Nullable: true},
+		{Name: "budget_revision", Type: field.TypeInt64, Default: 0},
+		{Name: "request_id", Type: field.TypeString, Nullable: true},
+		{Name: "actor_user_id", Type: field.TypeString},
+		{Name: "action", Type: field.TypeEnum, Enums: []string{"CREATE", "UPDATE", "RESOLVE_RECONCILIATION"}},
+		{Name: "reason", Type: field.TypeString},
+		{Name: "before_json", Type: field.TypeBytes, Nullable: true},
+		{Name: "after_json", Type: field.TypeBytes},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// BudgetAuditsTable holds the schema information for the "budget_audits" table.
+	BudgetAuditsTable = &schema.Table{
+		Name:       "budget_audits",
+		Columns:    BudgetAuditsColumns,
+		PrimaryKey: []*schema.Column{BudgetAuditsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgetaudit_user_id_capability_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetAuditsColumns[1], BudgetAuditsColumns[2], BudgetAuditsColumns[11]},
+			},
+			{
+				Name:    "budgetaudit_request_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetAuditsColumns[5], BudgetAuditsColumns[11]},
+			},
+		},
+	}
+	// BudgetBucketsColumns holds the columns for the "budget_buckets" table.
+	BudgetBucketsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "scope_key", Type: field.TypeString},
+		{Name: "period", Type: field.TypeEnum, Enums: []string{"DAY", "WEEK", "MONTH", "LIFETIME"}},
+		{Name: "period_start", Type: field.TypeTime},
+		{Name: "period_end", Type: field.TypeTime, Nullable: true},
+		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
+		{Name: "settled_quantity", Type: field.TypeInt64, Default: 0},
+		{Name: "reserved_quantity", Type: field.TypeInt64, Default: 0},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// BudgetBucketsTable holds the schema information for the "budget_buckets" table.
+	BudgetBucketsTable = &schema.Table{
+		Name:       "budget_buckets",
+		Columns:    BudgetBucketsColumns,
+		PrimaryKey: []*schema.Column{BudgetBucketsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgetbucket_scope_key_period_start_meter",
+				Unique:  true,
+				Columns: []*schema.Column{BudgetBucketsColumns[1], BudgetBucketsColumns[3], BudgetBucketsColumns[5]},
+			},
+			{
+				Name:    "budgetbucket_period_end",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetBucketsColumns[4]},
+			},
+		},
+	}
+	// BudgetLimitsColumns holds the columns for the "budget_limits" table.
+	BudgetLimitsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "user_budget_id", Type: field.TypeInt},
+		{Name: "scope_key", Type: field.TypeString},
+		{Name: "period", Type: field.TypeEnum, Enums: []string{"DAY", "WEEK", "MONTH", "LIFETIME"}},
+		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
+		{Name: "limit_quantity", Type: field.TypeInt64},
+		{Name: "scope_started_at", Type: field.TypeTime},
+		{Name: "effective_from", Type: field.TypeTime},
+		{Name: "effective_to", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "created_by_user_id", Type: field.TypeString},
+	}
+	// BudgetLimitsTable holds the schema information for the "budget_limits" table.
+	BudgetLimitsTable = &schema.Table{
+		Name:       "budget_limits",
+		Columns:    BudgetLimitsColumns,
+		PrimaryKey: []*schema.Column{BudgetLimitsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgetlimit_user_budget_id_scope_key_meter_effective_from",
+				Unique:  true,
+				Columns: []*schema.Column{BudgetLimitsColumns[1], BudgetLimitsColumns[2], BudgetLimitsColumns[4], BudgetLimitsColumns[7]},
+			},
+			{
+				Name:    "budgetlimit_user_budget_id_effective_from_effective_to",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetLimitsColumns[1], BudgetLimitsColumns[7], BudgetLimitsColumns[8]},
+			},
+			{
+				Name:    "budgetlimit_scope_key_meter_effective_from",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetLimitsColumns[2], BudgetLimitsColumns[4], BudgetLimitsColumns[7]},
+			},
+		},
+	}
+	// BudgetReconciliationsColumns holds the columns for the "budget_reconciliations" table.
+	BudgetReconciliationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "state", Type: field.TypeEnum, Enums: []string{"OPEN", "RESOLVED"}},
+		{Name: "reason", Type: field.TypeString},
+		{Name: "opened_at", Type: field.TypeTime},
+		{Name: "resolved_at", Type: field.TypeTime, Nullable: true},
+		{Name: "resolved_by_actor", Type: field.TypeString, Nullable: true},
+		{Name: "resolution_action", Type: field.TypeEnum, Nullable: true, Enums: []string{"RELIABLE_SETTLEMENT", "CONFIRM_USAGE", "RELEASE_UNCERTAIN"}},
+		{Name: "resolution_reason", Type: field.TypeString, Nullable: true},
+		{Name: "request_id", Type: field.TypeString, Unique: true},
+	}
+	// BudgetReconciliationsTable holds the schema information for the "budget_reconciliations" table.
+	BudgetReconciliationsTable = &schema.Table{
+		Name:       "budget_reconciliations",
+		Columns:    BudgetReconciliationsColumns,
+		PrimaryKey: []*schema.Column{BudgetReconciliationsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "budget_reconciliations_budget_requests_reconciliation",
+				Columns:    []*schema.Column{BudgetReconciliationsColumns[8]},
+				RefColumns: []*schema.Column{BudgetRequestsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgetreconciliation_request_id_state",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetReconciliationsColumns[8], BudgetReconciliationsColumns[1]},
+			},
+			{
+				Name:    "budgetreconciliation_state_opened_at",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetReconciliationsColumns[1], BudgetReconciliationsColumns[3]},
+			},
+		},
+	}
+	// BudgetRequestsColumns holds the columns for the "budget_requests" table.
+	BudgetRequestsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "request_hash", Type: field.TypeString},
+		{Name: "deployment_id", Type: field.TypeString},
+		{Name: "user_id", Type: field.TypeString},
+		{Name: "interaction_id", Type: field.TypeString, Nullable: true},
+		{Name: "device_id", Type: field.TypeString, Nullable: true},
+		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "TTS", "ASR", "MCP"}},
+		{Name: "resource_id", Type: field.TypeString},
+		{Name: "client_protocol", Type: field.TypeString},
+		{Name: "upstream_id", Type: field.TypeString},
+		{Name: "managed_generation", Type: field.TypeInt64},
+		{Name: "control_revision", Type: field.TypeInt64},
+		{Name: "user_budget_id", Type: field.TypeInt, Nullable: true},
+		{Name: "budget_revision", Type: field.TypeInt64, Default: 0},
+		{Name: "mode", Type: field.TypeEnum, Enums: []string{"UNLIMITED", "LIMITED"}},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"DEFAULT", "EXPLICIT"}},
+		{Name: "decision_json", Type: field.TypeBytes},
+		{Name: "state", Type: field.TypeEnum, Enums: []string{"DENIED", "ADMITTED", "STARTED", "RECONCILIATION", "SETTLED", "RELEASED", "RESOLVED"}},
+		{Name: "admitted_at", Type: field.TypeTime},
+		{Name: "started_at", Type: field.TypeTime, Nullable: true},
+		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_settlement_revision", Type: field.TypeInt64, Default: 0},
+		{Name: "last_lifecycle_revision", Type: field.TypeInt64, Default: 0},
+		{Name: "last_lifecycle_hash", Type: field.TypeString, Nullable: true},
+		{Name: "terminal_reason", Type: field.TypeString, Nullable: true},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// BudgetRequestsTable holds the schema information for the "budget_requests" table.
+	BudgetRequestsTable = &schema.Table{
+		Name:       "budget_requests",
+		Columns:    BudgetRequestsColumns,
+		PrimaryKey: []*schema.Column{BudgetRequestsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgetrequest_user_id_capability_state",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetRequestsColumns[3], BudgetRequestsColumns[6], BudgetRequestsColumns[17]},
+			},
+			{
+				Name:    "budgetrequest_state_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetRequestsColumns[17], BudgetRequestsColumns[25]},
+			},
+		},
+	}
+	// BudgetSettlementsColumns holds the columns for the "budget_settlements" table.
+	BudgetSettlementsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "revision", Type: field.TypeInt64},
+		{Name: "payload_hash", Type: field.TypeString},
+		{Name: "meters_json", Type: field.TypeBytes},
+		{Name: "complete", Type: field.TypeBool},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"RELAY", "ADMIN"}},
+		{Name: "outcome", Type: field.TypeEnum, Enums: []string{"SETTLED", "CORRECTED", "RECONCILIATION"}},
+		{Name: "reported_by", Type: field.TypeString},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// BudgetSettlementsTable holds the schema information for the "budget_settlements" table.
+	BudgetSettlementsTable = &schema.Table{
+		Name:       "budget_settlements",
+		Columns:    BudgetSettlementsColumns,
+		PrimaryKey: []*schema.Column{BudgetSettlementsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgetsettlement_request_id_revision",
+				Unique:  true,
+				Columns: []*schema.Column{BudgetSettlementsColumns[1], BudgetSettlementsColumns[2]},
+			},
+			{
+				Name:    "budgetsettlement_request_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetSettlementsColumns[1], BudgetSettlementsColumns[9]},
+			},
+		},
+	}
+	// DeletedCredentialsColumns holds the columns for the "deleted_credentials" table.
+	DeletedCredentialsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "digest", Type: field.TypeBytes, Unique: true},
+		{Name: "deleted_at", Type: field.TypeTime},
+	}
+	// DeletedCredentialsTable holds the schema information for the "deleted_credentials" table.
+	DeletedCredentialsTable = &schema.Table{
+		Name:       "deleted_credentials",
+		Columns:    DeletedCredentialsColumns,
+		PrimaryKey: []*schema.Column{DeletedCredentialsColumns[0]},
+	}
+	// DeletedPrincipalsColumns holds the columns for the "deleted_principals" table.
+	DeletedPrincipalsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "deleted_at", Type: field.TypeTime},
+	}
+	// DeletedPrincipalsTable holds the schema information for the "deleted_principals" table.
+	DeletedPrincipalsTable = &schema.Table{
+		Name:       "deleted_principals",
+		Columns:    DeletedPrincipalsColumns,
+		PrimaryKey: []*schema.Column{DeletedPrincipalsColumns[0]},
+	}
 	// DeploymentsColumns holds the columns for the "deployments" table.
 	DeploymentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -256,9 +529,11 @@ var (
 		{Name: "deployment_id", Type: field.TypeString},
 		{Name: "user_id", Type: field.TypeString},
 		{Name: "device_id", Type: field.TypeString, Nullable: true},
-		{Name: "resource_id", Type: field.TypeString, Nullable: true},
-		{Name: "runtime_route_id", Type: field.TypeString, Nullable: true},
-		{Name: "upstream_id", Type: field.TypeString, Nullable: true},
+		{Name: "resource_id", Type: field.TypeString},
+		{Name: "resource_kind", Type: field.TypeString},
+		{Name: "client_protocol", Type: field.TypeString},
+		{Name: "runtime_route_id", Type: field.TypeString},
+		{Name: "upstream_id", Type: field.TypeString},
 		{Name: "managed_generation", Type: field.TypeInt64},
 		{Name: "control_revision", Type: field.TypeInt64},
 		{Name: "started_at", Type: field.TypeTime},
@@ -270,6 +545,10 @@ var (
 		{Name: "response_bytes", Type: field.TypeInt64},
 		{Name: "duration_ms", Type: field.TypeInt64},
 		{Name: "error_class", Type: field.TypeString, Nullable: true},
+		{Name: "request_completeness", Type: field.TypeString},
+		{Name: "settlement_state", Type: field.TypeString},
+		{Name: "settlement_revision", Type: field.TypeInt64},
+		{Name: "budget_revision", Type: field.TypeInt64},
 		{Name: "ingested_at", Type: field.TypeTime},
 	}
 	// RequestUsagesTable holds the schema information for the "request_usages" table.
@@ -286,12 +565,22 @@ var (
 			{
 				Name:    "requestusage_completed_at_user_id",
 				Unique:  false,
-				Columns: []*schema.Column{RequestUsagesColumns[12], RequestUsagesColumns[4]},
+				Columns: []*schema.Column{RequestUsagesColumns[14], RequestUsagesColumns[4]},
 			},
 			{
 				Name:    "requestusage_completed_at_resource_id",
 				Unique:  false,
-				Columns: []*schema.Column{RequestUsagesColumns[12], RequestUsagesColumns[6]},
+				Columns: []*schema.Column{RequestUsagesColumns[14], RequestUsagesColumns[6]},
+			},
+			{
+				Name:    "requestusage_completed_at_client_protocol",
+				Unique:  false,
+				Columns: []*schema.Column{RequestUsagesColumns[14], RequestUsagesColumns[8]},
+			},
+			{
+				Name:    "requestusage_completed_at_resource_kind",
+				Unique:  false,
+				Columns: []*schema.Column{RequestUsagesColumns[14], RequestUsagesColumns[7]},
 			},
 		},
 	}
@@ -335,11 +624,11 @@ var (
 	// SemanticUsagesColumns holds the columns for the "semantic_usages" table.
 	SemanticUsagesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
-		{Name: "request_id", Type: field.TypeString, Nullable: true},
-		{Name: "upstream_id", Type: field.TypeString},
-		{Name: "resource_id", Type: field.TypeString, Nullable: true},
-		{Name: "source_event_id", Type: field.TypeString, Nullable: true},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "settlement_revision", Type: field.TypeInt64},
+		{Name: "source_event_id", Type: field.TypeString},
 		{Name: "meter", Type: field.TypeString},
+		{Name: "quantity_units", Type: field.TypeInt64},
 		{Name: "quantity_decimal", Type: field.TypeString},
 		{Name: "completeness", Type: field.TypeString},
 		{Name: "provider_cost", Type: field.TypeString, Nullable: true},
@@ -354,9 +643,14 @@ var (
 		PrimaryKey: []*schema.Column{SemanticUsagesColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "semanticusage_upstream_id_source_event_id",
+				Name:    "semanticusage_request_id_settlement_revision_meter",
 				Unique:  true,
-				Columns: []*schema.Column{SemanticUsagesColumns[2], SemanticUsagesColumns[4]},
+				Columns: []*schema.Column{SemanticUsagesColumns[1], SemanticUsagesColumns[2], SemanticUsagesColumns[4]},
+			},
+			{
+				Name:    "semanticusage_request_id_meter_settlement_revision",
+				Unique:  false,
+				Columns: []*schema.Column{SemanticUsagesColumns[1], SemanticUsagesColumns[4], SemanticUsagesColumns[2]},
 			},
 		},
 	}
@@ -424,6 +718,63 @@ var (
 			},
 		},
 	}
+	// UsageDetailsColumns holds the columns for the "usage_details" table.
+	UsageDetailsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "settlement_revision", Type: field.TypeInt64},
+		{Name: "name", Type: field.TypeString},
+		{Name: "quantity_units", Type: field.TypeInt64},
+		{Name: "source", Type: field.TypeString},
+		{Name: "completeness", Type: field.TypeString},
+		{Name: "occurred_at", Type: field.TypeTime},
+	}
+	// UsageDetailsTable holds the schema information for the "usage_details" table.
+	UsageDetailsTable = &schema.Table{
+		Name:       "usage_details",
+		Columns:    UsageDetailsColumns,
+		PrimaryKey: []*schema.Column{UsageDetailsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "usagedetail_request_id_settlement_revision_name",
+				Unique:  true,
+				Columns: []*schema.Column{UsageDetailsColumns[1], UsageDetailsColumns[2], UsageDetailsColumns[3]},
+			},
+			{
+				Name:    "usagedetail_request_id_settlement_revision",
+				Unique:  false,
+				Columns: []*schema.Column{UsageDetailsColumns[1], UsageDetailsColumns[2]},
+			},
+		},
+	}
+	// UsageEventsColumns holds the columns for the "usage_events" table.
+	UsageEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "revision", Type: field.TypeInt64},
+		{Name: "event_hash", Type: field.TypeString},
+		{Name: "source_event_id", Type: field.TypeString},
+		{Name: "payload_json", Type: field.TypeBytes},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// UsageEventsTable holds the schema information for the "usage_events" table.
+	UsageEventsTable = &schema.Table{
+		Name:       "usage_events",
+		Columns:    UsageEventsColumns,
+		PrimaryKey: []*schema.Column{UsageEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "usageevent_request_id_revision",
+				Unique:  true,
+				Columns: []*schema.Column{UsageEventsColumns[1], UsageEventsColumns[2]},
+			},
+			{
+				Name:    "usageevent_source_event_id",
+				Unique:  true,
+				Columns: []*schema.Column{UsageEventsColumns[4]},
+			},
+		},
+	}
 	// UsersColumns holds the columns for the "users" table.
 	UsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -448,9 +799,43 @@ var (
 			},
 		},
 	}
+	// UserBudgetsColumns holds the columns for the "user_budgets" table.
+	UserBudgetsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "user_id", Type: field.TypeString},
+		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "TTS", "ASR", "MCP"}},
+		{Name: "mode", Type: field.TypeEnum, Enums: []string{"UNLIMITED", "LIMITED"}},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"EXPLICIT"}},
+		{Name: "revision", Type: field.TypeInt64},
+		{Name: "activated_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "updated_by_user_id", Type: field.TypeString},
+	}
+	// UserBudgetsTable holds the schema information for the "user_budgets" table.
+	UserBudgetsTable = &schema.Table{
+		Name:       "user_budgets",
+		Columns:    UserBudgetsColumns,
+		PrimaryKey: []*schema.Column{UserBudgetsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userbudget_user_id_capability",
+				Unique:  true,
+				Columns: []*schema.Column{UserBudgetsColumns[1], UserBudgetsColumns[2]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		ActivationsTable,
+		BudgetAllocationsTable,
+		BudgetAuditsTable,
+		BudgetBucketsTable,
+		BudgetLimitsTable,
+		BudgetReconciliationsTable,
+		BudgetRequestsTable,
+		BudgetSettlementsTable,
+		DeletedCredentialsTable,
+		DeletedPrincipalsTable,
 		DeploymentsTable,
 		DevicesTable,
 		EnrollmentsTable,
@@ -468,9 +853,13 @@ var (
 		SessionsTable,
 		UpstreamsTable,
 		UpstreamConfigRevisionsTable,
+		UsageDetailsTable,
+		UsageEventsTable,
 		UsersTable,
+		UserBudgetsTable,
 	}
 )
 
 func init() {
+	BudgetReconciliationsTable.ForeignKeys[0].RefTable = BudgetRequestsTable
 }

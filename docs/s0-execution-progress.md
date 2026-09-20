@@ -1,6 +1,14 @@
 # S0 Platform Core 当前实现状态
 
-> 状态日期：2026-09-19。本文是唯一 living implementation/stage status。后文历史证据以本节最新状态为准。
+> 状态日期：2026-09-20。本文是唯一 living implementation/stage status。后文历史证据以本节最新状态为准。
+
+## S0.2 生产用量与用户额度闭环（2026-09-20，当前状态）
+
+Core 当前实现 12 个受管协议 profile 的有界生产观察与语义计量、durable spool/幂等修正/待核对恢复、日周月累计预算准入和真实结算。HTTP 压缩响应只在私有有界观察副本中解码，代理原始字节与响应头不变。Admin 已提供用户额度编辑、当前状态、趋势/分布/请求明细与 reconciliation；Portal/Client 本人接口只按认证主体查询。后文早期“真实请求均 UNKNOWN”“只有合成上游”的记录仅是当时快照，不代表当前实现。
+
+Admin 的用户删除采用精确用户名和原因确认、deny-first 状态机及完整私有数据清理。旧 access/runtime 和 refresh credential 通过不可逆摘要 tombstone 统一返回 `enterprise_identity_deleted`；审计不保留可恢复身份。真实浏览器流程已覆盖额度配置、用量分析和删除交互；真实 Core 分发链路已覆盖 DeepSeek、Qwen、MiMo、DashScope ASR 与 Firecrawl MCP。最终仓库门禁、Android 消费和设备联调结果以本轮后续记录为准，不由这段当前实现说明提前宣告完成。
+
+完整用户生命周期按 principal ID 而非 username 判定。删除 COMPLETED 后，管理员可复用 username 创建全新的 `usr_*`；新用户不继承旧 Device/Session、额度或用量，同一 installation 因旧 Device 已删除而可凭新一次性码重新接入。旧 principal 与 credential tombstone 永久保留拒绝能力。浏览器 harness 已覆盖删除、同名重建、默认额度未继承、新 Enrollment 与再次删除；Core 组件测试额外覆盖同 installation 兑换、旧 Access/Refresh 持续拒绝和新 credential 正常认证。
 
 ## 审查后修正（2026-09-19，当前工作树）
 

@@ -32,9 +32,9 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 	state := &State{
 		ControlRevision: input.ControlRevision, BundleHash: string(input.BundleHash),
 		ActiveManagedGeneration: input.ActiveManagedGeneration, DeploymentID: input.DeploymentId,
-		AuthKeys: make(map[string]ed25519.PublicKey), DisabledUsers: make(map[string]struct{}),
+		AuthKeys: make(map[string]ed25519.PublicKey), DisabledUsers: make(map[string]struct{}), DeletedUsers: make(map[string]struct{}),
 		RevokedDevices: make(map[string]struct{}), RevokedSessions: make(map[string]struct{}),
-		ResourceRoutes: make(map[string]string), Routes: make(map[string]Route), Upstreams: make(map[string]Upstream),
+		Resources: make(map[string]Resource), Routes: make(map[string]Route), Upstreams: make(map[string]Upstream),
 		OperationalLimits: input.OperationalLimits, AppliedAt: appliedAt,
 	}
 
@@ -52,6 +52,9 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		state.AuthKeys[key.Kid] = ed25519.PublicKey(append([]byte(nil), decoded...))
 	}
 	if err := addIDs(state.DisabledUsers, platformid.User, input.PrincipalState.DisabledUserIds); err != nil {
+		return nil, err
+	}
+	if err := addIDs(state.DeletedUsers, platformid.User, input.PrincipalState.DeletedUserIds); err != nil {
 		return nil, err
 	}
 	if err := addIDs(state.RevokedDevices, platformid.Device, input.PrincipalState.RevokedDeviceIds); err != nil {
@@ -135,18 +138,78 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 	}
 
 	for _, value := range input.ResourceRoutes {
-		if !runtimeResourceID(value.ResourceId) || platformid.Validate(platformid.Route, value.RuntimeRouteId) != nil {
+		if !runtimeResourceID(value.ResourceId) || platformid.Validate(platformid.Route, value.RuntimeRouteId) != nil ||
+			!value.ResourceKind.Valid() || !value.ClientProtocol.Valid() || !resourceProfileMatches(value) {
 			return nil, ErrInvalidControl
 		}
-		if _, exists := state.ResourceRoutes[value.ResourceId]; exists {
+		if _, exists := state.Resources[value.ResourceId]; exists {
 			return nil, ErrInvalidControl
 		}
 		if _, exists := state.Routes[value.RuntimeRouteId]; !exists {
 			return nil, ErrInvalidControl
 		}
-		state.ResourceRoutes[value.ResourceId] = value.RuntimeRouteId
+		var audio *relaycontrolapi.RuntimeAudioProfile
+		if value.AudioProfile != nil {
+			copyProfile := *value.AudioProfile
+			copyProfile.SampleRates = append([]relaycontrolapi.RuntimeAudioProfileSampleRates(nil), value.AudioProfile.SampleRates...)
+			audio = &copyProfile
+		}
+		var llm *relaycontrolapi.RuntimeLlmProfile
+		if value.LlmProfile != nil {
+			copyProfile := *value.LlmProfile
+			llm = &copyProfile
+		}
+		state.Resources[value.ResourceId] = Resource{
+			ID: value.ResourceId, RouteID: value.RuntimeRouteId, Kind: value.ResourceKind,
+			ClientProtocol: value.ClientProtocol, AudioProfile: audio, LLMProfile: llm,
+		}
 	}
 	return state, nil
+}
+
+func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
+	kind, err := platformid.KindOf(value.ResourceId)
+	if err != nil {
+		return false
+	}
+	protocol := string(value.ClientProtocol)
+	switch value.ResourceKind {
+	case relaycontrolapi.ResourceRouteResourceKindMODEL:
+		if kind != platformid.Model || value.AudioProfile != nil || value.LlmProfile == nil {
+			return false
+		}
+		switch protocol {
+		case "OPENAI_CHAT_COMPLETIONS", "OPENAI_RESPONSES", "GOOGLE_GENERATE_CONTENT", "ANTHROPIC_MESSAGES":
+			return true
+		}
+	case relaycontrolapi.ResourceRouteResourceKindTTS:
+		if kind != platformid.TTS || value.AudioProfile != nil || value.LlmProfile != nil {
+			return false
+		}
+		switch protocol {
+		case "OPENAI_AUDIO_SPEECH", "GEMINI_GENERATE_CONTENT_TTS", "MIMO_CHAT_COMPLETIONS_TTS":
+			return true
+		}
+	case relaycontrolapi.ResourceRouteResourceKindASR:
+		if kind != platformid.ASR || value.LlmProfile != nil || value.AudioProfile == nil || value.AudioProfile.Channels != 1 ||
+			!value.AudioProfile.Encoding.Valid() || len(value.AudioProfile.SampleRates) == 0 {
+			return false
+		}
+		seenRates := map[int]bool{}
+		for _, rate := range value.AudioProfile.SampleRates {
+			if rate != 8000 && rate != 16000 && rate != 24000 || seenRates[int(rate)] {
+				return false
+			}
+			seenRates[int(rate)] = true
+		}
+		switch protocol {
+		case "OPENAI_AUDIO_TRANSCRIPTIONS", "DASHSCOPE_HTTP_ASR", "OPENAI_REALTIME_TRANSCRIPTION", "DASHSCOPE_REALTIME_ASR":
+			return true
+		}
+	case relaycontrolapi.ResourceRouteResourceKindMCP:
+		return kind == platformid.MCP && protocol == "MCP_STREAMABLE_HTTP" && value.AudioProfile == nil && value.LlmProfile == nil
+	}
+	return false
 }
 
 func compileAuth(input relaycontrolapi.RuntimeUpstreamAuth) (UpstreamAuth, error) {

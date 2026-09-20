@@ -68,7 +68,7 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 		"--public-listen", fmt.Sprintf("127.0.0.1:%d", env.Ports.RelayPub),
 		"--internal-listen", fmt.Sprintf("127.0.0.1:%d", env.Ports.RelayInt),
 		"--spool", spoolPath,
-		"--hub-usage-url", "http://127.0.0.1:1/internal/v1/usage/request-events:batch",
+		"--hub-internal-url", "http://127.0.0.1:1",
 		"--hub-service-token-file", tokenFile,
 	)
 	if err != nil {

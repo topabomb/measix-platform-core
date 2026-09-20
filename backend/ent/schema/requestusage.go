@@ -16,9 +16,11 @@ func (RequestUsage) Fields() []ent.Field {
 		field.String("deployment_id"),
 		field.String("user_id"),
 		field.String("device_id").Optional().Nillable(),
-		field.String("resource_id").Optional(),
-		field.String("runtime_route_id").Optional(),
-		field.String("upstream_id").Optional(),
+		field.String("resource_id"),
+		field.String("resource_kind"),
+		field.String("client_protocol"),
+		field.String("runtime_route_id"),
+		field.String("upstream_id"),
 		field.Int64("managed_generation"),
 		field.Int64("control_revision"),
 		field.Time("started_at"),
@@ -30,6 +32,10 @@ func (RequestUsage) Fields() []ent.Field {
 		field.Int64("response_bytes"),
 		field.Int64("duration_ms"),
 		field.String("error_class").Optional().Nillable(),
+		field.String("request_completeness"),
+		field.String("settlement_state"),
+		field.Int64("settlement_revision"),
+		field.Int64("budget_revision"),
 		field.Time("ingested_at"),
 	}
 }
@@ -38,5 +44,7 @@ func (RequestUsage) Indexes() []ent.Index {
 		index.Fields("request_id").Unique(),
 		index.Fields("completed_at", "user_id"),
 		index.Fields("completed_at", "resource_id"),
+		index.Fields("completed_at", "client_protocol"),
+		index.Fields("completed_at", "resource_kind"),
 	}
 }

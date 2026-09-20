@@ -61,8 +61,8 @@ func TestDisabledResourcesStayUnroutableAcrossActivations(t *testing.T) {
 				if state == nil {
 					t.Fatal("relay not ready")
 				}
-				if len(state.ResourceRoutes) != 0 || len(state.Routes) != 0 {
-					t.Errorf("%s exposed disabled resources: %v", stage, state.ResourceRoutes)
+				if len(state.Resources) != 0 || len(state.Routes) != 0 {
+					t.Errorf("%s exposed disabled resources: %v", stage, state.Resources)
 				}
 			}
 			assertClosed("publish")

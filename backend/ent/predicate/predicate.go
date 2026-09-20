@@ -9,6 +9,33 @@ import (
 // Activation is the predicate function for activation builders.
 type Activation func(*sql.Selector)
 
+// BudgetAllocation is the predicate function for budgetallocation builders.
+type BudgetAllocation func(*sql.Selector)
+
+// BudgetAudit is the predicate function for budgetaudit builders.
+type BudgetAudit func(*sql.Selector)
+
+// BudgetBucket is the predicate function for budgetbucket builders.
+type BudgetBucket func(*sql.Selector)
+
+// BudgetLimit is the predicate function for budgetlimit builders.
+type BudgetLimit func(*sql.Selector)
+
+// BudgetReconciliation is the predicate function for budgetreconciliation builders.
+type BudgetReconciliation func(*sql.Selector)
+
+// BudgetRequest is the predicate function for budgetrequest builders.
+type BudgetRequest func(*sql.Selector)
+
+// BudgetSettlement is the predicate function for budgetsettlement builders.
+type BudgetSettlement func(*sql.Selector)
+
+// DeletedCredential is the predicate function for deletedcredential builders.
+type DeletedCredential func(*sql.Selector)
+
+// DeletedPrincipal is the predicate function for deletedprincipal builders.
+type DeletedPrincipal func(*sql.Selector)
+
 // Deployment is the predicate function for deployment builders.
 type Deployment func(*sql.Selector)
 
@@ -60,5 +87,14 @@ type Upstream func(*sql.Selector)
 // UpstreamConfigRevision is the predicate function for upstreamconfigrevision builders.
 type UpstreamConfigRevision func(*sql.Selector)
 
+// UsageDetail is the predicate function for usagedetail builders.
+type UsageDetail func(*sql.Selector)
+
+// UsageEvent is the predicate function for usageevent builders.
+type UsageEvent func(*sql.Selector)
+
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
+
+// UserBudget is the predicate function for userbudget builders.
+type UserBudget func(*sql.Selector)

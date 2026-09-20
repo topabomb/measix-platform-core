@@ -12,6 +12,7 @@ import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import StatusChip from '../components/StatusChip.vue'
 import UsageRequestList from '../components/UsageRequestList.vue'
+import UserBudgetPanel from '../components/UserBudgetPanel.vue'
 import { useActivationStore } from '../stores/activation'
 import QRCode from 'qrcode'
 import { useSessionStore } from '../stores/session'
@@ -59,6 +60,9 @@ const error = ref<unknown>()
 const createOpen = ref(false)
 const detailOpen = ref(false)
 const enrollmentOpen = ref(false)
+const deleteOpen = ref(false)
+const deleteForm = ref({ confirmationUsername: '', reason: '' })
+const deleting = ref(false)
 const enrollment = ref<Enrollment>()
 const enrollmentMaterial = ref('')
 const enrollmentCopied = ref(false)
@@ -257,6 +261,38 @@ async function runSecurity(path: string) {
   }
 }
 
+function beginDeleteUser() {
+  if (!selected.value) return
+  deleteForm.value = { confirmationUsername: '', reason: '' }
+  deleteOpen.value = true
+}
+
+async function deleteUser() {
+  if (!selected.value || !session.csrfToken || deleteForm.value.confirmationUsername !== selected.value.username || !deleteForm.value.reason.trim()) return
+  const target = selected.value
+  const path = `/api/admin/v1/users/${encodeURIComponent(target.userId)}`
+  const key = activation.beginCommand('SECURITY_CHANGE', path)
+  deleting.value = true
+  error.value = undefined
+  try {
+    const result = await apiFetch<Activation>(path, {
+      method: 'DELETE',
+      headers: { 'Idempotency-Key': key },
+      body: JSON.stringify({ confirmationUsername: deleteForm.value.confirmationUsername, reason: deleteForm.value.reason.trim() }),
+    }, session.csrfToken)
+    activation.accept(result)
+    if (result.state === 'APPLYING' || result.state === 'UNKNOWN') await activation.pollUntilSettled(result.activationId, { timeoutMs: 60_000 })
+    deleteOpen.value = false
+    detailOpen.value = false
+    selected.value = undefined
+    await refresh()
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    deleting.value = false
+  }
+}
+
 async function toggleUser() {
   if (!selected.value) return
   const action = selected.value.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')
@@ -358,7 +394,7 @@ onBeforeUnmount(() => {
         <!-- The body scrolls inside the card so the dialog actions stay visible
              however long the device list or the usage block grows. -->
         <div class="app-dialog__body">
-        <q-card-section><div class="row q-gutter-xs"><q-btn outline no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /></div></q-card-section>
+        <q-card-section><div class="row q-gutter-xs"><q-btn outline no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" /><q-btn outline :color="selected.status === 'ACTIVE' ? 'negative' : 'positive'" :label="selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable')" @click="toggleUser" /><q-btn outline color="negative" :label="$t('users.deleteUser')" :disable="selected.userId === session.session?.user.userId" data-cy="delete-user-btn" @click="beginDeleteUser" /></div></q-card-section>
         <q-card-section><div class="text-subtitle2 q-mb-xs">{{ $t('users.devices') }}</div>
           <div v-if="loadingDevices" class="text-caption text-grey-7 q-mb-xs" data-cy="devices-loading">{{ $t('common.loading') }}</div>
           <q-list bordered separator data-cy="user-devices">
@@ -384,6 +420,9 @@ onBeforeUnmount(() => {
         </q-list>
         <div v-if="devicesTruncated" class="text-caption text-grey-7 q-mt-xs">{{ $t('users.devicesTruncated', { count: devices.length }) }}</div>
         </q-card-section>
+        <q-card-section>
+          <UserBudgetPanel :user-id="selected.userId" />
+        </q-card-section>
         <q-card-section data-cy="user-usage">
           <div class="row items-center justify-between q-mb-xs">
             <div class="text-subtitle2">{{ $t('users.usage') }}</div>
@@ -404,6 +443,24 @@ onBeforeUnmount(() => {
         </div>
         <q-separator />
         <q-card-actions align="right"><q-btn flat :label="$t('common.close')" v-close-popup /></q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="deleteOpen">
+      <q-card v-if="selected" class="app-dialog app-dialog--sm" data-cy="delete-user-dialog">
+        <q-card-section>
+          <div class="text-h6 text-negative">{{ $t('users.deleteUser') }}</div>
+          <div class="text-body2 q-mt-xs">{{ $t('users.deleteWarning', { name: selected.displayName }) }}</div>
+          <div class="text-caption text-grey-7 q-mt-xs">{{ $t('users.deleteScope') }}</div>
+        </q-card-section>
+        <q-card-section class="q-gutter-xs">
+          <q-input v-model="deleteForm.confirmationUsername" outlined dense :label="$t('users.deleteConfirmation', { username: selected.username })" data-cy="delete-user-confirmation" />
+          <q-input v-model="deleteForm.reason" outlined autogrow maxlength="500" :label="$t('users.deleteReason')" data-cy="delete-user-reason" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat :label="$t('common.cancel')" v-close-popup />
+          <q-btn color="negative" :label="$t('users.deletePermanently')" :loading="deleting" :disable="deleteForm.confirmationUsername !== selected.username || !deleteForm.reason.trim()" data-cy="confirm-delete-user" @click="deleteUser" />
+        </q-card-actions>
       </q-card>
     </q-dialog>
 

@@ -1494,7 +1494,7 @@ func TestCAPSEC022InternalRoutesNotReachableFromPublic(t *testing.T) {
 	// These are management endpoints that should only exist on a private
 	// listener or be blocked by the public ingress.
 	internalPaths := []string{
-		"/internal/v1/usage/request-events:batch",
+		"/internal/v1/usage/settlements:batch",
 		"/internal/v1/something",
 		"/internal/live",
 		"/internal/ready",

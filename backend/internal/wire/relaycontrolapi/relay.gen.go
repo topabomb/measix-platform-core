@@ -12,6 +12,105 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Defines values for BudgetContextCapability.
+const (
+	BudgetContextCapabilityASR   BudgetContextCapability = "ASR"
+	BudgetContextCapabilityMCP   BudgetContextCapability = "MCP"
+	BudgetContextCapabilityMODEL BudgetContextCapability = "MODEL"
+	BudgetContextCapabilityTTS   BudgetContextCapability = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the BudgetContextCapability enum.
+func (e BudgetContextCapability) Valid() bool {
+	switch e {
+	case BudgetContextCapabilityASR:
+		return true
+	case BudgetContextCapabilityMCP:
+		return true
+	case BudgetContextCapabilityMODEL:
+		return true
+	case BudgetContextCapabilityTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetContextMode.
+const (
+	LIMITED   BudgetContextMode = "LIMITED"
+	UNLIMITED BudgetContextMode = "UNLIMITED"
+)
+
+// Valid indicates whether the value is a known member of the BudgetContextMode enum.
+func (e BudgetContextMode) Valid() bool {
+	switch e {
+	case LIMITED:
+		return true
+	case UNLIMITED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetLimitStateMeter.
+const (
+	AUDIOSECONDS BudgetLimitStateMeter = "AUDIO_SECONDS"
+	CACHEDTOKENS BudgetLimitStateMeter = "CACHED_TOKENS"
+	CHARACTERS   BudgetLimitStateMeter = "CHARACTERS"
+	INPUTTOKENS  BudgetLimitStateMeter = "INPUT_TOKENS"
+	OUTPUTTOKENS BudgetLimitStateMeter = "OUTPUT_TOKENS"
+	REQUESTS     BudgetLimitStateMeter = "REQUESTS"
+	TOTALTOKENS  BudgetLimitStateMeter = "TOTAL_TOKENS"
+)
+
+// Valid indicates whether the value is a known member of the BudgetLimitStateMeter enum.
+func (e BudgetLimitStateMeter) Valid() bool {
+	switch e {
+	case AUDIOSECONDS:
+		return true
+	case CACHEDTOKENS:
+		return true
+	case CHARACTERS:
+		return true
+	case INPUTTOKENS:
+		return true
+	case OUTPUTTOKENS:
+		return true
+	case REQUESTS:
+		return true
+	case TOTALTOKENS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetLimitStatePeriod.
+const (
+	DAY      BudgetLimitStatePeriod = "DAY"
+	LIFETIME BudgetLimitStatePeriod = "LIFETIME"
+	MONTH    BudgetLimitStatePeriod = "MONTH"
+	WEEK     BudgetLimitStatePeriod = "WEEK"
+)
+
+// Valid indicates whether the value is a known member of the BudgetLimitStatePeriod enum.
+func (e BudgetLimitStatePeriod) Valid() bool {
+	switch e {
+	case DAY:
+		return true
+	case LIFETIME:
+		return true
+	case MONTH:
+		return true
+	case WEEK:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ControlStatusSpoolState.
 const (
 	METERINGDEGRADED ControlStatusSpoolState = "METERING_DEGRADED"
@@ -84,6 +183,132 @@ const (
 func (e PublicJwkUse) Valid() bool {
 	switch e {
 	case Sig:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceRouteClientProtocol.
+const (
+	ANTHROPICMESSAGES           ResourceRouteClientProtocol = "ANTHROPIC_MESSAGES"
+	DASHSCOPEHTTPASR            ResourceRouteClientProtocol = "DASHSCOPE_HTTP_ASR"
+	DASHSCOPEREALTIMEASR        ResourceRouteClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	GEMINIGENERATECONTENTTTS    ResourceRouteClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	GOOGLEGENERATECONTENT       ResourceRouteClientProtocol = "GOOGLE_GENERATE_CONTENT"
+	MCPSTREAMABLEHTTP           ResourceRouteClientProtocol = "MCP_STREAMABLE_HTTP"
+	MIMOCHATCOMPLETIONSTTS      ResourceRouteClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	OPENAIAUDIOSPEECH           ResourceRouteClientProtocol = "OPENAI_AUDIO_SPEECH"
+	OPENAIAUDIOTRANSCRIPTIONS   ResourceRouteClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	OPENAICHATCOMPLETIONS       ResourceRouteClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	OPENAIREALTIMETRANSCRIPTION ResourceRouteClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
+	OPENAIRESPONSES             ResourceRouteClientProtocol = "OPENAI_RESPONSES"
+)
+
+// Valid indicates whether the value is a known member of the ResourceRouteClientProtocol enum.
+func (e ResourceRouteClientProtocol) Valid() bool {
+	switch e {
+	case ANTHROPICMESSAGES:
+		return true
+	case DASHSCOPEHTTPASR:
+		return true
+	case DASHSCOPEREALTIMEASR:
+		return true
+	case GEMINIGENERATECONTENTTTS:
+		return true
+	case GOOGLEGENERATECONTENT:
+		return true
+	case MCPSTREAMABLEHTTP:
+		return true
+	case MIMOCHATCOMPLETIONSTTS:
+		return true
+	case OPENAIAUDIOSPEECH:
+		return true
+	case OPENAIAUDIOTRANSCRIPTIONS:
+		return true
+	case OPENAICHATCOMPLETIONS:
+		return true
+	case OPENAIREALTIMETRANSCRIPTION:
+		return true
+	case OPENAIRESPONSES:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceRouteResourceKind.
+const (
+	ResourceRouteResourceKindASR   ResourceRouteResourceKind = "ASR"
+	ResourceRouteResourceKindMCP   ResourceRouteResourceKind = "MCP"
+	ResourceRouteResourceKindMODEL ResourceRouteResourceKind = "MODEL"
+	ResourceRouteResourceKindTTS   ResourceRouteResourceKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the ResourceRouteResourceKind enum.
+func (e ResourceRouteResourceKind) Valid() bool {
+	switch e {
+	case ResourceRouteResourceKindASR:
+		return true
+	case ResourceRouteResourceKindMCP:
+		return true
+	case ResourceRouteResourceKindMODEL:
+		return true
+	case ResourceRouteResourceKindTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RuntimeAudioProfileChannels.
+const (
+	N1 RuntimeAudioProfileChannels = 1
+)
+
+// Valid indicates whether the value is a known member of the RuntimeAudioProfileChannels enum.
+func (e RuntimeAudioProfileChannels) Valid() bool {
+	switch e {
+	case N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RuntimeAudioProfileEncoding.
+const (
+	PCM16LE    RuntimeAudioProfileEncoding = "PCM16_LE"
+	WAVPCM16LE RuntimeAudioProfileEncoding = "WAV_PCM16_LE"
+)
+
+// Valid indicates whether the value is a known member of the RuntimeAudioProfileEncoding enum.
+func (e RuntimeAudioProfileEncoding) Valid() bool {
+	switch e {
+	case PCM16LE:
+		return true
+	case WAVPCM16LE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RuntimeAudioProfileSampleRates.
+const (
+	N16000 RuntimeAudioProfileSampleRates = 16000
+	N24000 RuntimeAudioProfileSampleRates = 24000
+	N8000  RuntimeAudioProfileSampleRates = 8000
+)
+
+// Valid indicates whether the value is a known member of the RuntimeAudioProfileSampleRates enum.
+func (e RuntimeAudioProfileSampleRates) Valid() bool {
+	switch e {
+	case N16000:
+		return true
+	case N24000:
+		return true
+	case N8000:
 		return true
 	default:
 		return false
@@ -165,6 +390,38 @@ type ActivationId = string
 // AsrId defines model for AsrId.
 type AsrId = string
 
+// BudgetContext defines model for BudgetContext.
+type BudgetContext struct {
+	AsOf           *time.Time               `json:"asOf,omitempty"`
+	BlockingLimits *[]BudgetLimitState      `json:"blockingLimits,omitempty"`
+	Capability     *BudgetContextCapability `json:"capability,omitempty"`
+	Mode           *BudgetContextMode       `json:"mode,omitempty"`
+	ResetAt        *time.Time               `json:"resetAt,omitempty"`
+	ResourceId     *string                  `json:"resourceId,omitempty"`
+}
+
+// BudgetContextCapability defines model for BudgetContext.Capability.
+type BudgetContextCapability string
+
+// BudgetContextMode defines model for BudgetContext.Mode.
+type BudgetContextMode string
+
+// BudgetLimitState defines model for BudgetLimitState.
+type BudgetLimitState struct {
+	Limit    int64                  `json:"limit"`
+	Meter    BudgetLimitStateMeter  `json:"meter"`
+	Period   BudgetLimitStatePeriod `json:"period"`
+	Reserved int64                  `json:"reserved"`
+	ResetAt  *time.Time             `json:"resetAt,omitempty"`
+	Used     int64                  `json:"used"`
+}
+
+// BudgetLimitStateMeter defines model for BudgetLimitState.Meter.
+type BudgetLimitStateMeter string
+
+// BudgetLimitStatePeriod defines model for BudgetLimitState.Period.
+type BudgetLimitStatePeriod string
+
 // ControlAck defines model for ControlAck.
 type ControlAck struct {
 	ActiveManagedGeneration int        `json:"activeManagedGeneration"`
@@ -231,6 +488,7 @@ type PricingRuleId = string
 
 // PrincipalState defines model for PrincipalState.
 type PrincipalState struct {
+	DeletedUserIds    []UserId    `json:"deletedUserIds"`
 	DisabledUserIds   []UserId    `json:"disabledUserIds"`
 	RevokedDeviceIds  []DeviceId  `json:"revokedDeviceIds"`
 	RevokedSessionIds []SessionId `json:"revokedSessionIds"`
@@ -238,16 +496,17 @@ type PrincipalState struct {
 
 // Problem defines model for Problem.
 type Problem struct {
-	ActivationId            *ActivationId `json:"activationId,omitempty"`
-	Code                    string        `json:"code"`
-	CurrentDraftRevision    *int          `json:"currentDraftRevision,omitempty"`
-	Detail                  *string       `json:"detail,omitempty"`
-	Forwarded               *bool         `json:"forwarded,omitempty"`
-	RequestId               *RequestId    `json:"requestId,omitempty"`
-	Status                  int           `json:"status"`
-	TargetManagedGeneration *int          `json:"targetManagedGeneration,omitempty"`
-	Title                   string        `json:"title"`
-	Type                    string        `json:"type"`
+	ActivationId            *ActivationId  `json:"activationId,omitempty"`
+	Budget                  *BudgetContext `json:"budget,omitempty"`
+	Code                    string         `json:"code"`
+	CurrentDraftRevision    *int           `json:"currentDraftRevision,omitempty"`
+	Detail                  *string        `json:"detail,omitempty"`
+	Forwarded               *bool          `json:"forwarded,omitempty"`
+	RequestId               *RequestId     `json:"requestId,omitempty"`
+	Status                  int            `json:"status"`
+	TargetManagedGeneration *int           `json:"targetManagedGeneration,omitempty"`
+	Title                   string         `json:"title"`
+	Type                    string         `json:"type"`
 }
 
 // ProviderId defines model for ProviderId.
@@ -283,9 +542,35 @@ type RequestId = string
 
 // ResourceRoute defines model for ResourceRoute.
 type ResourceRoute struct {
-	ResourceId     string         `json:"resourceId"`
-	RuntimeRouteId RuntimeRouteId `json:"runtimeRouteId"`
+	AudioProfile   *RuntimeAudioProfile        `json:"audioProfile,omitempty"`
+	ClientProtocol ResourceRouteClientProtocol `json:"clientProtocol"`
+	LlmProfile     *RuntimeLlmProfile          `json:"llmProfile,omitempty"`
+	ResourceId     string                      `json:"resourceId"`
+	ResourceKind   ResourceRouteResourceKind   `json:"resourceKind"`
+	RuntimeRouteId RuntimeRouteId              `json:"runtimeRouteId"`
 }
+
+// ResourceRouteClientProtocol defines model for ResourceRoute.ClientProtocol.
+type ResourceRouteClientProtocol string
+
+// ResourceRouteResourceKind defines model for ResourceRoute.ResourceKind.
+type ResourceRouteResourceKind string
+
+// RuntimeAudioProfile defines model for RuntimeAudioProfile.
+type RuntimeAudioProfile struct {
+	Channels    RuntimeAudioProfileChannels      `json:"channels"`
+	Encoding    RuntimeAudioProfileEncoding      `json:"encoding"`
+	SampleRates []RuntimeAudioProfileSampleRates `json:"sampleRates"`
+}
+
+// RuntimeAudioProfileChannels defines model for RuntimeAudioProfile.Channels.
+type RuntimeAudioProfileChannels int
+
+// RuntimeAudioProfileEncoding defines model for RuntimeAudioProfile.Encoding.
+type RuntimeAudioProfileEncoding string
+
+// RuntimeAudioProfileSampleRates defines model for RuntimeAudioProfile.SampleRates.
+type RuntimeAudioProfileSampleRates int
 
 // RuntimeControlState defines model for RuntimeControlState.
 type RuntimeControlState struct {
@@ -299,6 +584,12 @@ type RuntimeControlState struct {
 	ResourceRoutes          []ResourceRoute       `json:"resourceRoutes"`
 	Routes                  []RuntimeRouteSpec    `json:"routes"`
 	Upstreams               []RuntimeUpstreamSpec `json:"upstreams"`
+}
+
+// RuntimeLlmProfile defines model for RuntimeLlmProfile.
+type RuntimeLlmProfile struct {
+	AnthropicCacheFieldsMayBeAbsent bool `json:"anthropicCacheFieldsMayBeAbsent"`
+	GeminiThoughtsMayBeAbsent       bool `json:"geminiThoughtsMayBeAbsent"`
 }
 
 // RuntimeRouteId defines model for RuntimeRouteId.

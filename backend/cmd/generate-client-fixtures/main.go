@@ -99,7 +99,7 @@ func main() {
 	add("v4-full", "ManagedSnapshot", true, snapshot)
 	var responsesContent adminapi.ManagedDraftContent
 	must(json.Unmarshal(raw, &responsesContent))
-	responsesContent.Providers[0].ClientProtocol = adminapi.OPENAIRESPONSES
+	responsesContent.Providers[0].ClientProtocol = adminapi.ProviderDefinitionClientProtocolOPENAIRESPONSES
 	for i := range responsesContent.Models {
 		responsesContent.Models[i].RuntimePath = "/v1/responses"
 	}

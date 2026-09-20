@@ -166,7 +166,7 @@ func TestHUBCAP004RouteUpstreamValidation(t *testing.T) {
 		content := validDraft(up.UpstreamID)
 		id := platformid.New(platformid.MCP)
 		content.Mcp = append(content.Mcp, adminapi.McpDefinition{
-			McpServerId: id, DisplayName: "MCP test", ClientProtocol: adminapi.MCPSTREAMABLEHTTP,
+			McpServerId: id, DisplayName: "MCP test", ClientProtocol: adminapi.McpDefinitionClientProtocolMCPSTREAMABLEHTTP,
 			AuthOwnership: adminapi.McpDefinitionAuthOwnershipNONE, RuntimePath: "/mcp", Enabled: true,
 		})
 		content.Bindings = append(content.Bindings, adminapi.RuntimeBindingDefinition{

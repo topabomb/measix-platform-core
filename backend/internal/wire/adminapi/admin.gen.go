@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for ActivationKind.
@@ -102,22 +103,22 @@ func (e AdminUserSummaryRole) Valid() bool {
 
 // Defines values for AsrDefinitionClientProtocol.
 const (
-	DASHSCOPEHTTPASR            AsrDefinitionClientProtocol = "DASHSCOPE_HTTP_ASR"
-	DASHSCOPEREALTIMEASR        AsrDefinitionClientProtocol = "DASHSCOPE_REALTIME_ASR"
-	OPENAIAUDIOTRANSCRIPTIONS   AsrDefinitionClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
-	OPENAIREALTIMETRANSCRIPTION AsrDefinitionClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
+	AsrDefinitionClientProtocolDASHSCOPEHTTPASR            AsrDefinitionClientProtocol = "DASHSCOPE_HTTP_ASR"
+	AsrDefinitionClientProtocolDASHSCOPEREALTIMEASR        AsrDefinitionClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	AsrDefinitionClientProtocolOPENAIAUDIOTRANSCRIPTIONS   AsrDefinitionClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	AsrDefinitionClientProtocolOPENAIREALTIMETRANSCRIPTION AsrDefinitionClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
 )
 
 // Valid indicates whether the value is a known member of the AsrDefinitionClientProtocol enum.
 func (e AsrDefinitionClientProtocol) Valid() bool {
 	switch e {
-	case DASHSCOPEHTTPASR:
+	case AsrDefinitionClientProtocolDASHSCOPEHTTPASR:
 		return true
-	case DASHSCOPEREALTIMEASR:
+	case AsrDefinitionClientProtocolDASHSCOPEREALTIMEASR:
 		return true
-	case OPENAIAUDIOTRANSCRIPTIONS:
+	case AsrDefinitionClientProtocolOPENAIAUDIOTRANSCRIPTIONS:
 		return true
-	case OPENAIREALTIMETRANSCRIPTION:
+	case AsrDefinitionClientProtocolOPENAIREALTIMETRANSCRIPTION:
 		return true
 	default:
 		return false
@@ -139,6 +140,111 @@ func (e AsrDefinitionSampleRate) Valid() bool {
 	case N24000:
 		return true
 	case N8000:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetCapability.
+const (
+	BudgetCapabilityASR   BudgetCapability = "ASR"
+	BudgetCapabilityMCP   BudgetCapability = "MCP"
+	BudgetCapabilityMODEL BudgetCapability = "MODEL"
+	BudgetCapabilityTTS   BudgetCapability = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the BudgetCapability enum.
+func (e BudgetCapability) Valid() bool {
+	switch e {
+	case BudgetCapabilityASR:
+		return true
+	case BudgetCapabilityMCP:
+		return true
+	case BudgetCapabilityMODEL:
+		return true
+	case BudgetCapabilityTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetMode.
+const (
+	LIMITED   BudgetMode = "LIMITED"
+	UNLIMITED BudgetMode = "UNLIMITED"
+)
+
+// Valid indicates whether the value is a known member of the BudgetMode enum.
+func (e BudgetMode) Valid() bool {
+	switch e {
+	case LIMITED:
+		return true
+	case UNLIMITED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetPeriod.
+const (
+	DAY      BudgetPeriod = "DAY"
+	LIFETIME BudgetPeriod = "LIFETIME"
+	MONTH    BudgetPeriod = "MONTH"
+	WEEK     BudgetPeriod = "WEEK"
+)
+
+// Valid indicates whether the value is a known member of the BudgetPeriod enum.
+func (e BudgetPeriod) Valid() bool {
+	switch e {
+	case DAY:
+		return true
+	case LIFETIME:
+		return true
+	case MONTH:
+		return true
+	case WEEK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetSource.
+const (
+	DEFAULT  BudgetSource = "DEFAULT"
+	EXPLICIT BudgetSource = "EXPLICIT"
+)
+
+// Valid indicates whether the value is a known member of the BudgetSource enum.
+func (e BudgetSource) Valid() bool {
+	switch e {
+	case DEFAULT:
+		return true
+	case EXPLICIT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetStatus.
+const (
+	BudgetStatusAVAILABLE             BudgetStatus = "AVAILABLE"
+	BudgetStatusEXHAUSTED             BudgetStatus = "EXHAUSTED"
+	BudgetStatusPENDINGRECONCILIATION BudgetStatus = "PENDING_RECONCILIATION"
+)
+
+// Valid indicates whether the value is a known member of the BudgetStatus enum.
+func (e BudgetStatus) Valid() bool {
+	switch e {
+	case BudgetStatusAVAILABLE:
+		return true
+	case BudgetStatusEXHAUSTED:
+		return true
+	case BudgetStatusPENDINGRECONCILIATION:
 		return true
 	default:
 		return false
@@ -306,13 +412,34 @@ func (e McpDefinitionAuthOwnership) Valid() bool {
 
 // Defines values for McpDefinitionClientProtocol.
 const (
-	MCPSTREAMABLEHTTP McpDefinitionClientProtocol = "MCP_STREAMABLE_HTTP"
+	McpDefinitionClientProtocolMCPSTREAMABLEHTTP McpDefinitionClientProtocol = "MCP_STREAMABLE_HTTP"
 )
 
 // Valid indicates whether the value is a known member of the McpDefinitionClientProtocol enum.
 func (e McpDefinitionClientProtocol) Valid() bool {
 	switch e {
-	case MCPSTREAMABLEHTTP:
+	case McpDefinitionClientProtocolMCPSTREAMABLEHTTP:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MeterQuantityConfidence.
+const (
+	MeterQuantityConfidenceEXACT   MeterQuantityConfidence = "EXACT"
+	MeterQuantityConfidencePARTIAL MeterQuantityConfidence = "PARTIAL"
+	MeterQuantityConfidenceUNKNOWN MeterQuantityConfidence = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the MeterQuantityConfidence enum.
+func (e MeterQuantityConfidence) Valid() bool {
+	switch e {
+	case MeterQuantityConfidenceEXACT:
+		return true
+	case MeterQuantityConfidencePARTIAL:
+		return true
+	case MeterQuantityConfidenceUNKNOWN:
 		return true
 	default:
 		return false
@@ -378,6 +505,7 @@ const (
 	INPUTTOKENS  PricingMeter = "INPUT_TOKENS"
 	OUTPUTTOKENS PricingMeter = "OUTPUT_TOKENS"
 	REQUESTS     PricingMeter = "REQUESTS"
+	TOTALTOKENS  PricingMeter = "TOTAL_TOKENS"
 )
 
 // Valid indicates whether the value is a known member of the PricingMeter enum.
@@ -395,6 +523,8 @@ func (e PricingMeter) Valid() bool {
 		return true
 	case REQUESTS:
 		return true
+	case TOTALTOKENS:
+		return true
 	default:
 		return false
 	}
@@ -402,22 +532,40 @@ func (e PricingMeter) Valid() bool {
 
 // Defines values for ProviderDefinitionClientProtocol.
 const (
-	ANTHROPICMESSAGES     ProviderDefinitionClientProtocol = "ANTHROPIC_MESSAGES"
-	GOOGLEGENERATECONTENT ProviderDefinitionClientProtocol = "GOOGLE_GENERATE_CONTENT"
-	OPENAICHATCOMPLETIONS ProviderDefinitionClientProtocol = "OPENAI_CHAT_COMPLETIONS"
-	OPENAIRESPONSES       ProviderDefinitionClientProtocol = "OPENAI_RESPONSES"
+	ProviderDefinitionClientProtocolANTHROPICMESSAGES     ProviderDefinitionClientProtocol = "ANTHROPIC_MESSAGES"
+	ProviderDefinitionClientProtocolGOOGLEGENERATECONTENT ProviderDefinitionClientProtocol = "GOOGLE_GENERATE_CONTENT"
+	ProviderDefinitionClientProtocolOPENAICHATCOMPLETIONS ProviderDefinitionClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	ProviderDefinitionClientProtocolOPENAIRESPONSES       ProviderDefinitionClientProtocol = "OPENAI_RESPONSES"
 )
 
 // Valid indicates whether the value is a known member of the ProviderDefinitionClientProtocol enum.
 func (e ProviderDefinitionClientProtocol) Valid() bool {
 	switch e {
-	case ANTHROPICMESSAGES:
+	case ProviderDefinitionClientProtocolANTHROPICMESSAGES:
 		return true
-	case GOOGLEGENERATECONTENT:
+	case ProviderDefinitionClientProtocolGOOGLEGENERATECONTENT:
 		return true
-	case OPENAICHATCOMPLETIONS:
+	case ProviderDefinitionClientProtocolOPENAICHATCOMPLETIONS:
 		return true
-	case OPENAIRESPONSES:
+	case ProviderDefinitionClientProtocolOPENAIRESPONSES:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReconciliationViewState.
+const (
+	ReconciliationViewStatePENDING  ReconciliationViewState = "PENDING"
+	ReconciliationViewStateRESOLVED ReconciliationViewState = "RESOLVED"
+)
+
+// Valid indicates whether the value is a known member of the ReconciliationViewState enum.
+func (e ReconciliationViewState) Valid() bool {
+	switch e {
+	case ReconciliationViewStatePENDING:
+		return true
+	case ReconciliationViewStateRESOLVED:
 		return true
 	default:
 		return false
@@ -481,6 +629,108 @@ func (e ReleaseDiffKind) Valid() bool {
 	case ReleaseDiffKindSTARTER:
 		return true
 	case ReleaseDiffKindTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RequestUsageViewRequestCompleteness.
+const (
+	RequestUsageViewRequestCompletenessEXACT   RequestUsageViewRequestCompleteness = "EXACT"
+	RequestUsageViewRequestCompletenessPARTIAL RequestUsageViewRequestCompleteness = "PARTIAL"
+	RequestUsageViewRequestCompletenessUNKNOWN RequestUsageViewRequestCompleteness = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the RequestUsageViewRequestCompleteness enum.
+func (e RequestUsageViewRequestCompleteness) Valid() bool {
+	switch e {
+	case RequestUsageViewRequestCompletenessEXACT:
+		return true
+	case RequestUsageViewRequestCompletenessPARTIAL:
+		return true
+	case RequestUsageViewRequestCompletenessUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RequestUsageViewSettlementState.
+const (
+	RequestUsageViewSettlementStateNOTREQUIRED            RequestUsageViewSettlementState = "NOT_REQUIRED"
+	RequestUsageViewSettlementStatePENDING                RequestUsageViewSettlementState = "PENDING"
+	RequestUsageViewSettlementStateRECONCILIATIONREQUIRED RequestUsageViewSettlementState = "RECONCILIATION_REQUIRED"
+	RequestUsageViewSettlementStateSETTLED                RequestUsageViewSettlementState = "SETTLED"
+)
+
+// Valid indicates whether the value is a known member of the RequestUsageViewSettlementState enum.
+func (e RequestUsageViewSettlementState) Valid() bool {
+	switch e {
+	case RequestUsageViewSettlementStateNOTREQUIRED:
+		return true
+	case RequestUsageViewSettlementStatePENDING:
+		return true
+	case RequestUsageViewSettlementStateRECONCILIATIONREQUIRED:
+		return true
+	case RequestUsageViewSettlementStateSETTLED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolveReconciliationRequestAction.
+const (
+	ACCEPTOBSERVED   ResolveReconciliationRequestAction = "ACCEPT_OBSERVED"
+	RELEASEUNCERTAIN ResolveReconciliationRequestAction = "RELEASE_UNCERTAIN"
+)
+
+// Valid indicates whether the value is a known member of the ResolveReconciliationRequestAction enum.
+func (e ResolveReconciliationRequestAction) Valid() bool {
+	switch e {
+	case ACCEPTOBSERVED:
+		return true
+	case RELEASEUNCERTAIN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolveReconciliationRequestExpectedState.
+const (
+	ResolveReconciliationRequestExpectedStatePENDING ResolveReconciliationRequestExpectedState = "PENDING"
+)
+
+// Valid indicates whether the value is a known member of the ResolveReconciliationRequestExpectedState enum.
+func (e ResolveReconciliationRequestExpectedState) Valid() bool {
+	switch e {
+	case ResolveReconciliationRequestExpectedStatePENDING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceKind.
+const (
+	ResourceKindASR   ResourceKind = "ASR"
+	ResourceKindMCP   ResourceKind = "MCP"
+	ResourceKindMODEL ResourceKind = "MODEL"
+	ResourceKindTTS   ResourceKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the ResourceKind enum.
+func (e ResourceKind) Valid() bool {
+	switch e {
+	case ResourceKindASR:
+		return true
+	case ResourceKindMCP:
+		return true
+	case ResourceKindMODEL:
+		return true
+	case ResourceKindTTS:
 		return true
 	default:
 		return false
@@ -576,22 +826,22 @@ func (e SystemStatusSpoolState) Valid() bool {
 
 // Defines values for TtsDefinitionClientProtocol.
 const (
-	GEMINIGENERATECONTENTTTS TtsDefinitionClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
-	MIMOCHATCOMPLETIONSTTS   TtsDefinitionClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
-	OPENAIAUDIOSPEECH        TtsDefinitionClientProtocol = "OPENAI_AUDIO_SPEECH"
-	SYSTEMTTS                TtsDefinitionClientProtocol = "SYSTEM_TTS"
+	TtsDefinitionClientProtocolGEMINIGENERATECONTENTTTS TtsDefinitionClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	TtsDefinitionClientProtocolMIMOCHATCOMPLETIONSTTS   TtsDefinitionClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	TtsDefinitionClientProtocolOPENAIAUDIOSPEECH        TtsDefinitionClientProtocol = "OPENAI_AUDIO_SPEECH"
+	TtsDefinitionClientProtocolSYSTEMTTS                TtsDefinitionClientProtocol = "SYSTEM_TTS"
 )
 
 // Valid indicates whether the value is a known member of the TtsDefinitionClientProtocol enum.
 func (e TtsDefinitionClientProtocol) Valid() bool {
 	switch e {
-	case GEMINIGENERATECONTENTTTS:
+	case TtsDefinitionClientProtocolGEMINIGENERATECONTENTTTS:
 		return true
-	case MIMOCHATCOMPLETIONSTTS:
+	case TtsDefinitionClientProtocolMIMOCHATCOMPLETIONSTTS:
 		return true
-	case OPENAIAUDIOSPEECH:
+	case TtsDefinitionClientProtocolOPENAIAUDIOSPEECH:
 		return true
-	case SYSTEMTTS:
+	case TtsDefinitionClientProtocolSYSTEMTTS:
 		return true
 	default:
 		return false
@@ -745,6 +995,54 @@ func (e UpstreamConfigUsageCapabilityLevel) Valid() bool {
 	}
 }
 
+// Defines values for UsageClientProtocol.
+const (
+	UsageClientProtocolANTHROPICMESSAGES           UsageClientProtocol = "ANTHROPIC_MESSAGES"
+	UsageClientProtocolDASHSCOPEHTTPASR            UsageClientProtocol = "DASHSCOPE_HTTP_ASR"
+	UsageClientProtocolDASHSCOPEREALTIMEASR        UsageClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	UsageClientProtocolGEMINIGENERATECONTENTTTS    UsageClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	UsageClientProtocolGOOGLEGENERATECONTENT       UsageClientProtocol = "GOOGLE_GENERATE_CONTENT"
+	UsageClientProtocolMCPSTREAMABLEHTTP           UsageClientProtocol = "MCP_STREAMABLE_HTTP"
+	UsageClientProtocolMIMOCHATCOMPLETIONSTTS      UsageClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	UsageClientProtocolOPENAIAUDIOSPEECH           UsageClientProtocol = "OPENAI_AUDIO_SPEECH"
+	UsageClientProtocolOPENAIAUDIOTRANSCRIPTIONS   UsageClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	UsageClientProtocolOPENAICHATCOMPLETIONS       UsageClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	UsageClientProtocolOPENAIREALTIMETRANSCRIPTION UsageClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
+	UsageClientProtocolOPENAIRESPONSES             UsageClientProtocol = "OPENAI_RESPONSES"
+)
+
+// Valid indicates whether the value is a known member of the UsageClientProtocol enum.
+func (e UsageClientProtocol) Valid() bool {
+	switch e {
+	case UsageClientProtocolANTHROPICMESSAGES:
+		return true
+	case UsageClientProtocolDASHSCOPEHTTPASR:
+		return true
+	case UsageClientProtocolDASHSCOPEREALTIMEASR:
+		return true
+	case UsageClientProtocolGEMINIGENERATECONTENTTTS:
+		return true
+	case UsageClientProtocolGOOGLEGENERATECONTENT:
+		return true
+	case UsageClientProtocolMCPSTREAMABLEHTTP:
+		return true
+	case UsageClientProtocolMIMOCHATCOMPLETIONSTTS:
+		return true
+	case UsageClientProtocolOPENAIAUDIOSPEECH:
+		return true
+	case UsageClientProtocolOPENAIAUDIOTRANSCRIPTIONS:
+		return true
+	case UsageClientProtocolOPENAICHATCOMPLETIONS:
+		return true
+	case UsageClientProtocolOPENAIREALTIMETRANSCRIPTION:
+		return true
+	case UsageClientProtocolOPENAIRESPONSES:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UsageSummaryCostStatus.
 const (
 	UsageSummaryCostStatusKNOWN   UsageSummaryCostStatus = "KNOWN"
@@ -760,27 +1058,6 @@ func (e UsageSummaryCostStatus) Valid() bool {
 	case UsageSummaryCostStatusPARTIAL:
 		return true
 	case UsageSummaryCostStatusUNKNOWN:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for UsageSummarySemanticMetersConfidence.
-const (
-	UsageSummarySemanticMetersConfidenceEXACT   UsageSummarySemanticMetersConfidence = "EXACT"
-	UsageSummarySemanticMetersConfidencePARTIAL UsageSummarySemanticMetersConfidence = "PARTIAL"
-	UsageSummarySemanticMetersConfidenceUNKNOWN UsageSummarySemanticMetersConfidence = "UNKNOWN"
-)
-
-// Valid indicates whether the value is a known member of the UsageSummarySemanticMetersConfidence enum.
-func (e UsageSummarySemanticMetersConfidence) Valid() bool {
-	switch e {
-	case UsageSummarySemanticMetersConfidenceEXACT:
-		return true
-	case UsageSummarySemanticMetersConfidencePARTIAL:
-		return true
-	case UsageSummarySemanticMetersConfidenceUNKNOWN:
 		return true
 	default:
 		return false
@@ -874,6 +1151,75 @@ func (e ValidationIssueSeverity) Valid() bool {
 	case ValidationIssueSeverityERROR:
 		return true
 	case ValidationIssueSeverityWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageDistributionParamsResourceKind.
+const (
+	UsageDistributionParamsResourceKindASR      UsageDistributionParamsResourceKind = "ASR"
+	UsageDistributionParamsResourceKindMCP      UsageDistributionParamsResourceKind = "MCP"
+	UsageDistributionParamsResourceKindMODEL    UsageDistributionParamsResourceKind = "MODEL"
+	UsageDistributionParamsResourceKindPROVIDER UsageDistributionParamsResourceKind = "PROVIDER"
+	UsageDistributionParamsResourceKindTTS      UsageDistributionParamsResourceKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the UsageDistributionParamsResourceKind enum.
+func (e UsageDistributionParamsResourceKind) Valid() bool {
+	switch e {
+	case UsageDistributionParamsResourceKindASR:
+		return true
+	case UsageDistributionParamsResourceKindMCP:
+		return true
+	case UsageDistributionParamsResourceKindMODEL:
+		return true
+	case UsageDistributionParamsResourceKindPROVIDER:
+		return true
+	case UsageDistributionParamsResourceKindTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageDistributionParamsStatus.
+const (
+	UsageDistributionParamsStatusBLOCKED UsageDistributionParamsStatus = "BLOCKED"
+	UsageDistributionParamsStatusERROR   UsageDistributionParamsStatus = "ERROR"
+	UsageDistributionParamsStatusSUCCESS UsageDistributionParamsStatus = "SUCCESS"
+)
+
+// Valid indicates whether the value is a known member of the UsageDistributionParamsStatus enum.
+func (e UsageDistributionParamsStatus) Valid() bool {
+	switch e {
+	case UsageDistributionParamsStatusBLOCKED:
+		return true
+	case UsageDistributionParamsStatusERROR:
+		return true
+	case UsageDistributionParamsStatusSUCCESS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageDistributionParamsCompleteness.
+const (
+	UsageDistributionParamsCompletenessEXACT   UsageDistributionParamsCompleteness = "EXACT"
+	UsageDistributionParamsCompletenessPARTIAL UsageDistributionParamsCompleteness = "PARTIAL"
+	UsageDistributionParamsCompletenessUNKNOWN UsageDistributionParamsCompleteness = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the UsageDistributionParamsCompleteness enum.
+func (e UsageDistributionParamsCompleteness) Valid() bool {
+	switch e {
+	case UsageDistributionParamsCompletenessEXACT:
+		return true
+	case UsageDistributionParamsCompletenessPARTIAL:
+		return true
+	case UsageDistributionParamsCompletenessUNKNOWN:
 		return true
 	default:
 		return false
@@ -1018,6 +1364,165 @@ func (e UsageSummaryParamsCompleteness) Valid() bool {
 	}
 }
 
+// Defines values for UsageTrendParamsResourceKind.
+const (
+	UsageTrendParamsResourceKindASR      UsageTrendParamsResourceKind = "ASR"
+	UsageTrendParamsResourceKindMCP      UsageTrendParamsResourceKind = "MCP"
+	UsageTrendParamsResourceKindMODEL    UsageTrendParamsResourceKind = "MODEL"
+	UsageTrendParamsResourceKindPROVIDER UsageTrendParamsResourceKind = "PROVIDER"
+	UsageTrendParamsResourceKindTTS      UsageTrendParamsResourceKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the UsageTrendParamsResourceKind enum.
+func (e UsageTrendParamsResourceKind) Valid() bool {
+	switch e {
+	case UsageTrendParamsResourceKindASR:
+		return true
+	case UsageTrendParamsResourceKindMCP:
+		return true
+	case UsageTrendParamsResourceKindMODEL:
+		return true
+	case UsageTrendParamsResourceKindPROVIDER:
+		return true
+	case UsageTrendParamsResourceKindTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageTrendParamsStatus.
+const (
+	UsageTrendParamsStatusBLOCKED UsageTrendParamsStatus = "BLOCKED"
+	UsageTrendParamsStatusERROR   UsageTrendParamsStatus = "ERROR"
+	UsageTrendParamsStatusSUCCESS UsageTrendParamsStatus = "SUCCESS"
+)
+
+// Valid indicates whether the value is a known member of the UsageTrendParamsStatus enum.
+func (e UsageTrendParamsStatus) Valid() bool {
+	switch e {
+	case UsageTrendParamsStatusBLOCKED:
+		return true
+	case UsageTrendParamsStatusERROR:
+		return true
+	case UsageTrendParamsStatusSUCCESS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageTrendParamsCompleteness.
+const (
+	UsageTrendParamsCompletenessEXACT   UsageTrendParamsCompleteness = "EXACT"
+	UsageTrendParamsCompletenessPARTIAL UsageTrendParamsCompleteness = "PARTIAL"
+	UsageTrendParamsCompletenessUNKNOWN UsageTrendParamsCompleteness = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the UsageTrendParamsCompleteness enum.
+func (e UsageTrendParamsCompleteness) Valid() bool {
+	switch e {
+	case UsageTrendParamsCompletenessEXACT:
+		return true
+	case UsageTrendParamsCompletenessPARTIAL:
+		return true
+	case UsageTrendParamsCompletenessUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUsageUsersParamsResourceKind.
+const (
+	ListUsageUsersParamsResourceKindASR      ListUsageUsersParamsResourceKind = "ASR"
+	ListUsageUsersParamsResourceKindMCP      ListUsageUsersParamsResourceKind = "MCP"
+	ListUsageUsersParamsResourceKindMODEL    ListUsageUsersParamsResourceKind = "MODEL"
+	ListUsageUsersParamsResourceKindPROVIDER ListUsageUsersParamsResourceKind = "PROVIDER"
+	ListUsageUsersParamsResourceKindTTS      ListUsageUsersParamsResourceKind = "TTS"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageUsersParamsResourceKind enum.
+func (e ListUsageUsersParamsResourceKind) Valid() bool {
+	switch e {
+	case ListUsageUsersParamsResourceKindASR:
+		return true
+	case ListUsageUsersParamsResourceKindMCP:
+		return true
+	case ListUsageUsersParamsResourceKindMODEL:
+		return true
+	case ListUsageUsersParamsResourceKindPROVIDER:
+		return true
+	case ListUsageUsersParamsResourceKindTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUsageUsersParamsStatus.
+const (
+	ListUsageUsersParamsStatusBLOCKED ListUsageUsersParamsStatus = "BLOCKED"
+	ListUsageUsersParamsStatusERROR   ListUsageUsersParamsStatus = "ERROR"
+	ListUsageUsersParamsStatusSUCCESS ListUsageUsersParamsStatus = "SUCCESS"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageUsersParamsStatus enum.
+func (e ListUsageUsersParamsStatus) Valid() bool {
+	switch e {
+	case ListUsageUsersParamsStatusBLOCKED:
+		return true
+	case ListUsageUsersParamsStatusERROR:
+		return true
+	case ListUsageUsersParamsStatusSUCCESS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUsageUsersParamsCompleteness.
+const (
+	ListUsageUsersParamsCompletenessEXACT   ListUsageUsersParamsCompleteness = "EXACT"
+	ListUsageUsersParamsCompletenessPARTIAL ListUsageUsersParamsCompleteness = "PARTIAL"
+	ListUsageUsersParamsCompletenessUNKNOWN ListUsageUsersParamsCompleteness = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageUsersParamsCompleteness enum.
+func (e ListUsageUsersParamsCompleteness) Valid() bool {
+	switch e {
+	case ListUsageUsersParamsCompletenessEXACT:
+		return true
+	case ListUsageUsersParamsCompletenessPARTIAL:
+		return true
+	case ListUsageUsersParamsCompletenessUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListUsageUsersParamsBudgetStatus.
+const (
+	ListUsageUsersParamsBudgetStatusEXHAUSTED             ListUsageUsersParamsBudgetStatus = "EXHAUSTED"
+	ListUsageUsersParamsBudgetStatusNEARLIMIT             ListUsageUsersParamsBudgetStatus = "NEAR_LIMIT"
+	ListUsageUsersParamsBudgetStatusPENDINGRECONCILIATION ListUsageUsersParamsBudgetStatus = "PENDING_RECONCILIATION"
+)
+
+// Valid indicates whether the value is a known member of the ListUsageUsersParamsBudgetStatus enum.
+func (e ListUsageUsersParamsBudgetStatus) Valid() bool {
+	switch e {
+	case ListUsageUsersParamsBudgetStatusEXHAUSTED:
+		return true
+	case ListUsageUsersParamsBudgetStatusNEARLIMIT:
+		return true
+	case ListUsageUsersParamsBudgetStatusPENDINGRECONCILIATION:
+		return true
+	default:
+		return false
+	}
+}
+
 // Activation defines model for Activation.
 type Activation struct {
 	ActivationId            ActivationId    `json:"activationId"`
@@ -1110,6 +1615,100 @@ type AssistantStarterDefinition struct {
 	Title                 string                `json:"title"`
 }
 
+// BudgetAuditItem defines model for BudgetAuditItem.
+type BudgetAuditItem struct {
+	AuditId          string                  `json:"auditId"`
+	Capability       BudgetCapability        `json:"capability"`
+	ChangedBy        string                  `json:"changedBy"`
+	CreatedAt        time.Time               `json:"createdAt"`
+	Limits           []BudgetLimitDefinition `json:"limits"`
+	Mode             BudgetMode              `json:"mode"`
+	PreviousRevision int                     `json:"previousRevision"`
+	Reason           string                  `json:"reason"`
+	Revision         int                     `json:"revision"`
+	UserId           UserId                  `json:"userId"`
+}
+
+// BudgetAuditPage defines model for BudgetAuditPage.
+type BudgetAuditPage struct {
+	Items      []BudgetAuditItem `json:"items"`
+	NextCursor *string           `json:"nextCursor,omitempty"`
+}
+
+// BudgetCapability defines model for BudgetCapability.
+type BudgetCapability string
+
+// BudgetCapabilityView defines model for BudgetCapabilityView.
+type BudgetCapabilityView struct {
+	AsOf             time.Time          `json:"asOf"`
+	Capability       BudgetCapability   `json:"capability"`
+	EffectiveFrom    time.Time          `json:"effectiveFrom"`
+	InFlightRequests int                `json:"inFlightRequests"`
+	Limits           []BudgetLimitState `json:"limits"`
+	Mode             BudgetMode         `json:"mode"`
+	ResourceId       *string            `json:"resourceId,omitempty"`
+	Revision         int                `json:"revision"`
+	Source           BudgetSource       `json:"source"`
+	Status           BudgetStatus       `json:"status"`
+
+	// UsageMeters Retained cumulative usage history for this capability. It remains available for unlimited budgets and is independent of the current-window used and reserved values in limits.
+	UsageMeters []MeterQuantity `json:"usageMeters"`
+}
+
+// BudgetContext defines model for BudgetContext.
+type BudgetContext struct {
+	AsOf       time.Time          `json:"asOf"`
+	Blockers   []BudgetLimitState `json:"blockers"`
+	Capability BudgetCapability   `json:"capability"`
+	Mode       BudgetMode         `json:"mode"`
+	ResetAt    *time.Time         `json:"resetAt,omitempty"`
+	Revision   int                `json:"revision"`
+}
+
+// BudgetLimitDefinition defines model for BudgetLimitDefinition.
+type BudgetLimitDefinition struct {
+	Limit string `json:"limit"`
+
+	// Meter Standard meters per the S0.2 production usage and user budget contract.
+	// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
+	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+	// ASR    → AUDIO_SECONDS + REQUESTS
+	// MCP    → REQUESTS
+	Meter  PricingMeter `json:"meter"`
+	Period BudgetPeriod `json:"period"`
+}
+
+// BudgetLimitState defines model for BudgetLimitState.
+type BudgetLimitState struct {
+	Limit string `json:"limit"`
+
+	// Meter Standard meters per the S0.2 production usage and user budget contract.
+	// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
+	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+	// ASR    → AUDIO_SECONDS + REQUESTS
+	// MCP    → REQUESTS
+	Meter      PricingMeter `json:"meter"`
+	Overage    string       `json:"overage"`
+	Period     BudgetPeriod `json:"period"`
+	Remaining  string       `json:"remaining"`
+	Reserved   string       `json:"reserved"`
+	ResetAt    *time.Time   `json:"resetAt,omitempty"`
+	ScopeStart time.Time    `json:"scopeStart"`
+	Used       string       `json:"used"`
+}
+
+// BudgetMode defines model for BudgetMode.
+type BudgetMode string
+
+// BudgetPeriod defines model for BudgetPeriod.
+type BudgetPeriod string
+
+// BudgetSource defines model for BudgetSource.
+type BudgetSource string
+
+// BudgetStatus defines model for BudgetStatus.
+type BudgetStatus string
+
 // CreateEnrollmentRequest defines model for CreateEnrollmentRequest.
 type CreateEnrollmentRequest struct {
 	ExpiresInSeconds *int `json:"expiresInSeconds,omitempty"`
@@ -1154,6 +1753,12 @@ type CreateUserRequest struct {
 
 // CreateUserRequestRole defines model for CreateUserRequest.Role.
 type CreateUserRequestRole string
+
+// DeleteUserRequest defines model for DeleteUserRequest.
+type DeleteUserRequest struct {
+	ConfirmationUsername string `json:"confirmationUsername"`
+	Reason               string `json:"reason"`
+}
 
 // DeploymentId defines model for DeploymentId.
 type DeploymentId = string
@@ -1353,6 +1958,22 @@ type McpDefinitionClientProtocol string
 // McpServerId defines model for McpServerId.
 type McpServerId = string
 
+// MeterQuantity defines model for MeterQuantity.
+type MeterQuantity struct {
+	Confidence MeterQuantityConfidence `json:"confidence"`
+
+	// Meter Standard meters per the S0.2 production usage and user budget contract.
+	// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
+	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+	// ASR    → AUDIO_SECONDS + REQUESTS
+	// MCP    → REQUESTS
+	Meter    PricingMeter `json:"meter"`
+	Quantity string       `json:"quantity"`
+}
+
+// MeterQuantityConfidence defines model for MeterQuantity.Confidence.
+type MeterQuantityConfidence string
+
 // ModelDefinition defines model for ModelDefinition.
 type ModelDefinition struct {
 	Capabilities     []ModelDefinitionCapabilities     `json:"capabilities"`
@@ -1386,8 +2007,8 @@ type PreviewDraftRequest struct {
 	ExpectedDraftRevision int `json:"expectedDraftRevision"`
 }
 
-// PricingMeter Standard meters per architecture s0-control-protocol §13.
-// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+// PricingMeter Standard meters per the S0.2 production usage and user budget contract.
+// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
 // TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
 // ASR    → AUDIO_SECONDS + REQUESTS
 // MCP    → REQUESTS
@@ -1398,8 +2019,8 @@ type PricingRule struct {
 	Currency      string    `json:"currency"`
 	EffectiveFrom time.Time `json:"effectiveFrom"`
 
-	// Meter Standard meters per architecture s0-control-protocol §13.
-	// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+	// Meter Standard meters per the S0.2 production usage and user budget contract.
+	// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
 	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
 	// ASR    → AUDIO_SECONDS + REQUESTS
 	// MCP    → REQUESTS
@@ -1422,16 +2043,19 @@ type PricingSet struct {
 
 // Problem defines model for Problem.
 type Problem struct {
-	ActivationId            *ActivationId `json:"activationId,omitempty"`
-	Code                    string        `json:"code"`
-	CurrentDraftRevision    *int          `json:"currentDraftRevision,omitempty"`
-	Detail                  *string       `json:"detail,omitempty"`
-	Forwarded               *bool         `json:"forwarded,omitempty"`
-	RequestId               *RequestId    `json:"requestId,omitempty"`
-	Status                  int           `json:"status"`
-	TargetManagedGeneration *int          `json:"targetManagedGeneration,omitempty"`
-	Title                   string        `json:"title"`
-	Type                    string        `json:"type"`
+	ActivationId *ActivationId  `json:"activationId,omitempty"`
+	Budget       *BudgetContext `json:"budget,omitempty"`
+
+	// Code Stable machine-readable reason. Authentication uses unauthenticated; destructive user lifecycle values include delete_confirmation_mismatch, cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight.
+	Code                    string     `json:"code"`
+	CurrentDraftRevision    *int       `json:"currentDraftRevision,omitempty"`
+	Detail                  *string    `json:"detail,omitempty"`
+	Forwarded               *bool      `json:"forwarded,omitempty"`
+	RequestId               *RequestId `json:"requestId,omitempty"`
+	Status                  int        `json:"status"`
+	TargetManagedGeneration *int       `json:"targetManagedGeneration,omitempty"`
+	Title                   string     `json:"title"`
+	Type                    string     `json:"type"`
 }
 
 // ProviderDefinition defines model for ProviderDefinition.
@@ -1454,6 +2078,14 @@ type PublishDraftRequest struct {
 	ExpectedDraftRevision    int      `json:"expectedDraftRevision"`
 }
 
+// PutBudgetRequest defines model for PutBudgetRequest.
+type PutBudgetRequest struct {
+	ExpectedRevision int                     `json:"expectedRevision"`
+	Limits           []BudgetLimitDefinition `json:"limits"`
+	Mode             BudgetMode              `json:"mode"`
+	Reason           string                  `json:"reason"`
+}
+
 // PutDraftRequest defines model for PutDraftRequest.
 type PutDraftRequest struct {
 	Content               ManagedDraftContent `json:"content"`
@@ -1465,6 +2097,30 @@ type PutPricingRequest struct {
 	ExpectedPricingRevision int           `json:"expectedPricingRevision"`
 	Rules                   []PricingRule `json:"rules"`
 }
+
+// ReconciliationPage defines model for ReconciliationPage.
+type ReconciliationPage struct {
+	Items      []ReconciliationView `json:"items"`
+	NextCursor *string              `json:"nextCursor,omitempty"`
+}
+
+// ReconciliationView defines model for ReconciliationView.
+type ReconciliationView struct {
+	Capability       BudgetCapability        `json:"capability"`
+	CreatedAt        time.Time               `json:"createdAt"`
+	Observed         []MeterQuantity         `json:"observed"`
+	RequestId        RequestId               `json:"requestId"`
+	Reservation      []MeterQuantity         `json:"reservation"`
+	ResolutionReason *string                 `json:"resolutionReason,omitempty"`
+	ResolvedAt       *time.Time              `json:"resolvedAt,omitempty"`
+	ResolvedBy       *string                 `json:"resolvedBy,omitempty"`
+	State            ReconciliationViewState `json:"state"`
+	UpdatedAt        time.Time               `json:"updatedAt"`
+	UserId           UserId                  `json:"userId"`
+}
+
+// ReconciliationViewState defines model for ReconciliationView.State.
+type ReconciliationViewState string
 
 // Release defines model for Release.
 type Release struct {
@@ -1520,35 +2176,60 @@ type RequestUsagePage struct {
 
 // RequestUsageView defines model for RequestUsageView.
 type RequestUsageView struct {
-	CompletedAt     time.Time    `json:"completedAt"`
-	ControlRevision int          `json:"controlRevision"`
-	DeploymentId    DeploymentId `json:"deploymentId"`
-	DeviceId        *DeviceId    `json:"deviceId,omitempty"`
+	Budget          *BudgetContext      `json:"budget,omitempty"`
+	ClientProtocol  UsageClientProtocol `json:"clientProtocol"`
+	CompletedAt     time.Time           `json:"completedAt"`
+	ControlRevision int                 `json:"controlRevision"`
+	DeploymentId    DeploymentId        `json:"deploymentId"`
+	DeviceId        *DeviceId           `json:"deviceId,omitempty"`
 
 	// DeviceName Device name reported at enrollment; empty when the request carries no device. Display metadata, not authorization identity.
-	DeviceName        string         `json:"deviceName,omitempty"`
-	DurationMs        int            `json:"durationMs"`
-	ErrorClass        *string        `json:"errorClass,omitempty"`
-	Forwarded         bool           `json:"forwarded"`
-	HttpStatus        int            `json:"httpStatus"`
-	InteractionId     *InteractionId `json:"interactionId,omitempty"`
-	ManagedGeneration int            `json:"managedGeneration"`
-	RequestBytes      int            `json:"requestBytes"`
-	RequestId         RequestId      `json:"requestId"`
+	DeviceName          string                              `json:"deviceName,omitempty"`
+	DurationMs          int                                 `json:"durationMs"`
+	ErrorClass          *string                             `json:"errorClass,omitempty"`
+	Forwarded           bool                                `json:"forwarded"`
+	HttpStatus          int                                 `json:"httpStatus"`
+	InteractionId       *InteractionId                      `json:"interactionId,omitempty"`
+	ManagedGeneration   int                                 `json:"managedGeneration"`
+	RequestBytes        int                                 `json:"requestBytes"`
+	RequestCompleteness RequestUsageViewRequestCompleteness `json:"requestCompleteness"`
+	RequestId           RequestId                           `json:"requestId"`
 
 	// ResourceDisplayName Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found.
-	ResourceDisplayName string         `json:"resourceDisplayName,omitempty"`
-	ResourceId          string         `json:"resourceId,omitempty"`
-	ResponseBytes       int            `json:"responseBytes"`
-	RuntimeRouteId      RuntimeRouteId `json:"runtimeRouteId,omitempty"`
-	StartedAt           time.Time      `json:"startedAt"`
-	UpstreamHttpStatus  *int           `json:"upstreamHttpStatus,omitempty"`
-	UpstreamId          UpstreamId     `json:"upstreamId,omitempty"`
+	ResourceDisplayName string                          `json:"resourceDisplayName,omitempty"`
+	ResourceId          string                          `json:"resourceId,omitempty"`
+	ResourceKind        ResourceKind                    `json:"resourceKind"`
+	ResponseBytes       int                             `json:"responseBytes"`
+	RuntimeRouteId      RuntimeRouteId                  `json:"runtimeRouteId,omitempty"`
+	SemanticMeters      []MeterQuantity                 `json:"semanticMeters"`
+	SettlementState     RequestUsageViewSettlementState `json:"settlementState"`
+	StartedAt           time.Time                       `json:"startedAt"`
+	UpstreamHttpStatus  *int                            `json:"upstreamHttpStatus,omitempty"`
+	UpstreamId          UpstreamId                      `json:"upstreamId,omitempty"`
 
 	// UserDisplayName Display name resolved from the users table. Always present, because a usage row cannot exist without its user. Display metadata, not authorization identity.
 	UserDisplayName string `json:"userDisplayName"`
 	UserId          UserId `json:"userId"`
 }
+
+// RequestUsageViewRequestCompleteness defines model for RequestUsageView.RequestCompleteness.
+type RequestUsageViewRequestCompleteness string
+
+// RequestUsageViewSettlementState defines model for RequestUsageView.SettlementState.
+type RequestUsageViewSettlementState string
+
+// ResolveReconciliationRequest defines model for ResolveReconciliationRequest.
+type ResolveReconciliationRequest struct {
+	Action        ResolveReconciliationRequestAction        `json:"action"`
+	ExpectedState ResolveReconciliationRequestExpectedState `json:"expectedState"`
+	Reason        string                                    `json:"reason"`
+}
+
+// ResolveReconciliationRequestAction defines model for ResolveReconciliationRequest.Action.
+type ResolveReconciliationRequestAction string
+
+// ResolveReconciliationRequestExpectedState defines model for ResolveReconciliationRequest.ExpectedState.
+type ResolveReconciliationRequestExpectedState string
 
 // ResourceDiff defines model for ResourceDiff.
 type ResourceDiff struct {
@@ -1557,6 +2238,9 @@ type ResourceDiff struct {
 	Kind    ReleaseDiffKind `json:"kind"`
 	Removed int             `json:"removed"`
 }
+
+// ResourceKind defines model for ResourceKind.
+type ResourceKind string
 
 // RuntimeBindingDefinition defines model for RuntimeBindingDefinition.
 type RuntimeBindingDefinition struct {
@@ -1781,6 +2465,26 @@ type UpstreamTestResult struct {
 	Warnings  []string `json:"warnings"`
 }
 
+// UsageClientProtocol defines model for UsageClientProtocol.
+type UsageClientProtocol string
+
+// UsageDistribution defines model for UsageDistribution.
+type UsageDistribution struct {
+	From  time.Time               `json:"from"`
+	Items []UsageDistributionItem `json:"items"`
+	To    time.Time               `json:"to"`
+}
+
+// UsageDistributionItem defines model for UsageDistributionItem.
+type UsageDistributionItem struct {
+	ClientProtocol      UsageClientProtocol `json:"clientProtocol"`
+	RequestCount        int                 `json:"requestCount"`
+	ResourceDisplayName *string             `json:"resourceDisplayName,omitempty"`
+	ResourceId          *string             `json:"resourceId,omitempty"`
+	ResourceKind        ResourceKind        `json:"resourceKind"`
+	SemanticMeters      []MeterQuantity     `json:"semanticMeters"`
+}
+
 // UsageSummary defines model for UsageSummary.
 type UsageSummary struct {
 	Cost struct {
@@ -1796,25 +2500,28 @@ type UsageSummary struct {
 	RequestCompleteness RequestCompletenessCounts `json:"requestCompleteness"`
 	RequestCount        int                       `json:"requestCount"`
 	ResponseBytes       int                       `json:"responseBytes"`
-	SemanticMeters      []struct {
-		Confidence UsageSummarySemanticMetersConfidence `json:"confidence"`
-
-		// Meter Standard meters per architecture s0-control-protocol §13.
-		// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
-		// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
-		// ASR    → AUDIO_SECONDS + REQUESTS
-		// MCP    → REQUESTS
-		Meter    PricingMeter `json:"meter"`
-		Quantity string       `json:"quantity"`
-	} `json:"semanticMeters"`
-	To time.Time `json:"to"`
+	SemanticMeters      []MeterQuantity           `json:"semanticMeters"`
+	To                  time.Time                 `json:"to"`
 }
 
 // UsageSummaryCostStatus defines model for UsageSummary.Cost.Status.
 type UsageSummaryCostStatus string
 
-// UsageSummarySemanticMetersConfidence defines model for UsageSummary.SemanticMeters.Confidence.
-type UsageSummarySemanticMetersConfidence string
+// UsageTrend defines model for UsageTrend.
+type UsageTrend struct {
+	From     time.Time         `json:"from"`
+	Points   []UsageTrendPoint `json:"points"`
+	Timezone string            `json:"timezone"`
+	To       time.Time         `json:"to"`
+}
+
+// UsageTrendPoint defines model for UsageTrendPoint.
+type UsageTrendPoint struct {
+	Date                  openapi_types.Date `json:"date"`
+	ForwardedRequestCount int                `json:"forwardedRequestCount"`
+	RequestCount          int                `json:"requestCount"`
+	SemanticMeters        []MeterQuantity    `json:"semanticMeters"`
+}
 
 // User defines model for User.
 type User struct {
@@ -1833,6 +2540,14 @@ type UserRole string
 // UserStatus defines model for User.Status.
 type UserStatus string
 
+// UserBudgetView defines model for UserBudgetView.
+type UserBudgetView struct {
+	AsOf     time.Time              `json:"asOf"`
+	Items    []BudgetCapabilityView `json:"items"`
+	Timezone string                 `json:"timezone"`
+	UserId   UserId                 `json:"userId"`
+}
+
 // UserId defines model for UserId.
 type UserId = string
 
@@ -1840,6 +2555,21 @@ type UserId = string
 type UserPage struct {
 	Items      []User  `json:"items"`
 	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+// UserUsagePage defines model for UserUsagePage.
+type UserUsagePage struct {
+	Items      []UserUsageView `json:"items"`
+	NextCursor *string         `json:"nextCursor,omitempty"`
+}
+
+// UserUsageView defines model for UserUsageView.
+type UserUsageView struct {
+	Budget          UserBudgetView  `json:"budget"`
+	RequestCount    int             `json:"requestCount"`
+	SemanticMeters  []MeterQuantity `json:"semanticMeters"`
+	UserDisplayName string          `json:"userDisplayName"`
+	UserId          UserId          `json:"userId"`
 }
 
 // ValidateDraftRequest defines model for ValidateDraftRequest.
@@ -1989,18 +2719,52 @@ type TestUpstreamParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// UsageDistributionParams defines parameters for UsageDistribution.
+type UsageDistributionParams struct {
+	From           *time.Time                           `form:"from,omitempty" json:"from,omitempty"`
+	To             *time.Time                           `form:"to,omitempty" json:"to,omitempty"`
+	UserId         *string                              `form:"userId,omitempty" json:"userId,omitempty"`
+	ResourceId     *string                              `form:"resourceId,omitempty" json:"resourceId,omitempty"`
+	ResourceKind   *UsageDistributionParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
+	UpstreamId     *string                              `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
+	Status         *UsageDistributionParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
+	Completeness   *UsageDistributionParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
+	ClientProtocol *UsageClientProtocol                 `form:"clientProtocol,omitempty" json:"clientProtocol,omitempty"`
+}
+
+// UsageDistributionParamsResourceKind defines parameters for UsageDistribution.
+type UsageDistributionParamsResourceKind string
+
+// UsageDistributionParamsStatus defines parameters for UsageDistribution.
+type UsageDistributionParamsStatus string
+
+// UsageDistributionParamsCompleteness defines parameters for UsageDistribution.
+type UsageDistributionParamsCompleteness string
+
+// ListUsageReconciliationsParams defines parameters for ListUsageReconciliations.
+type ListUsageReconciliationsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ResolveUsageReconciliationParams defines parameters for ResolveUsageReconciliation.
+type ResolveUsageReconciliationParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // ListUsageRequestsParams defines parameters for ListUsageRequests.
 type ListUsageRequestsParams struct {
-	Limit        *int                                 `form:"limit,omitempty" json:"limit,omitempty"`
-	Cursor       *string                              `form:"cursor,omitempty" json:"cursor,omitempty"`
-	From         *time.Time                           `form:"from,omitempty" json:"from,omitempty"`
-	To           *time.Time                           `form:"to,omitempty" json:"to,omitempty"`
-	UserId       *string                              `form:"userId,omitempty" json:"userId,omitempty"`
-	ResourceId   *string                              `form:"resourceId,omitempty" json:"resourceId,omitempty"`
-	ResourceKind *ListUsageRequestsParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
-	UpstreamId   *string                              `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
-	Status       *ListUsageRequestsParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
-	Completeness *ListUsageRequestsParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
+	Limit          *int                                 `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor         *string                              `form:"cursor,omitempty" json:"cursor,omitempty"`
+	From           *time.Time                           `form:"from,omitempty" json:"from,omitempty"`
+	To             *time.Time                           `form:"to,omitempty" json:"to,omitempty"`
+	UserId         *string                              `form:"userId,omitempty" json:"userId,omitempty"`
+	ResourceId     *string                              `form:"resourceId,omitempty" json:"resourceId,omitempty"`
+	ResourceKind   *ListUsageRequestsParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
+	UpstreamId     *string                              `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
+	Status         *ListUsageRequestsParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
+	Completeness   *ListUsageRequestsParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
+	ClientProtocol *UsageClientProtocol                 `form:"clientProtocol,omitempty" json:"clientProtocol,omitempty"`
 }
 
 // ListUsageRequestsParamsResourceKind defines parameters for ListUsageRequests.
@@ -2014,14 +2778,15 @@ type ListUsageRequestsParamsCompleteness string
 
 // UsageSummaryParams defines parameters for UsageSummary.
 type UsageSummaryParams struct {
-	From         *time.Time                      `form:"from,omitempty" json:"from,omitempty"`
-	To           *time.Time                      `form:"to,omitempty" json:"to,omitempty"`
-	UserId       *string                         `form:"userId,omitempty" json:"userId,omitempty"`
-	ResourceId   *string                         `form:"resourceId,omitempty" json:"resourceId,omitempty"`
-	ResourceKind *UsageSummaryParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
-	UpstreamId   *string                         `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
-	Status       *UsageSummaryParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
-	Completeness *UsageSummaryParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
+	From           *time.Time                      `form:"from,omitempty" json:"from,omitempty"`
+	To             *time.Time                      `form:"to,omitempty" json:"to,omitempty"`
+	UserId         *string                         `form:"userId,omitempty" json:"userId,omitempty"`
+	ResourceId     *string                         `form:"resourceId,omitempty" json:"resourceId,omitempty"`
+	ResourceKind   *UsageSummaryParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
+	UpstreamId     *string                         `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
+	Status         *UsageSummaryParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
+	Completeness   *UsageSummaryParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
+	ClientProtocol *UsageClientProtocol            `form:"clientProtocol,omitempty" json:"clientProtocol,omitempty"`
 }
 
 // UsageSummaryParamsResourceKind defines parameters for UsageSummary.
@@ -2032,6 +2797,57 @@ type UsageSummaryParamsStatus string
 
 // UsageSummaryParamsCompleteness defines parameters for UsageSummary.
 type UsageSummaryParamsCompleteness string
+
+// UsageTrendParams defines parameters for UsageTrend.
+type UsageTrendParams struct {
+	From           *time.Time                    `form:"from,omitempty" json:"from,omitempty"`
+	To             *time.Time                    `form:"to,omitempty" json:"to,omitempty"`
+	UserId         *string                       `form:"userId,omitempty" json:"userId,omitempty"`
+	ResourceId     *string                       `form:"resourceId,omitempty" json:"resourceId,omitempty"`
+	ResourceKind   *UsageTrendParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
+	UpstreamId     *string                       `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
+	Status         *UsageTrendParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
+	Completeness   *UsageTrendParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
+	ClientProtocol *UsageClientProtocol          `form:"clientProtocol,omitempty" json:"clientProtocol,omitempty"`
+}
+
+// UsageTrendParamsResourceKind defines parameters for UsageTrend.
+type UsageTrendParamsResourceKind string
+
+// UsageTrendParamsStatus defines parameters for UsageTrend.
+type UsageTrendParamsStatus string
+
+// UsageTrendParamsCompleteness defines parameters for UsageTrend.
+type UsageTrendParamsCompleteness string
+
+// ListUsageUsersParams defines parameters for ListUsageUsers.
+type ListUsageUsersParams struct {
+	Limit          *int                              `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor         *string                           `form:"cursor,omitempty" json:"cursor,omitempty"`
+	From           *time.Time                        `form:"from,omitempty" json:"from,omitempty"`
+	To             *time.Time                        `form:"to,omitempty" json:"to,omitempty"`
+	ResourceId     *string                           `form:"resourceId,omitempty" json:"resourceId,omitempty"`
+	ResourceKind   *ListUsageUsersParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
+	UpstreamId     *string                           `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
+	Status         *ListUsageUsersParamsStatus       `form:"status,omitempty" json:"status,omitempty"`
+	Completeness   *ListUsageUsersParamsCompleteness `form:"completeness,omitempty" json:"completeness,omitempty"`
+	ClientProtocol *UsageClientProtocol              `form:"clientProtocol,omitempty" json:"clientProtocol,omitempty"`
+
+	// BudgetStatus Filter the user page by the effective cross-capability budget health. NEAR_LIMIT is an Admin-only 80 percent presentation threshold and does not affect admission.
+	BudgetStatus *ListUsageUsersParamsBudgetStatus `form:"budgetStatus,omitempty" json:"budgetStatus,omitempty"`
+}
+
+// ListUsageUsersParamsResourceKind defines parameters for ListUsageUsers.
+type ListUsageUsersParamsResourceKind string
+
+// ListUsageUsersParamsStatus defines parameters for ListUsageUsers.
+type ListUsageUsersParamsStatus string
+
+// ListUsageUsersParamsCompleteness defines parameters for ListUsageUsers.
+type ListUsageUsersParamsCompleteness string
+
+// ListUsageUsersParamsBudgetStatus defines parameters for ListUsageUsers.
+type ListUsageUsersParamsBudgetStatus string
 
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
@@ -2047,9 +2863,26 @@ type CreateUserParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// DeleteUserParams defines parameters for DeleteUser.
+type DeleteUserParams struct {
+	XCSRFToken     string         `json:"X-CSRF-Token"`
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // UpdateUserParams defines parameters for UpdateUser.
 type UpdateUserParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// PutUserBudgetParams defines parameters for PutUserBudget.
+type PutUserBudgetParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ListUserBudgetAuditParams defines parameters for ListUserBudgetAudit.
+type ListUserBudgetAuditParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // ListDevicesParams defines parameters for ListDevices.
@@ -2116,11 +2949,20 @@ type CreateUpstreamJSONRequestBody = CreateUpstreamRequest
 // UpdateUpstreamJSONRequestBody defines body for UpdateUpstream for application/json ContentType.
 type UpdateUpstreamJSONRequestBody = UpdateUpstreamRequest
 
+// ResolveUsageReconciliationJSONRequestBody defines body for ResolveUsageReconciliation for application/json ContentType.
+type ResolveUsageReconciliationJSONRequestBody = ResolveReconciliationRequest
+
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequest
 
+// DeleteUserJSONRequestBody defines body for DeleteUser for application/json ContentType.
+type DeleteUserJSONRequestBody = DeleteUserRequest
+
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = UpdateUserRequest
+
+// PutUserBudgetJSONRequestBody defines body for PutUserBudget for application/json ContentType.
+type PutUserBudgetJSONRequestBody = PutBudgetRequest
 
 // CreateEnrollmentJSONRequestBody defines body for CreateEnrollment for application/json ContentType.
 type CreateEnrollmentJSONRequestBody = CreateEnrollmentRequest
@@ -2227,6 +3069,15 @@ type ServerInterface interface {
 	// (POST /api/admin/v1/upstreams/{upstreamId}:test)
 	TestUpstream(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId, params TestUpstreamParams)
 
+	// (GET /api/admin/v1/usage/distribution)
+	UsageDistribution(w http.ResponseWriter, r *http.Request, params UsageDistributionParams)
+
+	// (GET /api/admin/v1/usage/reconciliations)
+	ListUsageReconciliations(w http.ResponseWriter, r *http.Request, params ListUsageReconciliationsParams)
+
+	// (POST /api/admin/v1/usage/reconciliations/{requestId}:resolve)
+	ResolveUsageReconciliation(w http.ResponseWriter, r *http.Request, requestId RequestId, params ResolveUsageReconciliationParams)
+
 	// (GET /api/admin/v1/usage/requests)
 	ListUsageRequests(w http.ResponseWriter, r *http.Request, params ListUsageRequestsParams)
 
@@ -2236,17 +3087,35 @@ type ServerInterface interface {
 	// (GET /api/admin/v1/usage/summary)
 	UsageSummary(w http.ResponseWriter, r *http.Request, params UsageSummaryParams)
 
+	// (GET /api/admin/v1/usage/trend)
+	UsageTrend(w http.ResponseWriter, r *http.Request, params UsageTrendParams)
+
+	// (GET /api/admin/v1/usage/users)
+	ListUsageUsers(w http.ResponseWriter, r *http.Request, params ListUsageUsersParams)
+
 	// (GET /api/admin/v1/users)
 	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
 
 	// (POST /api/admin/v1/users)
 	CreateUser(w http.ResponseWriter, r *http.Request, params CreateUserParams)
 
+	// (DELETE /api/admin/v1/users/{userId})
+	DeleteUser(w http.ResponseWriter, r *http.Request, userId UserId, params DeleteUserParams)
+
 	// (GET /api/admin/v1/users/{userId})
 	GetUser(w http.ResponseWriter, r *http.Request, userId UserId)
 
 	// (PUT /api/admin/v1/users/{userId})
 	UpdateUser(w http.ResponseWriter, r *http.Request, userId UserId, params UpdateUserParams)
+
+	// (GET /api/admin/v1/users/{userId}/budgets)
+	GetUserBudgets(w http.ResponseWriter, r *http.Request, userId UserId)
+
+	// (PUT /api/admin/v1/users/{userId}/budgets/{capability})
+	PutUserBudget(w http.ResponseWriter, r *http.Request, userId UserId, capability BudgetCapability, params PutUserBudgetParams)
+
+	// (GET /api/admin/v1/users/{userId}/budgets/{capability}/audit)
+	ListUserBudgetAudit(w http.ResponseWriter, r *http.Request, userId UserId, capability BudgetCapability, params ListUserBudgetAuditParams)
 
 	// (GET /api/admin/v1/users/{userId}/devices)
 	ListDevices(w http.ResponseWriter, r *http.Request, userId UserId, params ListDevicesParams)
@@ -2428,6 +3297,21 @@ func (_ Unimplemented) TestUpstream(w http.ResponseWriter, r *http.Request, upst
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (GET /api/admin/v1/usage/distribution)
+func (_ Unimplemented) UsageDistribution(w http.ResponseWriter, r *http.Request, params UsageDistributionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/usage/reconciliations)
+func (_ Unimplemented) ListUsageReconciliations(w http.ResponseWriter, r *http.Request, params ListUsageReconciliationsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/usage/reconciliations/{requestId}:resolve)
+func (_ Unimplemented) ResolveUsageReconciliation(w http.ResponseWriter, r *http.Request, requestId RequestId, params ResolveUsageReconciliationParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/admin/v1/usage/requests)
 func (_ Unimplemented) ListUsageRequests(w http.ResponseWriter, r *http.Request, params ListUsageRequestsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -2443,6 +3327,16 @@ func (_ Unimplemented) UsageSummary(w http.ResponseWriter, r *http.Request, para
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (GET /api/admin/v1/usage/trend)
+func (_ Unimplemented) UsageTrend(w http.ResponseWriter, r *http.Request, params UsageTrendParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/usage/users)
+func (_ Unimplemented) ListUsageUsers(w http.ResponseWriter, r *http.Request, params ListUsageUsersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/admin/v1/users)
 func (_ Unimplemented) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -2453,6 +3347,11 @@ func (_ Unimplemented) CreateUser(w http.ResponseWriter, r *http.Request, params
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (DELETE /api/admin/v1/users/{userId})
+func (_ Unimplemented) DeleteUser(w http.ResponseWriter, r *http.Request, userId UserId, params DeleteUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/admin/v1/users/{userId})
 func (_ Unimplemented) GetUser(w http.ResponseWriter, r *http.Request, userId UserId) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -2460,6 +3359,21 @@ func (_ Unimplemented) GetUser(w http.ResponseWriter, r *http.Request, userId Us
 
 // (PUT /api/admin/v1/users/{userId})
 func (_ Unimplemented) UpdateUser(w http.ResponseWriter, r *http.Request, userId UserId, params UpdateUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/users/{userId}/budgets)
+func (_ Unimplemented) GetUserBudgets(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/admin/v1/users/{userId}/budgets/{capability})
+func (_ Unimplemented) PutUserBudget(w http.ResponseWriter, r *http.Request, userId UserId, capability BudgetCapability, params PutUserBudgetParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/users/{userId}/budgets/{capability}/audit)
+func (_ Unimplemented) ListUserBudgetAudit(w http.ResponseWriter, r *http.Request, userId UserId, capability BudgetCapability, params ListUserBudgetAuditParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3852,6 +4766,243 @@ func (siw *ServerInterfaceWrapper) TestUpstream(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// UsageDistribution operation middleware
+func (siw *ServerInterfaceWrapper) UsageDistribution(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UsageDistributionParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "userId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceId", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceKind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceKind", r.URL.Query(), &params.ResourceKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceKind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceKind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "upstreamId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "upstreamId", r.URL.Query(), &params.UpstreamId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "upstreamId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "upstreamId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "completeness" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "completeness", r.URL.Query(), &params.Completeness, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "completeness"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "completeness", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "clientProtocol" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "clientProtocol", r.URL.Query(), &params.ClientProtocol, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "clientProtocol"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clientProtocol", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UsageDistribution(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUsageReconciliations operation middleware
+func (siw *ServerInterfaceWrapper) ListUsageReconciliations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUsageReconciliationsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsageReconciliations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResolveUsageReconciliation operation middleware
+func (siw *ServerInterfaceWrapper) ResolveUsageReconciliation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId RequestId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ResolveUsageReconciliationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResolveUsageReconciliation(w, r, requestId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListUsageRequests operation middleware
 func (siw *ServerInterfaceWrapper) ListUsageRequests(w http.ResponseWriter, r *http.Request) {
 
@@ -3987,6 +5138,19 @@ func (siw *ServerInterfaceWrapper) ListUsageRequests(w http.ResponseWriter, r *h
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "completeness"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "completeness", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "clientProtocol" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "clientProtocol", r.URL.Query(), &params.ClientProtocol, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "clientProtocol"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clientProtocol", Err: err})
 		}
 		return
 	}
@@ -4141,8 +5305,321 @@ func (siw *ServerInterfaceWrapper) UsageSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// ------------- Optional query parameter "clientProtocol" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "clientProtocol", r.URL.Query(), &params.ClientProtocol, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "clientProtocol"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clientProtocol", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UsageSummary(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UsageTrend operation middleware
+func (siw *ServerInterfaceWrapper) UsageTrend(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UsageTrendParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "userId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceId", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceKind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceKind", r.URL.Query(), &params.ResourceKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceKind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceKind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "upstreamId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "upstreamId", r.URL.Query(), &params.UpstreamId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "upstreamId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "upstreamId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "completeness" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "completeness", r.URL.Query(), &params.Completeness, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "completeness"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "completeness", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "clientProtocol" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "clientProtocol", r.URL.Query(), &params.ClientProtocol, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "clientProtocol"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clientProtocol", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UsageTrend(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUsageUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListUsageUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUsageUsersParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceId", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "resourceKind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceKind", r.URL.Query(), &params.ResourceKind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceKind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceKind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "upstreamId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "upstreamId", r.URL.Query(), &params.UpstreamId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "upstreamId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "upstreamId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "completeness" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "completeness", r.URL.Query(), &params.Completeness, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "completeness"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "completeness", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "clientProtocol" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "clientProtocol", r.URL.Query(), &params.ClientProtocol, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "clientProtocol"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clientProtocol", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "budgetStatus" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "budgetStatus", r.URL.Query(), &params.BudgetStatus, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "budgetStatus"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "budgetStatus", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsageUsers(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4256,6 +5733,83 @@ func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetUser operation middleware
 func (siw *ServerInterfaceWrapper) GetUser(w http.ResponseWriter, r *http.Request) {
 
@@ -4327,6 +5881,159 @@ func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUserBudgets operation middleware
+func (siw *ServerInterfaceWrapper) GetUserBudgets(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUserBudgets(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutUserBudget operation middleware
+func (siw *ServerInterfaceWrapper) PutUserBudget(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "capability" -------------
+	var capability BudgetCapability
+
+	err = runtime.BindStyledParameterWithOptions("simple", "capability", chi.URLParam(r, "capability"), &capability, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "capability", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutUserBudgetParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutUserBudget(w, r, userId, capability, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUserBudgetAudit operation middleware
+func (siw *ServerInterfaceWrapper) ListUserBudgetAudit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "capability" -------------
+	var capability BudgetCapability
+
+	err = runtime.BindStyledParameterWithOptions("simple", "capability", chi.URLParam(r, "capability"), &capability, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "capability", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUserBudgetAuditParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUserBudgetAudit(w, r, userId, capability, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4782,6 +6489,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/admin/v1/users", wrapper.CreateUser)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/admin/v1/users/{userId}", wrapper.DeleteUser)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}", wrapper.GetUser)
 	})
 	r.Group(func(r chi.Router) {
@@ -4801,6 +6511,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/devices", wrapper.ListDevices)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/budgets", wrapper.GetUserBudgets)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/admin/v1/users/{userId}/budgets/{capability}", wrapper.PutUserBudget)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/budgets/{capability}/audit", wrapper.ListUserBudgetAudit)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/devices/{deviceId}:revoke", wrapper.RevokeDevice)
@@ -4861,6 +6580,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/usage/summary", wrapper.UsageSummary)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/usage/trend", wrapper.UsageTrend)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/usage/distribution", wrapper.UsageDistribution)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/usage/users", wrapper.ListUsageUsers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/usage/reconciliations", wrapper.ListUsageReconciliations)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/usage/reconciliations/{requestId}:resolve", wrapper.ResolveUsageReconciliation)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/usage/requests", wrapper.ListUsageRequests)

@@ -42,43 +42,24 @@ func (_u *SemanticUsageUpdate) SetNillableRequestID(v *string) *SemanticUsageUpd
 	return _u
 }
 
-// ClearRequestID clears the value of the "request_id" field.
-func (_u *SemanticUsageUpdate) ClearRequestID() *SemanticUsageUpdate {
-	_u.mutation.ClearRequestID()
+// SetSettlementRevision sets the "settlement_revision" field.
+func (_u *SemanticUsageUpdate) SetSettlementRevision(v int64) *SemanticUsageUpdate {
+	_u.mutation.ResetSettlementRevision()
+	_u.mutation.SetSettlementRevision(v)
 	return _u
 }
 
-// SetUpstreamID sets the "upstream_id" field.
-func (_u *SemanticUsageUpdate) SetUpstreamID(v string) *SemanticUsageUpdate {
-	_u.mutation.SetUpstreamID(v)
-	return _u
-}
-
-// SetNillableUpstreamID sets the "upstream_id" field if the given value is not nil.
-func (_u *SemanticUsageUpdate) SetNillableUpstreamID(v *string) *SemanticUsageUpdate {
+// SetNillableSettlementRevision sets the "settlement_revision" field if the given value is not nil.
+func (_u *SemanticUsageUpdate) SetNillableSettlementRevision(v *int64) *SemanticUsageUpdate {
 	if v != nil {
-		_u.SetUpstreamID(*v)
+		_u.SetSettlementRevision(*v)
 	}
 	return _u
 }
 
-// SetResourceID sets the "resource_id" field.
-func (_u *SemanticUsageUpdate) SetResourceID(v string) *SemanticUsageUpdate {
-	_u.mutation.SetResourceID(v)
-	return _u
-}
-
-// SetNillableResourceID sets the "resource_id" field if the given value is not nil.
-func (_u *SemanticUsageUpdate) SetNillableResourceID(v *string) *SemanticUsageUpdate {
-	if v != nil {
-		_u.SetResourceID(*v)
-	}
-	return _u
-}
-
-// ClearResourceID clears the value of the "resource_id" field.
-func (_u *SemanticUsageUpdate) ClearResourceID() *SemanticUsageUpdate {
-	_u.mutation.ClearResourceID()
+// AddSettlementRevision adds value to the "settlement_revision" field.
+func (_u *SemanticUsageUpdate) AddSettlementRevision(v int64) *SemanticUsageUpdate {
+	_u.mutation.AddSettlementRevision(v)
 	return _u
 }
 
@@ -96,12 +77,6 @@ func (_u *SemanticUsageUpdate) SetNillableSourceEventID(v *string) *SemanticUsag
 	return _u
 }
 
-// ClearSourceEventID clears the value of the "source_event_id" field.
-func (_u *SemanticUsageUpdate) ClearSourceEventID() *SemanticUsageUpdate {
-	_u.mutation.ClearSourceEventID()
-	return _u
-}
-
 // SetMeter sets the "meter" field.
 func (_u *SemanticUsageUpdate) SetMeter(v string) *SemanticUsageUpdate {
 	_u.mutation.SetMeter(v)
@@ -113,6 +88,27 @@ func (_u *SemanticUsageUpdate) SetNillableMeter(v *string) *SemanticUsageUpdate 
 	if v != nil {
 		_u.SetMeter(*v)
 	}
+	return _u
+}
+
+// SetQuantityUnits sets the "quantity_units" field.
+func (_u *SemanticUsageUpdate) SetQuantityUnits(v int64) *SemanticUsageUpdate {
+	_u.mutation.ResetQuantityUnits()
+	_u.mutation.SetQuantityUnits(v)
+	return _u
+}
+
+// SetNillableQuantityUnits sets the "quantity_units" field if the given value is not nil.
+func (_u *SemanticUsageUpdate) SetNillableQuantityUnits(v *int64) *SemanticUsageUpdate {
+	if v != nil {
+		_u.SetQuantityUnits(*v)
+	}
+	return _u
+}
+
+// AddQuantityUnits adds value to the "quantity_units" field.
+func (_u *SemanticUsageUpdate) AddQuantityUnits(v int64) *SemanticUsageUpdate {
+	_u.mutation.AddQuantityUnits(v)
 	return _u
 }
 
@@ -256,26 +252,23 @@ func (_u *SemanticUsageUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(semanticusage.FieldRequestID, field.TypeString, value)
 	}
-	if _u.mutation.RequestIDCleared() {
-		_spec.ClearField(semanticusage.FieldRequestID, field.TypeString)
+	if value, ok := _u.mutation.SettlementRevision(); ok {
+		_spec.SetField(semanticusage.FieldSettlementRevision, field.TypeInt64, value)
 	}
-	if value, ok := _u.mutation.UpstreamID(); ok {
-		_spec.SetField(semanticusage.FieldUpstreamID, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.ResourceID(); ok {
-		_spec.SetField(semanticusage.FieldResourceID, field.TypeString, value)
-	}
-	if _u.mutation.ResourceIDCleared() {
-		_spec.ClearField(semanticusage.FieldResourceID, field.TypeString)
+	if value, ok := _u.mutation.AddedSettlementRevision(); ok {
+		_spec.AddField(semanticusage.FieldSettlementRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.SourceEventID(); ok {
 		_spec.SetField(semanticusage.FieldSourceEventID, field.TypeString, value)
 	}
-	if _u.mutation.SourceEventIDCleared() {
-		_spec.ClearField(semanticusage.FieldSourceEventID, field.TypeString)
-	}
 	if value, ok := _u.mutation.Meter(); ok {
 		_spec.SetField(semanticusage.FieldMeter, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.QuantityUnits(); ok {
+		_spec.SetField(semanticusage.FieldQuantityUnits, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedQuantityUnits(); ok {
+		_spec.AddField(semanticusage.FieldQuantityUnits, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.QuantityDecimal(); ok {
 		_spec.SetField(semanticusage.FieldQuantityDecimal, field.TypeString, value)
@@ -335,43 +328,24 @@ func (_u *SemanticUsageUpdateOne) SetNillableRequestID(v *string) *SemanticUsage
 	return _u
 }
 
-// ClearRequestID clears the value of the "request_id" field.
-func (_u *SemanticUsageUpdateOne) ClearRequestID() *SemanticUsageUpdateOne {
-	_u.mutation.ClearRequestID()
+// SetSettlementRevision sets the "settlement_revision" field.
+func (_u *SemanticUsageUpdateOne) SetSettlementRevision(v int64) *SemanticUsageUpdateOne {
+	_u.mutation.ResetSettlementRevision()
+	_u.mutation.SetSettlementRevision(v)
 	return _u
 }
 
-// SetUpstreamID sets the "upstream_id" field.
-func (_u *SemanticUsageUpdateOne) SetUpstreamID(v string) *SemanticUsageUpdateOne {
-	_u.mutation.SetUpstreamID(v)
-	return _u
-}
-
-// SetNillableUpstreamID sets the "upstream_id" field if the given value is not nil.
-func (_u *SemanticUsageUpdateOne) SetNillableUpstreamID(v *string) *SemanticUsageUpdateOne {
+// SetNillableSettlementRevision sets the "settlement_revision" field if the given value is not nil.
+func (_u *SemanticUsageUpdateOne) SetNillableSettlementRevision(v *int64) *SemanticUsageUpdateOne {
 	if v != nil {
-		_u.SetUpstreamID(*v)
+		_u.SetSettlementRevision(*v)
 	}
 	return _u
 }
 
-// SetResourceID sets the "resource_id" field.
-func (_u *SemanticUsageUpdateOne) SetResourceID(v string) *SemanticUsageUpdateOne {
-	_u.mutation.SetResourceID(v)
-	return _u
-}
-
-// SetNillableResourceID sets the "resource_id" field if the given value is not nil.
-func (_u *SemanticUsageUpdateOne) SetNillableResourceID(v *string) *SemanticUsageUpdateOne {
-	if v != nil {
-		_u.SetResourceID(*v)
-	}
-	return _u
-}
-
-// ClearResourceID clears the value of the "resource_id" field.
-func (_u *SemanticUsageUpdateOne) ClearResourceID() *SemanticUsageUpdateOne {
-	_u.mutation.ClearResourceID()
+// AddSettlementRevision adds value to the "settlement_revision" field.
+func (_u *SemanticUsageUpdateOne) AddSettlementRevision(v int64) *SemanticUsageUpdateOne {
+	_u.mutation.AddSettlementRevision(v)
 	return _u
 }
 
@@ -389,12 +363,6 @@ func (_u *SemanticUsageUpdateOne) SetNillableSourceEventID(v *string) *SemanticU
 	return _u
 }
 
-// ClearSourceEventID clears the value of the "source_event_id" field.
-func (_u *SemanticUsageUpdateOne) ClearSourceEventID() *SemanticUsageUpdateOne {
-	_u.mutation.ClearSourceEventID()
-	return _u
-}
-
 // SetMeter sets the "meter" field.
 func (_u *SemanticUsageUpdateOne) SetMeter(v string) *SemanticUsageUpdateOne {
 	_u.mutation.SetMeter(v)
@@ -406,6 +374,27 @@ func (_u *SemanticUsageUpdateOne) SetNillableMeter(v *string) *SemanticUsageUpda
 	if v != nil {
 		_u.SetMeter(*v)
 	}
+	return _u
+}
+
+// SetQuantityUnits sets the "quantity_units" field.
+func (_u *SemanticUsageUpdateOne) SetQuantityUnits(v int64) *SemanticUsageUpdateOne {
+	_u.mutation.ResetQuantityUnits()
+	_u.mutation.SetQuantityUnits(v)
+	return _u
+}
+
+// SetNillableQuantityUnits sets the "quantity_units" field if the given value is not nil.
+func (_u *SemanticUsageUpdateOne) SetNillableQuantityUnits(v *int64) *SemanticUsageUpdateOne {
+	if v != nil {
+		_u.SetQuantityUnits(*v)
+	}
+	return _u
+}
+
+// AddQuantityUnits adds value to the "quantity_units" field.
+func (_u *SemanticUsageUpdateOne) AddQuantityUnits(v int64) *SemanticUsageUpdateOne {
+	_u.mutation.AddQuantityUnits(v)
 	return _u
 }
 
@@ -579,26 +568,23 @@ func (_u *SemanticUsageUpdateOne) sqlSave(ctx context.Context) (_node *SemanticU
 	if value, ok := _u.mutation.RequestID(); ok {
 		_spec.SetField(semanticusage.FieldRequestID, field.TypeString, value)
 	}
-	if _u.mutation.RequestIDCleared() {
-		_spec.ClearField(semanticusage.FieldRequestID, field.TypeString)
+	if value, ok := _u.mutation.SettlementRevision(); ok {
+		_spec.SetField(semanticusage.FieldSettlementRevision, field.TypeInt64, value)
 	}
-	if value, ok := _u.mutation.UpstreamID(); ok {
-		_spec.SetField(semanticusage.FieldUpstreamID, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.ResourceID(); ok {
-		_spec.SetField(semanticusage.FieldResourceID, field.TypeString, value)
-	}
-	if _u.mutation.ResourceIDCleared() {
-		_spec.ClearField(semanticusage.FieldResourceID, field.TypeString)
+	if value, ok := _u.mutation.AddedSettlementRevision(); ok {
+		_spec.AddField(semanticusage.FieldSettlementRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.SourceEventID(); ok {
 		_spec.SetField(semanticusage.FieldSourceEventID, field.TypeString, value)
 	}
-	if _u.mutation.SourceEventIDCleared() {
-		_spec.ClearField(semanticusage.FieldSourceEventID, field.TypeString)
-	}
 	if value, ok := _u.mutation.Meter(); ok {
 		_spec.SetField(semanticusage.FieldMeter, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.QuantityUnits(); ok {
+		_spec.SetField(semanticusage.FieldQuantityUnits, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedQuantityUnits(); ok {
+		_spec.AddField(semanticusage.FieldQuantityUnits, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.QuantityDecimal(); ok {
 		_spec.SetField(semanticusage.FieldQuantityDecimal, field.TypeString, value)

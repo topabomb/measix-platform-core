@@ -4,21 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math/big"
-	"measix/platform/pkg/platformid"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"measix/platform/ent"
+	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/device"
 	"measix/platform/ent/managedrelease"
 	"measix/platform/ent/predicate"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/semanticusage"
 	"measix/platform/ent/user"
+	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/wire/clientapi"
+	"measix/platform/pkg/platformid"
 )
 
 type Summary struct {
@@ -70,15 +72,16 @@ const (
 // Filter captures the combinable usage read-model filters (Time / User /
 // Resource / Resource Kind / Upstream / Status / Completeness).
 type Filter struct {
-	After        string
-	From         *time.Time
-	To           *time.Time
-	UserID       string
-	ResourceID   string
-	ResourceKind ResourceKind
-	UpstreamID   string
-	Status       RequestStatus
-	Completeness Completeness
+	After          string
+	From           *time.Time
+	To             *time.Time
+	UserID         string
+	ResourceID     string
+	ResourceKind   ResourceKind
+	UpstreamID     string
+	Status         RequestStatus
+	Completeness   Completeness
+	ClientProtocol string
 }
 
 type RequestView struct {
@@ -88,25 +91,32 @@ type RequestView struct {
 	UserID              string
 	DeviceID            *string
 	ResourceID          string
+	ResourceKind        ResourceKind
+	ClientProtocol      string
 	ResourceDisplayName string
 	// Display identity resolved from the users and devices tables so an audit row
 	// can be read without resolving identifiers by hand. Both are display
 	// metadata and carry no authority.
-	UserDisplayName    string
-	DeviceName         string
-	RuntimeRouteID     string
-	UpstreamID         string
-	ManagedGeneration  int
-	ControlRevision    int
-	StartedAt          time.Time
-	CompletedAt        time.Time
-	Forwarded          bool
-	HTTPStatus         int
-	UpstreamHTTPStatus *int
-	RequestBytes       int
-	ResponseBytes      int
-	DurationMs         int
-	ErrorClass         *string
+	UserDisplayName     string
+	DeviceName          string
+	RuntimeRouteID      string
+	UpstreamID          string
+	ManagedGeneration   int
+	ControlRevision     int
+	StartedAt           time.Time
+	CompletedAt         time.Time
+	Forwarded           bool
+	HTTPStatus          int
+	UpstreamHTTPStatus  *int
+	RequestBytes        int
+	ResponseBytes       int
+	DurationMs          int
+	ErrorClass          *string
+	RequestCompleteness Completeness
+	SettlementState     string
+	SettlementRevision  int64
+	SemanticMeters      []MeterSummary
+	Budget              *budget.AdmissionDecision
 }
 
 func requestView(row *ent.RequestUsage) RequestView {
@@ -117,9 +127,11 @@ func requestView(row *ent.RequestUsage) RequestView {
 	}
 	return RequestView{
 		RequestID: row.RequestID, InteractionID: row.InteractionID, DeploymentID: row.DeploymentID, UserID: row.UserID, DeviceID: row.DeviceID,
-		ResourceID: row.ResourceID, RuntimeRouteID: row.RuntimeRouteID, UpstreamID: row.UpstreamID, ManagedGeneration: int(row.ManagedGeneration), ControlRevision: int(row.ControlRevision),
+		ResourceID: row.ResourceID, ResourceKind: ResourceKind(row.ResourceKind), ClientProtocol: row.ClientProtocol,
+		RuntimeRouteID: row.RuntimeRouteID, UpstreamID: row.UpstreamID, ManagedGeneration: int(row.ManagedGeneration), ControlRevision: int(row.ControlRevision),
 		StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, Forwarded: row.Forwarded, HTTPStatus: row.HTTPStatus, UpstreamHTTPStatus: upstreamStatus,
 		RequestBytes: int(row.RequestBytes), ResponseBytes: int(row.ResponseBytes), DurationMs: int(row.DurationMs), ErrorClass: row.ErrorClass,
+		RequestCompleteness: Completeness(row.RequestCompleteness), SettlementState: row.SettlementState, SettlementRevision: row.SettlementRevision,
 	}
 }
 
@@ -161,7 +173,61 @@ func (s *Service) enrich(ctx context.Context, views []RequestView) error {
 	if err := s.resourceNames(ctx, views); err != nil {
 		return err
 	}
-	return s.identityNames(ctx, views)
+	if err := s.identityNames(ctx, views); err != nil {
+		return err
+	}
+	return s.usageFacts(ctx, views)
+}
+
+// usageFacts attaches only the current settlement revision and the immutable
+// admission decision. Corrections remain in the ledger for audit but never
+// appear twice in a request projection.
+func (s *Service) usageFacts(ctx context.Context, views []RequestView) error {
+	if len(views) == 0 {
+		return nil
+	}
+	requestIDs := make([]string, 0, len(views))
+	revisions := make(map[string]int64, len(views))
+	for _, view := range views {
+		requestIDs = append(requestIDs, view.RequestID)
+		revisions[view.RequestID] = view.SettlementRevision
+	}
+	semanticRows, err := s.Client.SemanticUsage.Query().Where(semanticusage.RequestIDIn(requestIDs...)).All(ctx)
+	if err != nil {
+		return err
+	}
+	meters := make(map[string][]MeterSummary, len(views))
+	for _, row := range semanticRows {
+		if revisions[row.RequestID] != row.SettlementRevision {
+			continue
+		}
+		meters[row.RequestID] = append(meters[row.RequestID], MeterSummary{
+			Meter: row.Meter, Quantity: row.QuantityDecimal, Confidence: Completeness(row.Completeness),
+		})
+	}
+	for id := range meters {
+		sort.Slice(meters[id], func(i, j int) bool { return meters[id][i].Meter < meters[id][j].Meter })
+	}
+	budgetRows, err := s.Client.BudgetRequest.Query().Where(budgetrequest.IDIn(requestIDs...)).All(ctx)
+	if err != nil {
+		return err
+	}
+	decisions := make(map[string]*budget.AdmissionDecision, len(budgetRows))
+	for _, row := range budgetRows {
+		var decision budget.AdmissionDecision
+		if err := json.Unmarshal(row.DecisionJSON, &decision); err != nil {
+			return err
+		}
+		decisions[row.ID] = &decision
+	}
+	for i := range views {
+		views[i].SemanticMeters = meters[views[i].RequestID]
+		if views[i].SemanticMeters == nil {
+			views[i].SemanticMeters = []MeterSummary{}
+		}
+		views[i].Budget = decisions[views[i].RequestID]
+	}
+	return nil
 }
 
 // identityNames resolves who and which device each request belongs to, in bulk so
@@ -288,6 +354,9 @@ func requestFilterPreds(filter Filter) []predicate.RequestUsage {
 	if filter.UpstreamID != "" {
 		preds = append(preds, requestusage.UpstreamIDEQ(filter.UpstreamID))
 	}
+	if filter.ClientProtocol != "" {
+		preds = append(preds, requestusage.ClientProtocolEQ(filter.ClientProtocol))
+	}
 	if filter.Status != "" {
 		preds = append(preds, requestStatusPred(filter.Status))
 	}
@@ -365,11 +434,33 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 		return Summary{}, err
 	}
 	defer tx.Rollback()
-	requests, err := tx.RequestUsage.Query().Where(requestusage.And(preds...)).All(ctx)
+	requestQuery := tx.RequestUsage.Query().Where(requestusage.And(preds...))
+	requestCount, err := requestQuery.Clone().Count(ctx)
 	if err != nil {
 		return Summary{}, err
 	}
-	result := Summary{From: from, To: to, Cost: CostSummary{State: CostUnknown}}
+	forwardedCount, err := requestQuery.Clone().Where(requestusage.ForwardedEQ(true)).Count(ctx)
+	if err != nil {
+		return Summary{}, err
+	}
+	var totals []struct {
+		RequestBytes  int64 `json:"request_bytes"`
+		ResponseBytes int64 `json:"response_bytes"`
+	}
+	if err := requestQuery.Clone().Aggregate(
+		func(selector *sql.Selector) string {
+			return sql.As("COALESCE("+sql.Sum(selector.C(requestusage.FieldRequestBytes))+",0)", "request_bytes")
+		},
+		func(selector *sql.Selector) string {
+			return sql.As("COALESCE("+sql.Sum(selector.C(requestusage.FieldResponseBytes))+",0)", "response_bytes")
+		},
+	).Scan(ctx, &totals); err != nil {
+		return Summary{}, err
+	}
+	result := Summary{From: from, To: to, RequestCount: requestCount, ForwardedRequestCount: forwardedCount, Cost: CostSummary{State: CostUnknown}}
+	if len(totals) == 1 {
+		result.RequestBytes, result.ResponseBytes = totals[0].RequestBytes, totals[0].ResponseBytes
+	}
 	for _, bucket := range []struct {
 		state Completeness
 		count *int
@@ -384,15 +475,6 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 		}
 		*bucket.count = count
 	}
-	for _, row := range requests {
-		result.RequestCount++
-		if row.Forwarded {
-			result.ForwardedRequestCount++
-		}
-		result.RequestBytes += row.RequestBytes
-		result.ResponseBytes += row.ResponseBytes
-	}
-
 	semanticQ := tx.SemanticUsage.Query().Where(
 		semanticusage.OccurredAtGTE(from),
 		semanticusage.OccurredAtLT(to),
@@ -405,98 +487,60 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 		for _, pred := range preds {
 			pred(matched)
 		}
-		matched.Where(sql.ColumnsEQ(table.C(requestusage.FieldRequestID), sel.C(semanticusage.FieldRequestID)))
-		condition := sql.Exists(matched)
-		if filter.UserID == "" && filter.Status == "" {
-			anyRequest := sql.Select(table.C(requestusage.FieldRequestID)).From(table).
-				Where(sql.ColumnsEQ(table.C(requestusage.FieldRequestID), sel.C(semanticusage.FieldRequestID)))
-			unlinked := sql.Not(sql.Exists(anyRequest))
-			if filter.Completeness != "" {
-				unlinked = sql.And(unlinked, sql.EQ(sel.C(semanticusage.FieldCompleteness), string(filter.Completeness)))
-			}
-			condition = sql.Or(condition, unlinked)
-		}
-		sel.Where(condition)
+		matched.Where(sql.And(
+			sql.ColumnsEQ(table.C(requestusage.FieldRequestID), sel.C(semanticusage.FieldRequestID)),
+			sql.ColumnsEQ(table.C(requestusage.FieldSettlementRevision), sel.C(semanticusage.FieldSettlementRevision)),
+		))
+		sel.Where(sql.Exists(matched))
 	})
-	if filter.ResourceID != "" {
-		semanticQ = semanticQ.Where(semanticusage.ResourceIDEQ(filter.ResourceID))
+	// Ingest normalizes count meters to integer units and AUDIO_SECONDS to
+	// integer milliseconds. Aggregate in SQLite so analytics never loads every
+	// retained settlement row merely to add it in process memory.
+	type semanticAggregate struct {
+		Meter         string `json:"meter"`
+		QuantityUnits int64  `json:"quantity_units"`
+		PartialCount  int    `json:"partial_count"`
+		UnknownCount  int    `json:"unknown_count"`
 	}
-	if filter.UpstreamID != "" {
-		semanticQ = semanticQ.Where(semanticusage.UpstreamIDEQ(filter.UpstreamID))
-	}
-	if filter.ResourceKind != "" {
-		semanticQ = semanticQ.Where(semanticusage.ResourceIDHasPrefix(resourceKindPrefix(filter.ResourceKind)))
-	}
-	semantic, err := semanticQ.All(ctx)
-	if err != nil {
+	var semantic []semanticAggregate
+	if err := semanticQ.GroupBy(semanticusage.FieldMeter).Aggregate(
+		func(selector *sql.Selector) string {
+			return sql.As(sql.Sum(selector.C(semanticusage.FieldQuantityUnits)), "quantity_units")
+		},
+		func(selector *sql.Selector) string {
+			column := selector.C(semanticusage.FieldCompleteness)
+			return sql.As("SUM(CASE WHEN "+column+" = 'PARTIAL' THEN 1 ELSE 0 END)", "partial_count")
+		},
+		func(selector *sql.Selector) string {
+			column := selector.C(semanticusage.FieldCompleteness)
+			return sql.As("SUM(CASE WHEN "+column+" = 'UNKNOWN' THEN 1 ELSE 0 END)", "unknown_count")
+		},
+	).Scan(ctx, &semantic); err != nil {
 		return Summary{}, err
 	}
-	type accumulator struct {
-		quantity     *big.Rat
-		completeness Completeness
-	}
-	meters := map[string]accumulator{}
-	costs := map[string]*big.Rat{}
-	costState := CostKnown
+	sort.Slice(semantic, func(i, j int) bool { return semantic[i].Meter < semantic[j].Meter })
 	for _, row := range semantic {
-		q, ok := decimalRat(row.QuantityDecimal)
-		if !ok {
-			continue
+		confidence := CompletenessComplete
+		if row.UnknownCount > 0 {
+			confidence = CompletenessUnknown
+		} else if row.PartialCount > 0 {
+			confidence = CompletenessPartial
 		}
-		acc := meters[row.Meter]
-		if acc.quantity == nil {
-			acc.quantity = new(big.Rat)
-			acc.completeness = CompletenessComplete
+		quantity := fmt.Sprintf("%d", row.QuantityUnits)
+		if row.Meter == "AUDIO_SECONDS" {
+			quantity = millisecondsAsSeconds(row.QuantityUnits)
 		}
-		acc.quantity.Add(acc.quantity, q)
-		rowCompleteness := Completeness(row.Completeness)
-		if rowCompleteness == CompletenessUnknown {
-			acc.completeness = CompletenessUnknown
-		} else if rowCompleteness == CompletenessPartial && acc.completeness == CompletenessComplete {
-			acc.completeness = CompletenessPartial
-		}
-		meters[row.Meter] = acc
-		if row.ProviderCost == nil || row.Currency == nil {
-			costState = CostPartial
-		}
-		if row.ProviderCost != nil && row.Currency != nil {
-			cost, ok := decimalRat(*row.ProviderCost)
-			if ok {
-				if costs[*row.Currency] == nil {
-					costs[*row.Currency] = new(big.Rat)
-				}
-				costs[*row.Currency].Add(costs[*row.Currency], cost)
-				if rowCompleteness != CompletenessComplete {
-					costState = CostPartial
-				}
-			}
-		}
-	}
-	meterNames := make([]string, 0, len(meters))
-	for meter := range meters {
-		meterNames = append(meterNames, meter)
-	}
-	sort.Strings(meterNames)
-	for _, meter := range meterNames {
-		acc := meters[meter]
-		quantity, err := exactDecimal(acc.quantity)
-		if err != nil {
-			return Summary{}, err
-		}
-		result.Meters = append(result.Meters, MeterSummary{Meter: meter, Quantity: quantity, Confidence: acc.completeness})
-	}
-	if len(costs) == 1 {
-		for currency, total := range costs {
-			amount, err := exactDecimal(total)
-			if err != nil {
-				return Summary{}, err
-			}
-			result.Cost = CostSummary{State: costState, Amount: amount, Currency: currency}
-		}
-	} else if len(costs) > 1 {
-		result.Cost = CostSummary{State: CostUnknown}
+		result.Meters = append(result.Meters, MeterSummary{Meter: row.Meter, Quantity: quantity, Confidence: confidence})
 	}
 	return result, nil
+}
+
+func millisecondsAsSeconds(value int64) string {
+	seconds, millis := value/1000, value%1000
+	if millis == 0 {
+		return fmt.Sprintf("%d", seconds)
+	}
+	return strings.TrimRight(fmt.Sprintf("%d.%03d", seconds, millis), "0")
 }
 
 var ErrPricingRevisionConflict = errors.New("pricing revision conflict")
@@ -508,28 +552,7 @@ func (s *Service) UnknownRequestCount(ctx context.Context) (int, error) {
 }
 
 func requestCompletenessPred(value Completeness) predicate.RequestUsage {
-	return func(sel *sql.Selector) {
-		exists := func(confidence string, negate bool) *sql.Predicate {
-			table := sql.Table(semanticusage.Table)
-			q := sql.Select(table.C(semanticusage.FieldID)).From(table).Where(sql.ColumnsEQ(table.C(semanticusage.FieldRequestID), sel.C(requestusage.FieldRequestID)))
-			if confidence != "" {
-				if negate {
-					q.Where(sql.NEQ(table.C(semanticusage.FieldCompleteness), confidence))
-				} else {
-					q.Where(sql.EQ(table.C(semanticusage.FieldCompleteness), confidence))
-				}
-			}
-			return sql.Exists(q)
-		}
-		switch value {
-		case CompletenessComplete:
-			sel.Where(sql.And(exists("", false), sql.Not(exists(string(CompletenessComplete), true))))
-		case CompletenessPartial:
-			sel.Where(sql.And(exists(string(CompletenessPartial), false), sql.Not(exists(string(CompletenessUnknown), false))))
-		default:
-			sel.Where(sql.Or(sql.Not(exists("", false)), exists(string(CompletenessUnknown), false)))
-		}
-	}
+	return requestusage.RequestCompletenessEQ(string(value))
 }
 
 var ErrRequestNotFound = errors.New("usage request not found")
@@ -559,5 +582,20 @@ func (f Filter) Validate() error {
 	if f.UpstreamID != "" && platformid.Validate(platformid.Upstream, f.UpstreamID) != nil {
 		return ErrInvalidBatch
 	}
+	if f.ClientProtocol != "" && !validClientProtocol(f.ClientProtocol) {
+		return ErrInvalidBatch
+	}
 	return nil
+}
+
+func validClientProtocol(value string) bool {
+	switch value {
+	case "OPENAI_CHAT_COMPLETIONS", "OPENAI_RESPONSES", "GOOGLE_GENERATE_CONTENT", "ANTHROPIC_MESSAGES",
+		"OPENAI_AUDIO_SPEECH", "GEMINI_GENERATE_CONTENT_TTS", "MIMO_CHAT_COMPLETIONS_TTS",
+		"OPENAI_AUDIO_TRANSCRIPTIONS", "DASHSCOPE_HTTP_ASR", "OPENAI_REALTIME_TRANSCRIPTION",
+		"DASHSCOPE_REALTIME_ASR", "MCP_STREAMABLE_HTTP":
+		return true
+	default:
+		return false
+	}
 }

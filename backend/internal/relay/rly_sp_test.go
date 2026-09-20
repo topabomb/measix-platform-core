@@ -27,7 +27,7 @@ func TestRLYSP001EventPersistsAcrossRestart(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	event := usageEventLocal(now)
 	payload, _ := json.Marshal(event)
-	if err := spool.Append(ctx, event.RequestId, payload, now); err != nil {
+	if err := appendUsageLocal(ctx, spool, event.RequestId, payload, now); err != nil {
 		t.Fatal(err)
 	}
 	if err := spool.Close(); err != nil {
@@ -57,10 +57,11 @@ func TestRLYSP002RequestIdUnique(t *testing.T) {
 	}
 	defer spool.Close()
 	id := platformid.New(platformid.Request)
-	if err := spool.Append(ctx, id, json.RawMessage(`{"a":1}`), time.Now()); err != nil {
+	now := time.Now().UTC()
+	if err := appendUsageLocal(ctx, spool, id, json.RawMessage(`{"requestId":"`+id+`","a":1}`), now); err != nil {
 		t.Fatal(err)
 	}
-	if err := spool.Append(ctx, id, json.RawMessage(`{"a":2}`), time.Now()); err == nil {
+	if err := spool.AppendSettlement(ctx, id, json.RawMessage(`{"requestId":"`+id+`","a":2}`), now); err == nil {
 		t.Fatal("duplicate request ID unexpectedly accepted")
 	}
 }
@@ -76,7 +77,7 @@ func TestRLYSP005AuthFailureTriggersDegradedLowFreq(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	event := usageEventLocal(now)
 	payload, _ := json.Marshal(event)
-	if err := spool.Append(ctx, event.RequestId, payload, now); err != nil {
+	if err := appendUsageLocal(ctx, spool, event.RequestId, payload, now); err != nil {
 		t.Fatal(err)
 	}
 	hub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +117,7 @@ func TestRLYSP007SenderRestartWithoutMemorySet(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	event := usageEventLocal(now)
 	payload, _ := json.Marshal(event)
-	if err := spool.Append(ctx, event.RequestId, payload, now); err != nil {
+	if err := appendUsageLocal(ctx, spool, event.RequestId, payload, now); err != nil {
 		t.Fatal(err)
 	}
 	// First sender fails (Hub unavailable).
@@ -150,7 +151,7 @@ func TestRLYSP008StatsCorrect(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		event := usageEventLocal(now)
 		payload, _ := json.Marshal(event)
-		if err := spool.Append(ctx, event.RequestId, payload, now.Add(time.Duration(i)*time.Second)); err != nil {
+		if err := appendUsageLocal(ctx, spool, event.RequestId, payload, now.Add(time.Duration(i)*time.Second)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -202,7 +203,7 @@ func TestRLYSP010ShutdownDoesNotBlock(t *testing.T) {
 	now := time.Date(2026, 8, 19, 12, 0, 0, 0, time.UTC)
 	event := usageEventLocal(now)
 	payload, _ := json.Marshal(event)
-	if err := spool.Append(ctx, event.RequestId, payload, now); err != nil {
+	if err := appendUsageLocal(ctx, spool, event.RequestId, payload, now); err != nil {
 		t.Fatal(err)
 	}
 	sender := metering.NewSender(spool, "http://127.0.0.1:1", "hub-service-token")
@@ -264,15 +265,31 @@ func TestRLYSecurityClientCannotInjectRequestId(t *testing.T) {
 
 // Ensure imports are used.
 var _ = os.Stat
-var _ = usageingestapi.UsageBatch{}
 
-// usageEventLocal creates a minimal valid RequestUsageEvent for relay_test package tests.
-func usageEventLocal(now time.Time) usageingestapi.RequestUsageEvent {
-	return usageingestapi.RequestUsageEvent{
-		RequestId: platformid.New(platformid.Request), DeploymentId: platformid.New(platformid.Deployment),
-		UserId: platformid.New(platformid.User), ResourceId: platformid.New(platformid.Model),
-		RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: platformid.New(platformid.Upstream),
-		ManagedGeneration: 1, ControlRevision: 1, StartedAt: now, CompletedAt: now,
-		Forwarded: true, HttpStatus: 200, RequestBytes: 1, ResponseBytes: 1, DurationMs: 0,
+// usageEventLocal creates a minimal valid settlement for durable sender tests.
+func usageEventLocal(now time.Time) usageingestapi.UsageSettlement {
+	one := int64(1)
+	requestID := platformid.New(platformid.Request)
+	return usageingestapi.UsageSettlement{
+		RequestId: requestID, Revision: 1, EventHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		SourceEventId: requestID + ":1", OccurredAt: now, Completeness: usageingestapi.EXACT, State: usageingestapi.SETTLED,
+		Meters: []usageingestapi.MeterValue{{Meter: usageingestapi.REQUESTS, Completeness: usageingestapi.EXACT, Numerator: &one, Denominator: &one}},
+		Request: usageingestapi.RequestUsageFact{
+			DeploymentId: platformid.New(platformid.Deployment), UserId: platformid.New(platformid.User),
+			ResourceId: platformid.New(platformid.Model), ResourceKind: usageingestapi.ResourceKindMODEL,
+			ClientProtocol: usageingestapi.OPENAIRESPONSES, RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: platformid.New(platformid.Upstream),
+			ManagedGeneration: 1, ControlRevision: 1, StartedAt: now, CompletedAt: now,
+			Forwarded: true, HttpStatus: 200, RequestBytes: 1, ResponseBytes: 1,
+		},
 	}
+}
+
+func appendUsageLocal(ctx context.Context, spool *metering.Spool, requestID string, payload json.RawMessage, now time.Time) error {
+	if err := spool.SaveAdmission(ctx, requestID, json.RawMessage(`{"admission":true}`), now); err != nil {
+		return err
+	}
+	if err := spool.MarkStarted(ctx, requestID, now); err != nil {
+		return err
+	}
+	return spool.AppendSettlement(ctx, requestID, payload, now)
 }

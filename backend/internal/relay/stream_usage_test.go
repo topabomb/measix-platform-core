@@ -5,11 +5,54 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	relayruntime "measix/platform/internal/relay/runtime"
 )
+
+func TestRuntimeWritesCapturedUsageSettlement(t *testing.T) {
+	var upstreamCalls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		upstreamCalls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}}`)
+	}))
+	defer upstream.Close()
+
+	fixture, resourceID := singleRouteFixture(t, upstream.URL, "runtime-secret")
+	fixture.server.Close()
+	recorder := &captureUsageRecorder{}
+	fixture.server = httptest.NewServer(relayruntime.NewHandler(fixture.store, recorder, &allowBudgetClient{}))
+	defer fixture.close()
+
+	request := fixture.request(t, nil, http.MethodPost, resourceID, "/v1/chat/completions", strings.NewReader(`{"messages":[]}`), "application/json")
+	response, err := fixture.server.Client().Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, response.Body)
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("runtime status = %d", response.StatusCode)
+	}
+	events := recorder.waitFor(t, 1)
+	if len(events) != 1 {
+		t.Fatalf("usage settlements = %d", len(events))
+	}
+	event := events[0]
+	if !event.Forwarded || event.HttpStatus != http.StatusCreated || event.UpstreamHttpStatus == nil || *event.UpstreamHttpStatus != http.StatusCreated ||
+		event.ResourceId != resourceID || event.RuntimeRouteId == "" || event.UpstreamId == "" || event.UserId != fixture.userID ||
+		event.DeviceId == nil || *event.DeviceId != fixture.deviceID || event.RequestBytes == 0 || event.ResponseBytes == 0 {
+		t.Fatalf("captured usage attribution incomplete: %+v", event)
+	}
+	if upstreamCalls.Load() != 1 {
+		t.Fatalf("upstream calls = %d", upstreamCalls.Load())
+	}
+}
 
 // RLY-TRN-004/005: a real interrupted stream still produces exactly one usage fact.
 func TestInterruptedStreamRecordsUsage(t *testing.T) {
@@ -34,7 +77,7 @@ func TestInterruptedStreamRecordsUsage(t *testing.T) {
 			fixture, resourceID := singleRouteFixture(t, upstream.URL, "runtime-secret")
 			fixture.server.Close()
 			recorder := &captureUsageRecorder{}
-			handler := relayruntime.NewHandlerWithRecorder(fixture.store, recorder)
+			handler := relayruntime.NewHandler(fixture.store, recorder, &allowBudgetClient{})
 			finished := make(chan struct{})
 			fixture.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				defer close(finished)

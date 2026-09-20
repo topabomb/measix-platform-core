@@ -163,6 +163,39 @@ paths:
       parameters:
       - *id002
       - *id001
+    delete:
+      operationId: deleteUser
+      responses:
+        '202':
+          description: Deletion accepted; runtime denial is applied before user-owned data is purged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activation'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteUserRequest'
+      parameters:
+      - *id002
+      - *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          $ref: '#/components/schemas/IdempotencyKey'
   /api/admin/v1/users/{userId}:disable:
     post:
       operationId: disableUser
@@ -282,6 +315,83 @@ paths:
           $ref: '#/components/responses/Problem'
       parameters:
       - *id002
+      - *id004
+      - *id005
+  /api/admin/v1/users/{userId}/budgets:
+    get:
+      operationId: getUserBudgets
+      responses:
+        '200':
+          description: Effective per-capability budget state for this user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBudgetView'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id002
+  /api/admin/v1/users/{userId}/budgets/{capability}:
+    put:
+      operationId: putUserBudget
+      responses:
+        '200':
+          description: Updated effective budget state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetCapabilityView'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutBudgetRequest'
+      parameters:
+      - *id002
+      - name: capability
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/BudgetCapability'
+      - *id001
+  /api/admin/v1/users/{userId}/budgets/{capability}/audit:
+    get:
+      operationId: listUserBudgetAudit
+      responses:
+        '200':
+          description: Immutable budget configuration and reconciliation audit history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetAuditPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id002
+      - name: capability
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/BudgetCapability'
       - *id004
       - *id005
   /api/admin/v1/devices/{deviceId}:revoke:
@@ -811,6 +921,131 @@ paths:
           - EXACT
           - PARTIAL
           - UNKNOWN
+      - &uf_clientProtocol
+        name: clientProtocol
+        in: query
+        schema:
+          $ref: '#/components/schemas/UsageClientProtocol'
+  /api/admin/v1/usage/trend:
+    get:
+      operationId: usageTrend
+      responses:
+        '200':
+          description: Daily aggregates in the deployment timezone.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageTrend'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters: *usageFilters
+  /api/admin/v1/usage/distribution:
+    get:
+      operationId: usageDistribution
+      responses:
+        '200':
+          description: Server-side grouped usage distribution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageDistribution'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters: *usageFilters
+  /api/admin/v1/usage/users:
+    get:
+      operationId: listUsageUsers
+      responses:
+        '200':
+          description: Paged per-user usage summaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserUsagePage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id004
+      - *id005
+      - *uf_from
+      - *uf_to
+      - *uf_resourceId
+      - *uf_resourceKind
+      - *uf_upstreamId
+      - *uf_status
+      - *uf_completeness
+      - *uf_clientProtocol
+      - name: budgetStatus
+        in: query
+        description: Filter the user page by the effective cross-capability budget health. NEAR_LIMIT is an Admin-only 80 percent presentation threshold and does not affect admission.
+        schema:
+          type: string
+          enum:
+          - EXHAUSTED
+          - NEAR_LIMIT
+          - PENDING_RECONCILIATION
+  /api/admin/v1/usage/reconciliations:
+    get:
+      operationId: listUsageReconciliations
+      responses:
+        '200':
+          description: Paged requests whose admitted reservation and settlement require operator action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id004
+      - *id005
+  /api/admin/v1/usage/reconciliations/{requestId}:resolve:
+    post:
+      operationId: resolveUsageReconciliation
+      responses:
+        '200':
+          description: Resolved reconciliation record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationView'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveReconciliationRequest'
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/RequestId'
+      - *id001
   /api/admin/v1/usage/requests:
     get:
       operationId: listUsageRequests
@@ -838,6 +1073,7 @@ paths:
       - *uf_upstreamId
       - *uf_status
       - *uf_completeness
+      - *uf_clientProtocol
   /api/admin/v1/usage/requests/{requestId}:
     get:
       operationId: getUsageRequest
@@ -1156,6 +1392,10 @@ components:
           maximum: 599
         code:
           type: string
+          description: >-
+            Stable machine-readable reason. Authentication uses unauthenticated; destructive
+            user lifecycle values include delete_confirmation_mismatch,
+            cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight.
         detail:
           type: string
         requestId:
@@ -1170,6 +1410,8 @@ components:
           minimum: 0
         forwarded:
           type: boolean
+        budget:
+          $ref: '#/components/schemas/BudgetContext'
     ValidationIssue:
       type: object
       additionalProperties: false
@@ -1725,6 +1967,20 @@ components:
           enum:
           - ADMIN
           - MEMBER
+    DeleteUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - confirmationUsername
+      - reason
+      properties:
+        confirmationUsername:
+          type: string
+          minLength: 1
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
     SetPasswordRequest:
       type: object
       additionalProperties: false
@@ -2364,6 +2620,388 @@ components:
             $ref: '#/components/schemas/Release'
         nextCursor:
           type: string
+    ResourceKind:
+      type: string
+      enum: [MODEL, TTS, ASR, MCP]
+    UsageClientProtocol:
+      type: string
+      enum:
+      - OPENAI_CHAT_COMPLETIONS
+      - OPENAI_RESPONSES
+      - ANTHROPIC_MESSAGES
+      - GOOGLE_GENERATE_CONTENT
+      - OPENAI_AUDIO_SPEECH
+      - GEMINI_GENERATE_CONTENT_TTS
+      - MIMO_CHAT_COMPLETIONS_TTS
+      - OPENAI_AUDIO_TRANSCRIPTIONS
+      - DASHSCOPE_HTTP_ASR
+      - OPENAI_REALTIME_TRANSCRIPTION
+      - DASHSCOPE_REALTIME_ASR
+      - MCP_STREAMABLE_HTTP
+    BudgetCapability:
+      type: string
+      enum: [MODEL, TTS, ASR, MCP]
+    BudgetMode:
+      type: string
+      enum: [UNLIMITED, LIMITED]
+    BudgetSource:
+      type: string
+      enum: [DEFAULT, EXPLICIT]
+    BudgetPeriod:
+      type: string
+      enum: [DAY, WEEK, MONTH, LIFETIME]
+    BudgetStatus:
+      type: string
+      enum: [AVAILABLE, EXHAUSTED, PENDING_RECONCILIATION]
+    BudgetLimitDefinition:
+      type: object
+      additionalProperties: false
+      required: [period, meter, limit]
+      properties:
+        period:
+          $ref: '#/components/schemas/BudgetPeriod'
+        meter:
+          $ref: '#/components/schemas/PricingMeter'
+        limit:
+          type: string
+          pattern: '^[0-9]+$'
+    BudgetLimitState:
+      type: object
+      additionalProperties: false
+      required: [period, meter, limit, used, reserved, remaining, overage, scopeStart]
+      properties:
+        period:
+          $ref: '#/components/schemas/BudgetPeriod'
+        meter:
+          $ref: '#/components/schemas/PricingMeter'
+        limit:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,9})?$'
+        used:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,9})?$'
+        reserved:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,9})?$'
+        remaining:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,9})?$'
+        overage:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,9})?$'
+        scopeStart:
+          type: string
+          format: date-time
+        resetAt:
+          type: string
+          format: date-time
+    BudgetCapabilityView:
+      type: object
+      additionalProperties: false
+      required: [capability, mode, source, revision, effectiveFrom, asOf, inFlightRequests, limits, usageMeters, status]
+      properties:
+        capability:
+          $ref: '#/components/schemas/BudgetCapability'
+        resourceId:
+          type: string
+        mode:
+          $ref: '#/components/schemas/BudgetMode'
+        source:
+          $ref: '#/components/schemas/BudgetSource'
+        revision:
+          type: integer
+          minimum: 0
+        effectiveFrom:
+          type: string
+          format: date-time
+        asOf:
+          type: string
+          format: date-time
+        inFlightRequests:
+          type: integer
+          minimum: 0
+        limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetLimitState'
+        usageMeters:
+          type: array
+          description: Retained cumulative usage history for this capability. It remains available for unlimited budgets and is independent of the current-window used and reserved values in limits.
+          items:
+            $ref: '#/components/schemas/MeterQuantity'
+        status:
+          $ref: '#/components/schemas/BudgetStatus'
+    UserBudgetView:
+      type: object
+      additionalProperties: false
+      required: [userId, timezone, items, asOf]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        timezone:
+          type: string
+        items:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/BudgetCapabilityView'
+        asOf:
+          type: string
+          format: date-time
+    PutBudgetRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, mode, limits, reason]
+      properties:
+        expectedRevision:
+          type: integer
+          minimum: 0
+        mode:
+          $ref: '#/components/schemas/BudgetMode'
+        limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetLimitDefinition'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    BudgetAuditItem:
+      type: object
+      additionalProperties: false
+      required: [auditId, userId, capability, previousRevision, revision, mode, limits, changedBy, reason, createdAt]
+      properties:
+        auditId:
+          type: string
+        userId:
+          $ref: '#/components/schemas/UserId'
+        capability:
+          $ref: '#/components/schemas/BudgetCapability'
+        previousRevision:
+          type: integer
+          minimum: 0
+        revision:
+          type: integer
+          minimum: 1
+        mode:
+          $ref: '#/components/schemas/BudgetMode'
+        limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetLimitDefinition'
+        changedBy:
+          type: string
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    BudgetAuditPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetAuditItem'
+        nextCursor:
+          type: string
+    MeterQuantity:
+      type: object
+      additionalProperties: false
+      required: [meter, quantity, confidence]
+      properties:
+        meter:
+          $ref: '#/components/schemas/PricingMeter'
+        quantity:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,9})?$'
+        confidence:
+          type: string
+          enum: [EXACT, PARTIAL, UNKNOWN]
+    BudgetContext:
+      type: object
+      additionalProperties: false
+      required: [capability, mode, revision, blockers, asOf]
+      properties:
+        capability:
+          $ref: '#/components/schemas/BudgetCapability'
+        mode:
+          $ref: '#/components/schemas/BudgetMode'
+        revision:
+          type: integer
+          minimum: 0
+        blockers:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetLimitState'
+        resetAt:
+          type: string
+          format: date-time
+        asOf:
+          type: string
+          format: date-time
+    UsageTrendPoint:
+      type: object
+      additionalProperties: false
+      required: [date, requestCount, forwardedRequestCount, semanticMeters]
+      properties:
+        date:
+          type: string
+          format: date
+        requestCount:
+          type: integer
+          minimum: 0
+        forwardedRequestCount:
+          type: integer
+          minimum: 0
+        semanticMeters:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeterQuantity'
+    UsageTrend:
+      type: object
+      additionalProperties: false
+      required: [from, to, timezone, points]
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        timezone:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageTrendPoint'
+    UsageDistributionItem:
+      type: object
+      additionalProperties: false
+      required: [resourceKind, clientProtocol, requestCount, semanticMeters]
+      properties:
+        resourceKind:
+          $ref: '#/components/schemas/ResourceKind'
+        clientProtocol:
+          $ref: '#/components/schemas/UsageClientProtocol'
+        resourceId:
+          type: string
+        resourceDisplayName:
+          type: string
+        requestCount:
+          type: integer
+          minimum: 0
+        semanticMeters:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeterQuantity'
+    UsageDistribution:
+      type: object
+      additionalProperties: false
+      required: [from, to, items]
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageDistributionItem'
+    UserUsageView:
+      type: object
+      additionalProperties: false
+      required: [userId, userDisplayName, requestCount, semanticMeters, budget]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        userDisplayName:
+          type: string
+        requestCount:
+          type: integer
+          minimum: 0
+        semanticMeters:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeterQuantity'
+        budget:
+          $ref: '#/components/schemas/UserBudgetView'
+    UserUsagePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserUsageView'
+        nextCursor:
+          type: string
+    ReconciliationView:
+      type: object
+      additionalProperties: false
+      required: [requestId, userId, capability, state, reservation, observed, createdAt, updatedAt]
+      properties:
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        capability:
+          $ref: '#/components/schemas/BudgetCapability'
+        state:
+          type: string
+          enum: [PENDING, RESOLVED]
+        reservation:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeterQuantity'
+        observed:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeterQuantity'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+        resolvedBy:
+          type: string
+        resolutionReason:
+          type: string
+    ReconciliationPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReconciliationView'
+        nextCursor:
+          type: string
+    ResolveReconciliationRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedState, action, reason]
+      properties:
+        expectedState:
+          type: string
+          enum: [PENDING]
+        action:
+          type: string
+          enum: [ACCEPT_OBSERVED, RELEASE_UNCERTAIN]
+        reason:
+          type: string
+          minLength: 1
     UsageSummary:
       type: object
       additionalProperties: false
@@ -2401,23 +3039,7 @@ components:
         semanticMeters:
           type: array
           items:
-            type: object
-            additionalProperties: false
-            required:
-            - meter
-            - quantity
-            - confidence
-            properties:
-              meter:
-                $ref: '#/components/schemas/PricingMeter'
-              quantity:
-                type: string
-              confidence:
-                type: string
-                enum:
-                - EXACT
-                - PARTIAL
-                - UNKNOWN
+            $ref: '#/components/schemas/MeterQuantity'
         cost:
           type: object
           additionalProperties: false
@@ -2458,6 +3080,8 @@ components:
       - userId
       - managedGeneration
       - controlRevision
+      - resourceKind
+      - clientProtocol
       - startedAt
       - completedAt
       - forwarded
@@ -2466,6 +3090,9 @@ components:
       - responseBytes
       - durationMs
       - userDisplayName
+      - requestCompleteness
+      - settlementState
+      - semanticMeters
       properties:
         requestId:
           $ref: '#/components/schemas/RequestId'
@@ -2480,6 +3107,10 @@ components:
         resourceId:
           x-go-type-skip-optional-pointer: true
           type: string
+        resourceKind:
+          $ref: '#/components/schemas/ResourceKind'
+        clientProtocol:
+          $ref: '#/components/schemas/UsageClientProtocol'
         resourceDisplayName:
           type: string
           x-go-type-skip-optional-pointer: true
@@ -2531,6 +3162,18 @@ components:
           minimum: 0
         errorClass:
           type: string
+        requestCompleteness:
+          type: string
+          enum: [EXACT, PARTIAL, UNKNOWN]
+        settlementState:
+          type: string
+          enum: [NOT_REQUIRED, PENDING, SETTLED, RECONCILIATION_REQUIRED]
+        semanticMeters:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeterQuantity'
+        budget:
+          $ref: '#/components/schemas/BudgetContext'
     RequestUsagePage:
       type: object
       additionalProperties: false
@@ -2549,12 +3192,13 @@ components:
       - INPUT_TOKENS
       - OUTPUT_TOKENS
       - CACHED_TOKENS
+      - TOTAL_TOKENS
       - CHARACTERS
       - AUDIO_SECONDS
       - REQUESTS
       description: |
-        Standard meters per architecture s0-control-protocol §13.
-        MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + REQUESTS
+        Standard meters per the S0.2 production usage and user budget contract.
+        MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
         TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
         ASR    → AUDIO_SECONDS + REQUESTS
         MCP    → REQUESTS

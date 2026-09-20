@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"measix/platform/ent"
+	"measix/platform/ent/deletedcredential"
 	"measix/platform/ent/session"
 	"measix/platform/internal/hub/security"
 	"measix/platform/pkg/platformid"
@@ -55,33 +56,49 @@ func (s *Service) Refresh(ctx context.Context, refreshToken, requestKey string) 
 	digest := security.DigestToken(refreshToken)
 	se, err := tx.Session.Query().Where(session.ChannelEQ("ANDROID"), session.Or(session.RefreshDigestEQ(digest), session.PreviousRefreshDigestEQ(digest))).Only(ctx)
 	if ent.IsNotFound(err) {
+		deleted, lookupErr := tx.DeletedCredential.Query().Where(deletedcredential.DigestEQ(digest)).Exist(ctx)
+		if lookupErr != nil {
+			return RefreshResult{}, lookupErr
+		}
+		if deleted {
+			return RefreshResult{}, ErrIdentityDeleted
+		}
 		return RefreshResult{}, ErrCredential
 	}
 	if err != nil {
 		return RefreshResult{}, err
 	}
 	now := s.Now().UTC()
-	if se.Status != "ACTIVE" {
-		return RefreshResult{}, ErrRevoked
-	}
-	if !now.Before(se.ExpiresAt) {
-		return RefreshResult{}, ErrExpired
-	}
 	u, err := tx.User.Get(ctx, se.UserID)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return RefreshResult{}, ErrRevoked
+		}
 		return RefreshResult{}, err
 	}
 	if u.Status != "ACTIVE" {
-		return RefreshResult{}, ErrRevoked
+		return RefreshResult{}, ErrUserDisabled
 	}
 	if se.DeviceID == nil {
 		return RefreshResult{}, ErrCredential
 	}
 	d, err := tx.Device.Get(ctx, *se.DeviceID)
 	if err != nil {
+		if ent.IsNotFound(err) {
+			return RefreshResult{}, ErrRevoked
+		}
 		return RefreshResult{}, err
 	}
-	if d.Status != "ACTIVE" || d.UserID != u.ID {
+	if d.UserID != u.ID {
+		return RefreshResult{}, ErrCredential
+	}
+	if d.Status != "ACTIVE" {
+		return RefreshResult{}, ErrDeviceRevoked
+	}
+	if !now.Before(se.ExpiresAt) {
+		return RefreshResult{}, ErrExpired
+	}
+	if se.Status != "ACTIVE" {
 		return RefreshResult{}, ErrRevoked
 	}
 	box, err := s.refreshBox()

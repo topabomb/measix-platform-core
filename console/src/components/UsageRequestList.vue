@@ -9,10 +9,12 @@ import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import { cursorPath } from '../api/pagination'
+import type { MeterQuantity, PricingMeter, RequestUsageS02 } from '../api/usageBudget'
+import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 import ProblemBanner from './ProblemBanner.vue'
 
-type RequestUsage = components['schemas']['RequestUsageView']
-type RequestUsagePage = components['schemas']['RequestUsagePage']
+type RequestUsage = components['schemas']['RequestUsageView'] & Partial<RequestUsageS02>
+type RequestUsagePage = { items: RequestUsage[], nextCursor?: string }
 
 const props = withDefaults(defineProps<{
   /** Encoded filter query string including the leading `?` when non-empty. */
@@ -33,7 +35,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ filterResource: [string] }>()
 
-const { t: $t } = useI18n()
+const { t: $t, locale } = useI18n()
 const items = ref<RequestUsage[]>([])
 const nextCursor = ref<string>()
 const loading = ref(false)
@@ -94,6 +96,10 @@ function kindOf(resourceId: string | undefined): string | undefined {
   return undefined
 }
 
+function requestKind(req: RequestUsage): string | undefined {
+  return req.resourceKind ?? kindOf(req.resourceId)
+}
+
 function kindColor(kind: string): string {
   switch (kind) {
     case 'MODEL': return 'primary'
@@ -124,6 +130,22 @@ function fmtBytes(n: number | undefined): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
+const unitLabels = computed<MeterUnitLabels>(() => ({
+  tokens: $t('usage.units.tokens'),
+  characters: $t('usage.units.characters'),
+  seconds: $t('usage.units.seconds'),
+  minutes: $t('usage.units.minutes'),
+  requests: $t('usage.units.requests'),
+}))
+
+function meterLabel(meter: PricingMeter): string {
+  return $t(`usage.meters.${meter}`)
+}
+
+function meterValue(item: MeterQuantity, compact: boolean): string {
+  return formatMeter(item.quantity, item.meter, locale.value, unitLabels.value, compact)
+}
+
 defineExpose({ refresh: () => load(false) })
 </script>
 
@@ -152,7 +174,7 @@ defineExpose({ refresh: () => load(false) })
           <q-item-section>
             <q-item-label>
               {{ req.resourceDisplayName || $t('usage.unnamedResource') }}
-              <q-chip v-if="kindOf(req.resourceId)" dense :color="kindColor(kindOf(req.resourceId)!)" text-color="white" size="sm">{{ kindLabel(kindOf(req.resourceId)!) }}</q-chip>
+              <q-chip v-if="requestKind(req)" dense :color="kindColor(requestKind(req)!)" text-color="white" size="sm">{{ kindLabel(requestKind(req)!) }}</q-chip>
               <q-chip v-if="req.errorClass" dense color="negative" text-color="white" size="sm">{{ errorLabel(req.errorClass) }}</q-chip>
             </q-item-label>
             <q-item-label v-if="showUser || req.deviceName" caption data-cy="usage-row-identity">
@@ -163,11 +185,13 @@ defineExpose({ refresh: () => load(false) })
             <q-item-label caption>
               {{ new Date(req.startedAt).toLocaleString() }}
               <template v-if="req.durationMs !== undefined"> · {{ req.durationMs }} ms</template>
+              <template v-if="req.clientProtocol"> · {{ req.clientProtocol }}</template>
             </q-item-label>
           </q-item-section>
           <q-item-section side>
             <div class="row items-center q-gutter-xs">
               <q-chip dense :color="req.forwarded ? 'green-2' : 'orange-2'">{{ req.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }}</q-chip>
+              <q-chip v-if="req.settlementState && req.settlementState !== 'NOT_REQUIRED'" dense :color="req.settlementState === 'SETTLED' ? 'green-2' : req.settlementState === 'RECONCILIATION_REQUIRED' ? 'red-2' : 'orange-2'">{{ $t(`usage.settlement.${req.settlementState}`) }}</q-chip>
               <q-chip dense :class="req.httpStatus >= 400 ? 'text-negative' : 'text-grey-8'">{{ req.httpStatus }}</q-chip>
             </div>
           </q-item-section>
@@ -194,6 +218,8 @@ defineExpose({ refresh: () => load(false) })
               <tr><td class="text-grey-7">{{ $t('usage.detail.user') }}</td><td>{{ identity(selected) }} <span class="text-caption text-grey-7">({{ selected.userId }})</span></td></tr>
               <tr v-if="selected.deviceId"><td class="text-grey-7">{{ $t('usage.detail.device') }}</td><td>{{ selected.deviceName || '—' }} <span class="text-caption text-grey-7">({{ selected.deviceId }})</span></td></tr>
               <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td>{{ selected.resourceDisplayName }}<div class="text-caption">{{ selected.resourceId }}</div></td></tr>
+              <tr v-if="selected.resourceKind"><td class="text-grey-7">{{ $t('usage.filters.resourceKind') }}</td><td>{{ kindLabel(selected.resourceKind) }}</td></tr>
+              <tr v-if="selected.clientProtocol"><td class="text-grey-7">{{ $t('usage.filters.protocol') }}</td><td class="text-break">{{ selected.clientProtocol }}</td></tr>
               <tr><td class="text-grey-7">{{ $t('usage.detail.upstream') }}</td><td>{{ selected.upstreamId }}</td></tr>
               <tr><td class="text-grey-7">{{ $t('usage.detail.runtimeRoute') }}</td><td>{{ selected.runtimeRouteId }}</td></tr>
               <tr><td class="text-grey-7">{{ $t('usage.detail.generation') }}</td><td>{{ $t('releases.generation') }} {{ selected.managedGeneration }}</td></tr>
@@ -201,9 +227,32 @@ defineExpose({ refresh: () => load(false) })
               <tr><td class="text-grey-7">{{ $t('common.status') }}</td><td>{{ selected.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }} · {{ selected.httpStatus }}<template v-if="selected.upstreamHttpStatus"> · {{ $t('usage.detail.upstream') }} {{ selected.upstreamHttpStatus }}</template></td></tr>
               <tr><td class="text-grey-7">{{ $t('usage.detail.duration') }}</td><td>{{ selected.durationMs }} ms</td></tr>
               <tr><td class="text-grey-7">{{ $t('usage.bytes') }}</td><td>{{ fmtBytes(selected.requestBytes) }} in · {{ fmtBytes(selected.responseBytes) }} out</td></tr>
+              <tr v-if="selected.requestCompleteness"><td class="text-grey-7">{{ $t('usage.detail.usageCompleteness') }}</td><td>{{ $t(`status.${selected.requestCompleteness}`) }}</td></tr>
+              <tr v-if="selected.settlementState"><td class="text-grey-7">{{ $t('usage.detail.settlement') }}</td><td>{{ $t(`usage.settlement.${selected.settlementState}`) }}</td></tr>
               <tr v-if="selected.errorClass"><td class="text-grey-7">{{ $t('usage.errorClass') }}</td><td>{{ errorLabel(selected.errorClass) }} <span class="text-caption text-grey-7">({{ selected.errorClass }})</span></td></tr>
             </tbody>
           </q-markup-table>
+          <div class="text-subtitle2 q-mt-sm">{{ $t('usage.detail.semanticMeters') }}</div>
+          <div v-if="selected.semanticMeters?.length" class="usage-detail-meters q-mt-xs">
+            <div v-for="meter in selected.semanticMeters" :key="meter.meter" class="usage-detail-meter">
+              <div>{{ meterLabel(meter.meter) }}</div>
+              <div class="text-weight-medium">{{ meterValue(meter, false) }}</div>
+              <div class="text-caption text-grey-7">{{ $t(`status.${meter.confidence}`) }}</div>
+            </div>
+          </div>
+          <div v-else class="text-body2 text-grey-7 q-mt-xs">{{ $t('usage.noSemanticMeters') }}</div>
+          <template v-if="selected.budget">
+            <div class="text-subtitle2 q-mt-sm">{{ $t('usage.detail.budget') }}</div>
+            <div class="text-body2">
+              {{ $t(`usage.kind.${selected.budget.capability}`) }} · {{ $t(`budgets.mode.${selected.budget.mode}`) }} · {{ $t('budgets.revision', { revision: selected.budget.revision }) }}
+            </div>
+            <div v-if="selected.budget.blockers.length" class="usage-detail-meters q-mt-xs">
+              <div v-for="blocker in selected.budget.blockers" :key="`${blocker.period}:${blocker.meter}`" class="usage-detail-meter">
+                <div>{{ meterLabel(blocker.meter) }} · {{ $t(`budgets.period.${blocker.period}`) }}</div>
+                <div class="text-caption">{{ $t('budgets.remaining') }}: {{ formatMeter(blocker.remaining, blocker.meter, locale, unitLabels, false) }}</div>
+              </div>
+            </div>
+          </template>
           <div class="text-caption text-grey-7 q-mt-xs">{{ $t('usage.detail.secretHint') }}</div>
         </q-card-section>
         <q-card-actions align="right">
@@ -214,3 +263,25 @@ defineExpose({ refresh: () => load(false) })
     </q-dialog>
   </q-card>
 </template>
+
+<style scoped>
+.usage-detail-meters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.usage-detail-meter {
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  padding: 6px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 420px) {
+  .usage-detail-meters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+</style>

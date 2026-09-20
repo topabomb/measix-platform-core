@@ -192,15 +192,47 @@ func TestSYSI1001IdentityHTTPClosedLoop(t *testing.T) {
 		t.Fatalf("refresh status=%d body=%s", refresh.Code, refresh.Body.String())
 	}
 
-	// I1 fixture seeds a deny; runtimecontrol tests own the full revocation transaction.
+	// I1 fixture seeds deny facts directly; runtimecontrol tests own the full
+	// revocation transaction. Client errors must retain the denied owner so the
+	// native lifecycle can present and retire the right state.
+	if _, err := svc.Client.User.UpdateOneID(user.UserID).SetStatus("DISABLED").Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	userDenied := doJSON(t, h, http.MethodGet, "/api/client/v1/bootstrap", map[string]string{
+		"Authorization": "Bearer " + tokens.AccessToken,
+	}, nil)
+	assertProblem(t, userDenied, http.StatusForbidden, "user_disabled")
+	if _, err := svc.Client.User.UpdateOneID(user.UserID).SetStatus("ACTIVE").Save(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := svc.Client.Device.UpdateOneID(tokens.DeviceID).SetStatus("REVOKED").Save(ctx); err != nil {
 		t.Fatal(err)
 	}
 	denied := doJSON(t, h, http.MethodGet, "/api/client/v1/bootstrap", map[string]string{
 		"Authorization": "Bearer " + tokens.AccessToken,
 	}, nil)
-	if denied.Code != http.StatusForbidden {
-		t.Fatalf("revoked access status=%d body=%s", denied.Code, denied.Body.String())
+	assertProblem(t, denied, http.StatusForbidden, "device_revoked")
+}
+
+func TestPublicAuthenticationProblemsUseStableCode(t *testing.T) {
+	h, _, _, _, _ := setupFullHandler(t)
+	for _, test := range []struct {
+		method string
+		path   string
+		body   any
+	}{
+		{http.MethodGet, "/api/client/v1/bootstrap", nil},
+		{http.MethodGet, "/api/client/v1/managed/state", nil},
+		{http.MethodGet, "/api/client/v1/managed/snapshots/1", nil},
+		{http.MethodPut, "/api/client/v1/managed/applied", map[string]any{"managedGeneration": 1, "snapshotHash": "hash"}},
+		{http.MethodPost, "/api/client/v1/portal/grants", nil},
+		{http.MethodGet, "/api/client/v1/budgets", nil},
+		{http.MethodGet, "/api/portal/v1/session", nil},
+		{http.MethodGet, "/api/admin/v1/session", nil},
+	} {
+		t.Run(test.method+" "+test.path, func(t *testing.T) {
+			assertProblem(t, doJSON(t, h, test.method, test.path, nil, test.body), http.StatusUnauthorized, "unauthenticated")
+		})
 	}
 }
 
@@ -253,5 +285,19 @@ func decodeJSON(t *testing.T, w *httptest.ResponseRecorder, target any) {
 	t.Helper()
 	if err := json.Unmarshal(w.Body.Bytes(), target); err != nil {
 		t.Fatalf("decode response: %v body=%s", err, w.Body.String())
+	}
+}
+
+func assertProblem(t *testing.T, response *httptest.ResponseRecorder, status int, code string) {
+	t.Helper()
+	if response.Code != status {
+		t.Fatalf("problem status=%d, want %d; body=%s", response.Code, status, response.Body.String())
+	}
+	var problem struct {
+		Code string `json:"code"`
+	}
+	decodeJSON(t, response, &problem)
+	if problem.Code != code {
+		t.Fatalf("problem code=%q, want %q; body=%s", problem.Code, code, response.Body.String())
 	}
 }

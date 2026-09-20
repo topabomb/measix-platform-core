@@ -89,8 +89,47 @@ func TestI1IdentityEnrollmentRefreshAndRevoke(t *testing.T) {
 	if _, err := s.Client.Device.UpdateOneID(exchange.DeviceID).SetStatus("REVOKED").Save(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Refresh(ctx, refreshed.RefreshToken, platformid.New(platformid.Idempotency)); !errors.Is(err, identity.ErrRevoked) {
+	if _, err := s.Refresh(ctx, refreshed.RefreshToken, platformid.New(platformid.Idempotency)); !errors.Is(err, identity.ErrDeviceRevoked) {
 		t.Fatalf("refresh after revoke err=%v", err)
+	}
+}
+
+func TestClientDenialsPreserveRevokedOwner(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		deny func(context.Context, *identity.Service, identity.ExchangeResult) error
+		want error
+	}{
+		{
+			name: "user disabled",
+			deny: func(ctx context.Context, service *identity.Service, exchange identity.ExchangeResult) error {
+				_, err := service.Client.User.UpdateOneID(exchange.UserID).SetStatus("DISABLED").Save(ctx)
+				return err
+			},
+			want: identity.ErrUserDisabled,
+		},
+		{
+			name: "device revoked",
+			deny: func(ctx context.Context, service *identity.Service, exchange identity.ExchangeResult) error {
+				_, err := service.Client.Device.UpdateOneID(exchange.DeviceID).SetStatus("REVOKED").Save(ctx)
+				return err
+			},
+			want: identity.ErrDeviceRevoked,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service, exchange := enrolled(t)
+			ctx := context.Background()
+			if err := test.deny(ctx, service, exchange); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.AuthenticateAccess(ctx, exchange.AccessToken); !errors.Is(err, test.want) {
+				t.Fatalf("access denial=%v, want %v", err, test.want)
+			}
+			if _, err := service.Refresh(ctx, exchange.RefreshToken, platformid.New(platformid.Idempotency)); !errors.Is(err, test.want) {
+				t.Fatalf("refresh denial=%v, want %v", err, test.want)
+			}
+		})
 	}
 }
 

@@ -17,6 +17,15 @@ type Route struct {
 	TimeoutPolicy       relaycontrolapi.TimeoutPolicy
 }
 
+type Resource struct {
+	ID             string
+	RouteID        string
+	Kind           relaycontrolapi.ResourceRouteResourceKind
+	ClientProtocol relaycontrolapi.ResourceRouteClientProtocol
+	AudioProfile   *relaycontrolapi.RuntimeAudioProfile
+	LLMProfile     *relaycontrolapi.RuntimeLlmProfile
+}
+
 type UpstreamAuth struct {
 	Type       relaycontrolapi.RuntimeUpstreamAuthType
 	Token      string
@@ -42,9 +51,10 @@ type State struct {
 	DeploymentID            string
 	AuthKeys                map[string]ed25519.PublicKey
 	DisabledUsers           map[string]struct{}
+	DeletedUsers            map[string]struct{}
 	RevokedDevices          map[string]struct{}
 	RevokedSessions         map[string]struct{}
-	ResourceRoutes          map[string]string
+	Resources               map[string]Resource
 	Routes                  map[string]Route
 	Upstreams               map[string]Upstream
 	OperationalLimits       relaycontrolapi.OperationalLimits

@@ -3,12 +3,19 @@ package runtimecontrol
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
+	"measix/platform/ent"
 	"measix/platform/ent/activation"
+	"measix/platform/ent/budgetrequest"
+	"measix/platform/ent/deletedcredential"
+	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/predicate"
 	"measix/platform/ent/session"
+	"measix/platform/ent/user"
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/internal/wire/relaystate"
 	"measix/platform/pkg/platformid"
@@ -21,21 +28,38 @@ const (
 	securityUserEnable    securitySubject = "USER_ENABLE"
 	securityDeviceRevoke  securitySubject = "DEVICE_REVOKE"
 	securitySessionRevoke securitySubject = "SESSION_REVOKE"
+	securityUserDelete    securitySubject = "USER_DELETE"
+)
+
+type DeleteUserInput struct {
+	ConfirmationUsername string
+	Reason               string
+}
+
+var (
+	ErrDeleteConfirmation = errors.New("user deletion confirmation does not match")
+	ErrDeleteSelf         = errors.New("an administrator cannot delete the active account")
+	ErrDeleteLastAdmin    = errors.New("cannot delete the last administrator")
+	ErrDeleteInFlight     = errors.New("user deletion is waiting for active requests to finish")
 )
 
 func (s *Service) DisableUser(ctx context.Context, adminUserID, idempotencyKey, userID string) (ActivationResult, error) {
-	return s.securityChange(ctx, adminUserID, idempotencyKey, string(securityUserDisable), userID)
+	return s.securityChange(ctx, adminUserID, idempotencyKey, string(securityUserDisable), userID, nil)
 }
 
 func (s *Service) EnableUser(ctx context.Context, adminUserID, idempotencyKey, userID string) (ActivationResult, error) {
-	return s.securityChange(ctx, adminUserID, idempotencyKey, string(securityUserEnable), userID)
+	return s.securityChange(ctx, adminUserID, idempotencyKey, string(securityUserEnable), userID, nil)
 }
 
 func (s *Service) RevokeDevice(ctx context.Context, adminUserID, idempotencyKey, deviceID string) (ActivationResult, error) {
-	return s.securityChange(ctx, adminUserID, idempotencyKey, string(securityDeviceRevoke), deviceID)
+	return s.securityChange(ctx, adminUserID, idempotencyKey, string(securityDeviceRevoke), deviceID, nil)
 }
 
-func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKey, operation, subjectID string) (ActivationResult, error) {
+func (s *Service) DeleteUser(ctx context.Context, adminUserID, idempotencyKey, userID string, input DeleteUserInput) (ActivationResult, error) {
+	return s.securityChange(ctx, adminUserID, idempotencyKey, string(securityUserDelete), userID, &input)
+}
+
+func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKey, operation, subjectID string, deleteInput *DeleteUserInput) (ActivationResult, error) {
 	if s.Client == nil || s.Signer == nil || s.Relay == nil || platformid.Validate(platformid.User, adminUserID) != nil || platformid.Validate(platformid.Idempotency, idempotencyKey) != nil {
 		return ActivationResult{}, fmt.Errorf("invalid security change request")
 	}
@@ -77,16 +101,54 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 			return ActivationResult{}, fmt.Errorf("session revoke is not durable")
 		}
 		path = "internal:session-revoke/" + subjectID
+	case securityUserDelete:
+		if subjectID == adminUserID {
+			return ActivationResult{}, ErrDeleteSelf
+		}
+		if platformid.Validate(platformid.User, subjectID) != nil || deleteInput == nil || strings.TrimSpace(deleteInput.Reason) == "" {
+			return ActivationResult{}, fmt.Errorf("invalid user deletion request")
+		}
+		path = "/api/admin/v1/users/" + subjectID
 	default:
 		return ActivationResult{}, fmt.Errorf("unknown security change")
 	}
 
 	requestHash := hashOperation(struct {
-		Operation string `json:"operation"`
-		SubjectID string `json:"subjectId"`
-	}{operation, subjectID})
+		Operation            string `json:"operation"`
+		SubjectID            string `json:"subjectId"`
+		ConfirmationUsername string `json:"confirmationUsername,omitempty"`
+		Reason               string `json:"reason,omitempty"`
+	}{operation, subjectID, func() string {
+		if deleteInput == nil {
+			return ""
+		}
+		return deleteInput.ConfirmationUsername
+	}(), func() string {
+		if deleteInput == nil {
+			return ""
+		}
+		return strings.TrimSpace(deleteInput.Reason)
+	}()})
 	if existing, found, err := s.findOperationIdempotent(ctx, adminUserID, path, idempotencyKey, requestHash); err != nil || found {
 		return existing, err
+	}
+	if securitySubject(operation) == securityUserDelete {
+		row, err := s.Client.User.Get(ctx, subjectID)
+		if err != nil {
+			return ActivationResult{}, err
+		}
+		if row.Username != deleteInput.ConfirmationUsername {
+			return ActivationResult{}, ErrDeleteConfirmation
+		}
+		if row.Role == "ADMIN" {
+			count, err := s.Client.User.Query().Where(user.RoleEQ("ADMIN"), user.StatusEQ("ACTIVE")).Count(ctx)
+			if err != nil {
+				return ActivationResult{}, err
+			}
+			if count <= 1 {
+				return ActivationResult{}, ErrDeleteLastAdmin
+			}
+		}
 	}
 
 	if securitySubject(operation) == securityUserEnable {
@@ -115,7 +177,11 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 	applySecurityPrincipal(&state.PrincipalState, securitySubject(operation), subjectID)
 	activationID := platformid.New(platformid.Activation)
 	now := s.Now().UTC()
-	pendingJSON, _ := json.Marshal(map[string]string{"operation": operation, "subjectId": subjectID})
+	pendingOperation := map[string]string{"operation": operation, "subjectId": subjectID}
+	if deleteInput != nil {
+		pendingOperation["reason"] = strings.TrimSpace(deleteInput.Reason)
+	}
+	pendingJSON, _ := json.Marshal(pendingOperation)
 
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
@@ -143,9 +209,32 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 		if _, err := tx.Device.UpdateOneID(subjectID).SetStatus("REVOKED").SetRevokedAt(now).Save(ctx); err != nil {
 			return ActivationResult{}, err
 		}
+	case securityUserDelete:
+		// The in-flight check and tombstone write share this transaction. That
+		// closes the admission race: a request is either already visible here
+		// and deletion is rejected, or the tombstone wins and later admissions
+		// fail closed.
+		active, err := tx.BudgetRequest.Query().Where(
+			budgetrequest.UserIDEQ(subjectID),
+			budgetrequest.StateIn(budgetrequest.StateADMITTED, budgetrequest.StateSTARTED, budgetrequest.StateRECONCILIATION),
+		).Exist(ctx)
+		if err != nil {
+			return ActivationResult{}, err
+		}
+		if active {
+			return ActivationResult{}, ErrDeleteInFlight
+		}
+		if _, err := tx.DeletedPrincipal.Query().Where(deletedprincipal.IDEQ(subjectID)).Only(ctx); err == nil {
+			// An existing tombstone means an earlier idempotent deletion already
+			// established the durable deny fact.
+		} else if !ent.IsNotFound(err) {
+			return ActivationResult{}, err
+		} else if _, err := tx.DeletedPrincipal.Create().SetID(subjectID).SetDeletedAt(now).Save(ctx); err != nil {
+			return ActivationResult{}, err
+		}
 	}
 
-	if securitySubject(operation) == securityUserDisable || securitySubject(operation) == securityDeviceRevoke {
+	if securitySubject(operation) == securityUserDisable || securitySubject(operation) == securityDeviceRevoke || securitySubject(operation) == securityUserDelete {
 		var subject predicate.Session = session.UserIDEQ(subjectID)
 		if securitySubject(operation) == securityDeviceRevoke {
 			subject = session.DeviceIDEQ(subjectID)
@@ -156,6 +245,22 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 		}
 		for _, se := range sessions {
 			state.PrincipalState.RevokedSessionIds = addSorted(state.PrincipalState.RevokedSessionIds, se.ID)
+			if securitySubject(operation) == securityUserDelete {
+				for _, digest := range []*[]byte{se.RefreshDigest, se.PreviousRefreshDigest} {
+					if digest == nil || len(*digest) == 0 {
+						continue
+					}
+					exists, err := tx.DeletedCredential.Query().Where(deletedcredential.DigestEQ(*digest)).Exist(ctx)
+					if err != nil {
+						return ActivationResult{}, err
+					}
+					if !exists {
+						if _, err := tx.DeletedCredential.Create().SetDigest(*digest).SetDeletedAt(now).Save(ctx); err != nil {
+							return ActivationResult{}, err
+						}
+					}
+				}
+			}
 		}
 		if _, err := tx.Session.Update().Where(subject, session.StatusEQ("ACTIVE")).SetStatus("REVOKED").SetRevokedAt(now).
 			ClearPreviousRefreshDigest().ClearRefreshReplayUntil().ClearRefreshResponseCiphertext().Save(ctx); err != nil {
@@ -215,6 +320,8 @@ func applySecurityPrincipal(principal *relaycontrolapi.PrincipalState, operation
 		principal.RevokedSessionIds = addSorted(principal.RevokedSessionIds, subjectID)
 	case securityDeviceRevoke:
 		principal.RevokedDeviceIds = addSorted(principal.RevokedDeviceIds, subjectID)
+	case securityUserDelete:
+		principal.DeletedUserIds = addSorted(principal.DeletedUserIds, subjectID)
 	}
 }
 
@@ -253,6 +360,11 @@ func (s *Service) finalizeSecurityChange(ctx context.Context, activationID strin
 	now := s.Now().UTC()
 	if operation == securityUserEnable {
 		if _, err := tx.User.UpdateOneID(subjectID).SetStatus("ACTIVE").SetUpdatedAt(now).Save(ctx); err != nil {
+			return err
+		}
+	}
+	if operation == securityUserDelete {
+		if err := purgeUserData(ctx, tx, subjectID, activationID); err != nil {
 			return err
 		}
 	}

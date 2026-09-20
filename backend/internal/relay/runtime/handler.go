@@ -1,39 +1,43 @@
 package runtime
 
 import (
+	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	relaybudget "measix/platform/internal/relay/budget"
 	"measix/platform/internal/relay/control"
 	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/usageingestapi"
 	"measix/platform/pkg/platformid"
 )
 
 type Handler struct {
 	store         *control.Store
 	recorder      UsageRecorder
+	budget        relaybudget.Client
 	baseTransport *http.Transport
 	transports    sync.Map
 }
 
-func NewHandler(store *control.Store) http.Handler {
-	return NewHandlerWithRecorder(store, nil)
-}
-
-func NewHandlerWithRecorder(store *control.Store, recorder UsageRecorder) http.Handler {
+func NewHandler(store *control.Store, recorder UsageRecorder, budgetClient relaybudget.Client) http.Handler {
 	base, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		base = &http.Transport{}
 	}
-	return &Handler{store: store, recorder: recorder, baseTransport: base.Clone()}
+	return &Handler{store: store, recorder: recorder, budget: budgetClient, baseTransport: base.Clone()}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	requestID := platformid.New(platformid.Request)
-	startedAt := h.store.Now()
+	admittedAt := h.store.Now()
 	observer := &responseObserver{ResponseWriter: w}
 	state := h.store.Current()
 	if state == nil {
@@ -57,109 +61,214 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if platformid.Validate(platformid.Interaction, interactionValue) == nil {
 		interactionID = &interactionValue
 	}
-	meterFailure := func(status int, code, title, errorClass string, target *int) {
-		route, upstream, resolved := usageRoute(state, resourceID)
-		resolvedResourceID := resourceID
-		if !resolved {
-			resolvedResourceID = ""
-		}
+	runtimeFailure := func(status int, code, title string, target *int) {
 		writeProblem(observer, status, code, title, requestID, target, false)
-		h.recordUsage(observer, nil, usageAttribution{
-			state: state, claims: claims, resourceID: resolvedResourceID, interactionID: interactionID,
-			route: route, upstream: upstream, startedAt: startedAt, requestID: requestID,
-		}, false, nil, errorClass)
 	}
 
 	if !validTarget {
-		meterFailure(http.StatusNotFound, "route_not_found", "Route not found", "ROUTE_NOT_FOUND", nil)
+		runtimeFailure(http.StatusNotFound, "route_not_found", "Route not found", nil)
+		return
+	}
+	if _, deleted := state.DeletedUsers[claims.Subject]; deleted {
+		runtimeFailure(http.StatusUnauthorized, "enterprise_identity_deleted", "Enterprise identity was deleted", nil)
 		return
 	}
 
 	if _, disabled := state.DisabledUsers[claims.Subject]; disabled {
-		meterFailure(http.StatusForbidden, "user_disabled", "User disabled", "USER_DISABLED", nil)
+		runtimeFailure(http.StatusForbidden, "user_disabled", "User disabled", nil)
 		return
 	}
 	if _, revoked := state.RevokedDevices[claims.DeviceID]; revoked {
-		meterFailure(http.StatusForbidden, "device_revoked", "Device revoked", "DEVICE_REVOKED", nil)
+		runtimeFailure(http.StatusForbidden, "device_revoked", "Device revoked", nil)
 		return
 	}
 	if _, revoked := state.RevokedSessions[claims.SessionID]; revoked {
-		meterFailure(http.StatusUnauthorized, "invalid_session", "Session revoked", "SESSION_REVOKED", nil)
+		runtimeFailure(http.StatusForbidden, "session_revoked", "Session revoked", nil)
 		return
 	}
 
 	generation, err := strconv.Atoi(strings.TrimSpace(r.Header.Get("X-Measix-Managed-Generation")))
 	if err != nil || generation < 0 {
-		meterFailure(http.StatusBadRequest, "invalid_request", "Invalid managed generation", "INVALID_GENERATION", nil)
+		runtimeFailure(http.StatusBadRequest, "invalid_request", "Invalid managed generation", nil)
 		return
 	}
 	if generation < state.ActiveManagedGeneration {
 		target := state.ActiveManagedGeneration
-		meterFailure(http.StatusPreconditionRequired, "managed_snapshot_required", "Managed snapshot required", "MANAGED_SNAPSHOT_REQUIRED", &target)
+		runtimeFailure(http.StatusPreconditionRequired, "managed_snapshot_required", "Managed snapshot required", &target)
 		return
 	}
 	if generation > state.ActiveManagedGeneration {
-		meterFailure(http.StatusConflict, "managed_generation_ahead", "Managed generation ahead", "MANAGED_GENERATION_AHEAD", nil)
+		runtimeFailure(http.StatusConflict, "managed_generation_ahead", "Managed generation ahead", nil)
 		return
 	}
 	if interactionID == nil {
-		meterFailure(http.StatusBadRequest, "invalid_request", "Invalid interaction id", "INVALID_INTERACTION", nil)
+		runtimeFailure(http.StatusBadRequest, "invalid_request", "Invalid interaction id", nil)
 		return
 	}
 
-	routeID, exists := state.ResourceRoutes[resourceID]
+	resource, exists := state.Resources[resourceID]
 	if !exists {
-		meterFailure(http.StatusForbidden, "resource_not_allowed", "Resource not allowed", "RESOURCE_NOT_ALLOWED", nil)
+		runtimeFailure(http.StatusForbidden, "resource_not_allowed", "Resource not allowed", nil)
 		return
 	}
-	route, exists := state.Routes[routeID]
+	route, exists := state.Routes[resource.RouteID]
 	if !exists {
-		meterFailure(http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime route unavailable", "ROUTE_UNAVAILABLE", nil)
+		runtimeFailure(http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime route unavailable", nil)
 		return
 	}
 	upstream, exists := state.Upstreams[route.UpstreamID]
 	if !exists {
-		meterFailure(http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime upstream unavailable", "UPSTREAM_UNAVAILABLE", nil)
+		runtimeFailure(http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime upstream unavailable", nil)
 		return
 	}
 	attr := usageAttribution{
 		state: state, claims: claims, resourceID: resourceID, interactionID: interactionID,
-		route: route, upstream: upstream, startedAt: startedAt, requestID: requestID,
+		resource: resource, route: route, upstream: upstream, admittedAt: admittedAt, requestID: requestID,
 	}
 	if _, allowed := route.AllowedMethods[r.Method]; !allowed || !allowedPath(runtimePath, route.AllowedPathPrefixes) {
 		writeProblem(observer, http.StatusForbidden, "resource_not_allowed", "Route policy denied request", requestID, nil, false)
-		h.recordUsage(observer, nil, attr, false, nil, "ROUTE_POLICY_DENIED")
 		return
 	}
 	if !upstream.Enabled {
 		writeProblem(observer, http.StatusServiceUnavailable, "upstream_unavailable", "Upstream unavailable", requestID, nil, false)
-		h.recordUsage(observer, nil, attr, false, nil, "UPSTREAM_DISABLED")
 		return
 	}
 	wantsUpgrade := strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 	if (route.TransportPolicy == relaycontrolapi.WEBSOCKET && (!wantsUpgrade || r.Method != http.MethodGet)) || (route.TransportPolicy != relaycontrolapi.WEBSOCKET && r.Header.Get("Upgrade") != "") {
 		writeProblem(observer, http.StatusBadRequest, "invalid_request", "Request does not match route transport", requestID, nil, false)
-		h.recordUsage(observer, nil, attr, false, nil, "INVALID_TRANSPORT")
 		return
 	}
 
 	maxRequestBytes := int64(state.OperationalLimits.MaxRequestBytes)
 	if r.ContentLength > maxRequestBytes {
 		writeProblem(observer, http.StatusRequestEntityTooLarge, "request_too_large", "Request too large", requestID, nil, false)
-		h.recordUsage(observer, nil, attr, false, nil, "REQUEST_TOO_LARGE")
 		return
 	}
+	observation, err := prepareUsageObservation(resource, r, maxRequestBytes)
+	if err != nil {
+		if errors.Is(err, errObservedRequestTooLarge) {
+			writeProblem(observer, http.StatusRequestEntityTooLarge, "request_too_large", "Request too large", requestID, nil, false)
+		} else {
+			writeProblem(observer, http.StatusUnprocessableEntity, "usage_meter_unavailable", "Request cannot be measured for this resource", requestID, nil, false)
+		}
+		return
+	}
+	observer.observation = observation
 	var body *countingBody
 	if r.Body != nil {
-		body = &countingBody{ReadCloser: http.MaxBytesReader(observer, r.Body, maxRequestBytes)}
+		body = &countingBody{ReadCloser: http.MaxBytesReader(observer, r.Body, maxRequestBytes), observation: observation}
 		r.Body = body
 	}
+	if h.budget == nil || h.recorder == nil {
+		writeProblem(observer, http.StatusServiceUnavailable, "budget_service_unavailable", "Budget service unavailable", requestID, nil, false)
+		return
+	}
+	admission := admissionRequest(attr, observation, r)
+	decision, problem, err := h.budget.Admit(r.Context(), admission)
+	if err != nil {
+		writeProblem(observer, http.StatusServiceUnavailable, "budget_service_unavailable", "Budget service unavailable", requestID, nil, false)
+		return
+	}
+	if problem != nil {
+		writeBudgetProblem(observer, *problem, requestID)
+		return
+	}
+	if !decision.Allowed {
+		writeAdmissionDenied(observer, decision, attr, requestID)
+		status, code := admissionDeniedStatus(decision)
+		_ = h.recordDenied(admission, attr, status, code)
+		return
+	}
+	attr.budgetRevision = decision.Revision
+	if err := h.recorder.PersistAdmission(admission, route.ID); err != nil {
+		releaseUnforwarded(context.WithoutCancel(r.Context()), h, attr, "admission_journal_failed")
+		writeProblem(observer, http.StatusServiceUnavailable, "usage_reconciliation_required", "Usage journal unavailable", requestID, nil, false)
+		return
+	}
+	attr.startedAt = h.store.Now()
+	const startRevision = 1
+	eventHash := lifecycleHash(requestID, "start", startRevision, attr.startedAt)
+	start := usageingestapi.BudgetLifecycleEvent{EventHash: eventHash, OccurredAt: attr.startedAt, Revision: startRevision}
+	if err := h.recorder.MarkStarted(requestID, attr.startedAt); err != nil {
+		releaseUnforwarded(context.WithoutCancel(r.Context()), h, attr, "start_journal_failed")
+		writeProblem(observer, http.StatusServiceUnavailable, "usage_reconciliation_required", "Usage journal unavailable", requestID, nil, false)
+		return
+	}
+	if err := h.budget.Start(r.Context(), requestID, start); err != nil {
+		releaseUnforwarded(context.WithoutCancel(r.Context()), h, attr, "budget_start_failed")
+		writeProblem(observer, http.StatusServiceUnavailable, "budget_service_unavailable", "Budget service unavailable", requestID, nil, false)
+		return
+	}
+	attr.lifecycleRevision = startRevision
 
 	result := &proxyResult{}
 	// ReverseProxy aborts an interrupted response with http.ErrAbortHandler.
 	// Meter in the unwind path as well, using the state captured at admission.
-	defer func() { h.recordUsage(observer, body, attr, true, result.UpstreamStatus, result.ErrorClass) }()
+	defer func() {
+		_ = h.recordSettlement(observer, body, observation, attr, true, result.UpstreamStatus, result.ErrorClass)
+	}()
 	h.serveProxy(observer, r, route, upstream, runtimePath, requestID, result, maxRequestBytes)
+}
+
+func lifecycleHash(requestID, action string, revision int, occurredAt time.Time) string {
+	sum := sha256.Sum256([]byte(requestID + "|" + action + "|" + strconv.Itoa(revision) + "|" + occurredAt.UTC().Format(time.RFC3339Nano)))
+	return fmt.Sprintf("sha256:%x", sum[:])
+}
+
+func releaseUnforwarded(ctx context.Context, h *Handler, attr usageAttribution, reason string) {
+	occurredAt := h.store.Now()
+	revision := attr.lifecycleRevision + 1
+	release := usageingestapi.BudgetReleaseRequest{
+		EventHash:  lifecycleHash(attr.requestID, "release:"+reason, revision, occurredAt),
+		OccurredAt: occurredAt, Reason: reason, Revision: revision,
+	}
+	if err := h.budget.Release(ctx, attr.requestID, release); err == nil {
+		_ = h.recorder.AbortAdmission(attr.requestID)
+	}
+}
+
+func writeAdmissionDenied(w http.ResponseWriter, decision usageingestapi.BudgetAdmissionDecision, attr usageAttribution, requestID string) {
+	status, code := admissionDeniedStatus(decision)
+	title := "Budget exhausted"
+	if code == "usage_meter_unavailable" {
+		title = "Required usage meter unavailable"
+	} else if code == "in_flight_limit" {
+		title = "Too many in-flight requests"
+	}
+	capability := usageingestapi.BudgetCapability(attr.resource.Kind)
+	resourceID := attr.resourceID
+	mode := decision.Mode
+	blocking := decision.BlockingLimits
+	asOf := decision.AsOf
+	problem := usageingestapi.Problem{
+		Type: "about:blank", Title: title, Status: status, Code: code,
+		Budget: &usageingestapi.BudgetContext{
+			Capability: &capability, ResourceId: &resourceID, Mode: &mode,
+			BlockingLimits: &blocking, ResetAt: decision.ResetAt, AsOf: &asOf,
+		},
+	}
+	writeBudgetProblem(w, problem, requestID)
+}
+
+func admissionDeniedStatus(decision usageingestapi.BudgetAdmissionDecision) (int, string) {
+	switch decision.Code {
+	case usageingestapi.USAGEMETERUNAVAILABLE:
+		return http.StatusUnprocessableEntity, "usage_meter_unavailable"
+	case usageingestapi.INFLIGHTLIMIT:
+		return http.StatusTooManyRequests, "in_flight_limit"
+	default:
+		return http.StatusTooManyRequests, "budget_exhausted"
+	}
+}
+
+func writeBudgetProblem(w http.ResponseWriter, problem usageingestapi.Problem, requestID string) {
+	forwarded := false
+	problem.Forwarded = &forwarded
+	problem.RequestId = &requestID
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("X-Measix-Request-Id", requestID)
+	w.WriteHeader(problem.Status)
+	_ = json.NewEncoder(w).Encode(problem)
 }
 
 func writeProblem(w http.ResponseWriter, status int, code, title, requestID string, targetGeneration *int, forwarded bool) {

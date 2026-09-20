@@ -301,7 +301,7 @@ func (s *Service) reconcileSessionDenies(ctx context.Context, revision int64) (*
 	if platformid.Validate(platformid.Idempotency, key) != nil {
 		return nil, fmt.Errorf("invalid persisted session id")
 	}
-	result, err := s.securityChange(ctx, pending.UserID, key, string(securitySessionRevoke), pending.ID)
+	result, err := s.securityChange(ctx, pending.UserID, key, string(securitySessionRevoke), pending.ID, nil)
 	if err != nil {
 		return nil, err
 	}

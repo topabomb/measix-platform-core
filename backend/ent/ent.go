@@ -7,6 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"measix/platform/ent/activation"
+	"measix/platform/ent/budgetallocation"
+	"measix/platform/ent/budgetaudit"
+	"measix/platform/ent/budgetbucket"
+	"measix/platform/ent/budgetlimit"
+	"measix/platform/ent/budgetreconciliation"
+	"measix/platform/ent/budgetrequest"
+	"measix/platform/ent/budgetsettlement"
+	"measix/platform/ent/deletedcredential"
+	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enrollment"
@@ -24,7 +33,10 @@ import (
 	"measix/platform/ent/session"
 	"measix/platform/ent/upstream"
 	"measix/platform/ent/upstreamconfigrevision"
+	"measix/platform/ent/usagedetail"
+	"measix/platform/ent/usageevent"
 	"measix/platform/ent/user"
+	"measix/platform/ent/userbudget"
 	"reflect"
 	"sync"
 
@@ -92,6 +104,15 @@ func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			activation.Table:             activation.ValidColumn,
+			budgetallocation.Table:       budgetallocation.ValidColumn,
+			budgetaudit.Table:            budgetaudit.ValidColumn,
+			budgetbucket.Table:           budgetbucket.ValidColumn,
+			budgetlimit.Table:            budgetlimit.ValidColumn,
+			budgetreconciliation.Table:   budgetreconciliation.ValidColumn,
+			budgetrequest.Table:          budgetrequest.ValidColumn,
+			budgetsettlement.Table:       budgetsettlement.ValidColumn,
+			deletedcredential.Table:      deletedcredential.ValidColumn,
+			deletedprincipal.Table:       deletedprincipal.ValidColumn,
 			deployment.Table:             deployment.ValidColumn,
 			device.Table:                 device.ValidColumn,
 			enrollment.Table:             enrollment.ValidColumn,
@@ -109,7 +130,10 @@ func checkColumn(t, c string) error {
 			session.Table:                session.ValidColumn,
 			upstream.Table:               upstream.ValidColumn,
 			upstreamconfigrevision.Table: upstreamconfigrevision.ValidColumn,
+			usagedetail.Table:            usagedetail.ValidColumn,
+			usageevent.Table:             usageevent.ValidColumn,
 			user.Table:                   user.ValidColumn,
+			userbudget.Table:             userbudget.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

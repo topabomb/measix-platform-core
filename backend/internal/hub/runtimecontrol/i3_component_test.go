@@ -185,7 +185,7 @@ func publishDraft(upstreamID string) adminapi.ManagedDraftContent {
 	routeID := platformid.New(platformid.Route)
 	policyID := platformid.New(platformid.Policy)
 	return adminapi.ManagedDraftContent{
-		Providers: []adminapi.ProviderDefinition{{ProviderId: providerID, DisplayName: "Managed AI", ClientProtocol: adminapi.OPENAICHATCOMPLETIONS, Enabled: true}},
+		Providers: []adminapi.ProviderDefinition{{ProviderId: providerID, DisplayName: "Managed AI", ClientProtocol: adminapi.ProviderDefinitionClientProtocolOPENAICHATCOMPLETIONS, Enabled: true}},
 		Models: []adminapi.ModelDefinition{{
 			ModelId: modelID, ProviderId: providerID, DisplayName: "Managed Model", UpstreamModelKey: "model-x", RuntimePath: "/v1/chat/completions", Enabled: true,
 			Capabilities: []adminapi.ModelDefinitionCapabilities{adminapi.TOOL}, InputModalities: []adminapi.ModelDefinitionInputModalities{adminapi.ModelDefinitionInputModalitiesTEXT}, OutputModalities: []adminapi.ModelDefinitionOutputModalities{adminapi.ModelDefinitionOutputModalitiesTEXT},

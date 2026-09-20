@@ -69,14 +69,9 @@ func RequestID(v string) predicate.SemanticUsage {
 	return predicate.SemanticUsage(sql.FieldEQ(FieldRequestID, v))
 }
 
-// UpstreamID applies equality check predicate on the "upstream_id" field. It's identical to UpstreamIDEQ.
-func UpstreamID(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldEQ(FieldUpstreamID, v))
-}
-
-// ResourceID applies equality check predicate on the "resource_id" field. It's identical to ResourceIDEQ.
-func ResourceID(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldEQ(FieldResourceID, v))
+// SettlementRevision applies equality check predicate on the "settlement_revision" field. It's identical to SettlementRevisionEQ.
+func SettlementRevision(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldEQ(FieldSettlementRevision, v))
 }
 
 // SourceEventID applies equality check predicate on the "source_event_id" field. It's identical to SourceEventIDEQ.
@@ -87,6 +82,11 @@ func SourceEventID(v string) predicate.SemanticUsage {
 // Meter applies equality check predicate on the "meter" field. It's identical to MeterEQ.
 func Meter(v string) predicate.SemanticUsage {
 	return predicate.SemanticUsage(sql.FieldEQ(FieldMeter, v))
+}
+
+// QuantityUnits applies equality check predicate on the "quantity_units" field. It's identical to QuantityUnitsEQ.
+func QuantityUnits(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldEQ(FieldQuantityUnits, v))
 }
 
 // QuantityDecimal applies equality check predicate on the "quantity_decimal" field. It's identical to QuantityDecimalEQ.
@@ -174,16 +174,6 @@ func RequestIDHasSuffix(v string) predicate.SemanticUsage {
 	return predicate.SemanticUsage(sql.FieldHasSuffix(FieldRequestID, v))
 }
 
-// RequestIDIsNil applies the IsNil predicate on the "request_id" field.
-func RequestIDIsNil() predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldIsNull(FieldRequestID))
-}
-
-// RequestIDNotNil applies the NotNil predicate on the "request_id" field.
-func RequestIDNotNil() predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldNotNull(FieldRequestID))
-}
-
 // RequestIDEqualFold applies the EqualFold predicate on the "request_id" field.
 func RequestIDEqualFold(v string) predicate.SemanticUsage {
 	return predicate.SemanticUsage(sql.FieldEqualFold(FieldRequestID, v))
@@ -194,144 +184,44 @@ func RequestIDContainsFold(v string) predicate.SemanticUsage {
 	return predicate.SemanticUsage(sql.FieldContainsFold(FieldRequestID, v))
 }
 
-// UpstreamIDEQ applies the EQ predicate on the "upstream_id" field.
-func UpstreamIDEQ(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldEQ(FieldUpstreamID, v))
+// SettlementRevisionEQ applies the EQ predicate on the "settlement_revision" field.
+func SettlementRevisionEQ(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldEQ(FieldSettlementRevision, v))
 }
 
-// UpstreamIDNEQ applies the NEQ predicate on the "upstream_id" field.
-func UpstreamIDNEQ(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldNEQ(FieldUpstreamID, v))
+// SettlementRevisionNEQ applies the NEQ predicate on the "settlement_revision" field.
+func SettlementRevisionNEQ(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldNEQ(FieldSettlementRevision, v))
 }
 
-// UpstreamIDIn applies the In predicate on the "upstream_id" field.
-func UpstreamIDIn(vs ...string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldIn(FieldUpstreamID, vs...))
+// SettlementRevisionIn applies the In predicate on the "settlement_revision" field.
+func SettlementRevisionIn(vs ...int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldIn(FieldSettlementRevision, vs...))
 }
 
-// UpstreamIDNotIn applies the NotIn predicate on the "upstream_id" field.
-func UpstreamIDNotIn(vs ...string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldNotIn(FieldUpstreamID, vs...))
+// SettlementRevisionNotIn applies the NotIn predicate on the "settlement_revision" field.
+func SettlementRevisionNotIn(vs ...int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldNotIn(FieldSettlementRevision, vs...))
 }
 
-// UpstreamIDGT applies the GT predicate on the "upstream_id" field.
-func UpstreamIDGT(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldGT(FieldUpstreamID, v))
+// SettlementRevisionGT applies the GT predicate on the "settlement_revision" field.
+func SettlementRevisionGT(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldGT(FieldSettlementRevision, v))
 }
 
-// UpstreamIDGTE applies the GTE predicate on the "upstream_id" field.
-func UpstreamIDGTE(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldGTE(FieldUpstreamID, v))
+// SettlementRevisionGTE applies the GTE predicate on the "settlement_revision" field.
+func SettlementRevisionGTE(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldGTE(FieldSettlementRevision, v))
 }
 
-// UpstreamIDLT applies the LT predicate on the "upstream_id" field.
-func UpstreamIDLT(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldLT(FieldUpstreamID, v))
+// SettlementRevisionLT applies the LT predicate on the "settlement_revision" field.
+func SettlementRevisionLT(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldLT(FieldSettlementRevision, v))
 }
 
-// UpstreamIDLTE applies the LTE predicate on the "upstream_id" field.
-func UpstreamIDLTE(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldLTE(FieldUpstreamID, v))
-}
-
-// UpstreamIDContains applies the Contains predicate on the "upstream_id" field.
-func UpstreamIDContains(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldContains(FieldUpstreamID, v))
-}
-
-// UpstreamIDHasPrefix applies the HasPrefix predicate on the "upstream_id" field.
-func UpstreamIDHasPrefix(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldHasPrefix(FieldUpstreamID, v))
-}
-
-// UpstreamIDHasSuffix applies the HasSuffix predicate on the "upstream_id" field.
-func UpstreamIDHasSuffix(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldHasSuffix(FieldUpstreamID, v))
-}
-
-// UpstreamIDEqualFold applies the EqualFold predicate on the "upstream_id" field.
-func UpstreamIDEqualFold(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldEqualFold(FieldUpstreamID, v))
-}
-
-// UpstreamIDContainsFold applies the ContainsFold predicate on the "upstream_id" field.
-func UpstreamIDContainsFold(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldContainsFold(FieldUpstreamID, v))
-}
-
-// ResourceIDEQ applies the EQ predicate on the "resource_id" field.
-func ResourceIDEQ(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldEQ(FieldResourceID, v))
-}
-
-// ResourceIDNEQ applies the NEQ predicate on the "resource_id" field.
-func ResourceIDNEQ(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldNEQ(FieldResourceID, v))
-}
-
-// ResourceIDIn applies the In predicate on the "resource_id" field.
-func ResourceIDIn(vs ...string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldIn(FieldResourceID, vs...))
-}
-
-// ResourceIDNotIn applies the NotIn predicate on the "resource_id" field.
-func ResourceIDNotIn(vs ...string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldNotIn(FieldResourceID, vs...))
-}
-
-// ResourceIDGT applies the GT predicate on the "resource_id" field.
-func ResourceIDGT(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldGT(FieldResourceID, v))
-}
-
-// ResourceIDGTE applies the GTE predicate on the "resource_id" field.
-func ResourceIDGTE(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldGTE(FieldResourceID, v))
-}
-
-// ResourceIDLT applies the LT predicate on the "resource_id" field.
-func ResourceIDLT(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldLT(FieldResourceID, v))
-}
-
-// ResourceIDLTE applies the LTE predicate on the "resource_id" field.
-func ResourceIDLTE(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldLTE(FieldResourceID, v))
-}
-
-// ResourceIDContains applies the Contains predicate on the "resource_id" field.
-func ResourceIDContains(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldContains(FieldResourceID, v))
-}
-
-// ResourceIDHasPrefix applies the HasPrefix predicate on the "resource_id" field.
-func ResourceIDHasPrefix(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldHasPrefix(FieldResourceID, v))
-}
-
-// ResourceIDHasSuffix applies the HasSuffix predicate on the "resource_id" field.
-func ResourceIDHasSuffix(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldHasSuffix(FieldResourceID, v))
-}
-
-// ResourceIDIsNil applies the IsNil predicate on the "resource_id" field.
-func ResourceIDIsNil() predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldIsNull(FieldResourceID))
-}
-
-// ResourceIDNotNil applies the NotNil predicate on the "resource_id" field.
-func ResourceIDNotNil() predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldNotNull(FieldResourceID))
-}
-
-// ResourceIDEqualFold applies the EqualFold predicate on the "resource_id" field.
-func ResourceIDEqualFold(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldEqualFold(FieldResourceID, v))
-}
-
-// ResourceIDContainsFold applies the ContainsFold predicate on the "resource_id" field.
-func ResourceIDContainsFold(v string) predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldContainsFold(FieldResourceID, v))
+// SettlementRevisionLTE applies the LTE predicate on the "settlement_revision" field.
+func SettlementRevisionLTE(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldLTE(FieldSettlementRevision, v))
 }
 
 // SourceEventIDEQ applies the EQ predicate on the "source_event_id" field.
@@ -387,16 +277,6 @@ func SourceEventIDHasPrefix(v string) predicate.SemanticUsage {
 // SourceEventIDHasSuffix applies the HasSuffix predicate on the "source_event_id" field.
 func SourceEventIDHasSuffix(v string) predicate.SemanticUsage {
 	return predicate.SemanticUsage(sql.FieldHasSuffix(FieldSourceEventID, v))
-}
-
-// SourceEventIDIsNil applies the IsNil predicate on the "source_event_id" field.
-func SourceEventIDIsNil() predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldIsNull(FieldSourceEventID))
-}
-
-// SourceEventIDNotNil applies the NotNil predicate on the "source_event_id" field.
-func SourceEventIDNotNil() predicate.SemanticUsage {
-	return predicate.SemanticUsage(sql.FieldNotNull(FieldSourceEventID))
 }
 
 // SourceEventIDEqualFold applies the EqualFold predicate on the "source_event_id" field.
@@ -472,6 +352,46 @@ func MeterEqualFold(v string) predicate.SemanticUsage {
 // MeterContainsFold applies the ContainsFold predicate on the "meter" field.
 func MeterContainsFold(v string) predicate.SemanticUsage {
 	return predicate.SemanticUsage(sql.FieldContainsFold(FieldMeter, v))
+}
+
+// QuantityUnitsEQ applies the EQ predicate on the "quantity_units" field.
+func QuantityUnitsEQ(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldEQ(FieldQuantityUnits, v))
+}
+
+// QuantityUnitsNEQ applies the NEQ predicate on the "quantity_units" field.
+func QuantityUnitsNEQ(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldNEQ(FieldQuantityUnits, v))
+}
+
+// QuantityUnitsIn applies the In predicate on the "quantity_units" field.
+func QuantityUnitsIn(vs ...int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldIn(FieldQuantityUnits, vs...))
+}
+
+// QuantityUnitsNotIn applies the NotIn predicate on the "quantity_units" field.
+func QuantityUnitsNotIn(vs ...int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldNotIn(FieldQuantityUnits, vs...))
+}
+
+// QuantityUnitsGT applies the GT predicate on the "quantity_units" field.
+func QuantityUnitsGT(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldGT(FieldQuantityUnits, v))
+}
+
+// QuantityUnitsGTE applies the GTE predicate on the "quantity_units" field.
+func QuantityUnitsGTE(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldGTE(FieldQuantityUnits, v))
+}
+
+// QuantityUnitsLT applies the LT predicate on the "quantity_units" field.
+func QuantityUnitsLT(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldLT(FieldQuantityUnits, v))
+}
+
+// QuantityUnitsLTE applies the LTE predicate on the "quantity_units" field.
+func QuantityUnitsLTE(v int64) predicate.SemanticUsage {
+	return predicate.SemanticUsage(sql.FieldLTE(FieldQuantityUnits, v))
 }
 
 // QuantityDecimalEQ applies the EQ predicate on the "quantity_decimal" field.

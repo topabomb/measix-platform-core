@@ -376,6 +376,7 @@ func findMeter(values []usageingestapi.MeterValue, meter usageingestapi.UsageMet
 
 func resourceKindMatches(kind platformid.Kind, declared usageingestapi.ResourceKind) bool {
 	return (kind == platformid.Model && declared == usageingestapi.ResourceKindMODEL) ||
+		(kind == platformid.ImageGeneration && declared == usageingestapi.ResourceKindIMAGEGENERATION) ||
 		(kind == platformid.TTS && declared == usageingestapi.ResourceKindTTS) ||
 		(kind == platformid.ASR && declared == usageingestapi.ResourceKindASR) ||
 		(kind == platformid.MCP && declared == usageingestapi.ResourceKindMCP)

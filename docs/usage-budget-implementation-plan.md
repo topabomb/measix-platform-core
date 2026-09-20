@@ -9,7 +9,7 @@
 
 - `backend/internal/relay/runtime` 负责透明代理、统一预算准入和请求观察；`protocolusage` 负责生产协议解析，`relay/metering` 以同一 SQLite spool 承载批量投递、重试和恢复。
 - `hub/usage` 负责语义计量、归属、查询与结算；`hub/budget` 负责规则、自然周期计数、原子占用、幂等结算和待核对状态，不以查询聚合代替准入计数器。
-- Admin 的 Usage 与 Users 页面提供筛选、趋势、请求详情、用户额度、审计与待核对处置；正式删除用户使用精确用户名、原因、幂等状态机和不可逆凭据 tombstone。
+- Admin 的 Usage 与 Users 页面提供筛选、趋势、请求详情、五类能力的用户额度、限额模板、能力覆盖、审计与待核对处置；正式删除用户使用精确用户名、原因、幂等状态机和不可逆凭据 tombstone。
 - Portal 在受限本人 Session 下提供首页摘要及“我的用量与额度”，复用 Core 投影，不持有预算真源。
 - Android 消费当前 Client OpenAPI，在企业空间展示本人额度，并在 Model、TTS、ASR、Realtime ASR 与 MCP 的平台运行时边界统一解析结构化 Problem；固定 Portal 深链不开放任意 URL。
 
@@ -46,7 +46,7 @@ Portal 代码在同级仓库维护；增加个人用量/额度界面及 source/s
 
 统一生命周期包含：创建观察器、提取可预知请求量、增量观察响应、终结结果。最终结果是结构化 meter/source/completeness 和诊断，不含正文。HTTP JSON、SSE、binary、multipart 和 WebSocket 使用同一结果模型，但不强迫使用同一种读取器。
 
-必须在 Core 这一轮整体实现下列 12 个云端协议/profile（4 LLM + 3 TTS + 4 ASR + 1 MCP），不能只实现一个协议后转去其他仓库。SYSTEM_TTS 明确不做服务端计量。最小实现由下表限定；协议解析支持与某个供应商模型的真实资格分别记录，不能用 LEVEL_0 掩盖缺少本表规定的生产解析代码。
+必须在 Core 这一轮整体实现下列 13 个云端协议/profile（4 LLM + 1 Image Generation + 3 TTS + 4 ASR + 1 MCP），不能只实现一个协议后转去其他仓库。SYSTEM_TTS 明确不做服务端计量。最小实现由下表限定；协议解析支持与某个供应商模型的真实资格分别记录，不能用 LEVEL_0 掩盖缺少本表规定的生产解析代码。
 
 ### 3.1 LLM：字段、合并与最小指标
 
@@ -61,7 +61,13 @@ Portal 代码在同级仓库维护；增加个人用量/额度界面及 source/s
 
 Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream_options.include_usage=true`，已有 builder 的 vendor 例外要按企业受信协议能力核对；Relay 不偷偷补写请求 body。不接受 include_usage 或不返回 usage 的兼容供应商保留透明调用能力，但不得标记为可执行 token 预算。Core 阶段使用正确生产形状的协议客户端验证，Android 阶段同步实际 builder。Responses 不增加服务端会话或 previous_response_id 依赖，原生工具往返仍遵守当前合同。
 
-### 3.2 TTS：最小按输入字符结算
+### 3.2 Image Generation：同步 text-to-image
+
+`OPENAI_IMAGES_GENERATIONS` 只接受已发布 `img_*` route 的同步 `POST /images/generations`。Relay 从受信 JSON 请求有界读取 `n` 与 `size`：`n` 缺失规范化为 1，必须位于 1..资源 `maxImagesPerRequest`（平台上限 6），`size` 必须属于资源 `allowedSizes`。合法请求保持 body 字节与供应商响应透明，不解析 prompt，不下载或持久化图片，不把 URL/`b64_json` 变成另一种结果。
+
+每次实际开始的上游调用计 `REQUESTS=1`，`REQUESTED_IMAGES=n`；它表示请求图片数，不冒充返回或保存成功数。明确未转发才释放两者。有限图片预算无法可靠解析合法 `n` 时 fail closed；无限模式也执行资源单次上限与 size 准入。edit、图片输入、reference、mask、multipart、stream、async 不在当前 profile 内，不能由通用代理路径绕开。
+
+### 3.3 TTS：最小按输入字符结算
 
 统一 CHARACTERS 口径为目标文本字段经 JSON 解码后的 Unicode 码点数，包含空白、换行、标点和字段内风格标签；不 trim、不按 UTF-8 字节或 UTF-16 单元计数。平台量表示“提交的朗读文本字符”，不承诺等于供应商计费或实际发声字符。合法目标文本完整读取后才可准确预占；在明确有界 JSON 内观察并原样重放，避免先转发后检查字符预算。
 
@@ -73,7 +79,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 
 目标字段格式超出上述最小 profile 时，无限或仅次数预算仍可按既有传输规则执行并标记字符 UNKNOWN；启用了字符预算则在转发前返回 `usage_meter_unavailable`，不能绕过字符预算。首次支持的三种云 TTS 正常文本调用必须均为 CHARACTERS EXACT；不能以该降级规则替代实现。
 
-### 3.3 HTTP ASR：最小音频格式与时长
+### 3.4 HTTP ASR：最小音频格式与时长
 
 必交输入是当前 Android 录音使用的 RIFF/WAVE PCM16 little-endian（合法声道/采样率由资源与上游约束）；最小验收包含单声道 16 kHz 和 24 kHz（只对供应商支持者执行真实调用）。用 RIFF chunk scanner 读取 fmt/data，跳过未知 chunk 与 padding，按实际完整样本数、声道和采样率计算。检查 blockAlign、截断和声明 data 长度，不能仅信 header 填值或所有 WAV 都固定 44 字节。
 
@@ -86,7 +92,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 
 上传字节只做有界观察，不整体加载内存。时长准入统一采用已结算达到额度后停后续；本阶段不为 HTTP 文件先完整上传到 Relay 再预占整文件时长。取消后按已确认实际提交样本结算，不能按原文件完整长度扣整段。秒到毫秒按一次请求终结时作固定向上取整；PCM 分块保留样本分子/余数，不能每块取整导致累计偏差。
 
-### 3.4 实时 ASR 与 MCP
+### 3.5 实时 ASR 与 MCP
 
 | clientProtocol | 必交的生产解析 | 去重与结束规则 |
 |---|---|---|
@@ -96,7 +102,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 
 WebSocket 生产观察器必须支持文本帧分片、continuation、控制帧穿插、mask 与协商压缩；对原始帧只读旁路解码，保留原帧转发。无法处理的协商不能静默标为可计量；有限音频预算要求受支持的协商组合。计量失败后仍将已知量写入 spool 并进入待核对，不能把未解决记录自动清零。
 
-### 3.5 共同完成标准和官方依据
+### 3.6 共同完成标准和官方依据
 
 每个 profile 都交付生产实现、声明的 meter capability、正常/缺字段/分块/取消固定输入与预期结果，适用时还有缓存、推理和格式变化用例。capability 必须是“协议 + 当前配置/模型/格式可证明的指标”，不能仅根据枚举宣告所有兼容供应商都精确。TOTAL_TOKENS 达量停后续；无法取得必需指标的资源在启用对应预算时失败关闭，次数或无限模式继续依照正常传输合同。Core 的集中验证一次覆盖全部 profile，后续仓库不重新实现计量。
 
@@ -160,11 +166,11 @@ Relay 在转发之前持久记录准入/执行身份，并将允许、开始尝�
 |---|---|
 | `api/internal/relay-control.openapi.yaml` | route 增加可信计量协议/必要静态参数，更新编译、控制状态校验与 hash；不下发每用户动态余额 |
 | `api/internal/usage-ingest.openapi.yaml` | 扩展生命周期/语义批量事件、ACK、结算身份与错误；内部预算 admit 接口与生成 client 纳入本仓库 API 管理，可集中在独立 `budget.openapi.yaml` |
-| `api/admin/admin.openapi.yaml` | 用户 budgets GET/PUT、状态、审计/待核对；usage 增加协议过滤、用户汇总、按日趋势和详细 meters；平台拒绝数与消耗请求数分开 |
-| `api/client/client-control.openapi.yaml` | `/api/portal/v1/budgets`、`/usage/summary`、`/usage/trend`、`/usage/requests` 及请求详情；只接受本人 Portal Session，不开放指定 userId |
+| `api/admin/admin.openapi.yaml` | 五类用户 budgets GET/PUT/清除覆盖、限额模板 CRUD、单模板指派/解除、状态、审计/待核对；usage 增加协议过滤、用户汇总、按日趋势和详细 meters；平台拒绝数与消耗请求数分开 |
+| `api/client/client-control.openapi.yaml` | `/api/portal/v1/budgets`、`/usage/summary`、`/usage/trend`、`/usage/requests` 及请求详情；只接受本人 Portal Session，不开放指定 userId，也不下发模板身份/修订/指派元数据 |
 | 同一 Client OpenAPI | 增加 `/api/client/v1/budgets` 本人摘要，Client Bearer 认证供 Android 企业空间使用；与 Portal DTO 共享有限/无限、配置来源、状态、多个阻断项及 asOf 等语义，不能将 Portal Cookie 当作原生 credential |
 | Runtime Problem | 定义 budget_exhausted（429）、budget_service_unavailable（503）、usage_reconciliation_required（503）、usage_meter_unavailable（422），分别表示耗尽、服务不可用、待核对和当前请求模式无法计量；预算耗尽给出能力/指标/周期及可得 resetAt，准入拒绝使用 forwarded=false；只有可确定整体自动恢复时间才给 Retry-After。已删除身份的 Runtime 与 refresh credential 统一返回 401 `enterprise_identity_deleted` |
-| Snapshot v4 | 不增加预算余额/动态规则；clientProtocol 是既有静态来源。本方案无需修改客户端资源字段；若实施发现必须补字段，先修架构变更清单，不升版 |
+| Snapshot v4 | 不增加预算余额、动态规则或模板元数据；新增可选 `imageGenerators` 与 `policy.defaultImageGenerationId`，缺失仅表示空/未设置。新 writer 显式写数组；不升版，不为该字段创建数据库迁移或双读协议 |
 | Bridge v3 | 不新增预算方法；Portal 用同源 HttpOnly Cookie 查询。同步生成包，不制造新 token 通道 |
 
 Portal API 在每个 handler 从 authenticatePortal 推导 userId，查询和详情都在 DB 层强制归属；不能只前端隐藏。用户响应去除内部 route、Secret、管理审计及其他用户信息；使用 no-store 和已有来源/会话检查。Admin 权限仍走 Admin API。
@@ -179,7 +185,9 @@ Android 维护方同步当前生成合同、错误枚举/消费测试；在 LLM 
 
 ## 7. Admin 与 Portal 页面落地
 
-Admin 在 UsersPage 用户详情增设“用量与额度”：每能力先选择无限/有限，有限模式编辑自然周期及累计规则，显示已用/在途/剩余/恢复、阻断原因和变更历史。默认无限与明确无限由服务端配置来源区分；无限仍展示用量，零为禁用该指标额度。历史图表时间筛选与当前额度卡分开。
+Admin 在 UsersPage 用户详情增设“用量与额度”：MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力先选择无限/有限，有限模式编辑自然周期及累计规则，显示已用/在途/剩余/恢复、阻断原因和变更历史。图片只提供 REQUESTS/REQUESTED_IMAGES。默认无限、限额模板与用户覆盖由服务端配置来源区分；无限仍展示用量，零为禁用该指标额度。历史图表时间筛选与当前额度卡分开，不提供资源级预算。
+
+一级 `Budget Templates` 位于 Users 与 Resources 之间，复用同一个 `BudgetRuleEditor`。一个用户最多指派一个 live-linked 模板；显式能力覆盖优先，清除覆盖恢复模板/默认，解除模板保留显式覆盖。模板修改在单事务中更新所有指派用户的未覆盖能力；被指派模板禁止删除。模板名称、ID、revision、assignment 和详细来源只出现在 Admin API/UI，不能进入 Client、Portal、Snapshot、Runtime 或 Android。
 
 同一详情提供正式“删除用户”操作：操作者必须逐字输入当前用户名并填写原因，服务端再次核验；删除状态机先 deny 新的 Client/Runtime/refresh 请求，等待或拒绝在途请求，再以单一可恢复事务清除用户、设备、Session、配置、预算、用量、Feed/Portal 与审计外的用户私有事实。审计记录使用不可反查的主体摘要；旧 access/runtime credential 及 refresh credential 以不可逆摘要 tombstone 识别并稳定返回 `enterprise_identity_deleted`。删除失败不得呈现成功，重试保持幂等，Admin 显示最终 COMPLETED/FAILED 与可操作诊断。
 
@@ -221,7 +229,7 @@ Core OpenAPI 和共享 fixture 至少定义 `BudgetContext` 的语义字段：�
 | 顺序/仓库 | 一次完成的实现内容 | 本仓库集中验证与交接 |
 |---|---|---|
 | 1. `measix-architecture` | 补充合同、边界、全部协议最小范围、有限/无限、错误上下文、各端职责、不升版及唯一执行顺序 | 全部文档完成后检查引用、冲突和验收覆盖；交接完整合同，不留“稍后再定义”的必需产品语义。 |
-| 2. `measix-platform-core`（包含 Admin） | 一次实现 §3 全部生产解析、spool/账本、所有周期预算/恢复、Admin 全部页面与分析、Client/Portal 全部接口、Runtime Problem、初始化 SQL/Ent、fixtures/生成包、运行手册。预算 API 和 DTO 一次交齐给两端 | 集中运行适用 Go/契约/生成一致性、全部新增预算/协议故障测试、Console 测试与 production build、真实 Hub/Relay/Admin 浏览器流程。协议客户端直接验证两种受限查询认证及所有错误 fixture，供尚未改造的 Portal/Android 对接；不提前把模拟客户端当 Android 验收。固定 Core 提交/构建和接口产物。 |
+| 2. `measix-platform-core`（包含 Admin） | 一次实现 §3 全部生产解析、Image Generation、spool/账本、五类能力的所有周期预算/恢复、live-linked 限额模板与覆盖、Admin 全部页面与分析、Client/Portal 全部接口、Runtime Problem、初始化 SQL/Ent、fixtures/生成包、运行手册。预算 API 和 DTO 一次交齐给两端 | 集中运行适用 Go/契约/生成一致性、全部新增预算/协议故障测试、Console 测试与 production build、真实 Hub/Relay/Admin 浏览器流程。协议客户端直接验证两种受限查询认证及所有错误 fixture，供尚未改造的 Portal/Android 对接；不提前把模拟客户端当 Android 验收。固定 Core 提交/构建和接口产物。 |
 | 3. `measix-enterprise-portal` | 一次完成首页额度卡、个人额度/趋势/分布/明细、有限/无限/多阻断/待结算、深链、移动端及 Session 失效/请求隔离；消费步骤 2 的全部合同 | 完成后集中 generation/typecheck/test/build 和浏览器 E2E，连接已完成 Core 验证实际本人查询/权限；固定 Portal 构建。此时不为 Portal 临时 invent 新 DTO 或复制后端计量。 |
 | 4. `rikkahub_mcp`（Android） | 一次同步 wire/fixtures、include_usage 请求构造、全部 LLM/Speech/MCP/WS 的统一预算错误、企业空间摘要、调用后刷新、Portal 用量入口、无限和 Realm 隔离 | 全部代码完成后集中 JVM/契约/适用 UI 测试、编译/lint及需要的设备测试；使用已完成 Core 与 Portal。固定 APK/提交；不只以 LLM Toast 完成代替所有资源入口与空间状态。 |
 | 5. 最终跨端联调（同一任务） | 使用上述同一组 Core/Portal/APK，在 Admin 配置用户与额度，从 Android 进入企业空间、调用真实资源并查看 Portal | 一次集中覆盖下节全部联调场景，收集各仓库提交/构建、测试结果和真实供应商证据；修复联调缺陷并复验相关链路，全部满足才关闭任务。 |
@@ -238,5 +246,7 @@ Core OpenAPI 和共享 fixture 至少定义 `BudgetContext` 的语义字段：�
 6. Hub 暂不可用、Relay 重启、重复/乱序结算、usage 缺失及待核对恢复不重复扣减、不静默放行；有界流式解析及 WebSocket 分片不破坏传输。
 7. 真实 Android 验证 Portal 进入/深链、企业提示、Session 到期和 Realm 切换迟到结果；不能以浏览器 native bridge 替身、固定 usage 或仅文档勾选代替。
 8. Admin 错误确认不能删除；正确用户名与原因启动 deny-first 全量清理，在途调用不逃逸。删除后该用户的设备、Session、配置、预算、用量和 Portal 私有数据均不可查询，旧 access/runtime 与 refresh credential 都稳定返回 `enterprise_identity_deleted`；Android 显示标准企业身份删除错误并只清理企业域状态。
+9. Admin 创建并编辑五类限额模板、指派用户、覆盖与清除单能力、更换/解除模板、验证被指派模板无法删除；模板变更实时作用于未覆盖能力且不清零同周期已用量，Client/Portal/Android/Snapshot 均无模板元数据。
+10. Admin 发布真实 `img_*` 资源和可选默认项；未设置默认保持未设置。Android 从 Snapshot v4 选择企业文生图资源，经 Relay 实际返回 URL 或 `b64_json` 并由 GeneratedMediaStore 接管；图片请求数与请求图片数分别达到额度后 no-forward。
 
 每个声称已验证的供应商/profile 保存真实证据；无法获得凭据/设备时保留具体未验证项，继续可完成的仓库工作，最后不得宣称整个任务验收通过。测试、build、供应商资格及 Android 设备证据分开记录；统计与预算同一 authority，但不声称所有兼容供应商提供所有指标。

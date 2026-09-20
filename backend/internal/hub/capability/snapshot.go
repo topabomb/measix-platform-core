@@ -32,6 +32,7 @@ type snapshotDescriptor struct {
 	ReleaseID         string                                 `json:"releaseId"`
 	Providers         []clientapi.ProviderDefinition         `json:"providers"`
 	Models            []clientapi.ModelDefinition            `json:"models"`
+	ImageGenerators   []clientapi.ImageGenerationDefinition  `json:"imageGenerators"`
 	TTS               []clientapi.TtsDefinition              `json:"tts"`
 	ASR               []clientapi.AsrDefinition              `json:"asr"`
 	MCP               []clientapi.McpDefinition              `json:"mcp"`
@@ -47,6 +48,7 @@ type snapshotMetadata struct {
 }
 
 func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapshot, string, error) {
+	input.Content = NormalizeManagedDraftContent(input.Content)
 	if err := platformid.Validate(platformid.Deployment, input.DeploymentID); err != nil {
 		return clientapi.ManagedSnapshot{}, "", ErrInvalidDraft
 	}
@@ -81,6 +83,21 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 			ModelId: value.ModelId, ProviderId: value.ProviderId, DisplayName: value.DisplayName,
 			UpstreamModelKey: value.UpstreamModelKey, RuntimePath: value.RuntimePath, Enabled: value.Enabled,
 			Capabilities: capabilities, InputModalities: inputs, OutputModalities: outputs,
+		})
+	}
+	images := make([]clientapi.ImageGenerationDefinition, 0, len(imageGenerators(input.Content)))
+	for _, value := range imageGenerators(input.Content) {
+		sizes := append([]string(nil), value.AllowedSizes...)
+		sort.Strings(sizes)
+		images = append(images, clientapi.ImageGenerationDefinition{
+			ImageId:             value.ImageId,
+			DisplayName:         value.DisplayName,
+			ClientProtocol:      clientapi.ImageGenerationDefinitionClientProtocol(value.ClientProtocol),
+			UpstreamModelKey:    value.UpstreamModelKey,
+			RuntimePath:         value.RuntimePath,
+			MaxImagesPerRequest: value.MaxImagesPerRequest,
+			AllowedSizes:        sizes,
+			Enabled:             value.Enabled,
 		})
 	}
 	tts := make([]clientapi.TtsDefinition, 0, len(input.Content.Tts))
@@ -136,21 +153,23 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	sort.Slice(starters, func(i, j int) bool { return starters[i].StarterId < starters[j].StarterId })
 	sort.Slice(providers, func(i, j int) bool { return providers[i].ProviderId < providers[j].ProviderId })
 	sort.Slice(models, func(i, j int) bool { return models[i].ModelId < models[j].ModelId })
+	sort.Slice(images, func(i, j int) bool { return images[i].ImageId < images[j].ImageId })
 	sort.Slice(tts, func(i, j int) bool { return tts[i].TtsId < tts[j].TtsId })
 	sort.Slice(asr, func(i, j int) bool { return asr[i].AsrId < asr[j].AsrId })
 	sort.Slice(mcp, func(i, j int) bool { return mcp[i].McpServerId < mcp[j].McpServerId })
 
 	policy := clientapi.ManagedPolicy{
-		PolicyId:             input.Content.Policy.PolicyId,
-		AllowLocalProviders:  input.Content.Policy.AllowLocalProviders,
-		AllowLocalTts:        input.Content.Policy.AllowLocalTts,
-		AllowLocalAsr:        input.Content.Policy.AllowLocalAsr,
-		AllowLocalMcp:        input.Content.Policy.AllowLocalMcp,
-		AllowLocalAssistants: input.Content.Policy.AllowLocalAssistants,
-		DefaultModelId:       input.Content.Policy.DefaultModelId,
-		DefaultTtsId:         input.Content.Policy.DefaultTtsId,
-		DefaultAsrId:         input.Content.Policy.DefaultAsrId,
-		DefaultAssistantId:   input.Content.Policy.DefaultAssistantId,
+		PolicyId:                 input.Content.Policy.PolicyId,
+		AllowLocalProviders:      input.Content.Policy.AllowLocalProviders,
+		AllowLocalTts:            input.Content.Policy.AllowLocalTts,
+		AllowLocalAsr:            input.Content.Policy.AllowLocalAsr,
+		AllowLocalMcp:            input.Content.Policy.AllowLocalMcp,
+		AllowLocalAssistants:     input.Content.Policy.AllowLocalAssistants,
+		DefaultModelId:           input.Content.Policy.DefaultModelId,
+		DefaultTtsId:             input.Content.Policy.DefaultTtsId,
+		DefaultAsrId:             input.Content.Policy.DefaultAsrId,
+		DefaultImageGenerationId: input.Content.Policy.DefaultImageGenerationId,
+		DefaultAssistantId:       input.Content.Policy.DefaultAssistantId,
 	}
 	var publishedBy *string
 	if input.PublishedByUserID != "" {
@@ -160,7 +179,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	metadata := snapshotMetadata{PublishedAt: input.PublishedAt.UTC(), PublishedByUserID: publishedBy}
 	descriptor := snapshotDescriptor{
 		DeploymentID: input.DeploymentID, SchemaVersion: CurrentSnapshotSchemaVersion, ManagedGeneration: input.ManagedGeneration,
-		ReleaseID: input.ReleaseID, Providers: providers, Models: models, TTS: tts, ASR: asr, MCP: mcp, Policy: policy, Metadata: metadata,
+		ReleaseID: input.ReleaseID, Providers: providers, Models: models, ImageGenerators: images, TTS: tts, ASR: asr, MCP: mcp, Policy: policy, Metadata: metadata,
 		Assistants: assistants, Starters: starters,
 	}
 	payload, err := json.Marshal(descriptor)
@@ -177,6 +196,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	snapshot.SnapshotHash = hash
 	snapshot.Providers = providers
 	snapshot.Models = models
+	snapshot.ImageGenerators = &images
 	snapshot.Tts = tts
 	snapshot.Asr = asr
 	snapshot.Mcp = mcp
@@ -202,7 +222,7 @@ func HashSnapshot(snapshot clientapi.ManagedSnapshot) (string, error) {
 	}
 	descriptor := snapshotDescriptor{
 		DeploymentID: string(snapshot.DeploymentId), SchemaVersion: int(snapshot.SchemaVersion), ManagedGeneration: snapshot.ManagedGeneration,
-		ReleaseID: string(snapshot.ReleaseId), Providers: snapshot.Providers, Models: snapshot.Models, TTS: snapshot.Tts, ASR: snapshot.Asr, MCP: snapshot.Mcp,
+		ReleaseID: string(snapshot.ReleaseId), Providers: snapshot.Providers, Models: snapshot.Models, ImageGenerators: clientImages(snapshot.ImageGenerators), TTS: snapshot.Tts, ASR: snapshot.Asr, MCP: snapshot.Mcp,
 		Policy: snapshot.Policy, Metadata: metadata,
 	}
 	descriptor.Assistants = snapshot.Assistants
@@ -213,6 +233,13 @@ func HashSnapshot(snapshot clientapi.ManagedSnapshot) (string, error) {
 	}
 	sum := sha256.Sum256(payload)
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+func clientImages(values *[]clientapi.ImageGenerationDefinition) []clientapi.ImageGenerationDefinition {
+	if values == nil {
+		return []clientapi.ImageGenerationDefinition{}
+	}
+	return *values
 }
 
 func projectionToAdminAssistants(src []clientapi.ManagedAssistantDefinition) []adminapi.ManagedAssistantDefinition {
@@ -290,6 +317,24 @@ func projectionToAdminModels(src []clientapi.ModelDefinition) []adminapi.ModelDe
 			ModelId: v.ModelId, ProviderId: v.ProviderId, DisplayName: v.DisplayName,
 			UpstreamModelKey: v.UpstreamModelKey, RuntimePath: v.RuntimePath, Enabled: v.Enabled,
 			Capabilities: caps, InputModalities: inputs, OutputModalities: outputs,
+		}
+	}
+	return dst
+}
+
+func projectionToAdminImages(src *[]clientapi.ImageGenerationDefinition) []adminapi.ImageGenerationDefinition {
+	values := clientImages(src)
+	dst := make([]adminapi.ImageGenerationDefinition, len(values))
+	for i, value := range values {
+		dst[i] = adminapi.ImageGenerationDefinition{
+			ImageId:             value.ImageId,
+			DisplayName:         value.DisplayName,
+			ClientProtocol:      adminapi.ImageGenerationDefinitionClientProtocol(value.ClientProtocol),
+			UpstreamModelKey:    value.UpstreamModelKey,
+			RuntimePath:         value.RuntimePath,
+			MaxImagesPerRequest: value.MaxImagesPerRequest,
+			AllowedSizes:        append([]string(nil), value.AllowedSizes...),
+			Enabled:             value.Enabled,
 		}
 	}
 	return dst

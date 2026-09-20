@@ -31,7 +31,7 @@ Root repository 的 npm orchestration、实际开发命令与 system harness 生
 
 ## 2. 当前源码组织
 
-`ResourcesPage` 使用统一配置工作台组织 Overview、Models、TTS、ASR、MCP、Assistants 和 Policy。桌面显示固定分区导航，窄屏使用同一 section state 的选择器；Policy 直接编辑当前五项必填用户配置准入开关。新草稿五项默认 false；不存在旧策略采用按钮或缺字段补齐逻辑，非当前旧草稿随旧开发数据库清理。服务端在 HTTP 边界独立校验五项必填 Boolean 与 Assistants/Starters 数组。
+`ResourcesPage` 使用统一配置工作台组织 Overview、Models、Image Generation、TTS、ASR、MCP、Assistants 和 Policy。Image Generation 是独立受管资源，只表达同步 text-to-image、允许尺寸、单次数量上限和固定 Runtime binding，不借用 Model 或引入资源级额度。桌面显示固定分区导航，窄屏使用同一 section state 的选择器；Policy 直接编辑当前五项必填用户配置准入开关和各类默认资源。新草稿五项默认 false；不存在旧策略采用按钮或缺字段补齐逻辑，非当前旧草稿随旧开发数据库清理。服务端在 HTTP 边界独立校验五项必填 Boolean 与所有资源、Assistants/Starters 数组。
 
 `DetailWorkspace.vue` 是 Users、Upstreams、Releases、Enterprise Updates 和 Usage Request 的共享紧凑主从工作区：宽屏同时显示 collection/detail，窄屏进入详情后只显示详情并提供返回列表，不复制业务状态。实体内部再按稳定任务拆成少量 section/tab；例如 User 只暴露 Devices、Usage budgets、User usage 三个详情分区，危险动作收敛到 actions menu。`CursorPager.vue` + `useCursorPager.ts` 是主 collection 的有界上一页/下一页 primitive，只保留当前页和 cursor 历史，不把数千行持续挂在 DOM。`PagedEntityPicker.vue` 是潜在大集合的共享选择面，`api/entityPickerSources.ts` 提供 User、Upstream、Secret 的服务端 query/keyset cursor/selected-value resolve adapter；选择面独立呈现 loading/empty/error/load-more，不加载全部数据，也不要求操作员手填稳定 ID。
 
@@ -66,9 +66,9 @@ css/          thin MEASIX semantic styling
 
 企业地址的页面预校验与 Hub 写边界遵循同一 Control Protocol host 语义：DNS host 在线协议中使用 ASCII/IDNA 形式，拒绝下划线、尾点和非法 label；浏览器可将用户输入的国际化域名转为 Punycode 后提交，Hub 不接受未编码 Unicode host。
 
-Usage 顶层只常驻时间、用户和上游等高频条件，其余资源类型、状态、完整性、协议、额度健康与精确资源 ID 收进带生效数量的“更多筛选”；汇总、请求、核对、定价保持独立页签。用户额度卡片把来源/模式/状态/修订/在途保留为紧凑摘要，只在存在累计用量或有限规则时展开对应内容，审计仍按需加载。定价只有本地规则相对已加载 revision 发生变化时才能保存。
+Usage 顶层只常驻时间、用户和上游等高频条件，其余资源类型、状态、完整性、协议、额度健康与精确资源 ID 收进带生效数量的“更多筛选”；汇总、请求、核对、定价保持独立页签。用户额度卡片固定覆盖 MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力；图片仅允许 REQUESTS/REQUESTED_IMAGES。卡片把来源/模式/状态/修订/在途保留为紧凑摘要，只在存在累计用量或有限规则时展开对应内容，审计仍按需加载。一级 `Budget Templates` 在 Users 与 Resources 之间，与用户额度复用 `BudgetRuleEditor`；每个用户最多一个 live-linked 模板，用户显式能力覆盖优先，清除覆盖即回到模板/部署默认。模板身份和指派只在 Admin 展示，不投影到 Client/Portal/Snapshot/Runtime。定价只有本地规则相对已加载 revision 发生变化时才能保存。
 
-当前实现已有 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/Resources/Upstreams/Releases/Usage/System/EnterpriseUpdates 等 route-level pages。
+当前实现已有 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/BudgetTemplates/Resources/Upstreams/Releases/Usage/System/EnterpriseUpdates 等 route-level pages。
 
 `ConfigurationSectionNav.vue` 只负责响应式分区导航；`ManagedExperienceEditor.vue` 负责 Assistant/Seed/Starter collection → selected settings。Draft 状态、引用删除、Validation、Preview/Publish 仍由既有 store/workflow owner 处理。`ResourcesPage.vue` 负责组合这些 owner，不创建平行状态或自由 JSON 编辑器。Shell route registry 以“Configuration & delivery / Operations & diagnostics”管理域分组；196px 桌面导航可手工折叠为 56px 图标栏，窄屏使用 overlay，同一按钮始终可恢复。S0.3 Enterprise Tools 及后续真实能力按域增加 route，不依赖序号切分，也不提前展示空导航。
 

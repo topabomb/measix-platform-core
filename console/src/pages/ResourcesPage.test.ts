@@ -69,6 +69,7 @@ const EMPTY_DRAFT: Draft = {
   content: {
     providers: [],
     models: [],
+    imageGenerators: [],
     tts: [],
     asr: [],
     mcp: [],
@@ -215,7 +216,7 @@ describe('ResourcesPage', () => {
     setupSession(pinia)
     await flushPromises()
 
-    for (const expected of ['overview', 'models', 'tts', 'asr', 'mcp', 'assistants', 'policy']) {
+    for (const expected of ['overview', 'models', 'image-generation', 'tts', 'asr', 'mcp', 'assistants', 'policy']) {
       expect(wrapper.find(`[data-cy="config-section-${expected}"]`).exists()).toBe(true)
     }
   })
@@ -226,7 +227,7 @@ describe('ResourcesPage', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-cy="configuration-section-nav"]').exists()).toBe(true)
-    for (const section of ['overview', 'models', 'tts', 'asr', 'mcp', 'assistants', 'policy']) {
+    for (const section of ['overview', 'models', 'image-generation', 'tts', 'asr', 'mcp', 'assistants', 'policy']) {
       expect(wrapper.find(`[data-cy="config-section-${section}"]`).exists()).toBe(true)
     }
     expect(wrapper.get('[data-cy="config-section-models"]').text()).toContain('0')
@@ -383,6 +384,75 @@ describe('ResourcesPage', () => {
     expect(draft.localContent?.tts[0].ttsId).toMatch(/^tts_/)
     expect(draft.localContent?.tts[0].clientProtocol).toBe('OPENAI_AUDIO_SPEECH')
     expect(draft.dirty).toBe(true)
+  })
+
+  it('authors standalone image generation and leaves its policy default unset until selected', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+
+    await switchTab(wrapper, 'image-generation')
+    await wrapper.get('[data-cy="add-image-generation-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(draft.localContent?.imageGenerators).toHaveLength(1)
+    expect(draft.localContent?.imageGenerators?.[0]).toMatchObject({
+      imageId: expect.stringMatching(/^img_/),
+      clientProtocol: 'OPENAI_IMAGES_GENERATIONS',
+      runtimePath: '/v1/images/generations',
+      maxImagesPerRequest: 1,
+      allowedSizes: ['auto'],
+      enabled: true,
+    })
+    expect(draft.localContent?.policy.defaultImageGenerationId).toBeUndefined()
+    expect(wrapper.find('[data-cy="image-generation-upstream-select"]').exists()).toBe(true)
+
+    await switchTab(wrapper, 'policy')
+    const selector = wrapper.get('[data-cy="policy-default-image-generation"]')
+    expect(selector.attributes('modelvalue')).toBeUndefined()
+  })
+
+  it('normalizes a draft with the additive image collection missing and writes only the current shape', async () => {
+    const stored = structuredClone(EMPTY_DRAFT)
+    delete stored.content.imageGenerators
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/draft') return structuredClone(stored)
+      if (path.startsWith('/api/admin/v1/upstreams')) return { items: [] }
+      return {}
+    })
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+    expect(draft.localContent?.imageGenerators).toEqual([])
+    expect(() => draft.addImageGeneration()).not.toThrow()
+    wrapper.unmount()
+  })
+
+  it('keeps every optional policy default explicitly unset instead of selecting the first resource', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    await switchTab(wrapper, 'policy')
+    const draft = useDraftStore(pinia)
+    const defaults = [
+      ['Default Model', 'defaultModelId'],
+      ['Default Image Generation', 'defaultImageGenerationId'],
+      ['Default TTS', 'defaultTtsId'],
+      ['Default ASR', 'defaultAsrId'],
+      ['Assistant for first use', 'defaultAssistantId'],
+    ] as const
+    for (const [label, key] of defaults) {
+      const selector = wrapper.findAllComponents(QSelect).find(item => item.props('label') === label)!
+      expect(selector).toBeDefined()
+      expect(selector.props('modelValue')).toBeUndefined()
+      selector.vm.$emit('update:modelValue', 'temporary_id')
+      await flushPromises()
+      selector.vm.$emit('update:modelValue', null)
+      await flushPromises()
+      expect(Object.hasOwn(draft.localContent!.policy, key)).toBe(false)
+    }
   })
 
   it('can add an ASR resource through the Add button', async () => {

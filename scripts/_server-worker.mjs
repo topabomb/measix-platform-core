@@ -79,6 +79,11 @@ const adapterServer = http.createServer((req, res) => {
       res.end(JSON.stringify({ text: 'transcribed' }))
       return
     }
+    if (path === '/v1/images/generations') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ created: 1789833600, data: [{ b64_json: 'iVBORw0KGgo=' }] }))
+      return
+    }
     if (path === '/mcp') {
       if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
       if (bodyJSON?.jsonrpc !== '2.0' || typeof bodyJSON.method !== 'string') {

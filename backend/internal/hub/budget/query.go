@@ -38,7 +38,7 @@ func (s *Service) State(ctx context.Context, userID string, capability Capabilit
 	return EffectiveState{}, fmt.Errorf("missing %s budget projection for %s", capability, userID)
 }
 
-// UserStates returns all four capability states with one asOf and one database
+// UserStates returns all five capability states with one asOf and one database
 // snapshot so Admin, Client and Portal cannot observe mixed revisions.
 func (s *Service) UserStates(ctx context.Context, userID string) ([]EffectiveState, error) {
 	if platformid.Validate(platformid.User, userID) != nil {
@@ -80,6 +80,14 @@ func (s *Service) UserStatesBatch(ctx context.Context, userIDs []string) (map[st
 	budgetRows, err := tx.UserBudget.Query().Where(userbudget.UserIDIn(unique...)).All(ctx)
 	if err != nil {
 		return nil, err
+	}
+	for _, row := range budgetRows {
+		if row.UpdatedAt.After(asOf) {
+			// Configuration mutations use a monotonic logical nanosecond when
+			// the wall clock repeats. A snapshot taken after that commit must
+			// include the current head even when the injected clock is fixed.
+			asOf = row.UpdatedAt
+		}
 	}
 	budgetsBySubject := make(map[string]*ent.UserBudget, len(budgetRows))
 	budgetIDs := make([]int, 0, len(budgetRows))
@@ -157,7 +165,7 @@ func (s *Service) UserStatesBatch(ctx context.Context, userIDs []string) (map[st
 	for _, value := range windows {
 		windowByLimit[value.limit.ID] = value.window
 	}
-	capabilities := []Capability{CapabilityModel, CapabilityTTS, CapabilityASR, CapabilityMCP}
+	capabilities := []Capability{CapabilityModel, CapabilityTTS, CapabilityASR, CapabilityMCP, CapabilityImageGeneration}
 	result := make(map[string][]EffectiveState, len(unique))
 	for _, userID := range unique {
 		states := make([]EffectiveState, 0, len(capabilities))

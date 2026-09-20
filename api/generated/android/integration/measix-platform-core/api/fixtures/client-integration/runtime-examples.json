@@ -27,6 +27,25 @@
   },
   {
     "body": {
+      "model": "gpt-image-1",
+      "n": 1,
+      "prompt": "A synthetic fixture image",
+      "size": "1024x1024"
+    },
+    "contentType": "application/json",
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token",
+      "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000",
+      "X-Measix-Managed-Generation": "42"
+    },
+    "method": "POST",
+    "protocol": "OPENAI_IMAGES_GENERATIONS",
+    "resourceId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "responseKind": "JSON_IMAGE_DATA",
+    "url": "https://platform.example.invalid/runtime/v1/resources/img_ffffffff-ffff-4fff-8fff-ffffffffffff/v1/images/generations"
+  },
+  {
+    "body": {
       "input": "Hello",
       "model": "tts-1",
       "voice": "alloy"

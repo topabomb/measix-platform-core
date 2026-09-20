@@ -3,6 +3,7 @@ package control
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"net/http"
 	"net/url"
 	"sort"
 	"strings"
@@ -145,8 +146,16 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		if _, exists := state.Resources[value.ResourceId]; exists {
 			return nil, ErrInvalidControl
 		}
-		if _, exists := state.Routes[value.RuntimeRouteId]; !exists {
+		route, exists := state.Routes[value.RuntimeRouteId]
+		if !exists {
 			return nil, ErrInvalidControl
+		}
+		if value.ResourceKind == relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION {
+			_, postOnly := route.AllowedMethods[http.MethodPost]
+			if !postOnly || len(route.AllowedMethods) != 1 || route.TransportPolicy != relaycontrolapi.HTTPREQUESTRESPONSE ||
+				len(route.AllowedPathPrefixes) != 1 || !strings.HasSuffix(route.AllowedPathPrefixes[0], "/images/generations") {
+				return nil, ErrInvalidControl
+			}
 		}
 		var audio *relaycontrolapi.RuntimeAudioProfile
 		if value.AudioProfile != nil {
@@ -159,9 +168,15 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 			copyProfile := *value.LlmProfile
 			llm = &copyProfile
 		}
+		var image *relaycontrolapi.RuntimeImageProfile
+		if value.ImageProfile != nil {
+			copyProfile := *value.ImageProfile
+			copyProfile.AllowedSizes = append([]string(nil), value.ImageProfile.AllowedSizes...)
+			image = &copyProfile
+		}
 		state.Resources[value.ResourceId] = Resource{
 			ID: value.ResourceId, RouteID: value.RuntimeRouteId, Kind: value.ResourceKind,
-			ClientProtocol: value.ClientProtocol, AudioProfile: audio, LLMProfile: llm,
+			ClientProtocol: value.ClientProtocol, AudioProfile: audio, LLMProfile: llm, ImageProfile: image,
 		}
 	}
 	return state, nil
@@ -175,7 +190,7 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 	protocol := string(value.ClientProtocol)
 	switch value.ResourceKind {
 	case relaycontrolapi.ResourceRouteResourceKindMODEL:
-		if kind != platformid.Model || value.AudioProfile != nil || value.LlmProfile == nil {
+		if kind != platformid.Model || value.AudioProfile != nil || value.LlmProfile == nil || value.ImageProfile != nil {
 			return false
 		}
 		switch protocol {
@@ -183,7 +198,7 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 			return true
 		}
 	case relaycontrolapi.ResourceRouteResourceKindTTS:
-		if kind != platformid.TTS || value.AudioProfile != nil || value.LlmProfile != nil {
+		if kind != platformid.TTS || value.AudioProfile != nil || value.LlmProfile != nil || value.ImageProfile != nil {
 			return false
 		}
 		switch protocol {
@@ -191,7 +206,7 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 			return true
 		}
 	case relaycontrolapi.ResourceRouteResourceKindASR:
-		if kind != platformid.ASR || value.LlmProfile != nil || value.AudioProfile == nil || value.AudioProfile.Channels != 1 ||
+		if kind != platformid.ASR || value.LlmProfile != nil || value.ImageProfile != nil || value.AudioProfile == nil || value.AudioProfile.Channels != 1 ||
 			!value.AudioProfile.Encoding.Valid() || len(value.AudioProfile.SampleRates) == 0 {
 			return false
 		}
@@ -207,7 +222,20 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 			return true
 		}
 	case relaycontrolapi.ResourceRouteResourceKindMCP:
-		return kind == platformid.MCP && protocol == "MCP_STREAMABLE_HTTP" && value.AudioProfile == nil && value.LlmProfile == nil
+		return kind == platformid.MCP && protocol == "MCP_STREAMABLE_HTTP" && value.AudioProfile == nil && value.LlmProfile == nil && value.ImageProfile == nil
+	case relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION:
+		if kind != platformid.ImageGeneration || protocol != "OPENAI_IMAGES_GENERATIONS" || value.AudioProfile != nil || value.LlmProfile != nil || value.ImageProfile == nil ||
+			value.ImageProfile.MaxImagesPerRequest < 1 || value.ImageProfile.MaxImagesPerRequest > 6 || len(value.ImageProfile.AllowedSizes) == 0 {
+			return false
+		}
+		seen := map[string]bool{}
+		for _, size := range value.ImageProfile.AllowedSizes {
+			if !validImageSize(size) || seen[size] {
+				return false
+			}
+			seen[size] = true
+		}
+		return true
 	}
 	return false
 }
@@ -271,11 +299,29 @@ func runtimeResourceID(value string) bool {
 		return false
 	}
 	switch kind {
-	case platformid.Model, platformid.TTS, platformid.ASR, platformid.MCP:
+	case platformid.Model, platformid.ImageGeneration, platformid.TTS, platformid.ASR, platformid.MCP:
 		return true
 	default:
 		return false
 	}
+}
+
+func validImageSize(value string) bool {
+	if value == "auto" {
+		return true
+	}
+	parts := strings.Split(value, "x")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" || strings.HasPrefix(parts[0], "0") || strings.HasPrefix(parts[1], "0") {
+		return false
+	}
+	for _, part := range parts {
+		for _, ch := range part {
+			if ch < '0' || ch > '9' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func validMethod(value string) bool {

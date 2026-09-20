@@ -1,11 +1,21 @@
 package runtimecontrol
 
-import "measix/platform/internal/wire/adminapi"
+import (
+	"sort"
+
+	"measix/platform/internal/wire/adminapi"
+)
 
 type resourceMeterProfile struct {
 	kind, protocol string
 	audio          *resourceAudioProfile
 	llm            *resourceLLMProfile
+	image          *resourceImageProfile
+}
+
+type resourceImageProfile struct {
+	maxImagesPerRequest int
+	allowedSizes        []string
 }
 
 type resourceLLMProfile struct {
@@ -29,6 +39,11 @@ func enabledBindings(content adminapi.ManagedDraftContent) []adminapi.RuntimeBin
 	for _, model := range content.Models {
 		enabled[model.ModelId] = model.Enabled && providers[model.ProviderId]
 	}
+	if content.ImageGenerators != nil {
+		for _, image := range *content.ImageGenerators {
+			enabled[image.ImageId] = image.Enabled
+		}
+	}
 	for _, tts := range content.Tts {
 		enabled[tts.TtsId] = tts.Enabled && tts.ClientProtocol != adminapi.TtsDefinitionClientProtocolSYSTEMTTS
 	}
@@ -48,7 +63,11 @@ func enabledBindings(content adminapi.ManagedDraftContent) []adminapi.RuntimeBin
 }
 
 func meterProfiles(content adminapi.ManagedDraftContent) map[string]resourceMeterProfile {
-	profiles := make(map[string]resourceMeterProfile, len(content.Models)+len(content.Tts)+len(content.Asr)+len(content.Mcp))
+	imageCount := 0
+	if content.ImageGenerators != nil {
+		imageCount = len(*content.ImageGenerators)
+	}
+	profiles := make(map[string]resourceMeterProfile, len(content.Models)+imageCount+len(content.Tts)+len(content.Asr)+len(content.Mcp))
 	providerProtocols := make(map[string]string, len(content.Providers))
 	for _, provider := range content.Providers {
 		providerProtocols[provider.ProviderId] = string(provider.ClientProtocol)
@@ -65,6 +84,16 @@ func meterProfiles(content adminapi.ManagedDraftContent) map[string]resourceMete
 			geminiThoughtsMayBeAbsent:       protocol == "GOOGLE_GENERATE_CONTENT" && !reasoning,
 			anthropicCacheFieldsMayBeAbsent: protocol == "ANTHROPIC_MESSAGES",
 		}}
+	}
+	if content.ImageGenerators != nil {
+		for _, image := range *content.ImageGenerators {
+			sizes := append([]string(nil), image.AllowedSizes...)
+			sort.Strings(sizes)
+			profiles[image.ImageId] = resourceMeterProfile{
+				kind: "IMAGE_GENERATION", protocol: string(image.ClientProtocol),
+				image: &resourceImageProfile{maxImagesPerRequest: image.MaxImagesPerRequest, allowedSizes: sizes},
+			}
+		}
 	}
 	for _, tts := range content.Tts {
 		if tts.ClientProtocol != adminapi.TtsDefinitionClientProtocolSYSTEMTTS {

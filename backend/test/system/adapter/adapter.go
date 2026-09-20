@@ -155,6 +155,8 @@ func (a *Adapter) serve(w http.ResponseWriter, r *http.Request) {
 		a.handleSpeech(w, r)
 	case r.URL.Path == "/v1/audio/transcriptions":
 		a.handleTranscriptions(w, r)
+	case r.URL.Path == "/v1/images/generations":
+		a.handleImageGeneration(w, r)
 	case r.URL.Path == "/mcp":
 		a.handleMCP(w, r)
 	case strings.HasPrefix(r.URL.Path, "/v1/errors/"):
@@ -300,6 +302,12 @@ func (a *Adapter) handleTranscriptions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.WriteString(w, `{"text":"transcribed"}`)
+}
+
+func (a *Adapter) handleImageGeneration(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.WriteString(w, `{"created":1789833600,"data":[{"b64_json":"iVBORw0KGgo="}]}`)
 }
 
 func (a *Adapter) handleMCP(w http.ResponseWriter, r *http.Request) {

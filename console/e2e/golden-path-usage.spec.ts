@@ -6,11 +6,11 @@ import { test, expect, type Page } from '@playwright/test'
  * This spec covers the usage/system verification phase of the C6 Golden Path.
  * It MUST run AFTER:
  *   1. golden-path-authoring.spec.ts completes (upstream ACTIVE, snapshot published)
- *   2. Four-capability runtime traffic has been generated (Model/TTS/ASR/MCP)
- *   3. Usage ingestion has recorded >= 4 requests
+ *   2. Five-capability runtime traffic has been generated (Model/Image/TTS/ASR/MCP)
+ *   3. Usage ingestion has recorded >= 5 requests
  *
  * Per audit P0-2: Browser tests are split into authoring/publish and
- * usage/system phases; the four-capability traffic runs between them.
+ * usage/system phases; the five-capability traffic runs between them.
  */
 
 const ADMIN_PASSWORD = process.env.MEASIX_E2E_ADMIN_PASSWORD || 'admin'
@@ -24,7 +24,7 @@ async function login(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/admin\/(overview)?$/)
 }
 
-test('CAP-C6-001-Usage Usage/System verification after four-capability traffic', async ({ page }: { page: Page }) => {
+test('CAP-C6-001-Usage Usage/System verification after five-capability traffic', async ({ page }: { page: Page }) => {
   // Login (session from authoring phase should persist)
   await test.step('login as admin', async () => {
     await login(page)
@@ -33,7 +33,7 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
   // ========================================================================
   // Phase 9: Usage verification — CAP-C6-003 Usage Closure
   // Per architecture: usage data MUST exist — empty state is a failure.
-  // The e2e-harness must generate runtime traffic (four profiles) before
+  // The e2e-harness must generate runtime traffic (five profiles) before
   // this phase runs.
   // ========================================================================
   await test.step('CAP-C6-003 usage closure — verify data, filters, details, cost', async () => {
@@ -43,20 +43,17 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     // Verify filter controls are visible
     await expect(page.locator('text=/filter|Filter/i').or(page.locator('.q-select')).first()).toBeVisible({ timeout: 5_000 })
 
-    // Usage data MUST exist — empty state is a failure.
-    // Timeout is longer because usage ingestion may be delayed.
-    const usageRows = page.locator('[data-cy="usage-row"]')
-    await expect(usageRows.first()).toBeVisible({ timeout: 30_000 })
-    // The four exercised protocol profiles must all reach the ledger. Profiles
+    // The five exercised capability profiles must all reach the ledger. Profiles
     // with a semantic parser may be EXACT/PARTIAL while opaque responses remain
     // UNKNOWN, so assert the total instead of encoding parser implementation
     // details into the system test.
     const requestCount = Number.parseInt(await page.locator('[data-cy="usage-request-count"]').innerText(), 10)
-    expect(requestCount).toBeGreaterThanOrEqual(4)
+    expect(requestCount).toBeGreaterThanOrEqual(5)
     const completeness = page.locator('[data-cy="request-completeness"]')
     const completenessCounts = await completeness.locator('.q-chip').allInnerTexts()
-    expect(completenessCounts.reduce((sum, text) => sum + Number.parseInt(text, 10), 0)).toBeGreaterThanOrEqual(4)
+    expect(completenessCounts.reduce((sum, text) => sum + Number.parseInt(text, 10), 0)).toBeGreaterThanOrEqual(5)
 
+    await page.locator('[data-cy="usage-more-filters"]').click()
     const budgetFilter = page.locator('[data-cy="usage-budget-status-filter"]')
     await expect(budgetFilter).toBeVisible()
     const filteredUsers = page.waitForResponse(response =>
@@ -68,6 +65,11 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     expect((await filteredUsers).ok()).toBe(true)
     await page.screenshot({ path: '../.artifacts/admin-usage-summary.png', fullPage: true })
 
+    await page.getByRole('tab', { name: 'Requests', exact: true }).click()
+    // Usage data MUST exist — empty state is a failure.
+    const usageRows = page.locator('[data-cy="usage-row"]')
+    await expect(usageRows.first()).toBeVisible({ timeout: 30_000 })
+
     // Verify multiple resource kinds are represented.
     const allRowTexts: string[] = []
     const rowCount = await usageRows.count()
@@ -77,11 +79,10 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     }
     const allText = allRowTexts.join('\n')
     expect(allText).toMatch(/MODEL|model/i)
-    const hasTts = /TTS|tts/i.test(allText)
-    const hasAsr = /ASR|asr/i.test(allText)
-    const hasMcp = /MCP|mcp/i.test(allText)
-    // At least 2 of the 3 non-model kinds should be present
-    expect([hasTts, hasAsr, hasMcp].filter(Boolean).length).toBeGreaterThanOrEqual(1)
+    expect(allText).toMatch(/IMAGE_GENERATION|image generation/i)
+    expect(allText).toMatch(/TTS|tts/i)
+    expect(allText).toMatch(/ASR|asr/i)
+    expect(allText).toMatch(/MCP|mcp/i)
 
     // Open a usage detail row
     await usageRows.first().click()
@@ -91,7 +92,7 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
     await expect(detailPanel).toBeVisible({ timeout: 5_000 })
     const detailText = await detailPanel.textContent()
     expect(detailText).toMatch(/req_[a-f0-9-]+/)
-    expect(detailText).toMatch(/mdl_|tts_|asr_|mcp_/)
+    expect(detailText).toMatch(/mdl_|img_|tts_|asr_|mcp_/)
 
     await page.keyboard.press('Escape')
     await page.getByRole('tab', { name: 'Reconciliation' }).click()
@@ -121,10 +122,12 @@ test('CAP-C6-001-Usage Usage/System verification after four-capability traffic',
       await expect(page.locator('[data-cy="relay-build-version"]')).toHaveText('dev')
       const relayText = await relayStatus.textContent()
       expect(relayText).toMatch(/READY|DEGRADED|NOT_READY|OFFLINE/i)
+      await page.getByRole('tab', { name: 'Runtime delivery', exact: true }).click()
       await expect(page.locator('[data-cy="system-convergence-status"]')).toBeVisible()
-      await expect(page.locator('[data-cy="system-upstream-status"]')).toBeVisible()
+      await expect(page.locator('[data-cy="lastActivation"]')).toContainText(/Completed/i)
       // The opaque profiles intentionally exercise the reconciliation path.
       // Verify that their incomplete records reach the rendered diagnostics.
+      await page.getByRole('tab', { name: 'Metering pipeline', exact: true }).click()
       const unknownCount = page.locator('[data-cy="semantic-unknown-count"]')
       await expect(unknownCount).toHaveText(/^\d+$/)
       expect(Number(await unknownCount.textContent())).toBeGreaterThanOrEqual(1)

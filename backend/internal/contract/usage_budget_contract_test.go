@@ -36,7 +36,7 @@ func TestUsageBudgetContractsFreezeTheSameProductionProtocols(t *testing.T) {
 		"ANTHROPIC_MESSAGES", "DASHSCOPE_HTTP_ASR", "DASHSCOPE_REALTIME_ASR",
 		"GEMINI_GENERATE_CONTENT_TTS", "GOOGLE_GENERATE_CONTENT", "MCP_STREAMABLE_HTTP",
 		"MIMO_CHAT_COMPLETIONS_TTS", "OPENAI_AUDIO_SPEECH", "OPENAI_AUDIO_TRANSCRIPTIONS",
-		"OPENAI_CHAT_COMPLETIONS", "OPENAI_REALTIME_TRANSCRIPTION", "OPENAI_RESPONSES",
+		"OPENAI_CHAT_COMPLETIONS", "OPENAI_IMAGES_GENERATIONS", "OPENAI_REALTIME_TRANSCRIPTION", "OPENAI_RESPONSES",
 	}
 	for _, file := range []string{
 		"api/admin/admin.openapi.yaml",
@@ -81,6 +81,9 @@ func TestS02BudgetAndSelfUsageSurfacesAreComplete(t *testing.T) {
 	admin := loadContractDoc(t, "api/admin/admin.openapi.yaml")
 	assertBudgetUsageMetersRequired(t, admin, "Admin")
 	for _, path := range []string{
+		"/api/admin/v1/budget-templates",
+		"/api/admin/v1/budget-templates/{budgetTemplateId}",
+		"/api/admin/v1/users/{userId}/budget-template",
 		"/api/admin/v1/users/{userId}/budgets",
 		"/api/admin/v1/users/{userId}/budgets/{capability}",
 		"/api/admin/v1/users/{userId}/budgets/{capability}/audit",
@@ -113,6 +116,31 @@ func TestS02BudgetAndSelfUsageSurfacesAreComplete(t *testing.T) {
 		for _, parameter := range item.Get.Parameters {
 			if parameter.Value != nil && parameter.Value.Name == "userId" {
 				t.Fatalf("self-scoped endpoint %s must not accept userId", path)
+			}
+		}
+	}
+	if client.Components.Schemas["BudgetTemplate"] != nil || client.Components.Schemas["BudgetTemplateAssignment"] != nil {
+		t.Fatal("Client/Portal contract must not expose Admin budget template metadata")
+	}
+}
+
+func TestBudgetCapabilitiesAndResourceKindsAreFivePeerCategories(t *testing.T) {
+	want := []string{"ASR", "IMAGE_GENERATION", "MCP", "MODEL", "TTS"}
+	for _, file := range []string{
+		"api/admin/admin.openapi.yaml",
+		"api/client/client-control.openapi.yaml",
+		"api/internal/usage-ingest.openapi.yaml",
+	} {
+		doc := loadContractDoc(t, file)
+		for _, schema := range []string{"ResourceKind", "BudgetCapability"} {
+			got := schemaEnums(t, doc, schema)
+			if len(got) != len(want) {
+				t.Fatalf("%s %s = %v, want %v", file, schema, got, want)
+			}
+			for index := range want {
+				if got[index] != want[index] {
+					t.Fatalf("%s %s = %v, want %v", file, schema, got, want)
+				}
 			}
 		}
 	}
@@ -149,7 +177,7 @@ func TestUnforwardedUsageFactsRetainCompleteAttribution(t *testing.T) {
 func TestUsageMetersIncludeTotalTokensWithoutInventedMeters(t *testing.T) {
 	usage := loadContractDoc(t, "api/internal/usage-ingest.openapi.yaml")
 	got := schemaEnums(t, usage, "UsageMeter")
-	want := []string{"AUDIO_SECONDS", "CACHED_TOKENS", "CHARACTERS", "INPUT_TOKENS", "OUTPUT_TOKENS", "REQUESTS", "TOTAL_TOKENS"}
+	want := []string{"AUDIO_SECONDS", "CACHED_TOKENS", "CHARACTERS", "INPUT_TOKENS", "OUTPUT_TOKENS", "REQUESTED_IMAGES", "REQUESTS", "TOTAL_TOKENS"}
 	if len(got) != len(want) {
 		t.Fatalf("UsageMeter = %v, want %v", got, want)
 	}

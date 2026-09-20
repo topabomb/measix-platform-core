@@ -104,6 +104,42 @@ func (f BudgetSettlementFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.V
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetSettlementMutation", m)
 }
 
+// The BudgetTemplateFunc type is an adapter to allow the use of ordinary
+// function as BudgetTemplate mutator.
+type BudgetTemplateFunc func(context.Context, *ent.BudgetTemplateMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetTemplateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetTemplateMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetTemplateMutation", m)
+}
+
+// The BudgetTemplateAssignmentFunc type is an adapter to allow the use of ordinary
+// function as BudgetTemplateAssignment mutator.
+type BudgetTemplateAssignmentFunc func(context.Context, *ent.BudgetTemplateAssignmentMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetTemplateAssignmentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetTemplateAssignmentMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetTemplateAssignmentMutation", m)
+}
+
+// The BudgetTemplateAuditFunc type is an adapter to allow the use of ordinary
+// function as BudgetTemplateAudit mutator.
+type BudgetTemplateAuditFunc func(context.Context, *ent.BudgetTemplateAuditMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BudgetTemplateAuditFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BudgetTemplateAuditMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BudgetTemplateAuditMutation", m)
+}
+
 // The DeletedCredentialFunc type is an adapter to allow the use of ordinary
 // function as DeletedCredential mutator.
 type DeletedCredentialFunc func(context.Context, *ent.DeletedCredentialMutation) (ent.Value, error)

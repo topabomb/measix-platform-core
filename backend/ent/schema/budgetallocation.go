@@ -19,7 +19,7 @@ func (BudgetAllocation) Fields() []ent.Field {
 		field.Int("budget_bucket_id").Immutable(),
 		field.String("scope_key").Immutable(),
 		field.Enum("period").Values("DAY", "WEEK", "MONTH", "LIFETIME").Immutable(),
-		field.Enum("meter").Values("REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS").Immutable(),
+		field.Enum("meter").Values("REQUESTS", "REQUESTED_IMAGES", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS").Immutable(),
 		field.Int64("reserved_quantity").Default(0).NonNegative().Immutable(),
 		field.Bool("reservation_released").Default(false),
 		field.Int64("settled_quantity").Default(0).NonNegative(),

@@ -12,10 +12,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +25,7 @@ import (
 
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/internal/wire/relaystate"
+	"measix/platform/internal/wire/usageingestapi"
 	"measix/platform/pkg/platformid"
 	"measix/platform/test/system/adapter"
 	"measix/platform/test/system/client"
@@ -52,6 +55,8 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 
 	ad := adapter.New()
 	defer ad.Close()
+	hub := newSystemHub(t)
+	defer hub.Close()
 
 	spoolPath := filepath.Join(env.Root, "relay-spool.db")
 	tokenFile := filepath.Join(env.Root, "service.token")
@@ -68,7 +73,7 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 		"--public-listen", fmt.Sprintf("127.0.0.1:%d", env.Ports.RelayPub),
 		"--internal-listen", fmt.Sprintf("127.0.0.1:%d", env.Ports.RelayInt),
 		"--spool", spoolPath,
-		"--hub-internal-url", "http://127.0.0.1:1",
+		"--hub-internal-url", hub.URL,
 		"--hub-service-token-file", tokenFile,
 	)
 	if err != nil {
@@ -100,7 +105,7 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 	interaction := platformid.New(platformid.Interaction)
 	c := client.New(client.Options{RuntimeBaseURL: pubURL, AccessToken: token, ManagedGeneration: 1, InteractionID: interaction})
 
-	chatID, ttsID, asrID, mcpID := resourceIDs(state)
+	chatID, imageID, ttsID, asrID, mcpID := resourceIDs(state)
 
 	// Model request/response (CAP-C4-001)
 	body, _, err := c.ChatCompletion(ctx, chatID, "/v1/chat/completions", `{"model":"gpt-test","messages":[]}`)
@@ -118,6 +123,15 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 	}
 	if chunks < 2 {
 		t.Fatalf("stream chunks=%d", chunks)
+	}
+
+	// Image generation request/response and body transparency.
+	imageBody, imageContentType, err := c.ImageGeneration(ctx, imageID, "/v1/images/generations", `{"model":"image-test","prompt":"draw a blue square","n":1,"size":"1024x1024"}`)
+	if err != nil {
+		t.Fatalf("image generation: %v", err)
+	}
+	if !bytes.HasPrefix([]byte(imageContentType), []byte("application/json")) || !bytes.Contains(imageBody, []byte(`"b64_json":"iVBORw0KGgo="`)) {
+		t.Fatalf("bad image generation: ct=%q body=%s", imageContentType, imageBody)
 	}
 
 	// TTS binary (CAP-C4-010/011)
@@ -173,7 +187,44 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 	t.Log("system-smoke real relay four transports: PASS")
 }
 
-func resourceIDs(state relaycontrolapi.RuntimeControlState) (chat, tts, asr, mcp string) {
+func newSystemHub(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer relay-service-token" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/budget/admissions":
+			var input usageingestapi.BudgetAdmissionRequest
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				http.Error(w, "invalid admission", http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(usageingestapi.BudgetAdmissionDecision{
+				RequestId: input.RequestId, Allowed: true, Code: usageingestapi.ALLOWED,
+				Mode: usageingestapi.UNLIMITED, Source: usageingestapi.DEFAULT, Revision: 1,
+				BlockingLimits: []usageingestapi.BudgetLimitState{}, AsOf: input.AdmittedAt,
+			})
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/internal/v1/budget/requests/") &&
+			(strings.HasSuffix(r.URL.Path, ":start") || strings.HasSuffix(r.URL.Path, ":release")):
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/usage/settlements:batch":
+			var input usageingestapi.UsageSettlementBatch
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				http.Error(w, "invalid batch", http.StatusUnprocessableEntity)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(usageingestapi.UsageBatchAck{AcceptedCount: len(input.Events)})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+}
+
+func resourceIDs(state relaycontrolapi.RuntimeControlState) (chat, image, tts, asr, mcp string) {
 	for _, r := range state.ResourceRoutes {
 		kind, err := platformid.KindOf(r.ResourceId)
 		if err != nil {
@@ -182,6 +233,8 @@ func resourceIDs(state relaycontrolapi.RuntimeControlState) (chat, tts, asr, mcp
 		switch kind {
 		case platformid.Model:
 			chat = r.ResourceId
+		case platformid.ImageGeneration:
+			image = r.ResourceId
 		case platformid.TTS:
 			tts = r.ResourceId
 		case platformid.ASR:
@@ -203,12 +256,13 @@ func buildState(t *testing.T, upstreamURL string) (relaycontrolapi.RuntimeContro
 	deploymentID := platformid.New(platformid.Deployment)
 	signer := &accessSigner{privateKey: privateKey, deploymentID: deploymentID, kid: "i4-key", now: now}
 	modelID := platformid.New(platformid.Model)
+	imageID := platformid.New(platformid.ImageGeneration)
 	ttsID := platformid.New(platformid.TTS)
 	asrID := platformid.New(platformid.ASR)
 	mcpID := platformid.New(platformid.MCP)
 	upstreamID := platformid.New(platformid.Upstream)
 	mkRoute := func() string { return platformid.New(platformid.Route) }
-	modelRoute, ttsRoute, asrRoute, mcpRoute := mkRoute(), mkRoute(), mkRoute(), mkRoute()
+	modelRoute, imageRoute, ttsRoute, asrRoute, mcpRoute := mkRoute(), mkRoute(), mkRoute(), mkRoute(), mkRoute()
 	state := relaycontrolapi.RuntimeControlState{
 		ControlRevision:         1,
 		ActiveManagedGeneration: 1,
@@ -216,13 +270,15 @@ func buildState(t *testing.T, upstreamURL string) (relaycontrolapi.RuntimeContro
 		AuthKeys:                []relaycontrolapi.PublicJwk{signer.publicJWK()},
 		PrincipalState:          relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{
-			{ResourceId: modelID, RuntimeRouteId: modelRoute},
-			{ResourceId: ttsID, RuntimeRouteId: ttsRoute},
-			{ResourceId: asrID, RuntimeRouteId: asrRoute},
-			{ResourceId: mcpID, RuntimeRouteId: mcpRoute},
+			{ResourceId: modelID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMODEL, ClientProtocol: relaycontrolapi.OPENAICHATCOMPLETIONS, RuntimeRouteId: modelRoute, LlmProfile: &relaycontrolapi.RuntimeLlmProfile{}},
+			{ResourceId: imageID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION, ClientProtocol: relaycontrolapi.OPENAIIMAGESGENERATIONS, RuntimeRouteId: imageRoute, ImageProfile: &relaycontrolapi.RuntimeImageProfile{MaxImagesPerRequest: 4, AllowedSizes: []string{"auto", "1024x1024"}}},
+			{ResourceId: ttsID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindTTS, ClientProtocol: relaycontrolapi.OPENAIAUDIOSPEECH, RuntimeRouteId: ttsRoute},
+			{ResourceId: asrID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.OPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: relaycontrolapi.N1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
+			{ResourceId: mcpID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMCP, ClientProtocol: relaycontrolapi.MCPSTREAMABLEHTTP, RuntimeRouteId: mcpRoute},
 		},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{
 			{RuntimeRouteId: modelRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
+			{RuntimeRouteId: imageRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/images/generations"}, TransportPolicy: relaycontrolapi.HTTPREQUESTRESPONSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
 			{RuntimeRouteId: ttsRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/audio/speech"}, TransportPolicy: relaycontrolapi.HTTPBINARYSTREAM, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
 			{RuntimeRouteId: asrRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/audio/transcriptions"}, TransportPolicy: relaycontrolapi.HTTPMULTIPART, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},
 			{RuntimeRouteId: mcpRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/mcp"}, TransportPolicy: relaycontrolapi.HTTPREQUESTRESPONSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},

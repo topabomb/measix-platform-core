@@ -98,6 +98,7 @@ type Meter string
 // Meter values.
 const (
 	MeterREQUESTS           Meter = "REQUESTS"
+	MeterREQUESTED_IMAGES   Meter = "REQUESTED_IMAGES"
 	MeterINPUT_TOKENS       Meter = "INPUT_TOKENS"
 	MeterOUTPUT_TOKENS      Meter = "OUTPUT_TOKENS"
 	MeterCACHED_TOKENS      Meter = "CACHED_TOKENS"
@@ -113,7 +114,7 @@ func (m Meter) String() string {
 // MeterValidator is a validator for the "meter" field enum values. It is called by the builders before save.
 func MeterValidator(m Meter) error {
 	switch m {
-	case MeterREQUESTS, MeterINPUT_TOKENS, MeterOUTPUT_TOKENS, MeterCACHED_TOKENS, MeterTOTAL_TOKENS, MeterCHARACTERS, MeterAUDIO_MILLISECONDS:
+	case MeterREQUESTS, MeterREQUESTED_IMAGES, MeterINPUT_TOKENS, MeterOUTPUT_TOKENS, MeterCACHED_TOKENS, MeterTOTAL_TOKENS, MeterCHARACTERS, MeterAUDIO_MILLISECONDS:
 		return nil
 	default:
 		return fmt.Errorf("budgetlimit: invalid enum value for meter field: %q", m)

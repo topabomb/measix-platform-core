@@ -50,6 +50,13 @@ func TestUserDeletionDeniesRetiredCredentialsAndPurgesOwnedState(t *testing.T) {
 		t.Fatal(err)
 	}
 	budgetService.Now = func() time.Time { return now }
+	templateID := platformid.New(platformid.BudgetTemplate)
+	if _, err := budgetService.CreateTemplate(ctx, budget.CreateTemplateInput{
+		TemplateID: templateID, Name: "Shared template", Description: "survives actor deletion",
+		ActorUserID: member.ID, Reason: "member authored shared template",
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := budgetService.Put(ctx, budget.PutBudgetInput{
 		UserID: member.ID, Capability: budget.CapabilityModel, Mode: budget.ModeUnlimited,
 		ActorUserID: boot.AdminUserID, Reason: "initial allocation",
@@ -108,6 +115,10 @@ func TestUserDeletionDeniesRetiredCredentialsAndPurgesOwnedState(t *testing.T) {
 	}
 	if count, _ := st.Client.UserBudget.Query().Count(ctx); count != 0 {
 		t.Fatalf("budget remains: %d", count)
+	}
+	templateAudit, err := budgetService.ListTemplateAudit(ctx, templateID, 10, "")
+	if err != nil || len(templateAudit.Items) != 1 || templateAudit.Items[0].ActorUserID != "deleted_principal" {
+		t.Fatalf("shared template audit attribution=%+v err=%v", templateAudit, err)
 	}
 	if exists, _ := st.Client.DeletedPrincipal.Query().Where(deletedprincipal.IDEQ(member.ID)).Exist(ctx); !exists {
 		t.Fatal("security tombstone missing")

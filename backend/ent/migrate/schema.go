@@ -40,7 +40,7 @@ var (
 		{Name: "budget_bucket_id", Type: field.TypeInt},
 		{Name: "scope_key", Type: field.TypeString},
 		{Name: "period", Type: field.TypeEnum, Enums: []string{"DAY", "WEEK", "MONTH", "LIFETIME"}},
-		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
+		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "REQUESTED_IMAGES", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
 		{Name: "reserved_quantity", Type: field.TypeInt64, Default: 0},
 		{Name: "reservation_released", Type: field.TypeBool, Default: false},
 		{Name: "settled_quantity", Type: field.TypeInt64, Default: 0},
@@ -70,12 +70,12 @@ var (
 	BudgetAuditsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "user_id", Type: field.TypeString},
-		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "TTS", "ASR", "MCP"}},
+		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "IMAGE_GENERATION", "TTS", "ASR", "MCP"}},
 		{Name: "user_budget_id", Type: field.TypeInt, Nullable: true},
 		{Name: "budget_revision", Type: field.TypeInt64, Default: 0},
 		{Name: "request_id", Type: field.TypeString, Nullable: true},
 		{Name: "actor_user_id", Type: field.TypeString},
-		{Name: "action", Type: field.TypeEnum, Enums: []string{"CREATE", "UPDATE", "RESOLVE_RECONCILIATION"}},
+		{Name: "action", Type: field.TypeEnum, Enums: []string{"CREATE", "UPDATE", "APPLY_TEMPLATE", "CLEAR_OVERRIDE", "UNASSIGN_TEMPLATE", "RESOLVE_RECONCILIATION"}},
 		{Name: "reason", Type: field.TypeString},
 		{Name: "before_json", Type: field.TypeBytes, Nullable: true},
 		{Name: "after_json", Type: field.TypeBytes},
@@ -106,7 +106,7 @@ var (
 		{Name: "period", Type: field.TypeEnum, Enums: []string{"DAY", "WEEK", "MONTH", "LIFETIME"}},
 		{Name: "period_start", Type: field.TypeTime},
 		{Name: "period_end", Type: field.TypeTime, Nullable: true},
-		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
+		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "REQUESTED_IMAGES", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
 		{Name: "settled_quantity", Type: field.TypeInt64, Default: 0},
 		{Name: "reserved_quantity", Type: field.TypeInt64, Default: 0},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -135,7 +135,7 @@ var (
 		{Name: "user_budget_id", Type: field.TypeInt},
 		{Name: "scope_key", Type: field.TypeString},
 		{Name: "period", Type: field.TypeEnum, Enums: []string{"DAY", "WEEK", "MONTH", "LIFETIME"}},
-		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
+		{Name: "meter", Type: field.TypeEnum, Enums: []string{"REQUESTS", "REQUESTED_IMAGES", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"}},
 		{Name: "limit_quantity", Type: field.TypeInt64},
 		{Name: "scope_started_at", Type: field.TypeTime},
 		{Name: "effective_from", Type: field.TypeTime},
@@ -212,7 +212,7 @@ var (
 		{Name: "user_id", Type: field.TypeString},
 		{Name: "interaction_id", Type: field.TypeString, Nullable: true},
 		{Name: "device_id", Type: field.TypeString, Nullable: true},
-		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "TTS", "ASR", "MCP"}},
+		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "IMAGE_GENERATION", "TTS", "ASR", "MCP"}},
 		{Name: "resource_id", Type: field.TypeString},
 		{Name: "client_protocol", Type: field.TypeString},
 		{Name: "upstream_id", Type: field.TypeString},
@@ -221,7 +221,7 @@ var (
 		{Name: "user_budget_id", Type: field.TypeInt, Nullable: true},
 		{Name: "budget_revision", Type: field.TypeInt64, Default: 0},
 		{Name: "mode", Type: field.TypeEnum, Enums: []string{"UNLIMITED", "LIMITED"}},
-		{Name: "source", Type: field.TypeEnum, Enums: []string{"DEFAULT", "EXPLICIT"}},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"DEFAULT", "TEMPLATE", "EXPLICIT"}},
 		{Name: "decision_json", Type: field.TypeBytes},
 		{Name: "state", Type: field.TypeEnum, Enums: []string{"DENIED", "ADMITTED", "STARTED", "RECONCILIATION", "SETTLED", "RELEASED", "RESOLVED"}},
 		{Name: "admitted_at", Type: field.TypeTime},
@@ -279,6 +279,91 @@ var (
 				Name:    "budgetsettlement_request_id_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{BudgetSettlementsColumns[1], BudgetSettlementsColumns[9]},
+			},
+		},
+	}
+	// BudgetTemplatesColumns holds the columns for the "budget_templates" table.
+	BudgetTemplatesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString},
+		{Name: "rules_json", Type: field.TypeBytes},
+		{Name: "revision", Type: field.TypeInt64},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "created_by_user_id", Type: field.TypeString},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "updated_by_user_id", Type: field.TypeString},
+	}
+	// BudgetTemplatesTable holds the schema information for the "budget_templates" table.
+	BudgetTemplatesTable = &schema.Table{
+		Name:       "budget_templates",
+		Columns:    BudgetTemplatesColumns,
+		PrimaryKey: []*schema.Column{BudgetTemplatesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgettemplate_name_id",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetTemplatesColumns[1], BudgetTemplatesColumns[0]},
+			},
+		},
+	}
+	// BudgetTemplateAssignmentsColumns holds the columns for the "budget_template_assignments" table.
+	BudgetTemplateAssignmentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "user_id", Type: field.TypeString},
+		{Name: "budget_template_id", Type: field.TypeString},
+		{Name: "revision", Type: field.TypeInt64},
+		{Name: "assigned_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "updated_by_user_id", Type: field.TypeString},
+	}
+	// BudgetTemplateAssignmentsTable holds the schema information for the "budget_template_assignments" table.
+	BudgetTemplateAssignmentsTable = &schema.Table{
+		Name:       "budget_template_assignments",
+		Columns:    BudgetTemplateAssignmentsColumns,
+		PrimaryKey: []*schema.Column{BudgetTemplateAssignmentsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgettemplateassignment_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{BudgetTemplateAssignmentsColumns[1]},
+			},
+			{
+				Name:    "budgettemplateassignment_budget_template_id_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetTemplateAssignmentsColumns[2], BudgetTemplateAssignmentsColumns[1]},
+			},
+		},
+	}
+	// BudgetTemplateAuditsColumns holds the columns for the "budget_template_audits" table.
+	BudgetTemplateAuditsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "budget_template_id", Type: field.TypeString, Nullable: true},
+		{Name: "user_id", Type: field.TypeString, Nullable: true},
+		{Name: "template_revision", Type: field.TypeInt64, Default: 0},
+		{Name: "assignment_revision", Type: field.TypeInt64, Default: 0},
+		{Name: "actor_user_id", Type: field.TypeString},
+		{Name: "action", Type: field.TypeEnum, Enums: []string{"CREATE", "UPDATE", "DELETE", "ASSIGN", "REASSIGN", "UNASSIGN"}},
+		{Name: "reason", Type: field.TypeString},
+		{Name: "before_json", Type: field.TypeBytes, Nullable: true},
+		{Name: "after_json", Type: field.TypeBytes, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// BudgetTemplateAuditsTable holds the schema information for the "budget_template_audits" table.
+	BudgetTemplateAuditsTable = &schema.Table{
+		Name:       "budget_template_audits",
+		Columns:    BudgetTemplateAuditsColumns,
+		PrimaryKey: []*schema.Column{BudgetTemplateAuditsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "budgettemplateaudit_budget_template_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetTemplateAuditsColumns[1], BudgetTemplateAuditsColumns[10]},
+			},
+			{
+				Name:    "budgettemplateaudit_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BudgetTemplateAuditsColumns[2], BudgetTemplateAuditsColumns[10]},
 			},
 		},
 	}
@@ -828,9 +913,9 @@ var (
 	UserBudgetsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "user_id", Type: field.TypeString},
-		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "TTS", "ASR", "MCP"}},
+		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "IMAGE_GENERATION", "TTS", "ASR", "MCP"}},
 		{Name: "mode", Type: field.TypeEnum, Enums: []string{"UNLIMITED", "LIMITED"}},
-		{Name: "source", Type: field.TypeEnum, Enums: []string{"EXPLICIT"}},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"DEFAULT", "TEMPLATE", "EXPLICIT"}},
 		{Name: "revision", Type: field.TypeInt64},
 		{Name: "activated_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -859,6 +944,9 @@ var (
 		BudgetReconciliationsTable,
 		BudgetRequestsTable,
 		BudgetSettlementsTable,
+		BudgetTemplatesTable,
+		BudgetTemplateAssignmentsTable,
+		BudgetTemplateAuditsTable,
 		DeletedCredentialsTable,
 		DeletedPrincipalsTable,
 		DeploymentsTable,

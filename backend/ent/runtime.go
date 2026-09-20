@@ -9,6 +9,9 @@ import (
 	"measix/platform/ent/budgetlimit"
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/budgetsettlement"
+	"measix/platform/ent/budgettemplate"
+	"measix/platform/ent/budgettemplateassignment"
+	"measix/platform/ent/budgettemplateaudit"
 	"measix/platform/ent/deployment"
 	"measix/platform/ent/deploymentsettingaudit"
 	"measix/platform/ent/device"
@@ -105,6 +108,32 @@ func init() {
 	budgetsettlementDescRevision := budgetsettlementFields[2].Descriptor()
 	// budgetsettlement.RevisionValidator is a validator for the "revision" field. It is called by the builders before save.
 	budgetsettlement.RevisionValidator = budgetsettlementDescRevision.Validators[0].(func(int64) error)
+	budgettemplateFields := schema.BudgetTemplate{}.Fields()
+	_ = budgettemplateFields
+	// budgettemplateDescRevision is the schema descriptor for revision field.
+	budgettemplateDescRevision := budgettemplateFields[4].Descriptor()
+	// budgettemplate.RevisionValidator is a validator for the "revision" field. It is called by the builders before save.
+	budgettemplate.RevisionValidator = budgettemplateDescRevision.Validators[0].(func(int64) error)
+	budgettemplateassignmentFields := schema.BudgetTemplateAssignment{}.Fields()
+	_ = budgettemplateassignmentFields
+	// budgettemplateassignmentDescRevision is the schema descriptor for revision field.
+	budgettemplateassignmentDescRevision := budgettemplateassignmentFields[3].Descriptor()
+	// budgettemplateassignment.RevisionValidator is a validator for the "revision" field. It is called by the builders before save.
+	budgettemplateassignment.RevisionValidator = budgettemplateassignmentDescRevision.Validators[0].(func(int64) error)
+	budgettemplateauditFields := schema.BudgetTemplateAudit{}.Fields()
+	_ = budgettemplateauditFields
+	// budgettemplateauditDescTemplateRevision is the schema descriptor for template_revision field.
+	budgettemplateauditDescTemplateRevision := budgettemplateauditFields[3].Descriptor()
+	// budgettemplateaudit.DefaultTemplateRevision holds the default value on creation for the template_revision field.
+	budgettemplateaudit.DefaultTemplateRevision = budgettemplateauditDescTemplateRevision.Default.(int64)
+	// budgettemplateaudit.TemplateRevisionValidator is a validator for the "template_revision" field. It is called by the builders before save.
+	budgettemplateaudit.TemplateRevisionValidator = budgettemplateauditDescTemplateRevision.Validators[0].(func(int64) error)
+	// budgettemplateauditDescAssignmentRevision is the schema descriptor for assignment_revision field.
+	budgettemplateauditDescAssignmentRevision := budgettemplateauditFields[4].Descriptor()
+	// budgettemplateaudit.DefaultAssignmentRevision holds the default value on creation for the assignment_revision field.
+	budgettemplateaudit.DefaultAssignmentRevision = budgettemplateauditDescAssignmentRevision.Default.(int64)
+	// budgettemplateaudit.AssignmentRevisionValidator is a validator for the "assignment_revision" field. It is called by the builders before save.
+	budgettemplateaudit.AssignmentRevisionValidator = budgettemplateauditDescAssignmentRevision.Validators[0].(func(int64) error)
 	deploymentFields := schema.Deployment{}.Fields()
 	_ = deploymentFields
 	// deploymentDescTimezone is the schema descriptor for timezone field.

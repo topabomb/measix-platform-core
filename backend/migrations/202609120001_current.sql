@@ -39,9 +39,9 @@ CREATE TABLE deleted_credentials(id INTEGER PRIMARY KEY AUTOINCREMENT,digest BLO
 CREATE TABLE user_budgets(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  user_id TEXT NOT NULL REFERENCES users(id),
- capability TEXT NOT NULL CHECK(capability IN ('MODEL','TTS','ASR','MCP')),
+ capability TEXT NOT NULL CHECK(capability IN ('MODEL','IMAGE_GENERATION','TTS','ASR','MCP')),
  mode TEXT NOT NULL CHECK(mode IN ('UNLIMITED','LIMITED')),
- source TEXT NOT NULL CHECK(source = 'EXPLICIT'),
+ source TEXT NOT NULL CHECK(source IN ('DEFAULT','TEMPLATE','EXPLICIT')),
  revision INTEGER NOT NULL CHECK(revision > 0),
  activated_at DATETIME NOT NULL,
  updated_at DATETIME NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE budget_limits(
  user_budget_id INTEGER NOT NULL REFERENCES user_budgets(id),
  scope_key TEXT NOT NULL,
  period TEXT NOT NULL CHECK(period IN ('DAY','WEEK','MONTH','LIFETIME')),
- meter TEXT NOT NULL CHECK(meter IN ('REQUESTS','INPUT_TOKENS','OUTPUT_TOKENS','CACHED_TOKENS','TOTAL_TOKENS','CHARACTERS','AUDIO_MILLISECONDS')),
+ meter TEXT NOT NULL CHECK(meter IN ('REQUESTS','REQUESTED_IMAGES','INPUT_TOKENS','OUTPUT_TOKENS','CACHED_TOKENS','TOTAL_TOKENS','CHARACTERS','AUDIO_MILLISECONDS')),
  limit_quantity INTEGER NOT NULL CHECK(limit_quantity >= 0),
  scope_started_at DATETIME NOT NULL,
  effective_from DATETIME NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE budget_buckets(
  period TEXT NOT NULL CHECK(period IN ('DAY','WEEK','MONTH','LIFETIME')),
  period_start DATETIME NOT NULL,
  period_end DATETIME,
- meter TEXT NOT NULL CHECK(meter IN ('REQUESTS','INPUT_TOKENS','OUTPUT_TOKENS','CACHED_TOKENS','TOTAL_TOKENS','CHARACTERS','AUDIO_MILLISECONDS')),
+ meter TEXT NOT NULL CHECK(meter IN ('REQUESTS','REQUESTED_IMAGES','INPUT_TOKENS','OUTPUT_TOKENS','CACHED_TOKENS','TOTAL_TOKENS','CHARACTERS','AUDIO_MILLISECONDS')),
  settled_quantity INTEGER NOT NULL DEFAULT 0 CHECK(settled_quantity >= 0),
  reserved_quantity INTEGER NOT NULL DEFAULT 0 CHECK(reserved_quantity >= 0),
  updated_at DATETIME NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE budget_requests(
  user_id TEXT NOT NULL REFERENCES users(id),
  interaction_id TEXT,
  device_id TEXT REFERENCES devices(id),
- capability TEXT NOT NULL CHECK(capability IN ('MODEL','TTS','ASR','MCP')),
+ capability TEXT NOT NULL CHECK(capability IN ('MODEL','IMAGE_GENERATION','TTS','ASR','MCP')),
  resource_id TEXT NOT NULL,
  client_protocol TEXT NOT NULL,
  upstream_id TEXT NOT NULL REFERENCES upstreams(id),
@@ -93,7 +93,7 @@ CREATE TABLE budget_requests(
  user_budget_id INTEGER REFERENCES user_budgets(id),
  budget_revision INTEGER NOT NULL DEFAULT 0 CHECK(budget_revision >= 0),
  mode TEXT NOT NULL CHECK(mode IN ('UNLIMITED','LIMITED')),
- source TEXT NOT NULL CHECK(source IN ('DEFAULT','EXPLICIT')),
+ source TEXT NOT NULL CHECK(source IN ('DEFAULT','TEMPLATE','EXPLICIT')),
  decision_json BLOB NOT NULL,
  state TEXT NOT NULL CHECK(state IN ('DENIED','ADMITTED','STARTED','RECONCILIATION','SETTLED','RELEASED','RESOLVED')),
  admitted_at DATETIME NOT NULL,
@@ -114,7 +114,7 @@ CREATE TABLE budget_allocations(
  budget_bucket_id INTEGER NOT NULL REFERENCES budget_buckets(id),
  scope_key TEXT NOT NULL,
  period TEXT NOT NULL CHECK(period IN ('DAY','WEEK','MONTH','LIFETIME')),
- meter TEXT NOT NULL CHECK(meter IN ('REQUESTS','INPUT_TOKENS','OUTPUT_TOKENS','CACHED_TOKENS','TOTAL_TOKENS','CHARACTERS','AUDIO_MILLISECONDS')),
+ meter TEXT NOT NULL CHECK(meter IN ('REQUESTS','REQUESTED_IMAGES','INPUT_TOKENS','OUTPUT_TOKENS','CACHED_TOKENS','TOTAL_TOKENS','CHARACTERS','AUDIO_MILLISECONDS')),
  reserved_quantity INTEGER NOT NULL DEFAULT 0 CHECK(reserved_quantity >= 0),
  reservation_released INTEGER NOT NULL DEFAULT 0 CHECK(reservation_released IN (0,1)),
  settled_quantity INTEGER NOT NULL DEFAULT 0 CHECK(settled_quantity >= 0),
@@ -151,15 +151,49 @@ CREATE TABLE budget_reconciliations(
 CREATE TABLE budget_audits(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  user_id TEXT NOT NULL REFERENCES users(id),
- capability TEXT NOT NULL CHECK(capability IN ('MODEL','TTS','ASR','MCP')),
+ capability TEXT NOT NULL CHECK(capability IN ('MODEL','IMAGE_GENERATION','TTS','ASR','MCP')),
  user_budget_id INTEGER REFERENCES user_budgets(id),
  budget_revision INTEGER NOT NULL DEFAULT 0 CHECK(budget_revision >= 0),
  request_id TEXT REFERENCES budget_requests(id),
  actor_user_id TEXT NOT NULL,
- action TEXT NOT NULL CHECK(action IN ('CREATE','UPDATE','RESOLVE_RECONCILIATION')),
+ action TEXT NOT NULL CHECK(action IN ('CREATE','UPDATE','APPLY_TEMPLATE','CLEAR_OVERRIDE','UNASSIGN_TEMPLATE','RESOLVE_RECONCILIATION')),
  reason TEXT NOT NULL,
  before_json BLOB,
  after_json BLOB NOT NULL,
+ created_at DATETIME NOT NULL
+);
+CREATE TABLE budget_templates(
+ id TEXT PRIMARY KEY,
+ name TEXT NOT NULL,
+ description TEXT NOT NULL,
+ rules_json BLOB NOT NULL,
+ revision INTEGER NOT NULL CHECK(revision > 0),
+ created_at DATETIME NOT NULL,
+ created_by_user_id TEXT NOT NULL,
+ updated_at DATETIME NOT NULL,
+ updated_by_user_id TEXT NOT NULL
+);
+CREATE TABLE budget_template_assignments(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ user_id TEXT NOT NULL REFERENCES users(id),
+ budget_template_id TEXT NOT NULL REFERENCES budget_templates(id),
+ revision INTEGER NOT NULL CHECK(revision > 0),
+ assigned_at DATETIME NOT NULL,
+ updated_at DATETIME NOT NULL,
+ updated_by_user_id TEXT NOT NULL,
+ UNIQUE(user_id)
+);
+CREATE TABLE budget_template_audits(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ budget_template_id TEXT,
+ user_id TEXT,
+ template_revision INTEGER NOT NULL DEFAULT 0 CHECK(template_revision >= 0),
+ assignment_revision INTEGER NOT NULL DEFAULT 0 CHECK(assignment_revision >= 0),
+ actor_user_id TEXT NOT NULL,
+ action TEXT NOT NULL CHECK(action IN ('CREATE','UPDATE','DELETE','ASSIGN','REASSIGN','UNASSIGN')),
+ reason TEXT NOT NULL,
+ before_json BLOB,
+ after_json BLOB,
  created_at DATETIME NOT NULL
 );
 CREATE INDEX idx_activations_state_created ON activations(state,created_at);
@@ -188,6 +222,10 @@ CREATE INDEX idx_budget_buckets_period_end ON budget_buckets(period_end);
 CREATE INDEX idx_budget_allocations_bucket ON budget_allocations(budget_bucket_id);
 CREATE INDEX idx_budget_requests_inflight ON budget_requests(user_id,capability,state);
 CREATE INDEX idx_budget_requests_state_updated ON budget_requests(state,updated_at);
+CREATE INDEX idx_budget_templates_name ON budget_templates(name,id);
+CREATE INDEX idx_budget_template_assignments_template ON budget_template_assignments(budget_template_id,user_id);
+CREATE INDEX idx_budget_template_audits_template ON budget_template_audits(budget_template_id,created_at);
+CREATE INDEX idx_budget_template_audits_user ON budget_template_audits(user_id,created_at);
 CREATE INDEX idx_budget_settlements_history ON budget_settlements(request_id,created_at);
 CREATE INDEX idx_budget_reconciliations_state_opened ON budget_reconciliations(state,opened_at);
 CREATE INDEX idx_budget_audits_subject ON budget_audits(user_id,capability,created_at);

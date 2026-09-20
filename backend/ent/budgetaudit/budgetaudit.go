@@ -77,10 +77,11 @@ type Capability string
 
 // Capability values.
 const (
-	CapabilityMODEL Capability = "MODEL"
-	CapabilityTTS   Capability = "TTS"
-	CapabilityASR   Capability = "ASR"
-	CapabilityMCP   Capability = "MCP"
+	CapabilityMODEL            Capability = "MODEL"
+	CapabilityIMAGE_GENERATION Capability = "IMAGE_GENERATION"
+	CapabilityTTS              Capability = "TTS"
+	CapabilityASR              Capability = "ASR"
+	CapabilityMCP              Capability = "MCP"
 )
 
 func (c Capability) String() string {
@@ -90,7 +91,7 @@ func (c Capability) String() string {
 // CapabilityValidator is a validator for the "capability" field enum values. It is called by the builders before save.
 func CapabilityValidator(c Capability) error {
 	switch c {
-	case CapabilityMODEL, CapabilityTTS, CapabilityASR, CapabilityMCP:
+	case CapabilityMODEL, CapabilityIMAGE_GENERATION, CapabilityTTS, CapabilityASR, CapabilityMCP:
 		return nil
 	default:
 		return fmt.Errorf("budgetaudit: invalid enum value for capability field: %q", c)
@@ -104,6 +105,9 @@ type Action string
 const (
 	ActionCREATE                 Action = "CREATE"
 	ActionUPDATE                 Action = "UPDATE"
+	ActionAPPLY_TEMPLATE         Action = "APPLY_TEMPLATE"
+	ActionCLEAR_OVERRIDE         Action = "CLEAR_OVERRIDE"
+	ActionUNASSIGN_TEMPLATE      Action = "UNASSIGN_TEMPLATE"
 	ActionRESOLVE_RECONCILIATION Action = "RESOLVE_RECONCILIATION"
 )
 
@@ -114,7 +118,7 @@ func (a Action) String() string {
 // ActionValidator is a validator for the "action" field enum values. It is called by the builders before save.
 func ActionValidator(a Action) error {
 	switch a {
-	case ActionCREATE, ActionUPDATE, ActionRESOLVE_RECONCILIATION:
+	case ActionCREATE, ActionUPDATE, ActionAPPLY_TEMPLATE, ActionCLEAR_OVERRIDE, ActionUNASSIGN_TEMPLATE, ActionRESOLVE_RECONCILIATION:
 		return nil
 	default:
 		return fmt.Errorf("budgetaudit: invalid enum value for action field: %q", a)

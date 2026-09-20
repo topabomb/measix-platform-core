@@ -148,16 +148,19 @@ func (e AsrDefinitionSampleRate) Valid() bool {
 
 // Defines values for BudgetCapability.
 const (
-	BudgetCapabilityASR   BudgetCapability = "ASR"
-	BudgetCapabilityMCP   BudgetCapability = "MCP"
-	BudgetCapabilityMODEL BudgetCapability = "MODEL"
-	BudgetCapabilityTTS   BudgetCapability = "TTS"
+	BudgetCapabilityASR             BudgetCapability = "ASR"
+	BudgetCapabilityIMAGEGENERATION BudgetCapability = "IMAGE_GENERATION"
+	BudgetCapabilityMCP             BudgetCapability = "MCP"
+	BudgetCapabilityMODEL           BudgetCapability = "MODEL"
+	BudgetCapabilityTTS             BudgetCapability = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the BudgetCapability enum.
 func (e BudgetCapability) Valid() bool {
 	switch e {
 	case BudgetCapabilityASR:
+		return true
+	case BudgetCapabilityIMAGEGENERATION:
 		return true
 	case BudgetCapabilityMCP:
 		return true
@@ -216,6 +219,7 @@ func (e BudgetPeriod) Valid() bool {
 const (
 	DEFAULT  BudgetSource = "DEFAULT"
 	EXPLICIT BudgetSource = "EXPLICIT"
+	TEMPLATE BudgetSource = "TEMPLATE"
 )
 
 // Valid indicates whether the value is a known member of the BudgetSource enum.
@@ -224,6 +228,8 @@ func (e BudgetSource) Valid() bool {
 	case DEFAULT:
 		return true
 	case EXPLICIT:
+		return true
+	case TEMPLATE:
 		return true
 	default:
 		return false
@@ -245,6 +251,36 @@ func (e BudgetStatus) Valid() bool {
 	case BudgetStatusEXHAUSTED:
 		return true
 	case BudgetStatusPENDINGRECONCILIATION:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BudgetTemplateAuditItemAction.
+const (
+	ASSIGN   BudgetTemplateAuditItemAction = "ASSIGN"
+	CREATE   BudgetTemplateAuditItemAction = "CREATE"
+	DELETE   BudgetTemplateAuditItemAction = "DELETE"
+	REASSIGN BudgetTemplateAuditItemAction = "REASSIGN"
+	UNASSIGN BudgetTemplateAuditItemAction = "UNASSIGN"
+	UPDATE   BudgetTemplateAuditItemAction = "UPDATE"
+)
+
+// Valid indicates whether the value is a known member of the BudgetTemplateAuditItemAction enum.
+func (e BudgetTemplateAuditItemAction) Valid() bool {
+	switch e {
+	case ASSIGN:
+		return true
+	case CREATE:
+		return true
+	case DELETE:
+		return true
+	case REASSIGN:
+		return true
+	case UNASSIGN:
+		return true
+	case UPDATE:
 		return true
 	default:
 		return false
@@ -392,6 +428,21 @@ func (e EnterpriseUpdateStatus) Valid() bool {
 	}
 }
 
+// Defines values for ImageGenerationDefinitionClientProtocol.
+const (
+	ImageGenerationDefinitionClientProtocolOPENAIIMAGESGENERATIONS ImageGenerationDefinitionClientProtocol = "OPENAI_IMAGES_GENERATIONS"
+)
+
+// Valid indicates whether the value is a known member of the ImageGenerationDefinitionClientProtocol enum.
+func (e ImageGenerationDefinitionClientProtocol) Valid() bool {
+	switch e {
+	case ImageGenerationDefinitionClientProtocolOPENAIIMAGESGENERATIONS:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for McpDefinitionAuthOwnership.
 const (
 	McpDefinitionAuthOwnershipENTERPRISEMANAGED McpDefinitionAuthOwnership = "ENTERPRISE_MANAGED"
@@ -499,13 +550,14 @@ func (e ModelDefinitionOutputModalities) Valid() bool {
 
 // Defines values for PricingMeter.
 const (
-	AUDIOSECONDS PricingMeter = "AUDIO_SECONDS"
-	CACHEDTOKENS PricingMeter = "CACHED_TOKENS"
-	CHARACTERS   PricingMeter = "CHARACTERS"
-	INPUTTOKENS  PricingMeter = "INPUT_TOKENS"
-	OUTPUTTOKENS PricingMeter = "OUTPUT_TOKENS"
-	REQUESTS     PricingMeter = "REQUESTS"
-	TOTALTOKENS  PricingMeter = "TOTAL_TOKENS"
+	AUDIOSECONDS    PricingMeter = "AUDIO_SECONDS"
+	CACHEDTOKENS    PricingMeter = "CACHED_TOKENS"
+	CHARACTERS      PricingMeter = "CHARACTERS"
+	INPUTTOKENS     PricingMeter = "INPUT_TOKENS"
+	OUTPUTTOKENS    PricingMeter = "OUTPUT_TOKENS"
+	REQUESTEDIMAGES PricingMeter = "REQUESTED_IMAGES"
+	REQUESTS        PricingMeter = "REQUESTS"
+	TOTALTOKENS     PricingMeter = "TOTAL_TOKENS"
 )
 
 // Valid indicates whether the value is a known member of the PricingMeter enum.
@@ -520,6 +572,8 @@ func (e PricingMeter) Valid() bool {
 	case INPUTTOKENS:
 		return true
 	case OUTPUTTOKENS:
+		return true
+	case REQUESTEDIMAGES:
 		return true
 	case REQUESTS:
 		return true
@@ -598,15 +652,16 @@ func (e ReleaseStatus) Valid() bool {
 
 // Defines values for ReleaseDiffKind.
 const (
-	ReleaseDiffKindASR       ReleaseDiffKind = "ASR"
-	ReleaseDiffKindASSISTANT ReleaseDiffKind = "ASSISTANT"
-	ReleaseDiffKindBINDING   ReleaseDiffKind = "BINDING"
-	ReleaseDiffKindMCP       ReleaseDiffKind = "MCP"
-	ReleaseDiffKindMODEL     ReleaseDiffKind = "MODEL"
-	ReleaseDiffKindPOLICY    ReleaseDiffKind = "POLICY"
-	ReleaseDiffKindPROVIDER  ReleaseDiffKind = "PROVIDER"
-	ReleaseDiffKindSTARTER   ReleaseDiffKind = "STARTER"
-	ReleaseDiffKindTTS       ReleaseDiffKind = "TTS"
+	ReleaseDiffKindASR             ReleaseDiffKind = "ASR"
+	ReleaseDiffKindASSISTANT       ReleaseDiffKind = "ASSISTANT"
+	ReleaseDiffKindBINDING         ReleaseDiffKind = "BINDING"
+	ReleaseDiffKindIMAGEGENERATION ReleaseDiffKind = "IMAGE_GENERATION"
+	ReleaseDiffKindMCP             ReleaseDiffKind = "MCP"
+	ReleaseDiffKindMODEL           ReleaseDiffKind = "MODEL"
+	ReleaseDiffKindPOLICY          ReleaseDiffKind = "POLICY"
+	ReleaseDiffKindPROVIDER        ReleaseDiffKind = "PROVIDER"
+	ReleaseDiffKindSTARTER         ReleaseDiffKind = "STARTER"
+	ReleaseDiffKindTTS             ReleaseDiffKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ReleaseDiffKind enum.
@@ -617,6 +672,8 @@ func (e ReleaseDiffKind) Valid() bool {
 	case ReleaseDiffKindASSISTANT:
 		return true
 	case ReleaseDiffKindBINDING:
+		return true
+	case ReleaseDiffKindIMAGEGENERATION:
 		return true
 	case ReleaseDiffKindMCP:
 		return true
@@ -715,16 +772,19 @@ func (e ResolveReconciliationRequestExpectedState) Valid() bool {
 
 // Defines values for ResourceKind.
 const (
-	ResourceKindASR   ResourceKind = "ASR"
-	ResourceKindMCP   ResourceKind = "MCP"
-	ResourceKindMODEL ResourceKind = "MODEL"
-	ResourceKindTTS   ResourceKind = "TTS"
+	ResourceKindASR             ResourceKind = "ASR"
+	ResourceKindIMAGEGENERATION ResourceKind = "IMAGE_GENERATION"
+	ResourceKindMCP             ResourceKind = "MCP"
+	ResourceKindMODEL           ResourceKind = "MODEL"
+	ResourceKindTTS             ResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ResourceKind enum.
 func (e ResourceKind) Valid() bool {
 	switch e {
 	case ResourceKindASR:
+		return true
+	case ResourceKindIMAGEGENERATION:
 		return true
 	case ResourceKindMCP:
 		return true
@@ -1007,6 +1067,7 @@ const (
 	UsageClientProtocolOPENAIAUDIOSPEECH           UsageClientProtocol = "OPENAI_AUDIO_SPEECH"
 	UsageClientProtocolOPENAIAUDIOTRANSCRIPTIONS   UsageClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
 	UsageClientProtocolOPENAICHATCOMPLETIONS       UsageClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	UsageClientProtocolOPENAIIMAGESGENERATIONS     UsageClientProtocol = "OPENAI_IMAGES_GENERATIONS"
 	UsageClientProtocolOPENAIREALTIMETRANSCRIPTION UsageClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
 	UsageClientProtocolOPENAIRESPONSES             UsageClientProtocol = "OPENAI_RESPONSES"
 )
@@ -1033,6 +1094,8 @@ func (e UsageClientProtocol) Valid() bool {
 	case UsageClientProtocolOPENAIAUDIOTRANSCRIPTIONS:
 		return true
 	case UsageClientProtocolOPENAICHATCOMPLETIONS:
+		return true
+	case UsageClientProtocolOPENAIIMAGESGENERATIONS:
 		return true
 	case UsageClientProtocolOPENAIREALTIMETRANSCRIPTION:
 		return true
@@ -1102,15 +1165,16 @@ func (e UserStatus) Valid() bool {
 
 // Defines values for ValidationIssueResourceKind.
 const (
-	ValidationIssueResourceKindASR       ValidationIssueResourceKind = "ASR"
-	ValidationIssueResourceKindASSISTANT ValidationIssueResourceKind = "ASSISTANT"
-	ValidationIssueResourceKindBINDING   ValidationIssueResourceKind = "BINDING"
-	ValidationIssueResourceKindMCP       ValidationIssueResourceKind = "MCP"
-	ValidationIssueResourceKindMODEL     ValidationIssueResourceKind = "MODEL"
-	ValidationIssueResourceKindPOLICY    ValidationIssueResourceKind = "POLICY"
-	ValidationIssueResourceKindPROVIDER  ValidationIssueResourceKind = "PROVIDER"
-	ValidationIssueResourceKindSTARTER   ValidationIssueResourceKind = "STARTER"
-	ValidationIssueResourceKindTTS       ValidationIssueResourceKind = "TTS"
+	ValidationIssueResourceKindASR             ValidationIssueResourceKind = "ASR"
+	ValidationIssueResourceKindASSISTANT       ValidationIssueResourceKind = "ASSISTANT"
+	ValidationIssueResourceKindBINDING         ValidationIssueResourceKind = "BINDING"
+	ValidationIssueResourceKindIMAGEGENERATION ValidationIssueResourceKind = "IMAGE_GENERATION"
+	ValidationIssueResourceKindMCP             ValidationIssueResourceKind = "MCP"
+	ValidationIssueResourceKindMODEL           ValidationIssueResourceKind = "MODEL"
+	ValidationIssueResourceKindPOLICY          ValidationIssueResourceKind = "POLICY"
+	ValidationIssueResourceKindPROVIDER        ValidationIssueResourceKind = "PROVIDER"
+	ValidationIssueResourceKindSTARTER         ValidationIssueResourceKind = "STARTER"
+	ValidationIssueResourceKindTTS             ValidationIssueResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ValidationIssueResourceKind enum.
@@ -1121,6 +1185,8 @@ func (e ValidationIssueResourceKind) Valid() bool {
 	case ValidationIssueResourceKindASSISTANT:
 		return true
 	case ValidationIssueResourceKindBINDING:
+		return true
+	case ValidationIssueResourceKindIMAGEGENERATION:
 		return true
 	case ValidationIssueResourceKindMCP:
 		return true
@@ -1159,17 +1225,20 @@ func (e ValidationIssueSeverity) Valid() bool {
 
 // Defines values for UsageDistributionParamsResourceKind.
 const (
-	UsageDistributionParamsResourceKindASR      UsageDistributionParamsResourceKind = "ASR"
-	UsageDistributionParamsResourceKindMCP      UsageDistributionParamsResourceKind = "MCP"
-	UsageDistributionParamsResourceKindMODEL    UsageDistributionParamsResourceKind = "MODEL"
-	UsageDistributionParamsResourceKindPROVIDER UsageDistributionParamsResourceKind = "PROVIDER"
-	UsageDistributionParamsResourceKindTTS      UsageDistributionParamsResourceKind = "TTS"
+	UsageDistributionParamsResourceKindASR             UsageDistributionParamsResourceKind = "ASR"
+	UsageDistributionParamsResourceKindIMAGEGENERATION UsageDistributionParamsResourceKind = "IMAGE_GENERATION"
+	UsageDistributionParamsResourceKindMCP             UsageDistributionParamsResourceKind = "MCP"
+	UsageDistributionParamsResourceKindMODEL           UsageDistributionParamsResourceKind = "MODEL"
+	UsageDistributionParamsResourceKindPROVIDER        UsageDistributionParamsResourceKind = "PROVIDER"
+	UsageDistributionParamsResourceKindTTS             UsageDistributionParamsResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the UsageDistributionParamsResourceKind enum.
 func (e UsageDistributionParamsResourceKind) Valid() bool {
 	switch e {
 	case UsageDistributionParamsResourceKindASR:
+		return true
+	case UsageDistributionParamsResourceKindIMAGEGENERATION:
 		return true
 	case UsageDistributionParamsResourceKindMCP:
 		return true
@@ -1228,17 +1297,20 @@ func (e UsageDistributionParamsCompleteness) Valid() bool {
 
 // Defines values for ListUsageRequestsParamsResourceKind.
 const (
-	ListUsageRequestsParamsResourceKindASR      ListUsageRequestsParamsResourceKind = "ASR"
-	ListUsageRequestsParamsResourceKindMCP      ListUsageRequestsParamsResourceKind = "MCP"
-	ListUsageRequestsParamsResourceKindMODEL    ListUsageRequestsParamsResourceKind = "MODEL"
-	ListUsageRequestsParamsResourceKindPROVIDER ListUsageRequestsParamsResourceKind = "PROVIDER"
-	ListUsageRequestsParamsResourceKindTTS      ListUsageRequestsParamsResourceKind = "TTS"
+	ListUsageRequestsParamsResourceKindASR             ListUsageRequestsParamsResourceKind = "ASR"
+	ListUsageRequestsParamsResourceKindIMAGEGENERATION ListUsageRequestsParamsResourceKind = "IMAGE_GENERATION"
+	ListUsageRequestsParamsResourceKindMCP             ListUsageRequestsParamsResourceKind = "MCP"
+	ListUsageRequestsParamsResourceKindMODEL           ListUsageRequestsParamsResourceKind = "MODEL"
+	ListUsageRequestsParamsResourceKindPROVIDER        ListUsageRequestsParamsResourceKind = "PROVIDER"
+	ListUsageRequestsParamsResourceKindTTS             ListUsageRequestsParamsResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ListUsageRequestsParamsResourceKind enum.
 func (e ListUsageRequestsParamsResourceKind) Valid() bool {
 	switch e {
 	case ListUsageRequestsParamsResourceKindASR:
+		return true
+	case ListUsageRequestsParamsResourceKindIMAGEGENERATION:
 		return true
 	case ListUsageRequestsParamsResourceKindMCP:
 		return true
@@ -1297,17 +1369,20 @@ func (e ListUsageRequestsParamsCompleteness) Valid() bool {
 
 // Defines values for UsageSummaryParamsResourceKind.
 const (
-	UsageSummaryParamsResourceKindASR      UsageSummaryParamsResourceKind = "ASR"
-	UsageSummaryParamsResourceKindMCP      UsageSummaryParamsResourceKind = "MCP"
-	UsageSummaryParamsResourceKindMODEL    UsageSummaryParamsResourceKind = "MODEL"
-	UsageSummaryParamsResourceKindPROVIDER UsageSummaryParamsResourceKind = "PROVIDER"
-	UsageSummaryParamsResourceKindTTS      UsageSummaryParamsResourceKind = "TTS"
+	UsageSummaryParamsResourceKindASR             UsageSummaryParamsResourceKind = "ASR"
+	UsageSummaryParamsResourceKindIMAGEGENERATION UsageSummaryParamsResourceKind = "IMAGE_GENERATION"
+	UsageSummaryParamsResourceKindMCP             UsageSummaryParamsResourceKind = "MCP"
+	UsageSummaryParamsResourceKindMODEL           UsageSummaryParamsResourceKind = "MODEL"
+	UsageSummaryParamsResourceKindPROVIDER        UsageSummaryParamsResourceKind = "PROVIDER"
+	UsageSummaryParamsResourceKindTTS             UsageSummaryParamsResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the UsageSummaryParamsResourceKind enum.
 func (e UsageSummaryParamsResourceKind) Valid() bool {
 	switch e {
 	case UsageSummaryParamsResourceKindASR:
+		return true
+	case UsageSummaryParamsResourceKindIMAGEGENERATION:
 		return true
 	case UsageSummaryParamsResourceKindMCP:
 		return true
@@ -1366,17 +1441,20 @@ func (e UsageSummaryParamsCompleteness) Valid() bool {
 
 // Defines values for UsageTrendParamsResourceKind.
 const (
-	UsageTrendParamsResourceKindASR      UsageTrendParamsResourceKind = "ASR"
-	UsageTrendParamsResourceKindMCP      UsageTrendParamsResourceKind = "MCP"
-	UsageTrendParamsResourceKindMODEL    UsageTrendParamsResourceKind = "MODEL"
-	UsageTrendParamsResourceKindPROVIDER UsageTrendParamsResourceKind = "PROVIDER"
-	UsageTrendParamsResourceKindTTS      UsageTrendParamsResourceKind = "TTS"
+	UsageTrendParamsResourceKindASR             UsageTrendParamsResourceKind = "ASR"
+	UsageTrendParamsResourceKindIMAGEGENERATION UsageTrendParamsResourceKind = "IMAGE_GENERATION"
+	UsageTrendParamsResourceKindMCP             UsageTrendParamsResourceKind = "MCP"
+	UsageTrendParamsResourceKindMODEL           UsageTrendParamsResourceKind = "MODEL"
+	UsageTrendParamsResourceKindPROVIDER        UsageTrendParamsResourceKind = "PROVIDER"
+	UsageTrendParamsResourceKindTTS             UsageTrendParamsResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the UsageTrendParamsResourceKind enum.
 func (e UsageTrendParamsResourceKind) Valid() bool {
 	switch e {
 	case UsageTrendParamsResourceKindASR:
+		return true
+	case UsageTrendParamsResourceKindIMAGEGENERATION:
 		return true
 	case UsageTrendParamsResourceKindMCP:
 		return true
@@ -1435,17 +1513,20 @@ func (e UsageTrendParamsCompleteness) Valid() bool {
 
 // Defines values for ListUsageUsersParamsResourceKind.
 const (
-	ListUsageUsersParamsResourceKindASR      ListUsageUsersParamsResourceKind = "ASR"
-	ListUsageUsersParamsResourceKindMCP      ListUsageUsersParamsResourceKind = "MCP"
-	ListUsageUsersParamsResourceKindMODEL    ListUsageUsersParamsResourceKind = "MODEL"
-	ListUsageUsersParamsResourceKindPROVIDER ListUsageUsersParamsResourceKind = "PROVIDER"
-	ListUsageUsersParamsResourceKindTTS      ListUsageUsersParamsResourceKind = "TTS"
+	ListUsageUsersParamsResourceKindASR             ListUsageUsersParamsResourceKind = "ASR"
+	ListUsageUsersParamsResourceKindIMAGEGENERATION ListUsageUsersParamsResourceKind = "IMAGE_GENERATION"
+	ListUsageUsersParamsResourceKindMCP             ListUsageUsersParamsResourceKind = "MCP"
+	ListUsageUsersParamsResourceKindMODEL           ListUsageUsersParamsResourceKind = "MODEL"
+	ListUsageUsersParamsResourceKindPROVIDER        ListUsageUsersParamsResourceKind = "PROVIDER"
+	ListUsageUsersParamsResourceKindTTS             ListUsageUsersParamsResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ListUsageUsersParamsResourceKind enum.
 func (e ListUsageUsersParamsResourceKind) Valid() bool {
 	switch e {
 	case ListUsageUsersParamsResourceKindASR:
+		return true
+	case ListUsageUsersParamsResourceKindIMAGEGENERATION:
 		return true
 	case ListUsageUsersParamsResourceKindMCP:
 		return true
@@ -1601,6 +1682,13 @@ type AsrDefinitionSampleRate int
 // AsrId defines model for AsrId.
 type AsrId = string
 
+// AssignBudgetTemplateRequest defines model for AssignBudgetTemplateRequest.
+type AssignBudgetTemplateRequest struct {
+	BudgetTemplateId           BudgetTemplateId `json:"budgetTemplateId"`
+	ExpectedAssignmentRevision int              `json:"expectedAssignmentRevision"`
+	Reason                     string           `json:"reason"`
+}
+
 // AssistantDefinitionId defines model for AssistantDefinitionId.
 type AssistantDefinitionId = string
 
@@ -1646,7 +1734,6 @@ type BudgetCapabilityView struct {
 	InFlightRequests int                `json:"inFlightRequests"`
 	Limits           []BudgetLimitState `json:"limits"`
 	Mode             BudgetMode         `json:"mode"`
-	ResourceId       *string            `json:"resourceId,omitempty"`
 	Revision         int                `json:"revision"`
 	Source           BudgetSource       `json:"source"`
 	Status           BudgetStatus       `json:"status"`
@@ -1674,6 +1761,7 @@ type BudgetLimitDefinition struct {
 	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
 	// ASR    → AUDIO_SECONDS + REQUESTS
 	// MCP    → REQUESTS
+	// IMAGE_GENERATION → REQUESTS + REQUESTED_IMAGES
 	Meter  PricingMeter `json:"meter"`
 	Period BudgetPeriod `json:"period"`
 }
@@ -1687,6 +1775,7 @@ type BudgetLimitState struct {
 	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
 	// ASR    → AUDIO_SECONDS + REQUESTS
 	// MCP    → REQUESTS
+	// IMAGE_GENERATION → REQUESTS + REQUESTED_IMAGES
 	Meter      PricingMeter `json:"meter"`
 	Overage    string       `json:"overage"`
 	Period     BudgetPeriod `json:"period"`
@@ -1708,6 +1797,84 @@ type BudgetSource string
 
 // BudgetStatus defines model for BudgetStatus.
 type BudgetStatus string
+
+// BudgetTemplate defines model for BudgetTemplate.
+type BudgetTemplate struct {
+	AssignedUserCount int                  `json:"assignedUserCount"`
+	BudgetTemplateId  BudgetTemplateId     `json:"budgetTemplateId"`
+	CreatedAt         time.Time            `json:"createdAt"`
+	Description       string               `json:"description"`
+	Name              string               `json:"name"`
+	Revision          int                  `json:"revision"`
+	Rules             []BudgetTemplateRule `json:"rules"`
+	UpdatedAt         time.Time            `json:"updatedAt"`
+}
+
+// BudgetTemplateAssignment defines model for BudgetTemplateAssignment.
+type BudgetTemplateAssignment struct {
+	AssignedAt         time.Time        `json:"assignedAt"`
+	AssignmentRevision int              `json:"assignmentRevision"`
+	BudgetTemplateId   BudgetTemplateId `json:"budgetTemplateId"`
+	Name               string           `json:"name"`
+	TemplateRevision   int              `json:"templateRevision"`
+}
+
+// BudgetTemplateAuditItem defines model for BudgetTemplateAuditItem.
+type BudgetTemplateAuditItem struct {
+	Action             BudgetTemplateAuditItemAction `json:"action"`
+	After              *BudgetTemplateAuditSnapshot  `json:"after,omitempty"`
+	AssignmentRevision int                           `json:"assignmentRevision"`
+	AuditId            int64                         `json:"auditId"`
+	Before             *BudgetTemplateAuditSnapshot  `json:"before,omitempty"`
+	BudgetTemplateId   BudgetTemplateId              `json:"budgetTemplateId"`
+
+	// ChangedBy Actor user ID, or the stable deleted_principal tombstone after user deletion.
+	ChangedBy        string    `json:"changedBy"`
+	CreatedAt        time.Time `json:"createdAt"`
+	Reason           string    `json:"reason"`
+	TemplateRevision int       `json:"templateRevision"`
+	UserId           *UserId   `json:"userId,omitempty"`
+}
+
+// BudgetTemplateAuditItemAction defines model for BudgetTemplateAuditItem.Action.
+type BudgetTemplateAuditItemAction string
+
+// BudgetTemplateAuditPage defines model for BudgetTemplateAuditPage.
+type BudgetTemplateAuditPage struct {
+	Items      []BudgetTemplateAuditItem `json:"items"`
+	NextCursor *string                   `json:"nextCursor,omitempty"`
+}
+
+// BudgetTemplateAuditSnapshot defines model for BudgetTemplateAuditSnapshot.
+type BudgetTemplateAuditSnapshot struct {
+	Description string               `json:"description"`
+	Name        string               `json:"name"`
+	Rules       []BudgetTemplateRule `json:"rules"`
+}
+
+// BudgetTemplateId defines model for BudgetTemplateId.
+type BudgetTemplateId = string
+
+// BudgetTemplatePage defines model for BudgetTemplatePage.
+type BudgetTemplatePage struct {
+	Items      []BudgetTemplate `json:"items"`
+	NextCursor *string          `json:"nextCursor,omitempty"`
+}
+
+// BudgetTemplateRule defines model for BudgetTemplateRule.
+type BudgetTemplateRule struct {
+	Capability BudgetCapability        `json:"capability"`
+	Limits     []BudgetLimitDefinition `json:"limits"`
+	Mode       BudgetMode              `json:"mode"`
+}
+
+// CreateBudgetTemplateRequest defines model for CreateBudgetTemplateRequest.
+type CreateBudgetTemplateRequest struct {
+	Description string               `json:"description"`
+	Name        string               `json:"name"`
+	Reason      string               `json:"reason"`
+	Rules       []BudgetTemplateRule `json:"rules"`
+}
 
 // CreateEnrollmentRequest defines model for CreateEnrollmentRequest.
 type CreateEnrollmentRequest struct {
@@ -1836,8 +2003,11 @@ type DraftPreviewResponse struct {
 	Assistants    []ManagedAssistantDefinition `json:"assistants"`
 	DiffSummary   DiffSummary                  `json:"diffSummary"`
 	DraftRevision int                          `json:"draftRevision"`
-	Mcp           []McpDefinition              `json:"mcp"`
-	Models        []ModelDefinition            `json:"models"`
+
+	// ImageGenerators Additive Snapshot v4 preview field; omission means an empty list.
+	ImageGenerators *[]ImageGenerationDefinition `json:"imageGenerators,omitempty"`
+	Mcp             []McpDefinition              `json:"mcp"`
+	Models          []ModelDefinition            `json:"models"`
 
 	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
 	Policy         ManagedPolicy        `json:"policy"`
@@ -1899,6 +2069,24 @@ type Health struct {
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
+// ImageGenerationDefinition defines model for ImageGenerationDefinition.
+type ImageGenerationDefinition struct {
+	AllowedSizes        []string                                `json:"allowedSizes"`
+	ClientProtocol      ImageGenerationDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName         string                                  `json:"displayName"`
+	Enabled             bool                                    `json:"enabled"`
+	ImageId             ImageGenerationId                       `json:"imageId"`
+	MaxImagesPerRequest int                                     `json:"maxImagesPerRequest"`
+	RuntimePath         string                                  `json:"runtimePath"`
+	UpstreamModelKey    string                                  `json:"upstreamModelKey"`
+}
+
+// ImageGenerationDefinitionClientProtocol defines model for ImageGenerationDefinition.ClientProtocol.
+type ImageGenerationDefinitionClientProtocol string
+
+// ImageGenerationId defines model for ImageGenerationId.
+type ImageGenerationId = string
+
 // InstallationId defines model for InstallationId.
 type InstallationId = string
 
@@ -1928,8 +2116,11 @@ type ManagedDraftContent struct {
 	Asr        []AsrDefinition              `json:"asr"`
 	Assistants []ManagedAssistantDefinition `json:"assistants"`
 	Bindings   []RuntimeBindingDefinition   `json:"bindings"`
-	Mcp        []McpDefinition              `json:"mcp"`
-	Models     []ModelDefinition            `json:"models"`
+
+	// ImageGenerators Additive Snapshot v4 field. Missing durable draft content normalizes to an empty list; new writers emit an explicit list.
+	ImageGenerators *[]ImageGenerationDefinition `json:"imageGenerators,omitempty"`
+	Mcp             []McpDefinition              `json:"mcp"`
+	Models          []ModelDefinition            `json:"models"`
 
 	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
 	Policy    ManagedPolicy                `json:"policy"`
@@ -1943,15 +2134,16 @@ type ManagedPolicy struct {
 	AllowLocalAsr bool `json:"allowLocalAsr"`
 
 	// AllowLocalAssistants Allows user assistants; referenced resources remain independently governed.
-	AllowLocalAssistants bool                   `json:"allowLocalAssistants"`
-	AllowLocalMcp        bool                   `json:"allowLocalMcp"`
-	AllowLocalProviders  bool                   `json:"allowLocalProviders"`
-	AllowLocalTts        bool                   `json:"allowLocalTts"`
-	DefaultAsrId         *AsrId                 `json:"defaultAsrId,omitempty"`
-	DefaultAssistantId   *AssistantDefinitionId `json:"defaultAssistantId,omitempty"`
-	DefaultModelId       *ModelId               `json:"defaultModelId,omitempty"`
-	DefaultTtsId         *TtsId                 `json:"defaultTtsId,omitempty"`
-	PolicyId             PolicyId               `json:"policyId"`
+	AllowLocalAssistants     bool                   `json:"allowLocalAssistants"`
+	AllowLocalMcp            bool                   `json:"allowLocalMcp"`
+	AllowLocalProviders      bool                   `json:"allowLocalProviders"`
+	AllowLocalTts            bool                   `json:"allowLocalTts"`
+	DefaultAsrId             *AsrId                 `json:"defaultAsrId,omitempty"`
+	DefaultAssistantId       *AssistantDefinitionId `json:"defaultAssistantId,omitempty"`
+	DefaultImageGenerationId *ImageGenerationId     `json:"defaultImageGenerationId,omitempty"`
+	DefaultModelId           *ModelId               `json:"defaultModelId,omitempty"`
+	DefaultTtsId             *TtsId                 `json:"defaultTtsId,omitempty"`
+	PolicyId                 PolicyId               `json:"policyId"`
 }
 
 // McpDefinition defines model for McpDefinition.
@@ -1982,6 +2174,7 @@ type MeterQuantity struct {
 	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
 	// ASR    → AUDIO_SECONDS + REQUESTS
 	// MCP    → REQUESTS
+	// IMAGE_GENERATION → REQUESTS + REQUESTED_IMAGES
 	Meter    PricingMeter `json:"meter"`
 	Quantity string       `json:"quantity"`
 }
@@ -2027,6 +2220,7 @@ type PreviewDraftRequest struct {
 // TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
 // ASR    → AUDIO_SECONDS + REQUESTS
 // MCP    → REQUESTS
+// IMAGE_GENERATION → REQUESTS + REQUESTED_IMAGES
 type PricingMeter string
 
 // PricingRule defines model for PricingRule.
@@ -2039,6 +2233,7 @@ type PricingRule struct {
 	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
 	// ASR    → AUDIO_SECONDS + REQUESTS
 	// MCP    → REQUESTS
+	// IMAGE_GENERATION → REQUESTS + REQUESTED_IMAGES
 	Meter         PricingMeter  `json:"meter"`
 	PricingRuleId PricingRuleId `json:"pricingRuleId"`
 	ResourceId    *string       `json:"resourceId,omitempty"`
@@ -2390,6 +2585,15 @@ type TtsDefinitionClientProtocol string
 // TtsId defines model for TtsId.
 type TtsId = string
 
+// UpdateBudgetTemplateRequest defines model for UpdateBudgetTemplateRequest.
+type UpdateBudgetTemplateRequest struct {
+	Description      string               `json:"description"`
+	ExpectedRevision int                  `json:"expectedRevision"`
+	Name             string               `json:"name"`
+	Reason           string               `json:"reason"`
+	Rules            []BudgetTemplateRule `json:"rules"`
+}
+
 // UpdateDeploymentSettingsRequest defines model for UpdateDeploymentSettingsRequest.
 type UpdateDeploymentSettingsRequest struct {
 	ExpectedUpdatedAt time.Time `json:"expectedUpdatedAt"`
@@ -2566,10 +2770,11 @@ type UserStatus string
 
 // UserBudgetView defines model for UserBudgetView.
 type UserBudgetView struct {
-	AsOf     time.Time              `json:"asOf"`
-	Items    []BudgetCapabilityView `json:"items"`
-	Timezone string                 `json:"timezone"`
-	UserId   UserId                 `json:"userId"`
+	AsOf               time.Time                 `json:"asOf"`
+	Items              []BudgetCapabilityView    `json:"items"`
+	TemplateAssignment *BudgetTemplateAssignment `json:"templateAssignment,omitempty"`
+	Timezone           string                    `json:"timezone"`
+	UserId             UserId                    `json:"userId"`
 }
 
 // UserId defines model for UserId.
@@ -2624,6 +2829,43 @@ type ValidationIssueResourceKind string
 
 // ValidationIssueSeverity defines model for ValidationIssue.Severity.
 type ValidationIssueSeverity string
+
+// ListBudgetTemplatesParams defines parameters for ListBudgetTemplates.
+type ListBudgetTemplatesParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Query  *string `form:"query,omitempty" json:"query,omitempty"`
+}
+
+// CreateBudgetTemplateParams defines parameters for CreateBudgetTemplate.
+type CreateBudgetTemplateParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// DeleteBudgetTemplateParams defines parameters for DeleteBudgetTemplate.
+type DeleteBudgetTemplateParams struct {
+	ExpectedRevision int    `form:"expectedRevision" json:"expectedRevision"`
+	Reason           string `form:"reason" json:"reason"`
+	XCSRFToken       string `json:"X-CSRF-Token"`
+}
+
+// UpdateBudgetTemplateParams defines parameters for UpdateBudgetTemplate.
+type UpdateBudgetTemplateParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ListBudgetTemplateAuditParams defines parameters for ListBudgetTemplateAudit.
+type ListBudgetTemplateAuditParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListBudgetTemplateUsersParams defines parameters for ListBudgetTemplateUsers.
+type ListBudgetTemplateUsersParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Query  *string `form:"query,omitempty" json:"query,omitempty"`
+}
 
 // UpdateDeploymentSettingsParams defines parameters for UpdateDeploymentSettings.
 type UpdateDeploymentSettingsParams struct {
@@ -2913,6 +3155,25 @@ type UpdateUserParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// UnassignUserBudgetTemplateParams defines parameters for UnassignUserBudgetTemplate.
+type UnassignUserBudgetTemplateParams struct {
+	ExpectedAssignmentRevision int    `form:"expectedAssignmentRevision" json:"expectedAssignmentRevision"`
+	Reason                     string `form:"reason" json:"reason"`
+	XCSRFToken                 string `json:"X-CSRF-Token"`
+}
+
+// AssignUserBudgetTemplateParams defines parameters for AssignUserBudgetTemplate.
+type AssignUserBudgetTemplateParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ClearUserBudgetOverrideParams defines parameters for ClearUserBudgetOverride.
+type ClearUserBudgetOverrideParams struct {
+	ExpectedRevision int    `form:"expectedRevision" json:"expectedRevision"`
+	Reason           string `form:"reason" json:"reason"`
+	XCSRFToken       string `json:"X-CSRF-Token"`
+}
+
 // PutUserBudgetParams defines parameters for PutUserBudget.
 type PutUserBudgetParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
@@ -2951,6 +3212,12 @@ type EnableUserParams struct {
 type SetPasswordParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
+
+// CreateBudgetTemplateJSONRequestBody defines body for CreateBudgetTemplate for application/json ContentType.
+type CreateBudgetTemplateJSONRequestBody = CreateBudgetTemplateRequest
+
+// UpdateBudgetTemplateJSONRequestBody defines body for UpdateBudgetTemplate for application/json ContentType.
+type UpdateBudgetTemplateJSONRequestBody = UpdateBudgetTemplateRequest
 
 // UpdateDeploymentSettingsJSONRequestBody defines body for UpdateDeploymentSettings for application/json ContentType.
 type UpdateDeploymentSettingsJSONRequestBody = UpdateDeploymentSettingsRequest
@@ -3003,6 +3270,9 @@ type DeleteUserJSONRequestBody = DeleteUserRequest
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = UpdateUserRequest
 
+// AssignUserBudgetTemplateJSONRequestBody defines body for AssignUserBudgetTemplate for application/json ContentType.
+type AssignUserBudgetTemplateJSONRequestBody = AssignBudgetTemplateRequest
+
 // PutUserBudgetJSONRequestBody defines body for PutUserBudget for application/json ContentType.
 type PutUserBudgetJSONRequestBody = PutBudgetRequest
 
@@ -3017,6 +3287,27 @@ type ServerInterface interface {
 
 	// (GET /api/admin/v1/activations/{activationId})
 	GetActivation(w http.ResponseWriter, r *http.Request, activationId ActivationId)
+
+	// (GET /api/admin/v1/budget-templates)
+	ListBudgetTemplates(w http.ResponseWriter, r *http.Request, params ListBudgetTemplatesParams)
+
+	// (POST /api/admin/v1/budget-templates)
+	CreateBudgetTemplate(w http.ResponseWriter, r *http.Request, params CreateBudgetTemplateParams)
+
+	// (DELETE /api/admin/v1/budget-templates/{budgetTemplateId})
+	DeleteBudgetTemplate(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId, params DeleteBudgetTemplateParams)
+
+	// (GET /api/admin/v1/budget-templates/{budgetTemplateId})
+	GetBudgetTemplate(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId)
+
+	// (PUT /api/admin/v1/budget-templates/{budgetTemplateId})
+	UpdateBudgetTemplate(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId, params UpdateBudgetTemplateParams)
+
+	// (GET /api/admin/v1/budget-templates/{budgetTemplateId}/audit)
+	ListBudgetTemplateAudit(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId, params ListBudgetTemplateAuditParams)
+
+	// (GET /api/admin/v1/budget-templates/{budgetTemplateId}/users)
+	ListBudgetTemplateUsers(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId, params ListBudgetTemplateUsersParams)
 
 	// (GET /api/admin/v1/deployment/settings)
 	GetDeploymentSettings(w http.ResponseWriter, r *http.Request)
@@ -3159,8 +3450,17 @@ type ServerInterface interface {
 	// (PUT /api/admin/v1/users/{userId})
 	UpdateUser(w http.ResponseWriter, r *http.Request, userId UserId, params UpdateUserParams)
 
+	// (DELETE /api/admin/v1/users/{userId}/budget-template)
+	UnassignUserBudgetTemplate(w http.ResponseWriter, r *http.Request, userId UserId, params UnassignUserBudgetTemplateParams)
+
+	// (PUT /api/admin/v1/users/{userId}/budget-template)
+	AssignUserBudgetTemplate(w http.ResponseWriter, r *http.Request, userId UserId, params AssignUserBudgetTemplateParams)
+
 	// (GET /api/admin/v1/users/{userId}/budgets)
 	GetUserBudgets(w http.ResponseWriter, r *http.Request, userId UserId)
+
+	// (DELETE /api/admin/v1/users/{userId}/budgets/{capability})
+	ClearUserBudgetOverride(w http.ResponseWriter, r *http.Request, userId UserId, capability BudgetCapability, params ClearUserBudgetOverrideParams)
 
 	// (PUT /api/admin/v1/users/{userId}/budgets/{capability})
 	PutUserBudget(w http.ResponseWriter, r *http.Request, userId UserId, capability BudgetCapability, params PutUserBudgetParams)
@@ -3190,6 +3490,41 @@ type Unimplemented struct{}
 
 // (GET /api/admin/v1/activations/{activationId})
 func (_ Unimplemented) GetActivation(w http.ResponseWriter, r *http.Request, activationId ActivationId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/budget-templates)
+func (_ Unimplemented) ListBudgetTemplates(w http.ResponseWriter, r *http.Request, params ListBudgetTemplatesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/budget-templates)
+func (_ Unimplemented) CreateBudgetTemplate(w http.ResponseWriter, r *http.Request, params CreateBudgetTemplateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/admin/v1/budget-templates/{budgetTemplateId})
+func (_ Unimplemented) DeleteBudgetTemplate(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId, params DeleteBudgetTemplateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/budget-templates/{budgetTemplateId})
+func (_ Unimplemented) GetBudgetTemplate(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/admin/v1/budget-templates/{budgetTemplateId})
+func (_ Unimplemented) UpdateBudgetTemplate(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId, params UpdateBudgetTemplateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/budget-templates/{budgetTemplateId}/audit)
+func (_ Unimplemented) ListBudgetTemplateAudit(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId, params ListBudgetTemplateAuditParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/budget-templates/{budgetTemplateId}/users)
+func (_ Unimplemented) ListBudgetTemplateUsers(w http.ResponseWriter, r *http.Request, budgetTemplateId BudgetTemplateId, params ListBudgetTemplateUsersParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3428,8 +3763,23 @@ func (_ Unimplemented) UpdateUser(w http.ResponseWriter, r *http.Request, userId
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (DELETE /api/admin/v1/users/{userId}/budget-template)
+func (_ Unimplemented) UnassignUserBudgetTemplate(w http.ResponseWriter, r *http.Request, userId UserId, params UnassignUserBudgetTemplateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/admin/v1/users/{userId}/budget-template)
+func (_ Unimplemented) AssignUserBudgetTemplate(w http.ResponseWriter, r *http.Request, userId UserId, params AssignUserBudgetTemplateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/admin/v1/users/{userId}/budgets)
 func (_ Unimplemented) GetUserBudgets(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/admin/v1/users/{userId}/budgets/{capability})
+func (_ Unimplemented) ClearUserBudgetOverride(w http.ResponseWriter, r *http.Request, userId UserId, capability BudgetCapability, params ClearUserBudgetOverrideParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3494,6 +3844,393 @@ func (siw *ServerInterfaceWrapper) GetActivation(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetActivation(w, r, activationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBudgetTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListBudgetTemplates(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBudgetTemplatesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBudgetTemplates(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBudgetTemplate operation middleware
+func (siw *ServerInterfaceWrapper) CreateBudgetTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateBudgetTemplateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBudgetTemplate(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteBudgetTemplate operation middleware
+func (siw *ServerInterfaceWrapper) DeleteBudgetTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "budgetTemplateId" -------------
+	var budgetTemplateId BudgetTemplateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "budgetTemplateId", chi.URLParam(r, "budgetTemplateId"), &budgetTemplateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "budgetTemplateId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteBudgetTemplateParams
+
+	// ------------- Required query parameter "expectedRevision" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedRevision", r.URL.Query(), &params.ExpectedRevision, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedRevision"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedRevision", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "reason" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "reason", r.URL.Query(), &params.Reason, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "reason"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reason", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteBudgetTemplate(w, r, budgetTemplateId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBudgetTemplate operation middleware
+func (siw *ServerInterfaceWrapper) GetBudgetTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "budgetTemplateId" -------------
+	var budgetTemplateId BudgetTemplateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "budgetTemplateId", chi.URLParam(r, "budgetTemplateId"), &budgetTemplateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "budgetTemplateId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBudgetTemplate(w, r, budgetTemplateId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateBudgetTemplate operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBudgetTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "budgetTemplateId" -------------
+	var budgetTemplateId BudgetTemplateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "budgetTemplateId", chi.URLParam(r, "budgetTemplateId"), &budgetTemplateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "budgetTemplateId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateBudgetTemplateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBudgetTemplate(w, r, budgetTemplateId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBudgetTemplateAudit operation middleware
+func (siw *ServerInterfaceWrapper) ListBudgetTemplateAudit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "budgetTemplateId" -------------
+	var budgetTemplateId BudgetTemplateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "budgetTemplateId", chi.URLParam(r, "budgetTemplateId"), &budgetTemplateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "budgetTemplateId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBudgetTemplateAuditParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBudgetTemplateAudit(w, r, budgetTemplateId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBudgetTemplateUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListBudgetTemplateUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "budgetTemplateId" -------------
+	var budgetTemplateId BudgetTemplateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "budgetTemplateId", chi.URLParam(r, "budgetTemplateId"), &budgetTemplateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "budgetTemplateId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBudgetTemplateUsersParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "query" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "query", r.URL.Query(), &params.Query, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBudgetTemplateUsers(w, r, budgetTemplateId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6093,6 +6830,140 @@ func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// UnassignUserBudgetTemplate operation middleware
+func (siw *ServerInterfaceWrapper) UnassignUserBudgetTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UnassignUserBudgetTemplateParams
+
+	// ------------- Required query parameter "expectedAssignmentRevision" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedAssignmentRevision", r.URL.Query(), &params.ExpectedAssignmentRevision, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedAssignmentRevision"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedAssignmentRevision", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "reason" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "reason", r.URL.Query(), &params.Reason, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "reason"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reason", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnassignUserBudgetTemplate(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AssignUserBudgetTemplate operation middleware
+func (siw *ServerInterfaceWrapper) AssignUserBudgetTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AssignUserBudgetTemplateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AssignUserBudgetTemplate(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetUserBudgets operation middleware
 func (siw *ServerInterfaceWrapper) GetUserBudgets(w http.ResponseWriter, r *http.Request) {
 
@@ -6110,6 +6981,95 @@ func (siw *ServerInterfaceWrapper) GetUserBudgets(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetUserBudgets(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClearUserBudgetOverride operation middleware
+func (siw *ServerInterfaceWrapper) ClearUserBudgetOverride(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "capability" -------------
+	var capability BudgetCapability
+
+	err = runtime.BindStyledParameterWithOptions("simple", "capability", chi.URLParam(r, "capability"), &capability, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "capability", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ClearUserBudgetOverrideParams
+
+	// ------------- Required query parameter "expectedRevision" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedRevision", r.URL.Query(), &params.ExpectedRevision, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedRevision"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedRevision", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "reason" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "reason", r.URL.Query(), &params.Reason, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "reason"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reason", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearUserBudgetOverride(w, r, userId, capability, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6719,7 +7679,37 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/budgets", wrapper.GetUserBudgets)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/admin/v1/users/{userId}/budgets/{capability}", wrapper.ClearUserBudgetOverride)
+	})
+	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/admin/v1/users/{userId}/budgets/{capability}", wrapper.PutUserBudget)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/admin/v1/users/{userId}/budget-template", wrapper.UnassignUserBudgetTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/admin/v1/users/{userId}/budget-template", wrapper.AssignUserBudgetTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/budget-templates", wrapper.ListBudgetTemplates)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/budget-templates", wrapper.CreateBudgetTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/admin/v1/budget-templates/{budgetTemplateId}", wrapper.DeleteBudgetTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/budget-templates/{budgetTemplateId}", wrapper.GetBudgetTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/admin/v1/budget-templates/{budgetTemplateId}", wrapper.UpdateBudgetTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/budget-templates/{budgetTemplateId}/users", wrapper.ListBudgetTemplateUsers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/budget-templates/{budgetTemplateId}/audit", wrapper.ListBudgetTemplateAudit)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/budgets/{capability}/audit", wrapper.ListUserBudgetAudit)

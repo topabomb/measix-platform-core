@@ -110,10 +110,15 @@ func (h *fullAdminHandler) ListUsageUsers(w http.ResponseWriter, r *http.Request
 	}
 	items := make([]adminapi.UserUsageView, 0, len(page.Items))
 	for _, item := range page.Items {
+		assignment, err := h.services.Budget.GetAssignment(r.Context(), item.UserID)
+		if err != nil {
+			writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+			return
+		}
 		items = append(items, adminapi.UserUsageView{
 			UserId: item.UserID, UserDisplayName: item.DisplayName, RequestCount: item.RequestCount,
 			SemanticMeters: adminMeterQuantities(item.Meters),
-			Budget:         adminBudgetView(item.UserID, h.services.Budget.Location.String(), item.Budget, item.UsageMeters),
+			Budget:         adminBudgetView(item.UserID, h.services.Budget.Location.String(), item.Budget, item.UsageMeters, assignment),
 		})
 	}
 	var next *string

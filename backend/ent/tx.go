@@ -28,6 +28,12 @@ type Tx struct {
 	BudgetRequest *BudgetRequestClient
 	// BudgetSettlement is the client for interacting with the BudgetSettlement builders.
 	BudgetSettlement *BudgetSettlementClient
+	// BudgetTemplate is the client for interacting with the BudgetTemplate builders.
+	BudgetTemplate *BudgetTemplateClient
+	// BudgetTemplateAssignment is the client for interacting with the BudgetTemplateAssignment builders.
+	BudgetTemplateAssignment *BudgetTemplateAssignmentClient
+	// BudgetTemplateAudit is the client for interacting with the BudgetTemplateAudit builders.
+	BudgetTemplateAudit *BudgetTemplateAuditClient
 	// DeletedCredential is the client for interacting with the DeletedCredential builders.
 	DeletedCredential *DeletedCredentialClient
 	// DeletedPrincipal is the client for interacting with the DeletedPrincipal builders.
@@ -215,6 +221,9 @@ func (tx *Tx) init() {
 	tx.BudgetReconciliation = NewBudgetReconciliationClient(tx.config)
 	tx.BudgetRequest = NewBudgetRequestClient(tx.config)
 	tx.BudgetSettlement = NewBudgetSettlementClient(tx.config)
+	tx.BudgetTemplate = NewBudgetTemplateClient(tx.config)
+	tx.BudgetTemplateAssignment = NewBudgetTemplateAssignmentClient(tx.config)
+	tx.BudgetTemplateAudit = NewBudgetTemplateAuditClient(tx.config)
 	tx.DeletedCredential = NewDeletedCredentialClient(tx.config)
 	tx.DeletedPrincipal = NewDeletedPrincipalClient(tx.config)
 	tx.Deployment = NewDeploymentClient(tx.config)

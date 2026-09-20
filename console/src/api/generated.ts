@@ -174,6 +174,86 @@ export interface paths {
         get?: never;
         put: operations["putUserBudget"];
         post?: never;
+        delete: operations["clearUserBudgetOverride"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/users/{userId}/budget-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["assignUserBudgetTemplate"];
+        post?: never;
+        delete: operations["unassignUserBudgetTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/budget-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listBudgetTemplates"];
+        put?: never;
+        post: operations["createBudgetTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/budget-templates/{budgetTemplateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getBudgetTemplate"];
+        put: operations["updateBudgetTemplate"];
+        post?: never;
+        delete: operations["deleteBudgetTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/budget-templates/{budgetTemplateId}/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listBudgetTemplateUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/budget-templates/{budgetTemplateId}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listBudgetTemplateAudit"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -723,6 +803,7 @@ export interface components {
         InstallationId: string;
         ProviderId: string;
         ModelId: string;
+        ImageGenerationId: string;
         TtsId: string;
         AsrId: string;
         McpServerId: string;
@@ -737,6 +818,7 @@ export interface components {
         InteractionId: string;
         PricingRuleId: string;
         IdempotencyKey: string;
+        BudgetTemplateId: string;
         AssistantDefinitionId: string;
         StarterId: string;
         EnterpriseUpdateId: string;
@@ -763,7 +845,7 @@ export interface components {
             path: string;
             message: string;
             /** @enum {string} */
-            resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY" | "BINDING" | "ASSISTANT" | "STARTER";
+            resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP" | "POLICY" | "BINDING" | "ASSISTANT" | "STARTER";
             resourceId?: string;
             field?: string;
         };
@@ -783,6 +865,17 @@ export interface components {
             inputModalities: ("TEXT" | "IMAGE")[];
             outputModalities: "TEXT"[];
             capabilities: ("TOOL" | "REASONING")[];
+            enabled: boolean;
+        };
+        ImageGenerationDefinition: {
+            imageId: components["schemas"]["ImageGenerationId"];
+            displayName: string;
+            /** @enum {string} */
+            clientProtocol: "OPENAI_IMAGES_GENERATIONS";
+            upstreamModelKey: string;
+            runtimePath: string;
+            maxImagesPerRequest: number;
+            allowedSizes: string[];
             enabled: boolean;
         };
         TtsDefinition: {
@@ -853,6 +946,7 @@ export interface components {
             /** @description Allows user assistants; referenced resources remain independently governed. */
             allowLocalAssistants: boolean;
             defaultModelId?: components["schemas"]["ModelId"];
+            defaultImageGenerationId?: components["schemas"]["ImageGenerationId"];
             defaultTtsId?: components["schemas"]["TtsId"];
             defaultAsrId?: components["schemas"]["AsrId"];
             defaultAssistantId?: components["schemas"]["AssistantDefinitionId"];
@@ -860,6 +954,8 @@ export interface components {
         ManagedDraftContent: {
             providers: components["schemas"]["ProviderDefinition"][];
             models: components["schemas"]["ModelDefinition"][];
+            /** @description Additive Snapshot v4 field. Missing durable draft content normalizes to an empty list; new writers emit an explicit list. */
+            imageGenerators?: components["schemas"]["ImageGenerationDefinition"][];
             tts: components["schemas"]["TtsDefinition"][];
             asr: components["schemas"]["AsrDefinition"][];
             mcp: components["schemas"]["McpDefinition"][];
@@ -1094,6 +1190,8 @@ export interface components {
             projectionHash: components["schemas"]["Sha256Hash"];
             providers: components["schemas"]["ProviderDefinition"][];
             models: components["schemas"]["ModelDefinition"][];
+            /** @description Additive Snapshot v4 preview field; omission means an empty list. */
+            imageGenerators?: components["schemas"]["ImageGenerationDefinition"][];
             tts: components["schemas"]["TtsDefinition"][];
             asr: components["schemas"]["AsrDefinition"][];
             mcp: components["schemas"]["McpDefinition"][];
@@ -1105,7 +1203,7 @@ export interface components {
             diffSummary: components["schemas"]["DiffSummary"];
         };
         /** @enum {string} */
-        ReleaseDiffKind: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP" | "POLICY" | "ASSISTANT" | "STARTER" | "BINDING";
+        ReleaseDiffKind: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP" | "POLICY" | "ASSISTANT" | "STARTER" | "BINDING";
         ResourceDiff: {
             kind: components["schemas"]["ReleaseDiffKind"];
             added: number;
@@ -1149,15 +1247,15 @@ export interface components {
             nextCursor?: string;
         };
         /** @enum {string} */
-        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP";
+        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION";
         /** @enum {string} */
-        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
+        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
         /** @enum {string} */
-        BudgetCapability: "MODEL" | "TTS" | "ASR" | "MCP";
+        BudgetCapability: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION";
         /** @enum {string} */
         BudgetMode: "UNLIMITED" | "LIMITED";
         /** @enum {string} */
-        BudgetSource: "DEFAULT" | "EXPLICIT";
+        BudgetSource: "DEFAULT" | "TEMPLATE" | "EXPLICIT";
         /** @enum {string} */
         BudgetPeriod: "DAY" | "WEEK" | "MONTH" | "LIFETIME";
         /** @enum {string} */
@@ -1182,7 +1280,6 @@ export interface components {
         };
         BudgetCapabilityView: {
             capability: components["schemas"]["BudgetCapability"];
-            resourceId?: string;
             mode: components["schemas"]["BudgetMode"];
             source: components["schemas"]["BudgetSource"];
             revision: number;
@@ -1200,6 +1297,7 @@ export interface components {
             userId: components["schemas"]["UserId"];
             timezone: string;
             items: components["schemas"]["BudgetCapabilityView"][];
+            templateAssignment?: components["schemas"]["BudgetTemplateAssignment"];
             /** Format: date-time */
             asOf: string;
         };
@@ -1207,6 +1305,79 @@ export interface components {
             expectedRevision: number;
             mode: components["schemas"]["BudgetMode"];
             limits: components["schemas"]["BudgetLimitDefinition"][];
+            reason: string;
+        };
+        BudgetTemplateRule: {
+            capability: components["schemas"]["BudgetCapability"];
+            mode: components["schemas"]["BudgetMode"];
+            limits: components["schemas"]["BudgetLimitDefinition"][];
+        };
+        BudgetTemplate: {
+            budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            name: string;
+            description: string;
+            revision: number;
+            rules: components["schemas"]["BudgetTemplateRule"][];
+            assignedUserCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        BudgetTemplatePage: {
+            items: components["schemas"]["BudgetTemplate"][];
+            nextCursor?: string;
+        };
+        BudgetTemplateAssignment: {
+            budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            name: string;
+            templateRevision: number;
+            assignmentRevision: number;
+            /** Format: date-time */
+            assignedAt: string;
+        };
+        BudgetTemplateAuditSnapshot: {
+            name: string;
+            description: string;
+            rules: components["schemas"]["BudgetTemplateRule"][];
+        };
+        BudgetTemplateAuditItem: {
+            /** Format: int64 */
+            auditId: number;
+            budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            userId?: components["schemas"]["UserId"];
+            /** @enum {string} */
+            action: "CREATE" | "UPDATE" | "DELETE" | "ASSIGN" | "REASSIGN" | "UNASSIGN";
+            templateRevision: number;
+            assignmentRevision: number;
+            before?: components["schemas"]["BudgetTemplateAuditSnapshot"];
+            after?: components["schemas"]["BudgetTemplateAuditSnapshot"];
+            /** @description Actor user ID, or the stable deleted_principal tombstone after user deletion. */
+            changedBy: string;
+            reason: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        BudgetTemplateAuditPage: {
+            items: components["schemas"]["BudgetTemplateAuditItem"][];
+            nextCursor?: string;
+        };
+        CreateBudgetTemplateRequest: {
+            name: string;
+            description: string;
+            rules: components["schemas"]["BudgetTemplateRule"][];
+            reason: string;
+        };
+        UpdateBudgetTemplateRequest: {
+            expectedRevision: number;
+            name: string;
+            description: string;
+            rules: components["schemas"]["BudgetTemplateRule"][];
+            reason: string;
+        };
+        AssignBudgetTemplateRequest: {
+            budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            expectedAssignmentRevision: number;
             reason: string;
         };
         BudgetAuditItem: {
@@ -1382,9 +1553,10 @@ export interface components {
          *     TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
          *     ASR    → AUDIO_SECONDS + REQUESTS
          *     MCP    → REQUESTS
+         *     IMAGE_GENERATION → REQUESTS + REQUESTED_IMAGES
          * @enum {string}
          */
-        PricingMeter: "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "TOTAL_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS" | "REQUESTS";
+        PricingMeter: "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "TOTAL_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS" | "REQUESTS" | "REQUESTED_IMAGES";
         PricingRule: {
             pricingRuleId: components["schemas"]["PricingRuleId"];
             resourceId?: string;
@@ -1969,6 +2141,302 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    clearUserBudgetOverride: {
+        parameters: {
+            query: {
+                expectedRevision: number;
+                reason: string;
+            };
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+                capability: components["schemas"]["BudgetCapability"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Effective budget after removing the user capability override. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetCapabilityView"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    assignUserBudgetTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignBudgetTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Effective user budget after assigning or replacing the live template. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBudgetView"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    unassignUserBudgetTemplate: {
+        parameters: {
+            query: {
+                expectedAssignmentRevision: number;
+                reason: string;
+            };
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Effective user budget after removing the live template assignment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBudgetView"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listBudgetTemplates: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Budget templates ordered by name and stable id. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetTemplatePage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    createBudgetTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBudgetTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetTemplate"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getBudgetTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current template. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetTemplate"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    updateBudgetTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBudgetTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated template; uncovered assigned-user capabilities now use this revision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetTemplate"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    deleteBudgetTemplate: {
+        parameters: {
+            query: {
+                expectedRevision: number;
+                reason: string;
+            };
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. Assigned templates return conflict instead. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listBudgetTemplateUsers: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+                query?: string;
+            };
+            header?: never;
+            path: {
+                budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Users currently assigned to this live template. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listBudgetTemplateAudit: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                budgetTemplateId: components["schemas"]["BudgetTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Immutable template and assignment command history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetTemplateAuditPage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     listUserBudgetAudit: {
@@ -2576,7 +3044,7 @@ export interface operations {
                 to?: string;
                 userId?: string;
                 resourceId?: string;
-                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP";
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
                 completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
@@ -2609,7 +3077,7 @@ export interface operations {
                 to?: string;
                 userId?: string;
                 resourceId?: string;
-                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP";
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
                 completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
@@ -2642,7 +3110,7 @@ export interface operations {
                 to?: string;
                 userId?: string;
                 resourceId?: string;
-                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP";
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
                 completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
@@ -2676,7 +3144,7 @@ export interface operations {
                 from?: string;
                 to?: string;
                 resourceId?: string;
-                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP";
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
                 completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";
@@ -2771,7 +3239,7 @@ export interface operations {
                 to?: string;
                 userId?: string;
                 resourceId?: string;
-                resourceKind?: "PROVIDER" | "MODEL" | "TTS" | "ASR" | "MCP";
+                resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP";
                 upstreamId?: string;
                 status?: "SUCCESS" | "ERROR" | "BLOCKED";
                 completeness?: "EXACT" | "PARTIAL" | "UNKNOWN";

@@ -25,6 +25,7 @@ type McpDefinition = components['schemas']['McpDefinition']
 type ProviderDefinition = components['schemas']['ProviderDefinition']
 type ManagedPolicy = components['schemas']['ManagedPolicy']
 type PolicyFlagKey = 'allowLocalProviders' | 'allowLocalTts' | 'allowLocalAsr' | 'allowLocalMcp' | 'allowLocalAssistants'
+type PolicyDefaultKey = 'defaultModelId' | 'defaultImageGenerationId' | 'defaultTtsId' | 'defaultAsrId' | 'defaultAssistantId'
 type Upstream = components['schemas']['Upstream']
 type UpstreamPage = components['schemas']['UpstreamPage']
 type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
@@ -49,7 +50,7 @@ const reviewing = ref(false)
 const upstreams = ref<Upstream[]>([])
 const upstreamsLoading = ref(false)
 const upstreamError = ref<unknown>()
-const activeTab = ref<'overview' | 'models' | 'tts' | 'asr' | 'mcp' | 'assistants' | 'policy'>('overview')
+const activeTab = ref<'overview' | 'models' | 'image-generation' | 'tts' | 'asr' | 'mcp' | 'assistants' | 'policy'>('overview')
 const canMutate = computed(() => Boolean(session.csrfToken))
 const reviewTotalChanges = computed(() => {
   const summary = preview.value?.diffSummary
@@ -61,11 +62,12 @@ const unchangedPublishedDraft = computed(() =>
 function previewModelName(id: string | undefined): string {
   return previewReferenceName('model', id)
 }
-function previewReferenceName(kind: 'model' | 'tts' | 'asr' | 'provider' | 'assistant', id: string | undefined): string {
+function previewReferenceName(kind: 'model' | 'image' | 'tts' | 'asr' | 'provider' | 'assistant', id: string | undefined): string {
   if (!id) return $t('resources.preview.notSelected')
   const snapshot = preview.value
   const resource = kind === 'model' ? snapshot?.models.find(item => item.modelId === id)
-    : kind === 'tts' ? snapshot?.tts.find(item => item.ttsId === id)
+    : kind === 'image' ? snapshot?.imageGenerators?.find(item => item.imageId === id)
+      : kind === 'tts' ? snapshot?.tts.find(item => item.ttsId === id)
       : kind === 'asr' ? snapshot?.asr.find(item => item.asrId === id)
         : kind === 'assistant' ? snapshot?.assistants.find(item => item.assistantDefinitionId === id)
           : snapshot?.providers.find(item => item.providerId === id)
@@ -89,6 +91,7 @@ const routingChanged = computed(() => {
 const reviewResourceRows = computed(() => [
   { kind: $t('resources.preview.providers'), diff: reviewDiffFor('PROVIDER') },
   { kind: $t('resources.tabs.models'), diff: reviewDiffFor('MODEL') },
+  { kind: $t('resources.tabs.imageGeneration'), diff: reviewDiffFor('IMAGE_GENERATION') },
   { kind: 'TTS', diff: reviewDiffFor('TTS') },
   { kind: 'ASR', diff: reviewDiffFor('ASR') },
   { kind: 'MCP', diff: reviewDiffFor('MCP') },
@@ -102,7 +105,7 @@ const policyChanged = computed(() => {
 
 const configurationSections = computed<ConfigurationSection[]>(() => {
   const content = draft.localContent
-  const totalResources = (content?.models.length ?? 0) + (content?.tts.length ?? 0)
+  const totalResources = (content?.models.length ?? 0) + (content?.imageGenerators?.length ?? 0) + (content?.tts.length ?? 0)
     + (content?.asr.length ?? 0) + (content?.mcp.length ?? 0)
   const enabledLocal = content?.policy
     ? [content.policy.allowLocalProviders, content.policy.allowLocalTts, content.policy.allowLocalAsr,
@@ -111,6 +114,7 @@ const configurationSections = computed<ConfigurationSection[]>(() => {
   return [
     { id: 'overview', label: $t('resources.navigation.overview'), description: $t('resources.navigation.overviewHint'), icon: 'account_tree', badge: totalResources },
     { id: 'models', label: $t('resources.tabs.models'), description: $t('resources.navigation.modelsHint'), icon: 'smart_toy', badge: content?.models.length ?? 0 },
+    { id: 'image-generation', label: $t('resources.tabs.imageGeneration'), description: $t('resources.navigation.imageGenerationHint'), icon: 'image', badge: content?.imageGenerators?.length ?? 0 },
     { id: 'tts', label: $t('resources.tabs.tts'), description: $t('resources.navigation.ttsHint'), icon: 'record_voice_over', badge: content?.tts.length ?? 0 },
     { id: 'asr', label: $t('resources.tabs.asr'), description: $t('resources.navigation.asrHint'), icon: 'hearing', badge: content?.asr.length ?? 0 },
     { id: 'mcp', label: $t('resources.tabs.mcp'), description: $t('resources.navigation.mcpHint'), icon: 'hub', badge: content?.mcp.length ?? 0 },
@@ -142,6 +146,7 @@ function matchesCollection(value: string, id: string): boolean {
 }
 
 const filteredModels = computed(() => draft.localContent?.models.filter(item => matchesCollection(item.displayName, item.modelId)) ?? [])
+const filteredImageGenerators = computed(() => draft.localContent?.imageGenerators?.filter(item => matchesCollection(item.displayName, item.imageId)) ?? [])
 const filteredTts = computed(() => draft.localContent?.tts.filter(item => matchesCollection(item.displayName, item.ttsId)) ?? [])
 const filteredAsr = computed(() => draft.localContent?.asr.filter(item => matchesCollection(item.displayName, item.asrId)) ?? [])
 const filteredMcp = computed(() => draft.localContent?.mcp.filter(item => matchesCollection(item.displayName, item.mcpServerId)) ?? [])
@@ -150,7 +155,8 @@ const INPUT_MODS = ['TEXT', 'IMAGE'] as const
 const OUTPUT_MODS = ['TEXT'] as const
 const MODEL_CAPS = ['TOOL', 'REASONING'] as const
 const AUTH_OWNERSHIPS = ['ENTERPRISE_MANAGED', 'NONE'] as const
-const RELATIONSHIP_KINDS = ['Model', 'TTS', 'ASR', 'MCP'] as const
+const IMAGE_SIZE_OPTIONS = ['auto', '256x256', '512x512', '1024x1024', '1024x1536', '1536x1024']
+const RELATIONSHIP_KINDS = ['Model', 'Image Generation', 'TTS', 'ASR', 'MCP'] as const
 const relationshipKindFilter = ref<string>('all')
 
 const up = (id?: string) => upstreams.value.find((u) => u.upstreamId === id)
@@ -160,6 +166,9 @@ const upstreamStatus = (id?: string) => up(id)?.status
 /** Selected model for the Models tab editor. */
 const selectedModel = computed(() =>
   draft.localContent?.models.find((m) => m.modelId === selectedResourceId.value),
+)
+const selectedImageGeneration = computed(() =>
+  draft.localContent?.imageGenerators?.find(item => item.imageId === selectedResourceId.value),
 )
 const selectedTts = computed(() =>
   draft.localContent?.tts.find((t) => t.ttsId === selectedResourceId.value),
@@ -223,6 +232,16 @@ const relationshipRows = computed(() => {
       bindingState: !b ? 'missing' : !b.upstreamId ? 'missing' : 'bound',
     })
   }
+  for (const image of c.imageGenerators ?? []) {
+    const binding = draft.bindingFor(image.imageId)
+    rows.push({
+      resourceId: image.imageId, kind: 'Image Generation', displayName: image.displayName,
+      upstreamId: binding?.upstreamId, upstreamName: upstreamLabel(binding?.upstreamId),
+      upstreamStatus: upstreamStatus(binding?.upstreamId), enabled: image.enabled,
+      runtimePath: image.runtimePath, transport: binding?.transportPolicy,
+      bindingState: !binding?.upstreamId ? 'missing' : 'bound',
+    })
+  }
   for (const t of c.tts) {
     const b = draft.bindingFor(t.ttsId)
     const local = t.clientProtocol === 'SYSTEM_TTS'
@@ -272,6 +291,19 @@ const enabledModels = computed(() =>
     value: m.modelId,
   })) ?? [],
 )
+const enabledImageGenerators = computed(() =>
+  draft.localContent?.imageGenerators?.filter(item => item.enabled).map(item => ({
+    label: item.displayName,
+    value: item.imageId,
+  })) ?? [],
+)
+
+function setPolicyDefault(key: PolicyDefaultKey, value: string | null) {
+  if (!draft.localContent) return
+  if (value) draft.localContent.policy[key] = value
+  else delete draft.localContent.policy[key]
+  draft.markDirty()
+}
 const enabledTts = computed(() =>
   draft.localContent?.tts.filter((t) => t.enabled).map((t) => ({
     label: t.displayName,
@@ -471,9 +503,10 @@ function toggleEnabled(kind: string, resourceId: string, enabled: boolean) {
   const content = draft.localContent
   if (!content) return
   const item = kind === 'Model' ? content.models.find(value => value.modelId === resourceId)
-    : kind === 'TTS' ? content.tts.find(value => value.ttsId === resourceId)
-      : kind === 'ASR' ? content.asr.find(value => value.asrId === resourceId)
-        : content.mcp.find(value => value.mcpServerId === resourceId)
+    : kind === 'Image Generation' ? content.imageGenerators?.find(value => value.imageId === resourceId)
+      : kind === 'TTS' ? content.tts.find(value => value.ttsId === resourceId)
+        : kind === 'ASR' ? content.asr.find(value => value.asrId === resourceId)
+          : content.mcp.find(value => value.mcpServerId === resourceId)
   if (item) {
     item.enabled = enabled
     draft.markDirty()
@@ -483,12 +516,13 @@ function toggleEnabled(kind: string, resourceId: string, enabled: boolean) {
 /** Navigate to the editor for a specific resource. */
 function goToResource(kind: string, resourceId: string) {
   selectedResourceId.value = resourceId
-  const tab = ({ Model: 'models', TTS: 'tts', ASR: 'asr', MCP: 'mcp' } as Record<string, string>)[kind]
+  const tab = ({ Model: 'models', 'Image Generation': 'image-generation', TTS: 'tts', ASR: 'asr', MCP: 'mcp' } as Record<string, string>)[kind]
   if (tab) activeTab.value = tab as typeof activeTab.value
 }
 
 /** Select a model in the editor. */
 function selectModel(id: string) { selectedResourceId.value = id }
+function selectImageGeneration(id: string) { selectedResourceId.value = id }
 function selectTts(id: string) { selectedResourceId.value = id }
 function selectAsr(id: string) { selectedResourceId.value = id }
 function selectMcp(id: string) { selectedResourceId.value = id }
@@ -501,15 +535,16 @@ function beforeUnload(event: BeforeUnloadEvent) {
 
 async function goToValidationIssue(issue: ValidationIssue) {
   const section = issue.resourceKind === 'MODEL' ? 'models'
-    : issue.resourceKind === 'TTS' ? 'tts'
-      : issue.resourceKind === 'ASR' ? 'asr'
-        : issue.resourceKind === 'MCP' ? 'mcp'
-          : issue.resourceKind === 'ASSISTANT' || issue.resourceKind === 'STARTER' ? 'assistants'
-            : issue.resourceKind === 'POLICY' ? 'policy'
-              : issue.resourceKind === 'PROVIDER' ? 'overview' : undefined
+    : issue.resourceKind === 'IMAGE_GENERATION' ? 'image-generation'
+      : issue.resourceKind === 'TTS' ? 'tts'
+        : issue.resourceKind === 'ASR' ? 'asr'
+          : issue.resourceKind === 'MCP' ? 'mcp'
+            : issue.resourceKind === 'ASSISTANT' || issue.resourceKind === 'STARTER' ? 'assistants'
+              : issue.resourceKind === 'POLICY' ? 'policy'
+                : issue.resourceKind === 'PROVIDER' ? 'overview' : undefined
   if (!section) return
   activeTab.value = section
-  if (issue.resourceId && ['MODEL', 'TTS', 'ASR', 'MCP'].includes(issue.resourceKind ?? '')) {
+  if (issue.resourceId && ['MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP'].includes(issue.resourceKind ?? '')) {
     selectedResourceId.value = issue.resourceId
   }
   await nextTick()
@@ -809,6 +844,70 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <div class="text-body2 q-mt-xs">{{ $t('resources.model.selectOrAdd') }}</div>
               </q-card-section>
             </q-card>
+          </div>
+        </div>
+      </template>
+
+      <!-- ===== Image Generation: Collection → Editor ===== -->
+      <template v-if="activeTab === 'image-generation'">
+        <div class="row q-col-gutter-xs resource-split" :class="{ 'resource-split--selected': Boolean(selectedImageGeneration) }">
+          <div class="col-12 col-md-4 resource-split__collection">
+            <q-card flat bordered>
+              <q-card-section class="row items-center justify-between">
+                <div class="text-subtitle2">{{ $t('resources.tabs.imageGeneration') }}</div>
+                <q-btn flat dense icon="add" :label="$t('common.add')" size="sm" data-cy="add-image-generation-btn" @click="selectedResourceId = draft.addImageGeneration()" />
+              </q-card-section>
+              <q-card-section class="q-pa-xs"><q-input v-model="collectionQuery" dense outlined clearable :label="$t('common.search')"><template #prepend><q-icon name="search" /></template></q-input></q-card-section>
+              <q-list separator>
+                <q-item v-for="image in filteredImageGenerators" :key="image.imageId" :active="selectedResourceId === image.imageId" clickable @click="selectImageGeneration(image.imageId)">
+                  <q-item-section>
+                    <q-item-label>{{ image.displayName }}</q-item-label>
+                    <q-item-label caption>{{ image.upstreamModelKey || $t('resources.imageGeneration.noKey') }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <div class="row items-center q-gutter-xs">
+                      <q-badge v-if="!draft.bindingFor(image.imageId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
+                      <q-btn flat dense color="negative" icon="delete" size="sm" :aria-label="$t('resources.removeNamed', { name: image.displayName })" @click.stop="removeResource('IMAGE_GENERATION', image.imageId, image.displayName)" />
+                    </div>
+                  </q-item-section>
+                </q-item>
+                <q-item v-if="!draft.localContent.imageGenerators?.length"><q-item-section class="text-grey-7">{{ $t('resources.imageGeneration.empty') }}</q-item-section></q-item>
+              </q-list>
+            </q-card>
+          </div>
+          <div class="col-12 col-md-8 resource-split__detail">
+            <q-btn flat dense icon="arrow_back" class="resource-detail-back q-mb-xs" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
+            <q-card v-if="selectedImageGeneration" flat bordered>
+              <q-card-section class="row items-start justify-between">
+                <div>
+                  <div class="text-subtitle1 text-weight-medium">{{ selectedImageGeneration.displayName }}</div>
+                  <details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selectedImageGeneration.imageId }} · {{ selectedImageGeneration.clientProtocol }}</details>
+                </div>
+                <q-toggle v-model="selectedImageGeneration.enabled" :label="$t('common.enabled')" @update:model-value="draft.markDirty()" />
+              </q-card-section>
+              <q-separator />
+              <q-card-section class="q-gutter-xs">
+                <div class="text-subtitle2">{{ $t('resources.imageGeneration.identity') }}</div>
+                <q-input v-model="selectedImageGeneration.displayName" dense outlined :label="$t('resources.imageGeneration.displayName')" data-cy="image-generation-display-name" @update:model-value="draft.markDirty()" />
+                <q-input v-model="selectedImageGeneration.upstreamModelKey" dense outlined :label="$t('resources.imageGeneration.modelKey')" data-cy="image-generation-model-key" @update:model-value="draft.markDirty()" />
+              </q-card-section>
+              <q-separator />
+              <q-card-section class="q-gutter-xs">
+                <div class="text-subtitle2">{{ $t('resources.imageGeneration.requestLimits') }}</div>
+                <q-input v-model.number="selectedImageGeneration.maxImagesPerRequest" type="number" min="1" max="6" dense outlined :label="$t('resources.imageGeneration.maxImages')" data-cy="image-generation-max-images" :rules="[(value: number) => Number.isInteger(value) && value >= 1 && value <= 6 || $t('resources.imageGeneration.maxImagesInvalid')]" @update:model-value="draft.markDirty()" />
+                <q-select v-model="selectedImageGeneration.allowedSizes" multiple use-chips use-input new-value-mode="add-unique" dense outlined :options="IMAGE_SIZE_OPTIONS" :label="$t('resources.imageGeneration.allowedSizes')" data-cy="image-generation-allowed-sizes" :rules="[(value: string[]) => value.length > 0 || $t('resources.imageGeneration.allowedSizesRequired')]" @update:model-value="draft.markDirty()" />
+              </q-card-section>
+              <q-separator />
+              <q-card-section>
+                <div class="text-subtitle2 q-mb-xs">{{ $t('resources.imageGeneration.execution') }}</div>
+                <div class="row q-gutter-xs">
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedImageGeneration.imageId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="image-generation-upstream-select" @update:model-value="value => value && draft.setBinding(selectedImageGeneration!.imageId, value, 'HTTP_REQUEST_RESPONSE')" />
+                  <q-input :model-value="selectedImageGeneration.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="image-generation-runtime-path" @update:model-value="value => draft.setRuntimePath(selectedImageGeneration!.imageId, String(value ?? ''))" />
+                </div>
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.imageGeneration.transport') }}</div>
+              </q-card-section>
+            </q-card>
+            <q-card v-else flat bordered><q-card-section class="text-grey-7 text-center"><q-icon name="image" size="3rem" /><div>{{ $t('resources.imageGeneration.selectOrAdd') }}</div></q-card-section></q-card>
           </div>
         </div>
       </template>
@@ -1180,19 +1279,23 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div class="text-body2 text-grey-7 q-mb-xs">{{ $t('resources.policy.defaultsHint') }}</div>
             <div class="row q-col-gutter-xs">
               <div class="col-12 col-md-3">
-                <q-select v-model="draft.localContent.policy.defaultModelId" dense outlined :label="$t('resources.policy.defaultModel')" :options="enabledModels" emit-value map-options clearable @update:model-value="draft.markDirty()" />
+                <q-select :model-value="draft.localContent.policy.defaultModelId" dense outlined :label="$t('resources.policy.defaultModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-model" @update:model-value="value => setPolicyDefault('defaultModelId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledModelsHint') }}</div>
               </div>
               <div class="col-12 col-md-3">
-                <q-select v-model="draft.localContent.policy.defaultTtsId" dense outlined :label="$t('resources.policy.defaultTts')" :options="enabledTts" emit-value map-options clearable @update:model-value="draft.markDirty()" />
+                <q-select :model-value="draft.localContent.policy.defaultImageGenerationId" dense outlined :label="$t('resources.policy.defaultImageGeneration')" :options="enabledImageGenerators" emit-value map-options clearable data-cy="policy-default-image-generation" @update:model-value="value => setPolicyDefault('defaultImageGenerationId', value)" />
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledImageGenerationHint') }}</div>
+              </div>
+              <div class="col-12 col-md-3">
+                <q-select :model-value="draft.localContent.policy.defaultTtsId" dense outlined :label="$t('resources.policy.defaultTts')" :options="enabledTts" emit-value map-options clearable data-cy="policy-default-tts" @update:model-value="value => setPolicyDefault('defaultTtsId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledTtsHint') }}</div>
               </div>
               <div class="col-12 col-md-3">
-                <q-select v-model="draft.localContent.policy.defaultAsrId" dense outlined :label="$t('resources.policy.defaultAsr')" :options="enabledAsr" emit-value map-options clearable @update:model-value="draft.markDirty()" />
+                <q-select :model-value="draft.localContent.policy.defaultAsrId" dense outlined :label="$t('resources.policy.defaultAsr')" :options="enabledAsr" emit-value map-options clearable data-cy="policy-default-asr" @update:model-value="value => setPolicyDefault('defaultAsrId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledAsrHint') }}</div>
               </div>
               <div class="col-12 col-md-3">
-                <q-select v-model="draft.localContent.policy.defaultAssistantId" dense outlined :label="$t('resources.policy.defaultAssistant')" :options="enabledAssistants" emit-value map-options clearable @update:model-value="draft.markDirty()" />
+                <q-select :model-value="draft.localContent.policy.defaultAssistantId" dense outlined :label="$t('resources.policy.defaultAssistant')" :options="enabledAssistants" emit-value map-options clearable data-cy="policy-default-assistant" @update:model-value="value => setPolicyDefault('defaultAssistantId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledAssistantsHint') }}</div>
               </div>
             </div>
@@ -1371,6 +1474,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </q-markup-table>
             </q-expansion-item>
 
+            <q-expansion-item dense group="preview" :label="`${$t('resources.tabs.imageGeneration')} (${preview.imageGenerators?.length ?? 0})`" icon="image">
+              <q-markup-table flat dense>
+                <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.imageGeneration.allowedSizes') }}</th><th>{{ $t('common.status') }}</th></tr></thead>
+                <tbody>
+                  <tr v-for="image in preview.imageGenerators ?? []" :key="image.imageId">
+                    <td>{{ image.displayName }}<details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ image.imageId }} · {{ image.upstreamModelKey }}</details></td>
+                    <td>{{ image.allowedSizes.join(', ') }} · {{ $t('resources.imageGeneration.maxImagesValue', { count: image.maxImagesPerRequest }) }}</td>
+                    <td>{{ image.enabled ? $t('common.enabled') : $t('common.disabled') }}</td>
+                  </tr>
+                </tbody>
+              </q-markup-table>
+            </q-expansion-item>
+
             <q-expansion-item dense group="preview" :label="`${$t('resources.preview.tts')} (${preview.tts.length})`" icon="record_voice_over">
               <q-markup-table flat dense>
                 <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.tts.speechProfile') }}</th><th>{{ $t('common.status') }}</th></tr></thead>
@@ -1442,6 +1558,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <tbody>
                   <tr v-for="setting in policySettings" :key="setting.key"><td class="text-grey-7">{{ setting.label }}</td><td>{{ preview.policy[setting.key] ? $t('resources.preview.allowed') : $t('resources.preview.notAllowed') }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultModel') }}</td><td>{{ previewReferenceName('model', preview.policy.defaultModelId) }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultImageGeneration') }}</td><td>{{ previewReferenceName('image', preview.policy.defaultImageGenerationId) }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultTts') }}</td><td>{{ previewReferenceName('tts', preview.policy.defaultTtsId) }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultAsr') }}</td><td>{{ previewReferenceName('asr', preview.policy.defaultAsrId) }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultAssistant') }}</td><td>{{ previewReferenceName('assistant', preview.policy.defaultAssistantId) }}</td></tr>

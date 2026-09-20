@@ -10,16 +10,21 @@ import type {
   BudgetCapabilityView,
   BudgetLimitDefinition,
   BudgetMode,
+  BudgetTemplate,
+  BudgetTemplateRule,
   PricingMeter,
   PutBudgetRequest,
   UserBudgetView,
 } from '../api/usageBudget'
-import { budgetPeriods, capabilities, metersForCapability } from '../api/usageBudget'
+import { budgetRuleValueKey, capabilities } from '../api/usageBudget'
 import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 import { useSessionStore } from '../stores/session'
 import LoadingState from './LoadingState.vue'
 import ProblemBanner from './ProblemBanner.vue'
 import StatusChip from './StatusChip.vue'
+import BudgetRuleEditor from './BudgetRuleEditor.vue'
+import PagedEntityPicker from './PagedEntityPicker.vue'
+import { fetchBudgetTemplatePickerPage, resolveBudgetTemplatePickerOption } from '../api/entityPickerSources'
 
 const props = defineProps<{ userId: string }>()
 const { t: $t, locale } = useI18n()
@@ -34,6 +39,12 @@ const editMode = ref<BudgetMode>('UNLIMITED')
 const editLimits = ref<BudgetLimitDefinition[]>([])
 const editReason = ref('')
 const saving = ref(false)
+const selectedTemplateId = ref<string>()
+const assignmentReason = ref('')
+const assignmentConfirmOpen = ref(false)
+const assignmentAction = ref<'assign' | 'unassign'>('assign')
+const assignmentPreviewLoading = ref(false)
+const selectedTemplatePreview = ref<BudgetTemplate>()
 const audit = ref<Partial<Record<BudgetCapability, BudgetAuditItem[]>>>({})
 const auditCursor = ref<Partial<Record<BudgetCapability, string>>>({})
 const auditLoading = ref<BudgetCapability>()
@@ -47,10 +58,29 @@ const unitLabels = computed<MeterUnitLabels>(() => ({
   seconds: $t('usage.units.seconds'),
   minutes: $t('usage.units.minutes'),
   requests: $t('usage.units.requests'),
+  images: $t('usage.units.images'),
 }))
 
 function capability(capabilityName: BudgetCapability): BudgetCapabilityView | undefined {
   return view.value?.items?.find(item => item.capability === capabilityName)
+}
+
+const assignmentChanges = computed(() => {
+  if (!selectedTemplatePreview.value) return []
+  return capabilities.flatMap(capabilityName => {
+    const current = capability(capabilityName)
+    if (!current || current.source === 'EXPLICIT') return []
+    const after = selectedTemplatePreview.value!.rules.find(rule => rule.capability === capabilityName)
+    if (after && budgetRuleValueKey(current) === budgetRuleValueKey(after)) return []
+    if (!after && current.source === 'DEFAULT') return []
+    return [{ capability: capabilityName, before: current, after }]
+  })
+})
+
+function ruleValueSummary(rule: Pick<BudgetTemplateRule, 'mode' | 'limits'> | undefined): string {
+  if (!rule) return $t('budgets.template.deploymentDefault')
+  if (rule.mode === 'UNLIMITED') return $t('budgets.mode.UNLIMITED')
+  return rule.limits.map(limit => `${$t(`budgets.period.${limit.period}`)} · ${$t(`usage.meters.${limit.meter}`)}: ${limit.limit}`).join('; ')
 }
 
 async function load() {
@@ -62,6 +92,7 @@ async function load() {
     if (current !== sequence) return
     if (!Array.isArray(result.items)) throw new Error('Invalid user budget response')
     view.value = result
+    selectedTemplateId.value = result.templateAssignment?.budgetTemplateId
   } catch (cause) {
     if (current === sequence) error.value = cause
   } finally {
@@ -75,22 +106,6 @@ function beginEdit(item: BudgetCapabilityView) {
   editMode.value = item.mode
   editLimits.value = item.limits.map(({ period, meter, limit }) => ({ period, meter, limit }))
   editReason.value = ''
-}
-
-function addLimit(capabilityName: BudgetCapability) {
-  const meters = metersForCapability(capabilityName)
-  const used = new Set(editLimits.value.map(item => `${item.period}:${item.meter}`))
-  for (const period of budgetPeriods) {
-    const meter = meters.find(candidate => !used.has(`${period}:${candidate}`))
-    if (meter) {
-      editLimits.value.push({ period, meter, limit: '' })
-      return
-    }
-  }
-}
-
-function removeLimit(index: number) {
-  editLimits.value.splice(index, 1)
 }
 
 const editorValid = computed(() => {
@@ -141,6 +156,121 @@ async function save(item: BudgetCapabilityView) {
   }
 }
 
+async function assignTemplate() {
+  if (!session.csrfToken || !selectedTemplateId.value || !assignmentReason.value.trim()) return
+  saving.value = true
+  error.value = undefined
+  conflict.value = false
+  try {
+    view.value = await apiFetch<UserBudgetView>(
+      `/api/admin/v1/users/${encodeURIComponent(props.userId)}/budget-template`,
+      { method: 'PUT', body: JSON.stringify({
+        budgetTemplateId: selectedTemplateId.value,
+        expectedAssignmentRevision: view.value?.templateAssignment?.assignmentRevision ?? 0,
+        reason: assignmentReason.value.trim(),
+      }) },
+      session.csrfToken,
+    )
+    selectedTemplateId.value = view.value.templateAssignment?.budgetTemplateId
+    assignmentReason.value = ''
+    assignmentConfirmOpen.value = false
+  } catch (cause) {
+    if (cause instanceof ApiProblem && cause.status === 409) {
+      assignmentConfirmOpen.value = false
+      conflict.value = true
+      await load()
+    } else {
+      error.value = cause
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+async function unassignTemplate() {
+  const assignment = view.value?.templateAssignment
+  if (!session.csrfToken || !assignment || !assignmentReason.value.trim()) return
+  saving.value = true
+  error.value = undefined
+  conflict.value = false
+  try {
+    const query = new URLSearchParams({ expectedAssignmentRevision: String(assignment.assignmentRevision), reason: assignmentReason.value.trim() })
+    view.value = await apiFetch<UserBudgetView>(
+      `/api/admin/v1/users/${encodeURIComponent(props.userId)}/budget-template?${query}`,
+      { method: 'DELETE' },
+      session.csrfToken,
+    )
+    selectedTemplateId.value = undefined
+    assignmentReason.value = ''
+    assignmentConfirmOpen.value = false
+  } catch (cause) {
+    if (cause instanceof ApiProblem && cause.status === 409) {
+      assignmentConfirmOpen.value = false
+      conflict.value = true
+      await load()
+    } else {
+      error.value = cause
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+async function requestAssignment(action: 'assign' | 'unassign') {
+  if (!assignmentReason.value.trim()) return
+  if (action === 'assign' && !selectedTemplateId.value) return
+  if (action === 'unassign' && !view.value?.templateAssignment) return
+  assignmentAction.value = action
+  if (action === 'assign') {
+    const templateId = selectedTemplateId.value!
+    assignmentPreviewLoading.value = true
+    error.value = undefined
+    try {
+      const template = await apiFetch<BudgetTemplate>(`/api/admin/v1/budget-templates/${encodeURIComponent(templateId)}`)
+      if (selectedTemplateId.value !== templateId) return
+      selectedTemplatePreview.value = template
+    } catch (cause) {
+      error.value = cause
+      return
+    } finally {
+      assignmentPreviewLoading.value = false
+    }
+  } else {
+    selectedTemplatePreview.value = undefined
+  }
+  assignmentConfirmOpen.value = true
+}
+
+function confirmAssignment() {
+  if (assignmentAction.value === 'unassign') void unassignTemplate()
+  else void assignTemplate()
+}
+
+async function clearOverride(item: BudgetCapabilityView) {
+  if (!session.csrfToken || item.source !== 'EXPLICIT') return
+  saving.value = true
+  error.value = undefined
+  conflict.value = false
+  try {
+    const query = new URLSearchParams({ expectedRevision: String(item.revision), reason: $t('budgets.clearOverrideReason') })
+    const updated = await apiFetch<BudgetCapabilityView>(
+      `/api/admin/v1/users/${encodeURIComponent(props.userId)}/budgets/${item.capability}?${query}`,
+      { method: 'DELETE' },
+      session.csrfToken,
+    )
+    if (view.value) view.value.items = view.value.items.map(candidate => candidate.capability === updated.capability ? updated : candidate)
+  } catch (cause) {
+    if (cause instanceof ApiProblem && cause.status === 409) {
+      conflict.value = true
+      await load()
+    } else {
+      error.value = cause
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
 async function loadAudit(capabilityName: BudgetCapability, more = false) {
   if (auditLoading.value) return
   auditLoading.value = capabilityName
@@ -177,10 +307,12 @@ function exactQuantity(quantity: string, meter: PricingMeter): string {
 watch(() => props.userId, () => {
   editing.value = undefined
   conflict.value = false
+  assignmentConfirmOpen.value = false
   audit.value = {}
   auditCursor.value = {}
   void load()
 }, { immediate: true })
+watch(selectedTemplateId, () => { selectedTemplatePreview.value = undefined })
 </script>
 
 <template>
@@ -205,7 +337,24 @@ watch(() => props.userId, () => {
     <ProblemBanner :error="error" class="q-mb-xs" />
     <LoadingState v-if="loading && !view" />
 
-    <div v-else-if="view" class="budget-grid">
+    <q-card v-if="view" flat bordered class="q-mb-sm" data-cy="budget-template-assignment">
+      <q-card-section class="q-pa-sm">
+        <div class="text-subtitle2">{{ $t('budgets.template.title') }}</div>
+        <div class="text-caption text-grey-7 q-mb-xs">
+          {{ view.templateAssignment ? $t('budgets.template.assigned', { name: view.templateAssignment.name }) : $t('budgets.template.unassigned') }}
+        </div>
+        <div class="row q-col-gutter-xs items-start">
+          <PagedEntityPicker v-model="selectedTemplateId" class="col-12 col-sm-4" :label="$t('budgets.template.select')" :empty-label="$t('budgets.template.unassignedShort')" :fetch-page="fetchBudgetTemplatePickerPage" :resolve-option="resolveBudgetTemplatePickerOption" />
+          <q-input v-model="assignmentReason" outlined dense class="col-12 col-sm" :label="$t('budgets.reasonLabel')" />
+          <div class="col-auto row q-gutter-xs">
+            <q-btn color="primary" no-caps :label="$t('budgets.template.assign')" :disable="!selectedTemplateId || !assignmentReason.trim()" :loading="saving || assignmentPreviewLoading" @click="requestAssignment('assign')" />
+            <q-btn v-if="view.templateAssignment" flat color="negative" no-caps :label="$t('budgets.template.unassign')" :disable="!assignmentReason.trim()" :loading="saving" @click="requestAssignment('unassign')" />
+          </div>
+        </div>
+      </q-card-section>
+    </q-card>
+
+    <div v-if="view" class="budget-grid">
       <q-card v-for="capabilityName in capabilities" :key="capabilityName" flat bordered class="budget-card" :data-cy="`budget-${capabilityName}`">
         <template v-if="capability(capabilityName)">
           <q-card-section class="q-pa-sm">
@@ -220,7 +369,10 @@ watch(() => props.userId, () => {
                   <StatusChip :value="capability(capabilityName)!.status" />
                 </div>
               </div>
-              <q-btn flat dense icon="edit" :aria-label="$t('budgets.edit')" :disable="!canMutate" @click="beginEdit(capability(capabilityName)!)" />
+              <div class="row no-wrap">
+                <q-btn flat dense icon="edit" :aria-label="$t('budgets.edit')" :disable="!canMutate" @click="beginEdit(capability(capabilityName)!)" />
+                <q-btn v-if="capability(capabilityName)!.source === 'EXPLICIT'" flat dense icon="undo" :aria-label="$t('budgets.clearOverride')" :data-cy="`clear-budget-override-${capabilityName}`" :disable="!canMutate" @click="clearOverride(capability(capabilityName)!)" />
+              </div>
             </div>
             <div class="text-caption text-grey-7 q-mt-xs budget-meta">
               {{ $t('budgets.revision', { revision: capability(capabilityName)!.revision }) }} ·
@@ -239,19 +391,7 @@ watch(() => props.userId, () => {
 
           <q-separator v-if="editing === capabilityName || capability(capabilityName)!.mode === 'LIMITED'" />
           <q-card-section v-if="editing === capabilityName" class="q-gutter-xs" data-cy="budget-editor">
-            <div class="budget-mode-actions">
-              <q-btn :outline="editMode !== 'UNLIMITED'" :color="editMode === 'UNLIMITED' ? 'primary' : undefined" no-caps :label="$t('budgets.mode.UNLIMITED')" @click="editMode = 'UNLIMITED'; editLimits = []" />
-              <q-btn :outline="editMode !== 'LIMITED'" :color="editMode === 'LIMITED' ? 'primary' : undefined" no-caps :label="$t('budgets.mode.LIMITED')" @click="editMode = 'LIMITED'; if (!editLimits.length) addLimit(capabilityName)" />
-            </div>
-            <template v-if="editMode === 'LIMITED'">
-              <div v-for="(limit, index) in editLimits" :key="index" class="budget-rule">
-                <q-select v-model="limit.period" outlined dense emit-value map-options :label="$t('budgets.periodLabel')" :options="budgetPeriods.map(value => ({ value, label: $t(`budgets.period.${value}`) }))" />
-                <q-select v-model="limit.meter" outlined dense emit-value map-options :label="$t('budgets.meterLabel')" :options="metersForCapability(capabilityName).map(value => ({ value, label: meterLabel(value) }))" />
-                <q-input v-model="limit.limit" outlined dense inputmode="numeric" :label="$t('budgets.limitLabel')" :error="Boolean(limit.limit) && !/^(0|[1-9]\d*)$/.test(limit.limit)" />
-                <q-btn flat dense round icon="delete" color="negative" :aria-label="$t('common.remove')" @click="removeLimit(index)" />
-              </div>
-              <q-btn flat dense no-caps icon="add" :label="$t('budgets.addLimit')" @click="addLimit(capabilityName)" />
-            </template>
+            <BudgetRuleEditor :capability="capabilityName" :mode="editMode" :limits="editLimits" @update:mode="editMode = $event" @update:limits="editLimits = $event" />
             <q-input v-model="editReason" outlined dense maxlength="500" :label="$t('budgets.reasonLabel')" :hint="$t('budgets.reasonHint')" />
             <div class="row justify-end q-gutter-xs">
               <q-btn flat :label="$t('common.cancel')" @click="editing = undefined" />
@@ -307,6 +447,32 @@ watch(() => props.userId, () => {
         </template>
       </q-card>
     </div>
+
+    <q-dialog v-model="assignmentConfirmOpen">
+      <q-card style="min-width: min(420px, 90vw)">
+        <q-card-section class="text-subtitle1">
+          {{ assignmentAction === 'unassign'
+            ? $t('budgets.template.confirmUnassignTitle')
+            : $t(view?.templateAssignment ? 'budgets.template.confirmReplaceTitle' : 'budgets.template.confirmAssignTitle') }}
+        </q-card-section>
+        <q-card-section class="q-pt-none text-body2">
+          <div>{{ assignmentAction === 'unassign' ? $t('budgets.template.unassignImpact') : $t('budgets.template.assignImpact') }}</div>
+          <template v-if="assignmentAction === 'assign'">
+            <div class="text-caption text-grey-7 q-mt-sm">{{ $t('budgets.template.effectiveChanges') }}</div>
+            <div v-if="!assignmentChanges.length" class="text-caption q-mt-xs">{{ $t('budgets.template.noEffectiveChanges') }}</div>
+            <div v-for="change in assignmentChanges" :key="change.capability" class="q-mt-xs" :data-cy="`budget-template-assignment-change-${change.capability}`">
+              <div class="text-weight-medium">{{ $t(`usage.kind.${change.capability}`) }}</div>
+              <div class="text-caption"><span class="text-grey-7">{{ $t('budgetTemplates.auditBefore') }}:</span> {{ ruleValueSummary(change.before) }}</div>
+              <div class="text-caption"><span class="text-grey-7">{{ $t('budgetTemplates.auditAfter') }}:</span> {{ ruleValueSummary(change.after) }}</div>
+            </div>
+          </template>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps :label="$t('common.cancel')" @click="assignmentConfirmOpen = false" />
+          <q-btn :color="assignmentAction === 'unassign' ? 'negative' : 'primary'" no-caps :label="assignmentAction === 'unassign' ? $t('budgets.template.unassign') : $t('budgets.template.assign')" :loading="saving" data-cy="confirm-budget-template-assignment" @click="confirmAssignment" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </section>
 </template>
 
@@ -325,18 +491,6 @@ watch(() => props.userId, () => {
   line-height: 1.25;
 }
 
-.budget-mode-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.budget-rule {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr) auto;
-  gap: 4px;
-  align-items: start;
-}
 
 .budget-limit + .budget-limit {
   border-top: 1px solid rgba(0, 0, 0, 0.12);
@@ -348,8 +502,5 @@ watch(() => props.userId, () => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .budget-rule {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 </style>

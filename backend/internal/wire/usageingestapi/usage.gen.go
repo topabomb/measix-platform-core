@@ -44,16 +44,19 @@ func (e BudgetAdmissionDecisionCode) Valid() bool {
 
 // Defines values for BudgetCapability.
 const (
-	BudgetCapabilityASR   BudgetCapability = "ASR"
-	BudgetCapabilityMCP   BudgetCapability = "MCP"
-	BudgetCapabilityMODEL BudgetCapability = "MODEL"
-	BudgetCapabilityTTS   BudgetCapability = "TTS"
+	BudgetCapabilityASR             BudgetCapability = "ASR"
+	BudgetCapabilityIMAGEGENERATION BudgetCapability = "IMAGE_GENERATION"
+	BudgetCapabilityMCP             BudgetCapability = "MCP"
+	BudgetCapabilityMODEL           BudgetCapability = "MODEL"
+	BudgetCapabilityTTS             BudgetCapability = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the BudgetCapability enum.
 func (e BudgetCapability) Valid() bool {
 	switch e {
 	case BudgetCapabilityASR:
+		return true
+	case BudgetCapabilityIMAGEGENERATION:
 		return true
 	case BudgetCapabilityMCP:
 		return true
@@ -138,6 +141,7 @@ const (
 	OPENAIAUDIOSPEECH           ClientProtocol = "OPENAI_AUDIO_SPEECH"
 	OPENAIAUDIOTRANSCRIPTIONS   ClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
 	OPENAICHATCOMPLETIONS       ClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	OPENAIIMAGESGENERATIONS     ClientProtocol = "OPENAI_IMAGES_GENERATIONS"
 	OPENAIREALTIMETRANSCRIPTION ClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
 	OPENAIRESPONSES             ClientProtocol = "OPENAI_RESPONSES"
 )
@@ -165,6 +169,8 @@ func (e ClientProtocol) Valid() bool {
 		return true
 	case OPENAICHATCOMPLETIONS:
 		return true
+	case OPENAIIMAGESGENERATIONS:
+		return true
 	case OPENAIREALTIMETRANSCRIPTION:
 		return true
 	case OPENAIRESPONSES:
@@ -176,16 +182,19 @@ func (e ClientProtocol) Valid() bool {
 
 // Defines values for ResourceKind.
 const (
-	ResourceKindASR   ResourceKind = "ASR"
-	ResourceKindMCP   ResourceKind = "MCP"
-	ResourceKindMODEL ResourceKind = "MODEL"
-	ResourceKindTTS   ResourceKind = "TTS"
+	ResourceKindASR             ResourceKind = "ASR"
+	ResourceKindIMAGEGENERATION ResourceKind = "IMAGE_GENERATION"
+	ResourceKindMCP             ResourceKind = "MCP"
+	ResourceKindMODEL           ResourceKind = "MODEL"
+	ResourceKindTTS             ResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ResourceKind enum.
 func (e ResourceKind) Valid() bool {
 	switch e {
 	case ResourceKindASR:
+		return true
+	case ResourceKindIMAGEGENERATION:
 		return true
 	case ResourceKindMCP:
 		return true
@@ -221,13 +230,14 @@ func (e UsageCompleteness) Valid() bool {
 
 // Defines values for UsageMeter.
 const (
-	AUDIOSECONDS UsageMeter = "AUDIO_SECONDS"
-	CACHEDTOKENS UsageMeter = "CACHED_TOKENS"
-	CHARACTERS   UsageMeter = "CHARACTERS"
-	INPUTTOKENS  UsageMeter = "INPUT_TOKENS"
-	OUTPUTTOKENS UsageMeter = "OUTPUT_TOKENS"
-	REQUESTS     UsageMeter = "REQUESTS"
-	TOTALTOKENS  UsageMeter = "TOTAL_TOKENS"
+	AUDIOSECONDS    UsageMeter = "AUDIO_SECONDS"
+	CACHEDTOKENS    UsageMeter = "CACHED_TOKENS"
+	CHARACTERS      UsageMeter = "CHARACTERS"
+	INPUTTOKENS     UsageMeter = "INPUT_TOKENS"
+	OUTPUTTOKENS    UsageMeter = "OUTPUT_TOKENS"
+	REQUESTEDIMAGES UsageMeter = "REQUESTED_IMAGES"
+	REQUESTS        UsageMeter = "REQUESTS"
+	TOTALTOKENS     UsageMeter = "TOTAL_TOKENS"
 )
 
 // Valid indicates whether the value is a known member of the UsageMeter enum.
@@ -242,6 +252,8 @@ func (e UsageMeter) Valid() bool {
 	case INPUTTOKENS:
 		return true
 	case OUTPUTTOKENS:
+		return true
+	case REQUESTEDIMAGES:
 		return true
 	case REQUESTS:
 		return true

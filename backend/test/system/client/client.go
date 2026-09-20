@@ -111,6 +111,11 @@ func (c *Client) Speech(ctx context.Context, resourceID, runtimePath, body strin
 	return c.roundTrip(ctx, resourceID, runtimePath, []byte(body), "application/json")
 }
 
+// ImageGeneration issues a synchronous OpenAI-compatible image generation request.
+func (c *Client) ImageGeneration(ctx context.Context, resourceID, runtimePath, body string) ([]byte, string, error) {
+	return c.roundTrip(ctx, resourceID, runtimePath, []byte(body), "application/json")
+}
+
 // Transcription issues a multipart transcription request.
 func (c *Client) Transcription(ctx context.Context, resourceID, runtimePath, model, filename string, file []byte) ([]byte, string, error) {
 	var buf bytes.Buffer

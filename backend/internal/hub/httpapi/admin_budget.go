@@ -39,7 +39,48 @@ func (h *fullAdminHandler) GetUserBudgets(w http.ResponseWriter, r *http.Request
 		writeProblem(w, 500, "internal_error", "Internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, adminBudgetView(userID, h.services.Budget.Location.String(), states, usageMeters))
+	assignment, err := h.services.Budget.GetAssignment(r.Context(), userID)
+	if err != nil {
+		writeProblem(w, 500, "internal_error", "Internal error")
+		return
+	}
+	writeJSON(w, http.StatusOK, adminBudgetView(userID, h.services.Budget.Location.String(), states, usageMeters, assignment))
+}
+
+func (h *fullAdminHandler) ClearUserBudgetOverride(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, capability adminapi.BudgetCapability, params adminapi.ClearUserBudgetOverrideParams) {
+	principal, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	view, err := h.services.Budget.ClearOverride(r.Context(), budget.ClearOverrideInput{
+		UserID: userID, Capability: budget.Capability(capability), ExpectedRevision: int64(params.ExpectedRevision),
+		ActorUserID: principal.UserID, Reason: params.Reason,
+	})
+	if errors.Is(err, budget.ErrRevisionConflict) {
+		writeProblem(w, 409, "budget_revision_conflict", "Budget was changed or has no explicit override")
+		return
+	}
+	if errors.Is(err, budget.ErrInvalidConfiguration) {
+		writeProblem(w, 400, "invalid_budget", "Invalid budget configuration")
+		return
+	}
+	if err != nil {
+		writeProblem(w, 500, "internal_error", "Internal error")
+		return
+	}
+	state, err := h.services.Budget.State(r.Context(), userID, budget.Capability(capability))
+	if err != nil {
+		writeProblem(w, 500, "internal_error", "Internal error")
+		return
+	}
+	usageMeters, err := h.services.Usage.UsageMetersByCapability(r.Context(), userID)
+	if err != nil {
+		writeProblem(w, 500, "internal_error", "Internal error")
+		return
+	}
+	state.Budget = view
+	writeJSON(w, 200, adminBudgetCapabilityView(state, usageMeters[state.Budget.Capability]))
 }
 
 func (h *fullAdminHandler) PutUserBudget(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, capability adminapi.BudgetCapability, params adminapi.PutUserBudgetParams) {
@@ -182,14 +223,22 @@ func budgetScopes(current budget.BudgetView, request adminapi.PutBudgetRequest) 
 	return result, nil
 }
 
-func adminBudgetView(userID, timezone string, states []budget.EffectiveState, usageMeters usage.CapabilityMeters) adminapi.UserBudgetView {
+func adminBudgetView(userID, timezone string, states []budget.EffectiveState, usageMeters usage.CapabilityMeters, assignment *budget.AssignmentView) adminapi.UserBudgetView {
 	items := make([]adminapi.BudgetCapabilityView, 0, len(states))
 	var asOf time.Time
 	for _, state := range states {
 		asOf = state.AsOf
 		items = append(items, adminBudgetCapabilityView(state, usageMeters[state.Budget.Capability]))
 	}
-	return adminapi.UserBudgetView{UserId: userID, Timezone: timezone, AsOf: asOf, Items: items}
+	view := adminapi.UserBudgetView{UserId: userID, Timezone: timezone, AsOf: asOf, Items: items}
+	if assignment != nil {
+		value := adminapi.BudgetTemplateAssignment{
+			BudgetTemplateId: assignment.TemplateID, Name: assignment.TemplateName,
+			TemplateRevision: int(assignment.TemplateRevision), AssignmentRevision: int(assignment.Revision), AssignedAt: assignment.AssignedAt,
+		}
+		view.TemplateAssignment = &value
+	}
+	return view
 }
 
 func adminBudgetCapabilityView(state budget.EffectiveState, usageMeters []usage.MeterSummary) adminapi.BudgetCapabilityView {

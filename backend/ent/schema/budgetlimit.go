@@ -17,7 +17,7 @@ func (BudgetLimit) Fields() []ent.Field {
 		field.Int("user_budget_id"),
 		field.String("scope_key"),
 		field.Enum("period").Values("DAY", "WEEK", "MONTH", "LIFETIME"),
-		field.Enum("meter").Values("REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"),
+		field.Enum("meter").Values("REQUESTS", "REQUESTED_IMAGES", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"),
 		field.Int64("limit_quantity").NonNegative(),
 		field.Time("scope_started_at").Immutable(),
 		field.Time("effective_from"),

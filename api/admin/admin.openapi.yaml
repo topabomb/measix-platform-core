@@ -336,6 +336,44 @@ paths:
       parameters:
       - *id002
   /api/admin/v1/users/{userId}/budgets/{capability}:
+    delete:
+      operationId: clearUserBudgetOverride
+      responses:
+        '200':
+          description: Effective budget after removing the user capability override.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetCapabilityView'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id002
+      - name: capability
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/BudgetCapability'
+      - name: expectedRevision
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+      - name: reason
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 500
+      - *id001
     put:
       operationId: putUserBudget
       responses:
@@ -369,6 +407,238 @@ paths:
         schema:
           $ref: '#/components/schemas/BudgetCapability'
       - *id001
+  /api/admin/v1/users/{userId}/budget-template:
+    put:
+      operationId: assignUserBudgetTemplate
+      responses:
+        '200':
+          description: Effective user budget after assigning or replacing the live template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBudgetView'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignBudgetTemplateRequest'
+      parameters:
+      - *id002
+      - *id001
+    delete:
+      operationId: unassignUserBudgetTemplate
+      responses:
+        '200':
+          description: Effective user budget after removing the live template assignment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBudgetView'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id002
+      - name: expectedAssignmentRevision
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+      - name: reason
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 500
+      - *id001
+  /api/admin/v1/budget-templates:
+    get:
+      operationId: listBudgetTemplates
+      responses:
+        '200':
+          description: Budget templates ordered by name and stable id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetTemplatePage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id004
+      - *id005
+      - name: query
+        in: query
+        schema:
+          type: string
+    post:
+      operationId: createBudgetTemplate
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetTemplate'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBudgetTemplateRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/budget-templates/{budgetTemplateId}:
+    get:
+      operationId: getBudgetTemplate
+      responses:
+        '200':
+          description: Current template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetTemplate'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - &budgetTemplateIdParam
+        name: budgetTemplateId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/BudgetTemplateId'
+    put:
+      operationId: updateBudgetTemplate
+      responses:
+        '200':
+          description: Updated template; uncovered assigned-user capabilities now use this revision.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetTemplate'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBudgetTemplateRequest'
+      parameters:
+      - *budgetTemplateIdParam
+      - *id001
+    delete:
+      operationId: deleteBudgetTemplate
+      responses:
+        '204':
+          description: Deleted. Assigned templates return conflict instead.
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *budgetTemplateIdParam
+      - name: expectedRevision
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      - name: reason
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 500
+      - *id001
+  /api/admin/v1/budget-templates/{budgetTemplateId}/users:
+    get:
+      operationId: listBudgetTemplateUsers
+      responses:
+        '200':
+          description: Users currently assigned to this live template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *budgetTemplateIdParam
+      - *id004
+      - *id005
+      - name: query
+        in: query
+        schema:
+          type: string
+  /api/admin/v1/budget-templates/{budgetTemplateId}/audit:
+    get:
+      operationId: listBudgetTemplateAudit
+      responses:
+        '200':
+          description: Immutable template and assignment command history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetTemplateAuditPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *budgetTemplateIdParam
+      - *id004
+      - *id005
   /api/admin/v1/users/{userId}/budgets/{capability}/audit:
     get:
       operationId: listUserBudgetAudit
@@ -928,6 +1198,7 @@ paths:
           enum:
           - PROVIDER
           - MODEL
+          - IMAGE_GENERATION
           - TTS
           - ASR
           - MCP
@@ -1401,6 +1672,9 @@ components:
     ModelId:
       type: string
       pattern: ^mdl_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ImageGenerationId:
+      type: string
+      pattern: ^img_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
     TtsId:
       type: string
       pattern: ^tts_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -1443,6 +1717,9 @@ components:
     IdempotencyKey:
       type: string
       pattern: ^idem_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    BudgetTemplateId:
+      type: string
+      pattern: ^bgt_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
     AssistantDefinitionId:
       type: string
       pattern: ^asd_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -1520,6 +1797,7 @@ components:
           enum:
           - PROVIDER
           - MODEL
+          - IMAGE_GENERATION
           - TTS
           - ASR
           - MCP
@@ -1603,6 +1881,46 @@ components:
             enum:
             - TOOL
             - REASONING
+        enabled:
+          type: boolean
+    ImageGenerationDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - imageId
+      - displayName
+      - clientProtocol
+      - upstreamModelKey
+      - runtimePath
+      - maxImagesPerRequest
+      - allowedSizes
+      - enabled
+      properties:
+        imageId:
+          $ref: '#/components/schemas/ImageGenerationId'
+        displayName:
+          type: string
+          minLength: 1
+        clientProtocol:
+          type: string
+          enum: [OPENAI_IMAGES_GENERATIONS]
+        upstreamModelKey:
+          type: string
+          minLength: 1
+        runtimePath:
+          type: string
+          pattern: ^/[^?#]*$
+        maxImagesPerRequest:
+          type: integer
+          minimum: 1
+          maximum: 6
+        allowedSizes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            pattern: '^(auto|[1-9][0-9]*x[1-9][0-9]*)$'
         enabled:
           type: boolean
     TtsDefinition:
@@ -1820,6 +2138,8 @@ components:
           description: Allows user assistants; referenced resources remain independently governed.
         defaultModelId:
           $ref: '#/components/schemas/ModelId'
+        defaultImageGenerationId:
+          $ref: '#/components/schemas/ImageGenerationId'
         defaultTtsId:
           $ref: '#/components/schemas/TtsId'
         defaultAsrId:
@@ -1848,6 +2168,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ModelDefinition'
+        imageGenerators:
+          type: array
+          description: Additive Snapshot v4 field. Missing durable draft content normalizes to an empty list; new writers emit an explicit list.
+          items:
+            $ref: '#/components/schemas/ImageGenerationDefinition'
         tts:
           type: array
           items:
@@ -2537,6 +2862,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ModelDefinition'
+        imageGenerators:
+          type: array
+          description: Additive Snapshot v4 preview field; omission means an empty list.
+          items:
+            $ref: '#/components/schemas/ImageGenerationDefinition'
         tts:
           type: array
           items:
@@ -2570,6 +2900,7 @@ components:
       enum:
       - PROVIDER
       - MODEL
+      - IMAGE_GENERATION
       - TTS
       - ASR
       - MCP
@@ -2705,7 +3036,7 @@ components:
           type: string
     ResourceKind:
       type: string
-      enum: [MODEL, TTS, ASR, MCP]
+      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
     UsageClientProtocol:
       type: string
       enum:
@@ -2713,6 +3044,7 @@ components:
       - OPENAI_RESPONSES
       - ANTHROPIC_MESSAGES
       - GOOGLE_GENERATE_CONTENT
+      - OPENAI_IMAGES_GENERATIONS
       - OPENAI_AUDIO_SPEECH
       - GEMINI_GENERATE_CONTENT_TTS
       - MIMO_CHAT_COMPLETIONS_TTS
@@ -2723,13 +3055,13 @@ components:
       - MCP_STREAMABLE_HTTP
     BudgetCapability:
       type: string
-      enum: [MODEL, TTS, ASR, MCP]
+      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
     BudgetMode:
       type: string
       enum: [UNLIMITED, LIMITED]
     BudgetSource:
       type: string
-      enum: [DEFAULT, EXPLICIT]
+      enum: [DEFAULT, TEMPLATE, EXPLICIT]
     BudgetPeriod:
       type: string
       enum: [DAY, WEEK, MONTH, LIFETIME]
@@ -2785,8 +3117,6 @@ components:
       properties:
         capability:
           $ref: '#/components/schemas/BudgetCapability'
-        resourceId:
-          type: string
         mode:
           $ref: '#/components/schemas/BudgetMode'
         source:
@@ -2825,10 +3155,12 @@ components:
           type: string
         items:
           type: array
-          minItems: 4
-          maxItems: 4
+          minItems: 5
+          maxItems: 5
           items:
             $ref: '#/components/schemas/BudgetCapabilityView'
+        templateAssignment:
+          $ref: '#/components/schemas/BudgetTemplateAssignment'
         asOf:
           type: string
           format: date-time
@@ -2846,6 +3178,196 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BudgetLimitDefinition'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    BudgetTemplateRule:
+      type: object
+      additionalProperties: false
+      required: [capability, mode, limits]
+      properties:
+        capability:
+          $ref: '#/components/schemas/BudgetCapability'
+        mode:
+          $ref: '#/components/schemas/BudgetMode'
+        limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetLimitDefinition'
+    BudgetTemplate:
+      type: object
+      additionalProperties: false
+      required: [budgetTemplateId, name, description, revision, rules, assignedUserCount, createdAt, updatedAt]
+      properties:
+        budgetTemplateId:
+          $ref: '#/components/schemas/BudgetTemplateId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        revision:
+          type: integer
+          minimum: 1
+        rules:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/BudgetTemplateRule'
+        assignedUserCount:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    BudgetTemplatePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetTemplate'
+        nextCursor:
+          type: string
+    BudgetTemplateAssignment:
+      type: object
+      additionalProperties: false
+      required: [budgetTemplateId, name, templateRevision, assignmentRevision, assignedAt]
+      properties:
+        budgetTemplateId:
+          $ref: '#/components/schemas/BudgetTemplateId'
+        name:
+          type: string
+        templateRevision:
+          type: integer
+          minimum: 1
+        assignmentRevision:
+          type: integer
+          minimum: 1
+        assignedAt:
+          type: string
+          format: date-time
+    BudgetTemplateAuditSnapshot:
+      type: object
+      additionalProperties: false
+      required: [name, description, rules]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetTemplateRule'
+    BudgetTemplateAuditItem:
+      type: object
+      additionalProperties: false
+      required: [auditId, budgetTemplateId, action, templateRevision, assignmentRevision, changedBy, reason, createdAt]
+      properties:
+        auditId:
+          type: integer
+          format: int64
+          minimum: 1
+        budgetTemplateId:
+          $ref: '#/components/schemas/BudgetTemplateId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        action:
+          type: string
+          enum: [CREATE, UPDATE, DELETE, ASSIGN, REASSIGN, UNASSIGN]
+        templateRevision:
+          type: integer
+          minimum: 0
+        assignmentRevision:
+          type: integer
+          minimum: 0
+        before:
+          $ref: '#/components/schemas/BudgetTemplateAuditSnapshot'
+        after:
+          $ref: '#/components/schemas/BudgetTemplateAuditSnapshot'
+        changedBy:
+          type: string
+          description: Actor user ID, or the stable deleted_principal tombstone after user deletion.
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    BudgetTemplateAuditPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetTemplateAuditItem'
+        nextCursor:
+          type: string
+    CreateBudgetTemplateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, description, rules, reason]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        rules:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/BudgetTemplateRule'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    UpdateBudgetTemplateRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, name, description, rules, reason]
+      properties:
+        expectedRevision:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        rules:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/BudgetTemplateRule'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    AssignBudgetTemplateRequest:
+      type: object
+      additionalProperties: false
+      required: [budgetTemplateId, expectedAssignmentRevision, reason]
+      properties:
+        budgetTemplateId:
+          $ref: '#/components/schemas/BudgetTemplateId'
+        expectedAssignmentRevision:
+          type: integer
+          minimum: 0
         reason:
           type: string
           minLength: 1
@@ -3279,12 +3801,14 @@ components:
       - CHARACTERS
       - AUDIO_SECONDS
       - REQUESTS
+      - REQUESTED_IMAGES
       description: |
         Standard meters per the S0.2 production usage and user budget contract.
         MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
         TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
         ASR    → AUDIO_SECONDS + REQUESTS
         MCP    → REQUESTS
+        IMAGE_GENERATION → REQUESTS + REQUESTED_IMAGES
     PricingRule:
       type: object
       additionalProperties: false

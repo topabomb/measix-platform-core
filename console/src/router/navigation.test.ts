@@ -7,6 +7,7 @@ describe('navigation registry', () => {
     expect(items.map((i) => i.id)).toEqual([
       'Overview',
       'Users',
+      'BudgetTemplates',
       'Resources',
       'Upstreams',
       'Releases',

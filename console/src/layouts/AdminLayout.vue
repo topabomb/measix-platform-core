@@ -70,6 +70,7 @@ async function logout() {
 const NAV_I18N_KEYS: Record<string, string> = {
   Overview: 'nav.overview',
   Users: 'nav.users',
+  BudgetTemplates: 'nav.budgetTemplates',
   Resources: 'nav.resources',
   Upstreams: 'nav.upstreams',
   Releases: 'nav.releases',

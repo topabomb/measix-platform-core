@@ -14,6 +14,7 @@ import (
 	"measix/platform/ent/idempotencyrecord"
 	"measix/platform/ent/session"
 	"measix/platform/ent/user"
+	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/wire/adminapi"
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/internal/wire/relaystate"
@@ -189,10 +190,12 @@ func (s *Service) activeReleaseContent(ctx context.Context) (adminapi.ManagedDra
 		return adminapi.ManagedDraftContent{}, err
 	}
 	if managed.ActiveReleaseID == nil || managed.ActiveManagedGeneration == 0 {
+		emptyImages := []adminapi.ImageGenerationDefinition{}
 		return adminapi.ManagedDraftContent{
 			Providers: []adminapi.ProviderDefinition{}, Models: []adminapi.ModelDefinition{}, Tts: []adminapi.TtsDefinition{},
 			Asr: []adminapi.AsrDefinition{}, Mcp: []adminapi.McpDefinition{}, Bindings: []adminapi.RuntimeBindingDefinition{},
-			Policy: adminapi.ManagedPolicy{PolicyId: platformid.New(platformid.Policy)},
+			ImageGenerators: &emptyImages,
+			Policy:          adminapi.ManagedPolicy{PolicyId: platformid.New(platformid.Policy)},
 		}, nil
 	}
 	release, err := s.Client.ManagedRelease.Get(ctx, *managed.ActiveReleaseID)
@@ -203,7 +206,7 @@ func (s *Service) activeReleaseContent(ctx context.Context) (adminapi.ManagedDra
 	if err := json.Unmarshal(release.ReleaseContentJSON, &content); err != nil {
 		return adminapi.ManagedDraftContent{}, err
 	}
-	return content, nil
+	return capability.NormalizeManagedDraftContent(content), nil
 }
 
 func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraftContent, generation, revision int, upstreamOverrides map[string]int) (relaycontrolapi.RuntimeControlState, error) {
@@ -286,6 +289,12 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 			resourceRoute.LlmProfile = &relaycontrolapi.RuntimeLlmProfile{
 				GeminiThoughtsMayBeAbsent:       profile.llm.geminiThoughtsMayBeAbsent,
 				AnthropicCacheFieldsMayBeAbsent: profile.llm.anthropicCacheFieldsMayBeAbsent,
+			}
+		}
+		if profile.image != nil {
+			resourceRoute.ImageProfile = &relaycontrolapi.RuntimeImageProfile{
+				MaxImagesPerRequest: profile.image.maxImagesPerRequest,
+				AllowedSizes:        append([]string(nil), profile.image.allowedSizes...),
 			}
 		}
 		state.ResourceRoutes = append(state.ResourceRoutes, resourceRoute)

@@ -4,7 +4,9 @@
 
 ## S0.2 生产用量与用户额度闭环（2026-09-20，当前状态）
 
-Core 当前实现 12 个受管协议 profile 的有界生产观察与语义计量、durable spool/幂等修正/待核对恢复、日周月累计预算准入和真实结算。HTTP 压缩响应只在私有有界观察副本中解码，代理原始字节与响应头不变。Admin 已提供用户额度编辑、当前状态、趋势/分布/请求明细与 reconciliation；Portal/Client 本人接口只按认证主体查询。后文早期“真实请求均 UNKNOWN”“只有合成上游”的记录仅是当时快照，不代表当前实现。
+Core 当前实现 13 个受管协议 profile（含同步 text-to-image）的有界生产观察与语义计量、durable spool/幂等修正/待核对恢复、日周月累计预算准入和真实结算。HTTP 压缩响应只在私有有界观察副本中解码，代理原始字节与响应头不变。Admin 已提供 MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力的用户额度编辑、live-linked Budget Templates、当前状态、趋势/分布/请求明细与 reconciliation；图片只有 REQUESTS/REQUESTED_IMAGES，不存在资源级预算。Portal/Client 本人接口只按认证主体查询有效能力预算，不暴露模板身份。后文早期“真实请求均 UNKNOWN”“只有合成上游”的记录仅是当时快照，不代表当前实现。
+
+受管 Image Generation 使用独立 `img_*` 身份、`OPENAI_IMAGES_GENERATIONS` profile 和固定 Runtime binding。Relay 只验证当前支持的同步 JSON 形态并观察 `n`/`size`，不解释 prompt/model，不存储图片。Snapshot v4 和当前初始化 SQL 直接纳入这些字段与表；Core 未发布，因此没有协议版本递增、数据库迁移链、兼容层或回填逻辑。旧 Android 本地持久化数据的加法升级由 Android 自身容忍缺字段；Core wire 仍按当前合同严格。
 
 Admin 的用户删除采用精确用户名和原因确认、deny-first 状态机及完整私有数据清理。旧 access/runtime 和 refresh credential 通过不可逆摘要 tombstone 统一返回 `enterprise_identity_deleted`；审计不保留可恢复身份。真实浏览器流程已覆盖额度配置、用量分析和删除交互；真实 Core 分发链路已覆盖 DeepSeek、Qwen、MiMo、DashScope ASR 与 Firecrawl MCP。最终仓库门禁、Android 消费和设备联调结果以本轮后续记录为准，不由这段当前实现说明提前宣告完成。
 
@@ -70,7 +72,7 @@ MEASIX 从未发布。Snapshot v4、Bridge v3、Enrollment formatVersion 1 和�
 | --- | --- |
 | architecture | Admin 配置工作台、Android 风格的分区/详情编辑、响应式行为、严格字段与 Review 基线写入产品和测试合同；数据库合同统一为当前 schema identity；Android 接线只要求当前配置初始化，不要求迁移旧配置 |
 | Core wire/backend | Admin/Client OpenAPI 要求 Assistants、Starters 和五项策略全部显式存在；资源字段执行当前最小约束。Bootstrap 直接创建完整当前 Draft。Hub Preview 将保存的 Draft 与最新 immutable Release 比较，返回资源、Binding、Policy、Assistant、Starter 的权威 diff |
-| Core Admin | 一个配置工作台覆盖 Overview、Models、TTS、ASR、MCP、Assistants、Policy；桌面固定导航、窄屏选择器。Assistant 采用 collection → selected settings，包含 Basic、Instructions、Memory、Model & MCP、Starters。资源删除检查 defaults/Assistant/Binding 引用；Validation issue 可返回对应分区；脏 Draft 的刷新、离页和重新加载需要确认 |
+| Core Admin | 一个配置工作台覆盖 Overview、Models、Image Generation、TTS、ASR、MCP、Assistants、Policy；一级 Budget Templates 在 Users 与 Resources 之间，支持实时传播、显式能力覆盖和审计。Assistant 采用 collection → selected settings，包含 Basic、Instructions、Memory、Model & MCP、Starters。资源删除检查 defaults/Assistant/Binding 引用；Validation issue 可返回对应分区；脏 Draft 的刷新、离页和重新加载需要确认 |
 | Core current-only cleanup | 删除旧的本地 diff 路径猜测、772 行重复 E2E、不可工作的 `freeze-gate` wrapper、旧 browser/schema 命令别名和迁移措辞；schema 工具只接受一份当前 SQL并拒绝增量历史 |
 | Portal | 独立仓库只生成一套标准静态工作台；Core 默认分发该构建，或同源代理企业自有 HTTP/HTTPS 静态站点。Portal 不拥有 Managed 配置编辑，Core Admin 不复制 Portal 工作台 |
 
@@ -81,9 +83,9 @@ Android 集成导出只含客户端实际消费的内容：可执行 Client Open
 | 检查 | 结果 |
 | --- | --- |
 | Core backend | `go test ./... -count=1` 通过；`go vet ./...` 通过 |
-| Core candidate systems | `go test -tags=candidate ./test/system/scenarios/ -count=1 -timeout 15m` 通过；真实 Hub/Relay/SQLite + deterministic Adapter |
-| Core Admin | 21 个 Vitest 文件、137 项测试通过；`vue-tsc --noEmit` 与 Quasar production build 通过 |
-| Core browser | `node scripts/e2e-harness.mjs` 通过 Admin authoring/publish、四类 runtime traffic、usage/system 和 topology security；System 页面在干净 Chromium 中没有页面脚本异常 |
+| Core system smoke | `go test -tags=smoke ./test/system/scenarios/ -count=1 -timeout 5m` 通过；真实 Hub/Relay/SQLite + deterministic Adapter，覆盖同步 Image Generation 透明转发 |
+| Core Admin | 30 个 Vitest 文件、178 项测试通过；`vue-tsc --noEmit`、E2E TypeScript 检查与 Quasar production build 通过 |
+| Core browser | `node scripts/e2e-harness.mjs` 使用隔离 SQLite、真实 Hub/Relay、production SPA 与 Chromium，通过模板创建/指派/实时传播/覆盖清除、Image Generation 配置发布、五类 runtime traffic、usage/system 和 topology security |
 | Current schema | 空库应用唯一一份 SQL 的 Go 测试通过（应用、业务读写、重复初始化、失败事务回滚） |
 | Portal | 当前单元、typecheck、production build 与真实 Hub 生命周期需以本工作树最新重跑结果为准；旧 remote/local 双构建与 local-read 证据已废止 |
 

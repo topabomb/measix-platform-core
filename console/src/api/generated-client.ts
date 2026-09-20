@@ -373,6 +373,7 @@ export interface components {
         InstallationId: string;
         ProviderId: string;
         ModelId: string;
+        ImageGenerationId: string;
         TtsId: string;
         AsrId: string;
         McpServerId: string;
@@ -392,15 +393,15 @@ export interface components {
         EnterpriseUpdateId: string;
         Sha256Hash: string;
         /** @enum {string} */
-        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP";
+        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION";
         /** @enum {string} */
-        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
+        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
         /** @enum {string} */
-        UsageMeter: "REQUESTS" | "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "TOTAL_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS";
+        UsageMeter: "REQUESTS" | "REQUESTED_IMAGES" | "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "TOTAL_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS";
         /** @enum {string} */
         UsageCompleteness: "EXACT" | "PARTIAL" | "UNKNOWN";
         /** @enum {string} */
-        BudgetCapability: "MODEL" | "TTS" | "ASR" | "MCP";
+        BudgetCapability: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION";
         /** @enum {string} */
         BudgetMode: "UNLIMITED" | "LIMITED";
         /** @enum {string} */
@@ -429,7 +430,6 @@ export interface components {
         };
         BudgetCapabilityView: {
             capability: components["schemas"]["BudgetCapability"];
-            resourceId?: string;
             mode: components["schemas"]["BudgetMode"];
             source: components["schemas"]["BudgetSource"];
             revision: number;
@@ -589,6 +589,17 @@ export interface components {
             capabilities: ("TOOL" | "REASONING")[];
             enabled: boolean;
         };
+        ImageGenerationDefinition: {
+            imageId: components["schemas"]["ImageGenerationId"];
+            displayName: string;
+            /** @enum {string} */
+            clientProtocol: "OPENAI_IMAGES_GENERATIONS";
+            upstreamModelKey: string;
+            runtimePath: string;
+            maxImagesPerRequest: number;
+            allowedSizes: string[];
+            enabled: boolean;
+        };
         TtsDefinition: {
             ttsId: components["schemas"]["TtsId"];
             displayName: string;
@@ -657,6 +668,7 @@ export interface components {
             /** @description Allows user assistants; referenced resources remain independently governed. */
             allowLocalAssistants: boolean;
             defaultModelId?: components["schemas"]["ModelId"];
+            defaultImageGenerationId?: components["schemas"]["ImageGenerationId"];
             defaultTtsId?: components["schemas"]["TtsId"];
             defaultAsrId?: components["schemas"]["AsrId"];
             defaultAssistantId?: components["schemas"]["AssistantDefinitionId"];
@@ -664,6 +676,8 @@ export interface components {
         ManagedDraftContent: {
             providers: components["schemas"]["ProviderDefinition"][];
             models: components["schemas"]["ModelDefinition"][];
+            /** @description Additive Snapshot v4 field; omission means an empty list. */
+            imageGenerators?: components["schemas"]["ImageGenerationDefinition"][];
             tts: components["schemas"]["TtsDefinition"][];
             asr: components["schemas"]["AsrDefinition"][];
             mcp: components["schemas"]["McpDefinition"][];
@@ -760,6 +774,8 @@ export interface components {
             snapshotHash: components["schemas"]["Sha256Hash"];
             providers: components["schemas"]["ProviderDefinition"][];
             models: components["schemas"]["ModelDefinition"][];
+            /** @description Additive Snapshot v4 field; omission means an empty list. */
+            imageGenerators?: components["schemas"]["ImageGenerationDefinition"][];
             tts: components["schemas"]["TtsDefinition"][];
             asr: components["schemas"]["AsrDefinition"][];
             mcp: components["schemas"]["McpDefinition"][];

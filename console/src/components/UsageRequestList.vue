@@ -72,6 +72,7 @@ function openDetail(req: RequestUsage) {
 function kindOf(resourceId: string | undefined): string | undefined {
   if (!resourceId) return undefined
   if (resourceId.startsWith('mdl_')) return 'MODEL'
+  if (resourceId.startsWith('img_')) return 'IMAGE_GENERATION'
   if (resourceId.startsWith('tts_')) return 'TTS'
   if (resourceId.startsWith('asr_')) return 'ASR'
   if (resourceId.startsWith('mcp_')) return 'MCP'
@@ -85,6 +86,7 @@ function requestKind(req: RequestUsage): string | undefined {
 function kindColor(kind: string): string {
   switch (kind) {
     case 'MODEL': return 'primary'
+    case 'IMAGE_GENERATION': return 'orange'
     case 'TTS': return 'teal'
     case 'ASR': return 'indigo'
     case 'MCP': return 'deep-purple'
@@ -118,6 +120,7 @@ const unitLabels = computed<MeterUnitLabels>(() => ({
   seconds: $t('usage.units.seconds'),
   minutes: $t('usage.units.minutes'),
   requests: $t('usage.units.requests'),
+  images: $t('usage.units.images'),
 }))
 
 function meterLabel(meter: PricingMeter): string {

@@ -62,7 +62,7 @@ const status = ref<string>()
 const completeness = ref<string>()
 const clientProtocol = ref<string>()
 const budgetStatus = ref<string>()
-const resourceKinds = ['PROVIDER', 'MODEL', 'TTS', 'ASR', 'MCP']
+const resourceKinds = ['PROVIDER', 'MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP']
 const statuses = ['SUCCESS', 'ERROR', 'BLOCKED']
 const completenesses = ['EXACT', 'PARTIAL', 'UNKNOWN']
 const budgetStatuses = ['EXHAUSTED', 'NEAR_LIMIT', 'PENDING_RECONCILIATION']
@@ -241,6 +241,7 @@ const unitLabels = computed<MeterUnitLabels>(() => ({
   seconds: $t('usage.units.seconds'),
   minutes: $t('usage.units.minutes'),
   requests: $t('usage.units.requests'),
+  images: $t('usage.units.images'),
 }))
 
 function meterLabel(meter: PricingMeter): string {

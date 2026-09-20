@@ -49,10 +49,30 @@ type requestStreamObserver interface {
 	Finish(bool) protocolusage.Result
 }
 
-func prepareUsageObservation(resource control.Resource, request *http.Request, maxBytes int64) (*usageObservation, error) {
+func prepareUsageObservation(resource control.Resource, request *http.Request, runtimePath string, maxBytes int64) (*usageObservation, error) {
 	observation := &usageObservation{resource: resource}
 	protocol := string(resource.ClientProtocol)
 	switch string(resource.Kind) {
+	case "IMAGE_GENERATION":
+		mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
+		if request.Method != http.MethodPost || request.URL.RawQuery != "" || !strings.HasSuffix(runtimePath, "/images/generations") || mediaType != "application/json" || err != nil || resource.ImageProfile == nil {
+			return nil, errInvalidImageGenerationRequest
+		}
+		body, err := io.ReadAll(io.LimitReader(request.Body, maxBytes+1))
+		if err != nil {
+			return nil, err
+		}
+		if int64(len(body)) > maxBytes {
+			return nil, errObservedRequestTooLarge
+		}
+		_ = request.Body.Close()
+		request.Body = io.NopCloser(bytes.NewReader(body))
+		request.ContentLength = int64(len(body))
+		result, err := protocolusage.ObserveImageGenerationRequest(body, resource.ImageProfile.MaxImagesPerRequest, resource.ImageProfile.AllowedSizes)
+		if err != nil {
+			return nil, errInvalidImageGenerationRequest
+		}
+		observation.requestResult = result
 	case "TTS":
 		body, err := io.ReadAll(io.LimitReader(request.Body, maxBytes+1))
 		if err != nil {
@@ -86,6 +106,7 @@ func prepareUsageObservation(resource control.Resource, request *http.Request, m
 }
 
 var errObservedRequestTooLarge = fmt.Errorf("observed request exceeds runtime limit")
+var errInvalidImageGenerationRequest = fmt.Errorf("invalid image generation request")
 
 func (o *usageObservation) supportedMeters() []string {
 	switch string(o.resource.Kind) {
@@ -104,6 +125,8 @@ func (o *usageObservation) supportedMeters() []string {
 		return []string{"REQUESTS"}
 	case "MCP":
 		return []string{"REQUESTS"}
+	case "IMAGE_GENERATION":
+		return []string{"REQUESTS", "REQUESTED_IMAGES"}
 	default:
 		return nil
 	}

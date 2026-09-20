@@ -27,7 +27,7 @@ func isRuntimeResourceID(value string) bool {
 		return false
 	}
 	switch kind {
-	case platformid.Model, platformid.TTS, platformid.ASR, platformid.MCP:
+	case platformid.Model, platformid.ImageGeneration, platformid.TTS, platformid.ASR, platformid.MCP:
 		return true
 	default:
 		return false

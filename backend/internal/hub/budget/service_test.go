@@ -104,13 +104,14 @@ func TestDefaultUnlimitedAndExactProtocolSet(t *testing.T) {
 	}
 	protocols := map[ClientProtocol]Capability{
 		ProtocolOpenAIChatCompletions: CapabilityModel, ProtocolOpenAIResponses: CapabilityModel,
-		ProtocolGoogleGenerateContent: CapabilityModel, ProtocolAnthropicMessages: CapabilityModel,
+		ProtocolOpenAIImagesGenerations: CapabilityImageGeneration,
+		ProtocolGoogleGenerateContent:   CapabilityModel, ProtocolAnthropicMessages: CapabilityModel,
 		ProtocolOpenAIAudioSpeech: CapabilityTTS, ProtocolGeminiGenerateContentTTS: CapabilityTTS,
 		ProtocolMiMoChatCompletionsTTS: CapabilityTTS, ProtocolOpenAIAudioTranscriptions: CapabilityASR,
 		ProtocolDashScopeHTTPASR: CapabilityASR, ProtocolOpenAIRealtimeTranscription: CapabilityASR,
 		ProtocolDashScopeRealtimeASR: CapabilityASR, ProtocolMCPStreamableHTTP: CapabilityMCP,
 	}
-	if len(protocols) != 12 {
+	if len(protocols) != 13 {
 		t.Fatalf("protocol count = %d", len(protocols))
 	}
 	for protocol, capability := range protocols {
@@ -231,7 +232,7 @@ func TestLimitedUnlimitedLimitedKeepsUsageAndPeriodChangeCreatesScope(t *testing
 		t.Fatalf("effective state = %+v, %v", state, err)
 	}
 	states, err := f.service.UserStates(ctx, f.userID)
-	if err != nil || len(states) != 4 {
+	if err != nil || len(states) != 5 {
 		t.Fatalf("all capability states = %+v, %v", states, err)
 	}
 	for _, other := range states {

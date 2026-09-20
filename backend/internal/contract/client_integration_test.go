@@ -111,11 +111,12 @@ func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
 	read("runtime-examples.json", &examples)
 	resources := map[string]string{}
 	resources[snapshot.Models[0].ModelId] = snapshot.Models[0].RuntimePath
+	resources[(*snapshot.ImageGenerators)[0].ImageId] = (*snapshot.ImageGenerators)[0].RuntimePath
 	resources[snapshot.Tts[0].TtsId] = snapshot.Tts[0].RuntimePath
 	resources[snapshot.Asr[0].AsrId] = snapshot.Asr[0].RuntimePath
 	resources[asrSnapshot.Asr[1].AsrId] = asrSnapshot.Asr[1].RuntimePath
 	resources[snapshot.Mcp[0].McpServerId] = snapshot.Mcp[0].RuntimePath
-	if len(examples) != 5 {
+	if len(examples) != 6 {
 		t.Fatal("missing Runtime profile")
 	}
 	for _, example := range examples {
@@ -132,6 +133,9 @@ func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
 		}
 		if example.ResourceID == snapshot.Models[0].ModelId && example.Body["model"] != snapshot.Models[0].UpstreamModelKey {
 			t.Fatal("wire ID used as model key")
+		}
+		if example.ResourceID == (*snapshot.ImageGenerators)[0].ImageId && example.Body["model"] != (*snapshot.ImageGenerators)[0].UpstreamModelKey {
+			t.Fatal("image wire ID used as upstream model key")
 		}
 		delete(resources, example.ResourceID)
 	}

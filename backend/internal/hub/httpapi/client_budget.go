@@ -72,6 +72,12 @@ func clientBudgetView(userID, timezone string, states []budget.EffectiveState, u
 			effectiveFrom = *state.Budget.ActivatedAt
 		}
 		status := clientapi.BudgetStatus("AVAILABLE")
+		source := clientapi.BudgetSource(state.Budget.Source)
+		if state.Budget.Source == budget.SourceTemplate {
+			// Template identity and revision are Admin-only. Client and Portal
+			// receive the same generic configured/default source contract.
+			source = clientapi.EXPLICIT
+		}
 		switch state.Status {
 		case budget.StatusExhausted:
 			status = "EXHAUSTED"
@@ -80,7 +86,7 @@ func clientBudgetView(userID, timezone string, states []budget.EffectiveState, u
 		}
 		items = append(items, clientapi.BudgetCapabilityView{
 			Capability: clientapi.BudgetCapability(state.Budget.Capability), Mode: clientapi.BudgetMode(state.Budget.Mode),
-			Source: clientapi.BudgetSource(state.Budget.Source), Revision: int(state.Budget.Revision), Status: status,
+			Source: source, Revision: int(state.Budget.Revision), Status: status,
 			EffectiveFrom: effectiveFrom, AsOf: state.AsOf, InFlightRequests: int(state.InFlightRequests), Limits: clientLimitStates(state),
 			UsageMeters: clientMeterQuantities(usageMeters[state.Budget.Capability]),
 		})

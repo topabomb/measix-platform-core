@@ -14,6 +14,9 @@ import (
 	"measix/platform/ent/budgetreconciliation"
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/budgetsettlement"
+	"measix/platform/ent/budgettemplate"
+	"measix/platform/ent/budgettemplateassignment"
+	"measix/platform/ent/budgettemplateaudit"
 	"measix/platform/ent/deletedcredential"
 	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/deployment"
@@ -104,38 +107,41 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			activation.Table:             activation.ValidColumn,
-			budgetallocation.Table:       budgetallocation.ValidColumn,
-			budgetaudit.Table:            budgetaudit.ValidColumn,
-			budgetbucket.Table:           budgetbucket.ValidColumn,
-			budgetlimit.Table:            budgetlimit.ValidColumn,
-			budgetreconciliation.Table:   budgetreconciliation.ValidColumn,
-			budgetrequest.Table:          budgetrequest.ValidColumn,
-			budgetsettlement.Table:       budgetsettlement.ValidColumn,
-			deletedcredential.Table:      deletedcredential.ValidColumn,
-			deletedprincipal.Table:       deletedprincipal.ValidColumn,
-			deployment.Table:             deployment.ValidColumn,
-			deploymentsettingaudit.Table: deploymentsettingaudit.ValidColumn,
-			device.Table:                 device.ValidColumn,
-			enrollment.Table:             enrollment.ValidColumn,
-			enterpriseupdate.Table:       enterpriseupdate.ValidColumn,
-			idempotencyrecord.Table:      idempotencyrecord.ValidColumn,
-			manageddraft.Table:           manageddraft.ValidColumn,
-			managedrelease.Table:         managedrelease.ValidColumn,
-			managedstate.Table:           managedstate.ValidColumn,
-			portalsession.Table:          portalsession.ValidColumn,
-			pricingrule.Table:            pricingrule.ValidColumn,
-			requestusage.Table:           requestusage.ValidColumn,
-			secret.Table:                 secret.ValidColumn,
-			secretversion.Table:          secretversion.ValidColumn,
-			semanticusage.Table:          semanticusage.ValidColumn,
-			session.Table:                session.ValidColumn,
-			upstream.Table:               upstream.ValidColumn,
-			upstreamconfigrevision.Table: upstreamconfigrevision.ValidColumn,
-			usagedetail.Table:            usagedetail.ValidColumn,
-			usageevent.Table:             usageevent.ValidColumn,
-			user.Table:                   user.ValidColumn,
-			userbudget.Table:             userbudget.ValidColumn,
+			activation.Table:               activation.ValidColumn,
+			budgetallocation.Table:         budgetallocation.ValidColumn,
+			budgetaudit.Table:              budgetaudit.ValidColumn,
+			budgetbucket.Table:             budgetbucket.ValidColumn,
+			budgetlimit.Table:              budgetlimit.ValidColumn,
+			budgetreconciliation.Table:     budgetreconciliation.ValidColumn,
+			budgetrequest.Table:            budgetrequest.ValidColumn,
+			budgetsettlement.Table:         budgetsettlement.ValidColumn,
+			budgettemplate.Table:           budgettemplate.ValidColumn,
+			budgettemplateassignment.Table: budgettemplateassignment.ValidColumn,
+			budgettemplateaudit.Table:      budgettemplateaudit.ValidColumn,
+			deletedcredential.Table:        deletedcredential.ValidColumn,
+			deletedprincipal.Table:         deletedprincipal.ValidColumn,
+			deployment.Table:               deployment.ValidColumn,
+			deploymentsettingaudit.Table:   deploymentsettingaudit.ValidColumn,
+			device.Table:                   device.ValidColumn,
+			enrollment.Table:               enrollment.ValidColumn,
+			enterpriseupdate.Table:         enterpriseupdate.ValidColumn,
+			idempotencyrecord.Table:        idempotencyrecord.ValidColumn,
+			manageddraft.Table:             manageddraft.ValidColumn,
+			managedrelease.Table:           managedrelease.ValidColumn,
+			managedstate.Table:             managedstate.ValidColumn,
+			portalsession.Table:            portalsession.ValidColumn,
+			pricingrule.Table:              pricingrule.ValidColumn,
+			requestusage.Table:             requestusage.ValidColumn,
+			secret.Table:                   secret.ValidColumn,
+			secretversion.Table:            secretversion.ValidColumn,
+			semanticusage.Table:            semanticusage.ValidColumn,
+			session.Table:                  session.ValidColumn,
+			upstream.Table:                 upstream.ValidColumn,
+			upstreamconfigrevision.Table:   upstreamconfigrevision.ValidColumn,
+			usagedetail.Table:              usagedetail.ValidColumn,
+			usageevent.Table:               usageevent.ValidColumn,
+			user.Table:                     user.ValidColumn,
+			userbudget.Table:               userbudget.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

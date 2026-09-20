@@ -52,15 +52,16 @@ func TestAdminUsageResourceKindFilterIsFrozenEnum(t *testing.T) {
 	}
 	values := enumStringValues(t, kindParam.Value.Schema.Value.Enum)
 	want := map[string]bool{
-		"PROVIDER": true,
-		"MODEL":    true,
-		"TTS":      true,
-		"ASR":      true,
-		"MCP":      true,
+		"PROVIDER":         true,
+		"MODEL":            true,
+		"IMAGE_GENERATION": true,
+		"TTS":              true,
+		"ASR":              true,
+		"MCP":              true,
 	}
 	for _, v := range values {
 		if !want[v] {
-			t.Fatalf("unexpected resourceKind %q, allowed: PROVIDER/MODEL/TTS/ASR/MCP", v)
+			t.Fatalf("unexpected resourceKind %q, allowed: PROVIDER/MODEL/IMAGE_GENERATION/TTS/ASR/MCP", v)
 		}
 	}
 }

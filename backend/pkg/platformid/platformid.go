@@ -10,42 +10,44 @@ import (
 type Kind string
 
 const (
-	Deployment   Kind = "dep"
-	User         Kind = "usr"
-	Device       Kind = "dev"
-	Enrollment   Kind = "enr"
-	Session      Kind = "ses"
-	Installation Kind = "ins"
-	Provider     Kind = "prv"
-	Model        Kind = "mdl"
-	TTS          Kind = "tts"
-	ASR          Kind = "asr"
-	MCP          Kind = "mcp"
-	Policy       Kind = "pol"
-	Draft        Kind = "drf"
-	Release      Kind = "rel"
-	Upstream     Kind = "ups"
-	Secret       Kind = "sec"
-	Route        Kind = "rte"
-	Activation   Kind = "act"
-	Request      Kind = "req"
-	Interaction  Kind = "int"
-	Idempotency  Kind = "idem"
-	UsageEvent   Kind = "usg"
-	PricingRule  Kind = "prc"
-	Assistant    Kind = "asd"
-	Starter      Kind = "str"
-	EntUpdate    Kind = "eup"
+	Deployment      Kind = "dep"
+	User            Kind = "usr"
+	Device          Kind = "dev"
+	Enrollment      Kind = "enr"
+	Session         Kind = "ses"
+	Installation    Kind = "ins"
+	Provider        Kind = "prv"
+	Model           Kind = "mdl"
+	ImageGeneration Kind = "img"
+	TTS             Kind = "tts"
+	ASR             Kind = "asr"
+	MCP             Kind = "mcp"
+	Policy          Kind = "pol"
+	Draft           Kind = "drf"
+	Release         Kind = "rel"
+	Upstream        Kind = "ups"
+	Secret          Kind = "sec"
+	Route           Kind = "rte"
+	Activation      Kind = "act"
+	Request         Kind = "req"
+	Interaction     Kind = "int"
+	Idempotency     Kind = "idem"
+	UsageEvent      Kind = "usg"
+	PricingRule     Kind = "prc"
+	Assistant       Kind = "asd"
+	Starter         Kind = "str"
+	EntUpdate       Kind = "eup"
+	BudgetTemplate  Kind = "bgt"
 )
 
 var ErrInvalid = errors.New("invalid platform id")
 
 var known = map[Kind]struct{}{
 	Deployment: {}, User: {}, Device: {}, Enrollment: {}, Session: {}, Installation: {},
-	Provider: {}, Model: {}, TTS: {}, ASR: {}, MCP: {}, Policy: {}, Draft: {}, Release: {},
+	Provider: {}, Model: {}, ImageGeneration: {}, TTS: {}, ASR: {}, MCP: {}, Policy: {}, Draft: {}, Release: {},
 	Upstream: {}, Secret: {}, Route: {}, Activation: {}, Request: {}, Interaction: {},
 	Idempotency: {}, UsageEvent: {}, PricingRule: {},
-	Assistant: {}, Starter: {}, EntUpdate: {},
+	Assistant: {}, Starter: {}, EntUpdate: {}, BudgetTemplate: {},
 }
 
 func New(kind Kind) string {

@@ -17,7 +17,7 @@ func (BudgetBucket) Fields() []ent.Field {
 		field.Enum("period").Values("DAY", "WEEK", "MONTH", "LIFETIME"),
 		field.Time("period_start"),
 		field.Time("period_end").Optional().Nillable(),
-		field.Enum("meter").Values("REQUESTS", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"),
+		field.Enum("meter").Values("REQUESTS", "REQUESTED_IMAGES", "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_MILLISECONDS"),
 		field.Int64("settled_quantity").Default(0).NonNegative(),
 		field.Int64("reserved_quantity").Default(0).NonNegative(),
 		field.Time("updated_at"),

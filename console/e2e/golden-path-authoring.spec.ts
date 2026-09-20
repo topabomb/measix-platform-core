@@ -11,21 +11,23 @@ test('ERX-UPD-001/002 Admin update authoring, safe preview, publish and withdraw
     if (request.url().includes('untrusted-embed.png')) embeddedRequests.push(request.url())
   })
   await updates.getByRole('button', { name: 'Create', exact: true }).click()
-  const dialog = page.locator('.q-dialog')
-  await dialog.getByLabel('Title', { exact: true }).fill(title)
-  await dialog.getByLabel('Content', { exact: true }).fill('**safe** <b>raw</b>\n\n![blocked](/untrusted-embed.png)')
-  await dialog.getByLabel('Format', { exact: true }).click()
+  let editor = updates.locator('[data-cy="enterprise-update-editor"]')
+  await editor.getByLabel('Title', { exact: true }).fill(title)
+  await editor.getByLabel('Content', { exact: true }).fill('**safe** <b>raw</b>\n\n![blocked](/untrusted-embed.png)')
+  await editor.getByLabel('Format', { exact: true }).click()
   await page.getByRole('option', { name: 'Formatted text (Markdown)', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+  await editor.getByRole('button', { name: 'Create', exact: true }).click()
   let row = updates.locator('.q-list > .q-item').filter({ hasText: title })
   await expect(row).toContainText('Draft')
   await row.click()
-  await expect(dialog.locator('.markdown-body strong')).toHaveText('safe')
-  await expect(dialog.locator('.markdown-body')).toContainText('<b>raw</b>')
-  await expect(dialog.locator('.markdown-body img, .markdown-body b')).toHaveCount(0)
-  await dialog.getByRole('button', { name: 'Edit', exact: true }).click()
-  await dialog.getByLabel('Title', { exact: true }).fill(editedTitle)
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  const detail = updates.locator('[data-cy="enterprise-update-detail"]')
+  await expect(detail.locator('.markdown-body strong')).toHaveText('safe')
+  await expect(detail.locator('.markdown-body')).toContainText('<b>raw</b>')
+  await expect(detail.locator('.markdown-body img, .markdown-body b')).toHaveCount(0)
+  await detail.getByRole('button', { name: 'Edit', exact: true }).click()
+  editor = updates.locator('[data-cy="enterprise-update-editor"]')
+  await editor.getByLabel('Title', { exact: true }).fill(editedTitle)
+  await editor.getByRole('button', { name: 'Save', exact: true }).click()
   row = updates.locator('.q-list > .q-item').filter({ hasText: editedTitle })
   await expect(row).toContainText('Draft')
   page.once('dialog', prompt => prompt.accept())
@@ -46,11 +48,11 @@ test('ERX-UPD-001/002 Admin update authoring, safe preview, publish and withdraw
  *   login → user/enrollment → secret → upstream test/apply →
  *   Provider/Model/TTS/ASR/MCP/Policy/Pricing → Validate → Review → Publish.
  *
- * It must run BEFORE the four-capability runtime traffic is generated,
+ * It must run BEFORE the five-capability runtime traffic is generated,
  * and BEFORE the usage/system verification phase (golden-path-usage.spec.ts).
  *
  * Per audit P0-2: Browser tests are split into authoring/publish and
- * usage/system phases; the four-capability traffic runs between them.
+ * usage/system phases; the five-capability traffic runs between them.
  */
 
 const ADMIN_PASSWORD = process.env.MEASIX_E2E_ADMIN_PASSWORD || 'admin'
@@ -73,20 +75,53 @@ async function selectOption(page: Page, selectCy: string, optionMatcher: string 
   await expect(select).toBeVisible({ timeout: 5_000 })
   await select.click()
   await page.waitForTimeout(300)
-  const popup = page.locator('.q-popup, .q-menu').first()
-  await expect(popup).toBeVisible({ timeout: 5_000 })
-  await popup.locator(`text=${optionMatcher}`).first().click()
+  const entityPicker = page.locator('[data-cy="entity-picker-dialog"]')
+  if (await entityPicker.isVisible()) {
+    await entityPicker.locator('[data-cy="entity-picker-option"]').filter({ hasText: optionMatcher }).first().click()
+  } else {
+    const popup = page.locator('.q-menu').first()
+    await expect(popup).toBeVisible({ timeout: 5_000 })
+    await popup.getByText(optionMatcher, { exact: typeof optionMatcher === 'string' }).first().click()
+  }
   await page.waitForTimeout(200)
 }
 
 test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page }: { page: Page }) => {
   const goldenUsername = `e2e-golden-${Date.now()}`
+  const budgetTemplateName = `E2E image template ${Date.now()}`
+  const fallbackTemplateName = `E2E fallback template ${Date.now()}`
   // ========================================================================
   // Phase 1: Login as admin
   // ========================================================================
   await test.step('login as admin → Overview loads', async () => {
     await login(page)
     await expect(page.locator('[data-cy="overview-page"]')).toBeVisible()
+  })
+
+  await test.step('create a reusable image-generation budget template', async () => {
+    await page.goto('/admin/budget-templates')
+    await page.getByRole('button', { name: 'Create template', exact: true }).click()
+    await page.getByLabel('Template name', { exact: true }).fill(budgetTemplateName)
+    await page.getByLabel('Description', { exact: true }).fill('Live-linked browser verification template')
+
+    const imageRule = page.locator('[data-cy="template-rule-IMAGE_GENERATION"]')
+    await imageRule.getByText('Template rule', { exact: true }).click()
+    await imageRule.getByRole('button', { name: 'Limited', exact: true }).click()
+    await imageRule.getByLabel('Meter', { exact: true }).click()
+    await page.getByRole('option', { name: 'Requested images', exact: true }).click()
+    await imageRule.getByLabel('Limit', { exact: true }).fill('9')
+    await page.getByLabel('Reason for change', { exact: true }).fill('Create browser verification template')
+    await page.getByRole('button', { name: 'Save', exact: true }).last().click()
+    await page.locator('[data-cy="confirm-budget-template-save"]').click()
+    await expect(page.locator('[data-cy="budget-template-row"]').filter({ hasText: budgetTemplateName })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Create template', exact: true }).click()
+    await page.getByLabel('Template name', { exact: true }).fill(fallbackTemplateName)
+    await page.getByLabel('Description', { exact: true }).fill('Template with deployment-default fallthrough')
+    await page.getByLabel('Reason for change', { exact: true }).fill('Create replacement verification template')
+    await page.getByRole('button', { name: 'Save', exact: true }).last().click()
+    await page.locator('[data-cy="confirm-budget-template-save"]').click()
+    await expect(page.locator('[data-cy="budget-template-row"]').filter({ hasText: fallbackTemplateName })).toBeVisible()
   })
 
   // ========================================================================
@@ -106,10 +141,75 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await expect(page.locator('[data-cy="user-row"]')).toHaveCount(initialCount + 1)
 
     await page.locator('[data-cy="user-row"]').filter({ hasText: goldenUsername }).click()
+    await page.getByRole('tab', { name: 'Usage budgets', exact: true }).click()
+
+    const templateAssignment = page.locator('[data-cy="budget-template-assignment"]')
+    await templateAssignment.locator('[data-cy="entity-picker-trigger"]').click()
+    await page.locator('[data-cy="entity-picker-option"]').filter({ hasText: budgetTemplateName }).click()
+    await templateAssignment.getByLabel('Reason for change', { exact: true }).fill('Assign browser verification template')
+    await templateAssignment.getByRole('button', { name: 'Assign / replace', exact: true }).click()
+    await page.locator('[data-cy="confirm-budget-template-assignment"]').click()
+
+    const imageBudget = page.locator('[data-cy="budget-IMAGE_GENERATION"]')
+    await expect(imageBudget).toContainText('Budget template')
+    await expect(imageBudget).toContainText('9')
+
+    await templateAssignment.locator('[data-cy="entity-picker-trigger"]').click()
+    await page.locator('[data-cy="entity-picker-option"]').filter({ hasText: fallbackTemplateName }).click()
+    await templateAssignment.getByLabel('Reason for change', { exact: true }).fill('Replace browser verification template')
+    await templateAssignment.getByRole('button', { name: 'Assign / replace', exact: true }).click()
+    await page.locator('[data-cy="confirm-budget-template-assignment"]').click()
+    await expect(imageBudget).toContainText('Deployment default')
+
+    await templateAssignment.locator('[data-cy="entity-picker-trigger"]').click()
+    await page.locator('[data-cy="entity-picker-option"]').filter({ hasText: budgetTemplateName }).click()
+    await templateAssignment.getByLabel('Reason for change', { exact: true }).fill('Restore image template before unassign')
+    await templateAssignment.getByRole('button', { name: 'Assign / replace', exact: true }).click()
+    await page.locator('[data-cy="confirm-budget-template-assignment"]').click()
+    await expect(imageBudget).toContainText('Budget template')
+
+    await templateAssignment.getByLabel('Reason for change', { exact: true }).fill('Verify template unassignment')
+    await templateAssignment.getByRole('button', { name: 'Unassign', exact: true }).click()
+    await page.locator('[data-cy="confirm-budget-template-assignment"]').click()
+    await expect(imageBudget).toContainText('Deployment default')
+
+    await templateAssignment.locator('[data-cy="entity-picker-trigger"]').click()
+    await page.locator('[data-cy="entity-picker-option"]').filter({ hasText: budgetTemplateName }).click()
+    await templateAssignment.getByLabel('Reason for change', { exact: true }).fill('Restore image template for propagation check')
+    await templateAssignment.getByRole('button', { name: 'Assign / replace', exact: true }).click()
+    await page.locator('[data-cy="confirm-budget-template-assignment"]').click()
+    await expect(imageBudget).toContainText('Budget template')
+
+    await page.goto('/admin/budget-templates')
+    await page.locator('[data-cy="budget-template-row"]').filter({ hasText: budgetTemplateName }).click()
+    await page.getByLabel('Reason for change', { exact: true }).fill('Delete must remain blocked while assigned')
+    await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled()
+    await expect(page.getByText(/Remove assignments before deleting/i)).toBeVisible()
+    const imageTemplateRule = page.locator('[data-cy="template-rule-IMAGE_GENERATION"]')
+    await imageTemplateRule.getByLabel('Limit', { exact: true }).fill('12')
+    await page.getByLabel('Reason for change', { exact: true }).fill('Verify live-linked propagation')
+    await page.getByRole('button', { name: 'Save', exact: true }).last().click()
+    await page.locator('[data-cy="confirm-budget-template-save"]').click()
+
+    await page.goto('/admin/users')
+    await page.locator('[data-cy="user-row"]').filter({ hasText: goldenUsername }).click()
+    await page.getByRole('tab', { name: 'Usage budgets', exact: true }).click()
+    await expect(imageBudget).toContainText('Budget template')
+    await expect(imageBudget).toContainText('12')
+    await imageBudget.getByRole('button', { name: 'Edit budget' }).click()
+    await imageBudget.getByRole('button', { name: 'Limited', exact: true }).click()
+    await imageBudget.getByLabel('Limit', { exact: true }).fill('3')
+    await imageBudget.getByLabel('Reason for change').fill('Verify image capability override')
+    await imageBudget.locator('[data-cy="save-budget"]').click()
+    await expect(imageBudget).toContainText('User override')
+    await imageBudget.locator('[data-cy="clear-budget-override-IMAGE_GENERATION"]').click()
+    await expect(imageBudget).toContainText('Budget template')
+    await expect(imageBudget).toContainText('12')
 
     const modelBudget = page.locator('[data-cy="budget-MODEL"]')
     await expect(modelBudget).toBeVisible({ timeout: 10_000 })
-    await expect(page.locator('.budget-card[data-cy^="budget-"]')).toHaveCount(4)
+    await expect(page.locator('.budget-card[data-cy^="budget-"]')).toHaveCount(5)
+    await expect(page.locator('[data-cy="budget-IMAGE_GENERATION"]')).toBeVisible()
     await expect(modelBudget).toContainText('Deployment default')
     await modelBudget.getByRole('button', { name: 'Edit budget' }).click()
     await modelBudget.getByRole('button', { name: 'Limited', exact: true }).click()
@@ -144,6 +244,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
 
     await page.keyboard.press('Escape')
 
+    await page.getByRole('button', { name: /Actions/ }).click()
     await page.locator('[data-cy="delete-user-btn"]').click()
     const deleteConfirm = page.locator('[data-cy="confirm-delete-user"]')
     await expect(deleteConfirm).toBeDisabled()
@@ -161,6 +262,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.click('[data-cy="user-form-submit"]')
     await expect(page.locator('[data-cy="user-row"]')).toHaveCount(initialCount + 1)
     await page.locator('[data-cy="user-row"]').filter({ hasText: goldenUsername }).click()
+    await page.getByRole('tab', { name: 'Usage budgets', exact: true }).click()
 
     const freshModelBudget = page.locator('[data-cy="budget-MODEL"]')
     await expect(freshModelBudget).toBeVisible({ timeout: 10_000 })
@@ -174,6 +276,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     expect(freshEnrollmentCode).not.toBe(retiredEnrollmentCode)
     await page.keyboard.press('Escape')
 
+    await page.getByRole('button', { name: /Actions/ }).click()
     await page.locator('[data-cy="delete-user-btn"]').click()
     await page.locator('[data-cy="delete-user-confirmation"]').fill(goldenUsername)
     await page.locator('[data-cy="delete-user-reason"]').fill('Remove recreated browser verification user')
@@ -233,9 +336,9 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
   })
 
   // ========================================================================
-  // Phase 4: Create Provider + Model + TTS + ASR + MCP + Policy + Pricing
+  // Phase 4: Create Provider + Model + Image Generation + TTS + ASR + MCP + Policy + Pricing
   // ========================================================================
-  await test.step('create resources: Provider, Model, TTS, ASR, MCP, Policy, Pricing', async () => {
+  await test.step('create resources: Provider, Model, Image Generation, TTS, ASR, MCP, Policy, Pricing', async () => {
     await page.goto('/admin/resources')
     await expect(page.locator('[data-cy="resources-page"]')).toBeVisible()
     await expect(page.locator('[data-cy="config-section-models"]')).toBeVisible({ timeout: 10_000 })
@@ -260,7 +363,18 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await selectOption(page, 'model-upstream-select', /e2e-upstream/)
     await page.fill('[data-cy="model-runtime-path"]', '/v1/chat/completions')
 
-    // --- 4c: Create a TTS ---
+    // --- 4c: Create an Image Generation resource ---
+    await page.click('[data-cy="config-section-image-generation"]')
+    await page.waitForTimeout(500)
+    await page.click('[data-cy="add-image-generation-btn"]')
+    await page.waitForTimeout(500)
+    await page.fill('[data-cy="image-generation-display-name"]', 'E2E Image Generation')
+    await page.fill('[data-cy="image-generation-model-key"]', 'image-1')
+    await page.fill('[data-cy="image-generation-max-images"]', '4')
+    await selectOption(page, 'image-generation-upstream-select', /e2e-upstream/)
+    await page.fill('[data-cy="image-generation-runtime-path"]', '/v1/images/generations')
+
+    // --- 4d: Create a TTS ---
     await page.click('[data-cy="config-section-tts"]')
     await page.waitForTimeout(500)
     await page.click('[data-cy="add-tts-btn"]')
@@ -271,7 +385,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await selectOption(page, 'tts-upstream-select', /e2e-upstream/)
     await page.fill('[data-cy="tts-runtime-path"]', '/v1/audio/speech')
 
-    // --- 4d: Create an ASR ---
+    // --- 4e: Create an ASR ---
     await page.click('[data-cy="config-section-asr"]')
     await page.waitForTimeout(500)
     await page.click('[data-cy="add-asr-btn"]')
@@ -281,7 +395,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await selectOption(page, 'asr-upstream-select', /e2e-upstream/)
     await page.fill('[data-cy="asr-runtime-path"]', '/v1/audio/transcriptions')
 
-    // --- 4e: Create an MCP ---
+    // --- 4f: Create an MCP ---
     await page.click('[data-cy="config-section-mcp"]')
     await page.waitForTimeout(500)
     await page.click('[data-cy="add-mcp-btn"]')
@@ -290,7 +404,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await selectOption(page, 'mcp-upstream-select', /e2e-upstream/)
     await page.fill('[data-cy="mcp-runtime-path"]', '/mcp')
 
-    // --- 4f: Configure Policy ---
+    // --- 4g: Configure Policy ---
     await page.click('[data-cy="config-section-policy"]')
     await page.waitForTimeout(500)
 
@@ -308,6 +422,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
       await page.waitForTimeout(300)
       await expect(toggle).toHaveAttribute('aria-checked', 'true')
     }
+    await selectOption(page, 'policy-default-image-generation', 'E2E Image Generation')
 
     // S0.2 typed experience authoring shares this same Draft and Publish.
     await page.click('[data-cy="config-section-assistants"]')
@@ -333,7 +448,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await saveBtn.click()
     await expect(page.locator('.q-badge').filter({ hasText: /dirty/i })).not.toBeVisible({ timeout: 10_000 })
 
-    // --- 4g: Configure Pricing ---
+    // --- 4h: Configure Pricing ---
     await page.goto('/admin/usage')
     await expect(page.locator('[data-cy="usage-page"]')).toBeVisible({ timeout: 10_000 })
 
@@ -396,27 +511,30 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     expect(previewResponse.status()).toBe(200)
     const projection = await previewResponse.json()
     expect(projection.assistants).toHaveLength(1)
+    expect(projection.imageGenerators).toHaveLength(1)
+    expect(projection.imageGenerators[0]).toMatchObject({ displayName: 'E2E Image Generation', upstreamModelKey: 'image-1', maxImagesPerRequest: 4 })
+    expect(projection.policy.defaultImageGenerationId).toBe(projection.imageGenerators[0].imageId)
     expect(projection.assistants[0].memorySeed).toEqual(['z authored first', 'a authored second'])
     expect(projection.starters).toHaveLength(1)
     expect(projection.starters[0].assistantDefinitionId).toBe(projection.assistants[0].assistantDefinitionId)
 
-    const previewDialog = page.locator('.q-dialog')
-    await expect(previewDialog).toBeVisible()
-    await previewDialog.locator('details summary').first().click()
-    await expect(previewDialog.locator('text=/projection hash|Projection Hash|hash/i')).toBeVisible({ timeout: 10_000 })
-    await expect(previewDialog.locator('text=Providers').first()).toBeVisible()
-    await expect(previewDialog.locator('text=Models').first()).toBeVisible()
-    await expect(previewDialog.locator('text=TTS').first()).toBeVisible()
-    await expect(previewDialog.locator('text=ASR').first()).toBeVisible()
-    await expect(previewDialog.locator('text=MCP').first()).toBeVisible()
+    const previewSurface = page.locator('[data-cy="snapshot-preview-surface"]')
+    await expect(previewSurface).toBeVisible()
+    await expect(previewSurface.getByText(/Hash:/i)).toBeVisible({ timeout: 10_000 })
+    await expect(previewSurface.getByText(/Providers \(1\)/)).toBeVisible()
+    await expect(previewSurface.getByText(/Models \(1\)/)).toBeVisible()
+    await expect(previewSurface.getByText(/Image Generation \(1\)/)).toBeVisible()
+    await expect(previewSurface.getByText(/TTS \(1\)/)).toBeVisible()
+    await expect(previewSurface.getByText(/ASR \(1\)/)).toBeVisible()
+    await expect(previewSurface.getByText(/MCP \(1\)/)).toBeVisible()
 
     // Verify no server-only data leaks
-    const previewContent = await page.locator('.q-dialog').textContent()
+    const previewContent = await previewSurface.textContent()
     expect(previewContent).not.toMatch(/http:\/\/\S+/)
     expect(previewContent).not.toMatch(/sec_[a-f0-9-]+/i)
     expect(previewContent).not.toMatch(/ups_[a-f0-9-]+/i)
 
-    await page.keyboard.press('Escape')
+    await previewSurface.getByRole('button', { name: 'Close', exact: true }).click()
     await page.waitForTimeout(500)
   })
 
@@ -452,7 +570,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
 
     // Click Review
     await page.click('[data-cy="draft-review-btn"]')
-    await expect(page.locator('.q-dialog').getByText('Review & Publish', { exact: true })).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('[data-cy="publish-review-surface"]')).toBeVisible({ timeout: 10_000 })
 
     // Accept publish confirm dialog
     page.once('dialog', dialog => {

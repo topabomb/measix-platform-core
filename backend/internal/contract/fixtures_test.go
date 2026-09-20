@@ -55,6 +55,7 @@ func TestSYSI0001CanonicalFixturesDecodeWithGeneratedWire(t *testing.T) {
 	_ = decodeFixture[clientapi.Problem](t, "problem/managed-snapshot-required.json", true)
 	_ = decodeFixture[adminapi.Problem](t, "problem/stale-draft-revision.json", true)
 	_ = decodeFixture[usageingestapi.UsageSettlementBatch](t, "usage/request-batch.json", true)
+	_ = decodeFixture[adminapi.BudgetTemplate](t, "budget/template.json", true)
 
 	// C0 canonical full-profile snapshot fixtures must decode with strict wire types.
 	_ = decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
@@ -144,6 +145,12 @@ func TestSnapshotV4PolicyGoldenHash(t *testing.T) {
 	if snapshot.SchemaVersion != 4 || !snapshot.Policy.AllowLocalAssistants {
 		t.Fatal("v4 fixture must carry explicit assistant permission")
 	}
+	if snapshot.ImageGenerators == nil || len(*snapshot.ImageGenerators) != 0 {
+		t.Fatalf("policy-only fixture imageGenerators = %#v, want explicit empty list", snapshot.ImageGenerators)
+	}
+	if snapshot.Policy.DefaultModelId != nil || snapshot.Policy.DefaultImageGenerationId != nil || snapshot.Policy.DefaultTtsId != nil || snapshot.Policy.DefaultAsrId != nil || snapshot.Policy.DefaultAssistantId != nil {
+		t.Fatalf("unset defaults must remain unset without first-item fallback: %+v", snapshot.Policy)
+	}
 	hash, err := capability.HashSnapshot(snapshot)
 	if err != nil {
 		t.Fatal(err)
@@ -178,8 +185,11 @@ func TestERXC0002CurrentSnapshotContainsResourceAndExperienceProfile(t *testing.
 		t.Fatal("current snapshot must contain at least one starter")
 	}
 	// Required runtime resource fields must be present
-	if len(snapshot.Providers) == 0 || len(snapshot.Models) == 0 || len(snapshot.Mcp) == 0 {
-		t.Fatal("current snapshot must contain providers/models/mcp")
+	if len(snapshot.Providers) == 0 || len(snapshot.Models) == 0 || snapshot.ImageGenerators == nil || len(*snapshot.ImageGenerators) == 0 || len(snapshot.Mcp) == 0 {
+		t.Fatal("current snapshot must contain providers/models/imageGenerators/mcp")
+	}
+	if snapshot.Policy.DefaultImageGenerationId == nil || *snapshot.Policy.DefaultImageGenerationId != "img_ffffffff-ffff-4fff-8fff-ffffffffffff" {
+		t.Fatal("current snapshot must preserve the explicit image generation default")
 	}
 	// Golden hash must match
 	hash, err := capability.HashSnapshot(snapshot)
@@ -345,18 +355,19 @@ func TestERXUPDC0AdminEnterpriseUpdateFixturesValidEnums(t *testing.T) {
 	}
 }
 
-func TestCAPC0007SnapshotUnknownOptionalFieldTolerated(t *testing.T) {
-	// CAP-C0-007: consumer test ignores unknown optional response field in Snapshot.
-	// The fixture contains a "futureOptionalField" in a model that the consumer must tolerate.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "snapshot/unknown-optional-field.json", false)
-	if snapshot.SchemaVersion != 4 {
-		t.Fatalf("expected schemaVersion=4, got %d", snapshot.SchemaVersion)
+func TestCAPC0007TypedSnapshotUnknownFieldRejected(t *testing.T) {
+	// CAP-C0-007: extensible HTTP responses may ignore unknown optional fields, but
+	// the typed Snapshot remains closed and fail-closed.
+	file, err := os.Open(filepath.Join(fixtureRoot(t), "snapshot/unknown-optional-field.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if len(snapshot.Models) != 1 {
-		t.Fatalf("expected 1 model, got %d", len(snapshot.Models))
-	}
-	if snapshot.Models[0].ModelId != "mdl_test-model" {
-		t.Fatalf("expected modelId mdl_test-model, got %s", snapshot.Models[0].ModelId)
+	defer file.Close()
+	var snapshot clientapi.ManagedSnapshot
+	decoder := json.NewDecoder(io.LimitReader(file, 2<<20))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&snapshot); err == nil {
+		t.Fatal("typed Snapshot unknown field unexpectedly accepted")
 	}
 }
 

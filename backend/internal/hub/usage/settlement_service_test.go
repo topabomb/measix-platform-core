@@ -88,7 +88,7 @@ func TestSettlementLedgerIsAtomicIdempotentAndConvertsAudioOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(users.Items) != 1 || users.Items[0].UserID != userID || len(users.Items[0].Budget) != 4 ||
+	if len(users.Items) != 1 || users.Items[0].UserID != userID || len(users.Items[0].Budget) != 5 ||
 		len(users.Items[0].Meters) != 2 || users.Items[0].Meters[0].Meter != "AUDIO_SECONDS" || users.Items[0].Meters[0].Quantity != "0.334" {
 		t.Fatalf("batched user projection = %+v", users)
 	}

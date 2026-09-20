@@ -1,0 +1,31 @@
+package protocolusage
+
+import "testing"
+
+func TestImageGenerationDefaultsToOneRequestedImageWithoutReadingPromptContent(t *testing.T) {
+	result, err := ObserveImageGenerationRequest([]byte(`{"model":"provider-model","prompt":"opaque text","size":"auto"}`), 6, []string{"auto", "1024x1024"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCounts(t, result, map[Meter]int64{Requests: 1, RequestedImages: 1}, Exact)
+}
+
+func TestImageGenerationRejectsNonIntegerCount(t *testing.T) {
+	if _, err := ObserveImageGenerationRequest([]byte(`{"model":"provider-model","prompt":"text","n":1.5,"size":"1024x1024"}`), 6, []string{"1024x1024"}); err == nil {
+		t.Fatal("fractional n was accepted")
+	}
+}
+
+func TestImageGenerationRejectsDuplicateObservedField(t *testing.T) {
+	if _, err := ObserveImageGenerationRequest([]byte(`{"model":"provider-model","prompt":"text","n":6,"n":1,"size":"1024x1024"}`), 6, []string{"1024x1024"}); err == nil {
+		t.Fatal("duplicate n was accepted")
+	}
+}
+
+func TestImageGenerationDoesNotInterpretProviderModelOrPrompt(t *testing.T) {
+	result, err := ObserveImageGenerationRequest([]byte(`{"prompt":"","size":"auto"}`), 6, []string{"auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCounts(t, result, map[Meter]int64{Requests: 1, RequestedImages: 1}, Exact)
+}

@@ -45,7 +45,9 @@ If an exact schema choice can change client interpretation, resolve architecture
 
 ## 3. Versioned contract state
 
-Only the current unpublished Snapshot v4 is supported. All five policy flags are required booleans. Old snapshots, policy adoption and incremental database migrations are removed; obsolete development data/configuration can be deleted and recreated. Shared Android materials, mappings and HTTP/runtime examples are maintained in [android-platform-integration.md](android-platform-integration.md).
+Only the current unpublished Snapshot v4 is supported. All five policy flags are required booleans. Standalone Image Generation is an additive v4 profile: `imageGenerators` and `policy.defaultImageGenerationId` may be absent only to represent an empty collection and an unset default; new writers emit the collection explicitly. Known values remain strict, and typed Snapshot consumers reject unknown fields. Old snapshots, policy adoption and incremental database migrations are removed; obsolete development data/configuration can be deleted and recreated. Shared Android materials, mappings and HTTP/runtime examples are maintained in [android-platform-integration.md](android-platform-integration.md).
+
+Budget templates are Admin-only configuration. Admin OpenAPI owns `bgt_*` CRUD, one-template user assignment and capability override removal. Client/Portal expose only the five effective capability budgets and generic configured/default source; Managed Snapshot, Relay control and Android exports contain no template identity, revision, assignment or rule metadata. Image Generation adds `IMAGE_GENERATION`, `OPENAI_IMAGES_GENERATIONS` and `REQUESTED_IMAGES` to the existing current contracts without an API or Snapshot version increment.
 
 Snapshot v4 is the only current profile; Gateway v5 remains planned. Policy has five required booleans and new policies deny all five. No old draft/release adoption or optional policy compatibility DTO remains. Discovery/Bootstrap advertises the current compiler version. Use:
 

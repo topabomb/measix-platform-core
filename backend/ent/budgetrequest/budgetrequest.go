@@ -139,10 +139,11 @@ type Capability string
 
 // Capability values.
 const (
-	CapabilityMODEL Capability = "MODEL"
-	CapabilityTTS   Capability = "TTS"
-	CapabilityASR   Capability = "ASR"
-	CapabilityMCP   Capability = "MCP"
+	CapabilityMODEL            Capability = "MODEL"
+	CapabilityIMAGE_GENERATION Capability = "IMAGE_GENERATION"
+	CapabilityTTS              Capability = "TTS"
+	CapabilityASR              Capability = "ASR"
+	CapabilityMCP              Capability = "MCP"
 )
 
 func (c Capability) String() string {
@@ -152,7 +153,7 @@ func (c Capability) String() string {
 // CapabilityValidator is a validator for the "capability" field enum values. It is called by the builders before save.
 func CapabilityValidator(c Capability) error {
 	switch c {
-	case CapabilityMODEL, CapabilityTTS, CapabilityASR, CapabilityMCP:
+	case CapabilityMODEL, CapabilityIMAGE_GENERATION, CapabilityTTS, CapabilityASR, CapabilityMCP:
 		return nil
 	default:
 		return fmt.Errorf("budgetrequest: invalid enum value for capability field: %q", c)
@@ -188,6 +189,7 @@ type Source string
 // Source values.
 const (
 	SourceDEFAULT  Source = "DEFAULT"
+	SourceTEMPLATE Source = "TEMPLATE"
 	SourceEXPLICIT Source = "EXPLICIT"
 )
 
@@ -198,7 +200,7 @@ func (s Source) String() string {
 // SourceValidator is a validator for the "source" field enum values. It is called by the builders before save.
 func SourceValidator(s Source) error {
 	switch s {
-	case SourceDEFAULT, SourceEXPLICIT:
+	case SourceDEFAULT, SourceTEMPLATE, SourceEXPLICIT:
 		return nil
 	default:
 		return fmt.Errorf("budgetrequest: invalid enum value for source field: %q", s)

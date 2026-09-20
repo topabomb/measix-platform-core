@@ -6,7 +6,7 @@ import (
 )
 
 func TestCanonicalKindsGenerateAndValidateUUIDv4(t *testing.T) {
-	kinds := []platformid.Kind{platformid.Deployment, platformid.User, platformid.Device, platformid.Enrollment, platformid.Session, platformid.Installation, platformid.Provider, platformid.Model, platformid.TTS, platformid.ASR, platformid.MCP, platformid.Policy, platformid.Draft, platformid.Release, platformid.Upstream, platformid.Secret, platformid.Route, platformid.Activation, platformid.Request, platformid.Interaction, platformid.Idempotency, platformid.UsageEvent, platformid.PricingRule}
+	kinds := []platformid.Kind{platformid.Deployment, platformid.User, platformid.Device, platformid.Enrollment, platformid.Session, platformid.Installation, platformid.Provider, platformid.Model, platformid.ImageGeneration, platformid.TTS, platformid.ASR, platformid.MCP, platformid.Policy, platformid.Draft, platformid.Release, platformid.Upstream, platformid.Secret, platformid.Route, platformid.Activation, platformid.Request, platformid.Interaction, platformid.Idempotency, platformid.UsageEvent, platformid.PricingRule, platformid.BudgetTemplate}
 	for _, kind := range kinds {
 		id := platformid.New(kind)
 		if err := platformid.Validate(kind, id); err != nil {

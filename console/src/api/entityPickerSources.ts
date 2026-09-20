@@ -9,6 +9,8 @@ type Upstream = components['schemas']['Upstream']
 type UpstreamPage = components['schemas']['UpstreamPage']
 type Secret = components['schemas']['Secret']
 type SecretPage = components['schemas']['SecretPage']
+type BudgetTemplate = components['schemas']['BudgetTemplate']
+type BudgetTemplatePage = components['schemas']['BudgetTemplatePage']
 
 function userOption(user: User): EntityPickerOption {
   return {
@@ -72,4 +74,25 @@ export async function fetchSecretPickerPage(query: string, cursor?: string): Pro
 
 export async function resolveSecretPickerOption(secretId: string): Promise<EntityPickerOption | undefined> {
   return secretOption(await apiFetch<Secret>(`/api/admin/v1/secrets/${encodeURIComponent(secretId)}`))
+}
+
+function budgetTemplateOption(template: BudgetTemplate): EntityPickerOption {
+  return {
+    value: template.budgetTemplateId,
+    label: template.name,
+    caption: template.description || `v${template.revision}`,
+    metadata: { revision: template.revision, assignedUserCount: template.assignedUserCount },
+  }
+}
+
+export async function fetchBudgetTemplatePickerPage(query: string, cursor?: string): Promise<EntityPickerPage> {
+  const params = new URLSearchParams({ limit: '50' })
+  if (query) params.set('query', query)
+  const path = `/api/admin/v1/budget-templates?${params.toString()}`
+  const page = await apiFetch<BudgetTemplatePage>(cursor ? cursorPath(path, cursor) : path)
+  return { items: page.items.map(budgetTemplateOption), nextCursor: page.nextCursor }
+}
+
+export async function resolveBudgetTemplatePickerOption(budgetTemplateId: string): Promise<EntityPickerOption | undefined> {
+  return budgetTemplateOption(await apiFetch<BudgetTemplate>(`/api/admin/v1/budget-templates/${encodeURIComponent(budgetTemplateId)}`))
 }

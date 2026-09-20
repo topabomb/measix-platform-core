@@ -92,6 +92,15 @@ func TestSnapshotWireVersionRequirements(t *testing.T) {
 			}
 		})
 	}
+	t.Run("image-generation-additive-fields", func(t *testing.T) {
+		value := read("v4-user-configuration-policy.json")
+		delete(value, "imageGenerators")
+		policy := value["policy"].(map[string]any)
+		delete(policy, "defaultImageGenerationId")
+		if err := schema.VisitJSON(value); err != nil {
+			t.Fatalf("missing additive image fields must remain valid Snapshot v4: %v", err)
+		}
+	})
 	for _, version := range []int{0, 1, 2, 3, 5, 99} {
 		t.Run("version/"+strconv.Itoa(version), func(t *testing.T) {
 			value := read("v4-user-configuration-policy.json")

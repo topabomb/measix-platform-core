@@ -25,6 +25,7 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	if err := json.Unmarshal(source.ReleaseContentJSON, &content); err != nil {
 		return ActivationResult{}, err
 	}
+	content = capability.NormalizeManagedDraftContent(content)
 	path := "/api/admin/v1/releases/" + sourceReleaseID + ":republish"
 	requestHash := hashOperation(struct {
 		ReleaseID string `json:"releaseId"`

@@ -11,10 +11,11 @@ import (
 type Capability string
 
 const (
-	CapabilityModel Capability = "MODEL"
-	CapabilityTTS   Capability = "TTS"
-	CapabilityASR   Capability = "ASR"
-	CapabilityMCP   Capability = "MCP"
+	CapabilityModel           Capability = "MODEL"
+	CapabilityImageGeneration Capability = "IMAGE_GENERATION"
+	CapabilityTTS             Capability = "TTS"
+	CapabilityASR             Capability = "ASR"
+	CapabilityMCP             Capability = "MCP"
 )
 
 type Mode string
@@ -28,6 +29,7 @@ type Source string
 
 const (
 	SourceDefault  Source = "DEFAULT"
+	SourceTemplate Source = "TEMPLATE"
 	SourceExplicit Source = "EXPLICIT"
 )
 
@@ -44,6 +46,7 @@ type Meter string
 
 const (
 	MeterRequests          Meter = "REQUESTS"
+	MeterRequestedImages   Meter = "REQUESTED_IMAGES"
 	MeterInputTokens       Meter = "INPUT_TOKENS"
 	MeterOutputTokens      Meter = "OUTPUT_TOKENS"
 	MeterCachedTokens      Meter = "CACHED_TOKENS"
@@ -56,6 +59,7 @@ type ClientProtocol string
 
 const (
 	ProtocolOpenAIChatCompletions       ClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	ProtocolOpenAIImagesGenerations     ClientProtocol = "OPENAI_IMAGES_GENERATIONS"
 	ProtocolOpenAIResponses             ClientProtocol = "OPENAI_RESPONSES"
 	ProtocolGoogleGenerateContent       ClientProtocol = "GOOGLE_GENERATE_CONTENT"
 	ProtocolAnthropicMessages           ClientProtocol = "ANTHROPIC_MESSAGES"
@@ -104,6 +108,9 @@ var (
 	ErrInvalidTransition          = errors.New("invalid budget request transition")
 	ErrReconciliationNotOpen      = errors.New("budget reconciliation is not open")
 	ErrIdentityDeleted            = errors.New("enterprise identity was deleted")
+	ErrTemplateNotFound           = errors.New("budget template not found")
+	ErrTemplateAssigned           = errors.New("budget template is assigned")
+	ErrAssignmentNotFound         = errors.New("budget template assignment not found")
 )
 
 const DefaultMaxInFlight int64 = 32

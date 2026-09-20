@@ -9,13 +9,14 @@ import "fmt"
 type Meter string
 
 const (
-	Requests     Meter = "REQUESTS"
-	InputTokens  Meter = "INPUT_TOKENS"
-	OutputTokens Meter = "OUTPUT_TOKENS"
-	TotalTokens  Meter = "TOTAL_TOKENS"
-	CachedTokens Meter = "CACHED_TOKENS"
-	Characters   Meter = "CHARACTERS"
-	AudioSeconds Meter = "AUDIO_SECONDS"
+	Requests        Meter = "REQUESTS"
+	InputTokens     Meter = "INPUT_TOKENS"
+	OutputTokens    Meter = "OUTPUT_TOKENS"
+	TotalTokens     Meter = "TOTAL_TOKENS"
+	CachedTokens    Meter = "CACHED_TOKENS"
+	Characters      Meter = "CHARACTERS"
+	AudioSeconds    Meter = "AUDIO_SECONDS"
+	RequestedImages Meter = "REQUESTED_IMAGES"
 )
 
 type Completeness string

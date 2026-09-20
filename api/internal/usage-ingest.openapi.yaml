@@ -139,13 +139,14 @@ components:
       pattern: ^ups_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
     ResourceKind:
       type: string
-      enum: [MODEL, TTS, ASR, MCP]
+      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
     ClientProtocol:
       type: string
       enum:
       - OPENAI_CHAT_COMPLETIONS
       - OPENAI_RESPONSES
       - GOOGLE_GENERATE_CONTENT
+      - OPENAI_IMAGES_GENERATIONS
       - ANTHROPIC_MESSAGES
       - OPENAI_AUDIO_SPEECH
       - GEMINI_GENERATE_CONTENT_TTS
@@ -157,7 +158,7 @@ components:
       - MCP_STREAMABLE_HTTP
     BudgetCapability:
       type: string
-      enum: [MODEL, TTS, ASR, MCP]
+      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
     BudgetMode:
       type: string
       enum: [UNLIMITED, LIMITED]
@@ -177,6 +178,7 @@ components:
       - CHARACTERS
       - AUDIO_SECONDS
       - REQUESTS
+      - REQUESTED_IMAGES
     UsageCompleteness:
       type: string
       enum: [EXACT, PARTIAL, UNKNOWN]

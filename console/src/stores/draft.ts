@@ -8,7 +8,7 @@ type ManagedDraftContent = components['schemas']['ManagedDraftContent']
 type ValidateDraftResponse = components['schemas']['ValidateDraftResponse']
 type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
 type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
-export type ManagedResourceKind = 'MODEL' | 'TTS' | 'ASR' | 'MCP'
+export type ManagedResourceKind = 'MODEL' | 'IMAGE_GENERATION' | 'TTS' | 'ASR' | 'MCP'
 export type TtsProtocol = components['schemas']['TtsDefinition']['clientProtocol']
 export type AsrProtocol = components['schemas']['AsrDefinition']['clientProtocol']
 export function isRealtimeAsr(protocol: AsrProtocol): boolean {
@@ -34,9 +34,11 @@ export const useDraftStore = defineStore('draft', () => {
   const conflictRevision = ref<number>()
 
   function accept(draft: Draft) {
+    const content = structuredClone(draft.content)
+    content.imageGenerators ??= []
     baselineRevision.value = draft.draftRevision
-    baselineContent.value = structuredClone(draft.content)
-    localContent.value = structuredClone(draft.content)
+    baselineContent.value = structuredClone(content)
+    localContent.value = content
     dirty.value = false
     conflictRevision.value = undefined
     validationResult.value = undefined
@@ -144,6 +146,23 @@ export const useDraftStore = defineStore('draft', () => {
     markDirty()
   }
 
+  function addImageGeneration(): string {
+    const imageId = createCandidateId('img')
+    requireContent().imageGenerators ??= []
+    requireContent().imageGenerators!.push({
+      imageId,
+      displayName: 'New image generator',
+      clientProtocol: 'OPENAI_IMAGES_GENERATIONS',
+      upstreamModelKey: '',
+      runtimePath: '/v1/images/generations',
+      maxImagesPerRequest: 1,
+      allowedSizes: ['auto'],
+      enabled: true,
+    })
+    markDirty()
+    return imageId
+  }
+
   function addStarter(assistantDefinitionId: string, title: string): string {
     const content = requireContent()
     if (!content.assistants.some(a => a.assistantDefinitionId === assistantDefinitionId)) throw new Error('assistant not found')
@@ -169,9 +188,10 @@ export const useDraftStore = defineStore('draft', () => {
 
   function runtimeResourceFor(resourceId: string) {
     const content = requireContent()
-    return [...content.models, ...content.tts, ...content.asr, ...content.mcp]
+    return [...content.models, ...(content.imageGenerators ?? []), ...content.tts, ...content.asr, ...content.mcp]
       .find(resource => ('modelId' in resource ? resource.modelId
-        : 'ttsId' in resource ? resource.ttsId
+        : 'imageId' in resource ? resource.imageId
+          : 'ttsId' in resource ? resource.ttsId
           : 'asrId' in resource ? resource.asrId : resource.mcpServerId) === resourceId)
   }
 
@@ -272,6 +292,8 @@ export const useDraftStore = defineStore('draft', () => {
       for (const assistant of content.assistants) {
         if (assistant.modelId === resourceId) references.push(`assistant:${assistant.assistantDefinitionId}.modelId`)
       }
+    } else if (kind === 'IMAGE_GENERATION' && content.policy.defaultImageGenerationId === resourceId) {
+      references.push('policy.defaultImageGenerationId')
     } else if (kind === 'TTS' && content.policy.defaultTtsId === resourceId) {
       references.push('policy.defaultTtsId')
     } else if (kind === 'ASR' && content.policy.defaultAsrId === resourceId) {
@@ -293,6 +315,10 @@ export const useDraftStore = defineStore('draft', () => {
       const before = content.models.length
       content.models = content.models.filter(item => item.modelId !== resourceId)
       removed = content.models.length !== before
+    } else if (kind === 'IMAGE_GENERATION') {
+      const before = (content.imageGenerators ?? []).length
+      content.imageGenerators = (content.imageGenerators ?? []).filter(item => item.imageId !== resourceId)
+      removed = content.imageGenerators.length !== before
     } else if (kind === 'TTS') {
       const before = content.tts.length
       content.tts = content.tts.filter(item => item.ttsId !== resourceId)
@@ -342,7 +368,7 @@ export const useDraftStore = defineStore('draft', () => {
 
   return {
     baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
-    load, save, validate, addModel, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, markDirty,
+    load, save, validate, addModel, addImageGeneration, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, markDirty,
     bindingFor, setBinding, setRuntimePath, removeBinding, resourceReferences, removeResource, setTtsProtocol, setAsrProtocol,
   }
 })

@@ -30,6 +30,15 @@ type BudgetRequest func(*sql.Selector)
 // BudgetSettlement is the predicate function for budgetsettlement builders.
 type BudgetSettlement func(*sql.Selector)
 
+// BudgetTemplate is the predicate function for budgettemplate builders.
+type BudgetTemplate func(*sql.Selector)
+
+// BudgetTemplateAssignment is the predicate function for budgettemplateassignment builders.
+type BudgetTemplateAssignment func(*sql.Selector)
+
+// BudgetTemplateAudit is the predicate function for budgettemplateaudit builders.
+type BudgetTemplateAudit func(*sql.Selector)
+
 // DeletedCredential is the predicate function for deletedcredential builders.
 type DeletedCredential func(*sql.Selector)
 

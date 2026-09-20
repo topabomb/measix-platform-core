@@ -70,6 +70,12 @@ func (s *Service) Admit(ctx context.Context, input AdmitInput) (AdmissionDecisio
 		budgetID = &budgetRow.ID
 		activated := budgetRow.ActivatedAt
 		activatedAt = &activated
+		if activated.After(normalized.AdmittedAt) {
+			// The committed configuration head wins over a repeated/coarse
+			// request clock tick; keep admission on the same logical timeline
+			// used by immutable limit versions.
+			normalized.AdmittedAt = activated
+		}
 	} else if !ent.IsNotFound(err) {
 		return AdmissionDecision{}, err
 	}
@@ -425,6 +431,8 @@ func resourceMatchesCapability(kind platformid.Kind, capability Capability) bool
 	switch capability {
 	case CapabilityModel:
 		return kind == platformid.Model
+	case CapabilityImageGeneration:
+		return kind == platformid.ImageGeneration
 	case CapabilityTTS:
 		return kind == platformid.TTS
 	case CapabilityASR:
@@ -440,6 +448,8 @@ func protocolMatchesCapability(protocol ClientProtocol, capability Capability) b
 	switch capability {
 	case CapabilityModel:
 		return protocol == ProtocolOpenAIChatCompletions || protocol == ProtocolOpenAIResponses || protocol == ProtocolGoogleGenerateContent || protocol == ProtocolAnthropicMessages
+	case CapabilityImageGeneration:
+		return protocol == ProtocolOpenAIImagesGenerations
 	case CapabilityTTS:
 		return protocol == ProtocolOpenAIAudioSpeech || protocol == ProtocolGeminiGenerateContentTTS || protocol == ProtocolMiMoChatCompletionsTTS
 	case CapabilityASR:

@@ -148,6 +148,12 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
 }
 
 func toWireDecision(input budget.AdmissionDecision) usageingestapi.BudgetAdmissionDecision {
+	source := usageingestapi.BudgetSource(input.Source)
+	if input.Source == budget.SourceTemplate {
+		// Relay enforces the effective budget but does not receive Admin-only
+		// template identity or provenance.
+		source = usageingestapi.EXPLICIT
+	}
 	blocking := make([]usageingestapi.BudgetLimitState, 0, len(input.BlockingLimits))
 	for _, limit := range input.BlockingLimits {
 		meter, divisor := usageingestapi.UsageMeter(limit.Meter), int64(1)
@@ -169,7 +175,7 @@ func toWireDecision(input budget.AdmissionDecision) usageingestapi.BudgetAdmissi
 	}
 	result := usageingestapi.BudgetAdmissionDecision{
 		RequestId: input.RequestID, Allowed: input.Allowed, Code: usageingestapi.BudgetAdmissionDecisionCode(input.Code),
-		Mode: usageingestapi.BudgetMode(input.Mode), Source: usageingestapi.BudgetSource(input.Source), Revision: int(input.Revision),
+		Mode: usageingestapi.BudgetMode(input.Mode), Source: source, Revision: int(input.Revision),
 		InFlightRequests: int(input.InFlightRequests), BlockingLimits: blocking, ResetAt: input.ResetAt, AsOf: input.AsOf,
 	}
 	if len(unavailable) > 0 {

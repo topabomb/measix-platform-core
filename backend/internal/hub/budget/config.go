@@ -55,9 +55,41 @@ func (s *Service) Put(ctx context.Context, input PutBudgetInput) (BudgetView, er
 		return BudgetView{}, err
 	}
 	defer tx.Rollback()
+	after, err := s.applyBudgetInTx(ctx, tx, budgetMutation{
+		UserID: input.UserID, Capability: input.Capability, ExpectedRevision: input.ExpectedRevision, CheckRevision: true,
+		Mode: input.Mode, Scopes: input.Scopes, Source: SourceExplicit,
+		ActorUserID: input.ActorUserID, Reason: input.Reason, Action: "UPDATE",
+	}, now)
+	if err != nil {
+		return BudgetView{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return BudgetView{}, err
+	}
+	return after, nil
+}
+
+type budgetMutation struct {
+	UserID           string
+	Capability       Capability
+	ExpectedRevision int64
+	CheckRevision    bool
+	Mode             Mode
+	Scopes           []ScopeInput
+	Source           Source
+	ActorUserID      string
+	Reason           string
+	Action           string
+}
+
+func (s *Service) applyBudgetInTx(ctx context.Context, tx *ent.Tx, mutation budgetMutation, now time.Time) (BudgetView, error) {
+	input := PutBudgetInput{
+		UserID: mutation.UserID, Capability: mutation.Capability, ExpectedRevision: mutation.ExpectedRevision,
+		Mode: mutation.Mode, Scopes: mutation.Scopes, ActorUserID: mutation.ActorUserID, Reason: mutation.Reason,
+	}
 
 	row, err := tx.UserBudget.Query().
-		Where(userbudget.UserIDEQ(input.UserID), userbudget.CapabilityEQ(userbudget.Capability(input.Capability))).
+		Where(userbudget.UserIDEQ(mutation.UserID), userbudget.CapabilityEQ(userbudget.Capability(mutation.Capability))).
 		Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return BudgetView{}, err
@@ -69,7 +101,7 @@ func (s *Service) Put(ctx context.Context, input PutBudgetInput) (BudgetView, er
 	if row != nil {
 		currentRevision = row.Revision
 	}
-	if currentRevision != input.ExpectedRevision {
+	if mutation.CheckRevision && currentRevision != mutation.ExpectedRevision {
 		return BudgetView{}, ErrRevisionConflict
 	}
 
@@ -83,10 +115,17 @@ func (s *Service) Put(ctx context.Context, input PutBudgetInput) (BudgetView, er
 		for _, limit := range allLimits {
 			if limit.EffectiveTo == nil {
 				currentLimits = append(currentLimits, limit)
+				// SQLite can return the same wall-clock tick for consecutive
+				// committed commands. Preserve immutable limit history with a
+				// per-budget logical timestamp instead of producing a zero-width
+				// version or mutating the prior row in place.
+				if !limit.EffectiveFrom.Before(now) {
+					now = limit.EffectiveFrom.Add(time.Nanosecond)
+				}
 			}
 		}
 	}
-	before := defaultView(input.UserID, input.Capability)
+	before := defaultView(mutation.UserID, mutation.Capability)
 	if row != nil {
 		before = viewFromRows(row, currentLimits)
 	}
@@ -98,22 +137,23 @@ func (s *Service) Put(ctx context.Context, input PutBudgetInput) (BudgetView, er
 	nextRevision := currentRevision + 1
 	if row == nil {
 		row, err = tx.UserBudget.Create().
-			SetUserID(input.UserID).
-			SetCapability(userbudget.Capability(input.Capability)).
-			SetMode(userbudget.Mode(input.Mode)).
-			SetSource(userbudget.Source(SourceExplicit)).
+			SetUserID(mutation.UserID).
+			SetCapability(userbudget.Capability(mutation.Capability)).
+			SetMode(userbudget.Mode(mutation.Mode)).
+			SetSource(userbudget.Source(mutation.Source)).
 			SetRevision(nextRevision).
 			SetActivatedAt(now).
 			SetUpdatedAt(now).
-			SetUpdatedByUserID(input.ActorUserID).
+			SetUpdatedByUserID(mutation.ActorUserID).
 			Save(ctx)
 	} else {
 		row, err = tx.UserBudget.UpdateOneID(row.ID).
-			SetMode(userbudget.Mode(input.Mode)).
+			SetMode(userbudget.Mode(mutation.Mode)).
+			SetSource(userbudget.Source(mutation.Source)).
 			SetRevision(nextRevision).
 			SetActivatedAt(now).
 			SetUpdatedAt(now).
-			SetUpdatedByUserID(input.ActorUserID).
+			SetUpdatedByUserID(mutation.ActorUserID).
 			Save(ctx)
 	}
 	if err != nil {
@@ -121,7 +161,7 @@ func (s *Service) Put(ctx context.Context, input PutBudgetInput) (BudgetView, er
 	}
 
 	if replaceLimits {
-		if err := replaceActiveLimits(ctx, tx, row.ID, currentLimits, desired, input.ActorUserID, now); err != nil {
+		if err := replaceActiveLimits(ctx, tx, row.ID, currentLimits, desired, mutation.ActorUserID, now); err != nil {
 			return BudgetView{}, err
 		}
 	}
@@ -140,25 +180,25 @@ func (s *Service) Put(ctx context.Context, input PutBudgetInput) (BudgetView, er
 	if err != nil {
 		return BudgetView{}, err
 	}
-	action := "UPDATE"
-	if currentRevision == 0 {
+	action := mutation.Action
+	if action == "" {
+		action = "UPDATE"
+	}
+	if currentRevision == 0 && action == "UPDATE" {
 		action = "CREATE"
 	}
 	if _, err := tx.BudgetAudit.Create().
-		SetUserID(input.UserID).
-		SetCapability(budgetaudit.Capability(input.Capability)).
+		SetUserID(mutation.UserID).
+		SetCapability(budgetaudit.Capability(mutation.Capability)).
 		SetUserBudgetID(row.ID).
 		SetBudgetRevision(nextRevision).
-		SetActorUserID(input.ActorUserID).
+		SetActorUserID(mutation.ActorUserID).
 		SetAction(budgetaudit.Action(action)).
-		SetReason(strings.TrimSpace(input.Reason)).
+		SetReason(strings.TrimSpace(mutation.Reason)).
 		SetBeforeJSON(beforeJSON).
 		SetAfterJSON(afterJSON).
 		SetCreatedAt(now).
 		Save(ctx); err != nil {
-		return BudgetView{}, err
-	}
-	if err := tx.Commit(); err != nil {
 		return BudgetView{}, err
 	}
 	return after, nil
@@ -280,6 +320,8 @@ func meterAllowed(capability Capability, meter Meter) bool {
 		return meter == MeterRequests || meter == MeterAudioMilliseconds
 	case CapabilityMCP:
 		return meter == MeterRequests
+	case CapabilityImageGeneration:
+		return meter == MeterRequests || meter == MeterRequestedImages
 	default:
 		return false
 	}
@@ -384,7 +426,7 @@ func newScopeKey() string { return "bgs_" + uuid.NewString() }
 
 func validCapability(value Capability) bool {
 	switch value {
-	case CapabilityModel, CapabilityTTS, CapabilityASR, CapabilityMCP:
+	case CapabilityModel, CapabilityImageGeneration, CapabilityTTS, CapabilityASR, CapabilityMCP:
 		return true
 	default:
 		return false
@@ -402,7 +444,7 @@ func validPeriod(value Period) bool {
 
 func validMeter(value Meter) bool {
 	switch value {
-	case MeterRequests, MeterInputTokens, MeterOutputTokens, MeterCachedTokens, MeterTotalTokens, MeterCharacters, MeterAudioMilliseconds:
+	case MeterRequests, MeterRequestedImages, MeterInputTokens, MeterOutputTokens, MeterCachedTokens, MeterTotalTokens, MeterCharacters, MeterAudioMilliseconds:
 		return true
 	default:
 		return false

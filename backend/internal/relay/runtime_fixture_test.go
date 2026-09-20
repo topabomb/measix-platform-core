@@ -24,8 +24,9 @@ import (
 )
 
 type captureUsageRecorder struct {
-	mu     sync.Mutex
-	events []usageingestapi.RequestUsageFact
+	mu          sync.Mutex
+	events      []usageingestapi.RequestUsageFact
+	settlements []usageingestapi.UsageSettlement
 }
 
 func (r *captureUsageRecorder) PersistAdmission(usageingestapi.BudgetAdmissionRequest, string) error {
@@ -40,6 +41,24 @@ func (r *captureUsageRecorder) Record(event usageingestapi.UsageSettlement) erro
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, event.Request)
+	r.settlements = append(r.settlements, event)
+	return nil
+}
+func (r *captureUsageRecorder) settlementSnapshot() []usageingestapi.UsageSettlement {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]usageingestapi.UsageSettlement(nil), r.settlements...)
+}
+func (r *captureUsageRecorder) waitForSettlements(t *testing.T, count int) []usageingestapi.UsageSettlement {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if events := r.settlementSnapshot(); len(events) >= count {
+			return events
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("expected %d settlements, got %d", count, len(r.settlementSnapshot()))
 	return nil
 }
 func (r *captureUsageRecorder) snapshot() []usageingestapi.RequestUsageFact {
@@ -126,6 +145,7 @@ func (s *testAccessSigner) publicJWK() relaycontrolapi.PublicJwk {
 type runtimeFixture struct {
 	store         *control.Store
 	server        *httptest.Server
+	recorder      *captureUsageRecorder
 	signer        *testAccessSigner
 	userID        string
 	deviceID      string
@@ -148,9 +168,11 @@ func newRuntimeFixture(t *testing.T, state relaycontrolapi.RuntimeControlState, 
 	if _, err := store.Apply(state); err != nil {
 		t.Fatal(err)
 	}
+	recorder := &captureUsageRecorder{}
 	return &runtimeFixture{
 		store:         store,
-		server:        httptest.NewServer(relayruntime.NewHandler(store, &captureUsageRecorder{}, &allowBudgetClient{})),
+		server:        httptest.NewServer(relayruntime.NewHandler(store, recorder, &allowBudgetClient{})),
+		recorder:      recorder,
 		signer:        signer,
 		userID:        platformid.New(platformid.User),
 		deviceID:      platformid.New(platformid.Device),

@@ -190,18 +190,19 @@ describe('UsagePage', () => {
     expect(wrapper.text()).toContain('unknown')
   })
 
-  it('classifies each request row by resource kind (MODEL/TTS/ASR/MCP)', async () => {
+  it('classifies each request row by resource kind including image generation', async () => {
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 4, requestCompleteness: { exact: 0, partial: 0, unknown: 4 }, forwardedRequestCount: 3, requestBytes: 0, responseBytes: 0,
+          requestCount: 5, requestCompleteness: { exact: 0, partial: 0, unknown: 5 }, forwardedRequestCount: 4, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'KNOWN', amount: '0', currency: 'USD' },
         }
       }
       return {
         items: [
           { requestId: 'req_1', resourceId: 'mdl_aaa', resourceDisplayName: 'Enterprise model', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
+          { requestId: 'req_img', resourceId: 'img_picture', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
           { requestId: 'req_2', resourceId: 'tts_bbb', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
           { requestId: 'req_3', resourceId: 'asr_ccc', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
           { requestId: 'req_4', resourceId: 'mcp_ddd', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: false, httpStatus: 403, errorClass: 'ROUTE_POLICY_DENIED' },
@@ -214,6 +215,7 @@ describe('UsagePage', () => {
     await openRequests(wrapper)
     const text = wrapper.text()
     expect(text).toContain('Model')
+    expect(text).toContain('Image generation')
     expect(text).toContain('TTS')
     expect(text).toContain('ASR')
     expect(text).toContain('MCP')

@@ -4,6 +4,7 @@
   "content": {
     "providers": [],
     "models": [],
+    "imageGenerators": [],
     "tts": [],
     "asr": [],
     "mcp": [],

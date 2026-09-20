@@ -1,6 +1,6 @@
 import type { PricingMeter } from './api/usageBudget'
 
-export type MeterUnitLabels = Record<'tokens' | 'characters' | 'seconds' | 'minutes' | 'requests', string>
+export type MeterUnitLabels = Record<'tokens' | 'characters' | 'seconds' | 'minutes' | 'requests' | 'images', string>
 
 function integer(value: string): bigint | undefined {
   try {
@@ -22,6 +22,7 @@ export function meterUnit(meter: PricingMeter, labels: MeterUnitLabels): string 
   if (meter.includes('TOKEN')) return labels.tokens
   if (meter === 'CHARACTERS') return labels.characters
   if (meter === 'AUDIO_SECONDS') return labels.seconds
+  if (meter === 'REQUESTED_IMAGES') return labels.images
   return labels.requests
 }
 

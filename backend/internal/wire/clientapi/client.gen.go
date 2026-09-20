@@ -79,16 +79,19 @@ func (e BootstrapDeviceStatus) Valid() bool {
 
 // Defines values for BudgetCapability.
 const (
-	BudgetCapabilityASR   BudgetCapability = "ASR"
-	BudgetCapabilityMCP   BudgetCapability = "MCP"
-	BudgetCapabilityMODEL BudgetCapability = "MODEL"
-	BudgetCapabilityTTS   BudgetCapability = "TTS"
+	BudgetCapabilityASR             BudgetCapability = "ASR"
+	BudgetCapabilityIMAGEGENERATION BudgetCapability = "IMAGE_GENERATION"
+	BudgetCapabilityMCP             BudgetCapability = "MCP"
+	BudgetCapabilityMODEL           BudgetCapability = "MODEL"
+	BudgetCapabilityTTS             BudgetCapability = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the BudgetCapability enum.
 func (e BudgetCapability) Valid() bool {
 	switch e {
 	case BudgetCapabilityASR:
+		return true
+	case BudgetCapabilityIMAGEGENERATION:
 		return true
 	case BudgetCapabilityMCP:
 		return true
@@ -281,6 +284,21 @@ func (e EnterpriseUpdateSeverity) Valid() bool {
 	case EnterpriseUpdateSeverityINFO:
 		return true
 	case EnterpriseUpdateSeverityWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImageGenerationDefinitionClientProtocol.
+const (
+	ImageGenerationDefinitionClientProtocolOPENAIIMAGESGENERATIONS ImageGenerationDefinitionClientProtocol = "OPENAI_IMAGES_GENERATIONS"
+)
+
+// Valid indicates whether the value is a known member of the ImageGenerationDefinitionClientProtocol enum.
+func (e ImageGenerationDefinitionClientProtocol) Valid() bool {
+	switch e {
+	case ImageGenerationDefinitionClientProtocolOPENAIIMAGESGENERATIONS:
 		return true
 	default:
 		return false
@@ -487,16 +505,19 @@ func (e RequestUsageViewSettlementState) Valid() bool {
 
 // Defines values for ResourceKind.
 const (
-	ResourceKindASR   ResourceKind = "ASR"
-	ResourceKindMCP   ResourceKind = "MCP"
-	ResourceKindMODEL ResourceKind = "MODEL"
-	ResourceKindTTS   ResourceKind = "TTS"
+	ResourceKindASR             ResourceKind = "ASR"
+	ResourceKindIMAGEGENERATION ResourceKind = "IMAGE_GENERATION"
+	ResourceKindMCP             ResourceKind = "MCP"
+	ResourceKindMODEL           ResourceKind = "MODEL"
+	ResourceKindTTS             ResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ResourceKind enum.
 func (e ResourceKind) Valid() bool {
 	switch e {
 	case ResourceKindASR:
+		return true
+	case ResourceKindIMAGEGENERATION:
 		return true
 	case ResourceKindMCP:
 		return true
@@ -572,6 +593,7 @@ const (
 	UsageClientProtocolOPENAIAUDIOSPEECH           UsageClientProtocol = "OPENAI_AUDIO_SPEECH"
 	UsageClientProtocolOPENAIAUDIOTRANSCRIPTIONS   UsageClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
 	UsageClientProtocolOPENAICHATCOMPLETIONS       UsageClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	UsageClientProtocolOPENAIIMAGESGENERATIONS     UsageClientProtocol = "OPENAI_IMAGES_GENERATIONS"
 	UsageClientProtocolOPENAIREALTIMETRANSCRIPTION UsageClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
 	UsageClientProtocolOPENAIRESPONSES             UsageClientProtocol = "OPENAI_RESPONSES"
 )
@@ -598,6 +620,8 @@ func (e UsageClientProtocol) Valid() bool {
 	case UsageClientProtocolOPENAIAUDIOTRANSCRIPTIONS:
 		return true
 	case UsageClientProtocolOPENAICHATCOMPLETIONS:
+		return true
+	case UsageClientProtocolOPENAIIMAGESGENERATIONS:
 		return true
 	case UsageClientProtocolOPENAIREALTIMETRANSCRIPTION:
 		return true
@@ -631,13 +655,14 @@ func (e UsageCompleteness) Valid() bool {
 
 // Defines values for UsageMeter.
 const (
-	AUDIOSECONDS UsageMeter = "AUDIO_SECONDS"
-	CACHEDTOKENS UsageMeter = "CACHED_TOKENS"
-	CHARACTERS   UsageMeter = "CHARACTERS"
-	INPUTTOKENS  UsageMeter = "INPUT_TOKENS"
-	OUTPUTTOKENS UsageMeter = "OUTPUT_TOKENS"
-	REQUESTS     UsageMeter = "REQUESTS"
-	TOTALTOKENS  UsageMeter = "TOTAL_TOKENS"
+	AUDIOSECONDS    UsageMeter = "AUDIO_SECONDS"
+	CACHEDTOKENS    UsageMeter = "CACHED_TOKENS"
+	CHARACTERS      UsageMeter = "CHARACTERS"
+	INPUTTOKENS     UsageMeter = "INPUT_TOKENS"
+	OUTPUTTOKENS    UsageMeter = "OUTPUT_TOKENS"
+	REQUESTEDIMAGES UsageMeter = "REQUESTED_IMAGES"
+	REQUESTS        UsageMeter = "REQUESTS"
+	TOTALTOKENS     UsageMeter = "TOTAL_TOKENS"
 )
 
 // Valid indicates whether the value is a known member of the UsageMeter enum.
@@ -652,6 +677,8 @@ func (e UsageMeter) Valid() bool {
 	case INPUTTOKENS:
 		return true
 	case OUTPUTTOKENS:
+		return true
+	case REQUESTEDIMAGES:
 		return true
 	case REQUESTS:
 		return true
@@ -759,7 +786,6 @@ type BudgetCapabilityView struct {
 	InFlightRequests int                `json:"inFlightRequests"`
 	Limits           []BudgetLimitState `json:"limits"`
 	Mode             BudgetMode         `json:"mode"`
-	ResourceId       *string            `json:"resourceId,omitempty"`
 	Revision         int                `json:"revision"`
 	Source           BudgetSource       `json:"source"`
 	Status           BudgetStatus       `json:"status"`
@@ -890,6 +916,24 @@ type EnterpriseUpdateSeverity string
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
+// ImageGenerationDefinition defines model for ImageGenerationDefinition.
+type ImageGenerationDefinition struct {
+	AllowedSizes        []string                                `json:"allowedSizes"`
+	ClientProtocol      ImageGenerationDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName         string                                  `json:"displayName"`
+	Enabled             bool                                    `json:"enabled"`
+	ImageId             ImageGenerationId                       `json:"imageId"`
+	MaxImagesPerRequest int                                     `json:"maxImagesPerRequest"`
+	RuntimePath         string                                  `json:"runtimePath"`
+	UpstreamModelKey    string                                  `json:"upstreamModelKey"`
+}
+
+// ImageGenerationDefinitionClientProtocol defines model for ImageGenerationDefinition.ClientProtocol.
+type ImageGenerationDefinitionClientProtocol string
+
+// ImageGenerationId defines model for ImageGenerationId.
+type ImageGenerationId = string
+
 // InstallationId defines model for InstallationId.
 type InstallationId = string
 
@@ -919,8 +963,11 @@ type ManagedDraftContent struct {
 	Asr        []AsrDefinition              `json:"asr"`
 	Assistants []ManagedAssistantDefinition `json:"assistants"`
 	Bindings   []RuntimeBindingDefinition   `json:"bindings"`
-	Mcp        []McpDefinition              `json:"mcp"`
-	Models     []ModelDefinition            `json:"models"`
+
+	// ImageGenerators Additive Snapshot v4 field; omission means an empty list.
+	ImageGenerators *[]ImageGenerationDefinition `json:"imageGenerators,omitempty"`
+	Mcp             []McpDefinition              `json:"mcp"`
+	Models          []ModelDefinition            `json:"models"`
 
 	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
 	Policy    ManagedPolicy                `json:"policy"`
@@ -934,22 +981,26 @@ type ManagedPolicy struct {
 	AllowLocalAsr bool `json:"allowLocalAsr"`
 
 	// AllowLocalAssistants Allows user assistants; referenced resources remain independently governed.
-	AllowLocalAssistants bool                   `json:"allowLocalAssistants"`
-	AllowLocalMcp        bool                   `json:"allowLocalMcp"`
-	AllowLocalProviders  bool                   `json:"allowLocalProviders"`
-	AllowLocalTts        bool                   `json:"allowLocalTts"`
-	DefaultAsrId         *AsrId                 `json:"defaultAsrId,omitempty"`
-	DefaultAssistantId   *AssistantDefinitionId `json:"defaultAssistantId,omitempty"`
-	DefaultModelId       *ModelId               `json:"defaultModelId,omitempty"`
-	DefaultTtsId         *TtsId                 `json:"defaultTtsId,omitempty"`
-	PolicyId             PolicyId               `json:"policyId"`
+	AllowLocalAssistants     bool                   `json:"allowLocalAssistants"`
+	AllowLocalMcp            bool                   `json:"allowLocalMcp"`
+	AllowLocalProviders      bool                   `json:"allowLocalProviders"`
+	AllowLocalTts            bool                   `json:"allowLocalTts"`
+	DefaultAsrId             *AsrId                 `json:"defaultAsrId,omitempty"`
+	DefaultAssistantId       *AssistantDefinitionId `json:"defaultAssistantId,omitempty"`
+	DefaultImageGenerationId *ImageGenerationId     `json:"defaultImageGenerationId,omitempty"`
+	DefaultModelId           *ModelId               `json:"defaultModelId,omitempty"`
+	DefaultTtsId             *TtsId                 `json:"defaultTtsId,omitempty"`
+	PolicyId                 PolicyId               `json:"policyId"`
 }
 
 // ManagedSnapshot defines model for ManagedSnapshot.
 type ManagedSnapshot struct {
-	Asr               []AsrDefinition              `json:"asr"`
-	Assistants        []ManagedAssistantDefinition `json:"assistants"`
-	DeploymentId      DeploymentId                 `json:"deploymentId"`
+	Asr          []AsrDefinition              `json:"asr"`
+	Assistants   []ManagedAssistantDefinition `json:"assistants"`
+	DeploymentId DeploymentId                 `json:"deploymentId"`
+
+	// ImageGenerators Additive Snapshot v4 field; omission means an empty list.
+	ImageGenerators   *[]ImageGenerationDefinition `json:"imageGenerators,omitempty"`
 	ManagedGeneration int                          `json:"managedGeneration"`
 	Mcp               []McpDefinition              `json:"mcp"`
 	Metadata          struct {

@@ -12,6 +12,9 @@ import (
 	"measix/platform/ent/budgetreconciliation"
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/budgetsettlement"
+	"measix/platform/ent/budgettemplate"
+	"measix/platform/ent/budgettemplateassignment"
+	"measix/platform/ent/budgettemplateaudit"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enrollment"
 	"measix/platform/ent/enterpriseupdate"
@@ -112,6 +115,12 @@ func purgeUserData(ctx context.Context, tx *ent.Tx, userID, deletionActivationID
 	if _, err = tx.UserBudget.Delete().Where(userbudget.UserIDEQ(userID)).Exec(ctx); err != nil {
 		return err
 	}
+	if _, err = tx.BudgetTemplateAssignment.Delete().Where(budgettemplateassignment.UserIDEQ(userID)).Exec(ctx); err != nil {
+		return err
+	}
+	if _, err = tx.BudgetTemplateAudit.Delete().Where(budgettemplateaudit.UserIDEQ(userID)).Exec(ctx); err != nil {
+		return err
+	}
 
 	sessionIDs, err := tx.Session.Query().Where(session.UserIDEQ(userID)).Select(session.FieldID).Strings(ctx)
 	if err != nil {
@@ -158,6 +167,18 @@ func purgeUserData(ctx context.Context, tx *ent.Tx, userID, deletionActivationID
 		return err
 	}
 	if _, err = tx.UserBudget.Update().Where(userbudget.UpdatedByUserIDEQ(userID)).SetUpdatedByUserID(deletedActorID).Save(ctx); err != nil {
+		return err
+	}
+	if _, err = tx.BudgetTemplate.Update().Where(budgettemplate.CreatedByUserIDEQ(userID)).SetCreatedByUserID(deletedActorID).Save(ctx); err != nil {
+		return err
+	}
+	if _, err = tx.BudgetTemplate.Update().Where(budgettemplate.UpdatedByUserIDEQ(userID)).SetUpdatedByUserID(deletedActorID).Save(ctx); err != nil {
+		return err
+	}
+	if _, err = tx.BudgetTemplateAssignment.Update().Where(budgettemplateassignment.UpdatedByUserIDEQ(userID)).SetUpdatedByUserID(deletedActorID).Save(ctx); err != nil {
+		return err
+	}
+	if _, err = tx.BudgetTemplateAudit.Update().Where(budgettemplateaudit.ActorUserIDEQ(userID)).SetActorUserID(deletedActorID).Save(ctx); err != nil {
 		return err
 	}
 	if _, err = tx.Enrollment.Update().Where(enrollment.CreatedByUserIDEQ(userID)).SetCreatedByUserID(deletedActorID).Save(ctx); err != nil {

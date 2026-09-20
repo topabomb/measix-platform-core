@@ -15,9 +15,9 @@ func (UserBudget) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("id"),
 		field.String("user_id"),
-		field.Enum("capability").Values("MODEL", "TTS", "ASR", "MCP"),
+		field.Enum("capability").Values("MODEL", "IMAGE_GENERATION", "TTS", "ASR", "MCP"),
 		field.Enum("mode").Values("UNLIMITED", "LIMITED"),
-		field.Enum("source").Values("EXPLICIT"),
+		field.Enum("source").Values("DEFAULT", "TEMPLATE", "EXPLICIT"),
 		field.Int64("revision").Positive(),
 		field.Time("activated_at"),
 		field.Time("updated_at"),

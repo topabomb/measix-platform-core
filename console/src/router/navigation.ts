@@ -1,7 +1,7 @@
 // Navigation registry (implementation §3.2): drives the primary navigation from
-// stable route metadata instead of a hardcoded array in AdminLayout. S0.1 keeps
-// the exact product IA: Overview / Users / Resources / Upstreams / Releases /
-// Usage / System — no coming-soon entries.
+// stable route metadata instead of a hardcoded array in AdminLayout. Entries
+// appear only when their current product surface is implemented; no
+// coming-soon placeholders are registered here.
 
 export interface NavItem {
   /** Stable route id — matches the router route name. */
@@ -21,6 +21,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { id: 'Overview', label: 'Overview', icon: 'dashboard', order: 0, path: '/', visible: true, group: 'configuration' },
   { id: 'Users', label: 'Users', icon: 'group', order: 10, path: '/users', visible: true, group: 'configuration' },
+  { id: 'BudgetTemplates', label: 'Budget Templates', icon: 'account_balance_wallet', order: 15, path: '/budget-templates', visible: true, group: 'configuration' },
   { id: 'Resources', label: 'Resources', icon: 'hub', order: 20, path: '/resources', visible: true, group: 'configuration' },
   { id: 'Upstreams', label: 'Upstreams', icon: 'cloud', order: 30, path: '/upstreams', visible: true, group: 'configuration' },
   { id: 'Releases', label: 'Releases', icon: 'rocket_launch', order: 40, path: '/releases', visible: true, group: 'configuration' },

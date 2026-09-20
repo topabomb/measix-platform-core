@@ -37,11 +37,12 @@ func main() {
 	root := filepath.Join("..", "api", "fixtures")
 	out := filepath.Join(root, "client-integration")
 	must(os.MkdirAll(out, 0755))
-	write := func(name string, value any) {
+	writeTo := func(directory, name string, value any) {
 		raw, err := json.MarshalIndent(value, "", "  ")
 		must(err)
-		must(os.WriteFile(filepath.Join(out, name), append(raw, '\n'), 0644))
+		must(os.WriteFile(filepath.Join(directory, name), append(raw, '\n'), 0644))
 	}
+	write := func(name string, value any) { writeTo(out, name, value) }
 	raw, err := os.ReadFile(filepath.Join(root, "draft", "s02-client-profile.json"))
 	must(err)
 	var content adminapi.ManagedDraftContent
@@ -54,6 +55,16 @@ func main() {
 	snapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: content, PublishedAt: at, PublishedByUserID: user})
 	must(err)
 	write("snapshot-v4.json", snapshot)
+	emptyImages := []adminapi.ImageGenerationDefinition{}
+	policyOnly := adminapi.ManagedDraftContent{
+		Providers: []adminapi.ProviderDefinition{}, Models: []adminapi.ModelDefinition{}, ImageGenerators: &emptyImages,
+		Tts: []adminapi.TtsDefinition{}, Asr: []adminapi.AsrDefinition{}, Mcp: []adminapi.McpDefinition{},
+		Assistants: []adminapi.ManagedAssistantDefinition{}, Starters: []adminapi.AssistantStarterDefinition{}, Bindings: []adminapi.RuntimeBindingDefinition{},
+		Policy: adminapi.ManagedPolicy{PolicyId: "pol_550e8400-e29b-41d4-a716-446655440000", AllowLocalProviders: true, AllowLocalMcp: true, AllowLocalAssistants: true},
+	}
+	policySnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 2, Content: policyOnly, PublishedAt: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)})
+	must(err)
+	writeTo(filepath.Join(root, "snapshot"), "v4-user-configuration-policy.json", policySnapshot)
 	denied := content
 	denied.Policy.AllowLocalProviders = false
 	denied.Policy.AllowLocalTts = false
@@ -79,6 +90,10 @@ func main() {
 		{"default-missing-model", "invalid_default_model", func(v object) {
 			v["policy"].(map[string]any)["defaultModelId"] = "mdl_99999999-9999-4999-8999-999999999999"
 		}},
+		{"default-missing-image-generation", "invalid_default_image_generation", func(v object) {
+			v["policy"].(map[string]any)["defaultImageGenerationId"] = "img_99999999-9999-4999-8999-999999999999"
+		}},
+		{"default-disabled-image-generation", "invalid_default_image_generation", func(v object) { v["imageGenerators"].([]any)[0].(map[string]any)["enabled"] = false }},
 		{"default-disabled-tts", "invalid_default_tts", func(v object) { v["tts"].([]any)[0].(map[string]any)["enabled"] = false }},
 		{"default-disabled-asr", "invalid_default_asr", func(v object) { v["asr"].([]any)[0].(map[string]any)["enabled"] = false }},
 		{"default-missing-assistant", "invalid_default_assistant", func(v object) {
@@ -241,6 +256,7 @@ func main() {
 	headers := object{"Authorization": "Bearer synthetic.access.token", "X-Measix-Managed-Generation": "42", "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000"}
 	write("runtime-examples.json", []object{
 		{"resourceId": snapshot.Models[0].ModelId, "protocol": snapshot.Providers[0].ClientProtocol, "method": "POST", "url": base + snapshot.Models[0].ModelId + snapshot.Models[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": snapshot.Models[0].UpstreamModelKey, "messages": []object{{"role": "user", "content": "Hello"}}, "stream": true, "stream_options": object{"include_usage": true}}, "responseKind": "SSE"},
+		{"resourceId": (*snapshot.ImageGenerators)[0].ImageId, "protocol": (*snapshot.ImageGenerators)[0].ClientProtocol, "method": "POST", "url": base + (*snapshot.ImageGenerators)[0].ImageId + (*snapshot.ImageGenerators)[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": (*snapshot.ImageGenerators)[0].UpstreamModelKey, "prompt": "A synthetic fixture image", "n": 1, "size": (*snapshot.ImageGenerators)[0].AllowedSizes[0]}, "responseKind": "JSON_IMAGE_DATA"},
 		{"resourceId": snapshot.Tts[0].TtsId, "protocol": snapshot.Tts[0].ClientProtocol, "method": "POST", "url": base + snapshot.Tts[0].TtsId + snapshot.Tts[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": snapshot.Tts[0].UpstreamModelKey, "voice": snapshot.Tts[0].Voice, "input": "Hello"}, "responseKind": "BINARY_AUDIO"},
 		{"resourceId": snapshot.Asr[0].AsrId, "protocol": snapshot.Asr[0].ClientProtocol, "method": "POST", "url": base + snapshot.Asr[0].AsrId + snapshot.Asr[0].RuntimePath, "headers": headers, "contentType": "multipart/form-data", "fields": object{"model": snapshot.Asr[0].UpstreamModelKey, "language": snapshot.Asr[0].Language, "file": "<client audio bytes>"}, "responseKind": "JSON"},
 		{"resourceId": asrSnapshot.Asr[1].AsrId, "protocol": asrSnapshot.Asr[1].ClientProtocol, "method": "POST", "url": base + asrSnapshot.Asr[1].AsrId + asrSnapshot.Asr[1].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": asrSnapshot.Asr[1].UpstreamModelKey, "input": object{"messages": []object{{"role": "user", "content": []object{{"type": "input_audio", "input_audio": object{"data": "data:audio/wav;base64,<recording>"}}}}}}, "parameters": object{"format": "wav"}}, "responseKind": "JSON_OUTPUT_TEXT"},

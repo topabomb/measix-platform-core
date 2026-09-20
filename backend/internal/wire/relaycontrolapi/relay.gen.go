@@ -14,16 +14,19 @@ import (
 
 // Defines values for BudgetContextCapability.
 const (
-	BudgetContextCapabilityASR   BudgetContextCapability = "ASR"
-	BudgetContextCapabilityMCP   BudgetContextCapability = "MCP"
-	BudgetContextCapabilityMODEL BudgetContextCapability = "MODEL"
-	BudgetContextCapabilityTTS   BudgetContextCapability = "TTS"
+	BudgetContextCapabilityASR             BudgetContextCapability = "ASR"
+	BudgetContextCapabilityIMAGEGENERATION BudgetContextCapability = "IMAGE_GENERATION"
+	BudgetContextCapabilityMCP             BudgetContextCapability = "MCP"
+	BudgetContextCapabilityMODEL           BudgetContextCapability = "MODEL"
+	BudgetContextCapabilityTTS             BudgetContextCapability = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the BudgetContextCapability enum.
 func (e BudgetContextCapability) Valid() bool {
 	switch e {
 	case BudgetContextCapabilityASR:
+		return true
+	case BudgetContextCapabilityIMAGEGENERATION:
 		return true
 	case BudgetContextCapabilityMCP:
 		return true
@@ -56,13 +59,14 @@ func (e BudgetContextMode) Valid() bool {
 
 // Defines values for BudgetLimitStateMeter.
 const (
-	AUDIOSECONDS BudgetLimitStateMeter = "AUDIO_SECONDS"
-	CACHEDTOKENS BudgetLimitStateMeter = "CACHED_TOKENS"
-	CHARACTERS   BudgetLimitStateMeter = "CHARACTERS"
-	INPUTTOKENS  BudgetLimitStateMeter = "INPUT_TOKENS"
-	OUTPUTTOKENS BudgetLimitStateMeter = "OUTPUT_TOKENS"
-	REQUESTS     BudgetLimitStateMeter = "REQUESTS"
-	TOTALTOKENS  BudgetLimitStateMeter = "TOTAL_TOKENS"
+	AUDIOSECONDS    BudgetLimitStateMeter = "AUDIO_SECONDS"
+	CACHEDTOKENS    BudgetLimitStateMeter = "CACHED_TOKENS"
+	CHARACTERS      BudgetLimitStateMeter = "CHARACTERS"
+	INPUTTOKENS     BudgetLimitStateMeter = "INPUT_TOKENS"
+	OUTPUTTOKENS    BudgetLimitStateMeter = "OUTPUT_TOKENS"
+	REQUESTEDIMAGES BudgetLimitStateMeter = "REQUESTED_IMAGES"
+	REQUESTS        BudgetLimitStateMeter = "REQUESTS"
+	TOTALTOKENS     BudgetLimitStateMeter = "TOTAL_TOKENS"
 )
 
 // Valid indicates whether the value is a known member of the BudgetLimitStateMeter enum.
@@ -77,6 +81,8 @@ func (e BudgetLimitStateMeter) Valid() bool {
 	case INPUTTOKENS:
 		return true
 	case OUTPUTTOKENS:
+		return true
+	case REQUESTEDIMAGES:
 		return true
 	case REQUESTS:
 		return true
@@ -201,6 +207,7 @@ const (
 	OPENAIAUDIOSPEECH           ResourceRouteClientProtocol = "OPENAI_AUDIO_SPEECH"
 	OPENAIAUDIOTRANSCRIPTIONS   ResourceRouteClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
 	OPENAICHATCOMPLETIONS       ResourceRouteClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	OPENAIIMAGESGENERATIONS     ResourceRouteClientProtocol = "OPENAI_IMAGES_GENERATIONS"
 	OPENAIREALTIMETRANSCRIPTION ResourceRouteClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
 	OPENAIRESPONSES             ResourceRouteClientProtocol = "OPENAI_RESPONSES"
 )
@@ -228,6 +235,8 @@ func (e ResourceRouteClientProtocol) Valid() bool {
 		return true
 	case OPENAICHATCOMPLETIONS:
 		return true
+	case OPENAIIMAGESGENERATIONS:
+		return true
 	case OPENAIREALTIMETRANSCRIPTION:
 		return true
 	case OPENAIRESPONSES:
@@ -239,16 +248,19 @@ func (e ResourceRouteClientProtocol) Valid() bool {
 
 // Defines values for ResourceRouteResourceKind.
 const (
-	ResourceRouteResourceKindASR   ResourceRouteResourceKind = "ASR"
-	ResourceRouteResourceKindMCP   ResourceRouteResourceKind = "MCP"
-	ResourceRouteResourceKindMODEL ResourceRouteResourceKind = "MODEL"
-	ResourceRouteResourceKindTTS   ResourceRouteResourceKind = "TTS"
+	ResourceRouteResourceKindASR             ResourceRouteResourceKind = "ASR"
+	ResourceRouteResourceKindIMAGEGENERATION ResourceRouteResourceKind = "IMAGE_GENERATION"
+	ResourceRouteResourceKindMCP             ResourceRouteResourceKind = "MCP"
+	ResourceRouteResourceKindMODEL           ResourceRouteResourceKind = "MODEL"
+	ResourceRouteResourceKindTTS             ResourceRouteResourceKind = "TTS"
 )
 
 // Valid indicates whether the value is a known member of the ResourceRouteResourceKind enum.
 func (e ResourceRouteResourceKind) Valid() bool {
 	switch e {
 	case ResourceRouteResourceKindASR:
+		return true
+	case ResourceRouteResourceKindIMAGEGENERATION:
 		return true
 	case ResourceRouteResourceKindMCP:
 		return true
@@ -544,6 +556,7 @@ type RequestId = string
 type ResourceRoute struct {
 	AudioProfile   *RuntimeAudioProfile        `json:"audioProfile,omitempty"`
 	ClientProtocol ResourceRouteClientProtocol `json:"clientProtocol"`
+	ImageProfile   *RuntimeImageProfile        `json:"imageProfile,omitempty"`
 	LlmProfile     *RuntimeLlmProfile          `json:"llmProfile,omitempty"`
 	ResourceId     string                      `json:"resourceId"`
 	ResourceKind   ResourceRouteResourceKind   `json:"resourceKind"`
@@ -584,6 +597,12 @@ type RuntimeControlState struct {
 	ResourceRoutes          []ResourceRoute       `json:"resourceRoutes"`
 	Routes                  []RuntimeRouteSpec    `json:"routes"`
 	Upstreams               []RuntimeUpstreamSpec `json:"upstreams"`
+}
+
+// RuntimeImageProfile defines model for RuntimeImageProfile.
+type RuntimeImageProfile struct {
+	AllowedSizes        []string `json:"allowedSizes"`
+	MaxImagesPerRequest int      `json:"maxImagesPerRequest"`
 }
 
 // RuntimeLlmProfile defines model for RuntimeLlmProfile.

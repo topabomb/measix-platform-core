@@ -176,10 +176,10 @@ func validCompleteness(value Completeness) bool {
 // defined in architecture s0-control-protocol §13.
 // Standard meters for S0.1 required profile:
 //
-//	INPUT_TOKENS, OUTPUT_TOKENS, CACHED_TOKENS, CHARACTERS, AUDIO_SECONDS, REQUESTS
+//	INPUT_TOKENS, OUTPUT_TOKENS, CACHED_TOKENS, CHARACTERS, AUDIO_SECONDS, REQUESTED_IMAGES, REQUESTS
 func validMeter(value string) bool {
 	switch strings.TrimSpace(value) {
-	case "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_SECONDS", "REQUESTS":
+	case "INPUT_TOKENS", "OUTPUT_TOKENS", "CACHED_TOKENS", "TOTAL_TOKENS", "CHARACTERS", "AUDIO_SECONDS", "REQUESTED_IMAGES", "REQUESTS":
 		return true
 	}
 	return false
@@ -190,7 +190,7 @@ func runtimeResourceID(value string) bool {
 	if err != nil {
 		return false
 	}
-	return kind == platformid.Model || kind == platformid.TTS || kind == platformid.ASR || kind == platformid.MCP
+	return kind == platformid.Model || kind == platformid.ImageGeneration || kind == platformid.TTS || kind == platformid.ASR || kind == platformid.MCP
 }
 
 func decimalRat(value string) (*big.Rat, bool) {

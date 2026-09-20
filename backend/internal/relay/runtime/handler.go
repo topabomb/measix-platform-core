@@ -161,10 +161,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeProblem(observer, http.StatusRequestEntityTooLarge, "request_too_large", "Request too large", requestID, nil, false)
 		return
 	}
-	observation, err := prepareUsageObservation(resource, r, maxRequestBytes)
+	observation, err := prepareUsageObservation(resource, r, runtimePath, maxRequestBytes)
 	if err != nil {
 		if errors.Is(err, errObservedRequestTooLarge) {
 			writeProblem(observer, http.StatusRequestEntityTooLarge, "request_too_large", "Request too large", requestID, nil, false)
+		} else if errors.Is(err, errInvalidImageGenerationRequest) {
+			writeProblem(observer, http.StatusBadRequest, "invalid_request", "Invalid image generation request", requestID, nil, false)
 		} else {
 			writeProblem(observer, http.StatusUnprocessableEntity, "usage_meter_unavailable", "Request cannot be measured for this resource", requestID, nil, false)
 		}

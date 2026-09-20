@@ -14,6 +14,9 @@ import (
 	"measix/platform/ent/budgetreconciliation"
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/budgetsettlement"
+	"measix/platform/ent/budgettemplate"
+	"measix/platform/ent/budgettemplateassignment"
+	"measix/platform/ent/budgettemplateaudit"
 	"measix/platform/ent/deletedcredential"
 	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/deployment"
@@ -55,38 +58,41 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeActivation             = "Activation"
-	TypeBudgetAllocation       = "BudgetAllocation"
-	TypeBudgetAudit            = "BudgetAudit"
-	TypeBudgetBucket           = "BudgetBucket"
-	TypeBudgetLimit            = "BudgetLimit"
-	TypeBudgetReconciliation   = "BudgetReconciliation"
-	TypeBudgetRequest          = "BudgetRequest"
-	TypeBudgetSettlement       = "BudgetSettlement"
-	TypeDeletedCredential      = "DeletedCredential"
-	TypeDeletedPrincipal       = "DeletedPrincipal"
-	TypeDeployment             = "Deployment"
-	TypeDeploymentSettingAudit = "DeploymentSettingAudit"
-	TypeDevice                 = "Device"
-	TypeEnrollment             = "Enrollment"
-	TypeEnterpriseUpdate       = "EnterpriseUpdate"
-	TypeIdempotencyRecord      = "IdempotencyRecord"
-	TypeManagedDraft           = "ManagedDraft"
-	TypeManagedRelease         = "ManagedRelease"
-	TypeManagedState           = "ManagedState"
-	TypePortalSession          = "PortalSession"
-	TypePricingRule            = "PricingRule"
-	TypeRequestUsage           = "RequestUsage"
-	TypeSecret                 = "Secret"
-	TypeSecretVersion          = "SecretVersion"
-	TypeSemanticUsage          = "SemanticUsage"
-	TypeSession                = "Session"
-	TypeUpstream               = "Upstream"
-	TypeUpstreamConfigRevision = "UpstreamConfigRevision"
-	TypeUsageDetail            = "UsageDetail"
-	TypeUsageEvent             = "UsageEvent"
-	TypeUser                   = "User"
-	TypeUserBudget             = "UserBudget"
+	TypeActivation               = "Activation"
+	TypeBudgetAllocation         = "BudgetAllocation"
+	TypeBudgetAudit              = "BudgetAudit"
+	TypeBudgetBucket             = "BudgetBucket"
+	TypeBudgetLimit              = "BudgetLimit"
+	TypeBudgetReconciliation     = "BudgetReconciliation"
+	TypeBudgetRequest            = "BudgetRequest"
+	TypeBudgetSettlement         = "BudgetSettlement"
+	TypeBudgetTemplate           = "BudgetTemplate"
+	TypeBudgetTemplateAssignment = "BudgetTemplateAssignment"
+	TypeBudgetTemplateAudit      = "BudgetTemplateAudit"
+	TypeDeletedCredential        = "DeletedCredential"
+	TypeDeletedPrincipal         = "DeletedPrincipal"
+	TypeDeployment               = "Deployment"
+	TypeDeploymentSettingAudit   = "DeploymentSettingAudit"
+	TypeDevice                   = "Device"
+	TypeEnrollment               = "Enrollment"
+	TypeEnterpriseUpdate         = "EnterpriseUpdate"
+	TypeIdempotencyRecord        = "IdempotencyRecord"
+	TypeManagedDraft             = "ManagedDraft"
+	TypeManagedRelease           = "ManagedRelease"
+	TypeManagedState             = "ManagedState"
+	TypePortalSession            = "PortalSession"
+	TypePricingRule              = "PricingRule"
+	TypeRequestUsage             = "RequestUsage"
+	TypeSecret                   = "Secret"
+	TypeSecretVersion            = "SecretVersion"
+	TypeSemanticUsage            = "SemanticUsage"
+	TypeSession                  = "Session"
+	TypeUpstream                 = "Upstream"
+	TypeUpstreamConfigRevision   = "UpstreamConfigRevision"
+	TypeUsageDetail              = "UsageDetail"
+	TypeUsageEvent               = "UsageEvent"
+	TypeUser                     = "User"
+	TypeUserBudget               = "UserBudget"
 )
 
 // ActivationMutation represents an operation that mutates the Activation nodes in the graph.
@@ -8738,6 +8744,2356 @@ func (m *BudgetSettlementMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *BudgetSettlementMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown BudgetSettlement edge %s", name)
+}
+
+// BudgetTemplateMutation represents an operation that mutates the BudgetTemplate nodes in the graph.
+type BudgetTemplateMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *string
+	name               *string
+	description        *string
+	rules_json         *[]byte
+	revision           *int64
+	addrevision        *int64
+	created_at         *time.Time
+	created_by_user_id *string
+	updated_at         *time.Time
+	updated_by_user_id *string
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*BudgetTemplate, error)
+	predicates         []predicate.BudgetTemplate
+}
+
+var _ ent.Mutation = (*BudgetTemplateMutation)(nil)
+
+// budgettemplateOption allows management of the mutation configuration using functional options.
+type budgettemplateOption func(*BudgetTemplateMutation)
+
+// newBudgetTemplateMutation creates new mutation for the BudgetTemplate entity.
+func newBudgetTemplateMutation(c config, op Op, opts ...budgettemplateOption) *BudgetTemplateMutation {
+	m := &BudgetTemplateMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeBudgetTemplate,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withBudgetTemplateID sets the ID field of the mutation.
+func withBudgetTemplateID(id string) budgettemplateOption {
+	return func(m *BudgetTemplateMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *BudgetTemplate
+		)
+		m.oldValue = func(ctx context.Context) (*BudgetTemplate, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().BudgetTemplate.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withBudgetTemplate sets the old BudgetTemplate of the mutation.
+func withBudgetTemplate(node *BudgetTemplate) budgettemplateOption {
+	return func(m *BudgetTemplateMutation) {
+		m.oldValue = func(context.Context) (*BudgetTemplate, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m BudgetTemplateMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m BudgetTemplateMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of BudgetTemplate entities.
+func (m *BudgetTemplateMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *BudgetTemplateMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *BudgetTemplateMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().BudgetTemplate.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetName sets the "name" field.
+func (m *BudgetTemplateMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *BudgetTemplateMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the BudgetTemplate entity.
+// If the BudgetTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *BudgetTemplateMutation) ResetName() {
+	m.name = nil
+}
+
+// SetDescription sets the "description" field.
+func (m *BudgetTemplateMutation) SetDescription(s string) {
+	m.description = &s
+}
+
+// Description returns the value of the "description" field in the mutation.
+func (m *BudgetTemplateMutation) Description() (r string, exists bool) {
+	v := m.description
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDescription returns the old "description" field's value of the BudgetTemplate entity.
+// If the BudgetTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateMutation) OldDescription(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDescription is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDescription requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDescription: %w", err)
+	}
+	return oldValue.Description, nil
+}
+
+// ResetDescription resets all changes to the "description" field.
+func (m *BudgetTemplateMutation) ResetDescription() {
+	m.description = nil
+}
+
+// SetRulesJSON sets the "rules_json" field.
+func (m *BudgetTemplateMutation) SetRulesJSON(b []byte) {
+	m.rules_json = &b
+}
+
+// RulesJSON returns the value of the "rules_json" field in the mutation.
+func (m *BudgetTemplateMutation) RulesJSON() (r []byte, exists bool) {
+	v := m.rules_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRulesJSON returns the old "rules_json" field's value of the BudgetTemplate entity.
+// If the BudgetTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateMutation) OldRulesJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRulesJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRulesJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRulesJSON: %w", err)
+	}
+	return oldValue.RulesJSON, nil
+}
+
+// ResetRulesJSON resets all changes to the "rules_json" field.
+func (m *BudgetTemplateMutation) ResetRulesJSON() {
+	m.rules_json = nil
+}
+
+// SetRevision sets the "revision" field.
+func (m *BudgetTemplateMutation) SetRevision(i int64) {
+	m.revision = &i
+	m.addrevision = nil
+}
+
+// Revision returns the value of the "revision" field in the mutation.
+func (m *BudgetTemplateMutation) Revision() (r int64, exists bool) {
+	v := m.revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevision returns the old "revision" field's value of the BudgetTemplate entity.
+// If the BudgetTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateMutation) OldRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevision: %w", err)
+	}
+	return oldValue.Revision, nil
+}
+
+// AddRevision adds i to the "revision" field.
+func (m *BudgetTemplateMutation) AddRevision(i int64) {
+	if m.addrevision != nil {
+		*m.addrevision += i
+	} else {
+		m.addrevision = &i
+	}
+}
+
+// AddedRevision returns the value that was added to the "revision" field in this mutation.
+func (m *BudgetTemplateMutation) AddedRevision() (r int64, exists bool) {
+	v := m.addrevision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRevision resets all changes to the "revision" field.
+func (m *BudgetTemplateMutation) ResetRevision() {
+	m.revision = nil
+	m.addrevision = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *BudgetTemplateMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *BudgetTemplateMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the BudgetTemplate entity.
+// If the BudgetTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *BudgetTemplateMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *BudgetTemplateMutation) SetCreatedByUserID(s string) {
+	m.created_by_user_id = &s
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *BudgetTemplateMutation) CreatedByUserID() (r string, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the BudgetTemplate entity.
+// If the BudgetTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateMutation) OldCreatedByUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *BudgetTemplateMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *BudgetTemplateMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *BudgetTemplateMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the BudgetTemplate entity.
+// If the BudgetTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *BudgetTemplateMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetUpdatedByUserID sets the "updated_by_user_id" field.
+func (m *BudgetTemplateMutation) SetUpdatedByUserID(s string) {
+	m.updated_by_user_id = &s
+}
+
+// UpdatedByUserID returns the value of the "updated_by_user_id" field in the mutation.
+func (m *BudgetTemplateMutation) UpdatedByUserID() (r string, exists bool) {
+	v := m.updated_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedByUserID returns the old "updated_by_user_id" field's value of the BudgetTemplate entity.
+// If the BudgetTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateMutation) OldUpdatedByUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedByUserID: %w", err)
+	}
+	return oldValue.UpdatedByUserID, nil
+}
+
+// ResetUpdatedByUserID resets all changes to the "updated_by_user_id" field.
+func (m *BudgetTemplateMutation) ResetUpdatedByUserID() {
+	m.updated_by_user_id = nil
+}
+
+// Where appends a list predicates to the BudgetTemplateMutation builder.
+func (m *BudgetTemplateMutation) Where(ps ...predicate.BudgetTemplate) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the BudgetTemplateMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *BudgetTemplateMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.BudgetTemplate, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *BudgetTemplateMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *BudgetTemplateMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (BudgetTemplate).
+func (m *BudgetTemplateMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *BudgetTemplateMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.name != nil {
+		fields = append(fields, budgettemplate.FieldName)
+	}
+	if m.description != nil {
+		fields = append(fields, budgettemplate.FieldDescription)
+	}
+	if m.rules_json != nil {
+		fields = append(fields, budgettemplate.FieldRulesJSON)
+	}
+	if m.revision != nil {
+		fields = append(fields, budgettemplate.FieldRevision)
+	}
+	if m.created_at != nil {
+		fields = append(fields, budgettemplate.FieldCreatedAt)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, budgettemplate.FieldCreatedByUserID)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, budgettemplate.FieldUpdatedAt)
+	}
+	if m.updated_by_user_id != nil {
+		fields = append(fields, budgettemplate.FieldUpdatedByUserID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *BudgetTemplateMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case budgettemplate.FieldName:
+		return m.Name()
+	case budgettemplate.FieldDescription:
+		return m.Description()
+	case budgettemplate.FieldRulesJSON:
+		return m.RulesJSON()
+	case budgettemplate.FieldRevision:
+		return m.Revision()
+	case budgettemplate.FieldCreatedAt:
+		return m.CreatedAt()
+	case budgettemplate.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case budgettemplate.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case budgettemplate.FieldUpdatedByUserID:
+		return m.UpdatedByUserID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *BudgetTemplateMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case budgettemplate.FieldName:
+		return m.OldName(ctx)
+	case budgettemplate.FieldDescription:
+		return m.OldDescription(ctx)
+	case budgettemplate.FieldRulesJSON:
+		return m.OldRulesJSON(ctx)
+	case budgettemplate.FieldRevision:
+		return m.OldRevision(ctx)
+	case budgettemplate.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case budgettemplate.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case budgettemplate.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case budgettemplate.FieldUpdatedByUserID:
+		return m.OldUpdatedByUserID(ctx)
+	}
+	return nil, fmt.Errorf("unknown BudgetTemplate field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BudgetTemplateMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case budgettemplate.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case budgettemplate.FieldDescription:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDescription(v)
+		return nil
+	case budgettemplate.FieldRulesJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRulesJSON(v)
+		return nil
+	case budgettemplate.FieldRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevision(v)
+		return nil
+	case budgettemplate.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case budgettemplate.FieldCreatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case budgettemplate.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case budgettemplate.FieldUpdatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplate field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *BudgetTemplateMutation) AddedFields() []string {
+	var fields []string
+	if m.addrevision != nil {
+		fields = append(fields, budgettemplate.FieldRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *BudgetTemplateMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case budgettemplate.FieldRevision:
+		return m.AddedRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BudgetTemplateMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case budgettemplate.FieldRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplate numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *BudgetTemplateMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *BudgetTemplateMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *BudgetTemplateMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown BudgetTemplate nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *BudgetTemplateMutation) ResetField(name string) error {
+	switch name {
+	case budgettemplate.FieldName:
+		m.ResetName()
+		return nil
+	case budgettemplate.FieldDescription:
+		m.ResetDescription()
+		return nil
+	case budgettemplate.FieldRulesJSON:
+		m.ResetRulesJSON()
+		return nil
+	case budgettemplate.FieldRevision:
+		m.ResetRevision()
+		return nil
+	case budgettemplate.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case budgettemplate.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case budgettemplate.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case budgettemplate.FieldUpdatedByUserID:
+		m.ResetUpdatedByUserID()
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplate field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *BudgetTemplateMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *BudgetTemplateMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *BudgetTemplateMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *BudgetTemplateMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *BudgetTemplateMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *BudgetTemplateMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *BudgetTemplateMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown BudgetTemplate unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *BudgetTemplateMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown BudgetTemplate edge %s", name)
+}
+
+// BudgetTemplateAssignmentMutation represents an operation that mutates the BudgetTemplateAssignment nodes in the graph.
+type BudgetTemplateAssignmentMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *int
+	user_id            *string
+	budget_template_id *string
+	revision           *int64
+	addrevision        *int64
+	assigned_at        *time.Time
+	updated_at         *time.Time
+	updated_by_user_id *string
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*BudgetTemplateAssignment, error)
+	predicates         []predicate.BudgetTemplateAssignment
+}
+
+var _ ent.Mutation = (*BudgetTemplateAssignmentMutation)(nil)
+
+// budgettemplateassignmentOption allows management of the mutation configuration using functional options.
+type budgettemplateassignmentOption func(*BudgetTemplateAssignmentMutation)
+
+// newBudgetTemplateAssignmentMutation creates new mutation for the BudgetTemplateAssignment entity.
+func newBudgetTemplateAssignmentMutation(c config, op Op, opts ...budgettemplateassignmentOption) *BudgetTemplateAssignmentMutation {
+	m := &BudgetTemplateAssignmentMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeBudgetTemplateAssignment,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withBudgetTemplateAssignmentID sets the ID field of the mutation.
+func withBudgetTemplateAssignmentID(id int) budgettemplateassignmentOption {
+	return func(m *BudgetTemplateAssignmentMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *BudgetTemplateAssignment
+		)
+		m.oldValue = func(ctx context.Context) (*BudgetTemplateAssignment, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().BudgetTemplateAssignment.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withBudgetTemplateAssignment sets the old BudgetTemplateAssignment of the mutation.
+func withBudgetTemplateAssignment(node *BudgetTemplateAssignment) budgettemplateassignmentOption {
+	return func(m *BudgetTemplateAssignmentMutation) {
+		m.oldValue = func(context.Context) (*BudgetTemplateAssignment, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m BudgetTemplateAssignmentMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m BudgetTemplateAssignmentMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of BudgetTemplateAssignment entities.
+func (m *BudgetTemplateAssignmentMutation) SetID(id int) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *BudgetTemplateAssignmentMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *BudgetTemplateAssignmentMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().BudgetTemplateAssignment.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetUserID sets the "user_id" field.
+func (m *BudgetTemplateAssignmentMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *BudgetTemplateAssignmentMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the BudgetTemplateAssignment entity.
+// If the BudgetTemplateAssignment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAssignmentMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *BudgetTemplateAssignmentMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetBudgetTemplateID sets the "budget_template_id" field.
+func (m *BudgetTemplateAssignmentMutation) SetBudgetTemplateID(s string) {
+	m.budget_template_id = &s
+}
+
+// BudgetTemplateID returns the value of the "budget_template_id" field in the mutation.
+func (m *BudgetTemplateAssignmentMutation) BudgetTemplateID() (r string, exists bool) {
+	v := m.budget_template_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBudgetTemplateID returns the old "budget_template_id" field's value of the BudgetTemplateAssignment entity.
+// If the BudgetTemplateAssignment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAssignmentMutation) OldBudgetTemplateID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBudgetTemplateID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBudgetTemplateID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBudgetTemplateID: %w", err)
+	}
+	return oldValue.BudgetTemplateID, nil
+}
+
+// ResetBudgetTemplateID resets all changes to the "budget_template_id" field.
+func (m *BudgetTemplateAssignmentMutation) ResetBudgetTemplateID() {
+	m.budget_template_id = nil
+}
+
+// SetRevision sets the "revision" field.
+func (m *BudgetTemplateAssignmentMutation) SetRevision(i int64) {
+	m.revision = &i
+	m.addrevision = nil
+}
+
+// Revision returns the value of the "revision" field in the mutation.
+func (m *BudgetTemplateAssignmentMutation) Revision() (r int64, exists bool) {
+	v := m.revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevision returns the old "revision" field's value of the BudgetTemplateAssignment entity.
+// If the BudgetTemplateAssignment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAssignmentMutation) OldRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevision: %w", err)
+	}
+	return oldValue.Revision, nil
+}
+
+// AddRevision adds i to the "revision" field.
+func (m *BudgetTemplateAssignmentMutation) AddRevision(i int64) {
+	if m.addrevision != nil {
+		*m.addrevision += i
+	} else {
+		m.addrevision = &i
+	}
+}
+
+// AddedRevision returns the value that was added to the "revision" field in this mutation.
+func (m *BudgetTemplateAssignmentMutation) AddedRevision() (r int64, exists bool) {
+	v := m.addrevision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRevision resets all changes to the "revision" field.
+func (m *BudgetTemplateAssignmentMutation) ResetRevision() {
+	m.revision = nil
+	m.addrevision = nil
+}
+
+// SetAssignedAt sets the "assigned_at" field.
+func (m *BudgetTemplateAssignmentMutation) SetAssignedAt(t time.Time) {
+	m.assigned_at = &t
+}
+
+// AssignedAt returns the value of the "assigned_at" field in the mutation.
+func (m *BudgetTemplateAssignmentMutation) AssignedAt() (r time.Time, exists bool) {
+	v := m.assigned_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAssignedAt returns the old "assigned_at" field's value of the BudgetTemplateAssignment entity.
+// If the BudgetTemplateAssignment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAssignmentMutation) OldAssignedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAssignedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAssignedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAssignedAt: %w", err)
+	}
+	return oldValue.AssignedAt, nil
+}
+
+// ResetAssignedAt resets all changes to the "assigned_at" field.
+func (m *BudgetTemplateAssignmentMutation) ResetAssignedAt() {
+	m.assigned_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *BudgetTemplateAssignmentMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *BudgetTemplateAssignmentMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the BudgetTemplateAssignment entity.
+// If the BudgetTemplateAssignment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAssignmentMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *BudgetTemplateAssignmentMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetUpdatedByUserID sets the "updated_by_user_id" field.
+func (m *BudgetTemplateAssignmentMutation) SetUpdatedByUserID(s string) {
+	m.updated_by_user_id = &s
+}
+
+// UpdatedByUserID returns the value of the "updated_by_user_id" field in the mutation.
+func (m *BudgetTemplateAssignmentMutation) UpdatedByUserID() (r string, exists bool) {
+	v := m.updated_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedByUserID returns the old "updated_by_user_id" field's value of the BudgetTemplateAssignment entity.
+// If the BudgetTemplateAssignment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAssignmentMutation) OldUpdatedByUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedByUserID: %w", err)
+	}
+	return oldValue.UpdatedByUserID, nil
+}
+
+// ResetUpdatedByUserID resets all changes to the "updated_by_user_id" field.
+func (m *BudgetTemplateAssignmentMutation) ResetUpdatedByUserID() {
+	m.updated_by_user_id = nil
+}
+
+// Where appends a list predicates to the BudgetTemplateAssignmentMutation builder.
+func (m *BudgetTemplateAssignmentMutation) Where(ps ...predicate.BudgetTemplateAssignment) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the BudgetTemplateAssignmentMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *BudgetTemplateAssignmentMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.BudgetTemplateAssignment, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *BudgetTemplateAssignmentMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *BudgetTemplateAssignmentMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (BudgetTemplateAssignment).
+func (m *BudgetTemplateAssignmentMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *BudgetTemplateAssignmentMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.user_id != nil {
+		fields = append(fields, budgettemplateassignment.FieldUserID)
+	}
+	if m.budget_template_id != nil {
+		fields = append(fields, budgettemplateassignment.FieldBudgetTemplateID)
+	}
+	if m.revision != nil {
+		fields = append(fields, budgettemplateassignment.FieldRevision)
+	}
+	if m.assigned_at != nil {
+		fields = append(fields, budgettemplateassignment.FieldAssignedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, budgettemplateassignment.FieldUpdatedAt)
+	}
+	if m.updated_by_user_id != nil {
+		fields = append(fields, budgettemplateassignment.FieldUpdatedByUserID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *BudgetTemplateAssignmentMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case budgettemplateassignment.FieldUserID:
+		return m.UserID()
+	case budgettemplateassignment.FieldBudgetTemplateID:
+		return m.BudgetTemplateID()
+	case budgettemplateassignment.FieldRevision:
+		return m.Revision()
+	case budgettemplateassignment.FieldAssignedAt:
+		return m.AssignedAt()
+	case budgettemplateassignment.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case budgettemplateassignment.FieldUpdatedByUserID:
+		return m.UpdatedByUserID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *BudgetTemplateAssignmentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case budgettemplateassignment.FieldUserID:
+		return m.OldUserID(ctx)
+	case budgettemplateassignment.FieldBudgetTemplateID:
+		return m.OldBudgetTemplateID(ctx)
+	case budgettemplateassignment.FieldRevision:
+		return m.OldRevision(ctx)
+	case budgettemplateassignment.FieldAssignedAt:
+		return m.OldAssignedAt(ctx)
+	case budgettemplateassignment.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case budgettemplateassignment.FieldUpdatedByUserID:
+		return m.OldUpdatedByUserID(ctx)
+	}
+	return nil, fmt.Errorf("unknown BudgetTemplateAssignment field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BudgetTemplateAssignmentMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case budgettemplateassignment.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case budgettemplateassignment.FieldBudgetTemplateID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBudgetTemplateID(v)
+		return nil
+	case budgettemplateassignment.FieldRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevision(v)
+		return nil
+	case budgettemplateassignment.FieldAssignedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAssignedAt(v)
+		return nil
+	case budgettemplateassignment.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case budgettemplateassignment.FieldUpdatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplateAssignment field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *BudgetTemplateAssignmentMutation) AddedFields() []string {
+	var fields []string
+	if m.addrevision != nil {
+		fields = append(fields, budgettemplateassignment.FieldRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *BudgetTemplateAssignmentMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case budgettemplateassignment.FieldRevision:
+		return m.AddedRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BudgetTemplateAssignmentMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case budgettemplateassignment.FieldRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplateAssignment numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *BudgetTemplateAssignmentMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *BudgetTemplateAssignmentMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *BudgetTemplateAssignmentMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown BudgetTemplateAssignment nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *BudgetTemplateAssignmentMutation) ResetField(name string) error {
+	switch name {
+	case budgettemplateassignment.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case budgettemplateassignment.FieldBudgetTemplateID:
+		m.ResetBudgetTemplateID()
+		return nil
+	case budgettemplateassignment.FieldRevision:
+		m.ResetRevision()
+		return nil
+	case budgettemplateassignment.FieldAssignedAt:
+		m.ResetAssignedAt()
+		return nil
+	case budgettemplateassignment.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case budgettemplateassignment.FieldUpdatedByUserID:
+		m.ResetUpdatedByUserID()
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplateAssignment field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *BudgetTemplateAssignmentMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *BudgetTemplateAssignmentMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *BudgetTemplateAssignmentMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *BudgetTemplateAssignmentMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *BudgetTemplateAssignmentMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *BudgetTemplateAssignmentMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *BudgetTemplateAssignmentMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown BudgetTemplateAssignment unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *BudgetTemplateAssignmentMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown BudgetTemplateAssignment edge %s", name)
+}
+
+// BudgetTemplateAuditMutation represents an operation that mutates the BudgetTemplateAudit nodes in the graph.
+type BudgetTemplateAuditMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *int
+	budget_template_id     *string
+	user_id                *string
+	template_revision      *int64
+	addtemplate_revision   *int64
+	assignment_revision    *int64
+	addassignment_revision *int64
+	actor_user_id          *string
+	action                 *budgettemplateaudit.Action
+	reason                 *string
+	before_json            *[]byte
+	after_json             *[]byte
+	created_at             *time.Time
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*BudgetTemplateAudit, error)
+	predicates             []predicate.BudgetTemplateAudit
+}
+
+var _ ent.Mutation = (*BudgetTemplateAuditMutation)(nil)
+
+// budgettemplateauditOption allows management of the mutation configuration using functional options.
+type budgettemplateauditOption func(*BudgetTemplateAuditMutation)
+
+// newBudgetTemplateAuditMutation creates new mutation for the BudgetTemplateAudit entity.
+func newBudgetTemplateAuditMutation(c config, op Op, opts ...budgettemplateauditOption) *BudgetTemplateAuditMutation {
+	m := &BudgetTemplateAuditMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeBudgetTemplateAudit,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withBudgetTemplateAuditID sets the ID field of the mutation.
+func withBudgetTemplateAuditID(id int) budgettemplateauditOption {
+	return func(m *BudgetTemplateAuditMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *BudgetTemplateAudit
+		)
+		m.oldValue = func(ctx context.Context) (*BudgetTemplateAudit, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().BudgetTemplateAudit.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withBudgetTemplateAudit sets the old BudgetTemplateAudit of the mutation.
+func withBudgetTemplateAudit(node *BudgetTemplateAudit) budgettemplateauditOption {
+	return func(m *BudgetTemplateAuditMutation) {
+		m.oldValue = func(context.Context) (*BudgetTemplateAudit, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m BudgetTemplateAuditMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m BudgetTemplateAuditMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of BudgetTemplateAudit entities.
+func (m *BudgetTemplateAuditMutation) SetID(id int) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *BudgetTemplateAuditMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *BudgetTemplateAuditMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().BudgetTemplateAudit.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetBudgetTemplateID sets the "budget_template_id" field.
+func (m *BudgetTemplateAuditMutation) SetBudgetTemplateID(s string) {
+	m.budget_template_id = &s
+}
+
+// BudgetTemplateID returns the value of the "budget_template_id" field in the mutation.
+func (m *BudgetTemplateAuditMutation) BudgetTemplateID() (r string, exists bool) {
+	v := m.budget_template_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBudgetTemplateID returns the old "budget_template_id" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldBudgetTemplateID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBudgetTemplateID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBudgetTemplateID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBudgetTemplateID: %w", err)
+	}
+	return oldValue.BudgetTemplateID, nil
+}
+
+// ClearBudgetTemplateID clears the value of the "budget_template_id" field.
+func (m *BudgetTemplateAuditMutation) ClearBudgetTemplateID() {
+	m.budget_template_id = nil
+	m.clearedFields[budgettemplateaudit.FieldBudgetTemplateID] = struct{}{}
+}
+
+// BudgetTemplateIDCleared returns if the "budget_template_id" field was cleared in this mutation.
+func (m *BudgetTemplateAuditMutation) BudgetTemplateIDCleared() bool {
+	_, ok := m.clearedFields[budgettemplateaudit.FieldBudgetTemplateID]
+	return ok
+}
+
+// ResetBudgetTemplateID resets all changes to the "budget_template_id" field.
+func (m *BudgetTemplateAuditMutation) ResetBudgetTemplateID() {
+	m.budget_template_id = nil
+	delete(m.clearedFields, budgettemplateaudit.FieldBudgetTemplateID)
+}
+
+// SetUserID sets the "user_id" field.
+func (m *BudgetTemplateAuditMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *BudgetTemplateAuditMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (m *BudgetTemplateAuditMutation) ClearUserID() {
+	m.user_id = nil
+	m.clearedFields[budgettemplateaudit.FieldUserID] = struct{}{}
+}
+
+// UserIDCleared returns if the "user_id" field was cleared in this mutation.
+func (m *BudgetTemplateAuditMutation) UserIDCleared() bool {
+	_, ok := m.clearedFields[budgettemplateaudit.FieldUserID]
+	return ok
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *BudgetTemplateAuditMutation) ResetUserID() {
+	m.user_id = nil
+	delete(m.clearedFields, budgettemplateaudit.FieldUserID)
+}
+
+// SetTemplateRevision sets the "template_revision" field.
+func (m *BudgetTemplateAuditMutation) SetTemplateRevision(i int64) {
+	m.template_revision = &i
+	m.addtemplate_revision = nil
+}
+
+// TemplateRevision returns the value of the "template_revision" field in the mutation.
+func (m *BudgetTemplateAuditMutation) TemplateRevision() (r int64, exists bool) {
+	v := m.template_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTemplateRevision returns the old "template_revision" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldTemplateRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTemplateRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTemplateRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTemplateRevision: %w", err)
+	}
+	return oldValue.TemplateRevision, nil
+}
+
+// AddTemplateRevision adds i to the "template_revision" field.
+func (m *BudgetTemplateAuditMutation) AddTemplateRevision(i int64) {
+	if m.addtemplate_revision != nil {
+		*m.addtemplate_revision += i
+	} else {
+		m.addtemplate_revision = &i
+	}
+}
+
+// AddedTemplateRevision returns the value that was added to the "template_revision" field in this mutation.
+func (m *BudgetTemplateAuditMutation) AddedTemplateRevision() (r int64, exists bool) {
+	v := m.addtemplate_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetTemplateRevision resets all changes to the "template_revision" field.
+func (m *BudgetTemplateAuditMutation) ResetTemplateRevision() {
+	m.template_revision = nil
+	m.addtemplate_revision = nil
+}
+
+// SetAssignmentRevision sets the "assignment_revision" field.
+func (m *BudgetTemplateAuditMutation) SetAssignmentRevision(i int64) {
+	m.assignment_revision = &i
+	m.addassignment_revision = nil
+}
+
+// AssignmentRevision returns the value of the "assignment_revision" field in the mutation.
+func (m *BudgetTemplateAuditMutation) AssignmentRevision() (r int64, exists bool) {
+	v := m.assignment_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAssignmentRevision returns the old "assignment_revision" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldAssignmentRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAssignmentRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAssignmentRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAssignmentRevision: %w", err)
+	}
+	return oldValue.AssignmentRevision, nil
+}
+
+// AddAssignmentRevision adds i to the "assignment_revision" field.
+func (m *BudgetTemplateAuditMutation) AddAssignmentRevision(i int64) {
+	if m.addassignment_revision != nil {
+		*m.addassignment_revision += i
+	} else {
+		m.addassignment_revision = &i
+	}
+}
+
+// AddedAssignmentRevision returns the value that was added to the "assignment_revision" field in this mutation.
+func (m *BudgetTemplateAuditMutation) AddedAssignmentRevision() (r int64, exists bool) {
+	v := m.addassignment_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAssignmentRevision resets all changes to the "assignment_revision" field.
+func (m *BudgetTemplateAuditMutation) ResetAssignmentRevision() {
+	m.assignment_revision = nil
+	m.addassignment_revision = nil
+}
+
+// SetActorUserID sets the "actor_user_id" field.
+func (m *BudgetTemplateAuditMutation) SetActorUserID(s string) {
+	m.actor_user_id = &s
+}
+
+// ActorUserID returns the value of the "actor_user_id" field in the mutation.
+func (m *BudgetTemplateAuditMutation) ActorUserID() (r string, exists bool) {
+	v := m.actor_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorUserID returns the old "actor_user_id" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldActorUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorUserID: %w", err)
+	}
+	return oldValue.ActorUserID, nil
+}
+
+// ResetActorUserID resets all changes to the "actor_user_id" field.
+func (m *BudgetTemplateAuditMutation) ResetActorUserID() {
+	m.actor_user_id = nil
+}
+
+// SetAction sets the "action" field.
+func (m *BudgetTemplateAuditMutation) SetAction(b budgettemplateaudit.Action) {
+	m.action = &b
+}
+
+// Action returns the value of the "action" field in the mutation.
+func (m *BudgetTemplateAuditMutation) Action() (r budgettemplateaudit.Action, exists bool) {
+	v := m.action
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAction returns the old "action" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldAction(ctx context.Context) (v budgettemplateaudit.Action, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAction is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAction requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAction: %w", err)
+	}
+	return oldValue.Action, nil
+}
+
+// ResetAction resets all changes to the "action" field.
+func (m *BudgetTemplateAuditMutation) ResetAction() {
+	m.action = nil
+}
+
+// SetReason sets the "reason" field.
+func (m *BudgetTemplateAuditMutation) SetReason(s string) {
+	m.reason = &s
+}
+
+// Reason returns the value of the "reason" field in the mutation.
+func (m *BudgetTemplateAuditMutation) Reason() (r string, exists bool) {
+	v := m.reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReason returns the old "reason" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldReason(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReason: %w", err)
+	}
+	return oldValue.Reason, nil
+}
+
+// ResetReason resets all changes to the "reason" field.
+func (m *BudgetTemplateAuditMutation) ResetReason() {
+	m.reason = nil
+}
+
+// SetBeforeJSON sets the "before_json" field.
+func (m *BudgetTemplateAuditMutation) SetBeforeJSON(b []byte) {
+	m.before_json = &b
+}
+
+// BeforeJSON returns the value of the "before_json" field in the mutation.
+func (m *BudgetTemplateAuditMutation) BeforeJSON() (r []byte, exists bool) {
+	v := m.before_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBeforeJSON returns the old "before_json" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldBeforeJSON(ctx context.Context) (v *[]byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBeforeJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBeforeJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBeforeJSON: %w", err)
+	}
+	return oldValue.BeforeJSON, nil
+}
+
+// ClearBeforeJSON clears the value of the "before_json" field.
+func (m *BudgetTemplateAuditMutation) ClearBeforeJSON() {
+	m.before_json = nil
+	m.clearedFields[budgettemplateaudit.FieldBeforeJSON] = struct{}{}
+}
+
+// BeforeJSONCleared returns if the "before_json" field was cleared in this mutation.
+func (m *BudgetTemplateAuditMutation) BeforeJSONCleared() bool {
+	_, ok := m.clearedFields[budgettemplateaudit.FieldBeforeJSON]
+	return ok
+}
+
+// ResetBeforeJSON resets all changes to the "before_json" field.
+func (m *BudgetTemplateAuditMutation) ResetBeforeJSON() {
+	m.before_json = nil
+	delete(m.clearedFields, budgettemplateaudit.FieldBeforeJSON)
+}
+
+// SetAfterJSON sets the "after_json" field.
+func (m *BudgetTemplateAuditMutation) SetAfterJSON(b []byte) {
+	m.after_json = &b
+}
+
+// AfterJSON returns the value of the "after_json" field in the mutation.
+func (m *BudgetTemplateAuditMutation) AfterJSON() (r []byte, exists bool) {
+	v := m.after_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAfterJSON returns the old "after_json" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldAfterJSON(ctx context.Context) (v *[]byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAfterJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAfterJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAfterJSON: %w", err)
+	}
+	return oldValue.AfterJSON, nil
+}
+
+// ClearAfterJSON clears the value of the "after_json" field.
+func (m *BudgetTemplateAuditMutation) ClearAfterJSON() {
+	m.after_json = nil
+	m.clearedFields[budgettemplateaudit.FieldAfterJSON] = struct{}{}
+}
+
+// AfterJSONCleared returns if the "after_json" field was cleared in this mutation.
+func (m *BudgetTemplateAuditMutation) AfterJSONCleared() bool {
+	_, ok := m.clearedFields[budgettemplateaudit.FieldAfterJSON]
+	return ok
+}
+
+// ResetAfterJSON resets all changes to the "after_json" field.
+func (m *BudgetTemplateAuditMutation) ResetAfterJSON() {
+	m.after_json = nil
+	delete(m.clearedFields, budgettemplateaudit.FieldAfterJSON)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *BudgetTemplateAuditMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *BudgetTemplateAuditMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the BudgetTemplateAudit entity.
+// If the BudgetTemplateAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetTemplateAuditMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *BudgetTemplateAuditMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the BudgetTemplateAuditMutation builder.
+func (m *BudgetTemplateAuditMutation) Where(ps ...predicate.BudgetTemplateAudit) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the BudgetTemplateAuditMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *BudgetTemplateAuditMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.BudgetTemplateAudit, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *BudgetTemplateAuditMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *BudgetTemplateAuditMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (BudgetTemplateAudit).
+func (m *BudgetTemplateAuditMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *BudgetTemplateAuditMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.budget_template_id != nil {
+		fields = append(fields, budgettemplateaudit.FieldBudgetTemplateID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, budgettemplateaudit.FieldUserID)
+	}
+	if m.template_revision != nil {
+		fields = append(fields, budgettemplateaudit.FieldTemplateRevision)
+	}
+	if m.assignment_revision != nil {
+		fields = append(fields, budgettemplateaudit.FieldAssignmentRevision)
+	}
+	if m.actor_user_id != nil {
+		fields = append(fields, budgettemplateaudit.FieldActorUserID)
+	}
+	if m.action != nil {
+		fields = append(fields, budgettemplateaudit.FieldAction)
+	}
+	if m.reason != nil {
+		fields = append(fields, budgettemplateaudit.FieldReason)
+	}
+	if m.before_json != nil {
+		fields = append(fields, budgettemplateaudit.FieldBeforeJSON)
+	}
+	if m.after_json != nil {
+		fields = append(fields, budgettemplateaudit.FieldAfterJSON)
+	}
+	if m.created_at != nil {
+		fields = append(fields, budgettemplateaudit.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *BudgetTemplateAuditMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case budgettemplateaudit.FieldBudgetTemplateID:
+		return m.BudgetTemplateID()
+	case budgettemplateaudit.FieldUserID:
+		return m.UserID()
+	case budgettemplateaudit.FieldTemplateRevision:
+		return m.TemplateRevision()
+	case budgettemplateaudit.FieldAssignmentRevision:
+		return m.AssignmentRevision()
+	case budgettemplateaudit.FieldActorUserID:
+		return m.ActorUserID()
+	case budgettemplateaudit.FieldAction:
+		return m.Action()
+	case budgettemplateaudit.FieldReason:
+		return m.Reason()
+	case budgettemplateaudit.FieldBeforeJSON:
+		return m.BeforeJSON()
+	case budgettemplateaudit.FieldAfterJSON:
+		return m.AfterJSON()
+	case budgettemplateaudit.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *BudgetTemplateAuditMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case budgettemplateaudit.FieldBudgetTemplateID:
+		return m.OldBudgetTemplateID(ctx)
+	case budgettemplateaudit.FieldUserID:
+		return m.OldUserID(ctx)
+	case budgettemplateaudit.FieldTemplateRevision:
+		return m.OldTemplateRevision(ctx)
+	case budgettemplateaudit.FieldAssignmentRevision:
+		return m.OldAssignmentRevision(ctx)
+	case budgettemplateaudit.FieldActorUserID:
+		return m.OldActorUserID(ctx)
+	case budgettemplateaudit.FieldAction:
+		return m.OldAction(ctx)
+	case budgettemplateaudit.FieldReason:
+		return m.OldReason(ctx)
+	case budgettemplateaudit.FieldBeforeJSON:
+		return m.OldBeforeJSON(ctx)
+	case budgettemplateaudit.FieldAfterJSON:
+		return m.OldAfterJSON(ctx)
+	case budgettemplateaudit.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown BudgetTemplateAudit field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BudgetTemplateAuditMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case budgettemplateaudit.FieldBudgetTemplateID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBudgetTemplateID(v)
+		return nil
+	case budgettemplateaudit.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case budgettemplateaudit.FieldTemplateRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTemplateRevision(v)
+		return nil
+	case budgettemplateaudit.FieldAssignmentRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAssignmentRevision(v)
+		return nil
+	case budgettemplateaudit.FieldActorUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorUserID(v)
+		return nil
+	case budgettemplateaudit.FieldAction:
+		v, ok := value.(budgettemplateaudit.Action)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAction(v)
+		return nil
+	case budgettemplateaudit.FieldReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReason(v)
+		return nil
+	case budgettemplateaudit.FieldBeforeJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBeforeJSON(v)
+		return nil
+	case budgettemplateaudit.FieldAfterJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAfterJSON(v)
+		return nil
+	case budgettemplateaudit.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplateAudit field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *BudgetTemplateAuditMutation) AddedFields() []string {
+	var fields []string
+	if m.addtemplate_revision != nil {
+		fields = append(fields, budgettemplateaudit.FieldTemplateRevision)
+	}
+	if m.addassignment_revision != nil {
+		fields = append(fields, budgettemplateaudit.FieldAssignmentRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *BudgetTemplateAuditMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case budgettemplateaudit.FieldTemplateRevision:
+		return m.AddedTemplateRevision()
+	case budgettemplateaudit.FieldAssignmentRevision:
+		return m.AddedAssignmentRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BudgetTemplateAuditMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case budgettemplateaudit.FieldTemplateRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTemplateRevision(v)
+		return nil
+	case budgettemplateaudit.FieldAssignmentRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAssignmentRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplateAudit numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *BudgetTemplateAuditMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(budgettemplateaudit.FieldBudgetTemplateID) {
+		fields = append(fields, budgettemplateaudit.FieldBudgetTemplateID)
+	}
+	if m.FieldCleared(budgettemplateaudit.FieldUserID) {
+		fields = append(fields, budgettemplateaudit.FieldUserID)
+	}
+	if m.FieldCleared(budgettemplateaudit.FieldBeforeJSON) {
+		fields = append(fields, budgettemplateaudit.FieldBeforeJSON)
+	}
+	if m.FieldCleared(budgettemplateaudit.FieldAfterJSON) {
+		fields = append(fields, budgettemplateaudit.FieldAfterJSON)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *BudgetTemplateAuditMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *BudgetTemplateAuditMutation) ClearField(name string) error {
+	switch name {
+	case budgettemplateaudit.FieldBudgetTemplateID:
+		m.ClearBudgetTemplateID()
+		return nil
+	case budgettemplateaudit.FieldUserID:
+		m.ClearUserID()
+		return nil
+	case budgettemplateaudit.FieldBeforeJSON:
+		m.ClearBeforeJSON()
+		return nil
+	case budgettemplateaudit.FieldAfterJSON:
+		m.ClearAfterJSON()
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplateAudit nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *BudgetTemplateAuditMutation) ResetField(name string) error {
+	switch name {
+	case budgettemplateaudit.FieldBudgetTemplateID:
+		m.ResetBudgetTemplateID()
+		return nil
+	case budgettemplateaudit.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case budgettemplateaudit.FieldTemplateRevision:
+		m.ResetTemplateRevision()
+		return nil
+	case budgettemplateaudit.FieldAssignmentRevision:
+		m.ResetAssignmentRevision()
+		return nil
+	case budgettemplateaudit.FieldActorUserID:
+		m.ResetActorUserID()
+		return nil
+	case budgettemplateaudit.FieldAction:
+		m.ResetAction()
+		return nil
+	case budgettemplateaudit.FieldReason:
+		m.ResetReason()
+		return nil
+	case budgettemplateaudit.FieldBeforeJSON:
+		m.ResetBeforeJSON()
+		return nil
+	case budgettemplateaudit.FieldAfterJSON:
+		m.ResetAfterJSON()
+		return nil
+	case budgettemplateaudit.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown BudgetTemplateAudit field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *BudgetTemplateAuditMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *BudgetTemplateAuditMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *BudgetTemplateAuditMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *BudgetTemplateAuditMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *BudgetTemplateAuditMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *BudgetTemplateAuditMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *BudgetTemplateAuditMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown BudgetTemplateAudit unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *BudgetTemplateAuditMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown BudgetTemplateAudit edge %s", name)
 }
 
 // DeletedCredentialMutation represents an operation that mutates the DeletedCredential nodes in the graph.

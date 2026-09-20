@@ -1,6 +1,6 @@
 import { uid } from 'quasar'
 
-export type CandidatePrefix = 'prv' | 'mdl' | 'tts' | 'asr' | 'mcp' | 'rte' | 'asd' | 'str' | 'prc'
+export type CandidatePrefix = 'prv' | 'mdl' | 'img' | 'tts' | 'asr' | 'mcp' | 'rte' | 'asd' | 'str' | 'prc'
 
 type UnauthorizedHandler = (() => void | Promise<void>) | undefined
 let unauthorizedHandler: UnauthorizedHandler

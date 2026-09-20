@@ -37,6 +37,7 @@ type DraftPreview struct {
 	DiffSummary         adminapi.DiffSummary
 	Providers           []adminapi.ProviderDefinition
 	Models              []adminapi.ModelDefinition
+	ImageGenerators     []adminapi.ImageGenerationDefinition
 	TTS                 []adminapi.TtsDefinition
 	ASR                 []adminapi.AsrDefinition
 	MCP                 []adminapi.McpDefinition
@@ -84,6 +85,10 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 		for _, m := range previous.Models {
 			prev[m.ModelId] = defHash(m)
 			prevKinds[m.ModelId] = adminapi.ReleaseDiffKindMODEL
+		}
+		for _, image := range imageGenerators(*previous) {
+			prev[image.ImageId] = defHash(image)
+			prevKinds[image.ImageId] = adminapi.ReleaseDiffKindIMAGEGENERATION
 		}
 		for _, t := range previous.Tts {
 			prev[t.TtsId] = defHash(t)
@@ -143,6 +148,9 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 	for _, m := range current.Models {
 		process(adminapi.ReleaseDiffKindMODEL, m.ModelId)
 	}
+	for _, image := range imageGenerators(*current) {
+		process(adminapi.ReleaseDiffKindIMAGEGENERATION, image.ImageId)
+	}
 	for _, t := range current.Tts {
 		process(adminapi.ReleaseDiffKindTTS, t.TtsId)
 	}
@@ -173,6 +181,7 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 	kinds := []adminapi.ReleaseDiffKind{
 		adminapi.ReleaseDiffKindPROVIDER,
 		adminapi.ReleaseDiffKindMODEL,
+		adminapi.ReleaseDiffKindIMAGEGENERATION,
 		adminapi.ReleaseDiffKindTTS,
 		adminapi.ReleaseDiffKindASR,
 		adminapi.ReleaseDiffKindMCP,
@@ -209,6 +218,11 @@ func currentHash(content *adminapi.ManagedDraftContent, id string) string {
 	for _, m := range content.Models {
 		if m.ModelId == id {
 			return defHash(m)
+		}
+	}
+	for _, image := range imageGenerators(*content) {
+		if image.ImageId == id {
+			return defHash(image)
 		}
 	}
 	for _, t := range content.Tts {
@@ -326,6 +340,8 @@ func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRe
 	if current == nil {
 		return ReleaseView{}, fmt.Errorf("invalid persisted release content")
 	}
+	normalizedCurrent := NormalizeManagedDraftContent(*current)
+	current = &normalizedCurrent
 	if prev != nil {
 		if err := json.Unmarshal(prev.ReleaseContentJSON, &previous); err != nil {
 			return ReleaseView{}, err
@@ -333,6 +349,8 @@ func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRe
 		if previous == nil {
 			return ReleaseView{}, fmt.Errorf("invalid previous release content")
 		}
+		normalizedPrevious := NormalizeManagedDraftContent(*previous)
+		previous = &normalizedPrevious
 	}
 	diff := releaseContentDiff(current, previous)
 	history, err := s.activationHistory(ctx, int(row.ManagedGeneration))
@@ -408,6 +426,24 @@ func NewService(client *ent.Client) *Service {
 	return &Service{Client: client, Now: time.Now}
 }
 
+// NormalizeManagedDraftContent applies the additive durable-storage rule for
+// Snapshot v4 image generators. Older rows may omit the field; every current
+// in-memory value and every new write uses an explicit empty list instead.
+func NormalizeManagedDraftContent(content adminapi.ManagedDraftContent) adminapi.ManagedDraftContent {
+	if content.ImageGenerators == nil {
+		empty := []adminapi.ImageGenerationDefinition{}
+		content.ImageGenerators = &empty
+	}
+	return content
+}
+
+func imageGenerators(content adminapi.ManagedDraftContent) []adminapi.ImageGenerationDefinition {
+	if content.ImageGenerators == nil {
+		return nil
+	}
+	return *content.ImageGenerators
+}
+
 func (s *Service) GetDraft(ctx context.Context) (DraftView, error) {
 	row, err := s.Client.ManagedDraft.Query().Only(ctx)
 	if err != nil {
@@ -417,10 +453,12 @@ func (s *Service) GetDraft(ctx context.Context) (DraftView, error) {
 	if err := json.Unmarshal(row.ContentJSON, &content); err != nil {
 		return DraftView{}, err
 	}
+	content = NormalizeManagedDraftContent(content)
 	return DraftView{DraftID: row.ID, DraftRevision: int(row.DraftRevision), Content: content}, nil
 }
 
 func (s *Service) PutDraft(ctx context.Context, updatedBy string, expectedRevision int, content adminapi.ManagedDraftContent) (DraftView, error) {
+	content = NormalizeManagedDraftContent(content)
 	if err := validateCandidateIDs(content); err != nil {
 		return DraftView{}, err
 	}
@@ -481,6 +519,7 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 		if err := json.Unmarshal(latest.ReleaseContentJSON, &content); err != nil {
 			return DraftPreview{}, fmt.Errorf("decode latest release content: %w", err)
 		}
+		content = NormalizeManagedDraftContent(content)
 		previous = &content
 		generation := int(latest.ManagedGeneration)
 		publishedGeneration = &generation
@@ -517,20 +556,22 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 		DiffSummary:         releaseContentDiff(&draft.Content, previous),
 		Providers:           projectionToAdminProviders(snapshot.Providers),
 		Models:              projectionToAdminModels(snapshot.Models),
+		ImageGenerators:     projectionToAdminImages(snapshot.ImageGenerators),
 		TTS:                 projectionToAdminTts(snapshot.Tts),
 		ASR:                 projectionToAdminAsr(snapshot.Asr),
 		MCP:                 projectionToAdminMcp(snapshot.Mcp),
 		Policy: adminapi.ManagedPolicy{
-			PolicyId:             snapshot.Policy.PolicyId,
-			AllowLocalProviders:  snapshot.Policy.AllowLocalProviders,
-			AllowLocalTts:        snapshot.Policy.AllowLocalTts,
-			AllowLocalAsr:        snapshot.Policy.AllowLocalAsr,
-			AllowLocalMcp:        snapshot.Policy.AllowLocalMcp,
-			AllowLocalAssistants: snapshot.Policy.AllowLocalAssistants,
-			DefaultModelId:       snapshot.Policy.DefaultModelId,
-			DefaultTtsId:         snapshot.Policy.DefaultTtsId,
-			DefaultAsrId:         snapshot.Policy.DefaultAsrId,
-			DefaultAssistantId:   snapshot.Policy.DefaultAssistantId,
+			PolicyId:                 snapshot.Policy.PolicyId,
+			AllowLocalProviders:      snapshot.Policy.AllowLocalProviders,
+			AllowLocalTts:            snapshot.Policy.AllowLocalTts,
+			AllowLocalAsr:            snapshot.Policy.AllowLocalAsr,
+			AllowLocalMcp:            snapshot.Policy.AllowLocalMcp,
+			AllowLocalAssistants:     snapshot.Policy.AllowLocalAssistants,
+			DefaultModelId:           snapshot.Policy.DefaultModelId,
+			DefaultTtsId:             snapshot.Policy.DefaultTtsId,
+			DefaultAsrId:             snapshot.Policy.DefaultAsrId,
+			DefaultImageGenerationId: snapshot.Policy.DefaultImageGenerationId,
+			DefaultAssistantId:       snapshot.Policy.DefaultAssistantId,
 		},
 		Assistants: projectionToAdminAssistants(snapshot.Assistants),
 		Starters:   projectionToAdminStarters(snapshot.Starters),
@@ -613,6 +654,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	// Helpers for common patterns
 	kindProvider := adminapi.ValidationIssueResourceKind("PROVIDER")
 	kindModel := adminapi.ValidationIssueResourceKind("MODEL")
+	kindImage := adminapi.ValidationIssueResourceKindIMAGEGENERATION
 	kindTTS := adminapi.ValidationIssueResourceKind("TTS")
 	kindASR := adminapi.ValidationIssueResourceKind("ASR")
 	kindMCP := adminapi.ValidationIssueResourceKind("MCP")
@@ -642,6 +684,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	deviceResources := map[string]bool{}
 	asrProtocols := map[string]adminapi.AsrDefinitionClientProtocol{}
 	resourceKinds := map[string]adminapi.ValidationIssueResourceKind{}
+	imageRuntimePaths := map[string]string{}
 	for i, model := range content.Models {
 		resources[model.ModelId] = model.Enabled
 		runtimePaths[model.ModelId] = model.RuntimePath
@@ -678,6 +721,41 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			if !m.Valid() {
 				addError("invalid_output_modality", fmt.Sprintf("models[%d].outputModalities[%d]", i, j), "unsupported output modality", &kindModel, ptrStr(model.ModelId), ptrStr("outputModalities"))
 			}
+		}
+	}
+	for i, value := range imageGenerators(content) {
+		path := fmt.Sprintf("imageGenerators[%d]", i)
+		resources[value.ImageId] = value.Enabled
+		runtimePaths[value.ImageId] = value.RuntimePath
+		imageRuntimePaths[value.ImageId] = value.RuntimePath
+		resourceKinds[value.ImageId] = kindImage
+		if strings.TrimSpace(value.DisplayName) == "" {
+			addError("missing_display_name", path+".displayName", "Image Generation displayName is required", &kindImage, ptrStr(value.ImageId), ptrStr("displayName"))
+		}
+		if !value.ClientProtocol.Valid() {
+			addError("invalid_client_protocol", path+".clientProtocol", "unsupported Image Generation client protocol", &kindImage, ptrStr(value.ImageId), ptrStr("clientProtocol"))
+		}
+		if strings.TrimSpace(value.UpstreamModelKey) == "" {
+			addError("missing_image_model_key", path+".upstreamModelKey", "Image Generation requires a non-empty upstreamModelKey", &kindImage, ptrStr(value.ImageId), ptrStr("upstreamModelKey"))
+		}
+		if !validRuntimePath(value.RuntimePath) || !strings.HasSuffix(value.RuntimePath, "/images/generations") {
+			addError("invalid_runtime_path", path+".runtimePath", "Image Generation runtimePath must be an exact normalized images/generations path", &kindImage, ptrStr(value.ImageId), ptrStr("runtimePath"))
+		}
+		if value.MaxImagesPerRequest < 1 || value.MaxImagesPerRequest > 6 {
+			addError("invalid_max_images", path+".maxImagesPerRequest", "maxImagesPerRequest must be between 1 and 6", &kindImage, ptrStr(value.ImageId), ptrStr("maxImagesPerRequest"))
+		}
+		seenSizes := map[string]bool{}
+		if len(value.AllowedSizes) == 0 {
+			addError("missing_image_sizes", path+".allowedSizes", "Image Generation requires at least one allowed size", &kindImage, ptrStr(value.ImageId), ptrStr("allowedSizes"))
+		}
+		for j, size := range value.AllowedSizes {
+			if !validImageSize(size) {
+				addError("invalid_image_size", fmt.Sprintf("%s.allowedSizes[%d]", path, j), "image size must be auto or normalized positive <width>x<height>", &kindImage, ptrStr(value.ImageId), ptrStr("allowedSizes"))
+			}
+			if seenSizes[size] {
+				addError("duplicate_image_size", fmt.Sprintf("%s.allowedSizes[%d]", path, j), "image sizes must be unique", &kindImage, ptrStr(value.ImageId), ptrStr("allowedSizes"))
+			}
+			seenSizes[size] = true
 		}
 	}
 	for i, value := range content.Tts {
@@ -833,6 +911,13 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 				addError("invalid_asr_transport", path+".transportPolicy", "ASR transport and method must match clientProtocol", &kindBinding, ptrStr(binding.ResourceId), ptrStr("transportPolicy"))
 			}
 		}
+		if imagePath, isImage := imageRuntimePaths[binding.ResourceId]; isImage {
+			if len(binding.AllowedMethods) != 1 || strings.ToUpper(strings.TrimSpace(binding.AllowedMethods[0])) != "POST" ||
+				len(binding.AllowedPathPrefixes) != 1 || binding.AllowedPathPrefixes[0] != imagePath ||
+				binding.TransportPolicy != adminapi.RuntimeBindingDefinitionTransportPolicyHTTPREQUESTRESPONSE {
+				addError("invalid_image_binding", path, "Image Generation binding must be POST, exact runtimePath, and HTTP_REQUEST_RESPONSE", &kindBinding, ptrStr(binding.ResourceId), nil)
+			}
+		}
 		if _, ok := resources[binding.ResourceId]; !ok {
 			addError("missing_resource", path+".resourceId", "binding references an unknown runtime resource", &kindBinding, ptrStr(binding.ResourceId), ptrStr("resourceId"))
 		} else if bound[binding.ResourceId] {
@@ -909,6 +994,11 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			addError("invalid_default_asr", "policy.defaultAsrId", "default ASR must reference an enabled ASR", &kindPolicy, content.Policy.DefaultAsrId, ptrStr("defaultAsrId"))
 		}
 	}
+	if content.Policy.DefaultImageGenerationId != nil {
+		if enabled, ok := resources[*content.Policy.DefaultImageGenerationId]; !ok || !enabled {
+			addError("invalid_default_image_generation", "policy.defaultImageGenerationId", "default Image Generation must reference an enabled image generator", &kindPolicy, content.Policy.DefaultImageGenerationId, ptrStr("defaultImageGenerationId"))
+		}
+	}
 	if content.Policy.DefaultAssistantId != nil && !assistantIds[string(*content.Policy.DefaultAssistantId)] {
 		addError("invalid_default_assistant", "policy.defaultAssistantId", "default assistant must reference an enabled assistant", &kindPolicy, ptrStr(string(*content.Policy.DefaultAssistantId)), ptrStr("defaultAssistantId"))
 	}
@@ -950,6 +1040,11 @@ func validateCandidateIDs(content adminapi.ManagedDraftContent) error {
 			return err
 		}
 	}
+	for i, value := range imageGenerators(content) {
+		if err := check(platformid.ImageGeneration, value.ImageId, fmt.Sprintf("imageGenerators[%d]", i)); err != nil {
+			return err
+		}
+	}
 	for i, value := range content.Tts {
 		if err := check(platformid.TTS, value.TtsId, fmt.Sprintf("tts[%d]", i)); err != nil {
 			return err
@@ -987,6 +1082,24 @@ func validateCandidateIDs(content adminapi.ManagedDraftContent) error {
 		}
 	}
 	return nil
+}
+
+func validImageSize(value string) bool {
+	if value == "auto" {
+		return true
+	}
+	parts := strings.Split(value, "x")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" || strings.HasPrefix(parts[0], "0") || strings.HasPrefix(parts[1], "0") {
+		return false
+	}
+	for _, part := range parts {
+		for _, ch := range part {
+			if ch < '0' || ch > '9' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func validRuntimePath(value string) bool {

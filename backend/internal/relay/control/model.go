@@ -24,6 +24,7 @@ type Resource struct {
 	ClientProtocol relaycontrolapi.ResourceRouteClientProtocol
 	AudioProfile   *relaycontrolapi.RuntimeAudioProfile
 	LLMProfile     *relaycontrolapi.RuntimeLlmProfile
+	ImageProfile   *relaycontrolapi.RuntimeImageProfile
 }
 
 type UpstreamAuth struct {

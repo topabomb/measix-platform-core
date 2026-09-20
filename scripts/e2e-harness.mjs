@@ -178,7 +178,7 @@ if (!existsSync(artifactsDir)) {
 //
 // This is the single browser candidate entry:
 //   Phase A: golden-path-authoring.spec.ts (setup, upstream, resources, publish)
-//   Phase B: Four-capability runtime traffic (Model/TTS/ASR/MCP)
+//   Phase B: Five-capability runtime traffic (Model/Image/TTS/ASR/MCP)
 //   Phase C: Wait for usage ingestion
 //   Phase D: golden-path-usage.spec.ts (usage, system, persistence, logout)
 let exitCode = 1
@@ -253,7 +253,7 @@ function mergePlaywrightJsons(filePaths, outputPath) {
   for (const fp of filePaths) { try { unlinkSync(fp) } catch {} }
 }
 
-async function runFourCapabilityTraffic() {
+async function runFiveCapabilityTraffic() {
   const discoveryResponse = await fetch(`${spaBaseURL}/.well-known/measix`)
   if (!discoveryResponse.ok) throw new Error(`Discovery through public origin failed: ${discoveryResponse.status}`)
   const discovery = await discoveryResponse.json()
@@ -318,12 +318,13 @@ async function runFourCapabilityTraffic() {
   const snapJson = await snapResp.json()
 
   const modelId = snapJson.models?.[0]?.modelId
+  const imageId = snapJson.imageGenerators?.[0]?.imageId
   const ttsId = snapJson.tts?.[0]?.ttsId
   const asrId = snapJson.asr?.[0]?.asrId
   const mcpId = snapJson.mcp?.[0]?.mcpServerId
 
-  if (!modelId || !ttsId || !asrId || !mcpId) {
-    throw new Error(`snapshot missing resource IDs: model=${modelId} tts=${ttsId} asr=${asrId} mcp=${mcpId}`)
+  if (!modelId || !imageId || !ttsId || !asrId || !mcpId) {
+    throw new Error(`snapshot missing resource IDs: model=${modelId} image=${imageId} tts=${ttsId} asr=${asrId} mcp=${mcpId}`)
   }
 
   const runtimeURL = (id, path) => `${runtimeBase.href}/resources/${id}${path}`
@@ -342,7 +343,17 @@ async function runFourCapabilityTraffic() {
   if (!modelResp.ok) throw new Error(`model request failed: ${modelResp.status}`)
   await modelResp.text()
 
-  // 2. TTS
+  // 2. Image Generation
+  const imageResp = await fetch(runtimeURL(imageId, snapJson.imageGenerators[0].runtimePath), {
+    method: 'POST',
+    headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
+    body: JSON.stringify({ model: snapJson.imageGenerators[0].upstreamModelKey, prompt: 'Draw a blue square', n: 1, size: snapJson.imageGenerators[0].allowedSizes[0] }),
+  })
+  if (!imageResp.ok) throw new Error(`image generation request failed: ${imageResp.status}`)
+  const imageBody = await imageResp.json()
+  if (imageBody.data?.[0]?.b64_json !== 'iVBORw0KGgo=') throw new Error('image generation response was changed')
+
+  // 3. TTS
   const ttsResp = await fetch(runtimeURL(ttsId, snapJson.tts[0].runtimePath), {
     method: 'POST',
     headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
@@ -351,7 +362,7 @@ async function runFourCapabilityTraffic() {
   if (!ttsResp.ok) throw new Error(`tts request failed: ${ttsResp.status}`)
   await ttsResp.text()
 
-  // 3. ASR
+  // 4. ASR
   const asrFormData = new FormData()
   asrFormData.append('file', new Blob([Buffer.from('RIFF')]), 'sample.wav')
   asrFormData.append('model', snapJson.asr[0].upstreamModelKey)
@@ -363,7 +374,7 @@ async function runFourCapabilityTraffic() {
   if (!asrResp.ok) throw new Error(`asr request failed: ${asrResp.status}`)
   await asrResp.text()
 
-  // 4. MCP
+  // 5. MCP
   const mcpResp = await fetch(runtimeURL(mcpId, snapJson.mcp[0].runtimePath), {
     method: 'POST',
     headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
@@ -407,11 +418,11 @@ try {
   if (phaseA !== 0) throw new Error(`Phase A failed (exit ${phaseA})`)
   log('Phase A PASSED')
 
-  // Phase B: Four-capability runtime traffic. A failure here is a gate
-  // failure, not a warning: the four-capability path is the point of the run.
-  log('Phase B: Four-capability runtime traffic...')
+  // Phase B: Five-capability runtime traffic. A failure here is a gate
+  // failure, not a warning: the complete capability path is the point of the run.
+  log('Phase B: Five-capability runtime traffic...')
   try {
-    await runFourCapabilityTraffic()
+    await runFiveCapabilityTraffic()
     log('Phase B PASSED')
   } catch (e) {
     throw new Error(`Phase B failed: ${e.message}`)
@@ -419,7 +430,7 @@ try {
 
   // Phase C: Wait for usage ingestion
   log('Phase C: Waiting for usage ingestion...')
-  await waitForUsageIngestion(4, 30)
+  await waitForUsageIngestion(5, 30)
   log('Phase C PASSED')
 
   // Phase D: Usage verification

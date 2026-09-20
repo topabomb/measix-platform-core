@@ -107,6 +107,39 @@ func TestImageGenerationIsValidatedMeteredAndForwardedTransparently(t *testing.T
 	assertSettlementMeter(t, settlements[0], usageingestapi.REQUESTEDIMAGES, 2)
 }
 
+func TestDashScopeImageGenerationIsValidatedMeteredAndForwardedTransparently(t *testing.T) {
+	path := "/api/v1/services/aigc/multimodal-generation/generation"
+	wantBody := []byte(`{"model":"wan2.7-image","input":{"messages":[{"role":"user","content":[{"text":"opaque text"}]}]},"parameters":{"size":"1024*1024","n":2,"watermark":false}}`)
+	responseBody := []byte(`{"output":{"choices":[{"message":{"content":[{"image":"https://images.example/1"}]}},{"message":{"content":[{"image":"https://images.example/2"}]}}]}}`)
+	var forwarded int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		forwarded++
+		got, _ := io.ReadAll(r.Body)
+		if r.Method != http.MethodPost || r.URL.Path != path || !bytes.Equal(got, wantBody) {
+			t.Errorf("request changed: method=%s path=%s body=%s", r.Method, r.URL.Path, got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(responseBody)
+	}))
+	defer upstream.Close()
+	fixture, imageID := imageRuntimeFixtureForProtocol(t, upstream.URL, platformid.New(platformid.Deployment), relaycontrolapi.DASHSCOPEMULTIMODALGENERATION, path)
+	defer fixture.close()
+
+	request := fixture.request(t, nil, http.MethodPost, imageID, path, bytes.NewReader(wantBody), "application/json")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotResponse, _ := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusOK || !bytes.Equal(gotResponse, responseBody) || forwarded != 1 {
+		t.Fatalf("response status=%d body=%s forwarded=%d", response.StatusCode, gotResponse, forwarded)
+	}
+	settlements := fixture.recorder.waitForSettlements(t, 1)
+	assertSettlementMeter(t, settlements[0], usageingestapi.REQUESTS, 1)
+	assertSettlementMeter(t, settlements[0], usageingestapi.REQUESTEDIMAGES, 2)
+}
+
 func TestImageGenerationRejectsUnsupportedShapesBeforeForwarding(t *testing.T) {
 	var forwarded int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,6 +250,10 @@ func imageRuntimeFixture(t *testing.T, upstreamURL string) (*runtimeFixture, str
 }
 
 func imageRuntimeFixtureForDeployment(t *testing.T, upstreamURL, deploymentID string) (*runtimeFixture, string) {
+	return imageRuntimeFixtureForProtocol(t, upstreamURL, deploymentID, relaycontrolapi.OPENAIIMAGESGENERATIONS, "/v1/images/generations")
+}
+
+func imageRuntimeFixtureForProtocol(t *testing.T, upstreamURL, deploymentID string, protocol relaycontrolapi.ResourceRouteClientProtocol, runtimePath string) (*runtimeFixture, string) {
 	t.Helper()
 	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -230,11 +267,11 @@ func imageRuntimeFixtureForDeployment(t *testing.T, upstreamURL, deploymentID st
 		PrincipalState: relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, DeletedUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{{
 			ResourceId: imageID, RuntimeRouteId: routeID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION,
-			ClientProtocol: relaycontrolapi.OPENAIIMAGESGENERATIONS,
+			ClientProtocol: protocol,
 			ImageProfile:   &relaycontrolapi.RuntimeImageProfile{MaxImagesPerRequest: 3, AllowedSizes: []string{"1024x1024", "1536x1024"}},
 		}},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{{
-			RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/images/generations"},
+			RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{runtimePath},
 			TransportPolicy: relaycontrolapi.HTTPREQUESTRESPONSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000},
 		}},
 		Upstreams: []relaycontrolapi.RuntimeUpstreamSpec{{

@@ -55,6 +55,20 @@ func main() {
 	snapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: content, PublishedAt: at, PublishedByUserID: user})
 	must(err)
 	write("snapshot-v4.json", snapshot)
+	var dashScopeImageContent adminapi.ManagedDraftContent
+	must(json.Unmarshal(raw, &dashScopeImageContent))
+	dashScopeImage := &(*dashScopeImageContent.ImageGenerators)[0]
+	dashScopeImage.ImageId = "img_77777777-7777-4777-8777-777777777777"
+	dashScopeImage.DisplayName = "DashScope Managed Image Generator"
+	dashScopeImage.ClientProtocol = adminapi.ImageGenerationDefinitionClientProtocolDASHSCOPEMULTIMODALGENERATION
+	dashScopeImage.UpstreamModelKey = "wan2.7-image"
+	dashScopeImage.RuntimePath = "/api/v1/services/aigc/multimodal-generation/generation"
+	dashScopeImage.AllowedSizes = []string{"1024x1024"}
+	dashScopeImageID := dashScopeImage.ImageId
+	dashScopeImageContent.Policy.DefaultImageGenerationId = &dashScopeImageID
+	dashScopeImageSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: dashScopeImageContent, PublishedAt: at, PublishedByUserID: user})
+	must(err)
+	write("snapshot-v4-dashscope-image.json", dashScopeImageSnapshot)
 	emptyImages := []adminapi.ImageGenerationDefinition{}
 	policyOnly := adminapi.ManagedDraftContent{
 		Providers: []adminapi.ProviderDefinition{}, Models: []adminapi.ModelDefinition{}, ImageGenerators: &emptyImages,
@@ -112,6 +126,7 @@ func main() {
 		cases = append(cases, wireCase{name, schema, valid, value})
 	}
 	add("v4-full", "ManagedSnapshot", true, snapshot)
+	add("v4-dashscope-image", "ManagedSnapshot", true, dashScopeImageSnapshot)
 	var responsesContent adminapi.ManagedDraftContent
 	must(json.Unmarshal(raw, &responsesContent))
 	responsesContent.Providers[0].ClientProtocol = adminapi.ProviderDefinitionClientProtocolOPENAIRESPONSES
@@ -256,7 +271,8 @@ func main() {
 	headers := object{"Authorization": "Bearer synthetic.access.token", "X-Measix-Managed-Generation": "42", "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000"}
 	write("runtime-examples.json", []object{
 		{"resourceId": snapshot.Models[0].ModelId, "protocol": snapshot.Providers[0].ClientProtocol, "method": "POST", "url": base + snapshot.Models[0].ModelId + snapshot.Models[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": snapshot.Models[0].UpstreamModelKey, "messages": []object{{"role": "user", "content": "Hello"}}, "stream": true, "stream_options": object{"include_usage": true}}, "responseKind": "SSE"},
-		{"resourceId": (*snapshot.ImageGenerators)[0].ImageId, "protocol": (*snapshot.ImageGenerators)[0].ClientProtocol, "method": "POST", "url": base + (*snapshot.ImageGenerators)[0].ImageId + (*snapshot.ImageGenerators)[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": (*snapshot.ImageGenerators)[0].UpstreamModelKey, "prompt": "A synthetic fixture image", "n": 1, "size": (*snapshot.ImageGenerators)[0].AllowedSizes[0]}, "responseKind": "JSON_IMAGE_DATA"},
+		{"resourceId": (*snapshot.ImageGenerators)[0].ImageId, "protocol": (*snapshot.ImageGenerators)[0].ClientProtocol, "method": "POST", "url": base + (*snapshot.ImageGenerators)[0].ImageId + (*snapshot.ImageGenerators)[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": (*snapshot.ImageGenerators)[0].UpstreamModelKey, "prompt": "A synthetic fixture image", "n": 1, "size": (*snapshot.ImageGenerators)[0].AllowedSizes[0]}, "responseKind": "JSON_IMAGE_DATA", "responseBody": object{"data": []object{{"b64_json": "iVBORw0KGgo="}}}},
+		{"resourceId": (*dashScopeImageSnapshot.ImageGenerators)[0].ImageId, "protocol": (*dashScopeImageSnapshot.ImageGenerators)[0].ClientProtocol, "method": "POST", "url": base + (*dashScopeImageSnapshot.ImageGenerators)[0].ImageId + (*dashScopeImageSnapshot.ImageGenerators)[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": (*dashScopeImageSnapshot.ImageGenerators)[0].UpstreamModelKey, "input": object{"messages": []object{{"role": "user", "content": []object{{"text": "A synthetic fixture image"}}}}}, "parameters": object{"size": "1024*1024", "n": 1, "watermark": false}}, "responseKind": "JSON_DASHSCOPE_IMAGE_URL", "responseBody": object{"output": object{"choices": []object{{"message": object{"content": []object{{"image": "https://images.example.invalid/generated.png"}}}}}}}},
 		{"resourceId": snapshot.Tts[0].TtsId, "protocol": snapshot.Tts[0].ClientProtocol, "method": "POST", "url": base + snapshot.Tts[0].TtsId + snapshot.Tts[0].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": snapshot.Tts[0].UpstreamModelKey, "voice": snapshot.Tts[0].Voice, "input": "Hello"}, "responseKind": "BINARY_AUDIO"},
 		{"resourceId": snapshot.Asr[0].AsrId, "protocol": snapshot.Asr[0].ClientProtocol, "method": "POST", "url": base + snapshot.Asr[0].AsrId + snapshot.Asr[0].RuntimePath, "headers": headers, "contentType": "multipart/form-data", "fields": object{"model": snapshot.Asr[0].UpstreamModelKey, "language": snapshot.Asr[0].Language, "file": "<client audio bytes>"}, "responseKind": "JSON"},
 		{"resourceId": asrSnapshot.Asr[1].AsrId, "protocol": asrSnapshot.Asr[1].ClientProtocol, "method": "POST", "url": base + asrSnapshot.Asr[1].AsrId + asrSnapshot.Asr[1].RuntimePath, "headers": headers, "contentType": "application/json", "body": object{"model": asrSnapshot.Asr[1].UpstreamModelKey, "input": object{"messages": []object{{"role": "user", "content": []object{{"type": "input_audio", "input_audio": object{"data": "data:audio/wav;base64,<recording>"}}}}}}, "parameters": object{"format": "wav"}}, "responseKind": "JSON_OUTPUT_TEXT"},

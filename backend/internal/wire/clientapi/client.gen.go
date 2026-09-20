@@ -292,12 +292,15 @@ func (e EnterpriseUpdateSeverity) Valid() bool {
 
 // Defines values for ImageGenerationDefinitionClientProtocol.
 const (
-	ImageGenerationDefinitionClientProtocolOPENAIIMAGESGENERATIONS ImageGenerationDefinitionClientProtocol = "OPENAI_IMAGES_GENERATIONS"
+	ImageGenerationDefinitionClientProtocolDASHSCOPEMULTIMODALGENERATION ImageGenerationDefinitionClientProtocol = "DASHSCOPE_MULTIMODAL_GENERATION"
+	ImageGenerationDefinitionClientProtocolOPENAIIMAGESGENERATIONS       ImageGenerationDefinitionClientProtocol = "OPENAI_IMAGES_GENERATIONS"
 )
 
 // Valid indicates whether the value is a known member of the ImageGenerationDefinitionClientProtocol enum.
 func (e ImageGenerationDefinitionClientProtocol) Valid() bool {
 	switch e {
+	case ImageGenerationDefinitionClientProtocolDASHSCOPEMULTIMODALGENERATION:
+		return true
 	case ImageGenerationDefinitionClientProtocolOPENAIIMAGESGENERATIONS:
 		return true
 	default:
@@ -583,19 +586,20 @@ func (e TtsDefinitionClientProtocol) Valid() bool {
 
 // Defines values for UsageClientProtocol.
 const (
-	UsageClientProtocolANTHROPICMESSAGES           UsageClientProtocol = "ANTHROPIC_MESSAGES"
-	UsageClientProtocolDASHSCOPEHTTPASR            UsageClientProtocol = "DASHSCOPE_HTTP_ASR"
-	UsageClientProtocolDASHSCOPEREALTIMEASR        UsageClientProtocol = "DASHSCOPE_REALTIME_ASR"
-	UsageClientProtocolGEMINIGENERATECONTENTTTS    UsageClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
-	UsageClientProtocolGOOGLEGENERATECONTENT       UsageClientProtocol = "GOOGLE_GENERATE_CONTENT"
-	UsageClientProtocolMCPSTREAMABLEHTTP           UsageClientProtocol = "MCP_STREAMABLE_HTTP"
-	UsageClientProtocolMIMOCHATCOMPLETIONSTTS      UsageClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
-	UsageClientProtocolOPENAIAUDIOSPEECH           UsageClientProtocol = "OPENAI_AUDIO_SPEECH"
-	UsageClientProtocolOPENAIAUDIOTRANSCRIPTIONS   UsageClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
-	UsageClientProtocolOPENAICHATCOMPLETIONS       UsageClientProtocol = "OPENAI_CHAT_COMPLETIONS"
-	UsageClientProtocolOPENAIIMAGESGENERATIONS     UsageClientProtocol = "OPENAI_IMAGES_GENERATIONS"
-	UsageClientProtocolOPENAIREALTIMETRANSCRIPTION UsageClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
-	UsageClientProtocolOPENAIRESPONSES             UsageClientProtocol = "OPENAI_RESPONSES"
+	UsageClientProtocolANTHROPICMESSAGES             UsageClientProtocol = "ANTHROPIC_MESSAGES"
+	UsageClientProtocolDASHSCOPEHTTPASR              UsageClientProtocol = "DASHSCOPE_HTTP_ASR"
+	UsageClientProtocolDASHSCOPEMULTIMODALGENERATION UsageClientProtocol = "DASHSCOPE_MULTIMODAL_GENERATION"
+	UsageClientProtocolDASHSCOPEREALTIMEASR          UsageClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	UsageClientProtocolGEMINIGENERATECONTENTTTS      UsageClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	UsageClientProtocolGOOGLEGENERATECONTENT         UsageClientProtocol = "GOOGLE_GENERATE_CONTENT"
+	UsageClientProtocolMCPSTREAMABLEHTTP             UsageClientProtocol = "MCP_STREAMABLE_HTTP"
+	UsageClientProtocolMIMOCHATCOMPLETIONSTTS        UsageClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	UsageClientProtocolOPENAIAUDIOSPEECH             UsageClientProtocol = "OPENAI_AUDIO_SPEECH"
+	UsageClientProtocolOPENAIAUDIOTRANSCRIPTIONS     UsageClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	UsageClientProtocolOPENAICHATCOMPLETIONS         UsageClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	UsageClientProtocolOPENAIIMAGESGENERATIONS       UsageClientProtocol = "OPENAI_IMAGES_GENERATIONS"
+	UsageClientProtocolOPENAIREALTIMETRANSCRIPTION   UsageClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
+	UsageClientProtocolOPENAIRESPONSES               UsageClientProtocol = "OPENAI_RESPONSES"
 )
 
 // Valid indicates whether the value is a known member of the UsageClientProtocol enum.
@@ -604,6 +608,8 @@ func (e UsageClientProtocol) Valid() bool {
 	case UsageClientProtocolANTHROPICMESSAGES:
 		return true
 	case UsageClientProtocolDASHSCOPEHTTPASR:
+		return true
+	case UsageClientProtocolDASHSCOPEMULTIMODALGENERATION:
 		return true
 	case UsageClientProtocolDASHSCOPEREALTIMEASR:
 		return true

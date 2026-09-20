@@ -11,6 +11,7 @@ type TransportPolicy = RuntimeBindingDefinition['transportPolicy']
 export type ManagedResourceKind = 'MODEL' | 'IMAGE_GENERATION' | 'TTS' | 'ASR' | 'MCP'
 export type TtsProtocol = components['schemas']['TtsDefinition']['clientProtocol']
 export type AsrProtocol = components['schemas']['AsrDefinition']['clientProtocol']
+export type ImageGenerationProtocol = components['schemas']['ImageGenerationDefinition']['clientProtocol']
 export function isRealtimeAsr(protocol: AsrProtocol): boolean {
   return protocol === 'OPENAI_REALTIME_TRANSCRIPTION' || protocol === 'DASHSCOPE_REALTIME_ASR'
 }
@@ -261,6 +262,24 @@ export const useDraftStore = defineStore('draft', () => {
     markDirty()
   }
 
+  function setImageGenerationProtocol(id: string, protocol: ImageGenerationProtocol) {
+    const content = requireContent()
+    const image = content.imageGenerators?.find(item => item.imageId === id)
+    if (!image || image.clientProtocol === protocol) return
+    image.clientProtocol = protocol
+    image.runtimePath = protocol === 'DASHSCOPE_MULTIMODAL_GENERATION'
+      ? '/api/v1/services/aigc/multimodal-generation/generation'
+      : '/v1/images/generations'
+    image.allowedSizes = protocol === 'DASHSCOPE_MULTIMODAL_GENERATION' ? ['1024x1024'] : ['auto']
+    const binding = bindingFor(id)
+    if (binding) {
+      binding.allowedMethods = ['POST']
+      binding.allowedPathPrefixes = [image.runtimePath]
+      binding.transportPolicy = 'HTTP_REQUEST_RESPONSE'
+    }
+    markDirty()
+  }
+
   function setAsrProtocol(id: string, protocol: AsrProtocol) {
     const content = requireContent()
     const index = content.asr.findIndex(asr => asr.asrId === id)
@@ -369,6 +388,6 @@ export const useDraftStore = defineStore('draft', () => {
   return {
     baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
     load, save, validate, addModel, addImageGeneration, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, markDirty,
-    bindingFor, setBinding, setRuntimePath, removeBinding, resourceReferences, removeResource, setTtsProtocol, setAsrProtocol,
+    bindingFor, setBinding, setRuntimePath, removeBinding, resourceReferences, removeResource, setImageGenerationProtocol, setTtsProtocol, setAsrProtocol,
   }
 })

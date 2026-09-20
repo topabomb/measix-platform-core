@@ -27,6 +27,7 @@ func TestUsageFiltersCursorSummaryEnrichmentAndUnknownRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 	modelID := platformid.New(platformid.Model)
+	imageID := platformid.New(platformid.ImageGeneration)
 	ttsID := platformid.New(platformid.TTS)
 	releaseID := platformid.New(platformid.Release)
 	snapshot, err := json.Marshal(map[string]any{
@@ -58,6 +59,11 @@ func TestUsageFiltersCursorSummaryEnrichmentAndUnknownRegression(t *testing.T) {
 		Protocol: "OPENAI_AUDIO_SPEECH", UpstreamID: upstreamID, CompletedAt: now.Add(-2 * time.Second), Forwarded: true, HTTPStatus: 500,
 		Completeness: "PARTIAL", RequestBytes: 12, ResponseBytes: 30,
 	})
+	imageRequestID := createUsageRequestRow(t, store.Client, requestRowInput{
+		DeploymentID: deploymentID, UserID: userA, ResourceID: imageID, ResourceKind: "IMAGE_GENERATION",
+		Protocol: "DASHSCOPE_MULTIMODAL_GENERATION", UpstreamID: upstreamID, CompletedAt: now.Add(-2500 * time.Millisecond), Forwarded: true, HTTPStatus: 200,
+		Completeness: "EXACT", RequestBytes: 14, ResponseBytes: 40,
+	})
 	unknownID := createUsageRequestRow(t, store.Client, requestRowInput{
 		DeploymentID: deploymentID, UserID: userA, ResourceID: modelID, ResourceKind: "MODEL",
 		Protocol: "OPENAI_RESPONSES", UpstreamID: upstreamID, CompletedAt: now.Add(-3 * time.Second), Forwarded: true, HTTPStatus: 200,
@@ -86,6 +92,10 @@ func TestUsageFiltersCursorSummaryEnrichmentAndUnknownRegression(t *testing.T) {
 	if err != nil || len(errorRows) != 1 || errorRows[0].HTTPStatus != 500 {
 		t.Fatalf("error filter = %+v err=%v", errorRows, err)
 	}
+	imageRows, err := service.ListRequests(ctx, Filter{ResourceKind: ResourceKindImage, ClientProtocol: "DASHSCOPE_MULTIMODAL_GENERATION"}, 50)
+	if err != nil || len(imageRows) != 1 || imageRows[0].RequestID != imageRequestID {
+		t.Fatalf("image filter = %+v err=%v", imageRows, err)
+	}
 
 	firstPage, err := service.ListRequests(ctx, Filter{}, 3)
 	if err != nil || len(firstPage) != 3 {
@@ -93,7 +103,7 @@ func TestUsageFiltersCursorSummaryEnrichmentAndUnknownRegression(t *testing.T) {
 	}
 	cursor := firstPage[2].CompletedAt.UTC().Format(time.RFC3339Nano) + "|" + firstPage[2].RequestID
 	secondPage, err := service.ListRequests(ctx, Filter{After: cursor}, 3)
-	if err != nil || len(secondPage) != 1 || secondPage[0].RequestID != unknownID {
+	if err != nil || len(secondPage) != 2 || secondPage[1].RequestID != unknownID {
 		t.Fatalf("second page = %+v err=%v", secondPage, err)
 	}
 	if _, err := service.ListRequests(ctx, Filter{After: "not-a-cursor"}, 2); !errors.Is(err, ErrInvalidBatch) {
@@ -101,8 +111,8 @@ func TestUsageFiltersCursorSummaryEnrichmentAndUnknownRegression(t *testing.T) {
 	}
 
 	summary, err := service.Summary(ctx, Filter{UserID: userA})
-	if err != nil || summary.RequestCount != 3 || summary.ForwardedRequestCount != 2 || summary.RequestBytes != 34 || summary.ResponseBytes != 25 ||
-		summary.RequestCompleteness.Exact != 2 || summary.RequestCompleteness.Unknown != 1 || len(summary.Meters) != 1 || summary.Meters[0].Quantity != "15" || summary.Meters[0].Confidence != CompletenessUnknown {
+	if err != nil || summary.RequestCount != 4 || summary.ForwardedRequestCount != 3 || summary.RequestBytes != 48 || summary.ResponseBytes != 65 ||
+		summary.RequestCompleteness.Exact != 3 || summary.RequestCompleteness.Unknown != 1 || len(summary.Meters) != 1 || summary.Meters[0].Quantity != "15" || summary.Meters[0].Confidence != CompletenessUnknown {
 		t.Fatalf("user summary = %+v err=%v", summary, err)
 	}
 	unknown, err := service.UnknownRequestCount(ctx)

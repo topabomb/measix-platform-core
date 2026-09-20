@@ -159,6 +159,7 @@ const id = {
   qwenProvider: 'prv_3d005a2a-7e91-4abd-a1a4-5c7d4a2e2222',
   deepseekModel: 'mdl_3d005a2a-7e91-4abd-a1a4-5c7d4a2e1111',
   qwenModel: 'mdl_3d005a2a-7e91-4abd-a1a4-5c7d4a2e2222',
+  wanImage: 'img_3d005a2a-7e91-4abd-a1a4-5c7d4a2e1111',
   mimoTts: 'tts_3d005a2a-7e91-4abd-a1a4-5c7d4a2e1111',
   systemTts: 'tts_3d005a2a-7e91-4abd-a1a4-5c7d4a2e2222',
   dashscopeAsr: 'asr_3d005a2a-7e91-4abd-a1a4-5c7d4a2e1111',
@@ -170,6 +171,7 @@ const id = {
   qwenStarter: 'str_3d005a2a-7e91-4abd-a1a4-5c7d4a2e3333',
   deepseekRoute: 'rte_3d005a2a-7e91-4abd-a1a4-5c7d4a2e1111',
   qwenRoute: 'rte_3d005a2a-7e91-4abd-a1a4-5c7d4a2e2222',
+  imageRoute: 'rte_3d005a2a-7e91-4abd-a1a4-5c7d4a2e6666',
   mimoRoute: 'rte_3d005a2a-7e91-4abd-a1a4-5c7d4a2e3333',
   asrRoute: 'rte_3d005a2a-7e91-4abd-a1a4-5c7d4a2e4444',
   mcpRoute: 'rte_3d005a2a-7e91-4abd-a1a4-5c7d4a2e5555',
@@ -178,7 +180,7 @@ const draft = await api('GET', '/draft')
 const policy = {
   ...draft.content.policy,
   allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true,
-  defaultModelId: id.deepseekModel, defaultTtsId: id.mimoTts, defaultAsrId: id.dashscopeAsr, defaultAssistantId: id.workAssistant,
+  defaultModelId: id.deepseekModel, defaultImageGenerationId: id.wanImage, defaultTtsId: id.mimoTts, defaultAsrId: id.dashscopeAsr, defaultAssistantId: id.workAssistant,
 }
 const content = {
   providers: [
@@ -188,6 +190,9 @@ const content = {
   models: [
     { modelId: id.deepseekModel, providerId: id.deepseekProvider, displayName: 'DeepSeek Flash（文字、图片、工具）', upstreamModelKey: 'deepseek-flash', runtimePath: '/chat/completions', inputModalities: ['TEXT', 'IMAGE'], outputModalities: ['TEXT'], capabilities: ['TOOL'], enabled: true },
     { modelId: id.qwenModel, providerId: id.qwenProvider, displayName: 'Qwen 3.8 Flash（文字、图片、工具；本机实验）', upstreamModelKey: 'qwen3.8-flash', runtimePath: '/compatible-mode/v1/chat/completions', inputModalities: ['TEXT', 'IMAGE'], outputModalities: ['TEXT'], capabilities: ['TOOL'], enabled: true },
+  ],
+  imageGenerators: [
+    { imageId: id.wanImage, displayName: '万相 2.7 文生图（本机实验）', clientProtocol: 'DASHSCOPE_MULTIMODAL_GENERATION', upstreamModelKey: 'wan2.7-image', runtimePath: '/api/v1/services/aigc/multimodal-generation/generation', maxImagesPerRequest: 4, allowedSizes: ['1024x1024'], enabled: true },
   ],
   tts: [
     { ttsId: id.mimoTts, displayName: 'MiMo 云端朗读', clientProtocol: 'MIMO_CHAT_COMPLETIONS_TTS', upstreamModelKey: 'mimo-v2.5-tts', voice: 'mimo_default', runtimePath: '/v1/chat/completions', enabled: true },
@@ -211,6 +216,7 @@ const content = {
   bindings: [
     { runtimeRouteId: id.deepseekRoute, resourceId: id.deepseekModel, upstreamId: upstreams.deepseek.upstreamId, allowedMethods: ['POST'], allowedPathPrefixes: ['/chat/completions'], transportPolicy: 'HTTP_STREAMING_SSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 } },
     { runtimeRouteId: id.qwenRoute, resourceId: id.qwenModel, upstreamId: upstreams.alibaba.upstreamId, allowedMethods: ['POST'], allowedPathPrefixes: ['/compatible-mode/v1/chat/completions'], transportPolicy: 'HTTP_STREAMING_SSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 } },
+    { runtimeRouteId: id.imageRoute, resourceId: id.wanImage, upstreamId: upstreams.alibaba.upstreamId, allowedMethods: ['POST'], allowedPathPrefixes: ['/api/v1/services/aigc/multimodal-generation/generation'], transportPolicy: 'HTTP_REQUEST_RESPONSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 120000, idleMs: 120000 } },
     { runtimeRouteId: id.mimoRoute, resourceId: id.mimoTts, upstreamId: upstreams.mimo.upstreamId, allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/chat/completions'], transportPolicy: 'HTTP_STREAMING_SSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 } },
     { runtimeRouteId: id.asrRoute, resourceId: id.dashscopeAsr, upstreamId: upstreams.alibaba.upstreamId, allowedMethods: ['POST'], allowedPathPrefixes: ['/api/v1/services/aigc/multimodal-generation/generation'], transportPolicy: 'HTTP_REQUEST_RESPONSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 } },
     { runtimeRouteId: id.mcpRoute, resourceId: id.firecrawl, upstreamId: upstreams.firecrawl.upstreamId, allowedMethods: ['POST', 'GET', 'DELETE'], allowedPathPrefixes: ['/mcp'], transportPolicy: 'HTTP_STREAMING_SSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 } },
@@ -243,6 +249,6 @@ console.log(JSON.stringify({
   origin,
   activationState,
   publishedGeneration: preview.publishedGeneration || 'new-release',
-  resources: { models: content.models.length, tts: content.tts.length, asr: content.asr.length, mcp: content.mcp.length, assistants: content.assistants.length, starters: content.starters.length },
+  resources: { models: content.models.length, imageGenerators: content.imageGenerators.length, tts: content.tts.length, asr: content.asr.length, mcp: content.mcp.length, assistants: content.assistants.length, starters: content.starters.length },
   usageCapabilityLevel: 'LEVEL_0',
 }, null, 2))

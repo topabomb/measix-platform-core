@@ -738,8 +738,8 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		if strings.TrimSpace(value.UpstreamModelKey) == "" {
 			addError("missing_image_model_key", path+".upstreamModelKey", "Image Generation requires a non-empty upstreamModelKey", &kindImage, ptrStr(value.ImageId), ptrStr("upstreamModelKey"))
 		}
-		if !validRuntimePath(value.RuntimePath) || !strings.HasSuffix(value.RuntimePath, "/images/generations") {
-			addError("invalid_runtime_path", path+".runtimePath", "Image Generation runtimePath must be an exact normalized images/generations path", &kindImage, ptrStr(value.ImageId), ptrStr("runtimePath"))
+		if !validImageRuntimePath(value.ClientProtocol, value.RuntimePath) {
+			addError("invalid_runtime_path", path+".runtimePath", "Image Generation runtimePath must be the normalized endpoint for its client protocol", &kindImage, ptrStr(value.ImageId), ptrStr("runtimePath"))
 		}
 		if value.MaxImagesPerRequest < 1 || value.MaxImagesPerRequest > 6 {
 			addError("invalid_max_images", path+".maxImagesPerRequest", "maxImagesPerRequest must be between 1 and 6", &kindImage, ptrStr(value.ImageId), ptrStr("maxImagesPerRequest"))
@@ -749,8 +749,8 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			addError("missing_image_sizes", path+".allowedSizes", "Image Generation requires at least one allowed size", &kindImage, ptrStr(value.ImageId), ptrStr("allowedSizes"))
 		}
 		for j, size := range value.AllowedSizes {
-			if !validImageSize(size) {
-				addError("invalid_image_size", fmt.Sprintf("%s.allowedSizes[%d]", path, j), "image size must be auto or normalized positive <width>x<height>", &kindImage, ptrStr(value.ImageId), ptrStr("allowedSizes"))
+			if !validImageSize(size) || value.ClientProtocol == adminapi.ImageGenerationDefinitionClientProtocolDASHSCOPEMULTIMODALGENERATION && size == "auto" {
+				addError("invalid_image_size", fmt.Sprintf("%s.allowedSizes[%d]", path, j), "image size must be a protocol-supported canonical positive <width>x<height> token", &kindImage, ptrStr(value.ImageId), ptrStr("allowedSizes"))
 			}
 			if seenSizes[size] {
 				addError("duplicate_image_size", fmt.Sprintf("%s.allowedSizes[%d]", path, j), "image sizes must be unique", &kindImage, ptrStr(value.ImageId), ptrStr("allowedSizes"))
@@ -1016,6 +1016,20 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	})
 	result.Valid = len(result.Errors) == 0
 	return result
+}
+
+func validImageRuntimePath(protocol adminapi.ImageGenerationDefinitionClientProtocol, runtimePath string) bool {
+	if !validRuntimePath(runtimePath) {
+		return false
+	}
+	switch protocol {
+	case adminapi.ImageGenerationDefinitionClientProtocolOPENAIIMAGESGENERATIONS:
+		return strings.HasSuffix(runtimePath, "/images/generations")
+	case adminapi.ImageGenerationDefinitionClientProtocolDASHSCOPEMULTIMODALGENERATION:
+		return runtimePath == "/api/v1/services/aigc/multimodal-generation/generation"
+	default:
+		return false
+	}
 }
 
 func validateCandidateIDs(content adminapi.ManagedDraftContent) error {

@@ -55,7 +55,7 @@ func prepareUsageObservation(resource control.Resource, request *http.Request, r
 	switch string(resource.Kind) {
 	case "IMAGE_GENERATION":
 		mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
-		if request.Method != http.MethodPost || request.URL.RawQuery != "" || !strings.HasSuffix(runtimePath, "/images/generations") || mediaType != "application/json" || err != nil || resource.ImageProfile == nil {
+		if request.Method != http.MethodPost || request.URL.RawQuery != "" || !validImageObservationPath(protocol, runtimePath) || mediaType != "application/json" || err != nil || resource.ImageProfile == nil {
 			return nil, errInvalidImageGenerationRequest
 		}
 		body, err := io.ReadAll(io.LimitReader(request.Body, maxBytes+1))
@@ -68,7 +68,7 @@ func prepareUsageObservation(resource control.Resource, request *http.Request, r
 		_ = request.Body.Close()
 		request.Body = io.NopCloser(bytes.NewReader(body))
 		request.ContentLength = int64(len(body))
-		result, err := protocolusage.ObserveImageGenerationRequest(body, resource.ImageProfile.MaxImagesPerRequest, resource.ImageProfile.AllowedSizes)
+		result, err := protocolusage.ObserveImageGenerationRequestForProtocol(protocol, body, resource.ImageProfile.MaxImagesPerRequest, resource.ImageProfile.AllowedSizes)
 		if err != nil {
 			return nil, errInvalidImageGenerationRequest
 		}
@@ -103,6 +103,17 @@ func prepareUsageObservation(resource control.Resource, request *http.Request, r
 		}
 	}
 	return observation, nil
+}
+
+func validImageObservationPath(protocol string, path string) bool {
+	switch protocol {
+	case protocolusage.OpenAIImagesGenerations:
+		return strings.HasSuffix(path, "/images/generations")
+	case protocolusage.DashScopeMultimodalGeneration:
+		return path == "/api/v1/services/aigc/multimodal-generation/generation"
+	default:
+		return false
+	}
 }
 
 var errObservedRequestTooLarge = fmt.Errorf("observed request exceeds runtime limit")

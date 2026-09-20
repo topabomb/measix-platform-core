@@ -56,7 +56,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | Model.displayName/modalities/capabilities | name 与显式 enum 映射。S0.2 为 CHAT；不映射成图片生成/附件等未声明 profile。未知 enum 拒绝候选，不能默认为普通文本模型 |
 | Provider.clientProtocol + Model.runtimePath | 保存在平台运行适配配置中，决定公开 Relay URL 与请求 profile；不塞入本地私有 binding，也不向用户存储注入企业上游地址/密钥 |
 | ImageGeneration.imageId/displayName/upstreamModelKey | 保持独立 `img_*` 企业资源身份；Android 只在统一图片选择目录中投影为 IMAGE 项，请求 body 的 `model` 使用 upstreamModelKey。不得并入 Provider/Model 表或借用 `mdl_*` |
-| ImageGeneration.clientProtocol/runtimePath/maxImagesPerRequest/allowedSizes | 当前只接受 `OPENAI_IMAGES_GENERATIONS` 同步 text-to-image。执行固定到该资源的 Relay 路径，发出 `model/prompt/n/size`；Android 在排队与每次外部请求前复验数量和尺寸，禁止参考图、编辑、mask、multipart、partial、stream 与异步任务 |
+| ImageGeneration.clientProtocol/runtimePath/maxImagesPerRequest/allowedSizes | 接受 `OPENAI_IMAGES_GENERATIONS` 与 `DASHSCOPE_MULTIMODAL_GENERATION` 两种同步 text-to-image typed profile。执行固定到该资源的 Relay 路径；Android 在排队与每次外部请求前复验数量和 canonical 尺寸，按协议构造 wire，禁止参考图、编辑、mask、multipart、partial、stream 与异步任务 |
 | TTS.ttsId/displayName/clientProtocol | 保留企业资源身份，按 Control Protocol §10.5 显式分派四种语音执行方式。现有企业 OpenAI 专用通道需扩展，不能按模型名猜协议 |
 | 云端 TTS.upstreamModelKey/voice/runtimePath/voiceDesignPrompt | 分别保留模型、预置音色、Relay 路径与 MiMo 描述。音色设计无 voice；Gemini JSON 内联 PCM，MiMo SSE 音频增量，OpenAI 二进制音频，各用对应编码/解码 |
 | SYSTEM_TTS.speechRate/pitch | 仅设备执行，无上游绑定、Runtime URL 或企业服务器密钥。仍为企业资源，可在 allowLocalTts=false 时作为 defaultTtsId；缺少可用设备引擎须明确报错，不切换云端 |
@@ -96,6 +96,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | GOOGLE_GENERATE_CONTENT | runtimePath 通常为 `/v1beta/models/{upstreamModelKey}:streamGenerateContent`，追加 `?alt=sse` | contents/parts、functionCall/functionResponse；保留模型返回的调用 ID 和 thoughtSignature；解析 candidates |
 | ANTHROPIC_MESSAGES | runtimePath 通常为 `/v1/messages` | messages、独立 system、max_tokens、stream=true；tool_use/tool_result 配对；anthropic-version 公开协议头；解析命名 SSE 直至 message_stop |
 | OPENAI_IMAGES_GENERATIONS | `/runtime/v1/resources/img_ffffffff-ffff-4fff-8fff-ffffffffffff/v1/images/generations` | 同步 JSON `{"model":"gpt-image-1","prompt":"...","n":1,"size":"1024x1024"}`；响应只接受 `b64_json` 或安全 HTTPS URL，下载不携带平台 Bearer/Cookie，并在交给 `GeneratedMediaStore` 前执行有界读取与图片签名校验 |
+| DASHSCOPE_MULTIMODAL_GENERATION | `/runtime/v1/resources/img_ffffffff-ffff-4fff-8fff-ffffffffffff/api/v1/services/aigc/multimodal-generation/generation` | 同步 JSON `model/input.messages/parameters`；Android 将 canonical `1024x1024` 只在 wire builder 转为 `1024*1024`，显式发送 `n` 与 `watermark=false`，从 `output.choices[].message.content[].image` 读取安全 HTTPS URL |
 | OPENAI_AUDIO_SPEECH | `/runtime/v1/resources/tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc/v1/audio/speech` | JSON `{"model":"tts-1","voice":"alloy","input":"你好"}`；读取二进制音频，不当 JSON/SSE 解析 |
 | GEMINI_GENERATE_CONTENT_TTS | runtimePath 中的 `:generateContent` 路径 | responseModalities=AUDIO，speechConfig 设置下发 voice；解码 inlineData 中的 PCM 和采样率 |
 | MIMO_CHAT_COMPLETIONS_TTS | runtimePath 通常为 `/v1/chat/completions` | 按当前 Android MiMo 编码器构造 audio/messages，分别消费标准 voice 或 voiceDesignPrompt；读取 SSE 音频增量 |
@@ -113,7 +114,7 @@ Direct MCP 的平台路由允许 `POST`、`GET`、`DELETE` 到 Snapshot 给出�
 
 ## 验证职责与交接清单
 
-共享样例覆盖当前全部能力：`snapshot-v4.json`（基础）、`snapshot-v4-responses/gemini/claude.json`（三种模型协议）、`snapshot-v4-speech.json`（四种 TTS，默认系统朗读、个人 TTS 准入关闭）、`snapshot-v4-asr.json`（四种 ASR）、`snapshot-v4-denied.json`（全部策略禁止）。请求构造示例见 `http-examples.json` 与 `runtime-examples.json`。Android 应对全部样例补候选校验、映射和执行分派测试，再做设备消费验收；上游资料更新本身不表示原生接线已完成。
+共享样例覆盖当前全部能力：`snapshot-v4.json`（基础与 OpenAI 文生图）、`snapshot-v4-dashscope-image.json`（DashScope 文生图）、`snapshot-v4-responses/gemini/claude.json`（三种模型协议）、`snapshot-v4-speech.json`（四种 TTS，默认系统朗读、个人 TTS 准入关闭）、`snapshot-v4-asr.json`（四种 ASR）、`snapshot-v4-denied.json`（全部策略禁止）。请求构造示例见 `http-examples.json` 与 `runtime-examples.json`。Android 应对全部样例补候选校验、映射和执行分派测试，再做设备消费验收；上游资料更新本身不表示原生接线已完成。
 
 上游协议证据入口在 Core 源码仓库，不在本包内：`contract` 复算 Snapshot hash；`httpapi/client_integration_test.go` 用真实身份/SQLite/HTTP 验证 pending、应用后状态、200/304 与撤销；`identity` 验证轮换幂等、并发与退出隔离；`relay` 的 `model_tool_roundtrip_test.go`、`provider_protocol_test.go`、`mcp_session_test.go`、`websocket_test.go` 覆盖四协议工具往返与 429、供应商认证边界、完整 MCP 会话以及握手/帧/超时/取消/准入。这些是上游证据，不替代 Android 设备验收；供应商付费账户权限与真实生成质量另行验证。
 

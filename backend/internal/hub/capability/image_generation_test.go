@@ -110,6 +110,29 @@ func TestImageGenerationValidationReferencesBindingAndDefault(t *testing.T) {
 		t.Fatalf("valid image definition rejected: %+v", result.Errors)
 	}
 
+	dashScope := updated.Content
+	dashScopeImages := append([]adminapi.ImageGenerationDefinition(nil), (*dashScope.ImageGenerators)...)
+	dashScopeImages[0].ClientProtocol = adminapi.ImageGenerationDefinitionClientProtocol("DASHSCOPE_MULTIMODAL_GENERATION")
+	dashScopeImages[0].RuntimePath = "/api/v1/services/aigc/multimodal-generation/generation"
+	dashScopeImages[0].AllowedSizes = []string{"1024x1024"}
+	dashScope.ImageGenerators = &dashScopeImages
+	for index := range dashScope.Bindings {
+		if dashScope.Bindings[index].ResourceId == imageID {
+			dashScope.Bindings[index].AllowedPathPrefixes = []string{"/api/v1/services/aigc/multimodal-generation/generation"}
+		}
+	}
+	updated, err = service.PutDraft(ctx, boot.AdminUserID, updated.DraftRevision, dashScope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err = service.ValidateDraft(ctx, updated.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Valid {
+		t.Fatalf("valid DashScope image definition rejected: %+v", result.Errors)
+	}
+
 	invalid := updated.Content
 	badID := platformid.New(platformid.ImageGeneration)
 	invalid.Policy.DefaultImageGenerationId = &badID

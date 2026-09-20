@@ -84,6 +84,23 @@ const adapterServer = http.createServer((req, res) => {
       res.end(JSON.stringify({ created: 1789833600, data: [{ b64_json: 'iVBORw0KGgo=' }] }))
       return
     }
+    if (path === '/api/v1/services/aigc/multimodal-generation/generation') {
+      const valid = bodyJSON?.model === 'wan2.7-image'
+        && bodyJSON?.input?.messages?.length === 1
+        && bodyJSON.input.messages[0]?.role === 'user'
+        && typeof bodyJSON.input.messages[0]?.content?.[0]?.text === 'string'
+        && bodyJSON?.parameters?.size === '1024*1024'
+        && Number.isInteger(bodyJSON?.parameters?.n)
+        && bodyJSON?.parameters?.watermark === false
+      if (!valid) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ code: 'InvalidParameter', message: 'invalid DashScope image request' }))
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ output: { choices: [{ message: { content: [{ image: 'https://images.example/generated.png' }] } }] } }))
+      return
+    }
     if (path === '/mcp') {
       if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
       if (bodyJSON?.jsonrpc !== '2.0' || typeof bodyJSON.method !== 'string') {

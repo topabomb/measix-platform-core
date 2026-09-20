@@ -395,7 +395,7 @@ export interface components {
         /** @enum {string} */
         ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION";
         /** @enum {string} */
-        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
+        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "DASHSCOPE_MULTIMODAL_GENERATION" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
         /** @enum {string} */
         UsageMeter: "REQUESTS" | "REQUESTED_IMAGES" | "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "TOTAL_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS";
         /** @enum {string} */
@@ -593,7 +593,7 @@ export interface components {
             imageId: components["schemas"]["ImageGenerationId"];
             displayName: string;
             /** @enum {string} */
-            clientProtocol: "OPENAI_IMAGES_GENERATIONS";
+            clientProtocol: "OPENAI_IMAGES_GENERATIONS" | "DASHSCOPE_MULTIMODAL_GENERATION";
             upstreamModelKey: string;
             runtimePath: string;
             maxImagesPerRequest: number;

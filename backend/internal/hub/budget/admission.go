@@ -449,7 +449,7 @@ func protocolMatchesCapability(protocol ClientProtocol, capability Capability) b
 	case CapabilityModel:
 		return protocol == ProtocolOpenAIChatCompletions || protocol == ProtocolOpenAIResponses || protocol == ProtocolGoogleGenerateContent || protocol == ProtocolAnthropicMessages
 	case CapabilityImageGeneration:
-		return protocol == ProtocolOpenAIImagesGenerations
+		return protocol == ProtocolOpenAIImagesGenerations || protocol == ProtocolDashScopeMultimodalGeneration
 	case CapabilityTTS:
 		return protocol == ProtocolOpenAIAudioSpeech || protocol == ProtocolGeminiGenerateContentTTS || protocol == ProtocolMiMoChatCompletionsTTS
 	case CapabilityASR:

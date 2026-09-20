@@ -31,7 +31,7 @@ Root repository 的 npm orchestration、实际开发命令与 system harness 生
 
 ## 2. 当前源码组织
 
-`ResourcesPage` 使用统一配置工作台组织 Overview、Models、Image Generation、TTS、ASR、MCP、Assistants 和 Policy。Image Generation 是独立受管资源，只表达同步 text-to-image、允许尺寸、单次数量上限和固定 Runtime binding，不借用 Model 或引入资源级额度。桌面显示固定分区导航，窄屏使用同一 section state 的选择器；Policy 直接编辑当前五项必填用户配置准入开关和各类默认资源。新草稿五项默认 false；不存在旧策略采用按钮或缺字段补齐逻辑，非当前旧草稿随旧开发数据库清理。服务端在 HTTP 边界独立校验五项必填 Boolean 与所有资源、Assistants/Starters 数组。
+`ResourcesPage` 使用统一配置工作台组织 Overview、Models、Image Generation、TTS、ASR、MCP、Assistants 和 Policy。Image Generation 是独立受管资源，只表达同步 text-to-image、允许尺寸、单次数量上限和固定 Runtime binding，不借用 Model 或引入资源级额度。协议选择只包含 `OPENAI_IMAGES_GENERATIONS` 与 `DASHSCOPE_MULTIMODAL_GENERATION`；切换协议会原子改写其固定 Runtime path、默认 canonical 尺寸和 binding protocol，避免产生跨协议半配置。桌面显示固定分区导航，窄屏使用同一 section state 的选择器；Policy 直接编辑当前五项必填用户配置准入开关和各类默认资源。新草稿五项默认 false；不存在旧策略采用按钮或缺字段补齐逻辑，非当前旧草稿随旧开发数据库清理。服务端在 HTTP 边界独立校验五项必填 Boolean 与所有资源、Assistants/Starters 数组。
 
 `DetailWorkspace.vue` 是 Users、Upstreams、Releases、Enterprise Updates 和 Usage Request 的共享紧凑主从工作区：宽屏同时显示 collection/detail，窄屏进入详情后只显示详情并提供返回列表，不复制业务状态。实体内部再按稳定任务拆成少量 section/tab；例如 User 只暴露 Devices、Usage budgets、User usage 三个详情分区，危险动作收敛到 actions menu。`CursorPager.vue` + `useCursorPager.ts` 是主 collection 的有界上一页/下一页 primitive，只保留当前页和 cursor 历史，不把数千行持续挂在 DOM。`PagedEntityPicker.vue` 是潜在大集合的共享选择面，`api/entityPickerSources.ts` 提供 User、Upstream、Secret 的服务端 query/keyset cursor/selected-value resolve adapter；选择面独立呈现 loading/empty/error/load-more，不加载全部数据，也不要求操作员手填稳定 ID。
 

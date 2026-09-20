@@ -46,7 +46,7 @@ Portal 代码在同级仓库维护；增加个人用量/额度界面及 source/s
 
 统一生命周期包含：创建观察器、提取可预知请求量、增量观察响应、终结结果。最终结果是结构化 meter/source/completeness 和诊断，不含正文。HTTP JSON、SSE、binary、multipart 和 WebSocket 使用同一结果模型，但不强迫使用同一种读取器。
 
-必须在 Core 这一轮整体实现下列 13 个云端协议/profile（4 LLM + 1 Image Generation + 3 TTS + 4 ASR + 1 MCP），不能只实现一个协议后转去其他仓库。SYSTEM_TTS 明确不做服务端计量。最小实现由下表限定；协议解析支持与某个供应商模型的真实资格分别记录，不能用 LEVEL_0 掩盖缺少本表规定的生产解析代码。
+必须在 Core 这一轮整体实现下列 14 个云端协议/profile（4 LLM + 2 Image Generation + 3 TTS + 4 ASR + 1 MCP），不能只实现一个协议后转去其他仓库。SYSTEM_TTS 明确不做服务端计量。最小实现由下表限定；协议解析支持与某个供应商模型的真实资格分别记录，不能用 LEVEL_0 掩盖缺少本表规定的生产解析代码。
 
 ### 3.1 LLM：字段、合并与最小指标
 
@@ -63,7 +63,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 
 ### 3.2 Image Generation：同步 text-to-image
 
-`OPENAI_IMAGES_GENERATIONS` 只接受已发布 `img_*` route 的同步 `POST /images/generations`。Relay 从受信 JSON 请求有界读取 `n` 与 `size`：`n` 缺失规范化为 1，必须位于 1..资源 `maxImagesPerRequest`（平台上限 6），`size` 必须属于资源 `allowedSizes`。合法请求保持 body 字节与供应商响应透明，不解析 prompt，不下载或持久化图片，不把 URL/`b64_json` 变成另一种结果。
+`OPENAI_IMAGES_GENERATIONS` 只接受已发布 `img_*` route 的同步 `POST /images/generations`。Relay 从受信 JSON 请求有界读取 `n` 与 `size`：`n` 缺失规范化为 1，必须位于 1..资源 `maxImagesPerRequest`（平台上限 6），`size` 必须属于资源 `allowedSizes`。`DASHSCOPE_MULTIMODAL_GENERATION` 只接受精确原生 generation path 与固定 `model/input.messages/parameters` 结构，要求显式整数 `parameters.n`、`parameters.size=宽*高` 和 `watermark=false`；Relay 仅把 `*` 映射为 canonical `x` 做 allowlist 比较。两种合法请求都保持 body 字节与供应商响应透明，不解析 prompt，不下载或持久化图片，不在协议间转换结果。
 
 每次实际开始的上游调用计 `REQUESTS=1`，`REQUESTED_IMAGES=n`；它表示请求图片数，不冒充返回或保存成功数。明确未转发才释放两者。有限图片预算无法可靠解析合法 `n` 时 fail closed；无限模式也执行资源单次上限与 size 准入。edit、图片输入、reference、mask、multipart、stream、async 不在当前 profile 内，不能由通用代理路径绕开。
 

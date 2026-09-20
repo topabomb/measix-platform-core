@@ -153,7 +153,7 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		if value.ResourceKind == relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION {
 			_, postOnly := route.AllowedMethods[http.MethodPost]
 			if !postOnly || len(route.AllowedMethods) != 1 || route.TransportPolicy != relaycontrolapi.HTTPREQUESTRESPONSE ||
-				len(route.AllowedPathPrefixes) != 1 || !strings.HasSuffix(route.AllowedPathPrefixes[0], "/images/generations") {
+				len(route.AllowedPathPrefixes) != 1 || !validImageRoutePath(string(value.ClientProtocol), route.AllowedPathPrefixes[0]) {
 				return nil, ErrInvalidControl
 			}
 		}
@@ -224,13 +224,13 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 	case relaycontrolapi.ResourceRouteResourceKindMCP:
 		return kind == platformid.MCP && protocol == "MCP_STREAMABLE_HTTP" && value.AudioProfile == nil && value.LlmProfile == nil && value.ImageProfile == nil
 	case relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION:
-		if kind != platformid.ImageGeneration || protocol != "OPENAI_IMAGES_GENERATIONS" || value.AudioProfile != nil || value.LlmProfile != nil || value.ImageProfile == nil ||
+		if kind != platformid.ImageGeneration || protocol != "OPENAI_IMAGES_GENERATIONS" && protocol != "DASHSCOPE_MULTIMODAL_GENERATION" || value.AudioProfile != nil || value.LlmProfile != nil || value.ImageProfile == nil ||
 			value.ImageProfile.MaxImagesPerRequest < 1 || value.ImageProfile.MaxImagesPerRequest > 6 || len(value.ImageProfile.AllowedSizes) == 0 {
 			return false
 		}
 		seen := map[string]bool{}
 		for _, size := range value.ImageProfile.AllowedSizes {
-			if !validImageSize(size) || seen[size] {
+			if !validImageSize(size) || protocol == "DASHSCOPE_MULTIMODAL_GENERATION" && size == "auto" || seen[size] {
 				return false
 			}
 			seen[size] = true
@@ -238,6 +238,17 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 		return true
 	}
 	return false
+}
+
+func validImageRoutePath(protocol string, path string) bool {
+	switch protocol {
+	case "OPENAI_IMAGES_GENERATIONS":
+		return strings.HasSuffix(path, "/images/generations")
+	case "DASHSCOPE_MULTIMODAL_GENERATION":
+		return path == "/api/v1/services/aigc/multimodal-generation/generation"
+	default:
+		return false
+	}
 }
 
 func compileAuth(input relaycontrolapi.RuntimeUpstreamAuth) (UpstreamAuth, error) {

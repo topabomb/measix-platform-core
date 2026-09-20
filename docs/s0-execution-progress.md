@@ -1,14 +1,16 @@
 # S0 Platform Core 当前实现状态
 
-> 状态日期：2026-09-20。本文是唯一 living implementation/stage status。后文历史证据以本节最新状态为准。
+> 状态日期：2026-09-21。本文是唯一 living implementation/stage status。后文历史证据以本节最新状态为准。
 
 ## S0.2 生产用量与用户额度闭环（2026-09-20，当前状态）
 
-Core 当前实现 13 个受管协议 profile（含同步 text-to-image）的有界生产观察与语义计量、durable spool/幂等修正/待核对恢复、日周月累计预算准入和真实结算。HTTP 压缩响应只在私有有界观察副本中解码，代理原始字节与响应头不变。Admin 已提供 MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力的用户额度编辑、live-linked Budget Templates、当前状态、趋势/分布/请求明细与 reconciliation；图片只有 REQUESTS/REQUESTED_IMAGES，不存在资源级预算。Portal/Client 本人接口只按认证主体查询有效能力预算，不暴露模板身份。后文早期“真实请求均 UNKNOWN”“只有合成上游”的记录仅是当时快照，不代表当前实现。
+Core 当前实现 14 个受管协议 profile（含 OpenAI 与 DashScope 两种同步 text-to-image）的有界生产观察与语义计量、durable spool/幂等修正/待核对恢复、日周月累计预算准入和真实结算。HTTP 压缩响应只在私有有界观察副本中解码，代理原始字节与响应头不变。Admin 已提供 MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力的用户额度编辑、live-linked Budget Templates、当前状态、趋势/分布/请求明细与 reconciliation；图片只有 REQUESTS/REQUESTED_IMAGES，不存在资源级预算。Portal/Client 本人接口只按认证主体查询有效能力预算，不暴露模板身份。后文早期“真实请求均 UNKNOWN”“只有合成上游”的记录仅是当时快照，不代表当前实现。
 
-受管 Image Generation 使用独立 `img_*` 身份、`OPENAI_IMAGES_GENERATIONS` profile 和固定 Runtime binding。Relay 只验证当前支持的同步 JSON 形态并观察 `n`/`size`，不解释 prompt/model，不存储图片。Snapshot v4 和当前初始化 SQL 直接纳入这些字段与表；Core 未发布，因此没有协议版本递增、数据库迁移链、兼容层或回填逻辑。旧 Android 本地持久化数据的加法升级由 Android 自身容忍缺字段；Core wire 仍按当前合同严格。
+受管 Image Generation 使用独立 `img_*` 身份、`OPENAI_IMAGES_GENERATIONS` / `DASHSCOPE_MULTIMODAL_GENERATION` typed profile 和固定 Runtime binding。Relay 按已发布协议只验证固定同步 JSON 形态并观察 `n`/`size`，不解释 prompt/model、不转换正文、不存储图片。Snapshot v4 和当前初始化 SQL 直接纳入这些字段与表；Core 未发布，因此没有协议版本递增、数据库迁移链、兼容层或回填逻辑。旧 Android 本地持久化数据的加法升级由 Android 自身容忍缺字段；Core wire 仍按当前合同严格。
 
-Admin 的用户删除采用精确用户名和原因确认、deny-first 状态机及完整私有数据清理。旧 access/runtime 和 refresh credential 通过不可逆摘要 tombstone 统一返回 `enterprise_identity_deleted`；审计不保留可恢复身份。真实浏览器流程已覆盖额度配置、用量分析和删除交互；真实 Core 分发链路已覆盖 DeepSeek、Qwen、MiMo、DashScope ASR 与 Firecrawl MCP。最终仓库门禁、Android 消费和设备联调结果以本轮后续记录为准，不由这段当前实现说明提前宣告完成。
+Admin 的用户删除采用精确用户名和原因确认、deny-first 状态机及完整私有数据清理。旧 access/runtime 和 refresh credential 通过不可逆摘要 tombstone 统一返回 `enterprise_identity_deleted`；审计不保留可恢复身份。真实浏览器流程已覆盖额度配置、用量分析和删除交互；真实 Core 分发链路已覆盖 DeepSeek、Qwen、MiMo、DashScope ASR、DashScope 文生图与 Firecrawl MCP。Android 模拟器已用一次性接入资料完成企业域选择、Snapshot 同步、`wan2.7-image` 默认解析、Core Relay 原生 DashScope 请求、安全 URL 下载和 `GeneratedMediaStore` 持久化；Core 对该请求完成 200 结算并记录 REQUESTS=1、REQUESTED_IMAGES=1。普通 connected 门禁中的付费供应商用例仍按设计跳过，不能据此扩大为全部供应商设备验收。
+
+最终跨端复核另发现并修复两处闭环缺口：Portal 已展示图片协议筛选，但 Core Usage filter 尚未接受 `IMAGE_GENERATION` 与两种图片协议；DashScope Snapshot 已生成导出，但未进入 canonical hash 复算与 Android 交接清单。修复后真实 Portal + Hub Chromium 用例实际选择资源和 DashScope 协议并取得成功查询，新 Snapshot 的 source/export 字节一致并由 Core 复算 `snapshotHash`。
 
 完整用户生命周期按 principal ID 而非 username 判定。删除 COMPLETED 后，管理员可复用 username 创建全新的 `usr_*`；新用户不继承旧 Device/Session、额度或用量，同一 installation 因旧 Device 已删除而可凭新一次性码重新接入。旧 principal 与 credential tombstone 永久保留拒绝能力。浏览器 harness 已覆盖删除、同名重建、默认额度未继承、新 Enrollment 与再次删除；Core 组件测试额外覆盖同 installation 兑换、旧 Access/Refresh 持续拒绝和新 credential 正常认证。
 
@@ -87,7 +89,8 @@ Android 集成导出只含客户端实际消费的内容：可执行 Client Open
 | Core Admin | 30 个 Vitest 文件、178 项测试通过；`vue-tsc --noEmit`、E2E TypeScript 检查与 Quasar production build 通过 |
 | Core browser | `node scripts/e2e-harness.mjs` 使用隔离 SQLite、真实 Hub/Relay、production SPA 与 Chromium，通过模板创建/指派/实时传播/覆盖清除、Image Generation 配置发布、五类 runtime traffic、usage/system 和 topology security |
 | Current schema | 空库应用唯一一份 SQL 的 Go 测试通过（应用、业务读写、重复初始化、失败事务回滚） |
-| Portal | 当前单元、typecheck、production build 与真实 Hub 生命周期需以本工作树最新重跑结果为准；旧 remote/local 双构建与 local-read 证据已废止 |
+| Portal | 11 个 Vitest 文件、87 项测试、typecheck、production build、format check 通过；真实 Hub + production Portal Chromium 生命周期及 Image Generation/DashScope 组合筛选通过 |
+| Android | `test assembleDebug lintDebug assembleRelease` 通过；Pixel 10 Pro Fold Android 17 上 `connectedDebugAndroidTest` 通过；另以 opt-in live 用例完成 Core Relay → DashScope → 安全下载 → GeneratedMediaStore 真链路 |
 
 Windows 当前 Go 环境未启用 CGO，`go test -race` 在测试启动前被 Go 拒绝。历史 candidate system、Core/Admin 和浏览器证据不自动适用于本工作树最新候选；交付时必须记录本轮重跑结果。旧 Portal 双构建、本地包和 local-read 测试结果不再是当前证据。付费模型/语音供应商 qualification、独立 clean-source rebuild/replay 与最终 Freeze 仍需独立证明。Firecrawl 官方免密钥 MCP 的真实调用不能替代其他供应商证据。
 

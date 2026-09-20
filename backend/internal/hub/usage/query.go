@@ -56,6 +56,7 @@ type ResourceKind string
 const (
 	ResourceKindProvider ResourceKind = "PROVIDER"
 	ResourceKindModel    ResourceKind = "MODEL"
+	ResourceKindImage    ResourceKind = "IMAGE_GENERATION"
 	ResourceKindTTS      ResourceKind = "TTS"
 	ResourceKindASR      ResourceKind = "ASR"
 	ResourceKindMCP      ResourceKind = "MCP"
@@ -369,6 +370,8 @@ func resourceKindPrefix(kind ResourceKind) string {
 		return "prv_"
 	case ResourceKindModel:
 		return "mdl_"
+	case ResourceKindImage:
+		return "img_"
 	case ResourceKindTTS:
 		return "tts_"
 	case ResourceKindASR:
@@ -572,7 +575,7 @@ func (f Filter) Validate() error {
 		return ErrInvalidBatch
 	}
 	switch f.ResourceKind {
-	case "", ResourceKindProvider, ResourceKindModel, ResourceKindTTS, ResourceKindASR, ResourceKindMCP:
+	case "", ResourceKindProvider, ResourceKindModel, ResourceKindImage, ResourceKindTTS, ResourceKindASR, ResourceKindMCP:
 	default:
 		return ErrInvalidBatch
 	}
@@ -591,6 +594,7 @@ func (f Filter) Validate() error {
 func validClientProtocol(value string) bool {
 	switch value {
 	case "OPENAI_CHAT_COMPLETIONS", "OPENAI_RESPONSES", "GOOGLE_GENERATE_CONTENT", "ANTHROPIC_MESSAGES",
+		"OPENAI_IMAGES_GENERATIONS", "DASHSCOPE_MULTIMODAL_GENERATION",
 		"OPENAI_AUDIO_SPEECH", "GEMINI_GENERATE_CONTENT_TTS", "MIMO_CHAT_COMPLETIONS_TTS",
 		"OPENAI_AUDIO_TRANSCRIPTIONS", "DASHSCOPE_HTTP_ASR", "OPENAI_REALTIME_TRANSCRIPTION",
 		"DASHSCOPE_REALTIME_ASR", "MCP_STREAMABLE_HTTP":

@@ -344,14 +344,24 @@ async function runFiveCapabilityTraffic() {
   await modelResp.text()
 
   // 2. Image Generation
-  const imageResp = await fetch(runtimeURL(imageId, snapJson.imageGenerators[0].runtimePath), {
+  const imageDefinition = snapJson.imageGenerators[0]
+  const imageRequest = imageDefinition.clientProtocol === 'DASHSCOPE_MULTIMODAL_GENERATION'
+    ? {
+        model: imageDefinition.upstreamModelKey,
+        input: { messages: [{ role: 'user', content: [{ text: 'Draw a blue square' }] }] },
+        parameters: { size: imageDefinition.allowedSizes[0].replace('x', '*'), n: 1, watermark: false },
+      }
+    : { model: imageDefinition.upstreamModelKey, prompt: 'Draw a blue square', n: 1, size: imageDefinition.allowedSizes[0] }
+  const imageResp = await fetch(runtimeURL(imageId, imageDefinition.runtimePath), {
     method: 'POST',
     headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
-    body: JSON.stringify({ model: snapJson.imageGenerators[0].upstreamModelKey, prompt: 'Draw a blue square', n: 1, size: snapJson.imageGenerators[0].allowedSizes[0] }),
+    body: JSON.stringify(imageRequest),
   })
-  if (!imageResp.ok) throw new Error(`image generation request failed: ${imageResp.status}`)
+  if (!imageResp.ok) throw new Error(`image generation request failed: ${imageResp.status} ${await imageResp.text()}`)
   const imageBody = await imageResp.json()
-  if (imageBody.data?.[0]?.b64_json !== 'iVBORw0KGgo=') throw new Error('image generation response was changed')
+  if (imageDefinition.clientProtocol === 'DASHSCOPE_MULTIMODAL_GENERATION') {
+    if (imageBody.output?.choices?.[0]?.message?.content?.[0]?.image !== 'https://images.example/generated.png') throw new Error('DashScope image generation response was changed')
+  } else if (imageBody.data?.[0]?.b64_json !== 'iVBORw0KGgo=') throw new Error('image generation response was changed')
 
   // 3. TTS
   const ttsResp = await fetch(runtimeURL(ttsId, snapJson.tts[0].runtimePath), {

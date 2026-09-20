@@ -369,10 +369,11 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.click('[data-cy="add-image-generation-btn"]')
     await page.waitForTimeout(500)
     await page.fill('[data-cy="image-generation-display-name"]', 'E2E Image Generation')
-    await page.fill('[data-cy="image-generation-model-key"]', 'image-1')
+    await page.fill('[data-cy="image-generation-model-key"]', 'wan2.7-image')
     await page.fill('[data-cy="image-generation-max-images"]', '4')
+    await selectOption(page, 'image-generation-protocol', 'DashScope Multimodal Generation')
     await selectOption(page, 'image-generation-upstream-select', /e2e-upstream/)
-    await page.fill('[data-cy="image-generation-runtime-path"]', '/v1/images/generations')
+    await expect(page.locator('[data-cy="image-generation-runtime-path"]')).toHaveValue('/api/v1/services/aigc/multimodal-generation/generation')
 
     // --- 4d: Create a TTS ---
     await page.click('[data-cy="config-section-tts"]')
@@ -516,7 +517,14 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     const projection = await previewResponse.json()
     expect(projection.assistants).toHaveLength(1)
     expect(projection.imageGenerators).toHaveLength(1)
-    expect(projection.imageGenerators[0]).toMatchObject({ displayName: 'E2E Image Generation', upstreamModelKey: 'image-1', maxImagesPerRequest: 4 })
+    expect(projection.imageGenerators[0]).toMatchObject({
+      displayName: 'E2E Image Generation',
+      upstreamModelKey: 'wan2.7-image',
+      clientProtocol: 'DASHSCOPE_MULTIMODAL_GENERATION',
+      runtimePath: '/api/v1/services/aigc/multimodal-generation/generation',
+      allowedSizes: ['1024x1024'],
+      maxImagesPerRequest: 4,
+    })
     expect(projection.policy.defaultImageGenerationId).toBeUndefined()
     expect(projection.assistants[0].memorySeed).toEqual(['z authored first', 'a authored second'])
     expect(projection.starters).toHaveLength(1)

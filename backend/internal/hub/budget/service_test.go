@@ -104,14 +104,15 @@ func TestDefaultUnlimitedAndExactProtocolSet(t *testing.T) {
 	}
 	protocols := map[ClientProtocol]Capability{
 		ProtocolOpenAIChatCompletions: CapabilityModel, ProtocolOpenAIResponses: CapabilityModel,
-		ProtocolOpenAIImagesGenerations: CapabilityImageGeneration,
-		ProtocolGoogleGenerateContent:   CapabilityModel, ProtocolAnthropicMessages: CapabilityModel,
+		ProtocolOpenAIImagesGenerations:       CapabilityImageGeneration,
+		ProtocolDashScopeMultimodalGeneration: CapabilityImageGeneration,
+		ProtocolGoogleGenerateContent:         CapabilityModel, ProtocolAnthropicMessages: CapabilityModel,
 		ProtocolOpenAIAudioSpeech: CapabilityTTS, ProtocolGeminiGenerateContentTTS: CapabilityTTS,
 		ProtocolMiMoChatCompletionsTTS: CapabilityTTS, ProtocolOpenAIAudioTranscriptions: CapabilityASR,
 		ProtocolDashScopeHTTPASR: CapabilityASR, ProtocolOpenAIRealtimeTranscription: CapabilityASR,
 		ProtocolDashScopeRealtimeASR: CapabilityASR, ProtocolMCPStreamableHTTP: CapabilityMCP,
 	}
-	if len(protocols) != 13 {
+	if len(protocols) != 14 {
 		t.Fatalf("protocol count = %d", len(protocols))
 	}
 	for protocol, capability := range protocols {

@@ -58,19 +58,20 @@ const (
 type ClientProtocol string
 
 const (
-	ProtocolOpenAIChatCompletions       ClientProtocol = "OPENAI_CHAT_COMPLETIONS"
-	ProtocolOpenAIImagesGenerations     ClientProtocol = "OPENAI_IMAGES_GENERATIONS"
-	ProtocolOpenAIResponses             ClientProtocol = "OPENAI_RESPONSES"
-	ProtocolGoogleGenerateContent       ClientProtocol = "GOOGLE_GENERATE_CONTENT"
-	ProtocolAnthropicMessages           ClientProtocol = "ANTHROPIC_MESSAGES"
-	ProtocolOpenAIAudioSpeech           ClientProtocol = "OPENAI_AUDIO_SPEECH"
-	ProtocolGeminiGenerateContentTTS    ClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
-	ProtocolMiMoChatCompletionsTTS      ClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
-	ProtocolOpenAIAudioTranscriptions   ClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
-	ProtocolDashScopeHTTPASR            ClientProtocol = "DASHSCOPE_HTTP_ASR"
-	ProtocolOpenAIRealtimeTranscription ClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
-	ProtocolDashScopeRealtimeASR        ClientProtocol = "DASHSCOPE_REALTIME_ASR"
-	ProtocolMCPStreamableHTTP           ClientProtocol = "MCP_STREAMABLE_HTTP"
+	ProtocolOpenAIChatCompletions         ClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	ProtocolOpenAIImagesGenerations       ClientProtocol = "OPENAI_IMAGES_GENERATIONS"
+	ProtocolDashScopeMultimodalGeneration ClientProtocol = "DASHSCOPE_MULTIMODAL_GENERATION"
+	ProtocolOpenAIResponses               ClientProtocol = "OPENAI_RESPONSES"
+	ProtocolGoogleGenerateContent         ClientProtocol = "GOOGLE_GENERATE_CONTENT"
+	ProtocolAnthropicMessages             ClientProtocol = "ANTHROPIC_MESSAGES"
+	ProtocolOpenAIAudioSpeech             ClientProtocol = "OPENAI_AUDIO_SPEECH"
+	ProtocolGeminiGenerateContentTTS      ClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	ProtocolMiMoChatCompletionsTTS        ClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	ProtocolOpenAIAudioTranscriptions     ClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	ProtocolDashScopeHTTPASR              ClientProtocol = "DASHSCOPE_HTTP_ASR"
+	ProtocolOpenAIRealtimeTranscription   ClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
+	ProtocolDashScopeRealtimeASR          ClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	ProtocolMCPStreamableHTTP             ClientProtocol = "MCP_STREAMABLE_HTTP"
 )
 
 type RequestState string

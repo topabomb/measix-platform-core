@@ -408,6 +408,21 @@ describe('ResourcesPage', () => {
     expect(draft.localContent?.policy.defaultImageGenerationId).toBeUndefined()
     expect(wrapper.find('[data-cy="image-generation-upstream-select"]').exists()).toBe(true)
 
+    const imageId = draft.localContent!.imageGenerators![0]!.imageId
+    draft.setBinding(imageId, 'ups_test', 'HTTP_REQUEST_RESPONSE')
+    draft.setImageGenerationProtocol(imageId, 'DASHSCOPE_MULTIMODAL_GENERATION')
+    expect(draft.localContent!.imageGenerators![0]).toMatchObject({
+      clientProtocol: 'DASHSCOPE_MULTIMODAL_GENERATION',
+      runtimePath: '/api/v1/services/aigc/multimodal-generation/generation',
+      allowedSizes: ['1024x1024'],
+    })
+    expect(draft.bindingFor(imageId)).toMatchObject({
+      upstreamId: 'ups_test',
+      transportPolicy: 'HTTP_REQUEST_RESPONSE',
+      allowedPathPrefixes: ['/api/v1/services/aigc/multimodal-generation/generation'],
+    })
+    expect(wrapper.find('[data-cy="image-generation-protocol"]').exists()).toBe(true)
+
     await switchTab(wrapper, 'policy')
     const selector = wrapper.get('[data-cy="policy-default-image-generation"]')
     expect(selector.attributes('modelvalue')).toBeUndefined()

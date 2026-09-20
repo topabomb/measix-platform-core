@@ -41,8 +41,63 @@
     "method": "POST",
     "protocol": "OPENAI_IMAGES_GENERATIONS",
     "resourceId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "responseBody": {
+      "data": [
+        {
+          "b64_json": "iVBORw0KGgo="
+        }
+      ]
+    },
     "responseKind": "JSON_IMAGE_DATA",
     "url": "https://platform.example.invalid/runtime/v1/resources/img_ffffffff-ffff-4fff-8fff-ffffffffffff/v1/images/generations"
+  },
+  {
+    "body": {
+      "input": {
+        "messages": [
+          {
+            "content": [
+              {
+                "text": "A synthetic fixture image"
+              }
+            ],
+            "role": "user"
+          }
+        ]
+      },
+      "model": "wan2.7-image",
+      "parameters": {
+        "n": 1,
+        "size": "1024*1024",
+        "watermark": false
+      }
+    },
+    "contentType": "application/json",
+    "headers": {
+      "Authorization": "Bearer synthetic.access.token",
+      "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000",
+      "X-Measix-Managed-Generation": "42"
+    },
+    "method": "POST",
+    "protocol": "DASHSCOPE_MULTIMODAL_GENERATION",
+    "resourceId": "img_77777777-7777-4777-8777-777777777777",
+    "responseBody": {
+      "output": {
+        "choices": [
+          {
+            "message": {
+              "content": [
+                {
+                  "image": "https://images.example.invalid/generated.png"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "responseKind": "JSON_DASHSCOPE_IMAGE_URL",
+    "url": "https://platform.example.invalid/runtime/v1/resources/img_77777777-7777-4777-8777-777777777777/api/v1/services/aigc/multimodal-generation/generation"
   },
   {
     "body": {

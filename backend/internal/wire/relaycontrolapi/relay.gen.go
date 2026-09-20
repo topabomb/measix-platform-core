@@ -197,19 +197,20 @@ func (e PublicJwkUse) Valid() bool {
 
 // Defines values for ResourceRouteClientProtocol.
 const (
-	ANTHROPICMESSAGES           ResourceRouteClientProtocol = "ANTHROPIC_MESSAGES"
-	DASHSCOPEHTTPASR            ResourceRouteClientProtocol = "DASHSCOPE_HTTP_ASR"
-	DASHSCOPEREALTIMEASR        ResourceRouteClientProtocol = "DASHSCOPE_REALTIME_ASR"
-	GEMINIGENERATECONTENTTTS    ResourceRouteClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
-	GOOGLEGENERATECONTENT       ResourceRouteClientProtocol = "GOOGLE_GENERATE_CONTENT"
-	MCPSTREAMABLEHTTP           ResourceRouteClientProtocol = "MCP_STREAMABLE_HTTP"
-	MIMOCHATCOMPLETIONSTTS      ResourceRouteClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
-	OPENAIAUDIOSPEECH           ResourceRouteClientProtocol = "OPENAI_AUDIO_SPEECH"
-	OPENAIAUDIOTRANSCRIPTIONS   ResourceRouteClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
-	OPENAICHATCOMPLETIONS       ResourceRouteClientProtocol = "OPENAI_CHAT_COMPLETIONS"
-	OPENAIIMAGESGENERATIONS     ResourceRouteClientProtocol = "OPENAI_IMAGES_GENERATIONS"
-	OPENAIREALTIMETRANSCRIPTION ResourceRouteClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
-	OPENAIRESPONSES             ResourceRouteClientProtocol = "OPENAI_RESPONSES"
+	ANTHROPICMESSAGES             ResourceRouteClientProtocol = "ANTHROPIC_MESSAGES"
+	DASHSCOPEHTTPASR              ResourceRouteClientProtocol = "DASHSCOPE_HTTP_ASR"
+	DASHSCOPEMULTIMODALGENERATION ResourceRouteClientProtocol = "DASHSCOPE_MULTIMODAL_GENERATION"
+	DASHSCOPEREALTIMEASR          ResourceRouteClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	GEMINIGENERATECONTENTTTS      ResourceRouteClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	GOOGLEGENERATECONTENT         ResourceRouteClientProtocol = "GOOGLE_GENERATE_CONTENT"
+	MCPSTREAMABLEHTTP             ResourceRouteClientProtocol = "MCP_STREAMABLE_HTTP"
+	MIMOCHATCOMPLETIONSTTS        ResourceRouteClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	OPENAIAUDIOSPEECH             ResourceRouteClientProtocol = "OPENAI_AUDIO_SPEECH"
+	OPENAIAUDIOTRANSCRIPTIONS     ResourceRouteClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	OPENAICHATCOMPLETIONS         ResourceRouteClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	OPENAIIMAGESGENERATIONS       ResourceRouteClientProtocol = "OPENAI_IMAGES_GENERATIONS"
+	OPENAIREALTIMETRANSCRIPTION   ResourceRouteClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
+	OPENAIRESPONSES               ResourceRouteClientProtocol = "OPENAI_RESPONSES"
 )
 
 // Valid indicates whether the value is a known member of the ResourceRouteClientProtocol enum.
@@ -218,6 +219,8 @@ func (e ResourceRouteClientProtocol) Valid() bool {
 	case ANTHROPICMESSAGES:
 		return true
 	case DASHSCOPEHTTPASR:
+		return true
+	case DASHSCOPEMULTIMODALGENERATION:
 		return true
 	case DASHSCOPEREALTIMEASR:
 		return true

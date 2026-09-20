@@ -47,7 +47,7 @@ func TestClientIntegrationSharedWireCases(t *testing.T) {
 			}
 		})
 	}
-	for _, file := range []string{"snapshot-v4.json", "snapshot-v4-denied.json"} {
+	for _, file := range []string{"snapshot-v4.json", "snapshot-v4-dashscope-image.json", "snapshot-v4-denied.json"} {
 		raw, err := os.ReadFile(filepath.Join(root, file))
 		if err != nil {
 			t.Fatal(err)
@@ -101,22 +101,25 @@ func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
 	}
 	var snapshot clientapi.ManagedSnapshot
 	read("snapshot-v4.json", &snapshot)
+	var dashScopeImageSnapshot clientapi.ManagedSnapshot
+	read("snapshot-v4-dashscope-image.json", &dashScopeImageSnapshot)
 	var asrSnapshot clientapi.ManagedSnapshot
 	read("snapshot-v4-asr.json", &asrSnapshot)
 	var examples []struct {
 		ResourceID, Protocol, Method, URL, ContentType, ResponseKind string
 		Headers                                                      map[string]string
-		Body, Fields                                                 map[string]any
+		Body, Fields, ResponseBody                                   map[string]any
 	}
 	read("runtime-examples.json", &examples)
 	resources := map[string]string{}
 	resources[snapshot.Models[0].ModelId] = snapshot.Models[0].RuntimePath
 	resources[(*snapshot.ImageGenerators)[0].ImageId] = (*snapshot.ImageGenerators)[0].RuntimePath
+	resources[(*dashScopeImageSnapshot.ImageGenerators)[0].ImageId] = (*dashScopeImageSnapshot.ImageGenerators)[0].RuntimePath
 	resources[snapshot.Tts[0].TtsId] = snapshot.Tts[0].RuntimePath
 	resources[snapshot.Asr[0].AsrId] = snapshot.Asr[0].RuntimePath
 	resources[asrSnapshot.Asr[1].AsrId] = asrSnapshot.Asr[1].RuntimePath
 	resources[snapshot.Mcp[0].McpServerId] = snapshot.Mcp[0].RuntimePath
-	if len(examples) != 6 {
+	if len(examples) != 7 {
 		t.Fatal("missing Runtime profile")
 	}
 	for _, example := range examples {
@@ -136,6 +139,16 @@ func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
 		}
 		if example.ResourceID == (*snapshot.ImageGenerators)[0].ImageId && example.Body["model"] != (*snapshot.ImageGenerators)[0].UpstreamModelKey {
 			t.Fatal("image wire ID used as upstream model key")
+		}
+		if example.ResourceID == (*dashScopeImageSnapshot.ImageGenerators)[0].ImageId {
+			parameters, ok := example.Body["parameters"].(map[string]any)
+			if example.Protocol != "DASHSCOPE_MULTIMODAL_GENERATION" || example.Body["model"] != (*dashScopeImageSnapshot.ImageGenerators)[0].UpstreamModelKey || !ok || parameters["size"] != "1024*1024" || parameters["n"] != float64(1) || parameters["watermark"] != false {
+				t.Fatal("invalid DashScope image request vector")
+			}
+			output, ok := example.ResponseBody["output"].(map[string]any)
+			if !ok || output["choices"] == nil {
+				t.Fatal("missing DashScope image response vector")
+			}
 		}
 		delete(resources, example.ResourceID)
 	}

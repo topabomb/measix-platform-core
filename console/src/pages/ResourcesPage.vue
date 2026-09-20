@@ -4,7 +4,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, createCandidateId } from '../api/client'
-import { useDraftStore, ttsTransport, asrTransport, isRealtimeAsr, type AsrProtocol, type TtsProtocol, type ManagedResourceKind } from '../stores/draft'
+import { useDraftStore, ttsTransport, asrTransport, isRealtimeAsr, type AsrProtocol, type ImageGenerationProtocol, type TtsProtocol, type ManagedResourceKind } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
 import { useActivationStore } from '../stores/activation'
 import ManagedExperienceEditor from '../components/ManagedExperienceEditor.vue'
@@ -170,6 +170,16 @@ const selectedModel = computed(() =>
 const selectedImageGeneration = computed(() =>
   draft.localContent?.imageGenerators?.find(item => item.imageId === selectedResourceId.value),
 )
+const imageGenerationProtocols = computed<{ label: string; value: ImageGenerationProtocol }[]>(() => [
+  { label: $t('resources.imageGeneration.openAiProtocol'), value: 'OPENAI_IMAGES_GENERATIONS' },
+  { label: $t('resources.imageGeneration.dashScopeProtocol'), value: 'DASHSCOPE_MULTIMODAL_GENERATION' },
+])
+const imageSizeOptions = computed(() => selectedImageGeneration.value?.clientProtocol === 'DASHSCOPE_MULTIMODAL_GENERATION'
+  ? IMAGE_SIZE_OPTIONS.filter(size => size !== 'auto')
+  : IMAGE_SIZE_OPTIONS)
+const imageGenerationTransportHint = computed(() => selectedImageGeneration.value?.clientProtocol === 'DASHSCOPE_MULTIMODAL_GENERATION'
+  ? $t('resources.imageGeneration.dashScopeTransport')
+  : $t('resources.imageGeneration.openAiTransport'))
 const selectedTts = computed(() =>
   draft.localContent?.tts.find((t) => t.ttsId === selectedResourceId.value),
 )
@@ -889,13 +899,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section class="q-gutter-xs">
                 <div class="text-subtitle2">{{ $t('resources.imageGeneration.identity') }}</div>
                 <q-input v-model="selectedImageGeneration.displayName" dense outlined :label="$t('resources.imageGeneration.displayName')" data-cy="image-generation-display-name" @update:model-value="draft.markDirty()" />
+                <q-select :model-value="selectedImageGeneration.clientProtocol" :options="imageGenerationProtocols" emit-value map-options dense outlined :label="$t('resources.imageGeneration.protocol')" data-cy="image-generation-protocol" @update:model-value="value => draft.setImageGenerationProtocol(selectedImageGeneration!.imageId, value as ImageGenerationProtocol)" />
+                <div class="text-caption text-grey-7">{{ $t('resources.imageGeneration.protocolHint') }}</div>
                 <q-input v-model="selectedImageGeneration.upstreamModelKey" dense outlined :label="$t('resources.imageGeneration.modelKey')" data-cy="image-generation-model-key" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
               <q-card-section class="q-gutter-xs">
                 <div class="text-subtitle2">{{ $t('resources.imageGeneration.requestLimits') }}</div>
                 <q-input v-model.number="selectedImageGeneration.maxImagesPerRequest" type="number" min="1" max="6" dense outlined :label="$t('resources.imageGeneration.maxImages')" data-cy="image-generation-max-images" :rules="[(value: number) => Number.isInteger(value) && value >= 1 && value <= 6 || $t('resources.imageGeneration.maxImagesInvalid')]" @update:model-value="draft.markDirty()" />
-                <q-select v-model="selectedImageGeneration.allowedSizes" multiple use-chips use-input new-value-mode="add-unique" dense outlined :options="IMAGE_SIZE_OPTIONS" :label="$t('resources.imageGeneration.allowedSizes')" data-cy="image-generation-allowed-sizes" :rules="[(value: string[]) => value.length > 0 || $t('resources.imageGeneration.allowedSizesRequired')]" @update:model-value="draft.markDirty()" />
+                <q-select v-model="selectedImageGeneration.allowedSizes" multiple use-chips use-input new-value-mode="add-unique" dense outlined :options="imageSizeOptions" :label="$t('resources.imageGeneration.allowedSizes')" data-cy="image-generation-allowed-sizes" :rules="[(value: string[]) => value.length > 0 || $t('resources.imageGeneration.allowedSizesRequired')]" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
               <q-card-section>
@@ -904,7 +916,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <PagedEntityPicker :model-value="draft.bindingFor(selectedImageGeneration.imageId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="image-generation-upstream-select" @update:model-value="value => value && draft.setBinding(selectedImageGeneration!.imageId, value, 'HTTP_REQUEST_RESPONSE')" />
                   <q-input :model-value="selectedImageGeneration.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="image-generation-runtime-path" @update:model-value="value => draft.setRuntimePath(selectedImageGeneration!.imageId, String(value ?? ''))" />
                 </div>
-                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.imageGeneration.transport') }}</div>
+                <div class="text-caption text-grey-7 q-mt-xs">{{ imageGenerationTransportHint }}</div>
               </q-card-section>
             </q-card>
             <q-card v-else flat bordered><q-card-section class="text-grey-7 text-center"><q-icon name="image" size="3rem" /><div>{{ $t('resources.imageGeneration.selectOrAdd') }}</div></q-card-section></q-card>
@@ -1479,7 +1491,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.imageGeneration.allowedSizes') }}</th><th>{{ $t('common.status') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="image in preview.imageGenerators ?? []" :key="image.imageId">
-                    <td>{{ image.displayName }}<details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ image.imageId }} · {{ image.upstreamModelKey }}</details></td>
+                    <td>{{ image.displayName }}<details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ image.imageId }} · {{ image.clientProtocol }} · {{ image.upstreamModelKey }}</details></td>
                     <td>{{ image.allowedSizes.join(', ') }} · {{ $t('resources.imageGeneration.maxImagesValue', { count: image.maxImagesPerRequest }) }}</td>
                     <td>{{ image.enabled ? $t('common.enabled') : $t('common.disabled') }}</td>
                   </tr>

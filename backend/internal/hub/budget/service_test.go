@@ -122,6 +122,16 @@ func TestDefaultUnlimitedAndExactProtocolSet(t *testing.T) {
 	if protocolMatchesCapability("SYSTEM_TTS", CapabilityTTS) {
 		t.Fatal("SYSTEM_TTS must not enter server budget admission")
 	}
+	for _, invalid := range []AdmitInput{
+		f.admit(platformid.New(platformid.Request), CapabilityModel, platformid.New(platformid.Model), ProtocolOpenAIResponses,
+			[]MeterQuantity{{Meter: MeterRequestedImages, Quantity: 1}}, MeterTotalTokens),
+		f.admit(platformid.New(platformid.Request), CapabilityModel, platformid.New(platformid.Model), ProtocolOpenAIResponses,
+			nil, MeterRequestedImages),
+	} {
+		if _, err := f.service.Admit(ctx, invalid); !errors.Is(err, ErrInvalidConfiguration) {
+			t.Fatalf("cross-capability admission meter error = %v", err)
+		}
+	}
 
 	requestID := platformid.New(platformid.Request)
 	input := f.admit(requestID, CapabilityModel, platformid.New(platformid.Model), ProtocolOpenAIResponses, nil, MeterTotalTokens)
@@ -151,6 +161,12 @@ func TestDefaultUnlimitedAndExactProtocolSet(t *testing.T) {
 	start.EventHash = testHash("different")
 	if err := f.service.Start(ctx, start); !errors.Is(err, ErrLifecycleRevisionConflict) {
 		t.Fatalf("same lifecycle revision with different hash = %v", err)
+	}
+	if _, err := f.service.Settle(ctx, SettlementInput{
+		RequestID: requestID, Revision: 1, Complete: true, ReportedBy: "runtime-relay",
+		Meters: []MeterQuantity{{Meter: MeterRequests, Quantity: 1}, {Meter: MeterRequestedImages, Quantity: 1}},
+	}); !errors.Is(err, ErrInvalidSettlement) {
+		t.Fatalf("cross-capability settlement meter error = %v", err)
 	}
 	if _, err := f.service.Settle(ctx, SettlementInput{
 		RequestID: requestID, Revision: 1, Complete: true, ReportedBy: "runtime-relay",

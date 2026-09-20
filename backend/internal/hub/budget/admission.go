@@ -339,7 +339,7 @@ func normalizeAdmit(input AdmitInput) (AdmitInput, map[Meter]int64, map[Meter]bo
 	input.AdmittedAt = input.AdmittedAt.UTC()
 	known := map[Meter]int64{MeterRequests: 1}
 	for _, quantity := range input.KnownQuantities {
-		if !validMeter(quantity.Meter) || quantity.Quantity < 0 {
+		if !validMeter(quantity.Meter) || !meterAllowed(input.Capability, quantity.Meter) || quantity.Quantity < 0 {
 			return AdmitInput{}, nil, nil, "", ErrInvalidConfiguration
 		}
 		if previous, duplicate := known[quantity.Meter]; duplicate && (quantity.Meter != MeterRequests || previous != quantity.Quantity) {
@@ -352,7 +352,7 @@ func normalizeAdmit(input AdmitInput) (AdmitInput, map[Meter]int64, map[Meter]bo
 	}
 	supported := map[Meter]bool{MeterRequests: true}
 	for _, meter := range input.SupportedMeters {
-		if !validMeter(meter) {
+		if !validMeter(meter) || !meterAllowed(input.Capability, meter) {
 			return AdmitInput{}, nil, nil, "", ErrInvalidConfiguration
 		}
 		supported[meter] = true

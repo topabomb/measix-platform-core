@@ -29,3 +29,14 @@ func TestImageGenerationDoesNotInterpretProviderModelOrPrompt(t *testing.T) {
 	}
 	assertCounts(t, result, map[Meter]int64{Requests: 1, RequestedImages: 1}, Exact)
 }
+
+func TestImageGenerationRejectsFieldsOutsideTheFixedProfile(t *testing.T) {
+	for _, body := range []string{
+		`{"model":"provider-model","prompt":"text","size":"auto","quality":"hd"}`,
+		`{"model":"provider-model","prompt":"text","size":"auto","response_format":"url"}`,
+	} {
+		if _, err := ObserveImageGenerationRequest([]byte(body), 6, []string{"auto"}); err == nil {
+			t.Fatalf("unsupported image field was accepted: %s", body)
+		}
+	}
+}

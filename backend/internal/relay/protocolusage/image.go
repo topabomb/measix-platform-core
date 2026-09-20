@@ -25,6 +25,14 @@ func ObserveImageGenerationRequest(body []byte, maxImages int, allowedSizes []st
 			return Result{}, fmt.Errorf("%s image generation is unsupported", name)
 		}
 	}
+	allowedFields := map[string]struct{}{
+		"model": {}, "prompt": {}, "n": {}, "size": {},
+	}
+	for name := range request {
+		if _, allowed := allowedFields[name]; !allowed {
+			return Result{}, fmt.Errorf("image generation field %q is unsupported", name)
+		}
+	}
 	n := int64(1)
 	if raw, exists := request["n"]; exists {
 		var number json.Number

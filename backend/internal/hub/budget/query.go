@@ -250,7 +250,13 @@ func (s *Service) ListConfigAudit(ctx context.Context, query AuditQuery) (AuditP
 	}
 	builder := s.Client.BudgetAudit.Query().Where(
 		budgetaudit.UserIDEQ(query.UserID),
-		budgetaudit.ActionIn(budgetaudit.ActionCREATE, budgetaudit.ActionUPDATE),
+		budgetaudit.ActionIn(
+			budgetaudit.ActionCREATE,
+			budgetaudit.ActionUPDATE,
+			budgetaudit.ActionAPPLY_TEMPLATE,
+			budgetaudit.ActionCLEAR_OVERRIDE,
+			budgetaudit.ActionUNASSIGN_TEMPLATE,
+		),
 	)
 	if query.Capability != nil {
 		builder.Where(budgetaudit.CapabilityEQ(budgetaudit.Capability(*query.Capability)))

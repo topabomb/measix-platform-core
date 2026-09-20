@@ -166,6 +166,11 @@ func applySettlement(
 	if err != nil {
 		return SettlementResult{}, err
 	}
+	for meter := range quantities {
+		if !meterAllowed(Capability(request.Capability), meter) {
+			return SettlementResult{}, ErrInvalidSettlement
+		}
+	}
 	existing, err := tx.BudgetSettlement.Query().Where(
 		budgetsettlement.RequestIDEQ(input.RequestID),
 		budgetsettlement.RevisionEQ(input.Revision),

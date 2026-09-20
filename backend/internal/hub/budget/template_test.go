@@ -91,6 +91,20 @@ func TestBudgetTemplateLiveLinkAndExplicitOverridePrecedence(t *testing.T) {
 	if err != nil || restored.Source != SourceTemplate || restored.Scopes[0].Limits[0].Limit != 20 {
 		t.Fatalf("clear override = %+v, %v", restored, err)
 	}
+	capability := CapabilityModel
+	configAudit, err := f.service.ListConfigAudit(ctx, AuditQuery{UserID: f.userID, Capability: &capability, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions := make(map[string]bool, len(configAudit.Items))
+	for _, item := range configAudit.Items {
+		actions[item.Action] = true
+	}
+	for _, action := range []string{"APPLY_TEMPLATE", "UPDATE", "CLEAR_OVERRIDE"} {
+		if !actions[action] {
+			t.Fatalf("user budget audit omitted %s: %+v", action, configAudit.Items)
+		}
+	}
 	modelScope := restored.Scopes[0].ScopeKey
 	f.now = f.now.Add(time.Millisecond)
 	updated, err = f.service.UpdateTemplate(ctx, UpdateTemplateInput{

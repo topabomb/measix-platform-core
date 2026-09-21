@@ -27,3 +27,10 @@ test('production installer accepts only an HTTPS public origin', () => {
   assert.match(installer, /\^https:\/\//)
   assert.doesNotMatch(installer, /\^https\?\:/)
 })
+
+test('Windows release packaging normalizes Linux executable modes', () => {
+  const builder = read('scripts/build-preview-release.mjs')
+  assert.match(builder, /createArchive\(stage, archive\)/)
+  assert.match(builder, /find "\$temp" -type f -exec chmod 0644/)
+  assert.match(builder, /chmod 0755 "\$temp"\/bin\/\* "\$temp"\/deploy\/\*\.sh/)
+})

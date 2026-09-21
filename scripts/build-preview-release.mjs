@@ -70,8 +70,31 @@ const files = walk(stage).filter(path => basename(path) !== 'SHA256SUMS').sort()
 writeFileSync(join(stage, 'SHA256SUMS'), files.map(path => `${sha256(path)}  ${relative(stage, path).split(sep).join('/')}`).join('\n') + '\n')
 const archive = join(outputDir, `${packageName}.tar.gz`)
 rmSync(archive, { force: true })
-run('tar', ['-czf', archive, '-C', stage, '.'], ROOT)
+createArchive(stage, archive)
 console.log(archive)
+
+function createArchive(stage, archive) {
+  if (process.platform !== 'win32') {
+    run('tar', ['-czf', archive, '-C', stage, '.'], ROOT)
+    return
+  }
+  // Windows file modes do not survive bsdtar consistently. Normalize inside
+  // the WSL filesystem so the uploaded production archive has executable
+  // binaries/scripts and non-executable assets/configuration.
+  const wslStage = command('wsl.exe', ['-e', 'wslpath', '-a', stage], ROOT).stdout.trim()
+  const wslArchive = command('wsl.exe', ['-e', 'wslpath', '-a', archive], ROOT).stdout.trim()
+  const script = `set -euo pipefail
+stage=$1
+archive=$2
+temp=$(mktemp -d /tmp/measix-release-XXXXXX)
+trap 'rm -rf -- "$temp"' EXIT
+cp -a -- "$stage/." "$temp/"
+find "$temp" -type d -exec chmod 0755 {} +
+find "$temp" -type f -exec chmod 0644 {} +
+chmod 0755 "$temp"/bin/* "$temp"/deploy/*.sh
+tar -czf "$archive" -C "$temp" .`
+  run('wsl.exe', ['-e', 'bash', '-lc', script, 'measix-release', wslStage, wslArchive], ROOT)
+}
 
 function migrationIdentity() {
   const dir = join(ROOT, 'backend', 'migrations')

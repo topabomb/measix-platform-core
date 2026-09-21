@@ -1,15 +1,15 @@
 __MEASIX_PUBLIC_ORIGIN__ {
-    @private path /internal /internal/*
-    handle @private {
-        respond 404
-    }
+	@private path /internal /internal/*
+	handle @private {
+		respond 404
+	}
 
-    @runtime path /runtime/v1 /runtime/v1/*
-    handle @runtime {
-        reverse_proxy 127.0.0.1:9002
-    }
+	@runtime path /runtime/v1 /runtime/v1/*
+	handle @runtime {
+		reverse_proxy 127.0.0.1:9002
+	}
 
-    handle {
-        reverse_proxy 127.0.0.1:9004
-    }
+	handle {
+		reverse_proxy 127.0.0.1:9004
+	}
 }

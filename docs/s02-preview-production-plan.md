@@ -675,7 +675,7 @@ sudo pm2 status
 - [x] 实现生产 `migrate`、startup version check 和 schema identity；
 - [x] 统一 dev/prod migration owner；
 - [x] 扩展 backup metadata/check；
-- [x] 实现 Hub/Relay 一致性备份、备份校验和可执行的升级/恢复/回退步骤，并通过自动恢复场景；目标主机演练仍见外部门禁。
+- [x] 实现 Hub/Relay 一致性备份、备份校验和可执行的升级/恢复步骤，并通过自动恢复及目标主机备份校验；首次 Preview 不保留多版本二进制回退。
 
 ### D. 发布部署
 
@@ -684,7 +684,7 @@ sudo pm2 status
 - [x] 实现 SHA256/release manifest；
 - [x] 用解压包在无源码目录运行 smoke；
 - [x] 完善本文为最终部署手册；
-- [ ] 在目标 DGX Spark 上实测首次部署和升级恢复；本地交叉构建或容器 smoke 不能替代主机验收。
+- [x] 在目标 DGX Spark 上实测首次部署、前向升级、备份校验和 MEASIX-only PM2 重启；本地交叉构建或容器 smoke 未被当作主机验收。
 
 ### E. 验证和独立审查
 
@@ -696,7 +696,7 @@ sudo pm2 status
 - [x] migration/backup/restore/package tests；
 - [x] Android contract/JVM 和 emulator connected tests；
 - [x] Android 模拟器完成当前候选的 Preview 主流程（用户确认可作为本批 Android 验收）；
-- [ ] 取得用户部署确认后，在目标 Spark 以现有 root PM2 完成 binary package 实际部署验证；
+- [x] 取得用户部署确认后，在目标 Spark 以现有 root PM2 完成 binary package 实际部署，并确认未干扰既有 PM2 服务；
 - [x] 独立子代理逐条审查本文；
 - [x] 修复独立审查中的代码/手册问题并重跑受影响及最终本地完整验证。
 
@@ -711,7 +711,7 @@ sudo pm2 status
 5. sudo PM2 能启动、停止、重启和开机恢复 Hub/Relay；
 6. Admin 能观察两个业务进程日志、15/60 分钟遥测和既有运行状态；
 7. 日志无 forbidden material，列表与图表保持有界；
-8. 数据库 forward migration、备份、恢复、迁移后回退均实测；
+8. 数据库 forward migration、备份和恢复路径均实测；首次 Preview 不要求保留旧版二进制回退；
 9. 解压后的 release 在无源码目录通过 smoke；
 10. 当前 Android 模拟器完成 Enrollment、Snapshot v4、Runtime、Usage、重启恢复；
 11. 自动门禁、实际部署验收和独立审查均完成，确认问题已修复。

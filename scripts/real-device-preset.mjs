@@ -19,7 +19,7 @@ const passwordPath = process.env.MEASIX_REAL_DEVICE_ADMIN_PASSWORD_FILE || resol
 const keyPath = process.env.MEASIX_REAL_DEVICE_SUPPLIER_KEYS || resolve(root, '.secrets/supplier-keys.env')
 const statePath = process.env.MEASIX_REAL_DEVICE_STATE || resolve(root, '.data/device-real/preset-state.json')
 
-if (!origin) throw new Error('MEASIX_REAL_DEVICE_ORIGIN is required (for example http://192.168.100.138:9100)')
+if (!origin) throw new Error('MEASIX_REAL_DEVICE_ORIGIN is required (for example http://192.0.2.20:9100; replace the documentation address)')
 if (!existsSync(passwordPath)) throw new Error(`Admin password file is missing: ${passwordPath}`)
 if (!existsSync(keyPath)) throw new Error(`Supplier key file is missing: ${keyPath}`)
 

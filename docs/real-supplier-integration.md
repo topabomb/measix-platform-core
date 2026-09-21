@@ -15,7 +15,7 @@ DeepSeek Chat Completions 和工具调用以[官方接口](https://api-docs.deep
 
 ## 当前环境发布组合
 
-公共入口 `http://192.168.31.235:9100` 同时承载 Discovery、Client API、Runtime Relay、Portal 和 Admin；手机在同一局域网可使用 HTTP IP 地址。当前真实预设下发 DeepSeek Flash 和 Qwen 3.8 Flash 两个 TEXT/IMAGE/TOOL 模型、`wan2.7-image` 文生图、MiMo 云端朗读与设备系统朗读、百炼 HTTP 录音转写、Firecrawl Direct MCP、两个企业助手和三个常用入口。`policy.defaultModelId` 指向 DeepSeek，`defaultImageGenerationId` 指向 `wan2.7-image`，`defaultTtsId` 指向 MiMo，`defaultAsrId` 指向百炼，`defaultAssistantId` 指向企业工作助手。五项 `allowLocal*` 允许在企业域按策略混用个人资源。Qwen、文生图和百炼 ASR 标注“本机实验”。
+现场局域网公共入口（具体值仅保存在忽略文件）同时承载 Discovery、Client API、Runtime Relay、Portal 和 Admin；手机在同一局域网可使用 HTTP IP 地址。当前真实预设下发 DeepSeek Flash 和 Qwen 3.8 Flash 两个 TEXT/IMAGE/TOOL 模型、`wan2.7-image` 文生图、MiMo 云端朗读与设备系统朗读、百炼 HTTP 录音转写、Firecrawl Direct MCP、两个企业助手和三个常用入口。`policy.defaultModelId` 指向 DeepSeek，`defaultImageGenerationId` 指向 `wan2.7-image`，`defaultTtsId` 指向 MiMo，`defaultAsrId` 指向百炼，`defaultAssistantId` 指向企业工作助手。五项 `allowLocal*` 允许在企业域按策略混用个人资源。Qwen、文生图和百炼 ASR 标注“本机实验”。
 
 第 5 版经同一公共入口的 Client Session 刷新、Snapshot、应用回执及 Runtime Relay 实测：DeepSeek 文本 SSE 的 `finish_reason` 先于 `[DONE]`、工具及后续回合、图片理解均 200；MiMo WAV 和流式 PCM 成功；Firecrawl initialize/list/scrape 200、无 ID 通知 202 空 body；Qwen 文本、工具、后续回合、看图均 200；百炼 ASR 200 且返回 12 字转写。2026-09-21 进一步由 Android 模拟器完成一次性接入、Snapshot 默认文生图解析、Core Relay 原生百炼请求、安全 URL 下载、图片签名/尺寸校验及 `GeneratedMediaStore` 文件/数据库提交；对应 Core Usage 为 HTTP 200、`SETTLED`，`REQUESTS=1`、`REQUESTED_IMAGES=1`。MCP 路由最初只允许 POST，历史用量里的 `ROUTE_POLICY_DENIED` 403 是 Core 自身阻断；第 5 版补齐 POST/GET/DELETE 后，GET 到达上游返回 405，DELETE 无会话标识到达上游返回 400，均不是 Core 403。管理员 Upstream 的 HEAD `401`/`404` 只反映服务根路径响应，必须用具体资源请求检查协议、认证、音频和 MCP 工具结果。
 

@@ -54,7 +54,7 @@ if (Test-Path -LiteralPath $pidPath) {
 
 $origin = $env:MEASIX_REAL_DEVICE_ORIGIN
 if ([string]::IsNullOrWhiteSpace($origin)) { $origin = "http://$(Get-DeviceIPv4):9100" }
-if ($origin -notmatch '^https?://[^/]+$') { throw 'MEASIX_REAL_DEVICE_ORIGIN must be an origin such as http://192.168.100.138:9100.' }
+if ($origin -notmatch '^https?://[^/]+$') { throw 'MEASIX_REAL_DEVICE_ORIGIN must be an origin such as http://192.0.2.20:9100; replace the documentation address.' }
 $uri = [Uri]$origin
 if ($uri.Scheme -ne 'http') { throw 'The local real-device preset serves HTTP only. Use an HTTP LAN origin.' }
 

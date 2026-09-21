@@ -143,7 +143,7 @@ sudo rm -- "$MEASIX_ROOT/secrets/initial-admin-password"
 
 ## 7. Spark 本机/局域网验收
 
-本批不从远端 Caddy 或公网验证，只验证 Spark 服务本身：
+先验证 Spark 服务本身；不要把公网连通误当作进程和数据健康：
 
 ```bash
 sudo pm2 status
@@ -154,11 +154,11 @@ curl -fsS http://127.0.0.1:9002/live
 sudo ss -lntp | grep -E ':(9001|9002|9003|9004)\b'
 ```
 
-预期：9002/9004 为 `0.0.0.0`，9001/9003 为 `127.0.0.1`；两个新 PM2 app online，原有 PM2 app 状态不变。
+预期：9002/9004 为 `0.0.0.0`，9001/9003 为 `127.0.0.1`；两个新 PM2 app online，原有 PM2 app 状态不变。尚未发布 Managed Configuration 时 Relay `/ready` 返回 503 是预期状态；发布并收敛后必须为 200。
 
 Admin 登录后检查 System 四页签、当前 release、Relay ready、配置 revision、spool、近期遥测和事件。Android 模拟器验证视为本批 Android 验收。
 
-## 8. 远端 Caddy 交接（不在 Spark 执行）
+## 8. 远端 Caddy 交接与公共入口验收（不在 Spark 执行）
 
 发布包中的 `deploy/Caddyfile.template` 只是远端入口服务器的参考片段，不由 Spark 安装器复制或 reload。入口服务器应从私有 `deployment-local.md` 取得现场值，并替换模板中的 `__MEASIX_SPARK_TAILSCALE_IP__` 与 `__MEASIX_PUBLIC_ORIGIN__`：
 
@@ -180,9 +180,34 @@ https://<approved-subdomain> {
 }
 ```
 
-远端 DNS、TLS、Caddy reload 和公网连通性由入口服务器维护者单独验收，本任务不操作也不验证该服务器。
+远端 DNS、证书和 Caddy reload 由入口服务器维护者执行。对方确认完成后，从普通客户端只读验收公共入口；现场值仍只记入私有 `deployment-local.md`：
 
-## 9. 备份
+```bash
+curl -fsS https://<approved-subdomain>/.well-known/measix
+curl -fsS https://<approved-subdomain>/live
+curl -fsS https://<approved-subdomain>/ready
+curl -fsS https://<approved-subdomain>/admin/ >/dev/null
+curl -fsS https://<approved-subdomain>/portal/ >/dev/null
+test "$(curl -sS -o /dev/null -w '%{http_code}' https://<approved-subdomain>/internal)" = 404
+test "$(curl -sS -o /dev/null -w '%{http_code}' https://<approved-subdomain>/internal/test)" = 404
+```
+
+最后从公共 origin 发起一次 Runtime 请求。即使业务返回 4xx/5xx，也要先区分“请求已经到达 Relay”与“上游或发布配置不可用”；只有已发布配置下的真实业务成功才算端到端通过。
+
+## 9. 发布后的最小业务配置
+
+内部 Preview 只配置实际可用的资源，不为凑齐类型发布失效占位项：
+
+1. 在 Admin 创建上游 Secret、上游连接，执行 Test 后 Apply；Secret 值不写入文档或日志。
+2. 在企业配置中至少建立一个真实模型、必要的系统 TTS 或 MCP、一个默认助手和一个 Starter；仅为实际可用的能力设置默认值。
+3. 保存草稿，依次执行 Validate、Snapshot Preview、Review、Publish，并等待 Activation `COMPLETED`。
+4. 确认 Relay `/ready` 为 200，Admin System 显示 active generation 与 control revision 已收敛。
+5. 创建内部成员和一小时一次性接入资料，在 Android 模拟器粘贴或扫码接入；接入资料属于凭据，不写入 Git 或共享日志。
+6. Android 完成同步、默认助手真实请求、Usage 回查和应用重启恢复后，才把该发布标为“可用”。
+
+上游地址、资源名称、模型 key、用户和现场验证结果记录在私有 `deployment-local.md`。Admin 对 token、字符、秒、请求数和图片数使用统一的人类可读格式；详情保留精确整数，`LEVEL_0` 的未知 token/费用不得显示成零。
+
+## 10. 备份
 
 ```bash
 backup=$(sudo "$MEASIX_ROOT/current/deploy/backup-preview.sh" "$MEASIX_ROOT")
@@ -191,7 +216,7 @@ sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$backup" "$MEASIX_ROOT/curr
 
 备份包含 Hub/Relay 一致性 SQLite 镜像、config、secrets 和逐文件 hash manifest。验证后必须另存一份到 Spark 之外的受保护存储。
 
-## 10. 升级
+## 11. 升级
 
 1. 解压新 release 并校验 SHA256；
 2. 使用旧 release 创建并验证备份；
@@ -200,17 +225,17 @@ sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$backup" "$MEASIX_ROOT/curr
 5. 从新 release 安装新的 `$MEASIX_ROOT/run.sh` 与 `$MEASIX_ROOT/ecosystem.config.cjs`；
 6. 原子切换 `current`；
 7. `sudo pm2 startOrReload "$MEASIX_ROOT/ecosystem.config.cjs"`，然后 `sudo pm2 save`；
-8. 执行第 7 节完整验收，并保留旧 release/备份直到确认完成。
+8. 执行第 7–9 节验收；确认完成后删除 staging 和旧 release，只保留当前 release 与最近一次已验证数据备份。
 
 `config/public-origin` 属于持久配置，升级不得被模板覆盖。新增 optional 配置不提升 config version；required 配置或语义改变必须提供明确转换步骤。
 
-## 11. 回退与恢复
+## 12. 数据恢复（首发不保留旧版回退）
 
-数据库版本未变化时，可以切回旧 release、刷新旧版 `run.sh`/ecosystem 并只重启两个 MEASIX app。数据库已经迁移时，旧 binary 不得打开新数据库，必须停止两个 app，验证升级前备份，再同时恢复 Hub DB、可选 Relay spool、config、secrets 和对应 release。
+首次 Preview 不保留多版本二进制回退。故障恢复使用当前 release 与已验证备份，同时恢复 Hub DB、可选 Relay spool、config 和 secrets；不得只恢复数据库而继续使用不匹配的配置或密钥。后续版本若需要旧版回退，必须在对应升级说明中明确数据库兼容边界后再启用。
 
 恢复一律先进入 `$MEASIX_ROOT/staging/recovery-<timestamp>`；当前数据移入 `original/`，不得直接删除。候选数据库先执行 `control-hub check`，验收前保留 `original/`。
 
-## 12. 日志与排障
+## 13. 日志与排障
 
 - Hub：`$MEASIX_ROOT/logs/hub.jsonl`、`hub.stderr.log`；
 - Relay：`$MEASIX_ROOT/logs/relay.jsonl`、`relay.stderr.log`；

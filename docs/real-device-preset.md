@@ -10,10 +10,10 @@
 npm run device:real
 ```
 
-启动器会选择默认网关所用网卡的 IPv4，并输出形如 `http://192.168.100.138:9100` 的手机接入地址。网络切换或希望指定网卡时，在启动前明确设置：
+启动器会选择默认网关所用网卡的 IPv4，并输出手机可访问的局域网地址。网络切换或希望指定网卡时，在启动前明确设置；以下 `192.0.2.20` 仅为文档示例：
 
 ```powershell
-$env:MEASIX_REAL_DEVICE_ORIGIN = 'http://192.168.100.138:9100'
+$env:MEASIX_REAL_DEVICE_ORIGIN = 'http://192.0.2.20:9100'
 npm run device:real
 ```
 

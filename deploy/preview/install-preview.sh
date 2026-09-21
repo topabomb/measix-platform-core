@@ -17,6 +17,11 @@ release_dir=$(readlink -f -- "$release_dir")
 (cd "$release_dir" && sha256sum -c SHA256SUMS)
 
 if ! id measix >/dev/null 2>&1; then useradd --system --home-dir "$root" --shell /usr/sbin/nologin measix; fi
+if ! sudo -u measix test -x "$release_dir/bin/control-hub"; then
+  echo "measix cannot traverse the selected deployment path; grant execute-only access on the blocking parent directory and retry" >&2
+  echo "inspect with: namei -l $release_dir/bin/control-hub" >&2
+  exit 2
+fi
 install -d -m 0755 -o root -g root "$root" "$root/releases" "$root/config"
 install -d -m 0750 -o root -g measix "$root/secrets"
 chmod 0755 "$release_dir"

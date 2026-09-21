@@ -497,11 +497,11 @@ https://core.example.com {
 
     @runtime path /runtime/v1 /runtime/v1/*
     handle @runtime {
-        reverse_proxy 100.64.0.4:9002
+        reverse_proxy <SPARK_TAILSCALE_IP>:9002
     }
 
     handle {
-        reverse_proxy 100.64.0.4:9004
+        reverse_proxy <SPARK_TAILSCALE_IP>:9004
     }
 }
 ```
@@ -526,7 +526,7 @@ export MEASIX_ROOT=/home/admin/project/service/measix-core
 ### 13.1 前置条件
 
 - NVIDIA DGX Spark，Linux `aarch64` / Go `arm64`；
-- Spark 已加入 Tailscale，当前地址为 `100.64.0.4`；
+- Spark 已加入 Tailscale；实际 LAN/Tailscale 地址和 Public Origin 只记录在不进 Git 的 `deployment-local.md`；
 - 已安装 Node LTS、PM2 和 pm2-logrotate；
 - `sudo pm2` 可用；
 - 主机时间同步正常。

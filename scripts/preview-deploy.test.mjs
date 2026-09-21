@@ -33,6 +33,8 @@ test('production installer accepts only an HTTPS public origin', () => {
   assert.doesNotMatch(installer, /--env production/)
   assert.doesNotMatch(installer, /\bcaddy\b|systemctl\s+reload/)
   assert.match(installer, /pm2 start "\$root\/ecosystem\.config\.cjs"/)
+  assert.match(installer, /sudo -u measix test -x "\$release_dir\/bin\/control-hub"/)
+  assert.ok(installer.indexOf('sudo -u measix test -x') < installer.indexOf('install -d -m 0755'))
 })
 
 test('PM2 uses one root-owned run script with fixed public and internal binds', () => {

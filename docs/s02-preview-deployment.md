@@ -1,20 +1,20 @@
 # S0.2 Preview — DGX Spark 部署手册
 
-本手册对应单机 NVIDIA DGX Spark 的内部 Preview。Spark 只运行 MEASIX Hub/Relay，由现有的 root PM2 管理；Spark 不安装 Caddy。另一台已经加入同一 Tailscale 网络的入口服务器负责 TLS、子域名和反向代理，该外部通道不属于本次 Spark 部署验收范围。
+本手册对应单机 NVIDIA DGX Spark 的内部 Preview。Spark 只运行 MEASIX Hub/Relay，由现有的 root PM2 管理；Spark 不安装 Caddy。另一台已经加入同一 Tailscale 网络的入口服务器负责 TLS、子域名和反向代理，并由入口维护者独立配置和验收。
 
 ## 1. 当前目标环境
 
-2026-09-21 已只读确认：
+目标机实际 LAN/Tailscale 地址、主机名和 Public Origin 属于部署现场信息，不写入 Git；部署后记录在服务主目录中权限为 `0640 root:admin` 的 `deployment-local.md`。已确认的通用条件：
 
-- Spark：`192.168.100.216`，Ubuntu 24.04.5 LTS，`aarch64`；
-- Tailscale 地址：`100.64.0.4`；
+- Spark 运行 Ubuntu 24.04 LTS，架构为 `aarch64`；
+- Spark 和远端 Caddy 入口已加入同一 Tailscale 网络；
 - Node `v24.21.0`、npm `11.19.0`、PM2 `7.0.4`；
 - `pm2-root.service` 已启用并运行，PM2 home 为 `/root/.pm2`；
 - 已有 PM2 服务必须保留，不得执行 `pm2 delete all`、`pm2 stop all` 或覆盖整个 dump；
-- `/home/admin/project/service` 已有 `measix-archive`、`deepseek-harness`；
-- 9001–9004 当前未占用；
+- 服务父目录已有其他项目，MEASIX 必须使用独立子目录；
+- 首次部署前必须确认 9001–9004 未占用；
 - Spark 未安装 Caddy，这是预期状态；
-- systemd 提示 `pm2-root.service` 的磁盘 unit 比已加载版本新，正式部署前经确认执行一次 `sudo systemctl daemon-reload`，但不重启其他服务。
+- 如 systemd 提示 PM2 unit 的磁盘版本变化，只执行 `sudo systemctl daemon-reload`，不重启其他服务。
 
 本次固定部署根目录：
 
@@ -45,6 +45,7 @@ export MEASIX_PUBLIC_ORIGIN=https://<approved-subdomain>
 /home/admin/project/service/measix-core/
 ├── run.sh                         # PM2 唯一进程入口：run.sh hub|relay
 ├── ecosystem.config.cjs           # root PM2 配置
+├── deployment-local.md            # 现场地址和验收记录；私有、不得提交 Git
 ├── current -> releases/<version>/
 ├── releases/<version>/
 │   ├── bin/{control-hub,runtime-relay}
@@ -97,11 +98,16 @@ df -h /home/admin/project/service
 
 ## 6. 首次部署（必须取得用户确认后执行）
 
-以下步骤当前尚未在 Spark 执行。
-
 1. 在主目录内创建 staging/release 目录并上传归档；不得把源码部署到 Spark。
 2. 解压后先运行 `sha256sum -c SHA256SUMS`。
-3. 执行首次安装器：
+3. 确认 `measix` 用户能穿越部署路径的所有父目录。若 `namei -l` 显示父目录阻断，只给阻断父目录增加 execute-only ACL，不开放目录读取：
+
+```bash
+namei -l "$MEASIX_ROOT/releases/$MEASIX_VERSION/bin/control-hub"
+sudo setfacl -m u:measix:--x <blocking-parent-directory>
+```
+
+4. 执行首次安装器：
 
 ```bash
 sudo "$MEASIX_ROOT/releases/$MEASIX_VERSION/deploy/install-preview.sh" \
@@ -154,7 +160,7 @@ Admin 登录后检查 System 四页签、当前 release、Relay ready、配置 r
 
 ## 8. 远端 Caddy 交接（不在 Spark 执行）
 
-发布包中的 `deploy/Caddyfile.template` 只是远端入口服务器的参考片段，不由 Spark 安装器复制或 reload。入口服务器应将 `__MEASIX_SPARK_TAILSCALE_IP__` 替换为 `100.64.0.4`，将 `__MEASIX_PUBLIC_ORIGIN__` 替换为获批子域名：
+发布包中的 `deploy/Caddyfile.template` 只是远端入口服务器的参考片段，不由 Spark 安装器复制或 reload。入口服务器应从私有 `deployment-local.md` 取得现场值，并替换模板中的 `__MEASIX_SPARK_TAILSCALE_IP__` 与 `__MEASIX_PUBLIC_ORIGIN__`：
 
 ```caddyfile
 https://<approved-subdomain> {
@@ -165,11 +171,11 @@ https://<approved-subdomain> {
 
 	@runtime path /runtime/v1 /runtime/v1/*
 	handle @runtime {
-		reverse_proxy 100.64.0.4:9002
+		reverse_proxy <SPARK_TAILSCALE_IP>:9002
 	}
 
 	handle {
-		reverse_proxy 100.64.0.4:9004
+		reverse_proxy <SPARK_TAILSCALE_IP>:9004
 	}
 }
 ```

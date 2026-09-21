@@ -272,6 +272,7 @@ export default {
     periodLabel: '周期',
     meterLabel: '计量项',
     limitLabel: '上限',
+    limitHint: '可输入精确整数，或使用 k / M，例如 100k = 100,000。',
     addLimit: '添加限制',
     reasonLabel: '变更原因',
     reasonHint: '必填，将写入不可变审计记录。',

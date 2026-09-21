@@ -136,6 +136,33 @@ describe('BudgetTemplatesPage', () => {
     expect(wrapper.get('[data-cy="budget-template-saved"]').text()).toContain('Explicit user overrides were unchanged')
   })
 
+  it('accepts a concise template limit and sends the canonical exact integer', async () => {
+    const fetch = vi.spyOn(client, 'apiFetch')
+    fetch.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return {
+        budgetTemplateId: 'bgt_team', name: 'Team standard', description: 'Shared defaults', revision: 2,
+        rules: [{ capability: 'IMAGE_GENERATION', mode: 'LIMITED', limits: [{ period: 'MONTH', meter: 'REQUESTED_IMAGES', limit: '100000' }] }],
+        assignedUserCount: 2, createdAt: '2026-09-20T00:00:00Z', updatedAt: '2026-09-20T01:00:00Z',
+      }
+      return { items: [{
+        budgetTemplateId: 'bgt_team', name: 'Team standard', description: 'Shared defaults', revision: 1,
+        rules: [{ capability: 'IMAGE_GENERATION', mode: 'LIMITED', limits: [{ period: 'MONTH', meter: 'REQUESTED_IMAGES', limit: '50' }] }],
+        assignedUserCount: 2, createdAt: '2026-09-20T00:00:00Z', updatedAt: '2026-09-20T00:00:00Z',
+      }] }
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-cy="budget-template-row"]').trigger('click')
+    const imageRule = wrapper.get('[data-cy="template-rule-IMAGE_GENERATION"]')
+    await imageRule.findAllComponents(QInput).find((input: { props: (name: string) => unknown }) => input.props('label') === 'Limit')!.setValue('100k')
+    await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Reason for change')!.setValue('Readable image allowance')
+    await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'Save')!.trigger('click')
+    await (document.body.querySelector('[data-cy="confirm-budget-template-save"]') as HTMLElement).click()
+    await flushPromises()
+    const call = fetch.mock.calls.find(([, init]) => init?.method === 'PUT')!
+    expect(JSON.parse(String(call[1]?.body)).rules[0].limits[0].limit).toBe('100000')
+  })
+
   it('deletes an unassigned template with revision and operator reason', async () => {
     const fetch = vi.spyOn(client, 'apiFetch')
     fetch.mockImplementation(async (path: string, init?: RequestInit) => {

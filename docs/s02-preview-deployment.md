@@ -213,7 +213,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' https://<approved-subdomain>/int
 5. 创建内部成员和一小时一次性接入资料，在 Android 模拟器粘贴或扫码接入；接入资料属于凭据，不写入 Git 或共享日志。
 6. Android 完成同步、默认助手真实请求、Usage 回查和应用重启恢复后，才把该发布标为“可用”。
 
-上游地址、资源名称、模型 key、用户和现场验证结果记录在私有 `deployment-local.md`。Admin 对 token、字符、秒、请求数和图片数使用统一的人类可读格式；详情保留精确整数，`LEVEL_0` 的未知 token/费用不得显示成零。
+上游地址、资源名称、模型 key、用户和现场验证结果记录在私有 `deployment-local.md`。Admin 对 token、字符、秒、请求数和图片数使用统一的人类可读格式；详情保留精确整数，额度模板和单用户额度允许用 `100k`、`2M` 这类简写输入并在保存时转换为精确整数，`LEVEL_0` 的未知 token/费用不得显示成零。
 
 ## 10. 备份
 

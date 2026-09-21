@@ -204,6 +204,26 @@ describe('UserBudgetPanel', () => {
     })
   })
 
+  it('accepts a concise limit and sends the canonical exact integer', async () => {
+    const fetch = vi.spyOn(client, 'apiFetch')
+    fetch.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/budgets')) return budgetView()
+      if (init?.method === 'PUT') return { ...limited, revision: 5 }
+      return { items: [] }
+    })
+    const wrapper = mountPanel()
+    await flushPromises()
+    const model = wrapper.get('[data-cy="budget-MODEL"]')
+    await model.findAllComponents(QBtn).find((button: { props: (name: string) => unknown }) => button.props('icon') === 'edit')!.trigger('click')
+    await flushPromises()
+    await model.findAllComponents(QInput).find((input: { props: (name: string) => unknown }) => input.props('label') === 'Limit')!.setValue('100k')
+    await model.findAllComponents(QInput).at(-1)!.setValue('Readable allocation')
+    await model.get('[data-cy="save-budget"]').trigger('click')
+    await flushPromises()
+    const call = fetch.mock.calls.find(([, init]) => init?.method === 'PUT')!
+    expect(JSON.parse(String(call[1]?.body)).limits[0].limit).toBe('100000')
+  })
+
   it('reloads the current server state after a CAS conflict', async () => {
     let reads = 0
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string, init?: RequestInit) => {

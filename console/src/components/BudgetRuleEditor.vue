@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { BudgetCapability, BudgetLimitDefinition, BudgetMode, PricingMeter } from '../api/usageBudget'
-import { budgetPeriods, metersForCapability } from '../api/usageBudget'
+import { budgetPeriods, metersForCapability, normalizeBudgetLimitInput } from '../api/usageBudget'
 
 const props = defineProps<{
   capability: BudgetCapability
@@ -21,7 +21,7 @@ const valid = computed(() => {
   const keys = new Set<string>()
   return props.limits.every(limit => {
     const key = `${limit.period}:${limit.meter}`
-    if (keys.has(key) || !/^(0|[1-9]\d*)$/.test(limit.limit)) return false
+    if (keys.has(key) || normalizeBudgetLimitInput(limit.limit) === undefined) return false
     keys.add(key)
     return true
   })
@@ -38,6 +38,11 @@ function updateLimit(index: number, field: 'period' | 'meter' | 'limit', value: 
   const next = props.limits.map(item => ({ ...item }))
   next[index] = { ...next[index]!, [field]: value }
   emit('update:limits', next)
+}
+
+function normalizeLimit(index: number) {
+  const normalized = normalizeBudgetLimitInput(props.limits[index]?.limit ?? '')
+  if (normalized !== undefined) updateLimit(index, 'limit', normalized)
 }
 
 function addLimit() {
@@ -66,7 +71,7 @@ function removeLimit(index: number) {
       <div v-for="(limit, index) in limits" :key="index" class="budget-rule">
         <q-select :model-value="limit.period" outlined dense emit-value map-options :label="$t('budgets.periodLabel')" :options="budgetPeriods.map(value => ({ value, label: $t(`budgets.period.${value}`) }))" @update:model-value="value => updateLimit(index, 'period', value)" />
         <q-select :model-value="limit.meter" outlined dense emit-value map-options :label="$t('budgets.meterLabel')" :options="metersForCapability(capability).map(value => ({ value, label: $t(`usage.meters.${value}`) }))" @update:model-value="value => updateLimit(index, 'meter', value as PricingMeter)" />
-        <q-input :model-value="limit.limit" outlined dense inputmode="numeric" :label="$t('budgets.limitLabel')" :error="Boolean(limit.limit) && !/^(0|[1-9]\d*)$/.test(limit.limit)" @update:model-value="value => updateLimit(index, 'limit', String(value ?? ''))" />
+        <q-input :model-value="limit.limit" outlined dense inputmode="text" :label="$t('budgets.limitLabel')" :hint="$t('budgets.limitHint')" :error="Boolean(limit.limit) && normalizeBudgetLimitInput(limit.limit) === undefined" @update:model-value="value => updateLimit(index, 'limit', String(value ?? ''))" @blur="normalizeLimit(index)" />
         <q-btn flat dense round icon="delete" color="negative" :aria-label="$t('common.remove')" @click="removeLimit(index)" />
       </div>
       <q-btn flat dense no-caps icon="add" :label="$t('budgets.addLimit')" @click="addLimit" />

@@ -272,6 +272,7 @@ export default {
     periodLabel: 'Period',
     meterLabel: 'Meter',
     limitLabel: 'Limit',
+    limitHint: 'Enter an exact integer, or use k / M (for example 100k = 100,000).',
     addLimit: 'Add limit',
     reasonLabel: 'Reason for change',
     reasonHint: 'Required for the immutable audit trail.',

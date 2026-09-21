@@ -16,7 +16,7 @@ import type {
   PutBudgetRequest,
   UserBudgetView,
 } from '../api/usageBudget'
-import { budgetRuleValueKey, capabilities } from '../api/usageBudget'
+import { budgetRuleValueKey, canonicalBudgetLimits, capabilities, normalizeBudgetLimitInput } from '../api/usageBudget'
 import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 import { useSessionStore } from '../stores/session'
 import LoadingState from './LoadingState.vue'
@@ -115,7 +115,7 @@ const editorValid = computed(() => {
   const keys = new Set<string>()
   return editLimits.value.every(limit => {
     const key = `${limit.period}:${limit.meter}`
-    if (keys.has(key) || !/^(0|[1-9]\d*)$/.test(limit.limit)) return false
+    if (keys.has(key) || normalizeBudgetLimitInput(limit.limit) === undefined) return false
     keys.add(key)
     return true
   })
@@ -129,7 +129,7 @@ async function save(item: BudgetCapabilityView) {
   const request: PutBudgetRequest = {
     expectedRevision: item.revision,
     mode: editMode.value,
-    limits: editMode.value === 'LIMITED' ? editLimits.value : [],
+    limits: editMode.value === 'LIMITED' ? canonicalBudgetLimits(editLimits.value) : [],
     reason: editReason.value.trim(),
   }
   try {

@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { ApiProblem, apiFetch } from '../api/client'
 import type { BudgetCapability, BudgetLimitDefinition, BudgetMode, BudgetTemplate, BudgetTemplatePage, BudgetTemplateRule } from '../api/usageBudget'
-import { budgetRuleValueKey, capabilities } from '../api/usageBudget'
+import { budgetRuleValueKey, canonicalBudgetLimits, capabilities, normalizeBudgetLimitInput } from '../api/usageBudget'
 import { useSessionStore } from '../stores/session'
 import DetailWorkspace from '../components/DetailWorkspace.vue'
 import BudgetRuleEditor from '../components/BudgetRuleEditor.vue'
@@ -69,7 +69,7 @@ const canSave = computed(() => Boolean(session.csrfToken && name.value.trim() &&
   const keys = new Set<string>()
   return rule.limits.every(limit => {
     const key = `${limit.period}:${limit.meter}`
-    if (keys.has(key) || !/^(0|[1-9]\d*)$/.test(limit.limit)) return false
+    if (keys.has(key) || normalizeBudgetLimitInput(limit.limit) === undefined) return false
     keys.add(key)
     return true
   })
@@ -166,7 +166,7 @@ function requestRules() {
   return capabilities.filter(capability => rules[capability].included).map(capability => ({
     capability,
     mode: rules[capability].mode,
-    limits: rules[capability].mode === 'LIMITED' ? rules[capability].limits : [],
+    limits: rules[capability].mode === 'LIMITED' ? canonicalBudgetLimits(rules[capability].limits) : [],
   }))
 }
 

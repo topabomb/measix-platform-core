@@ -2,6 +2,8 @@
 # This prevents gofmt failures on Windows (autocrlf=true) where
 # CRLF checkout causes every Go file to be flagged as needing formatting.
 
+.gitattributes text eol=lf
+
 *.go text eol=lf
 
 # Go module files also require LF
@@ -10,6 +12,7 @@ go.sum text eol=lf
 
 # Scripts and Makefile use LF
 Makefile text eol=lf
+*.sh text eol=lf
 *.mjs text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf

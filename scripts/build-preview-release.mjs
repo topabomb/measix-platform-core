@@ -7,11 +7,15 @@ import { spawnSync } from 'node:child_process'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORTAL = resolve(ROOT, '..', 'measix-enterprise-portal')
+const ARCHITECTURE = resolve(ROOT, '..', 'measix-architecture')
+const ANDROID = resolve(ROOT, '..', '..', 'rikkahub_mcp')
 const version = process.argv[2]
 if (!version || !/^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$/.test(version)) fail('Usage: node scripts/build-preview-release.mjs <version>')
 if (!existsSync(join(PORTAL, 'package.json'))) fail(`Portal repository not found: ${PORTAL}`)
 if (git(ROOT, ['status', '--porcelain']).trim()) fail('Core worktree must be clean before building a release')
 if (git(PORTAL, ['status', '--porcelain']).trim()) fail('Portal worktree must be clean before building a release')
+if (git(ARCHITECTURE, ['status', '--porcelain']).trim()) fail('Architecture worktree must be clean before building a release')
+if (git(ANDROID, ['status', '--porcelain']).trim()) fail('Android worktree must be clean before building a release')
 run('node', ['scripts/verify-preview-contract.mjs'], ROOT)
 run('node', ['scripts/checks.mjs', 'generate'], ROOT)
 if (git(ROOT, ['status', '--porcelain']).trim()) fail('Generated contracts or dependencies drift from committed sources')
@@ -48,7 +52,12 @@ const release = {
   version,
   target: { os: 'linux', arch: 'arm64', platform: 'NVIDIA DGX Spark' },
   builtAt: new Date().toISOString(),
-  source: { coreCommit: git(ROOT, ['rev-parse', 'HEAD']).trim(), portalCommit: git(PORTAL, ['rev-parse', 'HEAD']).trim() },
+  source: {
+    architectureCommit: git(ARCHITECTURE, ['rev-parse', 'HEAD']).trim(),
+    coreCommit: git(ROOT, ['rev-parse', 'HEAD']).trim(),
+    portalCommit: git(PORTAL, ['rev-parse', 'HEAD']).trim(),
+    androidCommit: git(ANDROID, ['rev-parse', 'HEAD']).trim(),
+  },
   protocols: Object.fromEntries(protocolFiles.map(path => [path, `sha256:${sha256(join(ROOT, path))}`])),
   schemaMigrationIdentity: migrationIdentity(),
 }

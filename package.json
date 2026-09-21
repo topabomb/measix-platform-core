@@ -32,7 +32,7 @@
     "contract": "cd backend && go test ./internal/contract -count=1",
     "test": "npm run test:backend && npm run test:console",
     "test:backend": "cd backend && go test ./... -count=1",
-    "test:backend-race": "cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/sqliteutil ./internal/relay/metering -count=1",
+    "test:backend-race": "cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/observability ./internal/common/sqliteutil ./internal/relay/metering -count=1",
     "test:console": "pnpm -C console test",
     "test:relay": "cd backend && go test ./internal/relay/... -count=1",
     "test:hub": "cd backend && go test ./internal/hub/... -count=1",

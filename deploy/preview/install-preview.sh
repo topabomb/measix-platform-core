@@ -14,6 +14,7 @@ release_dir=$(readlink -f -- "$release_dir")
 [[ "$release_dir" == "$root"/releases/* ]] || { echo "release must be below MEASIX_ROOT/releases" >&2; exit 2; }
 [[ -f "$release_dir/release.json" && -x "$release_dir/bin/control-hub" && -x "$release_dir/bin/runtime-relay" ]] || { echo "invalid release directory" >&2; exit 2; }
 [[ ! -e "$root/config/config-version" && ! -e "$root/data/hub/hub.db" ]] || { echo "deployment already initialized; use the upgrade runbook" >&2; exit 2; }
+(cd "$release_dir" && sha256sum -c SHA256SUMS)
 
 if ! id measix >/dev/null 2>&1; then useradd --system --home-dir "$root" --shell /usr/sbin/nologin measix; fi
 install -d -m 0755 -o root -g root "$root" "$root/releases" "$root/config"
@@ -28,6 +29,7 @@ escaped_origin=${public_origin//&/\\&}
 sed "s|__MEASIX_PUBLIC_ORIGIN__|$escaped_origin|g" "$release_dir/deploy/Caddyfile.template" > "$root/config/Caddyfile.tmp"
 install -m 0644 -o root -g root "$root/config/Caddyfile.tmp" "$root/config/Caddyfile"
 rm -f -- "$root/config/Caddyfile.tmp"
+caddy validate --config "$root/config/Caddyfile" --adapter caddyfile
 
 umask 077
 head -c 32 /dev/urandom > "$root/secrets/master.key"
@@ -50,6 +52,5 @@ sudo -u measix "$root/current/bin/control-hub" bootstrap-admin \
 env MEASIX_ROOT="$root" MEASIX_PUBLIC_ORIGIN="$public_origin" pm2 start "$root/config/ecosystem.config.cjs" --env production
 pm2 save
 ln -sfn -- "$root/config/Caddyfile" /etc/caddy/Caddyfile
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 systemctl reload caddy
 echo "Initial password remains at $root/secrets/initial-admin-password; remove it after the first successful login."

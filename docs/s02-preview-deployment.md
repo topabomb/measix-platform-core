@@ -245,6 +245,34 @@ sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$backup" "$MEASIX_ROOT/curr
 
 恢复一律先进入 `$MEASIX_ROOT/staging/recovery-<timestamp>`；当前数据移入 `original/`，不得直接删除。候选数据库先执行 `control-hub check`，验收前保留 `original/`。
 
+```bash
+backup="$MEASIX_ROOT/backups/<timestamp>"
+stage="$MEASIX_ROOT/staging/recovery-$(date -u +%Y%m%dT%H%M%SZ)"
+sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$backup" "$MEASIX_ROOT/current"
+sudo install -d -m 0700 -o measix -g measix \
+  "$stage/candidate/data/hub" "$stage/candidate/data/relay" "$stage/original"
+sudo install -m 0600 -o measix -g measix "$backup/hub.db" "$stage/candidate/data/hub/hub.db"
+if sudo test -f "$backup/relay-spool.db"; then
+  sudo install -m 0600 -o measix -g measix \
+    "$backup/relay-spool.db" "$stage/candidate/data/relay/relay-spool.db"
+fi
+sudo cp -a -- "$backup/config" "$backup/secrets" "$stage/candidate/"
+sudo -u measix "$MEASIX_ROOT/current/bin/control-hub" check \
+  --db "$stage/candidate/data/hub/hub.db"
+
+sudo pm2 stop measix-hub measix-relay
+sudo mv -- "$MEASIX_ROOT/data/hub" "$MEASIX_ROOT/data/relay" \
+  "$MEASIX_ROOT/config" "$MEASIX_ROOT/secrets" "$stage/original/"
+sudo mv -- "$stage/candidate/data/hub" "$MEASIX_ROOT/data/hub"
+sudo mv -- "$stage/candidate/data/relay" "$MEASIX_ROOT/data/relay"
+sudo mv -- "$stage/candidate/config" "$MEASIX_ROOT/config"
+sudo mv -- "$stage/candidate/secrets" "$MEASIX_ROOT/secrets"
+sudo pm2 startOrReload "$MEASIX_ROOT/ecosystem.config.cjs"
+sudo pm2 save
+```
+
+然后执行第 7–9 节验收，特别确认 Relay spool 待投递数、Managed Configuration revision、Android 请求和 Usage 入库。失败时停止两个 MEASIX 进程，把候选目录移到 `failed/`，再将 `original/` 中四个目录原样移回；不得删除 `original/` 后再判断恢复是否成功。
+
 ## 13. 日志与排障
 
 - Hub：`$MEASIX_ROOT/logs/hub.jsonl`、`hub.stderr.log`；

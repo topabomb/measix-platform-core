@@ -26,6 +26,15 @@ test('preview backup uses SQLite-owned online backups and verifies recovery file
   assert.match(verifier, /backup checksum mismatch/)
 })
 
+test('recovery runbook restores the Hub database and optional Relay spool', () => {
+  const runbook = read('docs/s02-preview-deployment.md')
+  const recovery = runbook.slice(runbook.indexOf('## 12.'), runbook.indexOf('## 13.'))
+  assert.match(recovery, /verify-backup\.sh" "\$backup" "\$MEASIX_ROOT\/current"/)
+  assert.match(recovery, /"\$backup\/hub\.db" "\$stage\/candidate\/data\/hub\/hub\.db"/)
+  assert.match(recovery, /"\$backup\/relay-spool\.db" "\$stage\/candidate\/data\/relay\/relay-spool\.db"/)
+  assert.ok(recovery.indexOf('control-hub" check') < recovery.indexOf('pm2 stop measix-hub measix-relay'))
+})
+
 test('production installer accepts only an HTTPS public origin', () => {
   const installer = read('deploy/preview/install-preview.sh')
   assert.match(installer, /\^https:\/\//)

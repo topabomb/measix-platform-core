@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"measix/platform/internal/common/sqliteutil"
@@ -61,6 +64,68 @@ func OpenSpool(path string) (*Spool, error) {
 }
 
 func (s *Spool) Close() error { return s.db.Close() }
+
+// Backup writes a transactionally consistent standalone image while the Relay
+// remains online. VACUUM INTO includes committed WAL content; copying only the
+// main database file does not.
+func (s *Spool) Backup(ctx context.Context, outputPath string) error {
+	if s == nil || s.db == nil || strings.TrimSpace(outputPath) == "" {
+		return fmt.Errorf("invalid spool backup request")
+	}
+	absolute, err := filepath.Abs(outputPath)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(absolute), 0o750); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(absolute, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(absolute)
+		return err
+	}
+	success := false
+	defer func() {
+		if !success {
+			_ = os.Remove(absolute)
+		}
+	}()
+	quoted := strings.ReplaceAll(absolute, "'", "''")
+	if _, err := s.db.ExecContext(ctx, "VACUUM INTO '"+quoted+"'"); err != nil {
+		return fmt.Errorf("backup relay spool: %w", err)
+	}
+	backup, err := sql.Open("sqlite", absolute)
+	if err != nil {
+		return err
+	}
+	defer backup.Close()
+	var integrity string
+	if err := backup.QueryRowContext(ctx, "PRAGMA integrity_check").Scan(&integrity); err != nil {
+		return err
+	}
+	if integrity != "ok" {
+		return fmt.Errorf("relay spool backup integrity: %s", integrity)
+	}
+	rows, err := backup.QueryContext(ctx, "PRAGMA foreign_key_check")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		return fmt.Errorf("relay spool backup foreign key violation")
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if err := os.Chmod(absolute, 0o600); err != nil {
+		return err
+	}
+	success = true
+	return nil
+}
 
 func (s *Spool) SaveAdmission(ctx context.Context, requestID string, payload json.RawMessage, createdAt time.Time) error {
 	if requestID == "" || !json.Valid(payload) || createdAt.IsZero() {

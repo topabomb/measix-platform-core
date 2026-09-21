@@ -7,7 +7,7 @@ public_origin=${3:-}
 if [[ $(id -u) -ne 0 ]]; then echo "install-preview.sh must run as root" >&2; exit 2; fi
 if [[ -z "$root" || "$root" != /* || "$root" == / ]]; then echo "MEASIX_ROOT must be an explicit absolute non-root path" >&2; exit 2; fi
 if [[ -z "$release_dir" || "$release_dir" != /* ]]; then echo "release directory must be absolute" >&2; exit 2; fi
-if [[ ! "$public_origin" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then echo "public origin must be an HTTP(S) origin without a path" >&2; exit 2; fi
+if [[ ! "$public_origin" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then echo "public origin must be an HTTPS origin without a path" >&2; exit 2; fi
 
 root=$(readlink -m -- "$root")
 release_dir=$(readlink -f -- "$release_dir")

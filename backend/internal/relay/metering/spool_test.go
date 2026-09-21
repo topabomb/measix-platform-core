@@ -2,6 +2,7 @@ package metering_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"path/filepath"
 	"testing"
@@ -115,6 +116,36 @@ func TestSpoolPurgesEveryStateOwnedByDeletedUser(t *testing.T) {
 	}
 	if rows, err := spool.Recoverable(ctx, 10); err != nil || len(rows) != 1 || rows[0].RequestID != "req_retained" {
 		t.Fatalf("unrelated request was not preserved: rows=%+v err=%v", rows, err)
+	}
+}
+
+func TestSpoolBackupIncludesCommittedWALRowsAndRefusesOverwrite(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	spool, err := metering.OpenSpool(filepath.Join(dir, "spool.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer spool.Close()
+	now := time.Now().UTC()
+	if err := spool.SaveAdmission(ctx, "request-backup", json.RawMessage(`{"request":"backup"}`), now); err != nil {
+		t.Fatal(err)
+	}
+	backupPath := filepath.Join(dir, "backup.db")
+	if err := spool.Backup(ctx, backupPath); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", backupPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM runtime_request_spool WHERE request_id='request-backup'`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("backup row count=%d err=%v", count, err)
+	}
+	if err := spool.Backup(ctx, backupPath); err == nil {
+		t.Fatal("backup must not overwrite an existing recovery image")
 	}
 }
 

@@ -209,27 +209,23 @@ errorCode
 
 ### 5.2 事件范围
 
-Hub 最少记录：
+Hub 的内部 Preview 最小事件集：
 
 - `service.started`、`service.stopping`、`service.start_failed`；
-- `database.check_failed`、`database.backup_*`、`database.migration_*`；
-- `runtime.reconcile_failed`、`runtime.reconcile_recovered`；
-- `activation.started`、`activation.completed`、`activation.failed`；
-- `usage.ingest_failed`；
-- `deployment.settings_changed`；
+- `command.failed`、`database.backup_*`、`database.migration_*`；
+- `runtime.reconcile_failed`；
 - Admin/Client 请求结束事件及认证/授权拒绝结果。
 
-Relay 最少记录：
+Relay 的内部 Preview 最小事件集：
 
 - `service.started`、`service.stopping`、`service.start_failed`；
 - `control.apply_completed`、`control.apply_failed`；
-- `runtime.request_completed`；
-- `upstream.timeout`、`upstream.unavailable`；
-- `budget.denied`；
-- `spool.write_failed`、`spool.flush_failed`、`spool.recovered`；
+- `http.request_completed`；
+- `usage_spool_write_failed`、`spool.flush_failed`、`spool.flush_recovered`；
+- `spool.backup_*`；
 - `shutdown.flush_incomplete`。
 
-每个正常请求最多一条完成日志。`/live`、`/ready` 的成功访问不写日志。失败、超时、拒绝和关键状态变化必须写日志。
+每个正常请求最多一条完成日志。`/live`、`/ready` 和成功的 Relay status 轮询不写日志也不进入请求遥测；失败、超时、拒绝和关键状态变化仍记录。Activation、预算、spool backlog 等已有结构化状态不重复制造领域事件，先由 System Status/telemetry 和请求完成结果联合排查；后续只有出现实际诊断缺口才增加事件。
 
 ### 5.3 实现结构
 
@@ -271,7 +267,7 @@ Relay 额外统计 `upstreamErrorCount`、`budgetDeniedCount`；Hub 额外统计
 - 不按 user/request/resource/upstream 建立无界标签；
 - `/live`、`/ready` 不进入业务请求统计；
 - Relay telemetry 作为 `ControlStatus` 的 additive optional 对象返回给 Hub；
-- Hub 缓存最近一次 Relay status，不因 Admin 打开页面形成高频 private 请求。
+- Hub 后台 reconciler 更新并缓存最近一次 Relay status；Admin 读取缓存，基础状态每 15 秒可见刷新，但不制造高频 private 请求和自观测噪音。`DBHealth` 的完整 integrity/history/column 检查缓存 60 秒，避免 UI 轮询反复执行重型 PRAGMA；命令行 `control-hub check` 始终执行即时完整检查。
 
 ## 7. Admin 观察与分析
 
@@ -401,16 +397,16 @@ $MEASIX_ROOT/backups/<timestamp>/hub.db
 $MEASIX_ROOT/backups/<timestamp>/hub.db.metadata.json
 ```
 
-发布前冷备份还包括：
+完整 recovery set 同时包括：
 
 ```text
 config/
 secrets/
-data/relay/relay-spool.db
+data/relay/relay-spool.db（由 Relay-owned `VACUUM INTO` 在线生成一致性镜像，不直接复制 WAL 主文件）
 backup-manifest.json
 ```
 
-备份目录权限为 `0700`。生产环境应另行复制一份到主机外安全位置；本仓库只负责生成和验证本地备份。
+manifest 固定记录 release version/四仓 commit、config/schema version、release manifest/checksum identity，以及每个恢复文件的 hash/size/mode。备份目录权限为 `0700`。生产环境应另行复制一份到主机外安全位置；本仓库只负责生成和验证本地备份。
 
 ### 9.3 恢复
 
@@ -513,6 +509,7 @@ https://core.example.com {
 - `/internal` 永不暴露；
 - 不配置 retry、body buffering 或 `flush_interval -1`；
 - Caddy 自动处理 SSE/WebSocket 和 TLS；
+- 保留 Caddy 默认仅 loopback 的 admin endpoint，供 systemd `reload` 使用，不对外开放；
 - 只开放主机 80/443；四个业务端口仅 loopback；
 - `/etc/caddy/Caddyfile` 链接到 `$MEASIX_ROOT/config/Caddyfile`；
 - 变更前执行 `caddy validate`，成功后才 reload。
@@ -664,50 +661,51 @@ sudo pm2 status
 
 ### A. 权威和协议
 
-- [ ] 更新 Architecture 对 Preview 后 forward migration、Admin 日志/遥测产品边界和验收要求；
-- [ ] 修复 Android/Portal contract hash 漂移；
-- [ ] 实现 release manifest 和 Preview contract gate；
-- [ ] 更新 Core 协议与发布文档。
+- [x] 更新 Architecture 对 Preview 后 forward migration、Admin 日志/遥测产品边界和验收要求；
+- [x] 修复 Android/Portal contract hash 漂移；
+- [x] 实现 release manifest、消费端导出校验和 Preview contract gate；
+- [x] 更新 Core 协议与发布文档。
 
 ### B. 日志和遥测
 
-- [ ] 实现 common observability logger/middleware；
-- [ ] 补齐 Hub/Relay 关键事件；
-- [ ] 实现固定 60 分钟 telemetry；
-- [ ] 扩展 Relay ControlStatus；
-- [ ] 实现 Admin telemetry/events API；
-- [ ] 实现 System 页面四页签与有界高效渲染；
-- [ ] 添加脱敏、边界、性能和 UI 测试。
+- [x] 实现 common observability logger/middleware；
+- [x] 补齐内部 Preview 最小关键事件和状态转换日志；
+- [x] 实现固定 60 分钟 telemetry；
+- [x] 扩展 Relay ControlStatus；
+- [x] 实现 Admin telemetry/events API；
+- [x] 实现 System 页面四页签与有界高效渲染；
+- [x] 添加脱敏、边界、性能和 UI 测试。
 
 ### C. 持久化
 
-- [ ] 将单初始化 SQL 转为 v1 forward migration；
-- [ ] 实现生产 `migrate`、startup version check 和 schema identity；
-- [ ] 统一 dev/prod migration owner；
-- [ ] 扩展 backup metadata/check；
-- [ ] 实现并验证升级、备份、恢复、回退脚本/步骤。
+- [x] 将单初始化 SQL 转为 v1 forward migration；
+- [x] 实现生产 `migrate`、startup version check 和 schema identity；
+- [x] 统一 dev/prod migration owner；
+- [x] 扩展 backup metadata/check；
+- [x] 实现 Hub/Relay 一致性备份、备份校验和可执行的升级/恢复/回退步骤，并通过自动恢复场景；目标主机演练仍见外部门禁。
 
 ### D. 发布部署
 
-- [ ] 实现并验证 DGX Spark Linux ARM64 release 构建；
-- [ ] 实现单根目录 ecosystem/Caddy 模板；
-- [ ] 实现 SHA256/release manifest；
-- [ ] 用解压包在无源码目录运行 smoke；
-- [ ] 完善本文为最终部署手册；
+- [x] 实现并验证 DGX Spark Linux ARM64 release 构建；
+- [x] 实现单根目录 ecosystem/Caddy 模板；
+- [x] 实现 SHA256/release manifest；
+- [x] 用解压包在无源码目录运行 smoke；
+- [x] 完善本文为最终部署手册；
 - [ ] 在目标 DGX Spark 上实测首次部署和升级恢复；本地交叉构建或容器 smoke 不能替代主机验收。
 
 ### E. 验证和独立审查
 
-- [ ] Core Go tests/vet/race（支持环境）；
-- [ ] Admin test/typecheck/build/E2E；
-- [ ] Portal test/typecheck/build；
-- [ ] contract/generate/drift；
-- [ ] system/candidate/browser harness；
-- [ ] migration/backup/restore/package tests；
-- [ ] Android contract/JVM 与至少一台物理设备 Preview 主流程；
+- [x] Core Go tests/vet/race（race 在 WSL Linux + GCC 环境）；
+- [x] Admin test/typecheck/build/E2E；
+- [x] Portal test/typecheck/build；
+- [x] contract/generate/drift；
+- [x] system/candidate/browser harness；
+- [x] migration/backup/restore/package tests；
+- [x] Android contract/JVM 和 emulator connected tests；
+- [ ] 至少一台物理 Android 设备完成当前候选的 Preview 主流程；
 - [ ] Caddy + sudo PM2 + binary package 实际部署验证；
-- [ ] 独立子代理逐条审查本文；
-- [ ] 修复审查问题并重跑受影响及最终完整验证。
+- [x] 独立子代理逐条审查本文；
+- [x] 修复独立审查中的代码/手册问题并重跑受影响及最终本地完整验证。
 
 ## 16. 最终验收标准
 

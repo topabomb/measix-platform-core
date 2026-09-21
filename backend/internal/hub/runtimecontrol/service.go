@@ -59,6 +59,9 @@ type Service struct {
 	Signer     *security.AccessSigner
 	Relay      RelayClient
 	Now        func() time.Time
+	// ObserveRelayStatus publishes successful observations to bounded
+	// diagnostics without making Admin polling another control-plane owner.
+	ObserveRelayStatus func(relaycontrolapi.ControlStatus)
 
 	// testHooks are test-only deterministic barrier/failure hooks that
 	// simulate Hub crashes at precise points in the Publish pipeline.

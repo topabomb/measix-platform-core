@@ -273,4 +273,54 @@ describe('SystemPage', () => {
     expect(wrapper.findComponent(QVirtualScroll).exists()).toBe(true)
     wrapper.unmount()
   })
+
+  it('refreshes basic status while visible instead of freezing the first observation', async () => {
+    vi.useFakeTimers()
+    try {
+      let observations = 0
+      const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+        if (path === '/api/admin/v1/system/status') return { ...BASE, spoolPendingCount: ++observations }
+        if (path === '/api/admin/v1/system/health') return { live: true, ready: true }
+        return {}
+      })
+      const { wrapper } = mountSystem()
+      await flushPromises()
+      const initial = fetch.mock.calls.filter(([path]) => path === '/api/admin/v1/system/status').length
+      await vi.advanceTimersByTimeAsync(15_000)
+      await flushPromises()
+      expect(fetch.mock.calls.filter(([path]) => path === '/api/admin/v1/system/status').length).toBe(initial + 1)
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not overlap slow background polls', async () => {
+    vi.useFakeTimers()
+    try {
+      let statusCalls = 0
+      let releaseSlowPoll: (() => void) | undefined
+      const slowPoll = new Promise<void>(resolve => { releaseSlowPoll = resolve })
+      const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+        if (path === '/api/admin/v1/system/status') {
+          statusCalls += 1
+          if (statusCalls === 2) await slowPoll
+          return BASE
+        }
+        if (path === '/api/admin/v1/system/health') return { live: true, ready: true }
+        return {}
+      })
+      const { wrapper } = mountSystem()
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(statusCalls).toBe(2)
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(statusCalls).toBe(2)
+      releaseSlowPoll?.()
+      await flushPromises()
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

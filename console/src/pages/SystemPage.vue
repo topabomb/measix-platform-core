@@ -32,6 +32,7 @@ const eventService = ref<'ALL' | 'HUB' | 'RELAY'>('ALL')
 const eventLevel = ref('')
 const eventPaused = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | undefined
+let pollInFlight = false
 
 const noPublishedConfiguration = computed(() => !!status.value && !hasPublishedConfiguration(status.value))
 const converged = computed(() => isManagedRuntimeConverged(status.value))
@@ -77,6 +78,17 @@ async function refreshDiagnostics(force = false) {
   }
 }
 
+async function pollVisible() {
+  if (document.hidden || pollInFlight) return
+  pollInFlight = true
+  try {
+    await refresh()
+    await refreshDiagnostics()
+  } finally {
+    pollInFlight = false
+  }
+}
+
 function requestPoints(process: ProcessTelemetry | undefined): string {
   const values = process?.buckets.map(bucket => bucket.requestCount) ?? []
   if (values.length === 0) return ''
@@ -89,7 +101,7 @@ watch([activeTab, telemetryWindow, eventService, eventLevel, eventPaused], () =>
 onMounted(async () => {
   await refresh()
   await refreshDiagnostics()
-  pollTimer = setInterval(refreshDiagnostics, 15_000)
+  pollTimer = setInterval(() => { void pollVisible() }, 15_000)
 })
 onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 </script>

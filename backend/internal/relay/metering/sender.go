@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand/v2"
 	"net/http"
 	"strings"
@@ -23,6 +24,7 @@ type Sender struct {
 	BatchSize int
 	Now       func() time.Time
 	Jitter    func(time.Duration) time.Duration
+	Log       *slog.Logger
 }
 
 func NewSender(spool *Spool, hubURL, token string) *Sender {
@@ -43,14 +45,19 @@ func NewSender(spool *Spool, hubURL, token string) *Sender {
 }
 
 func (s *Sender) FlushOnce(ctx context.Context) error {
+	_, err := s.flushOnce(ctx)
+	return err
+}
+
+func (s *Sender) flushOnce(ctx context.Context) (bool, error) {
 	if s.Spool == nil || s.HubURL == "" || s.Token == "" || s.Client == nil || s.BatchSize < 1 || s.BatchSize > 200 || s.Now == nil || s.Jitter == nil {
-		return errors.New("invalid usage sender configuration")
+		return false, errors.New("invalid usage sender configuration")
 	}
 	rows, err := s.Spool.Due(ctx, s.Now().UTC(), s.BatchSize)
 	if err != nil || len(rows) == 0 {
-		return err
+		return false, err
 	}
-	return s.sendRows(ctx, rows)
+	return true, s.sendRows(ctx, rows)
 }
 
 func (s *Sender) Run(ctx context.Context, interval time.Duration) error {
@@ -59,12 +66,23 @@ func (s *Sender) Run(ctx context.Context, interval time.Duration) error {
 	}
 	timer := time.NewTimer(interval)
 	defer timer.Stop()
+	var lastFailureLog time.Time
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-timer.C:
-			_ = s.FlushOnce(ctx)
+			attempted, err := s.flushOnce(ctx)
+			if err != nil && s.Log != nil && ctx.Err() == nil {
+				now := time.Now()
+				if lastFailureLog.IsZero() || now.Sub(lastFailureLog) >= time.Minute {
+					s.Log.Warn("usage spool flush failed; durable rows retained", "event", "spool.flush_failed", "error", err)
+					lastFailureLog = now
+				}
+			} else if attempted && err == nil && !lastFailureLog.IsZero() && s.Log != nil {
+				s.Log.Info("usage spool flush recovered", "event", "spool.flush_recovered")
+				lastFailureLog = time.Time{}
+			}
 			timer.Reset(interval)
 		}
 	}

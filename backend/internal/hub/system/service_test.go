@@ -17,6 +17,44 @@ type statusRelay struct {
 	err error
 }
 
+func TestRecentTelemetryUsesLatestBackgroundRelayObservation(t *testing.T) {
+	minute := time.Now().UTC().Truncate(time.Minute)
+	s := &Service{Now: time.Now}
+	for count := int64(1); count <= 2; count++ {
+		s.ObserveRelayStatus(relaycontrolapi.ControlStatus{Telemetry: &relaycontrolapi.ProcessTelemetry{
+			StartedAt: minute, Summary: relaycontrolapi.TelemetryMetrics{RequestCount: count},
+			Buckets: []relaycontrolapi.TelemetryBucket{{Minute: minute, RequestCount: count}},
+		}})
+	}
+	value := s.RecentTelemetry(15 * time.Minute)
+	if value.Relay == nil || value.Relay.Summary.RequestCount != 2 {
+		t.Fatalf("stale Relay telemetry: %+v", value.Relay)
+	}
+}
+
+func TestDatabaseHealthCachesFullCheckForOneMinute(t *testing.T) {
+	now := time.Date(2026, 9, 21, 10, 0, 0, 0, time.UTC)
+	calls := 0
+	s := &Service{Now: func() time.Time { return now }, DatabaseCheck: func(context.Context) error {
+		calls++
+		if calls > 1 {
+			return errors.New("database unavailable")
+		}
+		return nil
+	}}
+	if got := s.databaseHealth(context.Background()); got != "OK" {
+		t.Fatalf("first health=%s", got)
+	}
+	now = now.Add(15 * time.Second)
+	if got := s.databaseHealth(context.Background()); got != "OK" || calls != 1 {
+		t.Fatalf("cached health=%s calls=%d", got, calls)
+	}
+	now = now.Add(time.Minute)
+	if got := s.databaseHealth(context.Background()); got != "DEGRADED" || calls != 2 {
+		t.Fatalf("refreshed health=%s calls=%d", got, calls)
+	}
+}
+
 func (r *statusRelay) Status(context.Context) (relaycontrolapi.ControlStatus, error) {
 	return relaycontrolapi.ControlStatus{BuildVersion: "relay-distinct-build", Ready: true}, r.err
 }

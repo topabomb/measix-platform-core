@@ -73,6 +73,8 @@ curl -fsS http://127.0.0.1:19004/admin/ | grep -q 'id=q-app'
 curl -fsS http://127.0.0.1:19004/portal/ | grep -q '<div id="app"></div>'
 "$qemu_bin" "$stage/bin/control-hub" backup --db "$task_tmp/hub.db" --output "$task_tmp/hub.backup.db" >/dev/null
 "$qemu_bin" "$stage/bin/control-hub" check --db "$task_tmp/hub.backup.db" | grep -q 'integrity=ok'
+"$qemu_bin" "$stage/bin/runtime-relay" backup --spool "$task_tmp/relay.db" --output "$task_tmp/relay.backup.db" >/dev/null
+[[ -s "$task_tmp/relay.backup.db" ]]
 grep -q '"service":"hub"' "$task_tmp/hub.jsonl"
 grep -q '"service":"relay"' "$task_tmp/relay.jsonl"
 echo ARM64_NO_SOURCE_SMOKE_OK

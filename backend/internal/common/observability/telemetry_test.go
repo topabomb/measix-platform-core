@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -53,6 +55,16 @@ func TestSafeLoggerAttachesIdentityRedactsAndBounds(t *testing.T) {
 	}
 }
 
+func TestSafeErrorUsesStableCodesWithoutLeakingSecrets(t *testing.T) {
+	value := SafeError(errors.New("open database: token=private-value https://private.example/path"))
+	if value != "internal_error" || strings.Contains(value, "private-value") || strings.Contains(value, "private.example") {
+		t.Fatalf("unsafe error code: %q", value)
+	}
+	if value := SafeError(fmt.Errorf("listen failed: %w", syscall.EADDRINUSE)); value != "address_in_use" {
+		t.Fatalf("address code=%q", value)
+	}
+}
+
 func TestHTTPMiddlewareRecordsRouteTemplateInsteadOfPathValue(t *testing.T) {
 	var output bytes.Buffer
 	recorder := NewRecorder(nil)
@@ -81,5 +93,24 @@ func TestHTTPMiddlewareRecordsRouteTemplateInsteadOfPathValue(t *testing.T) {
 	}
 	if snapshot := recorder.Snapshot(15 * time.Minute); snapshot.Summary.RequestCount != 1 {
 		t.Fatalf("request count=%d", snapshot.Summary.RequestCount)
+	}
+}
+
+func TestHTTPMiddlewareSuppressesSuccessfulControlPollingButKeepsFailures(t *testing.T) {
+	var output bytes.Buffer
+	recorder := NewRecorder(nil)
+	router := chi.NewRouter()
+	router.Use(HTTPMiddleware(recorder, Logger{Log: NewLogger(&output, "relay", "preview")}))
+	status := http.StatusOK
+	router.Get("/internal/v1/control/status", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) })
+
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/internal/v1/control/status", nil))
+	if output.Len() != 0 || recorder.Snapshot(15*time.Minute).Summary.RequestCount != 0 {
+		t.Fatal("successful control polling must not dominate diagnostics")
+	}
+	status = http.StatusServiceUnavailable
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/internal/v1/control/status", nil))
+	if !strings.Contains(output.String(), "internal/v1/control/status") || recorder.Snapshot(15*time.Minute).Summary.ServerErrorCount != 1 {
+		t.Fatal("failed control polling must remain observable")
 	}
 }

@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -31,6 +33,9 @@ func main() {
 }
 
 func run(args []string, log *slog.Logger) error {
+	if len(args) > 0 && args[0] == "backup" {
+		return backupSpool(args[1:], log)
+	}
 	cfg, err := config.Load(args)
 	if err != nil {
 		return err
@@ -52,6 +57,7 @@ func run(args []string, log *slog.Logger) error {
 	recorder.Log = log
 	sender := metering.NewSender(spool, strings.TrimRight(cfg.HubInternalURL, "/")+"/internal/v1/usage/settlements:batch", serviceToken)
 	sender.BatchSize = cfg.UsageBatchSize
+	sender.Log = log
 	budgetClient, err := relaybudget.NewHTTPClient(cfg.HubInternalURL, serviceToken, nil)
 	if err != nil {
 		return err
@@ -91,6 +97,34 @@ func run(args []string, log *slog.Logger) error {
 		log.Warn("final usage flush incomplete; durable spool retained", "event", "shutdown.flush_incomplete", "error", err)
 	}
 	return runErr
+}
+
+func backupSpool(args []string, log *slog.Logger) error {
+	fs := flag.NewFlagSet("runtime-relay backup", flag.ContinueOnError)
+	spoolPath := fs.String("spool", os.Getenv("RELAY_SPOOL_PATH"), "Relay spool database path")
+	output := fs.String("output", "", "new backup database path")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *spoolPath == "" || *output == "" {
+		return fmt.Errorf("spool and output are required")
+	}
+	if _, err := os.Stat(*spoolPath); err != nil {
+		return fmt.Errorf("open relay spool source: %w", err)
+	}
+	spool, err := metering.OpenSpool(*spoolPath)
+	if err != nil {
+		return err
+	}
+	defer spool.Close()
+	log.Info("relay spool backup started", "event", "spool.backup_started")
+	if err := spool.Backup(context.Background(), *output); err != nil {
+		log.Error("relay spool backup failed", "event", "spool.backup_failed", "error", err)
+		return err
+	}
+	log.Info("relay spool backup completed", "event", "spool.backup_completed")
+	fmt.Printf("backup=%s\n", *output)
+	return nil
 }
 
 func minDuration(a, b time.Duration) time.Duration {

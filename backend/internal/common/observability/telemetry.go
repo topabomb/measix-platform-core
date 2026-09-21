@@ -250,11 +250,12 @@ func HTTPMiddleware(recorder *Recorder, logger Logger) func(http.Handler) http.H
 				next.ServeHTTP(w, r)
 				return
 			}
-			if r.URL.Path == "/live" || r.URL.Path == "/ready" {
+			if r.URL.Path == "/live" || r.URL.Path == "/ready" || r.URL.Path == "/internal/v1/control/status" {
 				writer := &statusWriter{ResponseWriter: w}
 				started := time.Now()
 				next.ServeHTTP(writer, r)
 				if writer.status >= 400 {
+					recorder.Record(Outcome{Status: writer.status, Duration: time.Since(started)})
 					logger.RequestCompleted(r.Context(), r.URL.Path, r.Method, writer.status, time.Since(started))
 				}
 				return

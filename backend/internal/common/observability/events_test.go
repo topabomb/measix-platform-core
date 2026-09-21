@@ -47,3 +47,18 @@ func TestReadEventsFiltersCorrelation(t *testing.T) {
 		t.Fatalf("unexpected page: %+v", page)
 	}
 }
+
+func TestReadEventsProjectsRedactedDiagnosticErrorIntoMessage(t *testing.T) {
+	dir := t.TempDir()
+	line := `{"time":"2026-09-21T10:00:00Z","level":"ERROR","msg":"startup failed","event":"service.start_failed","error":"address_in_use"}` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "hub.jsonl"), []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	page, err := ReadEvents(dir, EventFilter{Limit: 10})
+	if err != nil || len(page.Items) != 1 {
+		t.Fatalf("page=%+v err=%v", page, err)
+	}
+	if !strings.Contains(page.Items[0].Message, "address_in_use") {
+		t.Fatalf("unsafe or unhelpful Admin event: %q", page.Items[0].Message)
+	}
+}

@@ -27,8 +27,11 @@ type Service struct {
 	Now                func() time.Time
 	Telemetry          *observability.Recorder
 	DiagnosticsLogDir  string
+	DatabaseCheck      func(context.Context) error
 	mu                 sync.RWMutex
 	lastRelayTelemetry *relaycontrolapi.ProcessTelemetry
+	dbHealth           string
+	dbHealthCheckedAt  time.Time
 }
 
 type Status struct {
@@ -59,7 +62,8 @@ type Status struct {
 }
 
 func New(store *store.Store, control *runtimecontrol.Service, buildVersion string) *Service {
-	return &Service{Store: store, RuntimeControl: control, BuildVersion: buildVersion, PortalMode: "UNAVAILABLE", Now: time.Now}
+	return &Service{Store: store, RuntimeControl: control, BuildVersion: buildVersion, PortalMode: "UNAVAILABLE", Now: time.Now,
+		DatabaseCheck: func(ctx context.Context) error { _, err := maintenance.Check(ctx, store.DB); return err }}
 }
 
 // Health is a cheap local dependency probe. Full integrity/history/Relay
@@ -69,11 +73,7 @@ func (s *Service) Health(ctx context.Context) error { return s.Store.DB.PingCont
 func (s *Service) Status(ctx context.Context) (Status, error) {
 	result := Status{BuildVersion: s.BuildVersion, SchemaIdentity: maintenance.CurrentSchemaIdentity,
 		PortalMode: s.PortalMode, PortalURL: s.PortalURL, PortalUpstream: s.PortalUpstream}
-	if _, err := maintenance.Check(ctx, s.Store.DB); err != nil {
-		result.DBHealth = "DEGRADED"
-	} else {
-		result.DBHealth = "OK"
-	}
+	result.DBHealth = s.databaseHealth(ctx)
 	managed, err := s.Store.Client.ManagedState.Get(ctx, "current")
 	if err != nil {
 		return result, err
@@ -103,9 +103,7 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 				hash := status.BundleHash
 				result.AppliedBundleHash = &hash
 			}
-			s.mu.Lock()
-			s.lastRelayTelemetry = status.Telemetry
-			s.mu.Unlock()
+			s.ObserveRelayStatus(status)
 		}
 	}
 	if s.RuntimeControl != nil {
@@ -137,10 +135,45 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 	return result, nil
 }
 
+func (s *Service) databaseHealth(ctx context.Context) string {
+	now := time.Now().UTC()
+	if s.Now != nil {
+		now = s.Now().UTC()
+	}
+	s.mu.RLock()
+	if s.dbHealth != "" && now.Sub(s.dbHealthCheckedAt) < time.Minute {
+		value := s.dbHealth
+		s.mu.RUnlock()
+		return value
+	}
+	s.mu.RUnlock()
+	value := "OK"
+	check := s.DatabaseCheck
+	if check == nil {
+		check = func(ctx context.Context) error { _, err := maintenance.Check(ctx, s.Store.DB); return err }
+	}
+	if err := check(ctx); err != nil {
+		value = "DEGRADED"
+	}
+	s.mu.Lock()
+	s.dbHealth, s.dbHealthCheckedAt = value, now
+	s.mu.Unlock()
+	return value
+}
+
 type Telemetry struct {
 	CollectedAt time.Time
 	Hub         observability.Snapshot
 	Relay       *relaycontrolapi.ProcessTelemetry
+}
+
+func (s *Service) ObserveRelayStatus(status relaycontrolapi.ControlStatus) {
+	if status.Telemetry == nil {
+		return
+	}
+	s.mu.Lock()
+	s.lastRelayTelemetry = status.Telemetry
+	s.mu.Unlock()
 }
 
 func (s *Service) RecentTelemetry(window time.Duration) Telemetry {

@@ -1,7 +1,3 @@
-{
-    admin off
-}
-
 __MEASIX_PUBLIC_ORIGIN__ {
     @private path /internal /internal/*
     handle @private {

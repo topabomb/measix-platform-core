@@ -29,6 +29,9 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 		_ = s.setRuntimeStatus(ctx, "DEGRADED")
 		return nil, err
 	}
+	if s.ObserveRelayStatus != nil {
+		s.ObserveRelayStatus(status)
+	}
 	if relayUnexpected(managed.DesiredControlRevision, managed.DesiredBundleHash, status) {
 		_ = s.setRuntimeStatus(ctx, "DEGRADED")
 		return nil, ErrRelayDiverged

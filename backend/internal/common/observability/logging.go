@@ -2,11 +2,14 @@ package observability
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -137,7 +140,45 @@ func SafeError(err error) string {
 	if err == nil {
 		return ""
 	}
-	return bounded(fmt.Sprintf("%T", err))
+	// Never project arbitrary error text into production logs: upstream bodies,
+	// prompts and unlabeled credentials can all be embedded in an error. Return
+	// only a stable operational code selected from the error chain or message.
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "context_cancelled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, os.ErrNotExist):
+		return "file_not_found"
+	case errors.Is(err, os.ErrPermission):
+		return "permission_denied"
+	case errors.Is(err, syscall.EADDRINUSE):
+		return "address_in_use"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "connection_refused"
+	}
+	if timeout, ok := err.(interface{ Timeout() bool }); ok && timeout.Timeout() {
+		return "timeout"
+	}
+	message := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(message, "database is locked"), strings.Contains(message, "database table is locked"), strings.Contains(message, "database busy"):
+		return "database_busy"
+	case strings.Contains(message, "integrity check"), strings.Contains(message, "foreign key check"):
+		return "database_integrity_failed"
+	case strings.Contains(message, "schema checksum"):
+		return "schema_checksum_mismatch"
+	case strings.Contains(message, "schema version"):
+		return "schema_version_mismatch"
+	case strings.Contains(message, "tls"), strings.Contains(message, "x509"):
+		return "tls_error"
+	case strings.Contains(message, "invalid input"), strings.Contains(message, "invalid argument"):
+		return "invalid_input"
+	case strings.Contains(message, "unauthorized"), strings.Contains(message, "forbidden"), strings.Contains(message, "authorization"):
+		return "authorization_failed"
+	default:
+		return "internal_error"
+	}
 }
 
 type Logger struct{ Log *slog.Logger }

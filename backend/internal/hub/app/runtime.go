@@ -176,6 +176,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 		telemetry = observability.NewRecorder(nil)
 	}
 	systemService := system.New(st, runtimeControl, options.BuildVersion)
+	runtimeControl.ObserveRelayStatus = systemService.ObserveRelayStatus
 	systemService.PortalMode = portalMode
 	systemService.PortalUpstream = portalUpstream
 	systemService.Telemetry = telemetry

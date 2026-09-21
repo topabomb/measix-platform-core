@@ -157,6 +157,11 @@ func parseEvent(line []byte, file logFile, observedAt time.Time) (Event, bool) {
 	decodeString(row, "level", &event.Level)
 	decodeString(row, "event", &event.Event)
 	decodeString(row, "msg", &event.Message)
+	var errorDetail string
+	decodeString(row, "error", &errorDetail)
+	if errorDetail != "" {
+		event.Message = strings.TrimSpace(event.Message + ": " + errorDetail)
+	}
 	decodeString(row, "requestId", &event.RequestID)
 	decodeString(row, "interactionId", &event.InteractionID)
 	decodeString(row, "activationId", &event.ActivationID)

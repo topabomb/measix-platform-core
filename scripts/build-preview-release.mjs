@@ -16,9 +16,11 @@ if (git(ROOT, ['status', '--porcelain']).trim()) fail('Core worktree must be cle
 if (git(PORTAL, ['status', '--porcelain']).trim()) fail('Portal worktree must be clean before building a release')
 if (git(ARCHITECTURE, ['status', '--porcelain']).trim()) fail('Architecture worktree must be clean before building a release')
 if (git(ANDROID, ['status', '--porcelain']).trim()) fail('Android worktree must be clean before building a release')
-run('node', ['scripts/verify-preview-contract.mjs'], ROOT)
 run('node', ['scripts/checks.mjs', 'generate'], ROOT)
 if (git(ROOT, ['status', '--porcelain']).trim()) fail('Generated contracts or dependencies drift from committed sources')
+run('pnpm', ['generate:api'], PORTAL)
+if (git(PORTAL, ['status', '--porcelain']).trim()) fail('Portal generated contracts drift from committed sources')
+run('node', ['scripts/verify-preview-contract.mjs'], ROOT)
 
 const packageName = `measix-core-${version}-linux-arm64`
 const outputDir = join(ROOT, '.artifacts', 'releases')
@@ -59,6 +61,7 @@ const release = {
     androidCommit: git(ANDROID, ['rev-parse', 'HEAD']).trim(),
   },
   protocols: Object.fromEntries(protocolFiles.map(path => [path, `sha256:${sha256(join(ROOT, path))}`])),
+  compatibility: compatibilityEvidence(),
   schemaMigrationIdentity: migrationIdentity(),
 }
 writeFileSync(join(stage, 'release.json'), JSON.stringify(release, null, 2) + '\n')
@@ -76,6 +79,21 @@ function migrationIdentity() {
   const hash = createHash('sha256')
   files.forEach((name, index) => hash.update(`${String(index + 1).padStart(6, '0')}\0${name}\0${sha256(join(dir, name))}\n`))
   return `sha256:${hash.digest('hex')}`
+}
+
+function compatibilityEvidence() {
+  const portalContract = JSON.parse(readFileSync(join(PORTAL, 'src', 'api', 'contract.json'), 'utf8'))
+  const androidPortal = JSON.parse(readFileSync(join(ANDROID, 'app', 'src', 'test', 'resources', 'contracts', 'portal', 'manifest.json'), 'utf8'))
+  return {
+    baseline: JSON.parse(readFileSync(join(ROOT, 'api', 'protocol-baseline.json'), 'utf8')).baseline,
+    clientProtocolVersion: '1',
+    snapshotSchemaVersions: [4],
+    enrollmentFormatVersion: 1,
+    portalBridgeVersion: androidPortal.bridgeVersion,
+    portalArtifacts: portalContract.artifacts,
+    androidClientContract: `sha256:${sha256(join(ANDROID, 'app', 'src', 'test', 'resources', 'contracts', 'platform', 'client-control.openapi.yaml'))}`,
+    androidPortalArtifacts: androidPortal.artifacts,
+  }
 }
 
 function walk(dir) {

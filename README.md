@@ -24,5 +24,6 @@ Product semantics, stage scope, stable IDs, cross-component behavior and require
 - `docs/testing.md` — executable test/CI organization and TDD
 - `docs/database-migrations.md` — current database initialization workflow
 - `docs/operations.md` — runtime/backup/restore
+- `docs/s02-preview-deployment.md` — S0.2 internal Preview binary deployment and acceptance
 - `docs/release.md` — S0.1 freeze and final S0 RC evidence
 - `docs/real-device-preset.md` — local LAN real-supplier preset for Android device validation

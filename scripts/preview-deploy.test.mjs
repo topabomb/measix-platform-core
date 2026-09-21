@@ -17,6 +17,8 @@ test('preview backup uses SQLite-owned online backups and verifies recovery file
   const backup = read('deploy/preview/backup-preview.sh')
   assert.match(backup, /control-hub" backup/)
   assert.match(backup, /runtime-relay" backup/)
+  assert.match(backup, /control-hub" backup[^\n]+>&2/)
+  assert.match(backup, /--output "\$target\/relay-spool\.db" >&2/)
   assert.doesNotMatch(backup, /cp -a -- "\$root\/data\/relay\/relay-spool\.db"/)
   const verifier = read('deploy/preview/verify-backup.sh')
   assert.match(verifier, /backup checksum mismatch/)

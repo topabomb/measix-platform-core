@@ -15,13 +15,13 @@ done
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 target="$root/backups/$stamp"
 install -d -m 0700 -o measix -g measix "$target"
-sudo -u measix "$root/current/bin/control-hub" backup --db "$root/data/hub/hub.db" --output "$target/hub.db"
+sudo -u measix "$root/current/bin/control-hub" backup --db "$root/data/hub/hub.db" --output "$target/hub.db" >&2
 cp -a -- "$root/config" "$target/config"
 cp -a -- "$root/secrets" "$target/secrets"
 if [[ -f "$root/data/relay/relay-spool.db" ]]; then
   sudo -u measix "$root/current/bin/runtime-relay" backup \
     --spool "$root/data/relay/relay-spool.db" \
-    --output "$target/relay-spool.db"
+    --output "$target/relay-spool.db" >&2
 fi
 MEASIX_BACKUP_TARGET="$target" MEASIX_BACKUP_CURRENT="$root/current" node -e '
 const { createHash } = require("node:crypto");

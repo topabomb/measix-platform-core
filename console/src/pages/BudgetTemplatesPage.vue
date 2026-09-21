@@ -13,6 +13,7 @@ import LoadingState from '../components/LoadingState.vue'
 import CursorPager from '../components/CursorPager.vue'
 import { useCursorPager } from '../composables/useCursorPager'
 import { cursorPath } from '../api/pagination'
+import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 
 type RuleState = { included: boolean; mode: BudgetMode; limits: BudgetLimitDefinition[] }
 type User = components['schemas']['User']
@@ -21,7 +22,15 @@ type BudgetTemplateAuditItem = components['schemas']['BudgetTemplateAuditItem']
 type BudgetTemplateAuditPage = components['schemas']['BudgetTemplateAuditPage']
 type BudgetTemplateAuditSnapshot = components['schemas']['BudgetTemplateAuditSnapshot']
 
-const { t: $t } = useI18n()
+const { t: $t, locale } = useI18n()
+const unitLabels = computed<MeterUnitLabels>(() => ({
+  tokens: $t('usage.units.tokens'),
+  characters: $t('usage.units.characters'),
+  seconds: $t('usage.units.seconds'),
+  minutes: $t('usage.units.minutes'),
+  requests: $t('usage.units.requests'),
+  images: $t('usage.units.images'),
+}))
 const session = useSessionStore()
 const listPath = ref('/api/admin/v1/budget-templates?limit=50')
 const {
@@ -210,7 +219,7 @@ function auditRule(snapshot: BudgetTemplateAuditSnapshot | undefined, capability
 function ruleSummary(rule: BudgetTemplateRule | undefined): string {
   if (!rule) return $t('budgetTemplates.auditDefault')
   if (rule.mode === 'UNLIMITED') return $t('budgets.mode.UNLIMITED')
-  return rule.limits.map(limit => `${$t(`budgets.period.${limit.period}`)} · ${$t(`usage.meters.${limit.meter}`)}: ${limit.limit}`).join('; ')
+  return rule.limits.map(limit => `${$t(`budgets.period.${limit.period}`)} · ${$t(`usage.meters.${limit.meter}`)}: ${formatMeter(limit.limit, limit.meter, locale.value, unitLabels.value)}`).join('; ')
 }
 
 function auditRuleSummary(snapshot: BudgetTemplateAuditSnapshot | undefined, capability: BudgetCapability): string {

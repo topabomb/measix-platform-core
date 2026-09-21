@@ -3,12 +3,21 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { apiFetch } from '../api/client'
 import { cursorPath } from '../api/pagination'
-import type { ReconciliationPage, ReconciliationView, ResolveReconciliationRequest } from '../api/usageBudget'
+import type { PricingMeter, ReconciliationPage, ReconciliationView, ResolveReconciliationRequest } from '../api/usageBudget'
+import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 import { useSessionStore } from '../stores/session'
 import LoadingState from './LoadingState.vue'
 import ProblemBanner from './ProblemBanner.vue'
 
-const { t: $t } = useI18n()
+const { t: $t, locale } = useI18n()
+const unitLabels = computed<MeterUnitLabels>(() => ({
+  tokens: $t('usage.units.tokens'),
+  characters: $t('usage.units.characters'),
+  seconds: $t('usage.units.seconds'),
+  minutes: $t('usage.units.minutes'),
+  requests: $t('usage.units.requests'),
+  images: $t('usage.units.images'),
+}))
 const session = useSessionStore()
 const page = ref<ReconciliationPage>({ items: [] })
 const loading = ref(false)
@@ -21,6 +30,10 @@ const action = ref<ResolveReconciliationRequest['action']>('ACCEPT_OBSERVED')
 const reason = ref('')
 
 const canResolve = computed(() => Boolean(session.csrfToken && selected.value && reason.value.trim()))
+
+function meterValue(quantity: string, meter: PricingMeter): string {
+  return formatMeter(quantity, meter, locale.value, unitLabels.value)
+}
 
 async function refresh() {
   loading.value = true
@@ -93,10 +106,10 @@ onMounted(refresh)
           <q-item-label caption class="text-break">{{ item.requestId }} · {{ new Date(item.createdAt).toLocaleString() }}</q-item-label>
           <div class="row q-gutter-xs q-mt-xs">
             <q-chip v-for="meter in item.observed" :key="`observed:${meter.meter}`" dense outline color="primary">
-              {{ $t('usage.reconciliation.observed') }} {{ meter.meter }}: {{ meter.quantity }}
+              {{ $t('usage.reconciliation.observed') }} {{ $t(`usage.meters.${meter.meter}`) }}: {{ meterValue(meter.quantity, meter.meter) }}
             </q-chip>
             <q-chip v-for="meter in item.reservation" :key="`reserved:${meter.meter}`" dense outline color="grey-7">
-              {{ $t('usage.reconciliation.reserved') }} {{ meter.meter }}: {{ meter.quantity }}
+              {{ $t('usage.reconciliation.reserved') }} {{ $t(`usage.meters.${meter.meter}`) }}: {{ meterValue(meter.quantity, meter.meter) }}
             </q-chip>
           </div>
         </q-item-section>

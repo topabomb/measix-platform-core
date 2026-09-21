@@ -80,6 +80,8 @@ describe('UsageReconciliationPanel', () => {
     await flushPromises()
 
     expect(panel.text()).toContain('req_1')
+    expect(panel.text()).toContain('Observed Total tokens: 75 tokens')
+    expect(panel.text()).toContain('Reserved Total tokens: 100 tokens')
     await panel.findAllComponents(QBtn).find(button => button.props('label') === 'Resolve')!.trigger('click')
     await flushPromises()
     const dialog = document.body.querySelector('[data-cy="reconciliation-dialog"]')!

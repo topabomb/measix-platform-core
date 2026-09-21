@@ -78,8 +78,8 @@ describe('BudgetTemplatesPage', () => {
     expect(wrapper.get('[data-cy="budget-template-audit"]').text()).toContain('Old standard')
     expect(wrapper.get('[data-cy="budget-template-audit"]').text()).toContain('Team standard')
     expect(wrapper.get('[data-cy="budget-template-audit"]').text()).toContain('Image generation')
-    expect(wrapper.get('[data-cy="budget-template-audit"]').text()).toContain('20')
-    expect(wrapper.get('[data-cy="budget-template-audit"]').text()).toContain('50')
+    expect(wrapper.get('[data-cy="budget-template-audit"]').text()).toContain('20 images')
+    expect(wrapper.get('[data-cy="budget-template-audit"]').text()).toContain('50 images')
   })
 
   it('lets the Hub own the template id when creating', async () => {

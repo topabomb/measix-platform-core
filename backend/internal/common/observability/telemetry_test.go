@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func TestRecorderBoundsWindowAndComputesP95WithoutSamples(t *testing.T) {
@@ -46,5 +50,36 @@ func TestSafeLoggerAttachesIdentityRedactsAndBounds(t *testing.T) {
 	}
 	if _, ok := any(safeHandler{}).(slog.Handler); !ok {
 		t.Fatal("safe handler does not implement slog.Handler")
+	}
+}
+
+func TestHTTPMiddlewareRecordsRouteTemplateInsteadOfPathValue(t *testing.T) {
+	var output bytes.Buffer
+	recorder := NewRecorder(nil)
+	router := chi.NewRouter()
+	router.Use(HTTPMiddleware(recorder, Logger{Log: NewLogger(&output, "hub", "preview")}))
+	router.Get("/items/{itemID}", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/items/private-item-123", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status=%d", response.Code)
+	}
+
+	var row map[string]any
+	if err := json.Unmarshal(output.Bytes(), &row); err != nil {
+		t.Fatal(err)
+	}
+	if row["route"] != "/items/{itemID}" {
+		t.Fatalf("route=%v", row["route"])
+	}
+	if strings.Contains(output.String(), "private-item-123") {
+		t.Fatal("request path value leaked into bounded-cardinality logs")
+	}
+	if snapshot := recorder.Snapshot(15 * time.Minute); snapshot.Summary.RequestCount != 1 {
+		t.Fatalf("request count=%d", snapshot.Summary.RequestCount)
 	}
 }

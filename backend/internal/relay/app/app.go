@@ -28,8 +28,10 @@ func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *met
 	h := &health.State{}
 	store := control.NewStore(nil)
 	telemetry := observability.NewRecorder(nil)
+	log := observability.Logger{Log: slog.Default()}
 
 	pub := chi.NewRouter()
+	pub.Use(observability.HTTPMiddleware(telemetry, log))
 	pub.Get("/live", h.Live)
 	pub.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
 		h.SetReady(store.Current() != nil)
@@ -38,6 +40,7 @@ func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *met
 	pub.Handle("/runtime/v1/resources/*", relayruntime.NewHandler(store, recorder, budgetClient))
 
 	internal := chi.NewRouter()
+	internal.Use(observability.HTTPMiddleware(telemetry, log))
 	internal.Get("/live", h.Live)
 	var statusProvider control.SpoolStatusProvider
 	if spool != nil {
@@ -66,9 +69,8 @@ func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *met
 	}
 	internal.Mount("/", control.NewHandlerWithTelemetry(store, serviceToken, buildVersion, statusProvider, applyHook, telemetry))
 
-	log := observability.Logger{Log: slog.Default()}
 	return &App{
-		Public:   observability.HTTPMiddleware(telemetry, log)(pub),
+		Public:   pub,
 		Internal: internal,
 		Health:   h, Control: store, Recorder: recorder, Spool: spool, Telemetry: telemetry,
 	}

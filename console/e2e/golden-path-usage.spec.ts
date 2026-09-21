@@ -122,12 +122,12 @@ test('CAP-C6-001-Usage Usage/System verification after five-capability traffic',
       await expect(page.locator('[data-cy="relay-build-version"]')).toHaveText('dev')
       const relayText = await relayStatus.textContent()
       expect(relayText).toMatch(/READY|DEGRADED|NOT_READY|OFFLINE/i)
-      await page.getByRole('tab', { name: 'Runtime delivery', exact: true }).click()
+      await page.locator('[data-cy="system-tab-runtime"]').click()
       await expect(page.locator('[data-cy="system-convergence-status"]')).toBeVisible()
       await expect(page.locator('[data-cy="lastActivation"]')).toContainText(/Completed/i)
       // The opaque profiles intentionally exercise the reconciliation path.
       // Verify that their incomplete records reach the rendered diagnostics.
-      await page.getByRole('tab', { name: 'Metering pipeline', exact: true }).click()
+      await page.locator('[data-cy="system-tab-metering"]').click()
       const unknownCount = page.locator('[data-cy="semantic-unknown-count"]')
       await expect(unknownCount).toHaveText(/^\d+$/)
       expect(Number(await unknownCount.textContent())).toBeGreaterThanOrEqual(1)

@@ -187,6 +187,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	}
 
 	router := chi.NewRouter()
+	router.Use(observability.HTTPMiddleware(telemetry, observability.Logger{Log: slog.Default()}))
 	h := &health.State{}
 	router.Get("/live", h.Live)
 	router.Get("/ready", h.Ready)
@@ -204,6 +205,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	// Internal/private router: only Relay→Hub service APIs (usage ingest, etc.).
 	// Per architecture: /internal/* must NOT be exposed on the public listener.
 	internalRouter := chi.NewRouter()
+	internalRouter.Use(observability.HTTPMiddleware(telemetry, observability.Logger{Log: slog.Default()}))
 	internalRouter.Get("/live", h.Live)
 	internalRouter.Get("/ready", h.Ready)
 	usageingestapi.HandlerFromMux(usage.NewHandler(usageService, budgetService, serviceCredential), internalRouter)
@@ -212,10 +214,9 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	// while the fully initialized Admin/diagnostics surface remains available for recovery.
 	_, _ = runtimeControl.Reconcile(ctx)
 	h.SetReady(true)
-	logger := observability.Logger{Log: slog.Default()}
 	return &Runtime{
-		Handler:         observability.HTTPMiddleware(telemetry, logger)(router),
-		InternalHandler: observability.HTTPMiddleware(telemetry, logger)(internalRouter), Store: st, Services: services, Health: h,
+		Handler:         router,
+		InternalHandler: internalRouter, Store: st, Services: services, Health: h,
 		RuntimeControl: runtimeControl, ReconcileInterval: cfg.ReconcileInterval,
 		Telemetry: telemetry,
 	}, nil

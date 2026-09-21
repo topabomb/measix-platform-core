@@ -4,13 +4,15 @@ This document owns concrete operating procedures, configuration and current limi
 
 ## 1. Implemented topology
 
-Current daemons are `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. `devmigrate` and `generate-android-wire` are utilities, not services. The S0.2 internal Preview package targets NVIDIA DGX Spark Linux ARM64 and supplies Caddy/PM2 templates and runbooks under `deploy/preview`; it does not include the planned Enterprise Tool Gateway or multi-node/HA operation. See [S0.2 Preview deployment](s02-preview-deployment.md).
+Current daemons are `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. `devmigrate` and `generate-android-wire` are utilities, not services. The S0.2 internal Preview package targets NVIDIA DGX Spark Linux ARM64 and supplies a PM2 ecosystem, the service-root `run.sh`, a remote-Caddy reference template and runbooks under `deploy/preview`; it does not include the planned Enterprise Tool Gateway or multi-node/HA operation. See [S0.2 Preview deployment](s02-preview-deployment.md).
 
 Admin is a static Quasar SPA. Supply `--admin-assets-dir <console/dist/spa>` (or `HUB_ADMIN_ASSETS_DIR`) to the Hub daemon; startup rejects a missing `index.html`, and the existing static handler owns `/admin` and deep links. Omitting the option leaves static hosting disabled. Production ingress must route `/api/client/v1`, `/api/admin/v1`, `/admin` to Hub and `/runtime/v1` to Relay under one origin; test-library hosting does not qualify production TLS/ingress.
 
 `npm start`, `concurrently`, `go run`, and Node/Go harness process orchestration are development/test tools, not a production supervisor. See [development](development.md) for local startup; Relay usage delivery uses the private Hub listener.
 
 ### One public origin
+
+The repository-root Caddy example below remains a local development recipe. The Spark Preview does not install Caddy: Hub public binds `0.0.0.0:9004`, Relay public binds `0.0.0.0:9002`, and the remote Tailscale ingress proxies those two ports. Hub/Relay internal ports `9001`/`9003` stay on loopback. Do not apply the development bind variables or local Caddy commands to the Spark runbook.
 
 The checked-in [Caddyfile](../deploy/Caddyfile) routes Discovery, Admin, Client control and Portal to Hub, `/runtime/v1` to Relay, and rejects `/internal` and its children. With its loopback defaults, start Hub public on `127.0.0.1:9004` (private `9001`), Relay public on `127.0.0.1:9002` (private `9003`), then run from the repository root:
 
@@ -117,13 +119,13 @@ There is no in-place restore CLI. Restore uses a stopped-service file replacemen
 
 ## 7. Preview supervision, logging and recent telemetry
 
-The S0.2 Preview uses root-owned PM2 with one forked instance each for Hub and Relay; Caddy remains systemd-managed. This is intentionally smaller than the later Gateway/S0.3 topology. Concrete lifecycle and rotation settings are in the packaged ecosystem and [deployment runbook](s02-preview-deployment.md).
+The S0.2 Preview uses root-owned PM2 with one forked instance each for Hub and Relay. The root PM2 daemon calls the single service-root `run.sh hub|relay`; it does not assemble binary flags itself. Caddy is managed only on the separate Tailscale ingress server, not on Spark. This is intentionally smaller than the later Gateway/S0.3 topology. Concrete lifecycle and rotation settings are in the packaged ecosystem and [deployment runbook](s02-preview-deployment.md).
 
-Hub and Relay run as the unprivileged `measix` user, retain independent failure domains, bind only loopback behind Caddy, use bounded restart delay/count and a 40-second kill timeout, and write separate stdout/stderr files below the explicit deployment root. PM2 lifecycle state is not application readiness.
+Hub and Relay run as the unprivileged `measix` user and retain independent failure domains. The Preview `run.sh` fixes public listeners to `0.0.0.0:9004` and `0.0.0.0:9002`, fixes internal listeners to loopback `9001` and `9003`, uses bounded restart delay/count and a 40-second kill timeout, and writes separate stdout/stderr files below the explicit deployment root. PM2 lifecycle state is not application readiness.
 
 Hub/Relay use the common safe JSON logger on stdout with `service`, `buildVersion` and stable `event`. HTTP completion middleware records route templates, method, status and duration, excludes successful health probes, and feeds fixed 60 one-minute in-memory buckets. Error values are reduced to safe classes, sensitive field names are redacted and text values are bounded/scrubbed.
 
-Authenticated Admin exposes 15/60-minute telemetry and up to 200 recent redacted events from exactly four fixed Hub/Relay stdout/stderr files. Reads are tail-bounded to 2 MiB per file and 4 KiB per line; arbitrary paths and PM2/Caddy manager logs are never accepted. The System page uses at most 60 lightweight SVG points and Quasar virtual scrolling. PM2 logrotate owns file rotation; no centralized log-search platform is required.
+Authenticated Admin exposes 15/60-minute telemetry and up to 200 recent redacted events from exactly four fixed Hub/Relay stdout/stderr files. Reads are tail-bounded to 2 MiB per file and 4 KiB per line; arbitrary paths, PM2 manager logs and remote-Caddy logs are never accepted. The System page uses at most 60 lightweight SVG points and Quasar virtual scrolling. PM2 logrotate owns file rotation; no centralized log-search platform is required.
 
 Never emit tokens, cookies, credentials, enrollment/session/signing material, private endpoints, toolRef/claims, raw prompts/bodies/tool arguments/results or direct personal identity. Test normal and failure diagnostics for forbidden material. References: [systemd service lifecycle](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [journald retention](https://www.freedesktop.org/software/systemd/man/252/journald.conf.html); documentation is not runtime qualification.
 

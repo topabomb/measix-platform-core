@@ -1,64 +1,107 @@
-# S0.2 Preview deployment on NVIDIA DGX Spark
+# S0.2 Preview — DGX Spark 部署手册
 
-This is the operator runbook for the internal Preview. The target is one NVIDIA DGX Spark running Linux `aarch64`. Caddy terminates TLS and reverse-proxies the public origin. Root-owned PM2 manages the Hub and Relay lifecycle. The application is installed from an ARM64 binary release archive; Go, pnpm and source code are not required on the server.
+本手册对应单机 NVIDIA DGX Spark 的内部 Preview。Spark 只运行 MEASIX Hub/Relay，由现有的 root PM2 管理；Spark 不安装 Caddy。另一台已经加入同一 Tailscale 网络的入口服务器负责 TLS、子域名和反向代理，该外部通道不属于本次 Spark 部署验收范围。
 
-## 1. Required deployment inputs
+## 1. 当前目标环境
 
-Choose and record:
+2026-09-21 已只读确认：
 
-```bash
-export MEASIX_ROOT=/absolute/path/chosen-for-this-deployment
-export MEASIX_PUBLIC_ORIGIN=https://core.example.com
-export MEASIX_VERSION=<release-version>
-```
+- Spark：`192.168.100.216`，Ubuntu 24.04.5 LTS，`aarch64`；
+- Tailscale 地址：`100.64.0.4`；
+- Node `v24.21.0`、npm `11.19.0`、PM2 `7.0.4`；
+- `pm2-root.service` 已启用并运行，PM2 home 为 `/root/.pm2`；
+- 已有 PM2 服务必须保留，不得执行 `pm2 delete all`、`pm2 stop all` 或覆盖整个 dump；
+- `/home/admin/project/service` 已有 `measix-archive`、`deepseek-harness`；
+- 9001–9004 当前未占用；
+- Spark 未安装 Caddy，这是预期状态；
+- systemd 提示 `pm2-root.service` 的磁盘 unit 比已加载版本新，正式部署前经确认执行一次 `sudo systemctl daemon-reload`，但不重启其他服务。
 
-`MEASIX_ROOT` has no default. It must be an absolute standalone directory and must not be `/`. All MEASIX-owned releases, configuration, secrets, databases, logs, backups, staging and runtime files stay below it. Only the system installations and daemon metadata of Caddy and PM2, plus `/etc/caddy/Caddyfile`, are outside this tree.
-
-The public origin must already resolve to the DGX host. Inbound TCP 80/443 must be allowed; ports 9001–9004 remain loopback-only.
-
-Required host software:
-
-- Linux `uname -m` reports `aarch64`;
-- time synchronization is healthy;
-- Caddy is installed and managed by systemd; its default loopback-only admin endpoint remains enabled so `systemctl reload caddy` can work;
-- Node LTS, PM2 and `pm2-logrotate` are installed for root;
-- `sudo pm2 status` works;
-- `tar`, `sha256sum`, `curl`, `base64`, `sed` and `sudo` are available.
-
-## 2. Build the release on a trusted build host
-
-Core and Enterprise Portal worktrees must be committed and clean. From Core:
-
-```text
-node scripts/build-preview-release.mjs "$MEASIX_VERSION"
-```
-
-The builder regenerates contracts and rejects drift, verifies the pinned S0.2/v4 Preview protocol baseline, builds the Admin and Portal production assets, cross-compiles static Linux ARM64 Hub/Relay binaries, and creates:
-
-```text
-.artifacts/releases/measix-core-$MEASIX_VERSION-linux-arm64.tar.gz
-```
-
-The archive contains only `bin/`, `assets/`, `deploy/`, `release.json` and `SHA256SUMS`. It contains no source, Git metadata, `node_modules`, database, logs or secrets.
-
-Transfer the archive to the DGX through the deployment channel. Do not unpack it over an existing release.
-
-## 3. Stage and verify the archive
+本次固定部署根目录：
 
 ```bash
-sudo install -d -m 0755 -o root -g root "$MEASIX_ROOT/releases/$MEASIX_VERSION"
-sudo tar -xzf "measix-core-$MEASIX_VERSION-linux-arm64.tar.gz" \
-  -C "$MEASIX_ROOT/releases/$MEASIX_VERSION"
-cd "$MEASIX_ROOT/releases/$MEASIX_VERSION"
-sha256sum -c SHA256SUMS
-file bin/control-hub bin/runtime-relay
+export MEASIX_ROOT=/home/admin/project/service/measix-core
+export MEASIX_VERSION=<approved-preview-version>
+export MEASIX_PUBLIC_ORIGIN=https://<approved-subdomain>
 ```
 
-Both binaries must report Linux ARM64/aarch64. Inspect `release.json` and confirm version, Architecture/Core/Portal/Android commits, target, protocol hashes and consumer compatibility evidence.
+`MEASIX_PUBLIC_ORIGIN` 是 Android/Portal 使用的远端 Caddy HTTPS 地址，不是 Spark 的监听地址。
 
-## 4. First installation
+## 2. 网络边界
 
-The packaged installer is first-install only and refuses an existing config version or Hub database. It validates that the release is below the selected root, creates the `measix` service user and directory tree, generates secrets without printing them, initializes schema v1, bootstraps the first administrator, starts PM2 and validates Caddy before reload.
+端口固定，不提供可配置绑定地址：
+
+| 端口 | 监听 | 用途 |
+| --- | --- | --- |
+| 9001 | `127.0.0.1` | Hub internal，仅 Relay 本机访问 |
+| 9002 | `0.0.0.0` | Relay Runtime，供局域网/Tailscale Caddy 访问 |
+| 9003 | `127.0.0.1` | Relay internal，仅 Hub 本机访问 |
+| 9004 | `0.0.0.0` | Hub/Admin/Client，供局域网/Tailscale Caddy 访问 |
+
+9001/9003 不得通过防火墙、Tailscale funnel 或反向代理暴露。9002/9004 只应由受信局域网/Tailscale ACL 访问。
+
+## 3. 主目录布局
+
+```text
+/home/admin/project/service/measix-core/
+├── run.sh                         # PM2 唯一进程入口：run.sh hub|relay
+├── ecosystem.config.cjs           # root PM2 配置
+├── current -> releases/<version>/
+├── releases/<version>/
+│   ├── bin/{control-hub,runtime-relay}
+│   ├── assets/{admin,portal}/
+│   ├── deploy/
+│   ├── release.json
+│   └── SHA256SUMS
+├── config/
+│   ├── config-version
+│   └── public-origin
+├── secrets/
+├── data/{hub,relay}/
+├── logs/
+├── backups/
+├── staging/
+└── run/
+```
+
+发布、升级和回退不得删除或覆盖 `config/`、`secrets/`、`data/`、`logs/`、`backups/`。`run.sh` 和 `ecosystem.config.cjs` 是 release-owned 控制文件，升级时从已验证的新 release 刷新。
+
+## 4. 发布包生成与检查
+
+在开发机的 Core 仓库执行：
+
+```text
+node scripts/build-preview-release.mjs <version>
+```
+
+发布门禁会固定 Architecture/Core/Portal/Android commit、协议 hash、Snapshot v4、Portal Bridge v3 和 Enrollment v1，并输出：
+
+```text
+.artifacts/releases/measix-core-<version>-linux-arm64.tar.gz
+```
+
+归档只包含 Linux ARM64 二进制、静态资源、部署文件、`release.json` 和 `SHA256SUMS`，不包含源码、数据库、日志或秘密。
+
+## 5. 正式部署前检查（只读）
+
+```bash
+uname -m
+node --version
+sudo pm2 status
+systemctl is-active pm2-root
+tailscale ip -4
+ss -lnt | grep -E ':(9001|9002|9003|9004)\b' || true
+df -h /home/admin/project/service
+```
+
+必须确认架构为 `aarch64`、PM2 现有服务仍 online、9001–9004 空闲，并记录部署前的 `sudo pm2 status`。
+
+## 6. 首次部署（必须取得用户确认后执行）
+
+以下步骤当前尚未在 Spark 执行。
+
+1. 在主目录内创建 staging/release 目录并上传归档；不得把源码部署到 Spark。
+2. 解压后先运行 `sha256sum -c SHA256SUMS`。
+3. 执行首次安装器：
 
 ```bash
 sudo "$MEASIX_ROOT/releases/$MEASIX_VERSION/deploy/install-preview.sh" \
@@ -67,16 +110,15 @@ sudo "$MEASIX_ROOT/releases/$MEASIX_VERSION/deploy/install-preview.sh" \
   "$MEASIX_PUBLIC_ORIGIN"
 ```
 
-Then enable PM2 boot persistence. Run the exact systemd command printed by:
+安装器会：
 
-```bash
-sudo pm2 startup
-sudo pm2 save
-```
+- 创建 `measix` 系统用户及单根目录布局；
+- 安装根目录 `run.sh` 和 `ecosystem.config.cjs`；
+- 生成密钥、迁移数据库、创建首个管理员；
+- 通过 root PM2 增加且只增加 `measix-relay`、`measix-hub`；
+- 执行 `pm2 save`，保留现有 PM2 应用。
 
-Do not copy a hard-coded PM2 home from another host.
-
-Configure bounded log rotation:
+安装完成后配置日志轮转（如果 root PM2 尚未安装该模块）：
 
 ```bash
 sudo pm2 install pm2-logrotate
@@ -87,116 +129,87 @@ sudo pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
 sudo pm2 save
 ```
 
-The initial password is stored at `$MEASIX_ROOT/secrets/initial-admin-password`. Read it only through a protected administrator session, complete the first login, then remove that one file. The remaining key/token files are required for service operation and recovery.
+首次登录后删除且只删除：
 
-## 5. First acceptance
+```bash
+sudo rm -- "$MEASIX_ROOT/secrets/initial-admin-password"
+```
+
+## 7. Spark 本机/局域网验收
+
+本批不从远端 Caddy 或公网验证，只验证 Spark 服务本身：
 
 ```bash
 sudo pm2 status
-sudo systemctl status caddy --no-pager
-curl -fsS "$MEASIX_PUBLIC_ORIGIN/live"
-curl -fsS "$MEASIX_PUBLIC_ORIGIN/ready"
-curl -fsS "$MEASIX_PUBLIC_ORIGIN/.well-known/measix"
-sudo "$MEASIX_ROOT/current/deploy/verify-preview.sh" "$MEASIX_ROOT" "$MEASIX_PUBLIC_ORIGIN"
+sudo "$MEASIX_ROOT/current/deploy/verify-preview.sh" "$MEASIX_ROOT"
+curl -fsS http://127.0.0.1:9004/live
+curl -fsS http://127.0.0.1:9004/ready
+curl -fsS http://127.0.0.1:9002/live
+sudo ss -lntp | grep -E ':(9001|9002|9003|9004)\b'
 ```
 
-In Admin, verify all four System tabs:
+预期：9002/9004 为 `0.0.0.0`，9001/9003 为 `127.0.0.1`；两个新 PM2 app online，原有 PM2 app 状态不变。
 
-1. Hub/Relay builds, database health, public origin and Portal;
-2. desired/applied revision, bundle and activation state;
-3. 15/60-minute telemetry, spool and Usage diagnostics;
-4. bounded recent Hub/Relay events with no credentials or personal data.
+Admin 登录后检查 System 四页签、当前 release、Relay ready、配置 revision、spool、近期遥测和事件。Android 模拟器验证视为本批 Android 验收。
 
-Then use the Preview Android client for enrollment, Snapshot sync, one real configured resource request and Usage visibility. HTTP readiness alone is not runtime convergence or device acceptance.
+## 8. 远端 Caddy 交接（不在 Spark 执行）
 
-## 6. Backup
+发布包中的 `deploy/Caddyfile.template` 只是远端入口服务器的参考片段，不由 Spark 安装器复制或 reload。入口服务器应将 `__MEASIX_SPARK_TAILSCALE_IP__` 替换为 `100.64.0.4`，将 `__MEASIX_PUBLIC_ORIGIN__` 替换为获批子域名：
 
-Create a local recovery set before every upgrade and periodically during Preview use:
+```caddyfile
+https://<approved-subdomain> {
+	@private path /internal /internal/*
+	handle @private {
+		respond 404
+	}
+
+	@runtime path /runtime/v1 /runtime/v1/*
+	handle @runtime {
+		reverse_proxy 100.64.0.4:9002
+	}
+
+	handle {
+		reverse_proxy 100.64.0.4:9004
+	}
+}
+```
+
+远端 DNS、TLS、Caddy reload 和公网连通性由入口服务器维护者单独验收，本任务不操作也不验证该服务器。
+
+## 9. 备份
 
 ```bash
-sudo "$MEASIX_ROOT/current/deploy/backup-preview.sh" "$MEASIX_ROOT"
+backup=$(sudo "$MEASIX_ROOT/current/deploy/backup-preview.sh" "$MEASIX_ROOT")
+sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$backup" "$MEASIX_ROOT/current"
 ```
 
-The timestamped directory contains consistent checked Hub and Relay SQLite images, configuration, secrets, and a manifest with the exact release commits, config/schema versions and a checksum/size/mode entry for every recovery file. Verify it before copying and again before restore:
+备份包含 Hub/Relay 一致性 SQLite 镜像、config、secrets 和逐文件 hash manifest。验证后必须另存一份到 Spark 之外的受保护存储。
 
-```bash
-sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$MEASIX_ROOT/backups/<timestamp>"
-```
+## 10. 升级
 
-Copy a verified recovery set to protected storage outside the DGX. A backup left only on the same disk is not disaster recovery.
+1. 解压新 release 并校验 SHA256；
+2. 使用旧 release 创建并验证备份；
+3. `sudo pm2 stop measix-hub measix-relay`，不得停止其他 PM2 app；
+4. 用新 binary 执行 `migrate` 和 `check`；
+5. 从新 release 安装新的 `$MEASIX_ROOT/run.sh` 与 `$MEASIX_ROOT/ecosystem.config.cjs`；
+6. 原子切换 `current`；
+7. `sudo pm2 startOrReload "$MEASIX_ROOT/ecosystem.config.cjs"`，然后 `sudo pm2 save`；
+8. 执行第 7 节完整验收，并保留旧 release/备份直到确认完成。
 
-## 7. Upgrade
+`config/public-origin` 属于持久配置，升级不得被模板覆盖。新增 optional 配置不提升 config version；required 配置或语义改变必须提供明确转换步骤。
 
-1. Stage the new archive under a new `$MEASIX_ROOT/releases/<version>` directory and verify `SHA256SUMS` and `release.json`.
-2. Run the old release's `backup-preview.sh` and copy the result off-host.
-3. Stop both processes: `sudo pm2 stop measix-hub measix-relay`.
-4. Preserve the current symlink target: `readlink -f "$MEASIX_ROOT/current"`.
-5. Run the new binary against the persistent DB:
+## 11. 回退与恢复
 
-```bash
-sudo -u measix "$MEASIX_ROOT/releases/<version>/bin/control-hub" migrate \
-  --db "$MEASIX_ROOT/data/hub/hub.db"
-sudo -u measix "$MEASIX_ROOT/releases/<version>/bin/control-hub" check \
-  --db "$MEASIX_ROOT/data/hub/hub.db"
-```
+数据库版本未变化时，可以切回旧 release、刷新旧版 `run.sh`/ecosystem 并只重启两个 MEASIX app。数据库已经迁移时，旧 binary 不得打开新数据库，必须停止两个 app，验证升级前备份，再同时恢复 Hub DB、可选 Relay spool、config、secrets 和对应 release。
 
-6. Render and validate the new release-owned templates before switching. `config-version` governs persisted operator configuration; the packaged ecosystem and Caddy templates are refreshed on every upgrade:
+恢复一律先进入 `$MEASIX_ROOT/staging/recovery-<timestamp>`；当前数据移入 `original/`，不得直接删除。候选数据库先执行 `control-hub check`，验收前保留 `original/`。
 
-```bash
-NEW_RELEASE="$MEASIX_ROOT/releases/<version>"
-ESCAPED_ORIGIN=${MEASIX_PUBLIC_ORIGIN//&/\\&}
-sudo sed "s|__MEASIX_PUBLIC_ORIGIN__|$ESCAPED_ORIGIN|g" \
-  "$NEW_RELEASE/deploy/Caddyfile.template" | sudo tee "$MEASIX_ROOT/staging/Caddyfile.next" >/dev/null
-sudo caddy validate --config "$MEASIX_ROOT/staging/Caddyfile.next" --adapter caddyfile
-sudo env MEASIX_ROOT="$MEASIX_ROOT" MEASIX_PUBLIC_ORIGIN="$MEASIX_PUBLIC_ORIGIN" \
-  node -e 'require(process.argv[1])' "$NEW_RELEASE/deploy/ecosystem.config.cjs"
-```
+## 12. 日志与排障
 
-7. Install those validated templates, atomically switch `current`, restart PM2, then reload Caddy:
+- Hub：`$MEASIX_ROOT/logs/hub.jsonl`、`hub.stderr.log`；
+- Relay：`$MEASIX_ROOT/logs/relay.jsonl`、`relay.stderr.log`；
+- `sudo pm2 status` / `sudo pm2 describe measix-hub`；
+- Admin System 页读取有界的近期结构化事件和 15/60 分钟遥测；
+- 未知错误只显示稳定安全错误码，不输出请求 body、token、prompt 或密钥。
 
-```bash
-sudo install -m 0640 -o root -g measix "$NEW_RELEASE/deploy/ecosystem.config.cjs" "$MEASIX_ROOT/config/ecosystem.config.cjs"
-sudo install -m 0644 -o root -g root "$MEASIX_ROOT/staging/Caddyfile.next" "$MEASIX_ROOT/config/Caddyfile"
-sudo ln -sfn "$MEASIX_ROOT/releases/<version>" "$MEASIX_ROOT/current"
-sudo env MEASIX_ROOT="$MEASIX_ROOT" MEASIX_PUBLIC_ORIGIN="$MEASIX_PUBLIC_ORIGIN" \
-  pm2 restart "$MEASIX_ROOT/config/ecosystem.config.cjs" --update-env
-sudo pm2 save
-sudo systemctl reload caddy
-```
-
-8. Run the complete acceptance in section 5. Retain the previous release and backup until the Preview is accepted.
-
-Migration files and `schema_migrations` rows are immutable. Never repair an upgrade by editing migration history.
-
-## 8. Rollback and restore
-
-If no database migration ran, switch `current` back to the previous release and restart. If a migration ran, the previous binary must not open the upgraded database: restore the pre-upgrade data and release together.
-
-For a restore, first select a backup and verify its immutable contents:
-
-```bash
-export MEASIX_BACKUP="$MEASIX_ROOT/backups/<timestamp>"
-sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$MEASIX_BACKUP"
-```
-
-Then:
-
-1. stop Hub and Relay;
-2. create `$MEASIX_ROOT/staging/recovery-<timestamp>/{original,candidate}`;
-3. move the current Hub DB, Relay spool and their explicitly named `-wal`/`-shm` sidecars into `original`—do not delete them;
-4. copy `hub.db`, optional `relay-spool.db`, `config/` and `secrets/` from the backup into `candidate`, leaving the backup itself unchanged;
-5. use the release recorded by `backup-manifest.json` to run `control-hub check` on the candidate;
-6. verify config version, schema identity, release commit and every required secret. Once the recorded release is staged, bind it to the recovery set with `sudo <recorded-release>/deploy/verify-backup.sh "$MEASIX_BACKUP" <recorded-release>`; set Hub/spool to `measix:measix 0600`, config to `root:root` (`Caddyfile` 0644, other files 0640), and secrets to `root:measix 0640` under a `0750` directory;
-7. move the checked candidate Hub DB/config/secrets into their exact active locations. If `candidate/relay-spool.db` exists, install it as `$MEASIX_ROOT/data/relay/relay-spool.db` before startup and set it to `measix:measix 0600`; otherwise leave the intentionally empty Relay data directory in place. Switch `current` to a locally staged release whose `release.json` matches the manifest; never rely on the old absolute release path;
-8. start Relay and Hub, reload Caddy, and run section 5 plus Admin login, active Release/generation/revision, Usage, one Runtime request and Android refresh/sync;
-9. retain `original` until acceptance.
-
-All resolved recovery paths must remain below the explicit `MEASIX_ROOT`. Never use an empty variable, `/`, a home directory or a glob as a recursive move/delete target.
-
-## 9. Routine diagnostics
-
-- `sudo pm2 status` shows lifecycle, not application readiness.
-- Admin System is the primary bounded view for process events and recent request telemetry.
-- Raw files are `$MEASIX_ROOT/logs/{hub,relay}.jsonl` and matching `.stderr.log`; PM2 manager/Caddy logs are intentionally outside Admin.
-- `control-hub check` verifies migration history/checksums, SQLite integrity/foreign keys and required current tables/columns.
-- On failure, preserve logs, database, spool, release manifest and backup metadata before restarting. Never delete the spool or database as routine recovery.
+Spark 没有本机 Caddy，因此 Caddy 日志、TLS 与外部 502 应在远端入口服务器排查。

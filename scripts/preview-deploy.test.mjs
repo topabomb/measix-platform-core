@@ -6,11 +6,13 @@ import { resolve } from 'node:path'
 const ROOT = resolve(import.meta.dirname, '..')
 const read = path => readFileSync(resolve(ROOT, path), 'utf8')
 
-test('Caddy remains reloadable and private routes are fenced', () => {
+test('remote Caddy example fences private routes and targets the Spark tailnet address', () => {
   const config = read('deploy/preview/Caddyfile.template')
-  assert.doesNotMatch(config, /\badmin\s+off\b/)
   assert.match(config, /@private\s+path \/internal \/internal\/\*/)
   assert.ok(config.indexOf('handle @private') < config.indexOf('handle {'))
+  assert.match(config, /__MEASIX_SPARK_TAILSCALE_IP__:9002/)
+  assert.match(config, /__MEASIX_SPARK_TAILSCALE_IP__:9004/)
+  assert.doesNotMatch(config, /127\.0\.0\.1:900[24]/)
 })
 
 test('preview backup uses SQLite-owned online backups and verifies recovery files', () => {
@@ -29,6 +31,21 @@ test('production installer accepts only an HTTPS public origin', () => {
   assert.match(installer, /\^https:\/\//)
   assert.doesNotMatch(installer, /\^https\?\:/)
   assert.doesNotMatch(installer, /--env production/)
+  assert.doesNotMatch(installer, /\bcaddy\b|systemctl\s+reload/)
+  assert.match(installer, /pm2 start "\$root\/ecosystem\.config\.cjs"/)
+})
+
+test('PM2 uses one root-owned run script with fixed public and internal binds', () => {
+  const runner = read('deploy/preview/run.sh')
+  const ecosystem = read('deploy/preview/ecosystem.config.cjs')
+  assert.match(runner, /--public-listen 0\.0\.0\.0:9002/)
+  assert.match(runner, /--internal-listen 127\.0\.0\.1:9003/)
+  assert.match(runner, /HUB_LISTEN_ADDR=0\.0\.0\.0:9004/)
+  assert.match(runner, /HUB_INTERNAL_LISTEN_ADDR=127\.0\.0\.1:9001/)
+  assert.match(ecosystem, /script: at\('run\.sh'\), args: \['relay'\]/)
+  assert.match(ecosystem, /script: at\('run\.sh'\), args: \['hub'\]/)
+  assert.doesNotMatch(ecosystem, /runtime-relay|control-hub/)
+  assert.doesNotMatch(runner, /MEASIX_(?:ROOT|PUBLIC_LISTEN|INTERNAL_LISTEN)|LISTEN_(?:ADDR|PORT)=\"?\$\{/)
 })
 
 test('Windows release packaging normalizes Linux executable modes', () => {

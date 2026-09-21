@@ -6,10 +6,10 @@ __MEASIX_PUBLIC_ORIGIN__ {
 
 	@runtime path /runtime/v1 /runtime/v1/*
 	handle @runtime {
-		reverse_proxy 127.0.0.1:9002
+		reverse_proxy __MEASIX_SPARK_TAILSCALE_IP__:9002
 	}
 
 	handle {
-		reverse_proxy 127.0.0.1:9004
+		reverse_proxy __MEASIX_SPARK_TAILSCALE_IP__:9004
 	}
 }

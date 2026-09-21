@@ -22,14 +22,13 @@ install -d -m 0750 -o root -g measix "$root/secrets"
 chmod 0755 "$release_dir"
 for dir in data data/hub data/relay logs backups staging run; do install -d -m 0750 -o measix -g measix "$root/$dir"; done
 ln -sfn -- "$release_dir" "$root/current"
-install -m 0640 -o root -g measix "$release_dir/deploy/ecosystem.config.cjs" "$root/config/ecosystem.config.cjs"
+install -m 0644 -o root -g root "$release_dir/deploy/ecosystem.config.cjs" "$root/ecosystem.config.cjs"
+install -m 0755 -o root -g root "$release_dir/deploy/run.sh" "$root/run.sh"
 printf '1\n' > "$root/config/config-version"
-chmod 0640 "$root/config/config-version"
-escaped_origin=${public_origin//&/\\&}
-sed "s|__MEASIX_PUBLIC_ORIGIN__|$escaped_origin|g" "$release_dir/deploy/Caddyfile.template" > "$root/config/Caddyfile.tmp"
-install -m 0644 -o root -g root "$root/config/Caddyfile.tmp" "$root/config/Caddyfile"
-rm -f -- "$root/config/Caddyfile.tmp"
-caddy validate --config "$root/config/Caddyfile" --adapter caddyfile
+printf '%s\n' "$public_origin" > "$root/config/public-origin"
+chown root:measix "$root/config/config-version" "$root/config/public-origin"
+chmod 0640 "$root/config/config-version" "$root/config/public-origin"
+node -e 'require(process.argv[1])' "$root/ecosystem.config.cjs"
 
 umask 077
 head -c 32 /dev/urandom > "$root/secrets/master.key"
@@ -49,8 +48,6 @@ sudo -u measix "$root/current/bin/control-hub" bootstrap-admin \
   --password-file "$root/secrets/initial-admin-password" \
   --deployment-name MEASIX --username admin
 
-env MEASIX_ROOT="$root" MEASIX_PUBLIC_ORIGIN="$public_origin" pm2 start "$root/config/ecosystem.config.cjs"
+pm2 start "$root/ecosystem.config.cjs"
 pm2 save
-ln -sfn -- "$root/config/Caddyfile" /etc/caddy/Caddyfile
-systemctl reload caddy
 echo "Initial password remains at $root/secrets/initial-admin-password; remove it after the first successful login."

@@ -32,6 +32,7 @@ for (const [name, expected] of Object.entries(manifest.files ?? {})) {
   if (actual !== expected.sha256) throw new Error(`backup checksum mismatch: ${name}`);
 }
 if (readFileSync(resolve(root, 'config/config-version'), 'utf8').trim() !== String(manifest.configVersion)) throw new Error('backup config version mismatch');
+statSync(resolve(root, 'config/public-origin'));
 const metadata = JSON.parse(readFileSync(resolve(root, 'hub.db.metadata.json'), 'utf8'));
 if (metadata.schema !== manifest.schema.identity || metadata.schemaVersion !== manifest.schema.version) throw new Error('backup schema identity mismatch');
 for (const name of ['master.key', 'jwt-ed25519.seed', 'relay-service.token']) statSync(resolve(root, 'secrets', name));

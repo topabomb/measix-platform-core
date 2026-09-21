@@ -2,8 +2,8 @@
 
 > 状态：本批实施权威方案；完成实现、验证与独立审查后转为已完成记录。  
 > 范围：当前 S0.2 / Snapshot v4 内部预览版；Control Hub、Runtime Relay、Admin Console、标准 Enterprise Portal。  
-> 部署基线：单台 NVIDIA DGX Spark（Linux ARM64 / aarch64）、Caddy 反向代理和 TLS、root PM2 daemon 管理两个业务进程、预编译 Go 二进制和预构建静态资源。
-> 根目录原则：除 Caddy/PM2 自身的系统安装和 daemon 元数据外，MEASIX 拥有的发布、配置、密钥、数据、日志、备份及运行文件全部位于一个 `MEASIX_ROOT` 下。
+> 部署基线：单台 NVIDIA DGX Spark（Linux ARM64 / aarch64）运行 Hub/Relay，root PM2 daemon 管理两个业务进程；另一台 Tailscale 内网服务器负责 Caddy/TLS/子域名入口。
+> 根目录原则：除 root PM2 自身的系统安装和 daemon 元数据外，Spark 上 MEASIX 拥有的发布、配置、密钥、数据、日志、备份及运行文件全部位于一个 `MEASIX_ROOT` 下。
 
 ## 1. 目标与完成定义
 
@@ -14,8 +14,8 @@
 3. 配置、Hub 数据库和 Relay spool 在升级、重启和恢复时不会被发布目录覆盖；
 4. 数据库从本 Preview 开始支持有序、前向、可校验的升级；
 5. 发布物是 Linux 二进制和静态资源包，服务器不需要源码、Go、pnpm 或 `node_modules`；
-6. Caddy 提供唯一 HTTPS 入口，`sudo pm2` 管理 Hub/Relay 生命周期；
-7. 在独立 Linux 环境完成安装、升级、备份、恢复、回退和 Android 主流程验收；
+6. Spark 不安装 Caddy；9002/9004 提供局域网/Tailscale 服务，远端 Caddy 提供唯一 HTTPS 入口，`sudo pm2` 管理 Hub/Relay 生命周期；
+7. 在独立 Linux/ARM64 环境完成安装、升级、备份、恢复和回退，Android 模拟器完成本批主流程验收；
 8. 全部实现完成后由独立子代理按本文逐项审查，修复其确认的问题并重跑受影响验证。
 
 本批不实现 Gateway、Snapshot v5、HA、多节点数据库、Prometheus、集中日志平台、多协议并行兼容、自动密钥轮换或全设备矩阵。
@@ -56,6 +56,8 @@ Architecture 仓库拥有跨组件语义；上述 OpenAPI 拥有精确 HTTP/wire
 
 ```text
 <MEASIX_ROOT>/
+├── run.sh
+├── ecosystem.config.cjs
 ├── current -> releases/0.2.0-preview.N/
 ├── releases/
 │   └── 0.2.0-preview.N/
@@ -67,14 +69,14 @@ Architecture 仓库拥有跨组件语义；上述 OpenAPI 拥有精确 HTTP/wire
 │       │   └── portal/
 │       ├── deploy/
 │       │   ├── ecosystem.config.cjs
+│       │   ├── run.sh
 │       │   ├── Caddyfile.template
 │       │   └── *-preview.sh
 │       ├── release.json
 │       └── SHA256SUMS
 ├── config/
-│   ├── ecosystem.config.cjs
-│   ├── Caddyfile
-│   └── config-version
+│   ├── config-version
+│   └── public-origin
 ├── secrets/
 │   ├── master.key
 │   ├── jwt-ed25519.seed
@@ -95,11 +97,11 @@ Architecture 仓库拥有跨组件语义；上述 OpenAPI 拥有精确 HTTP/wire
 
 权限：
 
-- `releases/`、`current`、`config/`：root 写，业务进程只读；
+- `run.sh`、`ecosystem.config.cjs`、`releases/`、`current`、`config/`：root 写，业务进程只读；
 - `secrets/`：root 管理，业务用户 `measix` 组只读，目录 `0750 root:measix`、文件 `0640 root:measix`；
 - `data/`、`logs/`、`backups/`、`staging/`、`run/`：`measix:measix`，目录 `0750`；
-- root PM2 daemon 通过 `uid`/`gid` 以 `measix` 用户启动 Hub/Relay；
-- Caddy 的系统 binary、service unit、证书存储和 root PM2 daemon 自身的 `$PM2_HOME` 是外部运行依赖，不保存 MEASIX 业务配置或数据；`/etc/caddy/Caddyfile` 只允许链接到 `$MEASIX_ROOT/config/Caddyfile`。
+- root PM2 daemon 只调用 `$MEASIX_ROOT/run.sh hub|relay`，再通过 `uid`/`gid` 以 `measix` 用户启动 Hub/Relay；
+- root PM2 daemon 自身的 `$PM2_HOME` 是 Spark 上唯一的外部运行依赖；远端 Caddy 的 binary、配置、证书和日志由入口服务器独立维护。
 
 发布、升级、回退不得删除或替换 `config/`、`secrets/`、`data/`、`logs/`、`backups/`。
 
@@ -383,11 +385,11 @@ control-hub backup --db <path> --output <new-file>
 
 ### 9.1 配置
 
-不新增通用 YAML 配置层。站点配置由 `$MEASIX_ROOT/config/ecosystem.config.cjs` 统一保存，秘密只保存为文件路径。
+不新增通用 YAML 配置层。`$MEASIX_ROOT/run.sh` 固定进程参数和目录解析，`$MEASIX_ROOT/ecosystem.config.cjs` 固定 PM2 生命周期；持久站点配置放在 `$MEASIX_ROOT/config`，秘密只保存在 `$MEASIX_ROOT/secrets`。
 
 `$MEASIX_ROOT/config/config-version` 初始为 `1`。新增 optional 配置不提升版本；删除、改义或新增 required 配置才提升版本并在升级手册中给出明确转换。
 
-数据库中的 Deployment name/public origin 等仍由 Admin 和 Hub 持久化 owner 管理；PM2 中的 public origin 只作为空库首次启动 seed，不能覆盖已经审核的数据库值。
+`config/public-origin` 只作为空库首次启动 seed；数据库中的 Deployment name/public origin 仍由 Admin 和 Hub 持久化 owner 管理，后续 PM2 重启不能覆盖已经审核的数据库值。
 
 ### 9.2 备份范围
 
@@ -445,20 +447,19 @@ measix-core-<version>-linux-arm64.tar.gz
 - 生成 `release.json` 和 `SHA256SUMS`；
 - 从解压后的包运行 smoke，证明包不依赖源码目录。
 
-服务器只需要 Linux、Caddy、Node + PM2；无需 Go 或 pnpm。
+Spark 只需要 Linux、Node + root PM2；无需 Caddy、Go、pnpm 或源码。
 
 ## 11. PM2 配置
 
-`$MEASIX_ROOT/config/ecosystem.config.cjs` 以 root 所有、业务只读保存。两个 app 均使用 `exec_mode: 'fork'`、`instances: 1`、`interpreter: 'none'`。
+`$MEASIX_ROOT/ecosystem.config.cjs` 和 `$MEASIX_ROOT/run.sh` 以 root 所有、业务只读保存。PM2 只调用统一一键脚本 `run.sh relay|hub`，不直接拼装二进制参数。两个 app 均使用 `exec_mode: 'fork'`、`instances: 1`、`interpreter: 'bash'`。
 
 固定端口：
 
 | 服务 | 地址 |
 | --- | --- |
-| Caddy public | `:80` / `:443` |
-| Hub public | `127.0.0.1:9004` |
+| Hub public | `0.0.0.0:9004` |
 | Hub internal | `127.0.0.1:9001` |
-| Relay public | `127.0.0.1:9002` |
+| Relay public | `0.0.0.0:9002` |
 | Relay internal | `127.0.0.1:9003` |
 
 PM2 关键参数：
@@ -485,9 +486,9 @@ time: false
 
 PM2 app 列表先 Relay 后 Hub；启动顺序不是 correctness 前提，Hub reconciler 仍负责恢复收敛。
 
-## 12. Caddy 配置
+## 12. 远端 Caddy 配置边界
 
-`$MEASIX_ROOT/config/Caddyfile` 使用明确站点域名和 loopback upstream：
+Spark 不安装、不配置、不 reload Caddy。发布包中的 `deploy/Caddyfile.template` 仅供另一台 Tailscale 入口服务器参考，upstream 指向 Spark 的 Tailscale 地址：
 
 ```text
 https://core.example.com {
@@ -496,11 +497,11 @@ https://core.example.com {
 
     @runtime path /runtime/v1 /runtime/v1/*
     handle @runtime {
-        reverse_proxy 127.0.0.1:9002
+        reverse_proxy 100.64.0.4:9002
     }
 
     handle {
-        reverse_proxy 127.0.0.1:9004
+        reverse_proxy 100.64.0.4:9004
     }
 }
 ```
@@ -510,25 +511,22 @@ https://core.example.com {
 - `/internal` 永不暴露；
 - 不配置 retry、body buffering 或 `flush_interval -1`；
 - Caddy 自动处理 SSE/WebSocket 和 TLS；
-- 保留 Caddy 默认仅 loopback 的 admin endpoint，供 systemd `reload` 使用，不对外开放；
-- 只开放主机 80/443；四个业务端口仅 loopback；
-- `/etc/caddy/Caddyfile` 链接到 `$MEASIX_ROOT/config/Caddyfile`；
-- 变更前执行 `caddy validate`，成功后才 reload。
+- Spark 的 9002/9004 监听 `0.0.0.0`，仅允许受信局域网/Tailscale ACL 访问；
+- Spark 的 9001/9003 始终为 loopback，远端 Caddy 不得代理；
+- 远端 DNS、TLS、Caddy reload 和公网连通性由入口服务器维护者独立验收，本任务不操作该服务器。
 
 ## 13. 首次部署手册
 
 以下命令中的根目录变量不得使用系统 `HOME`。部署者先把占位值替换为本次部署专用的绝对路径：
 
 ```bash
-export MEASIX_ROOT=/absolute/path/chosen-for-this-deployment
+export MEASIX_ROOT=/home/admin/project/service/measix-core
 ```
 
 ### 13.1 前置条件
 
 - NVIDIA DGX Spark，Linux `aarch64` / Go `arm64`；
-- 域名已解析到主机；
-- 80/443 可访问；
-- 已安装并运行 Caddy；
+- Spark 已加入 Tailscale，当前地址为 `100.64.0.4`；
 - 已安装 Node LTS、PM2 和 pm2-logrotate；
 - `sudo pm2` 可用；
 - 主机时间同步正常。
@@ -570,13 +568,12 @@ sudo ln -sfn "$MEASIX_ROOT/releases/<version>" "$MEASIX_ROOT/current"
 
 ### 13.5 配置
 
-复制 release 中的 ecosystem/Caddy 模板到 `$MEASIX_ROOT/config`，设置：
+安装 release 中的一键 `run.sh` 和 ecosystem 到 `$MEASIX_ROOT`，持久配置仅保存到 `$MEASIX_ROOT/config`：
 
-- `MEASIX_ROOT`；
-- external public origin；
-- Hub/Relay listener 和内部 URL；
-- DB、spool、assets、log、secret 文件路径；
+- `public-origin`：远端 Caddy 的 external HTTPS origin；
 - config version。
+
+网络和路径不提供额外配置：9002/9004 固定 `0.0.0.0`，9001/9003 固定 loopback；`run.sh` 从自身所在主目录解析 current、DB、spool、assets、logs 和 secrets。
 
 ### 13.6 初始化和管理员
 
@@ -598,33 +595,27 @@ sudo -u measix "$MEASIX_ROOT/current/bin/control-hub" bootstrap-admin \
 ### 13.7 启动 PM2
 
 ```bash
-sudo env MEASIX_ROOT="$MEASIX_ROOT" MEASIX_PUBLIC_ORIGIN="$MEASIX_PUBLIC_ORIGIN" \
-  pm2 start "$MEASIX_ROOT/config/ecosystem.config.cjs"
+sudo pm2 start "$MEASIX_ROOT/ecosystem.config.cjs"
 sudo pm2 save
-sudo pm2 startup
 sudo pm2 status
 ```
 
-`pm2 startup` 输出的 systemd 命令必须按目标主机实际结果执行，不能在文档中硬编码用户 home。
+目标 Spark 已有启用且运行中的 `pm2-root.service` 和其他 PM2 app；不得重新创建 PM2 home，不得停止/删除全部 app。安装前记录状态，安装后只新增 `measix-relay`、`measix-hub` 并再次 `pm2 save`。
 
-### 13.8 启用 Caddy
+### 13.8 远端 Caddy 交接
 
-```bash
-sudo ln -sfn "$MEASIX_ROOT/config/Caddyfile" /etc/caddy/Caddyfile
-sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-sudo systemctl reload caddy
-```
+Spark 不执行 Caddy 命令。入口服务器维护者按第 12 节配置并独立验收。
 
 ### 13.9 验收
 
 ```bash
-curl -fsS https://<domain>/live
-curl -fsS https://<domain>/ready
-curl -fsS https://<domain>/.well-known/measix
+curl -fsS http://127.0.0.1:9004/live
+curl -fsS http://127.0.0.1:9004/ready
+curl -fsS http://127.0.0.1:9002/live
 sudo pm2 status
 ```
 
-再通过 Admin 登录核对 System 四页签，并用当前 Preview Android 完成 Enrollment、Snapshot sync、一次实际启用资源调用和 Usage 查看。
+再从局域网访问 9002/9004，核对端口绑定与 Admin System 四页签。Android 模拟器已作为本批 Enrollment、Snapshot sync、Runtime 和 Usage 验收环境。
 
 ## 14. 升级、回退与恢复手册
 
@@ -635,10 +626,10 @@ sudo pm2 status
 3. 停止 Hub/Relay；
 4. 冷备份 config、secrets、spool 并写入 backup manifest；
 5. 使用新 release binary 对 Hub DB 执行 `migrate` 和 `check`；
-6. 切换 `current` 软链接；
-7. 如模板版本变化，按手册更新 `config/`；
-8. `sudo pm2 restart ... --update-env`；
-9. 验证 Caddy、readiness、Admin 状态和实际 Runtime 调用；
+6. 从新 release 刷新根目录 `run.sh` 和 `ecosystem.config.cjs`，再切换 `current`；
+7. 不覆盖持久 `config/public-origin`；
+8. `sudo pm2 startOrReload "$MEASIX_ROOT/ecosystem.config.cjs"`；
+9. 验证端口绑定、readiness、Admin 状态和实际 Runtime 调用；
 10. 验收前保留旧 release 和升级前 backup。
 
 ### 14.2 回退
@@ -689,7 +680,7 @@ sudo pm2 status
 ### D. 发布部署
 
 - [x] 实现并验证 DGX Spark Linux ARM64 release 构建；
-- [x] 实现单根目录 ecosystem/Caddy 模板；
+- [x] 实现单根目录 `run.sh`/ecosystem，并提供远端 Caddy 参考模板；
 - [x] 实现 SHA256/release manifest；
 - [x] 用解压包在无源码目录运行 smoke；
 - [x] 完善本文为最终部署手册；
@@ -704,8 +695,8 @@ sudo pm2 status
 - [x] system/candidate/browser harness；
 - [x] migration/backup/restore/package tests；
 - [x] Android contract/JVM 和 emulator connected tests；
-- [ ] 至少一台物理 Android 设备完成当前候选的 Preview 主流程；
-- [ ] Caddy + sudo PM2 + binary package 实际部署验证；
+- [x] Android 模拟器完成当前候选的 Preview 主流程（用户确认可作为本批 Android 验收）；
+- [ ] 取得用户部署确认后，在目标 Spark 以现有 root PM2 完成 binary package 实际部署验证；
 - [x] 独立子代理逐条审查本文；
 - [x] 修复独立审查中的代码/手册问题并重跑受影响及最终本地完整验证。
 
@@ -716,11 +707,11 @@ sudo pm2 status
 1. 四仓库 pin 到明确 commit，协议 hash 完全一致；
 2. release 包不含源码或秘密，二进制显示真实 buildVersion；
 3. 单一 `MEASIX_ROOT` 保存全部 MEASIX-owned 配置、密钥、数据、日志和备份；
-4. Caddy 只暴露 HTTPS public origin，internal route 不可达；
+4. Spark 仅以 9002/9004 提供局域网/Tailscale 服务，9001/9003 保持 loopback；远端 Caddy 只暴露 HTTPS public origin 和允许的 public route；
 5. sudo PM2 能启动、停止、重启和开机恢复 Hub/Relay；
 6. Admin 能观察两个业务进程日志、15/60 分钟遥测和既有运行状态；
 7. 日志无 forbidden material，列表与图表保持有界；
 8. 数据库 forward migration、备份、恢复、迁移后回退均实测；
 9. 解压后的 release 在无源码目录通过 smoke；
-10. 当前 Android 对实际部署完成 Enrollment、Snapshot v4、Runtime、Usage、重启恢复；
+10. 当前 Android 模拟器完成 Enrollment、Snapshot v4、Runtime、Usage、重启恢复；
 11. 自动门禁、实际部署验收和独立审查均完成，确认问题已修复。

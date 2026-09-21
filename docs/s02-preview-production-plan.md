@@ -62,12 +62,13 @@ Architecture 仓库拥有跨组件语义；上述 OpenAPI 拥有精确 HTTP/wire
 │       ├── bin/
 │       │   ├── control-hub
 │       │   └── runtime-relay
-│       ├── web/
+│       ├── assets/
 │       │   ├── admin/
 │       │   └── portal/
 │       ├── deploy/
 │       │   ├── ecosystem.config.cjs
-│       │   └── Caddyfile
+│       │   ├── Caddyfile.template
+│       │   └── *-preview.sh
 │       ├── release.json
 │       └── SHA256SUMS
 ├── config/
@@ -95,7 +96,7 @@ Architecture 仓库拥有跨组件语义；上述 OpenAPI 拥有精确 HTTP/wire
 权限：
 
 - `releases/`、`current`、`config/`：root 写，业务进程只读；
-- `secrets/`：root 管理，业务用户 `measix` 只读，目录 `0750`、文件 `0600`；
+- `secrets/`：root 管理，业务用户 `measix` 组只读，目录 `0750 root:measix`、文件 `0640 root:measix`；
 - `data/`、`logs/`、`backups/`、`staging/`、`run/`：`measix:measix`，目录 `0750`；
 - root PM2 daemon 通过 `uid`/`gid` 以 `measix` 用户启动 Hub/Relay；
 - Caddy 的系统 binary、service unit、证书存储和 root PM2 daemon 自身的 `$PM2_HOME` 是外部运行依赖，不保存 MEASIX 业务配置或数据；`/etc/caddy/Caddyfile` 只允许链接到 `$MEASIX_ROOT/config/Caddyfile`。

@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +21,114 @@ import (
 )
 
 const performanceConcurrency = 100
+
+func TestAdminLoginCandidatePerformance(t *testing.T) {
+	if testing.Short() {
+		t.Skip("performance test requires a real Hub process")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	env, err := harness.NewHubEnv(ctx)
+	if err != nil {
+		t.Fatalf("create env: %v", err)
+	}
+	defer env.Cleanup()
+	if err := env.StartHub(ctx); err != nil {
+		t.Fatalf("start hub: %v", err)
+	}
+
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	normalDurations := make([]time.Duration, 5)
+	for index := range normalDurations {
+		started := time.Now()
+		request, requestErr := adminLoginRequest(ctx, env.HubBaseURL, "admin", env.AdminPassword)
+		if requestErr != nil {
+			t.Fatal(requestErr)
+		}
+		if requestErr = expectHTTPStatus(httpClient, request, http.StatusOK); requestErr != nil {
+			t.Fatal(requestErr)
+		}
+		normalDurations[index] = time.Since(started)
+		if normalDurations[index] > 2*time.Second {
+			t.Fatalf("normal admin login %d took %v, want <=2s", index+1, normalDurations[index])
+		}
+	}
+	sort.Slice(normalDurations, func(i, j int) bool { return normalDurations[i] < normalDurations[j] })
+	t.Logf("PERF admin-login-normal samples=%d p50=%v p95=%v", len(normalDurations), normalDurations[2], normalDurations[4])
+
+	before := env.HubProcessMetrics()
+	stopSampling := make(chan struct{})
+	peakRSS := make(chan int64, 1)
+	go func() {
+		peak := before.RSSBytes
+		ticker := time.NewTicker(25 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if current := env.HubProcessMetrics().RSSBytes; current > peak {
+					peak = current
+				}
+			case <-stopSampling:
+				peakRSS <- peak
+				return
+			}
+		}
+	}()
+
+	var unauthorized atomic.Int64
+	var throttled atomic.Int64
+	metrics := runConcurrentLoad(t, "admin-login-invalid-burst", func(index int) error {
+		request, requestErr := adminLoginRequest(ctx, env.HubBaseURL, fmt.Sprintf("unknown-%03d", index), "wrong password value")
+		if requestErr != nil {
+			return requestErr
+		}
+		response, requestErr := httpClient.Do(request)
+		if requestErr != nil {
+			return requestErr
+		}
+		defer response.Body.Close()
+		_, _ = io.Copy(io.Discard, response.Body)
+		switch response.StatusCode {
+		case http.StatusUnauthorized:
+			unauthorized.Add(1)
+		case http.StatusTooManyRequests:
+			throttled.Add(1)
+		default:
+			return fmt.Errorf("admin login returned %d", response.StatusCode)
+		}
+		return nil
+	})
+	close(stopSampling)
+	peak := <-peakRSS
+	after := env.HubProcessMetrics()
+	if after.RSSBytes > peak {
+		peak = after.RSSBytes
+	}
+	growth := peak - before.RSSBytes
+	t.Logf("PERF admin-login-invalid-burst unauthorized=%d throttled=%d hub_rss_before=%d hub_rss_peak=%d hub_rss_growth=%d",
+		unauthorized.Load(), throttled.Load(), before.RSSBytes, peak, growth)
+	if unauthorized.Load() == 0 || throttled.Load() == 0 {
+		t.Fatalf("burst did not exercise both verification and fast throttle: unauthorized=%d throttled=%d", unauthorized.Load(), throttled.Load())
+	}
+	if metrics.total > 30*time.Second {
+		t.Fatalf("admin login burst took %v, want <=30s", metrics.total)
+	}
+	if before.RSSBytes > 0 && growth > 512*1024*1024 {
+		t.Fatalf("admin login burst grew Hub RSS by %d bytes, want <=512 MiB", growth)
+	}
+}
+
+func adminLoginRequest(ctx context.Context, baseURL, username, password string) (*http.Request, error) {
+	body := fmt.Sprintf(`{"username":%q,"password":%q}`, username, password)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/admin/v1/session/login", strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	return request, nil
+}
 
 // TestRuntimeRelayHundredEnterpriseUsers exercises the real hot path:
 // Android-visible client reads plus Hub budget admission/lifecycle, Relay

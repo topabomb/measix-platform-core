@@ -104,6 +104,24 @@ func main() {
 		{"default-missing-model", "invalid_default_model", func(v object) {
 			v["policy"].(map[string]any)["defaultModelId"] = "mdl_99999999-9999-4999-8999-999999999999"
 		}},
+		{"default-missing-fast-model", "invalid_default_fast_model", func(v object) {
+			v["policy"].(map[string]any)["defaultFastModelId"] = "mdl_99999999-9999-4999-8999-999999999999"
+		}},
+		{"default-missing-title-model", "invalid_default_title_model", func(v object) {
+			v["policy"].(map[string]any)["defaultTitleModelId"] = "mdl_99999999-9999-4999-8999-999999999999"
+		}},
+		{"default-missing-attachment-inspection-model", "invalid_default_attachment_inspection_model", func(v object) {
+			v["policy"].(map[string]any)["defaultAttachmentInspectionModelId"] = "mdl_99999999-9999-4999-8999-999999999999"
+		}},
+		{"default-attachment-inspection-model-without-image", "invalid_default_attachment_inspection_model_modality", func(v object) {
+			v["models"].([]any)[0].(map[string]any)["inputModalities"] = []any{"TEXT"}
+		}},
+		{"default-missing-suggestion-model", "invalid_default_suggestion_model", func(v object) {
+			v["policy"].(map[string]any)["defaultSuggestionModelId"] = "mdl_99999999-9999-4999-8999-999999999999"
+		}},
+		{"default-missing-compress-model", "invalid_default_compress_model", func(v object) {
+			v["policy"].(map[string]any)["defaultCompressModelId"] = "mdl_99999999-9999-4999-8999-999999999999"
+		}},
 		{"default-missing-image-generation", "invalid_default_image_generation", func(v object) {
 			v["policy"].(map[string]any)["defaultImageGenerationId"] = "img_99999999-9999-4999-8999-999999999999"
 		}},

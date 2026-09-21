@@ -307,7 +307,17 @@ export const useDraftStore = defineStore('draft', () => {
     const content = requireContent()
     const references: string[] = []
     if (kind === 'MODEL') {
-      if (content.policy.defaultModelId === resourceId) references.push('policy.defaultModelId')
+      const defaultModelFields = [
+        'defaultModelId',
+        'defaultFastModelId',
+        'defaultTitleModelId',
+        'defaultAttachmentInspectionModelId',
+        'defaultSuggestionModelId',
+        'defaultCompressModelId',
+      ] as const
+      for (const field of defaultModelFields) {
+        if (content.policy[field] === resourceId) references.push(`policy.${field}`)
+      }
       for (const assistant of content.assistants) {
         if (assistant.modelId === resourceId) references.push(`assistant:${assistant.assistantDefinitionId}.modelId`)
       }

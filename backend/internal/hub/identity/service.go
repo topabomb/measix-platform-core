@@ -41,6 +41,7 @@ var (
 
 type Service struct {
 	deploymentSettingsMu  sync.Mutex
+	adminLoginLimiter     *adminLoginLimiter
 	publicOriginMu        sync.RWMutex
 	publicOrigin          string
 	PortalStaticAvailable bool
@@ -69,6 +70,7 @@ func (s *Service) SetPublicOrigin(value string) {
 
 func New(client *ent.Client, signer *security.AccessSigner, csrfKey []byte) *Service {
 	return &Service{
+		adminLoginLimiter:     newAdminLoginLimiter(),
 		BootstrapTimezone:     "UTC",
 		PortalStaticAvailable: true,
 		Client:                client,
@@ -161,17 +163,36 @@ func (s *Service) SetPassword(ctx context.Context, userID, password string) erro
 	if err != nil {
 		return err
 	}
-	n, err := s.Client.User.Update().Where(user.IDEQ(userID)).
-		SetPasswordHash(hash).
-		SetUpdatedAt(s.Now().UTC()).
-		Save(ctx)
+	now := s.Now().UTC()
+	tx, err := s.Client.Tx(ctx)
 	if err != nil {
 		return err
 	}
-	if n != 1 {
-		return ErrNotFound
+	rollback := func(cause error) error {
+		_ = tx.Rollback()
+		return cause
 	}
-	return nil
+	n, err := tx.User.Update().Where(user.IDEQ(userID)).
+		SetPasswordHash(hash).
+		SetUpdatedAt(now).
+		Save(ctx)
+	if err != nil {
+		return rollback(err)
+	}
+	if n != 1 {
+		return rollback(ErrNotFound)
+	}
+	_, err = tx.Session.Update().Where(
+		session.UserIDEQ(userID),
+		session.ChannelEQ("ADMIN_WEB"),
+		session.StatusEQ("ACTIVE"),
+	).SetStatus("REVOKED").SetRevokedAt(now).
+		ClearPreviousRefreshDigest().ClearRefreshRequestKey().ClearRefreshReplayUntil().ClearRefreshResponseCiphertext().
+		Save(ctx)
+	if err != nil {
+		return rollback(err)
+	}
+	return tx.Commit()
 }
 
 func (s *Service) CreateEnrollment(ctx context.Context, userID, createdBy string, ttl time.Duration) (EnrollmentGrant, error) {
@@ -418,22 +439,42 @@ func (s *Service) ListDevices(ctx context.Context, userID string, limit int) ([]
 }
 
 func (s *Service) LoginAdmin(ctx context.Context, username, password string) (AdminSessionResult, error) {
+	return s.LoginAdminWithOptions(ctx, username, password, AdminLoginOptions{})
+}
+
+func (s *Service) LoginAdminWithOptions(ctx context.Context, username, password string, options AdminLoginOptions) (AdminSessionResult, error) {
+	now := s.Now().UTC()
+	if wait := s.adminLoginLimiter.retryAfter(username, options.Source, now); wait > 0 {
+		return AdminSessionResult{}, &LoginThrottledError{RetryAfter: wait}
+	}
+	if !s.adminLoginLimiter.tryBeginVerification() {
+		return AdminSessionResult{}, &LoginThrottledError{RetryAfter: adminPasswordVerificationBusyRetry}
+	}
+	defer s.adminLoginLimiter.endVerification()
 	u, err := s.Client.User.Query().Where(user.UsernameEQ(NormalizeUsername(username))).Only(ctx)
 	if ent.IsNotFound(err) {
+		security.VerifyPasswordOrDummy(nil, password)
+		s.adminLoginLimiter.failure(username, options.Source, now)
 		return AdminSessionResult{}, ErrCredential
 	}
 	if err != nil {
 		return AdminSessionResult{}, err
 	}
-	if u.Role != "ADMIN" || u.Status != "ACTIVE" || u.PasswordHash == nil || !security.VerifyPassword(*u.PasswordHash, password) {
+	passwordValid := security.VerifyPasswordOrDummy(u.PasswordHash, password)
+	if u.Role != "ADMIN" || u.Status != "ACTIVE" || !passwordValid {
+		s.adminLoginLimiter.failure(username, options.Source, now)
 		return AdminSessionResult{}, ErrCredential
 	}
+	s.adminLoginLimiter.success(username, now)
 	cookieSecret, err := s.Random(32)
 	if err != nil {
 		return AdminSessionResult{}, err
 	}
-	now := s.Now().UTC()
-	expiresAt := now.Add(12 * time.Hour)
+	ttl := AdminSessionTTL
+	if options.RememberMe {
+		ttl = AdminRememberedSessionTTL
+	}
+	expiresAt := now.Add(ttl)
 	_, err = s.Client.Session.Create().
 		SetID(platformid.New(platformid.Session)).
 		SetUserID(u.ID).

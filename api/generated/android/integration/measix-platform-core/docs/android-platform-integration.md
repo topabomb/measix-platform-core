@@ -34,7 +34,7 @@
 | 手机不能访问开发电脑的 127.0.0.1 | 配置手机可达的 HTTP 或 HTTPS 统一公共入口（域名或 IP 均可），Hub PublicOrigin 保持相同；Discovery/Client/Runtime/Portal 都从该 origin 访问。具体 ingress 配置由 Core operations 文档维护 |
 | 当前预览上游是合成服务 | 它只证明协议和转发；真实使用须在 Admin 配置实际供应商/CLIProxyAPI 地址、模型、凭据并应用、发布。客户端不接收企业密钥，不能把合成回复当成真实生成 |
 | 五项 allowLocal* 为 false | 这是禁止企业域使用用户自带配置，不是禁用企业下发的资源。需要混用时由管理员启用对应策略并发布，不能由客户端越权绕过 |
-| 辅助功能没有选中的可用资源 | title/fast/compress 等槽位沿用本域选择规则；不要引用个人域中已被策略禁止的资源，也不要要求 Snapshot 存在未定义的额外默认字段。图片生成使用可选 `policy.defaultImageGenerationId`；未设置、资源禁用或显式引用失效时明确不可用，不静默切换到另一资源 |
+| 辅助功能没有选中的可用资源 | 管理员可分别配置 fast/title/attachment-inspection/suggestion/compress 默认模型；每项均可留空，留空时沿用本域已有选择规则，不得把 defaultModelId 复制到其他槽位。图片生成使用独立的可选 `policy.defaultImageGenerationId`；未设置、资源禁用或显式引用失效时明确不可用，不静默切换到另一资源 |
 | 401、403、428 或配置尚未发布 | 按认证/撤销/原子同步语义恢复并给出可理解状态。仅有明确未转发保证的请求可重新准入；不能自动重发已执行工具。管理员先发布一个有效 Release 并确认 Relay 已应用 |
 | 大图片、长录音、供应商限流或超时 | 当前 Hub 编译 Runtime 请求上限为 10 MiB；HTTP 按请求体、WebSocket 按连接累计客户端帧字节计数，base64/JSON 也计入。客户端应在编码后控制大小，采用有界录音会话，超限明确提示重新录制/压缩；不得静默截断或无限重试。Upstream 路由超时需按实际供应商配置，429/供应商容量限制不能靠协议适配消除 |
 
@@ -66,8 +66,8 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | Assistant.memorySeed[] | 按作者顺序转换为只读 Seed。内部 ID 从 deploymentId、助手 ID、generation、索引确定；空数组有效，条目不得为空白。不按内容去重、不建立可变 Assistant Memory 副本，配置替换时整体换代 |
 | Starter.starterId/assistantDefinitionId/title/prompt/description/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击只进入原生输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
 | policy 五项 allowLocal* | EnterprisePolicy 五项必填 Boolean；缺失/null/错误类型均拒绝。只控制本企业域内用户原配置准入，不复制用户定义、端点和密钥 |
-| defaultModelId/defaultTtsId/defaultAsrId/defaultAssistantId | defaults.chatModelId/ttsId/asrId/assistantId；显式无效引用不回退首项。没有用户已选助手时采用 defaultAssistantId；用户已选助手失效时呈现选择与修复入口，不静默改选默认助手。未提供的默认值保持未指定，由既有本域选择规则处理 |
-| defaults.fastModelId/titleModelId/attachmentInspectionModelId/suggestionModelId/compressModelId | v4 无对应的企业强制字段。保留本域偏好和功能已有选择规则，不把 defaultModelId 批量写入所有槽位。图片生成由独立 `defaultImageGenerationId` 映射既有本域 `imageGenerationModelId` 选择槽位 |
+| defaultModelId/defaultFastModelId/defaultTitleModelId/defaultAttachmentInspectionModelId/defaultSuggestionModelId/defaultCompressModelId | 分别映射 defaults.chatModelId/fastModelId/titleModelId/attachmentInspectionModelId/suggestionModelId/compressModelId。六项都可省略且互不推导，非空引用必须指向已启用模型；附件检查默认还必须支持 IMAGE 输入 |
+| defaultImageGenerationId/defaultTtsId/defaultAsrId/defaultAssistantId | 分别映射 defaults.imageGenerationModelId/ttsId/asrId/assistantId；显式无效引用不回退首项。没有用户已选助手时采用 defaultAssistantId；用户已选助手失效时呈现选择与修复入口，不静默改选默认助手。未提供的默认值保持未指定，由既有本域选择规则处理 |
 | allowAsSubAssistant/allowedSubAssistantIds、gateways | v4 不下发企业子助手关系或 Gateway；平台适配输出 false/空集合。用户自有子助手仍按现有五项准入和执行权限处理，不扩展 wire |
 
 ## 认证、同步与恢复时序

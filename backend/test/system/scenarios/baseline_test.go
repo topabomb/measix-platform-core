@@ -275,8 +275,9 @@ func TestBaseline(t *testing.T) {
 	t.Logf("BASELINE concurrent streaming memory growth (10 streams): %d bytes (relay RSS before=%d after=%d)", concMemGrowth, relayMemBeforeConc.RSSBytes, relayMemAfterConc.RSSBytes)
 	t.Logf("BASELINE concurrent streaming duration (10 streams): %v", concDuration)
 
-	// --- §17.5b: 50-stream concurrent test ---
-	// Run 50 concurrent streams to measure memory growth under heavier load.
+	// --- §17.5b: 50-request concurrent burst ---
+	// Run a same-user burst to measure bounded memory growth and verify that
+	// requests above the configured in-flight budget are shed explicitly.
 	relayMemBeforeConc50 := env.RelayProcessMetrics()
 	conc50Start := time.Now()
 	conc50WG := make(chan error, 50)
@@ -292,16 +293,27 @@ func TestBaseline(t *testing.T) {
 			conc50WG <- err
 		}()
 	}
+	conc50Allowed := 0
+	conc50Rejected := 0
 	for i := 0; i < 50; i++ {
 		if err := <-conc50WG; err != nil {
-			t.Errorf("concurrent stream 50 #%d: %v", i, err)
+			if strings.Contains(err.Error(), "code=in_flight_limit") {
+				conc50Rejected++
+				continue
+			}
+			t.Errorf("concurrent stream burst #%d: %v", i, err)
+			continue
 		}
+		conc50Allowed++
+	}
+	if conc50Allowed == 0 || conc50Rejected == 0 {
+		t.Errorf("50-request burst did not exercise both admission and load shedding: allowed=%d rejected=%d", conc50Allowed, conc50Rejected)
 	}
 	conc50Duration := time.Since(conc50Start)
 	relayMemAfterConc50 := env.RelayProcessMetrics()
 	conc50MemGrowth := relayMemAfterConc50.RSSBytes - relayMemBeforeConc50.RSSBytes
-	t.Logf("BASELINE concurrent streaming memory growth (50 streams): %d bytes (relay RSS before=%d after=%d)", conc50MemGrowth, relayMemBeforeConc50.RSSBytes, relayMemAfterConc50.RSSBytes)
-	t.Logf("BASELINE concurrent streaming duration (50 streams): %v", conc50Duration)
+	t.Logf("BASELINE concurrent streaming memory growth (50-request burst): %d bytes (relay RSS before=%d after=%d)", conc50MemGrowth, relayMemBeforeConc50.RSSBytes, relayMemAfterConc50.RSSBytes)
+	t.Logf("BASELINE concurrent streaming duration (50-request burst): %v allowed=%d rejected=%d", conc50Duration, conc50Allowed, conc50Rejected)
 
 	// Measure TTS latency
 	ttsStart := time.Now()
@@ -514,6 +526,8 @@ func TestBaseline(t *testing.T) {
 		"first_byte_overhead_ms":                relayOverhead.Milliseconds(),
 		"concurrent_stream_mem_growth_bytes":    concMemGrowth,
 		"concurrent_stream_50_mem_growth_bytes": conc50MemGrowth,
+		"concurrent_stream_50_allowed":          conc50Allowed,
+		"concurrent_stream_50_rejected":         conc50Rejected,
 		"multipart_mem_growth_bytes":            multipartMemGrowth,
 		"large_multipart_mem_growth_bytes":      largeMultipartMemGrowth,
 		"tts_buffering_latency_ms":              ttsBufLatency.Milliseconds(),

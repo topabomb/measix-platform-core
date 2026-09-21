@@ -25,7 +25,9 @@ type McpDefinition = components['schemas']['McpDefinition']
 type ProviderDefinition = components['schemas']['ProviderDefinition']
 type ManagedPolicy = components['schemas']['ManagedPolicy']
 type PolicyFlagKey = 'allowLocalProviders' | 'allowLocalTts' | 'allowLocalAsr' | 'allowLocalMcp' | 'allowLocalAssistants'
-type PolicyDefaultKey = 'defaultModelId' | 'defaultImageGenerationId' | 'defaultTtsId' | 'defaultAsrId' | 'defaultAssistantId'
+type PolicyDefaultKey = 'defaultModelId' | 'defaultFastModelId' | 'defaultTitleModelId'
+  | 'defaultAttachmentInspectionModelId' | 'defaultSuggestionModelId' | 'defaultCompressModelId'
+  | 'defaultImageGenerationId' | 'defaultTtsId' | 'defaultAsrId' | 'defaultAssistantId'
 type Upstream = components['schemas']['Upstream']
 type UpstreamPage = components['schemas']['UpstreamPage']
 type RuntimeBindingDefinition = components['schemas']['RuntimeBindingDefinition']
@@ -297,6 +299,12 @@ const filteredRelationshipRows = computed(() => {
 /** Enabled models for Policy default picker. */
 const enabledModels = computed(() =>
   draft.localContent?.models.filter((m) => m.enabled).map((m) => ({
+    label: m.displayName,
+    value: m.modelId,
+  })) ?? [],
+)
+const enabledVisionModels = computed(() =>
+  draft.localContent?.models.filter((m) => m.enabled && m.inputModalities.includes('IMAGE')).map((m) => ({
     label: m.displayName,
     value: m.modelId,
   })) ?? [],
@@ -805,7 +813,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   </div>
                 </div>
                 <div class="row q-gutter-xs">
-                  <q-select v-model="selectedModel.inputModalities" dense outlined :label="$t('resources.model.inputModalities')" multiple :options="INPUT_MODS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" data-field="inputModalities" emit-value map-options @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.inputModalities" dense outlined :label="$t('resources.model.inputModalities')" multiple :options="INPUT_MODS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" data-cy="model-input-modalities" data-field="inputModalities" emit-value map-options @update:model-value="draft.markDirty()" />
                   <q-select v-model="selectedModel.outputModalities" dense outlined :label="$t('resources.model.outputModalities')" multiple :options="OUTPUT_MODS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" data-field="outputModalities" emit-value map-options @update:model-value="draft.markDirty()" />
                   <q-select v-model="selectedModel.capabilities" dense outlined :label="$t('resources.model.capabilities')" multiple :options="MODEL_CAPS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
                 </div>
@@ -1289,26 +1297,48 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <q-card-section>
             <div class="text-subtitle2 q-mb-xs">{{ $t('resources.policy.defaults') }}</div>
             <div class="text-body2 text-grey-7 q-mb-xs">{{ $t('resources.policy.defaultsHint') }}</div>
+            <div class="text-subtitle2 q-mb-xs">{{ $t('resources.policy.primaryDefaults') }}</div>
             <div class="row q-col-gutter-xs">
-              <div class="col-12 col-md-3">
+              <div class="col-12 col-md-4">
                 <q-select :model-value="draft.localContent.policy.defaultModelId" dense outlined :label="$t('resources.policy.defaultModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-model" @update:model-value="value => setPolicyDefault('defaultModelId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledModelsHint') }}</div>
               </div>
-              <div class="col-12 col-md-3">
+              <div class="col-12 col-md-4">
                 <q-select :model-value="draft.localContent.policy.defaultImageGenerationId" dense outlined :label="$t('resources.policy.defaultImageGeneration')" :options="enabledImageGenerators" emit-value map-options clearable data-cy="policy-default-image-generation" @update:model-value="value => setPolicyDefault('defaultImageGenerationId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledImageGenerationHint') }}</div>
               </div>
-              <div class="col-12 col-md-3">
+              <div class="col-12 col-md-4">
                 <q-select :model-value="draft.localContent.policy.defaultTtsId" dense outlined :label="$t('resources.policy.defaultTts')" :options="enabledTts" emit-value map-options clearable data-cy="policy-default-tts" @update:model-value="value => setPolicyDefault('defaultTtsId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledTtsHint') }}</div>
               </div>
-              <div class="col-12 col-md-3">
+              <div class="col-12 col-md-4">
                 <q-select :model-value="draft.localContent.policy.defaultAsrId" dense outlined :label="$t('resources.policy.defaultAsr')" :options="enabledAsr" emit-value map-options clearable data-cy="policy-default-asr" @update:model-value="value => setPolicyDefault('defaultAsrId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledAsrHint') }}</div>
               </div>
-              <div class="col-12 col-md-3">
+              <div class="col-12 col-md-4">
                 <q-select :model-value="draft.localContent.policy.defaultAssistantId" dense outlined :label="$t('resources.policy.defaultAssistant')" :options="enabledAssistants" emit-value map-options clearable data-cy="policy-default-assistant" @update:model-value="value => setPolicyDefault('defaultAssistantId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledAssistantsHint') }}</div>
+              </div>
+            </div>
+            <q-separator class="q-my-md" />
+            <div class="text-subtitle2 q-mb-xs">{{ $t('resources.policy.auxiliaryModelDefaults') }}</div>
+            <div class="text-body2 text-grey-7 q-mb-xs">{{ $t('resources.policy.auxiliaryModelDefaultsHint') }}</div>
+            <div class="row q-col-gutter-xs">
+              <div class="col-12 col-md-4">
+                <q-select :model-value="draft.localContent.policy.defaultFastModelId" dense outlined :label="$t('resources.policy.defaultFastModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-fast-model" @update:model-value="value => setPolicyDefault('defaultFastModelId', value)" />
+              </div>
+              <div class="col-12 col-md-4">
+                <q-select :model-value="draft.localContent.policy.defaultTitleModelId" dense outlined :label="$t('resources.policy.defaultTitleModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-title-model" @update:model-value="value => setPolicyDefault('defaultTitleModelId', value)" />
+              </div>
+              <div class="col-12 col-md-4">
+                <q-select :model-value="draft.localContent.policy.defaultAttachmentInspectionModelId" dense outlined :label="$t('resources.policy.defaultAttachmentInspectionModel')" :options="enabledVisionModels" emit-value map-options clearable data-cy="policy-default-attachment-inspection-model" @update:model-value="value => setPolicyDefault('defaultAttachmentInspectionModelId', value)" />
+                <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledVisionModelsHint') }}</div>
+              </div>
+              <div class="col-12 col-md-4">
+                <q-select :model-value="draft.localContent.policy.defaultSuggestionModelId" dense outlined :label="$t('resources.policy.defaultSuggestionModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-suggestion-model" @update:model-value="value => setPolicyDefault('defaultSuggestionModelId', value)" />
+              </div>
+              <div class="col-12 col-md-4">
+                <q-select :model-value="draft.localContent.policy.defaultCompressModelId" dense outlined :label="$t('resources.policy.defaultCompressModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-compress-model" @update:model-value="value => setPolicyDefault('defaultCompressModelId', value)" />
               </div>
             </div>
           </q-card-section>
@@ -1570,6 +1600,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <tbody>
                   <tr v-for="setting in policySettings" :key="setting.key"><td class="text-grey-7">{{ setting.label }}</td><td>{{ preview.policy[setting.key] ? $t('resources.preview.allowed') : $t('resources.preview.notAllowed') }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultModel') }}</td><td>{{ previewReferenceName('model', preview.policy.defaultModelId) }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultFastModel') }}</td><td>{{ previewReferenceName('model', preview.policy.defaultFastModelId) }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultTitleModel') }}</td><td>{{ previewReferenceName('model', preview.policy.defaultTitleModelId) }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultAttachmentInspectionModel') }}</td><td>{{ previewReferenceName('model', preview.policy.defaultAttachmentInspectionModelId) }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultSuggestionModel') }}</td><td>{{ previewReferenceName('model', preview.policy.defaultSuggestionModelId) }}</td></tr>
+                  <tr><td class="text-grey-7">{{ $t('resources.preview.defaultCompressModel') }}</td><td>{{ previewReferenceName('model', preview.policy.defaultCompressModelId) }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultImageGeneration') }}</td><td>{{ previewReferenceName('image', preview.policy.defaultImageGenerationId) }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultTts') }}</td><td>{{ previewReferenceName('tts', preview.policy.defaultTtsId) }}</td></tr>
                   <tr><td class="text-grey-7">{{ $t('resources.preview.defaultAsr') }}</td><td>{{ previewReferenceName('asr', preview.policy.defaultAsrId) }}</td></tr>

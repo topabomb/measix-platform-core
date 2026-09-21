@@ -2015,7 +2015,7 @@ type DraftPreviewResponse struct {
 	Mcp             []McpDefinition              `json:"mcp"`
 	Models          []ModelDefinition            `json:"models"`
 
-	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
+	// Policy Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted.
 	Policy         ManagedPolicy        `json:"policy"`
 	ProjectionHash Sha256Hash           `json:"projectionHash"`
 	Providers      []ProviderDefinition `json:"providers"`
@@ -2102,7 +2102,10 @@ type InteractionId = string
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Password string `json:"password"`
-	Username string `json:"username"`
+
+	// RememberMe Request a fixed 30-day persistent Admin session. HTTPS cookies are Secure; HTTP/IP deployments remain supported but cannot provide transport confidentiality. False creates a browser-session cookie with a 12-hour server-side maximum.
+	RememberMe *bool  `json:"rememberMe,omitempty"`
+	Username   string `json:"username"`
 }
 
 // ManagedAssistantDefinition defines model for ManagedAssistantDefinition.
@@ -2128,28 +2131,33 @@ type ManagedDraftContent struct {
 	Mcp             []McpDefinition              `json:"mcp"`
 	Models          []ModelDefinition            `json:"models"`
 
-	// Policy Current policy. All five admission flags are required; new policies initialize all five to false.
+	// Policy Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted.
 	Policy    ManagedPolicy                `json:"policy"`
 	Providers []ProviderDefinition         `json:"providers"`
 	Starters  []AssistantStarterDefinition `json:"starters"`
 	Tts       []TtsDefinition              `json:"tts"`
 }
 
-// ManagedPolicy Current policy. All five admission flags are required; new policies initialize all five to false.
+// ManagedPolicy Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted.
 type ManagedPolicy struct {
 	AllowLocalAsr bool `json:"allowLocalAsr"`
 
 	// AllowLocalAssistants Allows user assistants; referenced resources remain independently governed.
-	AllowLocalAssistants     bool                   `json:"allowLocalAssistants"`
-	AllowLocalMcp            bool                   `json:"allowLocalMcp"`
-	AllowLocalProviders      bool                   `json:"allowLocalProviders"`
-	AllowLocalTts            bool                   `json:"allowLocalTts"`
-	DefaultAsrId             *AsrId                 `json:"defaultAsrId,omitempty"`
-	DefaultAssistantId       *AssistantDefinitionId `json:"defaultAssistantId,omitempty"`
-	DefaultImageGenerationId *ImageGenerationId     `json:"defaultImageGenerationId,omitempty"`
-	DefaultModelId           *ModelId               `json:"defaultModelId,omitempty"`
-	DefaultTtsId             *TtsId                 `json:"defaultTtsId,omitempty"`
-	PolicyId                 PolicyId               `json:"policyId"`
+	AllowLocalAssistants               bool                   `json:"allowLocalAssistants"`
+	AllowLocalMcp                      bool                   `json:"allowLocalMcp"`
+	AllowLocalProviders                bool                   `json:"allowLocalProviders"`
+	AllowLocalTts                      bool                   `json:"allowLocalTts"`
+	DefaultAsrId                       *AsrId                 `json:"defaultAsrId,omitempty"`
+	DefaultAssistantId                 *AssistantDefinitionId `json:"defaultAssistantId,omitempty"`
+	DefaultAttachmentInspectionModelId *ModelId               `json:"defaultAttachmentInspectionModelId,omitempty"`
+	DefaultCompressModelId             *ModelId               `json:"defaultCompressModelId,omitempty"`
+	DefaultFastModelId                 *ModelId               `json:"defaultFastModelId,omitempty"`
+	DefaultImageGenerationId           *ImageGenerationId     `json:"defaultImageGenerationId,omitempty"`
+	DefaultModelId                     *ModelId               `json:"defaultModelId,omitempty"`
+	DefaultSuggestionModelId           *ModelId               `json:"defaultSuggestionModelId,omitempty"`
+	DefaultTitleModelId                *ModelId               `json:"defaultTitleModelId,omitempty"`
+	DefaultTtsId                       *TtsId                 `json:"defaultTtsId,omitempty"`
+	PolicyId                           PolicyId               `json:"policyId"`
 }
 
 // McpDefinition defines model for McpDefinition.

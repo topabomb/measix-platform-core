@@ -180,7 +180,9 @@ const draft = await api('GET', '/draft')
 const policy = {
   ...draft.content.policy,
   allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true,
-  defaultModelId: id.deepseekModel, defaultImageGenerationId: id.wanImage, defaultTtsId: id.mimoTts, defaultAsrId: id.dashscopeAsr, defaultAssistantId: id.workAssistant,
+  defaultModelId: id.deepseekModel, defaultFastModelId: id.deepseekModel, defaultTitleModelId: id.deepseekModel,
+  defaultAttachmentInspectionModelId: id.qwenModel, defaultSuggestionModelId: id.deepseekModel, defaultCompressModelId: id.deepseekModel,
+  defaultImageGenerationId: id.wanImage, defaultTtsId: id.mimoTts, defaultAsrId: id.dashscopeAsr, defaultAssistantId: id.workAssistant,
 }
 const content = {
   providers: [

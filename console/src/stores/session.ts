@@ -26,12 +26,12 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
-  async function login(username: string, password: string) {
+  async function login(username: string, password: string, rememberMe = false) {
     loading.value = true
     try {
       session.value = await apiFetch<AdminSession>('/api/admin/v1/session/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, rememberMe }),
       })
       return session.value
     } finally {

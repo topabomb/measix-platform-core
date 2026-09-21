@@ -936,7 +936,7 @@ export interface components {
             transportPolicy: "HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART" | "WEBSOCKET";
             timeoutPolicy?: components["schemas"]["TimeoutPolicy"];
         };
-        /** @description Current policy. All five admission flags are required; new policies initialize all five to false. */
+        /** @description Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted. */
         ManagedPolicy: {
             policyId: components["schemas"]["PolicyId"];
             allowLocalProviders: boolean;
@@ -946,6 +946,11 @@ export interface components {
             /** @description Allows user assistants; referenced resources remain independently governed. */
             allowLocalAssistants: boolean;
             defaultModelId?: components["schemas"]["ModelId"];
+            defaultFastModelId?: components["schemas"]["ModelId"];
+            defaultTitleModelId?: components["schemas"]["ModelId"];
+            defaultAttachmentInspectionModelId?: components["schemas"]["ModelId"];
+            defaultSuggestionModelId?: components["schemas"]["ModelId"];
+            defaultCompressModelId?: components["schemas"]["ModelId"];
             defaultImageGenerationId?: components["schemas"]["ImageGenerationId"];
             defaultTtsId?: components["schemas"]["TtsId"];
             defaultAsrId?: components["schemas"]["AsrId"];
@@ -998,6 +1003,8 @@ export interface components {
         LoginRequest: {
             username: string;
             password: string;
+            /** @description Request a fixed 30-day persistent Admin session. HTTPS cookies are Secure; HTTP/IP deployments remain supported but cannot provide transport confidentiality. False creates a browser-session cookie with a 12-hour server-side maximum. */
+            rememberMe?: boolean;
         };
         User: {
             userId: components["schemas"]["UserId"];
@@ -1741,6 +1748,17 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             401: components["responses"]["Problem"];
+            /** @description Login attempts are temporarily throttled */
+            429: {
+                headers: {
+                    /** @description Whole seconds until another login attempt may be made. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     getSession: {

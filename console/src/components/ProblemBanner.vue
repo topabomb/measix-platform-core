@@ -13,12 +13,15 @@ const title = computed(() => {
   }
   return t('problem.default')
 })
-const detail = computed(() => props.error instanceof Error ? props.error.message : String(props.error ?? ''))
+const detail = computed(() => {
+  if (props.error instanceof ApiProblem && te(`problem.${props.error.code}`)) return ''
+  return props.error instanceof Error ? props.error.message : String(props.error ?? '')
+})
 </script>
 
 <template>
   <q-banner v-if="visible" class="bg-red-1 text-negative rounded-borders" dense data-cy="problem-banner">
     <div class="text-weight-medium">{{ title }}</div>
-    <div class="text-body2">{{ detail }}</div>
+    <div v-if="detail" class="text-body2">{{ detail }}</div>
   </q-banner>
 </template>

@@ -19,7 +19,7 @@ npm run device:real
 
 它会构建 Admin 与 Portal，初始化唯一当前数据库，启动一个本地 `device-demo` 组合进程，保存管理员密码到 `.secrets/device-real-admin-password.txt`，随后创建/应用上游并发布预设。进程直接在同一局域网 HTTP origin 提供 Hub、Portal、Admin 和 Relay 的 `/runtime/v1`；**本预设不启动或依赖 Caddy**。这样仍符合 Android 对 Discovery 相对同源 `clientApiBase`、`runtimeApiBase` 的要求。
 
-已发布资源为：DeepSeek Flash、Qwen 3.8 Flash（本机实验）、百炼 `wan2.7-image` 文生图（本机实验）、MiMo 云端朗读、设备本地朗读、百炼 HTTP 录音转写（本机实验）、Firecrawl Streamable HTTP MCP、两个企业助手和三个常用入口。默认项为 DeepSeek、`wan2.7-image`、MiMo、百炼 ASR 和企业工作助手。文生图使用 `DASHSCOPE_MULTIMODAL_GENERATION` 原生同步协议，不借用 OpenAI Images 或 Chat Model。所有上游目前为 `LEVEL_0`：管理台可验证转发次数、状态和字节数，但不能把供应商 token 或费用显示为已知。
+已发布资源为：DeepSeek Flash、Qwen 3.8 Flash（本机实验）、百炼 `wan2.7-image` 文生图（本机实验）、MiMo 云端朗读、设备本地朗读、百炼 HTTP 录音转写（本机实验）、Firecrawl Streamable HTTP MCP、两个企业助手和三个常用入口。十项默认值都由预设显式配置：对话、快速、标题、建议和上下文压缩使用 DeepSeek，附件检查使用 Qwen，另配置 `wan2.7-image`、MiMo、百炼 ASR 和企业工作助手。文生图使用 `DASHSCOPE_MULTIMODAL_GENERATION` 原生同步协议，不借用 OpenAI Images 或 Chat Model。所有上游目前为 `LEVEL_0`：管理台可验证转发次数、状态和字节数，但不能把供应商 token 或费用显示为已知。
 
 在 Admin 的 **Users** 创建成员并生成接入资料，手机扫描或粘贴该资料即可开始真实 Android 联调。手机与电脑必须在同一可达网络；若 Windows 防火墙提示，请允许该本机开发程序在专用网络接收 9100 端口访问。
 

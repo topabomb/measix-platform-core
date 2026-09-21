@@ -148,7 +148,9 @@ func TestSnapshotV4PolicyGoldenHash(t *testing.T) {
 	if snapshot.ImageGenerators == nil || len(*snapshot.ImageGenerators) != 0 {
 		t.Fatalf("policy-only fixture imageGenerators = %#v, want explicit empty list", snapshot.ImageGenerators)
 	}
-	if snapshot.Policy.DefaultModelId != nil || snapshot.Policy.DefaultImageGenerationId != nil || snapshot.Policy.DefaultTtsId != nil || snapshot.Policy.DefaultAsrId != nil || snapshot.Policy.DefaultAssistantId != nil {
+	if snapshot.Policy.DefaultModelId != nil || snapshot.Policy.DefaultFastModelId != nil || snapshot.Policy.DefaultTitleModelId != nil ||
+		snapshot.Policy.DefaultAttachmentInspectionModelId != nil || snapshot.Policy.DefaultSuggestionModelId != nil || snapshot.Policy.DefaultCompressModelId != nil ||
+		snapshot.Policy.DefaultImageGenerationId != nil || snapshot.Policy.DefaultTtsId != nil || snapshot.Policy.DefaultAsrId != nil || snapshot.Policy.DefaultAssistantId != nil {
 		t.Fatalf("unset defaults must remain unset without first-item fallback: %+v", snapshot.Policy)
 	}
 	hash, err := capability.HashSnapshot(snapshot)
@@ -190,6 +192,18 @@ func TestERXC0002CurrentSnapshotContainsResourceAndExperienceProfile(t *testing.
 	}
 	if snapshot.Policy.DefaultImageGenerationId == nil || *snapshot.Policy.DefaultImageGenerationId != "img_ffffffff-ffff-4fff-8fff-ffffffffffff" {
 		t.Fatal("current snapshot must preserve the explicit image generation default")
+	}
+	for field, value := range map[string]*clientapi.ModelId{
+		"defaultModelId":                     snapshot.Policy.DefaultModelId,
+		"defaultFastModelId":                 snapshot.Policy.DefaultFastModelId,
+		"defaultTitleModelId":                snapshot.Policy.DefaultTitleModelId,
+		"defaultAttachmentInspectionModelId": snapshot.Policy.DefaultAttachmentInspectionModelId,
+		"defaultSuggestionModelId":           snapshot.Policy.DefaultSuggestionModelId,
+		"defaultCompressModelId":             snapshot.Policy.DefaultCompressModelId,
+	} {
+		if value == nil || *value != "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" {
+			t.Fatalf("current snapshot must preserve %s, got %v", field, value)
+		}
 	}
 	// Golden hash must match
 	hash, err := capability.HashSnapshot(snapshot)

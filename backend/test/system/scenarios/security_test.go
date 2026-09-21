@@ -176,8 +176,9 @@ func TestCAPSEC003SessionCookieAttributes(t *testing.T) {
 	if !cookie.HttpOnly {
 		t.Fatal("session cookie not HttpOnly")
 	}
-	if !cookie.Secure {
-		t.Fatal("session cookie not Secure")
+	wantSecure := strings.HasPrefix(env.HubBaseURL, "https://")
+	if cookie.Secure != wantSecure {
+		t.Fatalf("session cookie Secure=%v, want %v for %s", cookie.Secure, wantSecure, env.HubBaseURL)
 	}
 	if cookie.SameSite != http.SameSiteStrictMode {
 		t.Fatalf("session cookie SameSite=%v, expected Strict", cookie.SameSite)

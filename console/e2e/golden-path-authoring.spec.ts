@@ -1,5 +1,30 @@
 import { test, expect, type Page } from '@playwright/test'
 
+test('Admin remembered login works over HTTP with an explicit transport warning', async ({ browser, page }) => {
+  await page.goto('/admin/', { waitUntil: 'domcontentloaded' })
+  await page.fill('[data-cy="login-username"]', 'admin')
+  await page.fill('[data-cy="login-password"]', ADMIN_PASSWORD)
+  await page.locator('[data-cy="login-remember"]').click()
+  if (new URL(page.url()).protocol === 'http:') {
+    await expect(page.locator('[data-cy="login-remember-warning"]')).toBeVisible()
+  }
+  await page.click('[data-cy="login-submit"]')
+  await expect(page).toHaveURL(/\/admin\/(overview)?$/)
+
+  const cookie = (await page.context().cookies()).find(item => item.name === 'measix_admin_session')
+  expect(cookie).toBeDefined()
+  expect(cookie!.httpOnly).toBe(true)
+  expect(cookie!.sameSite).toBe('Strict')
+  expect(cookie!.secure).toBe(new URL(page.url()).protocol === 'https:')
+  expect(cookie!.expires).toBeGreaterThan(Date.now() / 1000 + 29 * 24 * 60 * 60)
+
+  const restoredContext = await browser.newContext({ storageState: await page.context().storageState() })
+  const restoredPage = await restoredContext.newPage()
+  await restoredPage.goto('/admin/', { waitUntil: 'domcontentloaded' })
+  await expect(restoredPage).toHaveURL(/\/admin\/(overview)?$/)
+  await restoredContext.close()
+})
+
 test('ERX-UPD-001/002 Admin update authoring, safe preview, publish and withdraw', async ({ page }) => {
   await login(page)
   await page.goto('/admin/enterprise-updates')
@@ -61,6 +86,15 @@ const ADAPTER_URL = process.env.MEASIX_E2E_ADAPTER_URL || 'http://127.0.0.1:1809
 async function login(page: Page): Promise<void> {
   await page.goto('/admin/', { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-cy="login-username"]', { state: 'visible' })
+  await expect(page.locator('[data-cy="login-password-toggle"]')).toBeVisible()
+  const remember = page.locator('[data-cy="login-remember"]')
+  await expect(remember).toBeVisible()
+  await expect(remember).toBeEnabled()
+  if (new URL(page.url()).protocol === 'http:') {
+    await remember.click()
+    await expect(page.locator('[data-cy="login-remember-warning"]')).toBeVisible()
+    await remember.click()
+  }
   await page.fill('[data-cy="login-username"]', 'admin')
   await page.fill('[data-cy="login-password"]', ADMIN_PASSWORD)
   await page.click('[data-cy="login-submit"]')
@@ -362,6 +396,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.fill('[data-cy="model-upstream-key"]', 'gpt-4o')
     await selectOption(page, 'model-upstream-select', /e2e-upstream/)
     await page.fill('[data-cy="model-runtime-path"]', '/v1/chat/completions')
+    await selectOption(page, 'model-input-modalities', 'Images')
 
     // --- 4c: Create an Image Generation resource ---
     await page.click('[data-cy="config-section-image-generation"]')
@@ -423,6 +458,18 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
       await page.waitForTimeout(300)
       await expect(toggle).toHaveAttribute('aria-checked', 'true')
     }
+    for (const selector of [
+      'policy-default-model',
+      'policy-default-fast-model',
+      'policy-default-title-model',
+      'policy-default-attachment-inspection-model',
+      'policy-default-suggestion-model',
+      'policy-default-compress-model',
+    ]) {
+      await selectOption(page, selector, 'E2E Test Model')
+    }
+    await selectOption(page, 'policy-default-tts', 'E2E Test TTS')
+    await selectOption(page, 'policy-default-asr', 'E2E Test ASR')
     await selectOption(page, 'policy-default-image-generation', 'E2E Image Generation')
     const imageDefault = page.locator('[data-cy="policy-default-image-generation"]')
     await imageDefault.click()
@@ -446,6 +493,9 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.click('[data-cy="starter-add"]')
     await page.locator('[data-cy="starter-title"]').fill('E2E Starter')
     await page.locator('[data-cy="starter-prompt"]').fill('Synthetic starter question')
+
+    await page.click('[data-cy="config-section-policy"]')
+    await selectOption(page, 'policy-default-assistant', 'E2E Assistant')
 
     // Save the draft
     const saveBtn = page.locator('[data-cy="draft-save-btn"]')
@@ -640,6 +690,19 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     expect(previewResponse.status()).toBe(200)
     const projection = await previewResponse.json()
     expect(projection.policy.defaultImageGenerationId).toBe(projection.imageGenerators[0].imageId)
+    for (const field of [
+      'defaultModelId',
+      'defaultFastModelId',
+      'defaultTitleModelId',
+      'defaultAttachmentInspectionModelId',
+      'defaultSuggestionModelId',
+      'defaultCompressModelId',
+    ]) {
+      expect(projection.policy[field]).toBe(projection.models[0].modelId)
+    }
+    expect(projection.policy.defaultTtsId).toBe(projection.tts[0].ttsId)
+    expect(projection.policy.defaultAsrId).toBe(projection.asr[0].asrId)
+    expect(projection.policy.defaultAssistantId).toBe(projection.assistants[0].assistantDefinitionId)
     await page.locator('[data-cy="snapshot-preview-surface"]').getByRole('button', { name: 'Close', exact: true }).click()
 
     await page.click('[data-cy="draft-review-btn"]')
@@ -681,6 +744,56 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
       await expect(toggle).toBeVisible({ timeout: 5_000 })
       await expect(toggle).toHaveAttribute('aria-checked', 'true')
     }
+    for (const selector of [
+      'policy-default-model',
+      'policy-default-fast-model',
+      'policy-default-title-model',
+      'policy-default-attachment-inspection-model',
+      'policy-default-suggestion-model',
+      'policy-default-compress-model',
+    ]) {
+      await expect(page.locator(`[data-cy="${selector}"]`)).toContainText('E2E Test Model')
+    }
+    await expect(page.locator('[data-cy="policy-default-tts"]')).toContainText('E2E Test TTS')
+    await expect(page.locator('[data-cy="policy-default-asr"]')).toContainText('E2E Test ASR')
+    await expect(page.locator('[data-cy="policy-default-assistant"]')).toContainText('E2E Assistant')
     await expect(page.locator('[data-cy="policy-default-image-generation"]')).toContainText('E2E Image Generation')
+  })
+
+  await test.step('clear auxiliary defaults → save → validate → preview keeps them unset', async () => {
+    const auxiliarySelectors = [
+      'policy-default-fast-model',
+      'policy-default-title-model',
+      'policy-default-attachment-inspection-model',
+      'policy-default-suggestion-model',
+      'policy-default-compress-model',
+    ]
+    for (const selector of auxiliarySelectors) {
+      const select = page.locator(`[data-cy="${selector}"]`)
+      const field = select.locator('xpath=ancestor-or-self::*[contains(concat(" ", normalize-space(@class), " "), " q-field ")][1]')
+      await field.getByRole('button', { name: 'Clear' }).click()
+      await expect(select).not.toContainText('E2E Test Model')
+    }
+    await page.locator('[data-cy="draft-save-btn"]').click()
+
+    const validationResponsePromise = page.waitForResponse(r => r.url().endsWith('/api/admin/v1/draft:validate') && r.request().method() === 'POST')
+    await page.locator('[data-cy="draft-validate-btn"]').click()
+    const validation = await (await validationResponsePromise).json()
+    expect(validation.valid).toBe(true)
+
+    const previewResponsePromise = page.waitForResponse(r => r.url().endsWith('/api/admin/v1/draft:preview') && r.request().method() === 'POST')
+    await page.locator('[data-cy="draft-preview-btn"]').click()
+    const projection = await (await previewResponsePromise).json()
+    for (const field of [
+      'defaultFastModelId',
+      'defaultTitleModelId',
+      'defaultAttachmentInspectionModelId',
+      'defaultSuggestionModelId',
+      'defaultCompressModelId',
+    ]) {
+      expect(projection.policy[field]).toBeUndefined()
+    }
+    expect(projection.policy.defaultModelId).toBe(projection.models[0].modelId)
+    await page.locator('[data-cy="snapshot-preview-surface"]').getByRole('button', { name: 'Close', exact: true }).click()
   })
 })

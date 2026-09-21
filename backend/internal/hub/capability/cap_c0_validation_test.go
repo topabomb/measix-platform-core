@@ -330,7 +330,13 @@ func TestCAPC2041DefaultMustReferenceEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	content := validDraft(up.UpstreamID)
-	// Make the model disabled but keep it as defaultModelId — must fail validation.
+	// Make the model disabled but keep all model defaults — each reference must fail independently.
+	modelID := content.Models[0].ModelId
+	content.Policy.DefaultFastModelId = &modelID
+	content.Policy.DefaultTitleModelId = &modelID
+	content.Policy.DefaultAttachmentInspectionModelId = &modelID
+	content.Policy.DefaultSuggestionModelId = &modelID
+	content.Policy.DefaultCompressModelId = &modelID
 	content.Models[0].Enabled = false
 	// Remove the binding requirement by also removing the binding for the disabled model.
 	// Since the model is disabled, it doesn't need a binding, but the defaultModelId must still be valid.
@@ -351,14 +357,64 @@ func TestCAPC2041DefaultMustReferenceEnabled(t *testing.T) {
 	if result.Valid {
 		t.Fatalf("validation should fail for defaultModelId pointing to disabled model, result=%+v", result)
 	}
-	found := false
+	want := map[string]bool{
+		"invalid_default_model":                       false,
+		"invalid_default_fast_model":                  false,
+		"invalid_default_title_model":                 false,
+		"invalid_default_attachment_inspection_model": false,
+		"invalid_default_suggestion_model":            false,
+		"invalid_default_compress_model":              false,
+	}
 	for _, e := range result.Errors {
-		if strings.Contains(e.Code, "invalid_default_model") {
-			found = true
-			break
+		if _, ok := want[e.Code]; ok {
+			want[e.Code] = true
 		}
 	}
-	if !found {
-		t.Fatalf("expected invalid_default_model error, got %+v", result.Errors)
+	for code, found := range want {
+		if !found {
+			t.Errorf("expected %s error, got %+v", code, result.Errors)
+		}
 	}
+}
+
+func TestAttachmentInspectionDefaultRequiresImageInput(t *testing.T) {
+	ctx := context.Background()
+	st, boot, now := bootstrapI2(t)
+	box, err := security.NewSecretBox(bytes.Repeat([]byte{0x42}, 32), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ups := upstream.NewService(st.Client, box)
+	ups.Now = func() time.Time { return now }
+	secret, err := ups.CreateSecret(ctx, boot.AdminUserID, "provider-token", "super-secret-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up, err := ups.CreateUpstream(ctx, boot.AdminUserID, testUpstreamConfig(secret.SecretID, secret.SecretVersion))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cap := capability.NewService(st.Client)
+	cap.Now = func() time.Time { return now }
+	draft, err := cap.GetDraft(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := validDraft(up.UpstreamID)
+	modelID := content.Models[0].ModelId
+	content.Policy.DefaultAttachmentInspectionModelId = &modelID
+	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, issue := range result.Errors {
+		if issue.Code == "invalid_default_attachment_inspection_model_modality" {
+			return
+		}
+	}
+	t.Fatalf("expected image-input validation error, got %+v", result.Errors)
 }

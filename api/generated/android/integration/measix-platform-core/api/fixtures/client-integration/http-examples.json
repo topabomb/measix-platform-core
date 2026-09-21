@@ -116,7 +116,7 @@
     "response": {
       "bodyFile": "snapshot-v4.json",
       "headers": {
-        "ETag": "\"sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc\""
+        "ETag": "\"sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8\""
       },
       "status": 200
     }
@@ -124,7 +124,7 @@
   {
     "headers": {
       "Authorization": "Bearer synthetic.access.token",
-      "If-None-Match": "\"sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc\""
+      "If-None-Match": "\"sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8\""
     },
     "method": "GET",
     "name": "snapshot-not-modified",
@@ -132,7 +132,7 @@
     "response": {
       "body": null,
       "headers": {
-        "ETag": "\"sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc\""
+        "ETag": "\"sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8\""
       },
       "status": 304
     }
@@ -140,7 +140,7 @@
   {
     "body": {
       "managedGeneration": 42,
-      "snapshotHash": "sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc"
+      "snapshotHash": "sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8"
     },
     "headers": {
       "Authorization": "Bearer synthetic.access.token"

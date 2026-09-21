@@ -2,7 +2,7 @@
   {
     "context": {
       "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
-      "etag": "\"sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc\"",
+      "etag": "\"sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8\"",
       "generation": 42
     },
     "name": "accept",
@@ -103,8 +103,13 @@
         "allowLocalTts": true,
         "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         "defaultAssistantId": "asd_11111111-1111-4111-8111-111111111111",
+        "defaultAttachmentInspectionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultCompressModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultFastModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultImageGenerationId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
         "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultSuggestionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultTitleModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultTtsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         "policyId": "pol_550e8400-e29b-41d4-a716-446655440000"
       },
@@ -118,7 +123,7 @@
       ],
       "releaseId": "rel_550e8400-e29b-41d4-a716-446655440000",
       "schemaVersion": 4,
-      "snapshotHash": "sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc",
+      "snapshotHash": "sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8",
       "starters": [
         {
           "assistantDefinitionId": "asd_11111111-1111-4111-8111-111111111111",
@@ -163,7 +168,7 @@
   {
     "context": {
       "deploymentId": "dep_99999999-9999-4999-8999-999999999999",
-      "etag": "\"sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc\"",
+      "etag": "\"sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8\"",
       "generation": 42
     },
     "name": "wrong-deployment",
@@ -264,8 +269,13 @@
         "allowLocalTts": true,
         "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         "defaultAssistantId": "asd_11111111-1111-4111-8111-111111111111",
+        "defaultAttachmentInspectionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultCompressModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultFastModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultImageGenerationId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
         "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultSuggestionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultTitleModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultTtsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         "policyId": "pol_550e8400-e29b-41d4-a716-446655440000"
       },
@@ -279,7 +289,7 @@
       ],
       "releaseId": "rel_550e8400-e29b-41d4-a716-446655440000",
       "schemaVersion": 4,
-      "snapshotHash": "sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc",
+      "snapshotHash": "sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8",
       "starters": [
         {
           "assistantDefinitionId": "asd_11111111-1111-4111-8111-111111111111",
@@ -324,7 +334,7 @@
   {
     "context": {
       "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
-      "etag": "\"sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc\"",
+      "etag": "\"sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8\"",
       "generation": 43
     },
     "name": "wrong-generation",
@@ -425,8 +435,13 @@
         "allowLocalTts": true,
         "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         "defaultAssistantId": "asd_11111111-1111-4111-8111-111111111111",
+        "defaultAttachmentInspectionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultCompressModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultFastModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultImageGenerationId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
         "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultSuggestionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultTitleModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultTtsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         "policyId": "pol_550e8400-e29b-41d4-a716-446655440000"
       },
@@ -440,7 +455,7 @@
       ],
       "releaseId": "rel_550e8400-e29b-41d4-a716-446655440000",
       "schemaVersion": 4,
-      "snapshotHash": "sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc",
+      "snapshotHash": "sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8",
       "starters": [
         {
           "assistantDefinitionId": "asd_11111111-1111-4111-8111-111111111111",
@@ -586,8 +601,13 @@
         "allowLocalTts": true,
         "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         "defaultAssistantId": "asd_11111111-1111-4111-8111-111111111111",
+        "defaultAttachmentInspectionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultCompressModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultFastModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultImageGenerationId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
         "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultSuggestionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultTitleModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultTtsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         "policyId": "pol_550e8400-e29b-41d4-a716-446655440000"
       },
@@ -601,7 +621,7 @@
       ],
       "releaseId": "rel_550e8400-e29b-41d4-a716-446655440000",
       "schemaVersion": 4,
-      "snapshotHash": "sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc",
+      "snapshotHash": "sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8",
       "starters": [
         {
           "assistantDefinitionId": "asd_11111111-1111-4111-8111-111111111111",
@@ -646,7 +666,7 @@
   {
     "context": {
       "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
-      "etag": "\"sha256:d26018b7ee827e7bf65ea891dee7a6138bb08b21fa678688384d550906eb79fc\"",
+      "etag": "\"sha256:3f60d13495552b007ece3e188934553f6f8dffc1c76846b883f99e065f3113b8\"",
       "generation": 42
     },
     "name": "wrong-body-hash",
@@ -747,8 +767,13 @@
         "allowLocalTts": true,
         "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         "defaultAssistantId": "asd_11111111-1111-4111-8111-111111111111",
+        "defaultAttachmentInspectionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultCompressModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultFastModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultImageGenerationId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
         "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultSuggestionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "defaultTitleModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         "defaultTtsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         "policyId": "pol_550e8400-e29b-41d4-a716-446655440000"
       },

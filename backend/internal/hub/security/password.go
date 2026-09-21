@@ -22,6 +22,11 @@ const (
 
 var ErrInvalidPassword = errors.New("password must contain 12..128 Unicode code points")
 
+var (
+	dummyPasswordSalt = []byte("measix-login-pad")
+	dummyPasswordKey  = argon2.IDKey([]byte("not a real admin password"), dummyPasswordSalt, argonIterations, argonMemory, argonParallelism, argonKeyBytes)
+)
+
 func HashPassword(password string) (string, error) {
 	if n := utf8.RuneCountInString(password); n < 12 || n > 128 || !utf8.ValidString(password) {
 		return "", ErrInvalidPassword
@@ -62,4 +67,18 @@ func VerifyPassword(encoded, password string) bool {
 	}
 	got := argon2.IDKey([]byte(password), salt, iterations, memory, parallelism, uint32(len(want)))
 	return subtle.ConstantTimeCompare(got, want) == 1
+}
+
+// VerifyPasswordOrDummy keeps unknown-user login attempts on the same
+// Argon2id work path without introducing a real fallback credential.
+func VerifyPasswordOrDummy(encoded *string, password string) bool {
+	if encoded != nil {
+		return VerifyPassword(*encoded, password)
+	}
+	if !utf8.ValidString(password) || utf8.RuneCountInString(password) > 128 {
+		return false
+	}
+	got := argon2.IDKey([]byte(password), dummyPasswordSalt, argonIterations, argonMemory, argonParallelism, argonKeyBytes)
+	_ = subtle.ConstantTimeCompare(got, dummyPasswordKey)
+	return false
 }

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -155,5 +156,78 @@ func TestAdminSessionCookieAndCSRF(t *testing.T) {
 	}
 	if _, _, err := s.AuthenticateAdmin(ctx, login.CookieSecret, login.CSRFToken, false); !errors.Is(err, identity.ErrNotAuthorized) {
 		t.Fatalf("session remained active: %v", err)
+	}
+}
+
+func TestAdminSessionLifetimeAndPasswordResetRevocation(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newService(t)
+	boot, err := s.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := s.Now().UTC()
+	short, err := s.LoginAdminWithOptions(ctx, "admin", "correct horse battery staple", identity.AdminLoginOptions{Source: "browser-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := now.Add(12 * time.Hour); !short.ExpiresAt.Equal(want) {
+		t.Fatalf("ordinary admin expiry=%s want=%s", short.ExpiresAt, want)
+	}
+	remembered, err := s.LoginAdminWithOptions(ctx, "admin", "correct horse battery staple", identity.AdminLoginOptions{RememberMe: true, Source: "browser-b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := now.Add(30 * 24 * time.Hour); !remembered.ExpiresAt.Equal(want) {
+		t.Fatalf("remembered admin expiry=%s want=%s", remembered.ExpiresAt, want)
+	}
+	if err := s.SetPassword(ctx, boot.AdminUserID, "new correct horse battery staple"); err != nil {
+		t.Fatal(err)
+	}
+	for _, login := range []identity.AdminSessionResult{short, remembered} {
+		if _, _, err := s.AuthenticateAdmin(ctx, login.CookieSecret, "", false); !errors.Is(err, identity.ErrNotAuthorized) {
+			t.Fatalf("password reset left admin session active: %v", err)
+		}
+	}
+}
+
+func TestAdminLoginProgressiveAndSourceThrottling(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newService(t)
+	if _, err := s.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple"); err != nil {
+		t.Fatal(err)
+	}
+	now := s.Now().UTC()
+	s.Now = func() time.Time { return now }
+
+	for range 5 {
+		if _, err := s.LoginAdminWithOptions(ctx, "admin", "wrong password value", identity.AdminLoginOptions{Source: "browser-a"}); !errors.Is(err, identity.ErrCredential) {
+			t.Fatalf("wrong credential error=%v", err)
+		}
+	}
+	_, err := s.LoginAdminWithOptions(ctx, "admin", "correct horse battery staple", identity.AdminLoginOptions{Source: "browser-a"})
+	var throttled *identity.LoginThrottledError
+	if !errors.As(err, &throttled) || throttled.RetryAfter != 5*time.Second {
+		t.Fatalf("fifth failure throttle=%v", err)
+	}
+	now = now.Add(5 * time.Second)
+	if _, err := s.LoginAdminWithOptions(ctx, "admin", "correct horse battery staple", identity.AdminLoginOptions{Source: "browser-a"}); err != nil {
+		t.Fatalf("login did not recover after account wait: %v", err)
+	}
+
+	s2, _ := newService(t)
+	if _, err := s2.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple"); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 20 {
+		username := fmt.Sprintf("unknown-%d", i)
+		if _, err := s2.LoginAdminWithOptions(ctx, username, "wrong password value", identity.AdminLoginOptions{Source: "sprayer"}); !errors.Is(err, identity.ErrCredential) {
+			t.Fatalf("source failure %d error=%v", i+1, err)
+		}
+	}
+	_, err = s2.LoginAdminWithOptions(ctx, "admin", "correct horse battery staple", identity.AdminLoginOptions{Source: "sprayer"})
+	throttled = nil
+	if !errors.As(err, &throttled) || throttled.RetryAfter != 10*time.Minute {
+		t.Fatalf("source throttle=%v", err)
 	}
 }

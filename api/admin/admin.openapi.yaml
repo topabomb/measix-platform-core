@@ -17,6 +17,18 @@ paths:
           $ref: '#/components/responses/Problem'
         '401':
           $ref: '#/components/responses/Problem'
+        '429':
+          description: Login attempts are temporarily throttled
+          headers:
+            Retry-After:
+              description: Whole seconds until another login attempt may be made.
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
       requestBody:
         required: true
         content:
@@ -2114,7 +2126,7 @@ components:
     ManagedPolicy:
       type: object
       additionalProperties: false
-      description: Current policy. All five admission flags are required; new policies initialize all five to false.
+      description: Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted.
       required:
       - policyId
       - allowLocalProviders
@@ -2137,6 +2149,16 @@ components:
           type: boolean
           description: Allows user assistants; referenced resources remain independently governed.
         defaultModelId:
+          $ref: '#/components/schemas/ModelId'
+        defaultFastModelId:
+          $ref: '#/components/schemas/ModelId'
+        defaultTitleModelId:
+          $ref: '#/components/schemas/ModelId'
+        defaultAttachmentInspectionModelId:
+          $ref: '#/components/schemas/ModelId'
+        defaultSuggestionModelId:
+          $ref: '#/components/schemas/ModelId'
+        defaultCompressModelId:
           $ref: '#/components/schemas/ModelId'
         defaultImageGenerationId:
           $ref: '#/components/schemas/ImageGenerationId'
@@ -2307,6 +2329,9 @@ components:
           type: string
           minLength: 12
           maxLength: 128
+        rememberMe:
+          type: boolean
+          description: Request a fixed 30-day persistent Admin session. HTTPS cookies are Secure; HTTP/IP deployments remain supported but cannot provide transport confidentiality. False creates a browser-session cookie with a 12-hour server-side maximum.
     User:
       type: object
       additionalProperties: false

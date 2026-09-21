@@ -453,6 +453,11 @@ describe('ResourcesPage', () => {
     const draft = useDraftStore(pinia)
     const defaults = [
       ['Default Model', 'defaultModelId'],
+      ['Fast task model', 'defaultFastModelId'],
+      ['Title generation model', 'defaultTitleModelId'],
+      ['Attachment inspection model', 'defaultAttachmentInspectionModelId'],
+      ['Suggestion model', 'defaultSuggestionModelId'],
+      ['Context compaction model', 'defaultCompressModelId'],
       ['Default Image Generation', 'defaultImageGenerationId'],
       ['Default TTS', 'defaultTtsId'],
       ['Default ASR', 'defaultAsrId'],
@@ -468,6 +473,28 @@ describe('ResourcesPage', () => {
       await flushPromises()
       expect(Object.hasOwn(draft.localContent!.policy, key)).toBe(false)
     }
+  })
+
+  it('offers only image-capable enabled models for attachment inspection', async () => {
+    const stored = structuredClone(EMPTY_DRAFT)
+    stored.content.models = [
+      { modelId: 'mdl_text', providerId: 'prv_1', displayName: 'Text only', upstreamModelKey: 'text', runtimePath: '/chat', inputModalities: ['TEXT'], outputModalities: ['TEXT'], capabilities: [], enabled: true },
+      { modelId: 'mdl_vision', providerId: 'prv_1', displayName: 'Vision', upstreamModelKey: 'vision', runtimePath: '/chat', inputModalities: ['TEXT', 'IMAGE'], outputModalities: ['TEXT'], capabilities: [], enabled: true },
+      { modelId: 'mdl_disabled', providerId: 'prv_1', displayName: 'Disabled vision', upstreamModelKey: 'disabled', runtimePath: '/chat', inputModalities: ['IMAGE'], outputModalities: ['TEXT'], capabilities: [], enabled: false },
+    ]
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/draft') return structuredClone(stored)
+      if (path.startsWith('/api/admin/v1/upstreams')) return { items: [] }
+      return {}
+    })
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    await switchTab(wrapper, 'policy')
+
+    const selector = wrapper.findAllComponents(QSelect).find(item => item.props('label') === 'Attachment inspection model')!
+    expect(selector).toBeDefined()
+    expect(selector.props('options')).toEqual([{ label: 'Vision', value: 'mdl_vision' }])
   })
 
   it('can add an ASR resource through the Add button', async () => {

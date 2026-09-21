@@ -27,6 +27,12 @@ pnpm
 - API DTO/type 来自 generated Admin OpenAPI；不维护平行手写 wire model；
 - Secret plaintext 不进入 localStorage、持久 Pinia state、日志或测试 artifact。
 
+登录页只把 username/password/`rememberMe` 发送到 generated Admin API，Pinia 仅保留服务端返回的展示 Session/CSRF，不持久化凭据。默认登录由 Hub 创建最长 12 小时的浏览器会话 Cookie；HTTP/IP 与 HTTPS 下显式勾选“在此设备上保持登录”均创建固定 30 天、不可滑动续期的持久 Cookie，HTTPS 设置 Secure，HTTP 仅在勾选后显示未加密风险提示。密码显隐仅改变当前 input presentation。`api/client.ts` 将 `429 login_throttled` 的 `Retry-After` 投影为当前页面倒计时；安全计数仍全部由 Hub identity owner 执行。
+
+Hub 的 Admin login guard 使用有界、自动过期的进程内 username/source 状态：username 第 5 次失败后按 5 秒、30 秒、2 分钟、5 分钟渐进等待，来源 10 分钟内 20 次失败后等待 10 分钟；未知账号走同等 Argon2id 工作并返回相同 `401 invalid_credential`。单进程最多同时执行 4 个密码校验，容量已满时在账号查询和 Argon2id 前直接返回 `429 login_throttled` + `Retry-After: 1`，不排队累积内存。当前单 Hub 重启会清空临时限流状态，但不改变任何持久 Session。登录安全事件只记录 event/source、成功 userId 和保持登录选择，不记录 username/password/Cookie/CSRF；设置或重置密码在同一 DB 事务撤销目标用户全部 Admin Web Session。
+
+`candidate` system lane 使用真实 Hub 进程测量 5 次正常登录及 100 并发错误突发，记录 total、throughput、p50/p95/p99、401/429 分布与 Hub peak RSS；门禁为正常单次不超过 2 秒、错误突发不超过 30 秒且新增 RSS 不超过 512 MiB。该性能证据与普通单元测试分开，不用 mock/编译通过代替。
+
 Root repository 的 npm orchestration、实际开发命令与 system harness 生命周期由 `docs/development.md` 维护，不在本文重复。
 
 ## 2. 当前源码组织
@@ -88,7 +94,7 @@ Usage 顶层只常驻时间、用户和上游等高频条件，其余资源类�
 
 具体“必须做什么”只引用 architecture；当前实现与验证结果见 [当前状态](s0-execution-progress.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。
 
-S0.2 Assistant/Memory Seed/Starter 由 Resources 内的 `ManagedExperienceEditor.vue` 编辑，复用唯一 DraftStore/generated DTO/Save/Validate/Preview/Publish 流程；Seed 支持空数组及作者顺序，Starter 绑定 Assistant，删除 Assistant 同时移除其 local Draft Starters。删除资源先检查 defaults、Assistant 和 binding 引用，不通过数组名猜测类型；Validation issue 携带 resourceKind/resourceId/field 并导航到对应分区。Review diff 与 canonical Preview 覆盖资源、Binding、Policy、Assistant 和 Starter；有未保存编辑时不运行 saved-Draft Preview/Validate。不存在第二套 API/store/schema。EnterpriseUpdatesPage 继续使用独立 Feed API；两者仍需按 ERX gate 证明真实 consumer 产品闭环。新增 Gateway profile 与运维状态不得借用现有页面截图声称已经实现。
+S0.2 Assistant/Memory Seed/Starter 由 Resources 内的 `ManagedExperienceEditor.vue` 编辑，复用唯一 DraftStore/generated DTO/Save/Validate/Preview/Publish 流程；Seed 支持空数组及作者顺序，Starter 绑定 Assistant，删除 Assistant 同时移除其 local Draft Starters。Policy 在同一 Draft owner 中把十项可选默认值分为“主要默认值”和“辅助模型默认值”两组；清空即删除字段，附件检查选择器只列出已启用且支持 IMAGE 输入的模型。删除模型先检查六个模型默认引用和 Assistant/binding 引用，不通过数组名猜测类型；Validation issue 携带 resourceKind/resourceId/field 并导航到对应分区。Review diff 与 canonical Preview 覆盖资源、Binding、Policy 的十项默认值、Assistant 和 Starter；有未保存编辑时不运行 saved-Draft Preview/Validate。不存在第二套 API/store/schema。EnterpriseUpdatesPage 继续使用独立 Feed API；两者仍需按 ERX gate 证明真实 consumer 产品闭环。新增 Gateway profile 与运维状态不得借用现有页面截图声称已经实现。
 
 不要通过增加第二套 schema、自由 JSON editor、客户端自定义 Provider body/header DSL 或隐藏失败状态来绕过这些要求。
 

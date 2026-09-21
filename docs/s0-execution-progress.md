@@ -40,7 +40,7 @@ Admin 的用户删除采用精确用户名和原因确认、deny-first 状态机
 
 ## 最新真实供应商实验与 Android 交接
 
-当前局域网公共入口为 `http://192.168.31.235:9100`。第 5 版已真实发布并经协议客户端同步、应用回执和同源 Relay 调用：DeepSeek Flash 文本 SSE/工具/看图、MiMo WAV/流式 PCM、Firecrawl MCP initialize/202 通知/list/scrape、Qwen 3.8 Flash 文本/工具/看图、百炼 HTTP ASR 转写均成功。默认模型/TTS/ASR/企业助手和两个企业助手、三个入口均在 Snapshot 中。五类资源都有按资源归属的真实转发记录；`LEVEL_0` 不提供可靠 token/费用。Android 当前源码已读取 `defaultAssistantId` 并映射到 EnterpriseDefaults，但设备级进入空间及会话仍需维护方验证。本轮仅只读核对 Android 仓库。
+当前局域网公共入口为 `http://192.168.31.235:9100`。第 5 版已真实发布并经协议客户端同步、应用回执和同源 Relay 调用：DeepSeek Flash 文本 SSE/工具/看图、MiMo WAV/流式 PCM、Firecrawl MCP initialize/202 通知/list/scrape、Qwen 3.8 Flash 文本/工具/看图、百炼 HTTP ASR 转写均成功。当前合同现已包含十项独立可选默认值及两个企业助手、三个入口；已有第 5 版证据早于这五个辅助默认字段，不能作为本次十项 UI/设备验收。五类资源都有按资源归属的真实转发记录；`LEVEL_0` 不提供可靠 token/费用。
 
 四组凭据和协议结论见[真实供应商接入记录](real-supplier-integration.md)。百炼新加坡 Token Plan 直连 LLM/TTS/ASR/生图成功；Qwen Flash 图片与工具成功，具名强制工具调用需 `enable_thinking=false`。新增 `DASHSCOPE_HTTP_ASR`（HTTP JSON 音频 Data URI、`output.text`）的架构、Admin/Client OpenAPI、Hub 校验、Admin 编辑、共享 Snapshot/runtime 样例、Relay 凭据与载荷测试已完成。第 4 版发布 Qwen 与 HTTP ASR；实际管理界面和 Usage 审查发现 Firecrawl MCP 路由只允许 POST，历史 GET 请求被 Core 403 阻断。第 5 版补齐 POST/GET/DELETE，公共入口 GET 到达上游返回 405、无会话标识的 DELETE 返回 400；模型/TTS/MCP/Qwen/ASR 再次实测通过。Admin 资源编辑现让路由允许路径随资源路径变更，修正重复 ASR 提示、误写 DeepSeek 的通用提供商提示与用量页生硬术语；Hub 草稿校验也拒绝资源路径不在 binding allowlist 内或 MCP 方法不全。自动化 Go/Console 测试均通过；最终 Hub 重启后系统页确认活跃 Generation 5、Relay 已应用 Revision 10、状态已收敛。第 5 版的一次 Android 模拟器录音转写仍收到百炼上游 400；同一路由上的 Android 格式等价有效语音返回 200，8 秒纯静音 WAV 复现 400。静音是待核查的录音原因，不能将这次设备 ASR 调用算作通过。
 

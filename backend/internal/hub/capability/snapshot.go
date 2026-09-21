@@ -159,17 +159,22 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	sort.Slice(mcp, func(i, j int) bool { return mcp[i].McpServerId < mcp[j].McpServerId })
 
 	policy := clientapi.ManagedPolicy{
-		PolicyId:                 input.Content.Policy.PolicyId,
-		AllowLocalProviders:      input.Content.Policy.AllowLocalProviders,
-		AllowLocalTts:            input.Content.Policy.AllowLocalTts,
-		AllowLocalAsr:            input.Content.Policy.AllowLocalAsr,
-		AllowLocalMcp:            input.Content.Policy.AllowLocalMcp,
-		AllowLocalAssistants:     input.Content.Policy.AllowLocalAssistants,
-		DefaultModelId:           input.Content.Policy.DefaultModelId,
-		DefaultTtsId:             input.Content.Policy.DefaultTtsId,
-		DefaultAsrId:             input.Content.Policy.DefaultAsrId,
-		DefaultImageGenerationId: input.Content.Policy.DefaultImageGenerationId,
-		DefaultAssistantId:       input.Content.Policy.DefaultAssistantId,
+		PolicyId:                           input.Content.Policy.PolicyId,
+		AllowLocalProviders:                input.Content.Policy.AllowLocalProviders,
+		AllowLocalTts:                      input.Content.Policy.AllowLocalTts,
+		AllowLocalAsr:                      input.Content.Policy.AllowLocalAsr,
+		AllowLocalMcp:                      input.Content.Policy.AllowLocalMcp,
+		AllowLocalAssistants:               input.Content.Policy.AllowLocalAssistants,
+		DefaultModelId:                     input.Content.Policy.DefaultModelId,
+		DefaultFastModelId:                 input.Content.Policy.DefaultFastModelId,
+		DefaultTitleModelId:                input.Content.Policy.DefaultTitleModelId,
+		DefaultAttachmentInspectionModelId: input.Content.Policy.DefaultAttachmentInspectionModelId,
+		DefaultSuggestionModelId:           input.Content.Policy.DefaultSuggestionModelId,
+		DefaultCompressModelId:             input.Content.Policy.DefaultCompressModelId,
+		DefaultTtsId:                       input.Content.Policy.DefaultTtsId,
+		DefaultAsrId:                       input.Content.Policy.DefaultAsrId,
+		DefaultImageGenerationId:           input.Content.Policy.DefaultImageGenerationId,
+		DefaultAssistantId:                 input.Content.Policy.DefaultAssistantId,
 	}
 	var publishedBy *string
 	if input.PublishedByUserID != "" {

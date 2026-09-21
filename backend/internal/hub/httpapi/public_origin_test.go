@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -24,6 +25,84 @@ func TestAdminCookieUsesConfiguredPublicScheme(t *testing.T) {
 				t.Fatalf("incorrect cookie flags: secure=%v httpOnly=%v sameSite=%v", cookie.Secure, cookie.HttpOnly, cookie.SameSite)
 			}
 		})
+	}
+}
+
+func TestAdminRememberLoginCookiePolicy(t *testing.T) {
+	h, id, _, _, _ := setupFullHandler(t)
+	id.SetPublicOrigin("https://platform.example")
+	now := id.Now().UTC()
+
+	ordinary := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", nil, map[string]any{
+		"username": "admin", "password": "correct horse battery staple",
+	})
+	if ordinary.Code != http.StatusOK {
+		t.Fatalf("ordinary login: %d %s", ordinary.Code, ordinary.Body)
+	}
+	ordinaryCookie := ordinary.Result().Cookies()[0]
+	if !ordinaryCookie.Expires.IsZero() || ordinaryCookie.MaxAge != 0 {
+		t.Fatalf("ordinary login persisted cookie: %+v", ordinaryCookie)
+	}
+	var ordinarySession struct {
+		ExpiresAt time.Time `json:"expiresAt"`
+	}
+	decodeJSON(t, ordinary, &ordinarySession)
+	if want := now.Add(12 * time.Hour); !ordinarySession.ExpiresAt.Equal(want) {
+		t.Fatalf("ordinary expiry=%s want=%s", ordinarySession.ExpiresAt, want)
+	}
+
+	remembered := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", nil, map[string]any{
+		"username": "admin", "password": "correct horse battery staple", "rememberMe": true,
+	})
+	if remembered.Code != http.StatusOK {
+		t.Fatalf("remembered login: %d %s", remembered.Code, remembered.Body)
+	}
+	rememberedCookie := remembered.Result().Cookies()[0]
+	if rememberedCookie.MaxAge != 30*24*60*60 || !rememberedCookie.Expires.Equal(now.Add(30*24*time.Hour)) {
+		t.Fatalf("remembered cookie lifetime: %+v", rememberedCookie)
+	}
+
+	id.SetPublicOrigin("http://192.168.1.20:9000")
+	httpRemembered := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", nil, map[string]any{
+		"username": "admin", "password": "correct horse battery staple", "rememberMe": true,
+	})
+	if httpRemembered.Code != http.StatusOK {
+		t.Fatalf("HTTP remembered login=%d %s", httpRemembered.Code, httpRemembered.Body)
+	}
+	httpCookie := httpRemembered.Result().Cookies()[0]
+	if httpCookie.Secure || httpCookie.MaxAge != 30*24*60*60 || !httpCookie.Expires.Equal(now.Add(30*24*time.Hour)) {
+		t.Fatalf("HTTP remembered cookie policy: %+v", httpCookie)
+	}
+}
+
+func TestAdminLoginThrottleReturnsRetryAfter(t *testing.T) {
+	h, _, _, _, _ := setupFullHandler(t)
+	for range 5 {
+		response := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", nil, map[string]any{
+			"username": "admin", "password": "wrong password value",
+		})
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("credential failure=%d %s", response.Code, response.Body)
+		}
+	}
+	response := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", nil, map[string]any{
+		"username": "admin", "password": "correct horse battery staple",
+	})
+	if response.Code != http.StatusTooManyRequests || response.Header().Get("Retry-After") != "5" || !strings.Contains(response.Body.String(), "login_throttled") {
+		t.Fatalf("throttle response=%d retry=%q body=%s", response.Code, response.Header().Get("Retry-After"), response.Body)
+	}
+}
+
+func TestAdminLoginFailureDoesNotRevealUsername(t *testing.T) {
+	h, _, _, _, _ := setupFullHandler(t)
+	known := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", nil, map[string]any{
+		"username": "admin", "password": "wrong password value",
+	})
+	unknown := doJSON(t, h, http.MethodPost, "/api/admin/v1/session/login", nil, map[string]any{
+		"username": "does-not-exist", "password": "wrong password value",
+	})
+	if known.Code != http.StatusUnauthorized || unknown.Code != http.StatusUnauthorized || known.Body.String() != unknown.Body.String() {
+		t.Fatalf("login failure revealed username: known=%d %s unknown=%d %s", known.Code, known.Body, unknown.Code, unknown.Body)
 	}
 }
 

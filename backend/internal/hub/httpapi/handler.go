@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -42,20 +45,46 @@ func (h *adminHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	result, err := h.identity.LoginAdmin(r.Context(), request.Username, request.Password)
+	rememberMe := request.RememberMe != nil && *request.RememberMe
+	secure := strings.HasPrefix(h.identity.PublicOrigin(), "https://")
+	source := adminLoginSource(r)
+	result, err := h.identity.LoginAdminWithOptions(r.Context(), request.Username, request.Password, identity.AdminLoginOptions{
+		RememberMe: rememberMe,
+		Source:     source,
+	})
 	if err != nil {
+		var throttled *identity.LoginThrottledError
+		if errors.As(err, &throttled) {
+			seconds := int64((throttled.RetryAfter + time.Second - 1) / time.Second)
+			if seconds < 1 {
+				seconds = 1
+			}
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", seconds))
+			slog.Warn("admin login throttled", "event", "admin_login_throttled", "source", source, "retry_after_seconds", seconds)
+			writeProblem(w, http.StatusTooManyRequests, "login_throttled", "Login temporarily throttled")
+			return
+		}
+		if errors.Is(err, identity.ErrCredential) {
+			slog.Warn("admin login failed", "event", "admin_login_failed", "source", source)
+		}
 		writeIdentityError(w, err)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
+	cookie := &http.Cookie{
 		Name:     adminSessionCookie,
 		Value:    result.CookieSecret,
 		Path:     "/",
-		Expires:  result.ExpiresAt,
-		Secure:   strings.HasPrefix(h.identity.PublicOrigin(), "https://"),
+		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-	})
+	}
+	if rememberMe {
+		cookie.Expires = result.ExpiresAt
+		cookie.MaxAge = int(identity.AdminRememberedSessionTTL / time.Second)
+	}
+	http.SetCookie(w, cookie)
+	w.Header().Set("Cache-Control", "no-store")
+	slog.Info("admin login succeeded", "event", "admin_login_succeeded", "user_id", result.UserID, "remembered", rememberMe)
 	writeJSON(w, http.StatusOK, adminapi.AdminSession{
 		CsrfToken: result.CSRFToken,
 		ExpiresAt: result.ExpiresAt,
@@ -74,6 +103,7 @@ func (h *adminHandler) GetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cookie, _ := r.Cookie(adminSessionCookie)
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, adminapi.AdminSession{
 		CsrfToken: security.CSRFToken(cookie.Value, h.identity.CSRFKey),
 		ExpiresAt: admin.ExpiresAt,
@@ -83,6 +113,14 @@ func (h *adminHandler) GetSession(w http.ResponseWriter, r *http.Request) {
 			Role:        adminapi.AdminUserSummaryRole(admin.Role),
 		},
 	})
+}
+
+func adminLoginSource(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil && host != "" {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 func (h *adminHandler) LogoutAdmin(w http.ResponseWriter, r *http.Request, params adminapi.LogoutAdminParams) {

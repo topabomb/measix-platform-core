@@ -29,6 +29,23 @@ beforeEach(() => {
 })
 
 describe('SessionStore', () => {
+  it('sends the explicit remember-login choice without persisting credentials in the store', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
+      user: { userId: 'usr_00000000-0000-4000-8000-000000000001', displayName: 'Admin', role: 'ADMIN' },
+      csrfToken: 'csrf-1', expiresAt: '2026-09-18T12:00:00Z',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = useSessionStore()
+    await store.login('admin', 'correct horse battery staple', true)
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      username: 'admin', password: 'correct horse battery staple', rememberMe: true,
+    })
+    expect(store.session).toBeDefined()
+    expect(JSON.stringify(store.$state)).not.toContain('correct horse battery staple')
+  })
+
   it('clears session when the central API hook reports 401', async () => {
     // First call: successful session restore.
     // Second call: 401 Unauthorized.
@@ -129,11 +146,24 @@ describe('DraftStore', () => {
     expect(store.removeResource('MODEL', initial.content.models[0]!.modelId)).toEqual({ removed: true, references: [] })
     expect(store.dirty).toBe(true)
 
-    initial.content.policy.defaultModelId = initial.content.models[0]!.modelId
+    const modelId = initial.content.models[0]!.modelId
+    initial.content.policy.defaultModelId = modelId
+    initial.content.policy.defaultFastModelId = modelId
+    initial.content.policy.defaultTitleModelId = modelId
+    initial.content.policy.defaultAttachmentInspectionModelId = modelId
+    initial.content.policy.defaultSuggestionModelId = modelId
+    initial.content.policy.defaultCompressModelId = modelId
     await store.load()
-    const blocked = store.removeResource('MODEL', initial.content.models[0]!.modelId)
+    const blocked = store.removeResource('MODEL', modelId)
     expect(blocked.removed).toBe(false)
-    expect(blocked.references).toEqual(['policy.defaultModelId'])
+    expect(blocked.references).toEqual([
+      'policy.defaultModelId',
+      'policy.defaultFastModelId',
+      'policy.defaultTitleModelId',
+      'policy.defaultAttachmentInspectionModelId',
+      'policy.defaultSuggestionModelId',
+      'policy.defaultCompressModelId',
+    ])
     expect(store.localContent!.models).toHaveLength(1)
   })
 })

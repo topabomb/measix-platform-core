@@ -561,17 +561,22 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 		ASR:                 projectionToAdminAsr(snapshot.Asr),
 		MCP:                 projectionToAdminMcp(snapshot.Mcp),
 		Policy: adminapi.ManagedPolicy{
-			PolicyId:                 snapshot.Policy.PolicyId,
-			AllowLocalProviders:      snapshot.Policy.AllowLocalProviders,
-			AllowLocalTts:            snapshot.Policy.AllowLocalTts,
-			AllowLocalAsr:            snapshot.Policy.AllowLocalAsr,
-			AllowLocalMcp:            snapshot.Policy.AllowLocalMcp,
-			AllowLocalAssistants:     snapshot.Policy.AllowLocalAssistants,
-			DefaultModelId:           snapshot.Policy.DefaultModelId,
-			DefaultTtsId:             snapshot.Policy.DefaultTtsId,
-			DefaultAsrId:             snapshot.Policy.DefaultAsrId,
-			DefaultImageGenerationId: snapshot.Policy.DefaultImageGenerationId,
-			DefaultAssistantId:       snapshot.Policy.DefaultAssistantId,
+			PolicyId:                           snapshot.Policy.PolicyId,
+			AllowLocalProviders:                snapshot.Policy.AllowLocalProviders,
+			AllowLocalTts:                      snapshot.Policy.AllowLocalTts,
+			AllowLocalAsr:                      snapshot.Policy.AllowLocalAsr,
+			AllowLocalMcp:                      snapshot.Policy.AllowLocalMcp,
+			AllowLocalAssistants:               snapshot.Policy.AllowLocalAssistants,
+			DefaultModelId:                     snapshot.Policy.DefaultModelId,
+			DefaultFastModelId:                 snapshot.Policy.DefaultFastModelId,
+			DefaultTitleModelId:                snapshot.Policy.DefaultTitleModelId,
+			DefaultAttachmentInspectionModelId: snapshot.Policy.DefaultAttachmentInspectionModelId,
+			DefaultSuggestionModelId:           snapshot.Policy.DefaultSuggestionModelId,
+			DefaultCompressModelId:             snapshot.Policy.DefaultCompressModelId,
+			DefaultTtsId:                       snapshot.Policy.DefaultTtsId,
+			DefaultAsrId:                       snapshot.Policy.DefaultAsrId,
+			DefaultImageGenerationId:           snapshot.Policy.DefaultImageGenerationId,
+			DefaultAssistantId:                 snapshot.Policy.DefaultAssistantId,
 		},
 		Assistants: projectionToAdminAssistants(snapshot.Assistants),
 		Starters:   projectionToAdminStarters(snapshot.Starters),
@@ -685,6 +690,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	asrProtocols := map[string]adminapi.AsrDefinitionClientProtocol{}
 	resourceKinds := map[string]adminapi.ValidationIssueResourceKind{}
 	imageRuntimePaths := map[string]string{}
+	modelHasImageInput := map[string]bool{}
 	for i, model := range content.Models {
 		resources[model.ModelId] = model.Enabled
 		runtimePaths[model.ModelId] = model.RuntimePath
@@ -713,6 +719,9 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			}
 		}
 		for j, m := range model.InputModalities {
+			if m == adminapi.ModelDefinitionInputModalitiesIMAGE {
+				modelHasImageInput[model.ModelId] = true
+			}
 			if !m.Valid() {
 				addError("invalid_input_modality", fmt.Sprintf("models[%d].inputModalities[%d]", i, j), "unsupported input modality", &kindModel, ptrStr(model.ModelId), ptrStr("inputModalities"))
 			}
@@ -979,9 +988,29 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			addError("missing_binding", "bindings", "enabled resource has no runtime binding", &kind, ptrStr(resourceID), ptrStr("upstreamId"))
 		}
 	}
-	if content.Policy.DefaultModelId != nil {
-		if enabled, ok := resources[*content.Policy.DefaultModelId]; !ok || !enabled {
-			addError("invalid_default_model", "policy.defaultModelId", "default model must reference an enabled model", &kindPolicy, content.Policy.DefaultModelId, ptrStr("defaultModelId"))
+	modelDefaults := []struct {
+		id      *adminapi.ModelId
+		field   string
+		code    string
+		message string
+	}{
+		{content.Policy.DefaultModelId, "defaultModelId", "invalid_default_model", "default model must reference an enabled model"},
+		{content.Policy.DefaultFastModelId, "defaultFastModelId", "invalid_default_fast_model", "default fast model must reference an enabled model"},
+		{content.Policy.DefaultTitleModelId, "defaultTitleModelId", "invalid_default_title_model", "default title model must reference an enabled model"},
+		{content.Policy.DefaultAttachmentInspectionModelId, "defaultAttachmentInspectionModelId", "invalid_default_attachment_inspection_model", "default attachment inspection model must reference an enabled model"},
+		{content.Policy.DefaultSuggestionModelId, "defaultSuggestionModelId", "invalid_default_suggestion_model", "default suggestion model must reference an enabled model"},
+		{content.Policy.DefaultCompressModelId, "defaultCompressModelId", "invalid_default_compress_model", "default compaction model must reference an enabled model"},
+	}
+	for _, value := range modelDefaults {
+		if value.id != nil {
+			if enabled, ok := resources[*value.id]; !ok || !enabled {
+				addError(value.code, "policy."+value.field, value.message, &kindPolicy, value.id, ptrStr(value.field))
+			}
+		}
+	}
+	if id := content.Policy.DefaultAttachmentInspectionModelId; id != nil {
+		if enabled, ok := resources[*id]; ok && enabled && !modelHasImageInput[*id] {
+			addError("invalid_default_attachment_inspection_model_modality", "policy.defaultAttachmentInspectionModelId", "default attachment inspection model must accept IMAGE input", &kindPolicy, id, ptrStr("defaultAttachmentInspectionModelId"))
 		}
 	}
 	if content.Policy.DefaultTtsId != nil {

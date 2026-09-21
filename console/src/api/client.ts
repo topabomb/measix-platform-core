@@ -9,6 +9,7 @@ export class ApiProblem extends Error {
   readonly currentConfigRevision?: number
   readonly currentSecretVersion?: number
   readonly currentPricingRevision?: number
+  readonly retryAfterSeconds?: number
 
   constructor(
     readonly status: number,
@@ -24,6 +25,7 @@ export class ApiProblem extends Error {
       if (typeof extra.currentConfigRevision === 'number') this.currentConfigRevision = extra.currentConfigRevision
       if (typeof extra.currentSecretVersion === 'number') this.currentSecretVersion = extra.currentSecretVersion
       if (typeof extra.currentPricingRevision === 'number') this.currentPricingRevision = extra.currentPricingRevision
+      if (typeof extra.retryAfterSeconds === 'number') this.retryAfterSeconds = extra.retryAfterSeconds
     }
   }
 }
@@ -59,13 +61,16 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, csrfToke
       // Stable HTTP status/code remain sufficient when an intermediary returned non-JSON.
     }
     if (response.status === 401 && unauthorizedHandler) await unauthorizedHandler()
+    const retryAfter = Number(response.headers.get('Retry-After'))
+    const extra = { ...body }
+    if (Number.isFinite(retryAfter) && retryAfter > 0) extra.retryAfterSeconds = Math.ceil(retryAfter)
     throw new ApiProblem(
       response.status,
       String(body.code ?? 'http_error'),
       String(body.detail ?? body.title ?? response.statusText),
       typeof body.activationId === 'string' ? body.activationId : undefined,
       typeof body.currentDraftRevision === 'number' ? body.currentDraftRevision : undefined,
-      body,
+      extra,
     )
   }
   if (response.status === 204) return undefined as T

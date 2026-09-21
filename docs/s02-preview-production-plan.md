@@ -520,7 +520,7 @@ https://core.example.com {
 以下命令中的根目录变量不得使用系统 `HOME`。部署者先把占位值替换为本次部署专用的绝对路径：
 
 ```bash
-export MEASIX_ROOT=/home/admin/project/service/measix-core
+export MEASIX_ROOT=/absolute/path/to/measix-core
 ```
 
 ### 13.1 前置条件

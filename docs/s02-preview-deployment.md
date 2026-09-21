@@ -16,10 +16,11 @@
 - Spark 未安装 Caddy，这是预期状态；
 - 如 systemd 提示 PM2 unit 的磁盘版本变化，只执行 `sudo systemctl daemon-reload`，不重启其他服务。
 
-本次固定部署根目录：
+为每个站点显式选择独立的绝对部署根目录；实际值只记录在私有
+`deployment-local.md`：
 
 ```bash
-export MEASIX_ROOT=/home/admin/project/service/measix-core
+export MEASIX_ROOT=/absolute/path/to/measix-core
 export MEASIX_VERSION=<approved-preview-version>
 export MEASIX_PUBLIC_ORIGIN=https://<approved-subdomain>
 ```
@@ -42,7 +43,7 @@ export MEASIX_PUBLIC_ORIGIN=https://<approved-subdomain>
 ## 3. 主目录布局
 
 ```text
-/home/admin/project/service/measix-core/
+<MEASIX_ROOT>/
 ├── run.sh                         # PM2 唯一进程入口：run.sh hub|relay
 ├── ecosystem.config.cjs           # root PM2 配置
 ├── deployment-local.md            # 现场地址和验收记录；私有、不得提交 Git
@@ -91,7 +92,7 @@ sudo pm2 status
 systemctl is-active pm2-root
 tailscale ip -4
 ss -lnt | grep -E ':(9001|9002|9003|9004)\b' || true
-df -h /home/admin/project/service
+df -h "$(dirname "$MEASIX_ROOT")"
 ```
 
 必须确认架构为 `aarch64`、PM2 现有服务仍 online、9001–9004 空闲，并记录部署前的 `sudo pm2 status`。

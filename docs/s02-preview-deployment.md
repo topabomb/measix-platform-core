@@ -135,11 +135,19 @@ sudo pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
 sudo pm2 save
 ```
 
-首次登录后删除且只删除：
+安装器把一次性初始密码写入 root-only 文件。只在受控终端查看，将它保存到团队密码库并完成一次 Admin 登录；不得写入部署记录、工单或 Git：
+
+```bash
+sudo cat "$MEASIX_ROOT/secrets/initial-admin-password"
+```
+
+确认密码库中的凭据可以重新登录后，删除且只删除：
 
 ```bash
 sudo rm -- "$MEASIX_ROOT/secrets/initial-admin-password"
 ```
+
+密码文件删除后无法从数据库反查明文。凭据遗失时，使用 `control-hub bootstrap-admin --add-admin` 和新的受保护 password file 新增具名管理员；不要复用 SSH 密码，也不要为找回旧密码修改数据库。
 
 ## 7. Spark 本机/局域网验收
 

@@ -15,6 +15,7 @@ type Config struct {
 	PortalAssetsDir       string
 	PortalUpstreamURL     string
 	AdminAssetsDir        string
+	DiagnosticsLogDir     string
 	ListenAddr            string
 	InternalListenAddr    string
 	DBPath                string
@@ -41,6 +42,7 @@ func Load(args []string) (Config, error) {
 		PortalAssetsDir:       env("HUB_PORTAL_ASSETS_DIR", ""),
 		PortalUpstreamURL:     env("HUB_PORTAL_UPSTREAM_URL", ""),
 		AdminAssetsDir:        env("HUB_ADMIN_ASSETS_DIR", ""),
+		DiagnosticsLogDir:     env("HUB_DIAGNOSTICS_LOG_DIR", ""),
 		ListenAddr:            env("HUB_LISTEN_ADDR", ":8080"),
 		InternalListenAddr:    env("HUB_INTERNAL_LISTEN_ADDR", "127.0.0.1:8081"),
 		DBPath:                env("HUB_DB_PATH", ""),
@@ -52,6 +54,7 @@ func Load(args []string) (Config, error) {
 		ReconcileInterval:     reconcileInterval,
 	}
 	fs.StringVar(&cfg.AdminAssetsDir, "admin-assets-dir", cfg.AdminAssetsDir, "built Admin SPA directory (contains index.html)")
+	fs.StringVar(&cfg.DiagnosticsLogDir, "diagnostics-log-dir", cfg.DiagnosticsLogDir, "directory containing fixed Hub and Relay diagnostic log files")
 	fs.StringVar(&cfg.PublicOrigin, "public-origin", cfg.PublicOrigin, "public platform origin (HTTP or HTTPS, IP or domain)")
 	fs.StringVar(&cfg.PortalAssetsDir, "portal-assets-dir", cfg.PortalAssetsDir, "built standard Enterprise Portal SPA directory")
 	fs.StringVar(&cfg.PortalUpstreamURL, "portal-upstream-url", cfg.PortalUpstreamURL, "optional enterprise Portal HTTP/HTTPS static base URL")

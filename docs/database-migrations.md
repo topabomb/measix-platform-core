@@ -1,28 +1,44 @@
-# Database initialization
+# Database migrations
 
-MEASIX 尚未发布，当前结构是唯一支持的数据库版本。旧开发数据库或配置直接删除、重新初始化；不提供增量迁移、旧策略收养、版本回填或兼容恢复。目录名沿用 migrations，不代表存在需要支持的历史版本。
+S0.2 Preview uses one ordered, append-only migration history for the Control Hub database. Production and development use the same embedded migration owner in `backend/migrations`.
 
-## 当前结构与职责
+## Contract
 
-- Ent schema 定义业务结构，`backend/migrations/202609120001_current.sql` 是唯一完整初始化 SQL。
-- `migrations.CurrentSQL()` 要求恰好一份 SQL；测试使用同一来源。
-- Hub 启动不运行 ORM AutoMigrate，不静默修改已有 schema。Relay 本地 spool 独立于 `hub.db`。
-- 开发 helper `go run ./cmd/devmigrate --db ../.data/hub.db` 仅用于独立开发数据库。它读取当前 SQL、校验本地初始化记录，重复执行当前版本幂等，SQL 与初始化记录在同一事务中提交。非当前结构需清理相应旧数据库后重建，不修复或收养历史。它不要求目录摘要文件；SQL 与数据库之间的漂移由 `devmigrate_revisions` 中记录的文件名与 sha256 检出。
-- 报 `non-current schema/checksum`（或 `non-current database`、`non-current initialization record`）表示该库由当前 SQL 的**另一版本**初始化，属过期开发状态。`npm run setup` 会对 `.data/hub.db` 自动删除并重建；真机预设用 `npm run device:real:reset` 对其独立数据目录做同样处理。两者都只删除各自的开发库，不改动密钥。仅"无法识别"的库不会被自动删除，需人工确认。
-- `maintenance.Check` 校验 Ent 所需表/列及 SQLite integrity/foreign keys，不比较全部索引或列类型。System/backup 报告 binary expected revision。
+- Files are named `000001_name.sql`, `000002_name.sql`, and so on, with contiguous versions starting at 1.
+- An accepted migration is immutable. Change the schema by adding the next file; never edit or reorder an applied file.
+- `schema_migrations` records version, filename, SHA-256 and apply time. Startup and `check` reject missing history, gaps, changed checksums and databases newer than the binary.
+- Every file and its history row commit in one transaction. Earlier completed files remain committed if a later file fails.
+- Hub startup never mutates schema. Upgrade automation must back up first, then run `control-hub migrate`, then `control-hub check`, before starting the service.
+- An unrecognized non-empty database is never adopted or deleted automatically.
 
-## 修改与验证
+The one pre-Preview development layout recorded in `devmigrate_revisions` may be adopted only when its exact filename and historical checksum match the known version-1 schema. Adoption replaces only the history table; it does not rewrite business data. Atlas-managed databases remain rejected.
 
-修改 Ent schema 后，同步更新完整初始化 SQL 与生成代码。检查唯一约束、外键、默认值、NULL、索引和事务语义，不增加旧数据回填脚本。
+## Commands
 
-验证方式是执行真实 SQL 的 Go 测试（空库应用、当前业务读写、重复初始化和失败事务回滚），而不是维护一份独立的摘要文件。当前版本备份/恢复与完整性检查仍需保留，旧版本升级测试删除。
+Production and packaged upgrades:
 
-SQLite 连接配置由 `common/sqliteutil` 统一维护。
+```text
+control-hub migrate --db <hub.db>
+control-hub check --db <hub.db>
+```
 
-## 旧开发文件处理
+Local development may continue to use the compatibility wrapper:
 
-先停止占用相应数据库的本地进程，确认路径属于本项目且文件确为旧版本，再删除数据库及其 `-wal`/`-shm` 文件，按当前初始化流程创建。旧配置直接移除并使用当前配置；不触碰 Android 或其他项目数据。不因某个测试失败就清空正常的当前数据库或密钥。
+```text
+go run ./cmd/devmigrate --db ../.data/hub.db
+```
 
-当前版本日常备份、恢复与密钥操作见 [operations.md](operations.md)。首次发布前另行确定发布后的持久化政策。
+Both commands execute `migrations.Apply`; the wrapper does not have separate schema behavior. Repeating either command at the current version is a no-op.
 
-ManagedRelease 不再持久化重复的 snapshot_schema_version 列。当前 Snapshot JSON 的 schemaVersion 是协议版本来源，读取和编译统一校验当前版本；数据库不维护历史版本索引或回填流程。
+## Schema changes
+
+Update the Ent schema and generated code, add the next SQL file, and test at least:
+
+1. empty database to current;
+2. previous supported version to current with representative data preserved;
+3. repeat application;
+4. per-file rollback on invalid SQL;
+5. checksum conflict, version gap and future-version rejection;
+6. backup, isolated restore, `check`, and critical business reads.
+
+SQLite connections remain owned by `internal/common/sqliteutil`. Relay spool schema is a separate owner and must be backed up or replay-qualified independently.

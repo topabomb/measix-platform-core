@@ -2,26 +2,33 @@ package system
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"measix/platform/ent"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/semanticusage"
+	"measix/platform/internal/common/observability"
 	"measix/platform/internal/hub/maintenance"
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/hub/store"
 	"measix/platform/internal/hub/usage"
+	"measix/platform/internal/wire/relaycontrolapi"
 )
 
 type Service struct {
-	Store          *store.Store
-	RuntimeControl *runtimecontrol.Service
-	BuildVersion   string
-	PortalMode     string
-	PortalURL      *string
-	PortalUpstream *string
-	Now            func() time.Time
+	Store              *store.Store
+	RuntimeControl     *runtimecontrol.Service
+	BuildVersion       string
+	PortalMode         string
+	PortalURL          *string
+	PortalUpstream     *string
+	Now                func() time.Time
+	Telemetry          *observability.Recorder
+	DiagnosticsLogDir  string
+	mu                 sync.RWMutex
+	lastRelayTelemetry *relaycontrolapi.ProcessTelemetry
 }
 
 type Status struct {
@@ -96,6 +103,9 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 				hash := status.BundleHash
 				result.AppliedBundleHash = &hash
 			}
+			s.mu.Lock()
+			s.lastRelayTelemetry = status.Telemetry
+			s.mu.Unlock()
 		}
 	}
 	if s.RuntimeControl != nil {
@@ -125,6 +135,68 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 	}
 	result.SemanticUnknownRequestCount = &unknown
 	return result, nil
+}
+
+type Telemetry struct {
+	CollectedAt time.Time
+	Hub         observability.Snapshot
+	Relay       *relaycontrolapi.ProcessTelemetry
+}
+
+func (s *Service) RecentTelemetry(window time.Duration) Telemetry {
+	if window != 15*time.Minute && window != 60*time.Minute {
+		window = 15 * time.Minute
+	}
+	result := Telemetry{CollectedAt: s.Now().UTC()}
+	if s.Telemetry != nil {
+		result.Hub = s.Telemetry.Snapshot(window)
+	}
+	s.mu.RLock()
+	if s.lastRelayTelemetry != nil {
+		copy := *s.lastRelayTelemetry
+		cutoff := result.CollectedAt.Truncate(time.Minute).Add(-window + time.Minute)
+		copy.Buckets = append([]relaycontrolapi.TelemetryBucket(nil), copy.Buckets...)
+		filtered := copy.Buckets[:0]
+		for _, bucket := range copy.Buckets {
+			if !bucket.Minute.Before(cutoff) {
+				filtered = append(filtered, bucket)
+			}
+		}
+		copy.Buckets = filtered
+		copy.Summary = summarizeRelayTelemetry(filtered, copy.Summary.InFlight)
+		result.Relay = &copy
+	}
+	s.mu.RUnlock()
+	return result
+}
+
+func summarizeRelayTelemetry(buckets []relaycontrolapi.TelemetryBucket, inFlight int64) relaycontrolapi.TelemetryMetrics {
+	result := relaycontrolapi.TelemetryMetrics{InFlight: inFlight}
+	var upstream, denied int64
+	for _, bucket := range buckets {
+		result.RequestCount += bucket.RequestCount
+		result.SuccessCount += bucket.SuccessCount
+		result.ClientErrorCount += bucket.ClientErrorCount
+		result.ServerErrorCount += bucket.ServerErrorCount
+		result.RejectedCount += bucket.RejectedCount
+		result.TimeoutCount += bucket.TimeoutCount
+		result.CancelledCount += bucket.CancelledCount
+		if bucket.DurationP95Ms > result.DurationP95Ms {
+			result.DurationP95Ms = bucket.DurationP95Ms
+		}
+		if bucket.UpstreamErrorCount != nil {
+			upstream += *bucket.UpstreamErrorCount
+		}
+		if bucket.BudgetDeniedCount != nil {
+			denied += *bucket.BudgetDeniedCount
+		}
+	}
+	result.UpstreamErrorCount, result.BudgetDeniedCount = &upstream, &denied
+	return result
+}
+
+func (s *Service) RecentEvents(filter observability.EventFilter) (observability.EventPage, error) {
+	return observability.ReadEvents(s.DiagnosticsLogDir, filter)
 }
 
 func semanticOrphanCount(ctx context.Context, client *ent.Client) (int, error) {

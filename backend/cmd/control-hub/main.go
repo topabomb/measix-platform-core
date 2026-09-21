@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"measix/platform/internal/common/observability"
 	"measix/platform/internal/common/server"
 	"measix/platform/internal/hub/app"
 	"measix/platform/internal/hub/config"
@@ -21,13 +22,14 @@ import (
 	"measix/platform/internal/hub/maintenance"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/hub/store"
+	"measix/platform/migrations"
 	"measix/platform/pkg/platformid"
 )
 
 var buildVersion = "dev"
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	log := observability.NewLogger(os.Stdout, "hub", buildVersion)
 	slog.SetDefault(log)
 	command := "run"
 	args := os.Args[1:]
@@ -44,11 +46,17 @@ func main() {
 		err = backup(args)
 	case "check":
 		err = check(args)
+	case "migrate":
+		err = migrateDatabase(args)
 	default:
 		err = fmt.Errorf("unknown command %q", command)
 	}
 	if err != nil {
-		log.Error("control-hub command failed", "command", command, "error", err)
+		event := "command.failed"
+		if command == "run" {
+			event = "service.start_failed"
+		}
+		log.Error("control-hub command failed", "event", event, "command", command, "error", err)
 		os.Exit(1)
 	}
 }
@@ -65,6 +73,8 @@ func run(args []string, log *slog.Logger) error {
 		return err
 	}
 	defer runtime.Close()
+	log.Info("control hub started", "event", "service.started")
+	defer log.Info("control hub stopping", "event", "service.stopping")
 	group, runCtx := errgroup.WithContext(ctx)
 	group.Go(func() error { return server.New(cfg.ListenAddr, runtime.Handler).Run(runCtx, log) })
 	group.Go(func() error { return server.New(cfg.InternalListenAddr, runtime.InternalHandler).Run(runCtx, log) })
@@ -176,10 +186,13 @@ func backup(args []string) error {
 		return err
 	}
 	defer st.Close()
+	slog.Info("database backup started", "event", "database.backup_started")
 	metadata, err := maintenance.Backup(context.Background(), st.DB, *output, buildVersion, time.Now())
 	if err != nil {
+		slog.Error("database backup failed", "event", "database.backup_failed", "error", err)
 		return err
 	}
+	slog.Info("database backup completed", "event", "database.backup_completed")
 	fmt.Printf("backup=%s metadata=%s\n", *output, metadata)
 	return nil
 }
@@ -202,7 +215,31 @@ func check(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("integrity=%s tables=%d\n", result.Integrity, result.Tables)
+	fmt.Printf("integrity=%s tables=%d schema_version=%d schema=%s\n", result.Integrity, result.Tables, result.SchemaVersion, result.Schema)
+	return nil
+}
+
+func migrateDatabase(args []string) error {
+	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
+	dbPath := fs.String("db", os.Getenv("HUB_DB_PATH"), "SQLite database path")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *dbPath == "" {
+		return fmt.Errorf("db is required")
+	}
+	st, err := store.OpenEnt(*dbPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	result, err := migrations.Apply(context.Background(), st.DB)
+	if err != nil {
+		slog.Error("database migration failed", "event", "database.migration_failed", "error", err)
+		return err
+	}
+	slog.Info("database migration completed", "event", "database.migration_completed", "schema_from", result.FromVersion, "schema_to", result.ToVersion, "applied_count", len(result.Applied), "adopted_legacy", result.AdoptedLegacy)
+	fmt.Printf("schema_from=%d schema_to=%d applied=%v adopted_legacy=%t\n", result.FromVersion, result.ToVersion, result.Applied, result.AdoptedLegacy)
 	return nil
 }
 

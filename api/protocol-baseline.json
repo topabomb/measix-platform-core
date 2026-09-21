@@ -1,0 +1,10 @@
+{
+  "baseline": "S0.2/v4-preview",
+  "policy": "Existing fields and operations remain compatible within S0.2. Additive optional changes require baseline review; removals, renames, type changes and new required inputs require a new protocol version and migration plan.",
+  "documents": {
+    "api/admin/admin.openapi.yaml": "sha256:d7dd60115381e28e3dddc696f8561f8cacda6ebdafa864325d4cf96e3bfbbfb3",
+    "api/client/client-control.openapi.yaml": "sha256:a8c687d94e24b8fe9362d81b441946624be5b12ceb7d88c06bfb3e2e6998b1be",
+    "api/internal/relay-control.openapi.yaml": "sha256:088637bd5ef38a3328c4d282eba91277a13e1fce40aac6023d27d32ece1869ad",
+    "api/internal/usage-ingest.openapi.yaml": "sha256:fee3174462f93a851abbcfd1ca00d76e24edd73196f83f7bb2ff930897d93504"
+  }
+}

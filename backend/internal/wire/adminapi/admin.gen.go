@@ -827,6 +827,24 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 	}
 }
 
+// Defines values for SystemEventService.
+const (
+	SystemEventServiceHUB   SystemEventService = "HUB"
+	SystemEventServiceRELAY SystemEventService = "RELAY"
+)
+
+// Valid indicates whether the value is a known member of the SystemEventService enum.
+func (e SystemEventService) Valid() bool {
+	switch e {
+	case SystemEventServiceHUB:
+		return true
+	case SystemEventServiceRELAY:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SystemStatusPortalMode.
 const (
 	CUSTOM      SystemStatusPortalMode = "CUSTOM"
@@ -881,6 +899,24 @@ func (e SystemStatusSpoolState) Valid() bool {
 	case METERINGDEGRADED:
 		return true
 	case OK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SystemTelemetryWindowMinutes.
+const (
+	N15 SystemTelemetryWindowMinutes = 15
+	N60 SystemTelemetryWindowMinutes = 60
+)
+
+// Valid indicates whether the value is a known member of the SystemTelemetryWindowMinutes enum.
+func (e SystemTelemetryWindowMinutes) Valid() bool {
+	switch e {
+	case N15:
+		return true
+	case N60:
 		return true
 	default:
 		return false
@@ -1223,6 +1259,42 @@ func (e ValidationIssueSeverity) Valid() bool {
 	case ValidationIssueSeverityERROR:
 		return true
 	case ValidationIssueSeverityWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SystemEventsParamsService.
+const (
+	SystemEventsParamsServiceHUB   SystemEventsParamsService = "HUB"
+	SystemEventsParamsServiceRELAY SystemEventsParamsService = "RELAY"
+)
+
+// Valid indicates whether the value is a known member of the SystemEventsParamsService enum.
+func (e SystemEventsParamsService) Valid() bool {
+	switch e {
+	case SystemEventsParamsServiceHUB:
+		return true
+	case SystemEventsParamsServiceRELAY:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SystemTelemetryParamsWindow.
+const (
+	N15m SystemTelemetryParamsWindow = "15m"
+	N60m SystemTelemetryParamsWindow = "60m"
+)
+
+// Valid indicates whether the value is a known member of the SystemTelemetryParamsWindow enum.
+func (e SystemTelemetryParamsWindow) Valid() bool {
+	switch e {
+	case N15m:
+		return true
+	case N60m:
 		return true
 	default:
 		return false
@@ -2282,6 +2354,13 @@ type Problem struct {
 	Type                    string     `json:"type"`
 }
 
+// ProcessTelemetry defines model for ProcessTelemetry.
+type ProcessTelemetry struct {
+	Buckets   []TelemetryBucket `json:"buckets"`
+	StartedAt time.Time         `json:"startedAt"`
+	Summary   TelemetryMetrics  `json:"summary"`
+}
+
 // ProviderDefinition defines model for ProviderDefinition.
 type ProviderDefinition struct {
 	ClientProtocol ProviderDefinitionClientProtocol `json:"clientProtocol"`
@@ -2519,6 +2598,35 @@ type Sha256Hash = string
 // StarterId defines model for StarterId.
 type StarterId = string
 
+// SystemEvent defines model for SystemEvent.
+type SystemEvent struct {
+	ActivationId    *string            `json:"activationId,omitempty"`
+	ControlRevision *int64             `json:"controlRevision,omitempty"`
+	DeploymentId    *string            `json:"deploymentId,omitempty"`
+	DurationMs      *int64             `json:"durationMs,omitempty"`
+	ErrorCode       *string            `json:"errorCode,omitempty"`
+	Event           string             `json:"event"`
+	HttpStatus      *int               `json:"httpStatus,omitempty"`
+	InteractionId   *string            `json:"interactionId,omitempty"`
+	Level           string             `json:"level"`
+	Message         string             `json:"message"`
+	Outcome         *string            `json:"outcome,omitempty"`
+	RequestId       *string            `json:"requestId,omitempty"`
+	ResourceId      *string            `json:"resourceId,omitempty"`
+	Service         SystemEventService `json:"service"`
+	Time            time.Time          `json:"time"`
+	Truncated       *bool              `json:"truncated,omitempty"`
+}
+
+// SystemEventService defines model for SystemEvent.Service.
+type SystemEventService string
+
+// SystemEventPage defines model for SystemEventPage.
+type SystemEventPage struct {
+	Items     []SystemEvent `json:"items"`
+	Truncated bool          `json:"truncated"`
+}
+
 // SystemStatus defines model for SystemStatus.
 type SystemStatus struct {
 	ActiveManagedGeneration int         `json:"activeManagedGeneration"`
@@ -2570,6 +2678,52 @@ type SystemStatusRuntimeStatus string
 
 // SystemStatusSpoolState Omitted when Relay spool status is unavailable; omission does not mean OK.
 type SystemStatusSpoolState string
+
+// SystemTelemetry defines model for SystemTelemetry.
+type SystemTelemetry struct {
+	CollectedAt   time.Time                    `json:"collectedAt"`
+	Hub           ProcessTelemetry             `json:"hub"`
+	Relay         *ProcessTelemetry            `json:"relay,omitempty"`
+	WindowMinutes SystemTelemetryWindowMinutes `json:"windowMinutes"`
+}
+
+// SystemTelemetryWindowMinutes defines model for SystemTelemetry.WindowMinutes.
+type SystemTelemetryWindowMinutes int
+
+// TelemetryBucket defines model for TelemetryBucket.
+type TelemetryBucket struct {
+	ActivationFailureCount *int64    `json:"activationFailureCount,omitempty"`
+	BudgetDeniedCount      *int64    `json:"budgetDeniedCount,omitempty"`
+	CancelledCount         int64     `json:"cancelledCount"`
+	ClientErrorCount       int64     `json:"clientErrorCount"`
+	DurationP95Ms          int64     `json:"durationP95Ms"`
+	InFlight               int64     `json:"inFlight"`
+	Minute                 time.Time `json:"minute"`
+	ReconcileFailureCount  *int64    `json:"reconcileFailureCount,omitempty"`
+	RejectedCount          int64     `json:"rejectedCount"`
+	RequestCount           int64     `json:"requestCount"`
+	ServerErrorCount       int64     `json:"serverErrorCount"`
+	SuccessCount           int64     `json:"successCount"`
+	TimeoutCount           int64     `json:"timeoutCount"`
+	UpstreamErrorCount     *int64    `json:"upstreamErrorCount,omitempty"`
+}
+
+// TelemetryMetrics defines model for TelemetryMetrics.
+type TelemetryMetrics struct {
+	ActivationFailureCount *int64 `json:"activationFailureCount,omitempty"`
+	BudgetDeniedCount      *int64 `json:"budgetDeniedCount,omitempty"`
+	CancelledCount         int64  `json:"cancelledCount"`
+	ClientErrorCount       int64  `json:"clientErrorCount"`
+	DurationP95Ms          int64  `json:"durationP95Ms"`
+	InFlight               int64  `json:"inFlight"`
+	ReconcileFailureCount  *int64 `json:"reconcileFailureCount,omitempty"`
+	RejectedCount          int64  `json:"rejectedCount"`
+	RequestCount           int64  `json:"requestCount"`
+	ServerErrorCount       int64  `json:"serverErrorCount"`
+	SuccessCount           int64  `json:"successCount"`
+	TimeoutCount           int64  `json:"timeoutCount"`
+	UpstreamErrorCount     *int64 `json:"upstreamErrorCount,omitempty"`
+}
 
 // TimeoutPolicy defines model for TimeoutPolicy.
 type TimeoutPolicy struct {
@@ -2983,6 +3137,26 @@ type ReplaceSecretParams struct {
 type LogoutAdminParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
+
+// SystemEventsParams defines parameters for SystemEvents.
+type SystemEventsParams struct {
+	Service     *SystemEventsParamsService `form:"service,omitempty" json:"service,omitempty"`
+	Level       *string                    `form:"level,omitempty" json:"level,omitempty"`
+	Event       *string                    `form:"event,omitempty" json:"event,omitempty"`
+	Correlation *string                    `form:"correlation,omitempty" json:"correlation,omitempty"`
+	Limit       *int                       `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// SystemEventsParamsService defines parameters for SystemEvents.
+type SystemEventsParamsService string
+
+// SystemTelemetryParams defines parameters for SystemTelemetry.
+type SystemTelemetryParams struct {
+	Window *SystemTelemetryParamsWindow `form:"window,omitempty" json:"window,omitempty"`
+}
+
+// SystemTelemetryParamsWindow defines parameters for SystemTelemetry.
+type SystemTelemetryParamsWindow string
 
 // ListUpstreamsParams defines parameters for ListUpstreams.
 type ListUpstreamsParams struct {
@@ -3401,11 +3575,17 @@ type ServerInterface interface {
 	// (POST /api/admin/v1/session/login)
 	Login(w http.ResponseWriter, r *http.Request)
 
+	// (GET /api/admin/v1/system/events)
+	SystemEvents(w http.ResponseWriter, r *http.Request, params SystemEventsParams)
+
 	// (GET /api/admin/v1/system/health)
 	SystemHealth(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/admin/v1/system/status)
 	SystemStatus(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/admin/v1/system/telemetry)
+	SystemTelemetry(w http.ResponseWriter, r *http.Request, params SystemTelemetryParams)
 
 	// (GET /api/admin/v1/upstreams)
 	ListUpstreams(w http.ResponseWriter, r *http.Request, params ListUpstreamsParams)
@@ -3672,6 +3852,11 @@ func (_ Unimplemented) Login(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (GET /api/admin/v1/system/events)
+func (_ Unimplemented) SystemEvents(w http.ResponseWriter, r *http.Request, params SystemEventsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/admin/v1/system/health)
 func (_ Unimplemented) SystemHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -3679,6 +3864,11 @@ func (_ Unimplemented) SystemHealth(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/admin/v1/system/status)
 func (_ Unimplemented) SystemStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/system/telemetry)
+func (_ Unimplemented) SystemTelemetry(w http.ResponseWriter, r *http.Request, params SystemTelemetryParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5377,6 +5567,91 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
+// SystemEvents operation middleware
+func (siw *ServerInterfaceWrapper) SystemEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SystemEventsParams
+
+	// ------------- Optional query parameter "service" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "service", r.URL.Query(), &params.Service, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "service"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "service", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "level" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "level", r.URL.Query(), &params.Level, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "level"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "level", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "event" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "event", r.URL.Query(), &params.Event, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "event"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "event", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "correlation" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "correlation", r.URL.Query(), &params.Correlation, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "correlation"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "correlation", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SystemEvents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SystemHealth operation middleware
 func (siw *ServerInterfaceWrapper) SystemHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -5396,6 +5671,39 @@ func (siw *ServerInterfaceWrapper) SystemStatus(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SystemStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SystemTelemetry operation middleware
+func (siw *ServerInterfaceWrapper) SystemTelemetry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SystemTelemetryParams
+
+	// ------------- Optional query parameter "window" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "window", r.URL.Query(), &params.Window, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "window"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "window", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SystemTelemetry(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7820,6 +8128,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/system/status", wrapper.SystemStatus)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/system/telemetry", wrapper.SystemTelemetry)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/system/events", wrapper.SystemEvents)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/deployment/settings", wrapper.GetDeploymentSettings)

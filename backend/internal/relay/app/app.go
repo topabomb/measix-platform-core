@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"measix/platform/internal/common/health"
+	"measix/platform/internal/common/observability"
 	"measix/platform/internal/relay/budget"
 	"measix/platform/internal/relay/control"
 	"measix/platform/internal/relay/metering"
@@ -19,11 +21,13 @@ type App struct {
 	Control          *control.Store
 	Recorder         *metering.Recorder
 	Spool            *metering.Spool
+	Telemetry        *observability.Recorder
 }
 
 func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *metering.Recorder, budgetClient budget.Client) *App {
 	h := &health.State{}
 	store := control.NewStore(nil)
+	telemetry := observability.NewRecorder(nil)
 
 	pub := chi.NewRouter()
 	pub.Get("/live", h.Live)
@@ -60,7 +64,12 @@ func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *met
 			return spool.PurgeUsers(ctx, state.PrincipalState.DeletedUserIds)
 		}
 	}
-	internal.Mount("/", control.NewHandler(store, serviceToken, buildVersion, statusProvider, applyHook))
+	internal.Mount("/", control.NewHandlerWithTelemetry(store, serviceToken, buildVersion, statusProvider, applyHook, telemetry))
 
-	return &App{Public: pub, Internal: internal, Health: h, Control: store, Recorder: recorder, Spool: spool}
+	log := observability.Logger{Log: slog.Default()}
+	return &App{
+		Public:   observability.HTTPMiddleware(telemetry, log)(pub),
+		Internal: internal,
+		Health:   h, Control: store, Recorder: recorder, Spool: spool, Telemetry: telemetry,
+	}
 }

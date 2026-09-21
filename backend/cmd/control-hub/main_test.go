@@ -23,7 +23,7 @@ func TestBootstrapRepeatAndConfiguredStaticHosting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.DB.Exec(migrations.CurrentSQL()); err != nil {
+	if _, err := migrations.Apply(context.Background(), st.DB); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.Close(); err != nil {
@@ -81,5 +81,24 @@ func TestBootstrapRepeatAndConfiguredStaticHosting(t *testing.T) {
 	if bad, err := app.OpenRuntime(context.Background(), app.RuntimeOptions{Config: cfg}); err == nil {
 		bad.Close()
 		t.Fatal("missing SPA accepted")
+	}
+}
+
+func TestMigrateCommandInitializesAndRepeats(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "hub.db")
+	args := []string{"--db", dbPath}
+	if err := migrateDatabase(args); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateDatabase(args); err != nil {
+		t.Fatalf("repeat migrate: %v", err)
+	}
+	st, err := store.OpenEnt(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if _, err := migrations.Verify(context.Background(), st.DB); err != nil {
+		t.Fatal(err)
 	}
 }

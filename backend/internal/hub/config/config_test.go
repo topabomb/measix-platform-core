@@ -13,6 +13,7 @@ func TestLoadCanonicalizesPublicOrigin(t *testing.T) {
 		"--jwt-private-key-file", "jwt.key",
 		"--relay-internal-url", "http://127.0.0.1:8091",
 		"--relay-service-token-file", "relay.token",
+		"--diagnostics-log-dir", "logs",
 		"--public-origin", " HTTPS://Core.Example.COM:443/ ",
 	})
 	if err != nil {
@@ -20,5 +21,8 @@ func TestLoadCanonicalizesPublicOrigin(t *testing.T) {
 	}
 	if cfg.PublicOrigin != "https://core.example.com" {
 		t.Fatalf("public origin = %q", cfg.PublicOrigin)
+	}
+	if cfg.DiagnosticsLogDir != "logs" {
+		t.Fatalf("diagnostics log dir = %q", cfg.DiagnosticsLogDir)
 	}
 }

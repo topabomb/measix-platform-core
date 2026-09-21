@@ -1,4 +1,4 @@
--- Current unpublished MEASIX Control Hub schema. Initialize empty databases only.
+-- MEASIX Control Hub Preview schema version 1.
 PRAGMA foreign_keys = ON;
 CREATE TABLE activations(id TEXT PRIMARY KEY,kind TEXT NOT NULL,state TEXT NOT NULL,idempotency_key TEXT NOT NULL,request_hash TEXT NOT NULL,control_revision INTEGER NOT NULL,bundle_hash TEXT NOT NULL,target_generation INTEGER,target_descriptor_json BLOB NOT NULL,subject_id TEXT,pending_operation_json BLOB,error_code TEXT,created_by_user_id TEXT NOT NULL,created_at DATETIME NOT NULL,completed_at DATETIME);
 CREATE TABLE deployments(id TEXT PRIMARY KEY,name TEXT NOT NULL,status TEXT NOT NULL,created_at DATETIME NOT NULL,updated_at DATETIME NOT NULL, timezone text NOT NULL DEFAULT 'UTC', public_origin text NOT NULL DEFAULT '', feed_revision integer NOT NULL DEFAULT 0);

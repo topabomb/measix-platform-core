@@ -6,6 +6,8 @@ This document defines how implementation candidates are composed and proven repr
 
 A candidate is a fixed, reproducible composition of source commits, generated contracts, builds and test evidence — never an implicit moving branch head.
 
+For the S0.2 internal Preview, `node scripts/build-preview-release.mjs <version>` is the production artifact owner. It requires clean pinned Core and Portal worktrees, verifies the `S0.2/v4-preview` protocol baseline and regenerated artifacts, builds Admin/Portal assets, cross-compiles static Linux ARM64 binaries with a non-`dev` build identity, and emits `release.json` plus `SHA256SUMS`. The target runbook is [S0.2 Preview deployment](s02-preview-deployment.md). This package is a Preview delivery vehicle, not proof of later S0.3/S0.4/final gates.
+
 ```text
 S0.1 Client Contract Freeze Candidate
   → pre-Android server-side product closure

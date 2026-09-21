@@ -2,7 +2,7 @@
 
 > 状态：本批实施权威方案；完成实现、验证与独立审查后转为已完成记录。  
 > 范围：当前 S0.2 / Snapshot v4 内部预览版；Control Hub、Runtime Relay、Admin Console、标准 Enterprise Portal。  
-> 部署基线：单台 Linux 主机、Caddy 反向代理和 TLS、root PM2 daemon 管理两个业务进程、预编译 Go 二进制和预构建静态资源。  
+> 部署基线：单台 NVIDIA DGX Spark（Linux ARM64 / aarch64）、Caddy 反向代理和 TLS、root PM2 daemon 管理两个业务进程、预编译 Go 二进制和预构建静态资源。
 > 根目录原则：除 Caddy/PM2 自身的系统安装和 daemon 元数据外，MEASIX 拥有的发布、配置、密钥、数据、日志、备份及运行文件全部位于一个 `MEASIX_ROOT` 下。
 
 ## 1. 目标与完成定义
@@ -430,16 +430,16 @@ backup-manifest.json
 
 ## 10. 二进制发布包
 
-包名：
+本 Preview 的正式发布目标只有 DGX Spark 使用的 Linux ARM64；amd64 构建只可用于开发便利，不计入发布验收。包名：
 
 ```text
-measix-core-<version>-linux-<amd64|arm64>.tar.gz
+measix-core-<version>-linux-arm64.tar.gz
 ```
 
 构建要求：
 
 - locked Go/Node/pnpm 版本；
-- `CGO_ENABLED=0`，分别构建目标架构；
+- `CGO_ENABLED=0 GOOS=linux GOARCH=arm64` 构建 DGX Spark 目标二进制；
 - Go `-trimpath`；
 - `-ldflags` 注入非 `dev` 的 buildVersion；
 - Admin production SPA；
@@ -527,7 +527,7 @@ export MEASIX_ROOT=/absolute/path/chosen-for-this-deployment
 
 ### 13.1 前置条件
 
-- Linux amd64 或 arm64；
+- NVIDIA DGX Spark，Linux `aarch64` / Go `arm64`；
 - 域名已解析到主机；
 - 80/443 可访问；
 - 已安装并运行 Caddy；
@@ -540,9 +540,11 @@ export MEASIX_ROOT=/absolute/path/chosen-for-this-deployment
 ```bash
 sudo useradd --system --home-dir "$MEASIX_ROOT" --shell /usr/sbin/nologin measix
 sudo mkdir -p "$MEASIX_ROOT"/{releases,config,secrets,data/hub,data/relay,logs,backups,staging,run}
-sudo chown root:root "$MEASIX_ROOT" "$MEASIX_ROOT"/{releases,config,secrets}
+sudo chown root:root "$MEASIX_ROOT" "$MEASIX_ROOT"/{releases,config}
+sudo chown root:measix "$MEASIX_ROOT/secrets"
 sudo chown -R measix:measix "$MEASIX_ROOT"/{data,logs,backups,staging,run}
-sudo chmod 0750 "$MEASIX_ROOT" "$MEASIX_ROOT"/{config,secrets,data,logs,backups,staging,run}
+sudo chmod 0755 "$MEASIX_ROOT" "$MEASIX_ROOT"/{releases,config}
+sudo chmod 0750 "$MEASIX_ROOT"/{secrets,data,logs,backups,staging,run}
 ```
 
 实现部署脚本时必须逐一解析目标路径并确认位于 `MEASIX_ROOT` 内，不对未验证变量执行递归删除或移动。
@@ -551,7 +553,7 @@ sudo chmod 0750 "$MEASIX_ROOT" "$MEASIX_ROOT"/{config,secrets,data,logs,backups,
 
 ```bash
 sudo mkdir -p "$MEASIX_ROOT/releases/<version>"
-sudo tar -xzf measix-core-<version>-linux-<arch>.tar.gz -C "$MEASIX_ROOT/releases/<version>"
+sudo tar -xzf measix-core-<version>-linux-arm64.tar.gz -C "$MEASIX_ROOT/releases/<version>"
 cd "$MEASIX_ROOT/releases/<version>"
 sha256sum -c SHA256SUMS
 sudo ln -sfn "$MEASIX_ROOT/releases/<version>" "$MEASIX_ROOT/current"
@@ -566,7 +568,7 @@ sudo ln -sfn "$MEASIX_ROOT/releases/<version>" "$MEASIX_ROOT/current"
 - `relay-service.token`：高熵文本 token；
 - 首次管理员密码文件。
 
-所有文件 `0600`，不在 shell 输出内容，不写进 release、Git 或普通日志。
+秘密文件由 root 拥有、`measix` 组只读（`0640`），秘密目录为 `0750 root:measix`；不在 shell 输出内容，不写进 release、Git 或普通日志。
 
 ### 13.5 配置
 
@@ -687,12 +689,12 @@ sudo pm2 status
 
 ### D. 发布部署
 
-- [ ] 实现 Linux amd64/arm64 release 构建；
+- [ ] 实现并验证 DGX Spark Linux ARM64 release 构建；
 - [ ] 实现单根目录 ecosystem/Caddy 模板；
 - [ ] 实现 SHA256/release manifest；
 - [ ] 用解压包在无源码目录运行 smoke；
 - [ ] 完善本文为最终部署手册；
-- [ ] 在独立 Linux 主机或等价隔离环境实测首次部署和升级恢复。
+- [ ] 在目标 DGX Spark 上实测首次部署和升级恢复；本地交叉构建或容器 smoke 不能替代主机验收。
 
 ### E. 验证和独立审查
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"measix/platform/internal/common/observability"
 	"measix/platform/internal/common/server"
 	"measix/platform/internal/relay/app"
 	relaybudget "measix/platform/internal/relay/budget"
@@ -21,9 +22,10 @@ import (
 var buildVersion = "dev"
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	log := observability.NewLogger(os.Stdout, "relay", buildVersion)
+	slog.SetDefault(log)
 	if err := run(os.Args[1:], log); err != nil {
-		log.Error("runtime relay stopped", "error", err)
+		log.Error("runtime relay stopped", "event", "service.start_failed", "error", err)
 		os.Exit(1)
 	}
 }
@@ -63,6 +65,8 @@ func run(args []string, log *slog.Logger) error {
 		return err
 	}
 	a := app.New(serviceToken, buildVersion, spool, recorder, budgetClient)
+	log.Info("runtime relay started", "event", "service.started")
+	defer log.Info("runtime relay stopping", "event", "service.stopping")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
@@ -84,7 +88,7 @@ func run(args []string, log *slog.Logger) error {
 	flushCtx, flushCancel := context.WithTimeout(context.Background(), minDuration(cfg.ShutdownGrace, 2*time.Second))
 	defer flushCancel()
 	if err := sender.FlushOnce(flushCtx); err != nil {
-		log.Warn("final usage flush incomplete; durable spool retained", "error", err)
+		log.Warn("final usage flush incomplete; durable spool retained", "event", "shutdown.flush_incomplete", "error", err)
 	}
 	return runErr
 }

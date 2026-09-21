@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -16,7 +17,7 @@ func OpenStore(t *testing.T) *store.Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(migrations.CurrentSQL()); err != nil {
+	if _, err := migrations.Apply(context.Background(), db); err != nil {
 		t.Fatalf("initialize real current test schema: %v", err)
 	}
 	if err := db.Close(); err != nil {

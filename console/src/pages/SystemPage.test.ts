@@ -4,6 +4,7 @@ import {
   Quasar, QLayout, QPage, QPageContainer, QCard, QCardSection, QBtn, QList,
   QItem, QItemSection, QItemLabel, QChip, QSpinner, QIcon, QToolbarTitle,
   QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, QBadge, QMarkupTable, QBanner,
+  QTabs, QTab, QBtnToggle, QSelect, QToggle, QVirtualScroll,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -34,6 +35,7 @@ function mountSystem() {
             QLayout, QPage, QPageContainer, QCard, QCardSection, QBtn, QList,
             QItem, QItemSection, QItemLabel, QChip, QSpinner, QIcon, QToolbarTitle,
             QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, QBadge, QMarkupTable, QBanner,
+            QTabs, QTab, QBtnToggle, QSelect, QToggle, QVirtualScroll,
             PageHeader, StatusChip,
           },
         }], pinia, router],
@@ -245,5 +247,30 @@ describe('SystemPage', () => {
     await flushPromises()
     expect(wrapper.find('[data-cy="system-upstream-status"]').exists()).toBe(false)
     expect(fetch.mock.calls.some(([path]) => String(path).startsWith('/api/admin/v1/upstreams'))).toBe(false)
+  })
+
+  it('loads bounded telemetry and recent events only for their visible tabs', async () => {
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/system/status') return BASE
+      if (path === '/api/admin/v1/system/health') return { live: true, ready: true }
+      if (path === '/api/admin/v1/system/telemetry?window=15m') return {
+        windowMinutes: 15, collectedAt: '2026-09-21T10:00:00Z',
+        hub: { startedAt: '2026-09-21T09:45:00Z', summary: { requestCount: 4, successCount: 3, clientErrorCount: 1, serverErrorCount: 0, rejectedCount: 0, timeoutCount: 0, cancelledCount: 0, durationP95Ms: 25, inFlight: 0 }, buckets: [] },
+      }
+      if (path.startsWith('/api/admin/v1/system/events?')) return { items: [{ time: '2026-09-21T10:00:00Z', service: 'HUB', level: 'WARN', event: 'sample.failed', message: 'safe' }], truncated: false }
+      return {}
+    })
+    const { wrapper } = mountSystem()
+    await flushPromises()
+    expect(fetch.mock.calls.some(([path]) => String(path).includes('/system/telemetry'))).toBe(false)
+    const tabs = wrapper.findAllComponents(QTab)
+    await tabs[2]!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-cy="system-telemetry"]').text()).toContain('4')
+    await tabs[3]!.trigger('click')
+    await flushPromises()
+    expect(fetch.mock.calls.some(([path]) => String(path).startsWith('/api/admin/v1/system/events?'))).toBe(true)
+    expect(wrapper.findComponent(QVirtualScroll).exists()).toBe(true)
+    wrapper.unmount()
   })
 })

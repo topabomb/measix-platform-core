@@ -4,7 +4,7 @@ This document owns concrete operating procedures, configuration and current limi
 
 ## 1. Implemented topology
 
-Current daemons are `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. `devmigrate` and `generate-android-wire` are utilities, not services. Enterprise Tool Gateway, service units and a production installation package do not exist yet.
+Current daemons are `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. `devmigrate` and `generate-android-wire` are utilities, not services. The S0.2 internal Preview package targets NVIDIA DGX Spark Linux ARM64 and supplies Caddy/PM2 templates and runbooks under `deploy/preview`; it does not include the planned Enterprise Tool Gateway or multi-node/HA operation. See [S0.2 Preview deployment](s02-preview-deployment.md).
 
 Admin is a static Quasar SPA. Supply `--admin-assets-dir <console/dist/spa>` (or `HUB_ADMIN_ASSETS_DIR`) to the Hub daemon; startup rejects a missing `index.html`, and the existing static handler owns `/admin` and deep links. Omitting the option leaves static hosting disabled. Production ingress must route `/api/client/v1`, `/api/admin/v1`, `/admin` to Hub and `/runtime/v1` to Relay under one origin; test-library hosting does not qualify production TLS/ingress.
 
@@ -38,6 +38,7 @@ Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/
 | `--listen` | `HUB_LISTEN_ADDR` | `:8080` |
 | `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8081`; keep private |
 | `--admin-assets-dir` | `HUB_ADMIN_ASSETS_DIR` | Optional production SPA directory |
+| `--diagnostics-log-dir` | `HUB_DIAGNOSTICS_LOG_DIR` | Optional fixed directory containing Hub/Relay PM2 log files for authenticated Admin diagnostics |
 | `--public-origin` | `HUB_PUBLIC_ORIGIN` | Initial public HTTP/HTTPS platform origin seed; later changes are persisted through Admin Global settings |
 | `--portal-assets-dir` | `HUB_PORTAL_ASSETS_DIR` | Standard `measix-enterprise-portal/dist`; requires approved origin |
 | `--portal-upstream-url` | `HUB_PORTAL_UPSTREAM_URL` | Optional custom enterprise HTTP/HTTPS static site; takes precedence over assets and does not fall back |
@@ -74,9 +75,9 @@ Use restricted secret files and persistent, explicitly resolved DB/spool paths. 
 
 ## 3. Bootstrap and startup
 
-`control-hub` has `run`, `bootstrap-admin`, `check` and `backup` subcommands. Inspect each subcommand's flags with `--help`; maintenance commands do not use the full run configuration. Default bootstrap refuses an existing deployment; `--if-empty` skips an initialized deployment without resetting credentials, while `--add-admin` explicitly adds an administrator. They are mutually exclusive. Initial bootstrap accepts `--timezone <IANA zone>` (default UTC) for Enterprise Update date boundaries. Use its password-file input, not a password printed into shared logs.
+`control-hub` has `run`, `migrate`, `bootstrap-admin`, `check` and `backup` subcommands. Inspect each subcommand's flags with `--help`; maintenance commands do not use the full run configuration. Default bootstrap refuses an existing deployment; `--if-empty` skips an initialized deployment without resetting credentials, while `--add-admin` explicitly adds an administrator. They are mutually exclusive. Initial bootstrap accepts `--timezone <IANA zone>` (default UTC) for Enterprise Update date boundaries. Use its password-file input, not a password printed into shared logs.
 
-Initialize a clean database from the reviewed current SQL before startup; `run` does not create or alter schema. Startup opens/checks the database, requires the deployment invariant and initializes runtime services. See [database initialization](database-migrations.md) for limits of the check and development helper.
+Run `migrate` before bootstrap/startup; it initializes an empty database or applies pending append-only migrations. `run` does not create or alter schema. Startup verifies recorded versions/checksums, opens the database, requires the deployment invariant and initializes runtime services. See [database migrations](database-migrations.md).
 
 Start Hub/Relay, wait for explicit readiness, verify desired/applied control state, then expose traffic. Relay cannot serve authorized runtime traffic before valid control state is applied. Process liveness does not prove activation, usage delivery or static hosting.
 
@@ -108,21 +109,21 @@ control-hub check --db <hub.db>
 control-hub backup --db <hub.db> --output <new-backup.db>
 ```
 
-Backup uses SQLite `VACUUM INTO` and writes an adjacent `.metadata.json`. Both targets are exclusively reserved; existing database or orphan metadata is not overwritten. Source and copied database pass integrity/foreign-key/current-column checks before metadata is synced. Metadata records the binary's current SQL content identity. These checks do not replace an isolated restore/business replay.
+Backup uses SQLite `VACUUM INTO` and writes an adjacent `.metadata.json`. Both targets are exclusively reserved; existing database or orphan metadata is not overwritten. Source and copied database pass migration-history, integrity, foreign-key and current-column checks before metadata is synced. Metadata records the binary schema identity and integer schema version. These checks do not replace an isolated restore/business replay.
 
 `check` derives required tables/columns from current Ent schema, including Enterprise Update and session recovery; it checks SQLite integrity/foreign keys. It does not attest every index or column type equivalence. Success is necessary but insufficient for release.
 
-There is no restore CLI or fully packaged production restore runbook. Before replacing any deployment database, restore a copy in an isolated environment with matching binaries, required keys and the same current schema identity; check integrity, identities, releases/generations and usage, then run recovery scenarios. Never experiment on the only production copy; keep the original recoverable until acceptance.
+There is no in-place restore CLI. Restore uses a stopped-service file replacement described by the S0.2 Preview deployment runbook. First restore a copy in an isolated environment with matching binaries and required keys, run `check`, and verify identities, releases/generations and usage. Never experiment on the only production copy; keep the original recoverable until acceptance.
 
-## 7. S0.3 supervision and logging deliverables
+## 7. Preview supervision, logging and recent telemetry
 
-Implement supervision **within S0.3**, using host-native service management, not a fourth custom orchestration daemon. The reference is Linux `systemd` + `journald`; other platforms must prove equivalent behavior. Architecture owns the [Gateway operational contract](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-enterprise-tool-gateway-contract-spec.md); unit names, concrete timeouts, paths and commands belong here once implemented.
+The S0.2 Preview uses root-owned PM2 with one forked instance each for Hub and Relay; Caddy remains systemd-managed. This is intentionally smaller than the later Gateway/S0.3 topology. Concrete lifecycle and rotation settings are in the packaged ecosystem and [deployment runbook](s02-preview-deployment.md).
 
-Required package: one unit per Hub/Relay/Gateway, one aggregate target/group, independent failure domains, least privilege, immutable builds, private/public binding, readiness separate from ordering, bounded restart delay/rate limiting, permanent configuration-failure handling, graceful stop followed by supervisor termination after timeout, clean install/recovery commands and failure-injection tests. None is production-qualified merely by being listed here.
+Hub and Relay run as the unprivileged `measix` user, retain independent failure domains, bind only loopback behind Caddy, use bounded restart delay/count and a 40-second kill timeout, and write separate stdout/stderr files below the explicit deployment root. PM2 lifecycle state is not application readiness.
 
-Hub/Relay currently use `slog.JSONHandler` on stdout (`time`, `level`, `msg`). They do not consistently attach `service`, `buildVersion`, stable `event` or correlations. Raw error logging does not establish redaction.
+Hub/Relay use the common safe JSON logger on stdout with `service`, `buildVersion` and stable `event`. HTTP completion middleware records route templates, method, status and duration, excludes successful health probes, and feeds fixed 60 one-minute in-memory buckets. Error values are reduced to safe classes, sensitive field names are redacted and text values are bounded/scrubbed.
 
-The S0.3 shared initializer must attach `time`, `level`, `msg`, `service`, `buildVersion`, `event`; add request/interaction/activation/deployment/generation/control/resource/tool IDs, duration/outcome/errorCode only when applicable. Log route templates, not raw query strings. Supervisor collection owns rotation, bounded size/time retention and safe export; services do not share/rotate log files. No centralized log-search platform is required.
+Authenticated Admin exposes 15/60-minute telemetry and up to 200 recent redacted events from exactly four fixed Hub/Relay stdout/stderr files. Reads are tail-bounded to 2 MiB per file and 4 KiB per line; arbitrary paths and PM2/Caddy manager logs are never accepted. The System page uses at most 60 lightweight SVG points and Quasar virtual scrolling. PM2 logrotate owns file rotation; no centralized log-search platform is required.
 
 Never emit tokens, cookies, credentials, enrollment/session/signing material, private endpoints, toolRef/claims, raw prompts/bodies/tool arguments/results or direct personal identity. Test normal and failure diagnostics for forbidden material. References: [systemd service lifecycle](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [journald retention](https://www.freedesktop.org/software/systemd/man/252/journald.conf.html); documentation is not runtime qualification.
 
@@ -134,7 +135,7 @@ Never emit tokens, cookies, credentials, enrollment/session/signing material, pr
 | Relay not ready after restart | Inspect Hub reconcile and Relay applied revision; do not bypass authentication/inject state |
 | Hub ready but runtime degraded | Compare desired/applied revision and activation; readiness is not convergence |
 | `/admin` missing or deep links fail | Check actual static host/ingress; verify `--admin-assets-dir`, `index.html` and same-origin ingress |
-| Schema/check disagreement | Delete a non-current database or inspect the reviewed current initialization SQL; do not convert it in place |
+| Schema/check disagreement | Preserve the database and migration error, compare the packaged migration set, and restore the pre-upgrade backup if needed; never edit history rows |
 | Repeated process crash | Preserve diagnostics/persistent data; no production restart-rate-limit package exists yet |
 
-Deployment must pin artifacts, verify applicable evidence, initialize the reviewed current schema on a clean database, validate readiness/control/static routing and run smoke/recovery checks. A database with another schema identity is deleted and recreated; there is no binary/database upgrade or downgrade path before the first release. RC also needs isolated restore of the same current schema, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).
+Deployment must pin artifacts, verify checksums, back up, apply the packaged forward migrations, validate readiness/control/static routing and run smoke/recovery checks. Downgrade means restoring both the pre-upgrade release and its backup; migration files/history are never reversed in place. RC also needs isolated restore, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).

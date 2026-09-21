@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
@@ -11,16 +11,27 @@ import PageHeader from '../components/PageHeader.vue'
 
 const { t: $t } = useI18n()
 
-const activeTab = ref<'overview' | 'runtime' | 'metering'>('overview')
+const activeTab = ref<'overview' | 'runtime' | 'metering' | 'events'>('overview')
 
 type SystemStatus = components['schemas']['SystemStatus']
 type SystemHealth = components['schemas']['Health']
+type SystemTelemetry = components['schemas']['SystemTelemetry']
+type SystemEventPage = components['schemas']['SystemEventPage']
+type ProcessTelemetry = components['schemas']['ProcessTelemetry']
 
 const status = ref<SystemStatus>()
 const health = ref<SystemHealth>()
 const loading = ref(false)
 const error = ref<unknown>()
 const healthError = ref<unknown>()
+const telemetry = ref<SystemTelemetry>()
+const events = ref<SystemEventPage>()
+const diagnosticsError = ref<unknown>()
+const telemetryWindow = ref<'15m' | '60m'>('15m')
+const eventService = ref<'ALL' | 'HUB' | 'RELAY'>('ALL')
+const eventLevel = ref('')
+const eventPaused = ref(false)
+let pollTimer: ReturnType<typeof setInterval> | undefined
 
 const noPublishedConfiguration = computed(() => !!status.value && !hasPublishedConfiguration(status.value))
 const converged = computed(() => isManagedRuntimeConverged(status.value))
@@ -49,7 +60,38 @@ async function refresh() {
   }
 }
 
-onMounted(refresh)
+async function refreshDiagnostics(force = false) {
+  if (document.hidden) return
+  diagnosticsError.value = undefined
+  try {
+    if (activeTab.value === 'metering') {
+      telemetry.value = await apiFetch<SystemTelemetry>(`/api/admin/v1/system/telemetry?window=${telemetryWindow.value}`)
+    } else if (activeTab.value === 'events' && (!eventPaused.value || force)) {
+      const query = new URLSearchParams({ limit: '100' })
+      if (eventService.value !== 'ALL') query.set('service', eventService.value)
+      if (eventLevel.value.trim()) query.set('level', eventLevel.value.trim())
+      events.value = await apiFetch<SystemEventPage>(`/api/admin/v1/system/events?${query}`)
+    }
+  } catch (reason) {
+    diagnosticsError.value = reason
+  }
+}
+
+function requestPoints(process: ProcessTelemetry | undefined): string {
+  const values = process?.buckets.map(bucket => bucket.requestCount) ?? []
+  if (values.length === 0) return ''
+  const max = Math.max(1, ...values)
+  const divisor = Math.max(1, values.length - 1)
+  return values.map((value, index) => `${(index / divisor) * 100},${28 - (value / max) * 24}`).join(' ')
+}
+
+watch([activeTab, telemetryWindow, eventService, eventLevel, eventPaused], () => refreshDiagnostics())
+onMounted(async () => {
+  await refresh()
+  await refreshDiagnostics()
+  pollTimer = setInterval(refreshDiagnostics, 15_000)
+})
+onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 </script>
 
 <template>
@@ -63,8 +105,10 @@ onMounted(refresh)
       <q-tab name="overview" icon="dashboard" :label="$t('system.tabs.overview')" />
       <q-tab name="runtime" icon="sync_alt" :label="$t('system.tabs.runtime')" />
       <q-tab name="metering" icon="monitoring" :label="$t('system.tabs.metering')" />
+      <q-tab name="events" icon="receipt_long" :label="$t('system.tabs.events')" />
     </q-tabs>
     <ProblemBanner :error="error" class="q-mb-xs" />
+    <ProblemBanner :error="diagnosticsError" class="q-mb-xs" />
     <q-banner v-if="noPublishedConfiguration" data-cy="system-setup-state" class="bg-amber-1 text-warning q-mb-xs rounded-borders">
       {{ $t('system.noPublishedConfiguration') }} {{ $t('system.setupGuidance') }}
       <div class="row q-gutter-xs q-mt-xs">
@@ -137,6 +181,29 @@ onMounted(refresh)
         </div>
       <!-- Metering & spool state -->
         <div v-show="activeTab === 'metering'" class="col-12">
+          <div class="row items-center q-gutter-xs q-mb-xs">
+            <q-btn-toggle v-model="telemetryWindow" dense no-caps toggle-color="primary" :options="[{ label: '15m', value: '15m' }, { label: '60m', value: '60m' }]" />
+            <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" @click="refreshDiagnostics()" />
+            <span v-if="telemetry" class="text-caption text-grey-7">{{ $t('system.telemetrySince') }} {{ new Date(telemetry.hub.startedAt).toLocaleString() }}</span>
+          </div>
+          <div v-if="telemetry" class="telemetry-grid q-mb-xs" data-cy="system-telemetry">
+            <q-card v-for="process in [{ name: 'Hub', value: telemetry.hub }, { name: 'Relay', value: telemetry.relay }]" :key="process.name" flat bordered>
+              <q-card-section>
+                <div class="row items-center justify-between"><div class="text-subtitle2">{{ process.name }}</div><div class="text-caption text-grey-7">P95 {{ process.value?.summary.durationP95Ms ?? '—' }} ms</div></div>
+                <template v-if="process.value">
+                  <div class="row q-col-gutter-sm q-mt-xs text-caption">
+                    <div class="col">{{ $t('system.requests') }} <strong>{{ process.value.summary.requestCount }}</strong></div>
+                    <div class="col">{{ $t('system.errors') }} <strong>{{ process.value.summary.clientErrorCount + process.value.summary.serverErrorCount }}</strong></div>
+                    <div class="col">{{ $t('system.inFlight') }} <strong>{{ process.value.summary.inFlight }}</strong></div>
+                  </div>
+                  <svg class="telemetry-chart" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" :aria-label="$t('system.requestTrend')">
+                    <polyline :points="requestPoints(process.value)" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+                  </svg>
+                </template>
+                <div v-else class="text-grey-7">{{ $t('system.telemetryUnavailable') }}</div>
+              </q-card-section>
+            </q-card>
+          </div>
           <q-card flat bordered>
             <q-card-section class="text-subtitle2">{{ $t('system.meteringSpool') }}</q-card-section>
             <q-list separator class="system-metering-list">
@@ -205,6 +272,29 @@ onMounted(refresh)
       </div>
     </template>
 
+    <div v-show="activeTab === 'events'" class="q-mt-xs" data-cy="system-events">
+      <div class="row items-center q-gutter-xs q-mb-xs">
+        <q-btn-toggle v-model="eventService" dense no-caps toggle-color="primary" :options="[{ label: $t('common.all'), value: 'ALL' }, { label: 'Hub', value: 'HUB' }, { label: 'Relay', value: 'RELAY' }]" />
+        <q-select v-model="eventLevel" dense outlined clearable emit-value map-options :label="$t('system.level')" :options="['INFO', 'WARN', 'ERROR']" style="min-width: 120px" />
+        <q-toggle v-model="eventPaused" :label="$t('system.pauseRefresh')" />
+        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" @click="refreshDiagnostics(true)" />
+      </div>
+      <q-card flat bordered>
+        <q-virtual-scroll v-if="events?.items.length" :items="events.items" virtual-scroll-item-size="56" style="max-height: 520px">
+          <template #default="{ item }">
+            <q-item :key="`${item.time}-${item.service}-${item.event}`">
+              <q-item-section>
+                <q-item-label><q-badge outline :color="item.level === 'ERROR' ? 'negative' : item.level === 'WARN' ? 'warning' : 'primary'" :label="item.level" /> {{ item.event }}</q-item-label>
+                <q-item-label caption>{{ new Date(item.time).toLocaleString() }} · {{ item.service }} · {{ item.message }}</q-item-label>
+                <q-item-label v-if="item.requestId || item.activationId || item.resourceId" caption class="text-mono">{{ item.requestId || item.activationId || item.resourceId }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </template>
+        </q-virtual-scroll>
+        <q-card-section v-else class="text-grey-7">{{ $t('system.noEvents') }}</q-card-section>
+      </q-card>
+    </div>
+
     <ProblemBanner :error="healthError" class="q-mb-xs" />
     <q-card v-if="health" v-show="activeTab === 'overview'" flat bordered>
       <q-card-section><div class="text-subtitle2">{{ $t('system.hubHealth') }}</div></q-card-section>
@@ -240,8 +330,13 @@ onMounted(refresh)
   overflow-wrap: anywhere;
 }
 
+.telemetry-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.telemetry-chart { width: 100%; height: 72px; color: var(--q-primary); margin-top: 8px; }
+.text-mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+
 @media (max-width: 700px) {
   .system-overview-grid,
-  .system-metering-list { grid-template-columns: minmax(0, 1fr); }
+  .system-metering-list,
+  .telemetry-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

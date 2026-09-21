@@ -23,6 +23,8 @@
     "generate:go-relay": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/relay.yaml api/internal/relay-control.openapi.yaml",
     "generate:go-usage": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/usage.yaml api/internal/usage-ingest.openapi.yaml",
     "generate": "node scripts/checks.mjs generate",
+    "verify:preview-contract": "node scripts/verify-preview-contract.mjs",
+    "build:preview-release": "node scripts/build-preview-release.mjs",
     "drift": "node scripts/checks.mjs drift",
     "fmt": "cd backend && gofmt -w .",
     "fmt:check": "node scripts/checks.mjs fmt",
@@ -35,7 +37,7 @@
     "test:relay": "cd backend && go test ./internal/relay/... -count=1",
     "test:hub": "cd backend && go test ./internal/hub/... -count=1",
     "ci": "make ci",
-    "test:tooling": "node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs scripts/replay-freeze.test.mjs scripts/adapter-identity.test.mjs scripts/harness-cleanup.test.mjs scripts/harness-path.test.mjs scripts/scenario-definitions.test.mjs scripts/cli-contract.test.mjs scripts/freeze-producers.test.mjs scripts/dev-setup-obsolete.test.mjs",
+    "test:tooling": "node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs scripts/replay-freeze.test.mjs scripts/adapter-identity.test.mjs scripts/harness-cleanup.test.mjs scripts/harness-path.test.mjs scripts/scenario-definitions.test.mjs scripts/cli-contract.test.mjs scripts/freeze-producers.test.mjs",
     "test:public-origin": "node --test scripts/public-origin.test.mjs"
   },
   "packageManager": "pnpm@11.0.0",

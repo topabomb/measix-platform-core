@@ -13,7 +13,7 @@ api/                   four OpenAPI documents, fixtures, Android export
 backend/cmd/           Hub, Relay, development/export utilities
 backend/internal/      common, generated wire, Hub and Relay implementation
 backend/ent/           schema and generated persistence code
-backend/migrations/    single current initialization SQL
+backend/migrations/    ordered embedded Hub database migrations
 backend/test/system/   Go harness, deterministic adapter/client, tagged scenarios
 console/src/           Admin UI
 console/e2e/           browser assertions
@@ -71,7 +71,7 @@ From either PowerShell or POSIX, `node scripts/checks.mjs generate` owns regener
 
 Semantic changes start in the owning architecture contract, then OpenAPI → canonical fixtures → generated artifacts → tests → implementation. `make generate` delegates to that same Node owner and installs locked console dependencies before generation. It covers four Go wire surfaces, Android Client OpenAPI export/manifest, Ent, canonical client fixtures, the Android integration export and Admin TypeScript. It does not produce a schema checksum file: there is none. Android export is not Kotlin consumer implementation. See [API contracts](api-contracts.md).
 
-Schema changes update the reviewed current initialization SQL, with empty initialization, atomic failure and current-version integrity/recovery tests. No historical upgrade fixtures are maintained. `devmigrate` is a development convenience that records the one accepted SQL checksum; it is not an upgrade mechanism or an equivalent release schema gate. See [database initialization](database-migrations.md).
+Schema changes add an immutable, sequential SQL migration and update Ent/generated code. Preserve a previous-version fixture when a new migration is introduced, and test empty initialization, upgrade data preservation, idempotence, per-file atomic failure and backup/recovery. `devmigrate` is only a compatibility wrapper around the same embedded migrator used by `control-hub migrate`. See [database migrations](database-migrations.md).
 
 ## 5. System and browser ownership
 

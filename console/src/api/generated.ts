@@ -695,6 +695,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/system/telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["systemTelemetry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/system/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["systemEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/deployment/settings": {
         parameters: {
             query?: never;
@@ -1633,6 +1665,78 @@ export interface components {
             semanticOrphanCount?: number;
             /** @description Number of retained requests with no linked semantic records or at least one UNKNOWN record. Counts requests once, excludes unlinked provider records, and uses the same completeness rule as Usage. Omission means unavailable, not zero. */
             semanticUnknownRequestCount?: number;
+        };
+        TelemetryMetrics: {
+            /** Format: int64 */
+            requestCount: number;
+            /** Format: int64 */
+            successCount: number;
+            /** Format: int64 */
+            clientErrorCount: number;
+            /** Format: int64 */
+            serverErrorCount: number;
+            /** Format: int64 */
+            rejectedCount: number;
+            /** Format: int64 */
+            timeoutCount: number;
+            /** Format: int64 */
+            cancelledCount: number;
+            /** Format: int64 */
+            upstreamErrorCount?: number;
+            /** Format: int64 */
+            budgetDeniedCount?: number;
+            /** Format: int64 */
+            activationFailureCount?: number;
+            /** Format: int64 */
+            reconcileFailureCount?: number;
+            /** Format: int64 */
+            durationP95Ms: number;
+            /** Format: int64 */
+            inFlight: number;
+        };
+        TelemetryBucket: components["schemas"]["TelemetryMetrics"] & {
+            /** Format: date-time */
+            minute: string;
+        };
+        ProcessTelemetry: {
+            /** Format: date-time */
+            startedAt: string;
+            summary: components["schemas"]["TelemetryMetrics"];
+            buckets: components["schemas"]["TelemetryBucket"][];
+        };
+        SystemTelemetry: {
+            /** @enum {integer} */
+            windowMinutes: 15 | 60;
+            /** Format: date-time */
+            collectedAt: string;
+            hub: components["schemas"]["ProcessTelemetry"];
+            relay?: components["schemas"]["ProcessTelemetry"];
+        };
+        SystemEvent: {
+            /** Format: date-time */
+            time: string;
+            /** @enum {string} */
+            service: "HUB" | "RELAY";
+            level: string;
+            event: string;
+            message: string;
+            requestId?: string;
+            interactionId?: string;
+            activationId?: string;
+            deploymentId?: string;
+            /** Format: int64 */
+            controlRevision?: number;
+            resourceId?: string;
+            /** Format: int64 */
+            durationMs?: number;
+            httpStatus?: number;
+            outcome?: string;
+            errorCode?: string;
+            truncated?: boolean;
+        };
+        SystemEventPage: {
+            items: components["schemas"]["SystemEvent"][];
+            truncated: boolean;
         };
         DeploymentSettings: {
             deploymentId: components["schemas"]["DeploymentId"];
@@ -3379,6 +3483,60 @@ export interface operations {
                     "application/json": components["schemas"]["SystemStatus"];
                 };
             };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    systemTelemetry: {
+        parameters: {
+            query?: {
+                window?: "15m" | "60m";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded in-memory request telemetry for the current Hub and last observed Relay process windows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemTelemetry"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    systemEvents: {
+        parameters: {
+            query?: {
+                service?: "HUB" | "RELAY";
+                level?: string;
+                event?: string;
+                correlation?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent redacted Hub and Relay process events from fixed deployment log files. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemEventPage"];
+                };
+            };
+            400: components["responses"]["Problem"];
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
         };

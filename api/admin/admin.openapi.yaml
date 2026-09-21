@@ -1467,6 +1467,71 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
+  /api/admin/v1/system/telemetry:
+    get:
+      operationId: systemTelemetry
+      parameters:
+      - name: window
+        in: query
+        schema:
+          type: string
+          enum: [15m, 60m]
+          default: 15m
+      responses:
+        '200':
+          description: Bounded in-memory request telemetry for the current Hub and last observed Relay process windows.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemTelemetry'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/system/events:
+    get:
+      operationId: systemEvents
+      parameters:
+      - name: service
+        in: query
+        schema:
+          type: string
+          enum: [HUB, RELAY]
+      - name: level
+        in: query
+        schema:
+          type: string
+      - name: event
+        in: query
+        schema:
+          type: string
+      - name: correlation
+        in: query
+        schema:
+          type: string
+          maxLength: 256
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 100
+      responses:
+        '200':
+          description: Recent redacted Hub and Relay process events from fixed deployment log files.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemEventPage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/deployment/settings:
     get:
       operationId: getDeploymentSettings
@@ -3983,6 +4048,82 @@ components:
           type: integer
           minimum: 0
           description: Number of retained requests with no linked semantic records or at least one UNKNOWN record. Counts requests once, excludes unlinked provider records, and uses the same completeness rule as Usage. Omission means unavailable, not zero.
+    TelemetryMetrics:
+      type: object
+      additionalProperties: false
+      required: [requestCount, successCount, clientErrorCount, serverErrorCount, rejectedCount, timeoutCount, cancelledCount, durationP95Ms, inFlight]
+      properties:
+        requestCount: { type: integer, format: int64, minimum: 0 }
+        successCount: { type: integer, format: int64, minimum: 0 }
+        clientErrorCount: { type: integer, format: int64, minimum: 0 }
+        serverErrorCount: { type: integer, format: int64, minimum: 0 }
+        rejectedCount: { type: integer, format: int64, minimum: 0 }
+        timeoutCount: { type: integer, format: int64, minimum: 0 }
+        cancelledCount: { type: integer, format: int64, minimum: 0 }
+        upstreamErrorCount: { type: integer, format: int64, minimum: 0 }
+        budgetDeniedCount: { type: integer, format: int64, minimum: 0 }
+        activationFailureCount: { type: integer, format: int64, minimum: 0 }
+        reconcileFailureCount: { type: integer, format: int64, minimum: 0 }
+        durationP95Ms: { type: integer, format: int64, minimum: 0 }
+        inFlight: { type: integer, format: int64, minimum: 0 }
+    TelemetryBucket:
+      allOf:
+      - $ref: '#/components/schemas/TelemetryMetrics'
+      - type: object
+        required: [minute]
+        properties:
+          minute: { type: string, format: date-time }
+    ProcessTelemetry:
+      type: object
+      additionalProperties: false
+      required: [startedAt, summary, buckets]
+      properties:
+        startedAt: { type: string, format: date-time }
+        summary: { $ref: '#/components/schemas/TelemetryMetrics' }
+        buckets:
+          type: array
+          maxItems: 60
+          items: { $ref: '#/components/schemas/TelemetryBucket' }
+    SystemTelemetry:
+      type: object
+      additionalProperties: false
+      required: [windowMinutes, collectedAt, hub]
+      properties:
+        windowMinutes: { type: integer, enum: [15, 60] }
+        collectedAt: { type: string, format: date-time }
+        hub: { $ref: '#/components/schemas/ProcessTelemetry' }
+        relay: { $ref: '#/components/schemas/ProcessTelemetry' }
+    SystemEvent:
+      type: object
+      additionalProperties: false
+      required: [time, service, level, event, message]
+      properties:
+        time: { type: string, format: date-time }
+        service: { type: string, enum: [HUB, RELAY] }
+        level: { type: string }
+        event: { type: string }
+        message: { type: string }
+        requestId: { type: string }
+        interactionId: { type: string }
+        activationId: { type: string }
+        deploymentId: { type: string }
+        controlRevision: { type: integer, format: int64 }
+        resourceId: { type: string }
+        durationMs: { type: integer, format: int64, minimum: 0 }
+        httpStatus: { type: integer, minimum: 100, maximum: 599 }
+        outcome: { type: string }
+        errorCode: { type: string }
+        truncated: { type: boolean }
+    SystemEventPage:
+      type: object
+      additionalProperties: false
+      required: [items, truncated]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/SystemEvent' }
+        truncated: { type: boolean }
     DeploymentSettings:
       type: object
       additionalProperties: false

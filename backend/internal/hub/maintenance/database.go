@@ -12,22 +12,30 @@ import (
 	"time"
 
 	"measix/platform/ent/migrate"
+	"measix/platform/migrations"
 )
 
 type CheckResult struct {
-	Integrity string
-	Tables    int
+	Integrity     string
+	Tables        int
+	SchemaVersion int
+	Schema        string
 }
 
 type BackupMetadata struct {
-	CreatedAt time.Time `json:"createdAt"`
-	Build     string    `json:"build"`
-	Schema    string    `json:"schema"`
+	CreatedAt     time.Time `json:"createdAt"`
+	Build         string    `json:"build"`
+	Schema        string    `json:"schema"`
+	SchemaVersion int       `json:"schemaVersion"`
 }
 
 func Check(ctx context.Context, db *sql.DB) (CheckResult, error) {
 	if db == nil {
 		return CheckResult{}, fmt.Errorf("database is nil")
+	}
+	schema, err := migrations.Verify(ctx, db)
+	if err != nil {
+		return CheckResult{}, fmt.Errorf("schema migration history: %w", err)
 	}
 	var integrity string
 	if err := db.QueryRowContext(ctx, "PRAGMA integrity_check").Scan(&integrity); err != nil {
@@ -89,7 +97,7 @@ func Check(ctx context.Context, db *sql.DB) (CheckResult, error) {
 			}
 		}
 	}
-	return CheckResult{Integrity: integrity, Tables: len(migrate.Tables)}, nil
+	return CheckResult{Integrity: integrity, Tables: len(migrate.Tables), SchemaVersion: schema.Version, Schema: schema.Identity}, nil
 }
 
 // RequiredTableList returns the list of required table names that must exist
@@ -159,7 +167,7 @@ func Backup(ctx context.Context, db *sql.DB, outputPath, build string, now time.
 	if closeErr != nil {
 		return "", closeErr
 	}
-	metadata := BackupMetadata{CreatedAt: now.UTC(), Build: build, Schema: CurrentSchemaIdentity}
+	metadata := BackupMetadata{CreatedAt: now.UTC(), Build: build, Schema: CurrentSchemaIdentity, SchemaVersion: migrations.CurrentVersion()}
 	if err := json.NewEncoder(metadataFile).Encode(metadata); err != nil {
 		return "", err
 	}

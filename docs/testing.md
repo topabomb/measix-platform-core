@@ -88,7 +88,7 @@ Do not mock away the behavior under test:
 - Hub persistence tests use real SQLite;
 - Relay spool tests use real SQLite;
 - Relay streaming/cancellation tests use real HTTP/TCP boundaries;
-- schema tests execute the single current initialization SQL;
+- schema tests execute the ordered embedded migration set;
 - Admin static-host tests use production build output;
 - T3 Hub/Relay tests run real processes/binaries;
 - S0.3 T3/T4.3 tests run real Hub/Gateway/Relay production binaries plus deterministic downstream MCP;

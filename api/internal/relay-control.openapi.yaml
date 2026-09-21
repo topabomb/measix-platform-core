@@ -593,6 +593,42 @@ components:
         oldestPendingAgeSeconds:
           type: integer
           minimum: 0
+        telemetry:
+          $ref: '#/components/schemas/ProcessTelemetry'
+    TelemetryMetrics:
+      type: object
+      additionalProperties: false
+      required: [requestCount, successCount, clientErrorCount, serverErrorCount, rejectedCount, timeoutCount, cancelledCount, durationP95Ms, inFlight]
+      properties:
+        requestCount: { type: integer, format: int64, minimum: 0 }
+        successCount: { type: integer, format: int64, minimum: 0 }
+        clientErrorCount: { type: integer, format: int64, minimum: 0 }
+        serverErrorCount: { type: integer, format: int64, minimum: 0 }
+        rejectedCount: { type: integer, format: int64, minimum: 0 }
+        timeoutCount: { type: integer, format: int64, minimum: 0 }
+        cancelledCount: { type: integer, format: int64, minimum: 0 }
+        upstreamErrorCount: { type: integer, format: int64, minimum: 0 }
+        budgetDeniedCount: { type: integer, format: int64, minimum: 0 }
+        durationP95Ms: { type: integer, format: int64, minimum: 0 }
+        inFlight: { type: integer, format: int64, minimum: 0 }
+    TelemetryBucket:
+      allOf:
+      - $ref: '#/components/schemas/TelemetryMetrics'
+      - type: object
+        required: [minute]
+        properties:
+          minute: { type: string, format: date-time }
+    ProcessTelemetry:
+      type: object
+      additionalProperties: false
+      required: [startedAt, summary, buckets]
+      properties:
+        startedAt: { type: string, format: date-time }
+        summary: { $ref: '#/components/schemas/TelemetryMetrics' }
+        buckets:
+          type: array
+          maxItems: 60
+          items: { $ref: '#/components/schemas/TelemetryBucket' }
   responses:
     Problem:
       description: Problem response

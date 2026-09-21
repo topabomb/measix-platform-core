@@ -26,8 +26,7 @@ func currentSchemaSQL(t *testing.T) string { t.Helper(); return migrations.Curre
 // initializeCurrentSchema applies the current initialization SQL to a clean database.
 func initializeCurrentSchema(t *testing.T, db *sql.DB) {
 	t.Helper()
-	sqlText := currentSchemaSQL(t)
-	if _, err := db.Exec(sqlText); err != nil {
+	if _, err := migrations.Apply(context.Background(), db); err != nil {
 		t.Fatalf("initialize current schema: %v", err)
 	}
 }
@@ -258,7 +257,7 @@ func TestHUBDB003CurrentSchemaNotRewrittenOnRestart(t *testing.T) {
 }
 
 // HUB-DB-004: a non-current schema must fail-fast at startup. An empty
-// DB (no required tables) must fail the check immediately.
+// DB has no migration history and must fail the check immediately.
 func TestHUBDB004NonCurrentSchemaFailFast(t *testing.T) {
 	db, _ := openEmptyDB(t)
 	defer db.Close()
@@ -268,8 +267,8 @@ func TestHUBDB004NonCurrentSchemaFailFast(t *testing.T) {
 	if err == nil {
 		t.Fatal("empty database should fail the current schema check")
 	}
-	if !strings.Contains(err.Error(), "missing") && !strings.Contains(err.Error(), "required") {
-		t.Fatalf("error should mention missing/required table, got: %v", err)
+	if !strings.Contains(err.Error(), "migration history") {
+		t.Fatalf("error should mention migration history, got: %v", err)
 	}
 }
 
@@ -376,6 +375,9 @@ func TestHUBDB007BackupIsConsistentDurableImage(t *testing.T) {
 	}
 	if meta.Schema == "" {
 		t.Fatal("metadata schema is empty")
+	}
+	if meta.SchemaVersion != migrations.CurrentVersion() {
+		t.Fatalf("metadata schema version=%d want=%d", meta.SchemaVersion, migrations.CurrentVersion())
 	}
 
 	// Open backup and verify integrity

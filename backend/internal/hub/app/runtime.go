@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"measix/platform/internal/common/health"
+	"measix/platform/internal/common/observability"
 	"measix/platform/internal/hub/adminstatic"
 	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/hub/capability"
@@ -41,6 +42,7 @@ type Runtime struct {
 	Health            *health.State
 	RuntimeControl    *runtimecontrol.Service
 	ReconcileInterval time.Duration
+	Telemetry         *observability.Recorder
 }
 
 type RuntimeOptions struct {
@@ -48,6 +50,7 @@ type RuntimeOptions struct {
 	AdminAssets  fs.FS
 	BuildVersion string
 	HTTPClient   *http.Client
+	Telemetry    *observability.Recorder
 }
 
 func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) {
@@ -168,9 +171,15 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 		return closeOnError(fmt.Errorf("initialize budget service: %w", err))
 	}
 	usageService := usage.NewService(st.Client, budgetService)
+	telemetry := options.Telemetry
+	if telemetry == nil {
+		telemetry = observability.NewRecorder(nil)
+	}
 	systemService := system.New(st, runtimeControl, options.BuildVersion)
 	systemService.PortalMode = portalMode
 	systemService.PortalUpstream = portalUpstream
+	systemService.Telemetry = telemetry
+	systemService.DiagnosticsLogDir = cfg.DiagnosticsLogDir
 	services := httpapi.Services{
 		Identity: identityService, Capability: capabilityService, Upstream: upstreamService,
 		RuntimeControl: runtimeControl, Usage: usageService, Budget: budgetService, System: systemService,
@@ -203,9 +212,12 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	// while the fully initialized Admin/diagnostics surface remains available for recovery.
 	_, _ = runtimeControl.Reconcile(ctx)
 	h.SetReady(true)
+	logger := observability.Logger{Log: slog.Default()}
 	return &Runtime{
-		Handler: router, InternalHandler: internalRouter, Store: st, Services: services, Health: h,
+		Handler:         observability.HTTPMiddleware(telemetry, logger)(router),
+		InternalHandler: observability.HTTPMiddleware(telemetry, logger)(internalRouter), Store: st, Services: services, Health: h,
 		RuntimeControl: runtimeControl, ReconcileInterval: cfg.ReconcileInterval,
+		Telemetry: telemetry,
 	}, nil
 }
 
@@ -227,7 +239,10 @@ func (r *Runtime) RunReconciler(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			_, _ = r.RuntimeControl.Reconcile(ctx)
+			if _, err := r.RuntimeControl.Reconcile(ctx); err != nil {
+				r.Telemetry.IncrementReconcileFailure()
+				slog.Error("runtime reconcile failed", "event", "runtime.reconcile_failed", "error", err)
+			}
 			if err := r.Services.Identity.SweepRefreshRecovery(ctx); err != nil {
 				slog.Error("refresh recovery cleanup failed; will retry", "event", "refresh_cleanup_failed", "error", err)
 			}

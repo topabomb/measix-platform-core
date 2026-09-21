@@ -458,6 +458,7 @@ type ControlStatus struct {
 	SpoolPendingCount       *int                     `json:"spoolPendingCount,omitempty"`
 	SpoolState              *ControlStatusSpoolState `json:"spoolState,omitempty"`
 	StartedAt               time.Time                `json:"startedAt"`
+	Telemetry               *ProcessTelemetry        `json:"telemetry,omitempty"`
 }
 
 // ControlStatusSpoolState defines model for ControlStatus.SpoolState.
@@ -522,6 +523,13 @@ type Problem struct {
 	TargetManagedGeneration *int           `json:"targetManagedGeneration,omitempty"`
 	Title                   string         `json:"title"`
 	Type                    string         `json:"type"`
+}
+
+// ProcessTelemetry defines model for ProcessTelemetry.
+type ProcessTelemetry struct {
+	Buckets   []TelemetryBucket `json:"buckets"`
+	StartedAt time.Time         `json:"startedAt"`
+	Summary   TelemetryMetrics  `json:"summary"`
 }
 
 // ProviderId defines model for ProviderId.
@@ -663,6 +671,37 @@ type SessionId = string
 
 // Sha256Hash defines model for Sha256Hash.
 type Sha256Hash = string
+
+// TelemetryBucket defines model for TelemetryBucket.
+type TelemetryBucket struct {
+	BudgetDeniedCount  *int64    `json:"budgetDeniedCount,omitempty"`
+	CancelledCount     int64     `json:"cancelledCount"`
+	ClientErrorCount   int64     `json:"clientErrorCount"`
+	DurationP95Ms      int64     `json:"durationP95Ms"`
+	InFlight           int64     `json:"inFlight"`
+	Minute             time.Time `json:"minute"`
+	RejectedCount      int64     `json:"rejectedCount"`
+	RequestCount       int64     `json:"requestCount"`
+	ServerErrorCount   int64     `json:"serverErrorCount"`
+	SuccessCount       int64     `json:"successCount"`
+	TimeoutCount       int64     `json:"timeoutCount"`
+	UpstreamErrorCount *int64    `json:"upstreamErrorCount,omitempty"`
+}
+
+// TelemetryMetrics defines model for TelemetryMetrics.
+type TelemetryMetrics struct {
+	BudgetDeniedCount  *int64 `json:"budgetDeniedCount,omitempty"`
+	CancelledCount     int64  `json:"cancelledCount"`
+	ClientErrorCount   int64  `json:"clientErrorCount"`
+	DurationP95Ms      int64  `json:"durationP95Ms"`
+	InFlight           int64  `json:"inFlight"`
+	RejectedCount      int64  `json:"rejectedCount"`
+	RequestCount       int64  `json:"requestCount"`
+	ServerErrorCount   int64  `json:"serverErrorCount"`
+	SuccessCount       int64  `json:"successCount"`
+	TimeoutCount       int64  `json:"timeoutCount"`
+	UpstreamErrorCount *int64 `json:"upstreamErrorCount,omitempty"`
+}
 
 // TimeoutPolicy defines model for TimeoutPolicy.
 type TimeoutPolicy struct {

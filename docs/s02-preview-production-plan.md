@@ -598,7 +598,8 @@ sudo -u measix "$MEASIX_ROOT/current/bin/control-hub" bootstrap-admin \
 ### 13.7 启动 PM2
 
 ```bash
-sudo pm2 start "$MEASIX_ROOT/config/ecosystem.config.cjs" --env production
+sudo env MEASIX_ROOT="$MEASIX_ROOT" MEASIX_PUBLIC_ORIGIN="$MEASIX_PUBLIC_ORIGIN" \
+  pm2 start "$MEASIX_ROOT/config/ecosystem.config.cjs"
 sudo pm2 save
 sudo pm2 startup
 sudo pm2 status

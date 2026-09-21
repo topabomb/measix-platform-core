@@ -28,6 +28,7 @@ test('production installer accepts only an HTTPS public origin', () => {
   const installer = read('deploy/preview/install-preview.sh')
   assert.match(installer, /\^https:\/\//)
   assert.doesNotMatch(installer, /\^https\?\:/)
+  assert.doesNotMatch(installer, /--env production/)
 })
 
 test('Windows release packaging normalizes Linux executable modes', () => {

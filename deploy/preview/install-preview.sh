@@ -49,7 +49,7 @@ sudo -u measix "$root/current/bin/control-hub" bootstrap-admin \
   --password-file "$root/secrets/initial-admin-password" \
   --deployment-name MEASIX --username admin
 
-env MEASIX_ROOT="$root" MEASIX_PUBLIC_ORIGIN="$public_origin" pm2 start "$root/config/ecosystem.config.cjs" --env production
+env MEASIX_ROOT="$root" MEASIX_PUBLIC_ORIGIN="$public_origin" pm2 start "$root/config/ecosystem.config.cjs"
 pm2 save
 ln -sfn -- "$root/config/Caddyfile" /etc/caddy/Caddyfile
 systemctl reload caddy

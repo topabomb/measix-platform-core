@@ -605,7 +605,7 @@ func TestUnsupportedLimitedMeterAndAudioUseIntegerMilliseconds(t *testing.T) {
 	resourceID := platformid.New(platformid.ASR)
 	unsupported := f.admit(platformid.New(platformid.Request), CapabilityASR, resourceID, ProtocolOpenAIAudioTranscriptions, nil)
 	decision, err := f.service.Admit(ctx, unsupported)
-	if err != nil || decision.Allowed || decision.Code != DecisionMeterUnavailable || len(decision.Unavailable) != 1 || decision.Unavailable[0] != MeterAudioMilliseconds {
+	if err != nil || !decision.Allowed || decision.Code != DecisionAllowed || len(decision.Unavailable) != 1 || decision.Unavailable[0] != MeterAudioMilliseconds {
 		t.Fatalf("unavailable meter decision = %+v, %v", decision, err)
 	}
 
@@ -628,6 +628,39 @@ func TestUnsupportedLimitedMeterAndAudioUseIntegerMilliseconds(t *testing.T) {
 		[]MeterQuantity{{Meter: MeterAudioMilliseconds, Quantity: 501}}, MeterAudioMilliseconds))
 	if err != nil || blocked.Allowed || blocked.BlockingLimits[0].Used != 1000 || blocked.BlockingLimits[0].Limit != 1500 {
 		t.Fatalf("millisecond budget decision = %+v, %v", blocked, err)
+	}
+}
+
+func TestReconciliationAndActiveRequestsDoNotCreateSyntheticAdmissionLimit(t *testing.T) {
+	f := newBudgetFixture(t, "UTC")
+	ctx := context.Background()
+	resourceID := platformid.New(platformid.Model)
+
+	uncertainID := platformid.New(platformid.Request)
+	decision, err := f.service.Admit(ctx, f.admit(uncertainID, CapabilityModel, resourceID, ProtocolOpenAIResponses, nil, MeterTotalTokens))
+	if err != nil || !decision.Allowed {
+		t.Fatalf("uncertain admission = %+v, %v", decision, err)
+	}
+	if err := f.service.Start(ctx, LifecycleInput{RequestID: uncertainID, Revision: 1, OccurredAt: f.now, EventHash: testHash("uncertain-active")}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.Settle(ctx, SettlementInput{
+		RequestID: uncertainID, Revision: 1, Complete: false, ReportedBy: "runtime-relay",
+		Meters: []MeterQuantity{{Meter: MeterRequests, Quantity: 1}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	activeID := platformid.New(platformid.Request)
+	decision, err = f.service.Admit(ctx, f.admit(activeID, CapabilityModel, resourceID, ProtocolOpenAIResponses, nil, MeterTotalTokens))
+	if err != nil || !decision.Allowed || decision.InFlightRequests != 1 {
+		t.Fatalf("reconciliation blocked a new active request: %+v, %v", decision, err)
+	}
+
+	nextID := platformid.New(platformid.Request)
+	decision, err = f.service.Admit(ctx, f.admit(nextID, CapabilityModel, resourceID, ProtocolOpenAIResponses, nil, MeterTotalTokens))
+	if err != nil || !decision.Allowed || decision.InFlightRequests != 2 {
+		t.Fatalf("active metering rows blocked a business request: %+v, %v", decision, err)
 	}
 }
 

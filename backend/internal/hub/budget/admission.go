@@ -147,19 +147,15 @@ func (s *Service) Admit(ctx context.Context, input AdmitInput) (AdmissionDecisio
 	inFlight, err := tx.BudgetRequest.Query().Where(
 		budgetrequest.UserIDEQ(normalized.UserID),
 		budgetrequest.CapabilityEQ(budgetrequest.Capability(normalized.Capability)),
-		budgetrequest.StateIn(budgetrequest.State(RequestAdmitted), budgetrequest.State(RequestStarted), budgetrequest.State(RequestReconciliation)),
+		budgetrequest.StateIn(budgetrequest.State(RequestAdmitted), budgetrequest.State(RequestStarted)),
 	).Count(ctx)
 	if err != nil {
 		return AdmissionDecision{}, err
 	}
 	decision.InFlightRequests = int64(inFlight)
 	switch {
-	case len(decision.Unavailable) > 0:
-		decision.Code = DecisionMeterUnavailable
 	case len(decision.BlockingLimits) > 0:
 		decision.Code = DecisionBudgetExhausted
-	case s.MaxInFlight > 0 && int64(inFlight) >= s.MaxInFlight:
-		decision.Code = DecisionInFlightLimit
 	default:
 		decision.Allowed = true
 		decision.Code = DecisionAllowed

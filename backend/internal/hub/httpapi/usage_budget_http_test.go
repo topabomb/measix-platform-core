@@ -42,12 +42,16 @@ func TestAdminUsageReconciliationHTTPClosedLoop(t *testing.T) {
 	}
 	var page adminapi.ReconciliationPage
 	decodeJSON(t, response, &page)
-	if len(page.Items) != 1 || page.Items[0].RequestId != requestID || page.Items[0].State != adminapi.ReconciliationViewStatePENDING {
+	if len(page.Items) != 1 || page.Items[0].RequestId != requestID || page.Items[0].State != adminapi.ReconciliationViewStatePENDING ||
+		page.Items[0].ResourceId == "" || page.Items[0].ClientProtocol != adminapi.UsageClientProtocolOPENAIRESPONSES ||
+		page.Items[0].Forwarded == nil || !*page.Items[0].Forwarded || page.Items[0].HttpStatus == nil || *page.Items[0].HttpStatus != http.StatusOK ||
+		page.Items[0].Completeness == nil || *page.Items[0].Completeness != adminapi.UsageCompletenessPARTIAL ||
+		len(page.Items[0].Reservation) != 0 || len(page.Items[0].Observed) != 1 || page.Items[0].Observed[0].Quantity != "1" {
 		t.Fatalf("unexpected reconciliation page: %+v", page)
 	}
 	response = doJSON(t, h, http.MethodPost, "/api/admin/v1/usage/reconciliations/"+requestID+":resolve", map[string]string{
 		"Cookie": adminCookie, "X-CSRF-Token": csrf,
-	}, map[string]any{"expectedState": "PENDING", "action": "ACCEPT_OBSERVED", "reason": "verified against upstream trace"})
+	}, map[string]any{"expectedState": "PENDING", "action": "RELEASE_UNCERTAIN", "reason": "verified against upstream trace"})
 	if response.Code != http.StatusOK {
 		t.Fatalf("resolve reconciliation: %d %s", response.Code, response.Body)
 	}

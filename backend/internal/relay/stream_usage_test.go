@@ -11,6 +11,7 @@ import (
 	"time"
 
 	relayruntime "measix/platform/internal/relay/runtime"
+	"measix/platform/internal/wire/usageingestapi"
 )
 
 func TestRuntimeWritesCapturedUsageSettlement(t *testing.T) {
@@ -118,6 +119,53 @@ func TestInterruptedStreamRecordsUsage(t *testing.T) {
 			}
 			if event.ErrorClass == nil || *event.ErrorClass != wantClass {
 				t.Fatalf("stream error class = %v, want %s", event.ErrorClass, wantClass)
+			}
+		})
+	}
+}
+
+func TestDefinitiveNoConsumptionOutcomesSettleWithoutReconciliation(t *testing.T) {
+	badRequest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+	}))
+	defer badRequest.Close()
+
+	for _, test := range []struct {
+		name        string
+		upstreamURL string
+		wantStatus  int
+	}{
+		{name: "upstream_400", upstreamURL: badRequest.URL, wantStatus: http.StatusBadRequest},
+		{name: "connection_failure", upstreamURL: "http://127.0.0.1:1", wantStatus: http.StatusBadGateway},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture, resourceID := singleRouteFixture(t, test.upstreamURL, "runtime-secret")
+			fixture.server.Close()
+			recorder := &captureUsageRecorder{}
+			fixture.server = httptest.NewServer(relayruntime.NewHandler(fixture.store, recorder, &allowBudgetClient{}))
+			defer fixture.close()
+
+			response, err := fixture.server.Client().Do(fixture.request(t, nil, http.MethodPost, resourceID, "/v1/chat/completions", strings.NewReader(`{"model":"test"}`), "application/json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.Copy(io.Discard, response.Body)
+			_ = response.Body.Close()
+			if response.StatusCode != test.wantStatus {
+				t.Fatalf("runtime status = %d, want %d", response.StatusCode, test.wantStatus)
+			}
+			settlements := recorder.waitForSettlements(t, 1)
+			if settlements[0].State != usageingestapi.SETTLED || settlements[0].Completeness != usageingestapi.EXACT {
+				t.Fatalf("no-consumption outcome was left for reconciliation: %+v", settlements[0])
+			}
+			for _, meter := range settlements[0].Meters {
+				if meter.Completeness != usageingestapi.EXACT || meter.Numerator == nil || meter.Denominator == nil {
+					t.Fatalf("meter was not closed exactly: %+v", meter)
+				}
+				if meter.Meter != usageingestapi.REQUESTS && *meter.Numerator != 0 {
+					t.Fatalf("provider meter was not zero: %+v", meter)
+				}
 			}
 		})
 	}

@@ -65,10 +65,10 @@ func run(args []string, log *slog.Logger) error {
 	recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer recoveryCancel()
 	if err := metering.RecoverLifecycle(recoveryCtx, spool, budgetClient, recorder); err != nil {
-		return err
+		log.Warn("usage lifecycle recovery incomplete; runtime will start and retry through normal reconciliation", "event", "startup.usage_recovery_incomplete", "error", err)
 	}
 	if err := sender.FlushOnce(recoveryCtx); err != nil {
-		return err
+		log.Warn("initial usage flush incomplete; durable spool retained", "event", "startup.usage_flush_incomplete", "error", err)
 	}
 	a := app.New(serviceToken, buildVersion, spool, recorder, budgetClient)
 	log.Info("runtime relay started", "event", "service.started")

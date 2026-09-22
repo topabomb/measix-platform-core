@@ -185,20 +185,15 @@ func (h *fullAdminHandler) ResolveUsageReconciliation(w http.ResponseWriter, r *
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
-	action := budget.ResolutionReleaseUncertain
-	var meters []budget.MeterQuantity
-	if request.Action == adminapi.ACCEPTOBSERVED {
-		action = budget.ResolutionConfirmUsage
-		meters, err = reconciliationObserved(record.Allocations)
-	} else if request.Action != adminapi.RELEASEUNCERTAIN {
+	if request.Action != adminapi.RELEASEUNCERTAIN {
 		err = budget.ErrInvalidConfiguration
 	}
 	if err != nil {
-		writeProblem(w, http.StatusUnprocessableEntity, "invalid_reconciliation", "Persisted observed usage cannot be accepted")
+		writeProblem(w, http.StatusUnprocessableEntity, "invalid_reconciliation", "Invalid reconciliation action")
 		return
 	}
 	if err := h.services.Budget.Resolve(r.Context(), budget.ResolveInput{
-		RequestID: requestID, Action: action, Revision: record.LastSettlementRevision + 1, Meters: meters,
+		RequestID: requestID, Action: budget.ResolutionReleaseUncertain, Revision: record.LastSettlementRevision + 1,
 		ActorUserID: principal.UserID, Reason: request.Reason,
 	}); errors.Is(err, budget.ErrReconciliationNotOpen) || errors.Is(err, budget.ErrSettlementRevisionConflict) {
 		writeProblem(w, http.StatusConflict, "reconciliation_not_pending", "Reconciliation is no longer pending")
@@ -463,17 +458,27 @@ func reconciliationWire(record budget.ReconciliationRecord, state adminapi.Recon
 	reservationByMeter := make(map[budget.Meter]int64)
 	observedByMeter := make(map[budget.Meter]int64)
 	for _, allocation := range record.Allocations {
-		if allocation.Reserved > reservationByMeter[allocation.Meter] {
+		if !allocation.ReservationReleased && allocation.Reserved > reservationByMeter[allocation.Meter] {
 			reservationByMeter[allocation.Meter] = allocation.Reserved
 		}
-		if allocation.Observed > observedByMeter[allocation.Meter] {
+		if allocation.Resolved && allocation.Observed > observedByMeter[allocation.Meter] {
 			observedByMeter[allocation.Meter] = allocation.Observed
 		}
 	}
 	return adminapi.ReconciliationView{
 		RequestId: record.RequestID, UserId: record.UserID, Capability: adminapi.BudgetCapability(record.Capability), State: state,
+		ResourceId: record.ResourceID, ClientProtocol: adminapi.UsageClientProtocol(record.ClientProtocol), ReconciliationReason: record.Reason,
+		Forwarded: record.Forwarded, HttpStatus: record.HTTPStatus, UpstreamHttpStatus: record.UpstreamHTTPStatus,
+		ErrorClass: record.ErrorClass, AdmittedAt: record.AdmittedAt, StartedAt: record.StartedAt,
 		Reservation: reconciliationMeterWire(reservationByMeter), Observed: reconciliationMeterWire(observedByMeter),
 		CreatedAt: record.OpenedAt, UpdatedAt: record.UpdatedAt, ResolvedAt: resolvedAt, ResolvedBy: resolvedBy, ResolutionReason: reason,
+		Completeness: func() *adminapi.UsageCompleteness {
+			if record.Completeness == nil {
+				return nil
+			}
+			value := adminapi.UsageCompleteness(*record.Completeness)
+			return &value
+		}(),
 	}
 }
 
@@ -495,27 +500,6 @@ func reconciliationMeterWire(values map[budget.Meter]int64) []adminapi.MeterQuan
 		})
 	}
 	return items
-}
-
-func reconciliationObserved(allocations []budget.ReconciliationAllocation) ([]budget.MeterQuantity, error) {
-	quantities := make(map[budget.Meter]int64)
-	for _, allocation := range allocations {
-		if existing, ok := quantities[allocation.Meter]; ok && existing != allocation.Observed {
-			return nil, budget.ErrInvalidSettlement
-		}
-		quantities[allocation.Meter] = allocation.Observed
-	}
-	meters := make([]string, 0, len(quantities))
-	for meter := range quantities {
-		meters = append(meters, string(meter))
-	}
-	sort.Strings(meters)
-	items := make([]budget.MeterQuantity, 0, len(meters))
-	for _, name := range meters {
-		meter := budget.Meter(name)
-		items = append(items, budget.MeterQuantity{Meter: meter, Quantity: quantities[meter]})
-	}
-	return items, nil
 }
 
 func adminBudgetContext(decision budget.AdmissionDecision) *adminapi.BudgetContext {

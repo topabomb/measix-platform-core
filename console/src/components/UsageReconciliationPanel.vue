@@ -9,7 +9,7 @@ import { useSessionStore } from '../stores/session'
 import LoadingState from './LoadingState.vue'
 import ProblemBanner from './ProblemBanner.vue'
 
-const { t: $t, locale } = useI18n()
+const { t: $t, te: $te, locale } = useI18n()
 const unitLabels = computed<MeterUnitLabels>(() => ({
   tokens: $t('usage.units.tokens'),
   characters: $t('usage.units.characters'),
@@ -26,13 +26,23 @@ const resolving = ref(false)
 const error = ref<unknown>()
 const selected = ref<ReconciliationView>()
 const dialogOpen = ref(false)
-const action = ref<ResolveReconciliationRequest['action']>('ACCEPT_OBSERVED')
 const reason = ref('')
 
 const canResolve = computed(() => Boolean(session.csrfToken && selected.value && reason.value.trim()))
 
 function meterValue(quantity: string, meter: PricingMeter): string {
   return formatMeter(quantity, meter, locale.value, unitLabels.value)
+}
+
+function reasonText(value: string): string {
+  return /^settlement revision \d+ is incomplete$/.test(value)
+    ? $t('usage.reconciliation.reasons.incompleteSettlement')
+    : value
+}
+
+function errorClassText(value: string): string {
+  const key = `usage.reconciliation.errors.${value}`
+  return $te(key) ? $t(key) : value
 }
 
 async function refresh() {
@@ -62,7 +72,6 @@ async function loadMore() {
 
 function openResolve(item: ReconciliationView) {
   selected.value = item
-  action.value = 'ACCEPT_OBSERVED'
   reason.value = ''
   dialogOpen.value = true
 }
@@ -72,9 +81,14 @@ async function resolve() {
   resolving.value = true
   error.value = undefined
   try {
+    const request: ResolveReconciliationRequest = {
+      expectedState: 'PENDING',
+      action: 'RELEASE_UNCERTAIN',
+      reason: reason.value.trim(),
+    }
     await apiFetch<ReconciliationView>(`/api/admin/v1/usage/reconciliations/${selected.value.requestId}:resolve`, {
       method: 'POST',
-      body: JSON.stringify({ expectedState: 'PENDING', action: action.value, reason: reason.value.trim() }),
+      body: JSON.stringify(request),
     }, session.csrfToken)
     dialogOpen.value = false
     await refresh()
@@ -103,7 +117,22 @@ onMounted(refresh)
       <q-item v-for="item in page.items" :key="item.requestId" data-cy="reconciliation-row">
         <q-item-section>
           <q-item-label class="text-weight-medium">{{ item.userId }} · {{ $t(`usage.kind.${item.capability}`) }}</q-item-label>
-          <q-item-label caption class="text-break">{{ item.requestId }} · {{ new Date(item.createdAt).toLocaleString() }}</q-item-label>
+          <q-item-label caption class="text-break">
+            {{ $t('usage.reconciliation.resource') }}: {{ item.resourceId }} ·
+            {{ $t('usage.reconciliation.protocol') }}: {{ item.clientProtocol }}
+          </q-item-label>
+          <q-item-label caption class="text-break">
+            {{ $t('usage.reconciliation.result') }}:
+            {{ item.forwarded === true ? $t('usage.reconciliation.forwarded') : item.forwarded === false ? $t('usage.reconciliation.notForwarded') : $t('common.unknown') }}
+            <template v-if="item.httpStatus"> · HTTP {{ item.httpStatus }}</template>
+            <template v-if="item.upstreamHttpStatus"> · {{ $t('usage.reconciliation.upstream') }} {{ item.upstreamHttpStatus }}</template>
+            <template v-if="item.errorClass"> · {{ errorClassText(item.errorClass) }}</template>
+            <template v-if="item.completeness"> · {{ $t(`status.${item.completeness}`) }}</template>
+          </q-item-label>
+          <q-item-label caption class="text-break">
+            {{ $t('usage.reconciliation.reasonLabel') }}: {{ reasonText(item.reconciliationReason) }} ·
+            {{ item.requestId }} · {{ new Date(item.admittedAt).toLocaleString() }}
+          </q-item-label>
           <div class="row q-gutter-xs q-mt-xs">
             <q-chip v-for="meter in item.observed" :key="`observed:${meter.meter}`" dense outline color="primary">
               {{ $t('usage.reconciliation.observed') }} {{ $t(`usage.meters.${meter.meter}`) }}: {{ meterValue(meter.quantity, meter.meter) }}
@@ -131,13 +160,6 @@ onMounted(refresh)
         <div class="text-body2 text-grey-7 q-mt-xs">{{ $t('usage.reconciliation.resolveWarning') }}</div>
       </q-card-section>
       <q-card-section class="q-pt-none q-gutter-sm">
-        <q-option-group v-model="action" :options="[
-          { label: $t('usage.reconciliation.acceptObserved'), value: 'ACCEPT_OBSERVED' },
-          { label: $t('usage.reconciliation.releaseUncertain'), value: 'RELEASE_UNCERTAIN' },
-        ]" type="radio" color="primary" />
-        <q-banner v-if="action === 'RELEASE_UNCERTAIN'" class="bg-orange-1">
-          {{ $t('usage.reconciliation.releaseWarning') }}
-        </q-banner>
         <q-input v-model="reason" outlined autogrow :label="$t('usage.reconciliation.reason')" maxlength="500" counter data-cy="reconciliation-reason" />
       </q-card-section>
       <q-card-actions align="right">

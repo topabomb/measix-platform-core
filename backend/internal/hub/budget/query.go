@@ -16,6 +16,7 @@ import (
 	"measix/platform/ent/budgetreconciliation"
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/predicate"
+	"measix/platform/ent/requestusage"
 	"measix/platform/ent/userbudget"
 	"measix/platform/pkg/platformid"
 )
@@ -155,9 +156,10 @@ func (s *Service) UserStatesBatch(ctx context.Context, userIDs []string) (map[st
 	}
 	for _, request := range requests {
 		key := subjectKey(request.UserID, Capability(request.Capability))
-		inFlight[key]++
 		if RequestState(request.State) == RequestReconciliation {
 			reconciliations[key] = true
+		} else {
+			inFlight[key]++
 		}
 	}
 
@@ -341,6 +343,7 @@ func (s *Service) ListOpenReconciliations(ctx context.Context, query Reconciliat
 		requestIDs = append(requestIDs, row.RequestID)
 	}
 	requestsByID := make(map[string]*ent.BudgetRequest, len(requestIDs))
+	usageByRequest := make(map[string]*ent.RequestUsage, len(requestIDs))
 	allocationsByRequest := make(map[string][]ReconciliationAllocation, len(requestIDs))
 	if len(requestIDs) > 0 {
 		requests, err := s.Client.BudgetRequest.Query().Where(budgetrequest.IDIn(requestIDs...)).All(ctx)
@@ -349,6 +352,13 @@ func (s *Service) ListOpenReconciliations(ctx context.Context, query Reconciliat
 		}
 		for _, request := range requests {
 			requestsByID[request.ID] = request
+		}
+		usageRows, err := s.Client.RequestUsage.Query().Where(requestusage.RequestIDIn(requestIDs...)).All(ctx)
+		if err != nil {
+			return ReconciliationPage{}, err
+		}
+		for _, usageRow := range usageRows {
+			usageByRequest[usageRow.RequestID] = usageRow
 		}
 		allocations, err := s.Client.BudgetAllocation.Query().Where(budgetallocation.RequestIDIn(requestIDs...)).All(ctx)
 		if err != nil {
@@ -375,12 +385,18 @@ func (s *Service) ListOpenReconciliations(ctx context.Context, query Reconciliat
 			}
 			return allocations[i].Meter < allocations[j].Meter
 		})
-		page.Items = append(page.Items, ReconciliationRecord{
+		record := ReconciliationRecord{
 			ID: row.ID, RequestID: row.RequestID, UserID: request.UserID, Capability: Capability(request.Capability),
 			ResourceID: request.ResourceID, ClientProtocol: ClientProtocol(request.ClientProtocol), RequestState: RequestState(request.State),
 			Reason: row.Reason, LastSettlementRevision: request.LastSettlementRevision, Allocations: allocations,
 			AdmittedAt: request.AdmittedAt, StartedAt: request.StartedAt, OpenedAt: row.OpenedAt, UpdatedAt: request.UpdatedAt,
-		})
+		}
+		if usageRow := usageByRequest[row.RequestID]; usageRow != nil {
+			forwarded, status, completeness := usageRow.Forwarded, usageRow.HTTPStatus, usageRow.RequestCompleteness
+			record.Forwarded, record.HTTPStatus, record.Completeness = &forwarded, &status, &completeness
+			record.UpstreamHTTPStatus, record.ErrorClass = usageRow.UpstreamHTTPStatus, usageRow.ErrorClass
+		}
+		page.Items = append(page.Items, record)
 	}
 	if len(rows) > pageSize {
 		last := rows[pageSize-1]
@@ -409,6 +425,10 @@ func (s *Service) GetOpenReconciliation(ctx context.Context, requestID string) (
 	if err != nil {
 		return ReconciliationRecord{}, err
 	}
+	usageRow, err := s.Client.RequestUsage.Query().Where(requestusage.RequestIDEQ(requestID)).Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return ReconciliationRecord{}, err
+	}
 	rows, err := s.Client.BudgetAllocation.Query().Where(budgetallocation.RequestIDEQ(requestID)).All(ctx)
 	if err != nil {
 		return ReconciliationRecord{}, err
@@ -427,12 +447,18 @@ func (s *Service) GetOpenReconciliation(ctx context.Context, requestID string) (
 		}
 		return allocations[i].Meter < allocations[j].Meter
 	})
-	return ReconciliationRecord{
+	record := ReconciliationRecord{
 		ID: reconciliation.ID, RequestID: request.ID, UserID: request.UserID, Capability: Capability(request.Capability),
 		ResourceID: request.ResourceID, ClientProtocol: ClientProtocol(request.ClientProtocol), RequestState: RequestState(request.State),
 		Reason: reconciliation.Reason, LastSettlementRevision: request.LastSettlementRevision, Allocations: allocations,
 		AdmittedAt: request.AdmittedAt, StartedAt: request.StartedAt, OpenedAt: reconciliation.OpenedAt, UpdatedAt: request.UpdatedAt,
-	}, nil
+	}
+	if usageRow != nil {
+		forwarded, status, completeness := usageRow.Forwarded, usageRow.HTTPStatus, usageRow.RequestCompleteness
+		record.Forwarded, record.HTTPStatus, record.Completeness = &forwarded, &status, &completeness
+		record.UpstreamHTTPStatus, record.ErrorClass = usageRow.UpstreamHTTPStatus, usageRow.ErrorClass
+	}
+	return record, nil
 }
 
 type pageCursor struct {

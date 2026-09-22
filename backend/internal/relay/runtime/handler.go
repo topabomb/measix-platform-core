@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -187,7 +188,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else if errors.Is(err, errInvalidImageGenerationRequest) {
 			writeProblem(observer, http.StatusBadRequest, "invalid_request", "Invalid image generation request", requestID, nil, false)
 		} else {
-			writeProblem(observer, http.StatusUnprocessableEntity, "usage_meter_unavailable", "Request cannot be measured for this resource", requestID, nil, false)
+			writeProblem(observer, http.StatusBadRequest, "invalid_request", "Invalid request body", requestID, nil, false)
 		}
 		return
 	}
@@ -198,13 +199,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Body = body
 	}
 	if h.budget == nil || h.recorder == nil {
-		writeProblem(observer, http.StatusServiceUnavailable, "budget_service_unavailable", "Budget service unavailable", requestID, nil, false)
+		h.serveWithMeteringDegraded(observer, r, route, upstream, outboundRuntimePath, requestID, maxRequestBytes, "budget_or_metering_not_configured")
 		return
 	}
 	admission := admissionRequest(attr, observation, r)
 	decision, problem, err := h.budget.Admit(r.Context(), admission)
 	if err != nil {
-		writeProblem(observer, http.StatusServiceUnavailable, "budget_service_unavailable", "Budget service unavailable", requestID, nil, false)
+		h.serveWithMeteringDegraded(observer, r, route, upstream, outboundRuntimePath, requestID, maxRequestBytes, "budget_admission_unavailable")
 		return
 	}
 	if problem != nil {
@@ -212,6 +213,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !decision.Allowed {
+		if decision.Code == usageingestapi.USAGEMETERUNAVAILABLE || decision.Code == usageingestapi.INFLIGHTLIMIT {
+			h.serveWithMeteringDegraded(observer, r, route, upstream, outboundRuntimePath, requestID, maxRequestBytes, strings.ToLower(string(decision.Code)))
+			return
+		}
 		writeAdmissionDenied(observer, decision, attr, requestID)
 		status, code := admissionDeniedStatus(decision)
 		_ = h.recordDenied(admission, attr, status, code)
@@ -220,7 +225,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	attr.budgetRevision = decision.Revision
 	if err := h.recorder.PersistAdmission(admission, route.ID); err != nil {
 		releaseUnforwarded(context.WithoutCancel(r.Context()), h, attr, "admission_journal_failed")
-		writeProblem(observer, http.StatusServiceUnavailable, "usage_reconciliation_required", "Usage journal unavailable", requestID, nil, false)
+		h.serveWithMeteringDegraded(observer, r, route, upstream, outboundRuntimePath, requestID, maxRequestBytes, "admission_journal_failed")
 		return
 	}
 	attr.startedAt = h.store.Now()
@@ -229,12 +234,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := usageingestapi.BudgetLifecycleEvent{EventHash: eventHash, OccurredAt: attr.startedAt, Revision: startRevision}
 	if err := h.recorder.MarkStarted(requestID, attr.startedAt); err != nil {
 		releaseUnforwarded(context.WithoutCancel(r.Context()), h, attr, "start_journal_failed")
-		writeProblem(observer, http.StatusServiceUnavailable, "usage_reconciliation_required", "Usage journal unavailable", requestID, nil, false)
+		h.serveWithMeteringDegraded(observer, r, route, upstream, outboundRuntimePath, requestID, maxRequestBytes, "start_journal_failed")
 		return
 	}
 	if err := h.budget.Start(r.Context(), requestID, start); err != nil {
 		releaseUnforwarded(context.WithoutCancel(r.Context()), h, attr, "budget_start_failed")
-		writeProblem(observer, http.StatusServiceUnavailable, "budget_service_unavailable", "Budget service unavailable", requestID, nil, false)
+		h.serveWithMeteringDegraded(observer, r, route, upstream, outboundRuntimePath, requestID, maxRequestBytes, "budget_start_unavailable")
 		return
 	}
 	attr.lifecycleRevision = startRevision
@@ -246,6 +251,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = h.recordSettlement(observer, body, observation, attr, true, result.UpstreamStatus, result.ErrorClass)
 	}()
 	h.serveProxy(observer, r, route, upstream, outboundRuntimePath, requestID, result, maxRequestBytes)
+}
+
+func (h *Handler) serveWithMeteringDegraded(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string, maxRequestBytes int64, reason string) {
+	slog.Warn("runtime request proceeding while budget or metering is degraded", "event", "runtime.metering_degraded", "requestId", requestID, "reason", reason)
+	h.serveProxy(w, r, route, upstream, runtimePath, requestID, &proxyResult{}, maxRequestBytes)
 }
 
 func lifecycleHash(requestID, action string, revision int, occurredAt time.Time) string {

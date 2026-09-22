@@ -3191,6 +3191,9 @@ components:
       - OPENAI_REALTIME_TRANSCRIPTION
       - DASHSCOPE_REALTIME_ASR
       - MCP_STREAMABLE_HTTP
+    UsageCompleteness:
+      type: string
+      enum: [EXACT, PARTIAL, UNKNOWN]
     BudgetCapability:
       type: string
       enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
@@ -3688,7 +3691,7 @@ components:
     ReconciliationView:
       type: object
       additionalProperties: false
-      required: [requestId, userId, capability, state, reservation, observed, createdAt, updatedAt]
+      required: [requestId, userId, capability, resourceId, clientProtocol, state, reconciliationReason, reservation, observed, admittedAt, createdAt, updatedAt]
       properties:
         requestId:
           $ref: '#/components/schemas/RequestId'
@@ -3696,9 +3699,29 @@ components:
           $ref: '#/components/schemas/UserId'
         capability:
           $ref: '#/components/schemas/BudgetCapability'
+        resourceId:
+          type: string
+        clientProtocol:
+          $ref: '#/components/schemas/UsageClientProtocol'
         state:
           type: string
           enum: [PENDING, RESOLVED]
+        reconciliationReason:
+          type: string
+        forwarded:
+          type: boolean
+        httpStatus:
+          type: integer
+          minimum: 100
+          maximum: 599
+        upstreamHttpStatus:
+          type: integer
+          minimum: 100
+          maximum: 599
+        errorClass:
+          type: string
+        completeness:
+          $ref: '#/components/schemas/UsageCompleteness'
         reservation:
           type: array
           items:
@@ -3707,6 +3730,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MeterQuantity'
+        admittedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
         createdAt:
           type: string
           format: date-time
@@ -3741,7 +3770,7 @@ components:
           enum: [PENDING]
         action:
           type: string
-          enum: [ACCEPT_OBSERVED, RELEASE_UNCERTAIN]
+          enum: [RELEASE_UNCERTAIN]
         reason:
           type: string
           minLength: 1

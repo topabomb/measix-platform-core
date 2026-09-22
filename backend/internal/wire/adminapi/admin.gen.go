@@ -742,15 +742,12 @@ func (e RequestUsageViewSettlementState) Valid() bool {
 
 // Defines values for ResolveReconciliationRequestAction.
 const (
-	ACCEPTOBSERVED   ResolveReconciliationRequestAction = "ACCEPT_OBSERVED"
 	RELEASEUNCERTAIN ResolveReconciliationRequestAction = "RELEASE_UNCERTAIN"
 )
 
 // Valid indicates whether the value is a known member of the ResolveReconciliationRequestAction enum.
 func (e ResolveReconciliationRequestAction) Valid() bool {
 	switch e {
-	case ACCEPTOBSERVED:
-		return true
 	case RELEASEUNCERTAIN:
 		return true
 	default:
@@ -1142,6 +1139,27 @@ func (e UsageClientProtocol) Valid() bool {
 	case UsageClientProtocolOPENAIREALTIMETRANSCRIPTION:
 		return true
 	case UsageClientProtocolOPENAIRESPONSES:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsageCompleteness.
+const (
+	UsageCompletenessEXACT   UsageCompleteness = "EXACT"
+	UsageCompletenessPARTIAL UsageCompleteness = "PARTIAL"
+	UsageCompletenessUNKNOWN UsageCompleteness = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the UsageCompleteness enum.
+func (e UsageCompleteness) Valid() bool {
+	switch e {
+	case UsageCompletenessEXACT:
+		return true
+	case UsageCompletenessPARTIAL:
+		return true
+	case UsageCompletenessUNKNOWN:
 		return true
 	default:
 		return false
@@ -2421,17 +2439,27 @@ type ReconciliationPage struct {
 
 // ReconciliationView defines model for ReconciliationView.
 type ReconciliationView struct {
-	Capability       BudgetCapability        `json:"capability"`
-	CreatedAt        time.Time               `json:"createdAt"`
-	Observed         []MeterQuantity         `json:"observed"`
-	RequestId        RequestId               `json:"requestId"`
-	Reservation      []MeterQuantity         `json:"reservation"`
-	ResolutionReason *string                 `json:"resolutionReason,omitempty"`
-	ResolvedAt       *time.Time              `json:"resolvedAt,omitempty"`
-	ResolvedBy       *string                 `json:"resolvedBy,omitempty"`
-	State            ReconciliationViewState `json:"state"`
-	UpdatedAt        time.Time               `json:"updatedAt"`
-	UserId           UserId                  `json:"userId"`
+	AdmittedAt           time.Time               `json:"admittedAt"`
+	Capability           BudgetCapability        `json:"capability"`
+	ClientProtocol       UsageClientProtocol     `json:"clientProtocol"`
+	Completeness         *UsageCompleteness      `json:"completeness,omitempty"`
+	CreatedAt            time.Time               `json:"createdAt"`
+	ErrorClass           *string                 `json:"errorClass,omitempty"`
+	Forwarded            *bool                   `json:"forwarded,omitempty"`
+	HttpStatus           *int                    `json:"httpStatus,omitempty"`
+	Observed             []MeterQuantity         `json:"observed"`
+	ReconciliationReason string                  `json:"reconciliationReason"`
+	RequestId            RequestId               `json:"requestId"`
+	Reservation          []MeterQuantity         `json:"reservation"`
+	ResolutionReason     *string                 `json:"resolutionReason,omitempty"`
+	ResolvedAt           *time.Time              `json:"resolvedAt,omitempty"`
+	ResolvedBy           *string                 `json:"resolvedBy,omitempty"`
+	ResourceId           string                  `json:"resourceId"`
+	StartedAt            *time.Time              `json:"startedAt,omitempty"`
+	State                ReconciliationViewState `json:"state"`
+	UpdatedAt            time.Time               `json:"updatedAt"`
+	UpstreamHttpStatus   *int                    `json:"upstreamHttpStatus,omitempty"`
+	UserId               UserId                  `json:"userId"`
 }
 
 // ReconciliationViewState defines model for ReconciliationView.State.
@@ -2875,6 +2903,9 @@ type UpstreamTestResult struct {
 
 // UsageClientProtocol defines model for UsageClientProtocol.
 type UsageClientProtocol string
+
+// UsageCompleteness defines model for UsageCompleteness.
+type UsageCompleteness string
 
 // UsageDistribution defines model for UsageDistribution.
 type UsageDistribution struct {

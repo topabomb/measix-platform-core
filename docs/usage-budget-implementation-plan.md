@@ -65,7 +65,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 
 `OPENAI_IMAGES_GENERATIONS` 只接受已发布 `img_*` route 的同步 `POST /images/generations`。Relay 从受信 JSON 请求有界读取 `n` 与 `size`：`n` 缺失规范化为 1，必须位于 1..资源 `maxImagesPerRequest`（平台上限 6），`size` 必须属于资源 `allowedSizes`。`DASHSCOPE_MULTIMODAL_GENERATION` 只接受精确原生 generation path 与固定 `model/input.messages/parameters` 结构，要求显式整数 `parameters.n`、`parameters.size=宽*高` 和 `watermark=false`；Relay 仅把 `*` 映射为 canonical `x` 做 allowlist 比较。两种合法请求都保持 body 字节与供应商响应透明，不解析 prompt，不下载或持久化图片，不在协议间转换结果。
 
-每次实际开始的上游调用计 `REQUESTS=1`，`REQUESTED_IMAGES=n`；它表示请求图片数，不冒充返回或保存成功数。明确未转发才释放两者。有限图片预算无法可靠解析合法 `n` 时 fail closed；无限模式也执行资源单次上限与 size 准入。edit、图片输入、reference、mask、multipart、stream、async 不在当前 profile 内，不能由通用代理路径绕开。
+每次实际开始的上游调用计 `REQUESTS=1`，`REQUESTED_IMAGES=n`；它表示请求图片数，不冒充返回或保存成功数。明确未转发才释放两者。有限图片预算无法可靠解析合法 `n` 时按 UNKNOWN 留待核对，但不能因计量能力不足阻断合法请求；资源单次上限与 size 等业务准入仍照常执行。edit、图片输入、reference、mask、multipart、stream、async 不在当前 profile 内，不能由通用代理路径绕开。
 
 ### 3.3 TTS：最小按输入字符结算
 
@@ -77,7 +77,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 | `GEMINI_GENERATE_CONTENT_TTS` | 对当前单个用户输入的 `contents[].parts[].text` 计数，多个 text part 分别计数后相加且不人为插入分隔符；内嵌朗读指令包含在该平台文本口径内，speechConfig 不计。JSON inlineData 音频不为字符预算解码 | 不区分自然语言提示中的“指令字符/正文字符”，不通过模型预测实际朗读内容，不要求音频 token 预算。 |
 | `MIMO_CHAT_COMPLETIONS_TTS` | 对当前 profile 最后目标 `role=assistant` 消息的字符串 content 计数；前置 user 声音设计/风格描述不计；JSON WAV 和 SSE PCM16 两种响应均透传 | 不将 LLM Chat Completions 的 token 必需项套到 MiMo TTS；无 assistant 文本的自动生成/润色特殊模式不声明支持精确字符预算。 |
 
-目标字段格式超出上述最小 profile 时，无限或仅次数预算仍可按既有传输规则执行并标记字符 UNKNOWN；启用了字符预算则在转发前返回 `usage_meter_unavailable`，不能绕过字符预算。首次支持的三种云 TTS 正常文本调用必须均为 CHARACTERS EXACT；不能以该降级规则替代实现。
+目标字段格式超出上述最小 profile 时，仍按既有传输规则执行并标记字符 UNKNOWN；计量能力或依赖故障不得阻断合法请求。首次支持的三种云 TTS 正常文本调用必须均为 CHARACTERS EXACT；不能以降级路径替代协议解析实现。
 
 ### 3.4 HTTP ASR：最小音频格式与时长
 
@@ -85,7 +85,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 
 | clientProtocol | 生产提取方法 | 预算及其他格式行为 |
 |---|---|---|
-| `OPENAI_AUDIO_TRANSCRIPTIONS` | 增量观察 multipart 的 `file` 音频 part，不把 multipart 边界/其他字段计入时长；WAV 按实际提交样本统计。响应 JSON 的 `usage.type=duration`/`usage.seconds` 或 verbose JSON `duration` 可作为有来源的供应商时长；`usage.type=tokens` 只存可得 token 明细，不能换算秒数 | WAV 的平台 AUDIO_SECONDS 优先实际样本口径；非 WAV 可使用已验证的供应商 duration（事后结算）。首次完整交付必须支持 WAV；MP3/M4A/WebM 等无可靠时长来源时只声明请求计数，启用时长预算的未认证格式在上传前尽早拒绝，不引入 ffmpeg 或完整媒体解码框架。 |
+| `OPENAI_AUDIO_TRANSCRIPTIONS` | 增量观察 multipart 的 `file` 音频 part，不把 multipart 边界/其他字段计入时长；WAV 按实际提交样本统计。响应 JSON 的 `usage.type=duration`/`usage.seconds` 或 verbose JSON `duration` 可作为有来源的供应商时长；`usage.type=tokens` 只存可得 token 明细，不能换算秒数 | WAV 的平台 AUDIO_SECONDS 优先实际样本口径；非 WAV 可使用已验证的供应商 duration（事后结算）。首次完整交付必须支持 WAV；MP3/M4A/WebM 等无可靠时长来源时只声明请求计数并将时长标记 UNKNOWN，不引入 ffmpeg 或完整媒体解码框架，也不因计量缺口拒绝合法上传。 |
 | `DASHSCOPE_HTTP_ASR` | 增量读取 `input.messages[].content[].input_audio.data` 的 Data URI，增量 Base64 解码后送同一 WAV scanner；`parameters.format/sample_rate` 只作一致性检查。当前非流式响应解析 `usage.duration`（秒），不把 output.text 字数/句子 end_time 当音频总时长 | WAV 按样本计平台时长；供应商 duration 独立记录并显示来源/精度，不能重复加入 AUDIO_SECONDS。URL 音频不由 Relay 另行 fetch；只在已验证供应商完整 duration 可用时支持其事后时长预算。新官网的 HTTP ASR SSE 句级 usage 不在当前最小 Android profile 内，不猜其增量/累计关系；启用时长预算且不受支持时明确拒绝。 |
 
 采用“实际提交音频时长”作为 WAV/实时 ASR 共同平台额度口径；供应商处理/舍入时长是另一个有来源的诊断值，不覆盖已有精确样本计数。样本不完整保留已确认的量并标 PARTIAL。压缩格式供应商来源若作为预算量，需在资源能力及 Admin/Portal 明细中标明来源，禁止静默换单位。
@@ -148,13 +148,13 @@ WebSocket 生产观察器必须支持文本帧分片、continuation、控制帧�
 
 整数指标使用足够范围的整数，音频以整数毫秒存储和运算，在 UI 转为分钟；禁止浮点累计额度。TOTAL_TOKENS 与其明细不重复更新总量计数。
 
-Hub 原子准入事务检查所有适用规则、周期和用户在途数，再创建唯一 requestId 占用并返回决策。使用数据库条件更新/事务串行化处理竞争及 SQLite busy，不能用进程 map 锁代替数据库原子性；网络调用不置于 DB 写事务内。起步让每次企业 Runtime 调用经过这个轻量准入入口，避免先建设规则缓存失效协议；因此 Hub 可用性成为 Runtime 准入依赖，必须在 operations 和 readiness 中说明。
+Hub 原子准入事务检查所有适用规则、周期和用户当前活动请求数，再创建唯一 requestId 占用并返回决策。使用数据库条件更新/事务串行化处理竞争及 SQLite busy，不能用进程 map 锁代替数据库原子性；网络调用不置于 DB 写事务内。每次企业 Runtime 调用都会尝试这个轻量准入入口；Hub 或计量存储不可用时记录降级诊断并继续转发，不能把计量依赖变成 Runtime 可用性依赖。
 
 可预知字符/时长同时预占；未知最终 token 只检查已知耗尽状态并占一个在途位置，不能伪造精确 token 预留。请求数、字符硬上限和 token 到量停后续的差别由 Hub 状态明确投影给两端。
 
 Relay 在转发之前持久记录准入/执行身份，并将允许、开始尝试和最终结果纳入可恢复状态。若 Hub 已占用但回复丢失，以相同 requestId 重试获得同一决策；超时不换 ID 二次占用。只能证明未开始转发时释放；转发发生与进程崩溃之间无法判定的窗口保持待核对。已有 spool 需要扩展为可承载这些生命周期记录，而非只在响应结束后首次写入。
 
-结算事务一次性去重、入账、更新周期计数、释放已解决的在途占用。Relay 收到 durable ACK 后才清理已交付记录。重启从 durable 状态恢复，不能按短 TTL 无条件退回名额。待核对记录提供 Admin 查询与受审计的人工处理入口；迟到可靠计量仍能修正，不能重复扣整笔或冲掉审计。
+结算事务一次性去重、入账、更新周期计数、释放已解决的活动占用。Relay 收到 durable ACK 后才清理已交付记录。重启从 durable 状态恢复，不能按短 TTL 无条件丢弃计量事实。上游明确 HTTP 400、以及未收到响应头的连接失败按已验证无供应商语义消耗自动收口，不制造人工任务；客户端取消、超时和收到响应头后的断流继续保留 UNKNOWN/PARTIAL。待核对记录不计入活动并发，也不阻断后续请求；Admin 提供查询和受审计的简洁确认入口，迟到可靠计量仍能修正，不能重复扣整笔或冲掉审计。
 
 额度配置独立于 Managed Release，采用 expectedRevision 防覆盖，后续准入读取最新规则；已准入请求保留捕获的周期归属。有限切换无限仍保留并累计既有规则窗口的实际消耗，恢复有限不重置计数；全新规则从明确启用时刻计算。无限请求仍需可靠用量记录和有限运行保护，不建立虚构额度占用。自然周期由部署 IANA 时区计算，时区修改不得悄悄重置活动桶；第一版将额度时区固定为部署约定并在 UI 显示。
 
@@ -169,7 +169,7 @@ Relay 在转发之前持久记录准入/执行身份，并将允许、开始尝�
 | `api/admin/admin.openapi.yaml` | 五类用户 budgets GET/PUT/清除覆盖、限额模板 CRUD、单模板指派/解除、状态、审计/待核对；usage 增加协议过滤、用户汇总、按日趋势和详细 meters；平台拒绝数与消耗请求数分开 |
 | `api/client/client-control.openapi.yaml` | `/api/portal/v1/budgets`、`/usage/summary`、`/usage/trend`、`/usage/requests` 及请求详情；只接受本人 Portal Session，不开放指定 userId，也不下发模板身份/修订/指派元数据 |
 | 同一 Client OpenAPI | 增加 `/api/client/v1/budgets` 本人摘要，Client Bearer 认证供 Android 企业空间使用；与 Portal DTO 共享有限/无限、配置来源、状态、多个阻断项及 asOf 等语义，不能将 Portal Cookie 当作原生 credential |
-| Runtime Problem | 定义 budget_exhausted（429）、budget_service_unavailable（503）、usage_reconciliation_required（503）、usage_meter_unavailable（422），分别表示耗尽、服务不可用、待核对和当前请求模式无法计量；预算耗尽给出能力/指标/周期及可得 resetAt，准入拒绝使用 forwarded=false；只有可确定整体自动恢复时间才给 Retry-After。已删除身份的 Runtime 与 refresh credential 统一返回 401 `enterprise_identity_deleted` |
+| Runtime Problem | 只有预算明确耗尽返回 `budget_exhausted`（429）；它给出能力/指标/周期及可得 resetAt，准入拒绝使用 forwarded=false，只有可确定整体自动恢复时间才给 Retry-After。计量服务不可用、计量落盘失败、计量生命周期行与待核对积压只产生诊断，不作为 Runtime Problem 返回。已删除身份的 Runtime 与 refresh credential 统一返回 401 `enterprise_identity_deleted` |
 | Snapshot v4 | 不增加预算余额、动态规则或模板元数据；新增可选 `imageGenerators` 与 `policy.defaultImageGenerationId`，缺失仅表示空/未设置。新 writer 显式写数组；不升版，不为该字段创建数据库迁移或双读协议 |
 | Bridge v3 | 不新增预算方法；Portal 用同源 HttpOnly Cookie 查询。同步生成包，不制造新 token 通道 |
 
@@ -189,7 +189,7 @@ Admin 在 UsersPage 用户详情增设“用量与额度”：MODEL/TTS/ASR/MCP/
 
 一级 `Budget Templates` 位于 Users 与 Resources 之间，复用同一个 `BudgetRuleEditor`。一个用户最多指派一个 live-linked 模板；显式能力覆盖优先，清除覆盖恢复模板/默认，解除模板保留显式覆盖。模板修改在单事务中更新所有指派用户的未覆盖能力；被指派模板禁止删除。模板名称、ID、revision、assignment 和详细来源只出现在 Admin API/UI，不能进入 Client、Portal、Snapshot、Runtime 或 Android。
 
-同一详情提供正式“删除用户”操作：操作者必须逐字输入当前用户名并填写原因，服务端再次核验；删除状态机先 deny 新的 Client/Runtime/refresh 请求，等待或拒绝在途请求，再以单一可恢复事务清除用户、设备、Session、配置、预算、用量、Feed/Portal 与审计外的用户私有事实。审计记录使用不可反查的主体摘要；旧 access/runtime credential 及 refresh credential 以不可逆摘要 tombstone 识别并稳定返回 `enterprise_identity_deleted`。删除失败不得呈现成功，重试保持幂等，Admin 显示最终 COMPLETED/FAILED 与可操作诊断。
+同一详情提供正式“删除用户”操作：操作者必须逐字输入当前用户名并填写原因，服务端再次核验；删除状态机先 deny 新的 Client/Runtime/refresh 请求，等待或拒绝活动请求，再以单一可恢复事务清除用户、设备、Session、配置、预算、用量、Feed/Portal 与审计外的用户私有事实。审计记录使用不可反查的主体摘要；旧 access/runtime credential 及 refresh credential 以不可逆摘要 tombstone 识别并稳定返回 `enterprise_identity_deleted`。删除失败不得呈现成功，重试保持幂等，Admin 显示最终 COMPLETED/FAILED 与可操作诊断。
 
 UsagePage 提供用户搜索/汇总、协议及资源分布、按日趋势；复用 UsageRequestList 的分页和详情，不另造第二套个人明细逻辑。详情含调用次数、token 等语义、完整度、预算周期和失败原因。常用数值本地化为万 token、字符、分钟；精确值在详情可查。
 
@@ -211,7 +211,7 @@ Portal 增加首页额度摘要及“我的用量与额度”，与 Admin 同源
 | 已建立实时会话中额度达到 | 本阶段按已准入会话允许完成，受单次时长上限保护，不插入伪造供应商预算事件；新连接被拒绝 | 不虚构流内 429 或误称握手被拒绝；结束后刷新额度。因运行时长保护关闭与额度拒绝使用不同说明。 |
 | 上游自己返回 429 | 保留上游错误，不能给它盖上平台 `budget_exhausted/forwarded=false` 标记 | 仅在受信企业路由的结构化平台错误匹配时走预算提示；普通供应商限流保留原分类，不得说用户额度耗尽。 |
 | 无限预算/摘要加载失败/预算服务中断 | 分别返回 UNLIMITED、读取错误或独立 503 预算错误 | 分别显示无限及已用量、暂不可获取可刷新、额度服务暂不可用；不会将任一状态伪装成额度耗尽，也不自动 logout。 |
-| 有限额度所需指标不支持当前请求格式 | 返回 422 `usage_meter_unavailable`、受限指标及可解释的格式/模式原因，未转发 | 提示“当前音频格式无法用于企业时长额度，请使用支持的录音格式”等操作指引；不是“额度已用完”，不自动换个人资源。 |
+| 有限额度所需指标不支持当前请求格式 | 合法请求继续转发，已知指标照常记录，不可确定指标标为 UNKNOWN 并进入核对；写入降级诊断 | 不向终端用户伪报“额度已用完”或“服务不可用”，也不自动换个人资源；Admin 可看到协议、资源、请求结果和未知原因。 |
 | 用户已被管理员删除，旧 access/runtime 或 refresh credential 再使用 | 返回 401 `enterprise_identity_deleted`，不转发、不刷新、不泄漏删除前资料 | 停止 refresh/retry，按企业标准错误展示明确原因；清理企业 Realm/Session 私有状态并保留个人空间与本地个人数据，提供重新绑定或联系管理员动作。 |
 
 HTTP 错误必须先于各 provider 的 SSE/JSON/audio decoder 统一处理；错误 body 只读一次、有大小限制且保留结构化字段，不能先包装成泛化字符串后再正则抽字段。取消和普通网络异常保留原语义。成功 HTTP/SSE 不依赖在结束后补写 header 来通知额度，使用本人摘要查询。

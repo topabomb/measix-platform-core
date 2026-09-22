@@ -1314,6 +1314,8 @@ export interface components {
         /** @enum {string} */
         UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "DASHSCOPE_MULTIMODAL_GENERATION" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
         /** @enum {string} */
+        UsageCompleteness: "EXACT" | "PARTIAL" | "UNKNOWN";
+        /** @enum {string} */
         BudgetCapability: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION";
         /** @enum {string} */
         BudgetMode: "UNLIMITED" | "LIMITED";
@@ -1521,10 +1523,22 @@ export interface components {
             requestId: components["schemas"]["RequestId"];
             userId: components["schemas"]["UserId"];
             capability: components["schemas"]["BudgetCapability"];
+            resourceId: string;
+            clientProtocol: components["schemas"]["UsageClientProtocol"];
             /** @enum {string} */
             state: "PENDING" | "RESOLVED";
+            reconciliationReason: string;
+            forwarded?: boolean;
+            httpStatus?: number;
+            upstreamHttpStatus?: number;
+            errorClass?: string;
+            completeness?: components["schemas"]["UsageCompleteness"];
             reservation: components["schemas"]["MeterQuantity"][];
             observed: components["schemas"]["MeterQuantity"][];
+            /** Format: date-time */
+            admittedAt: string;
+            /** Format: date-time */
+            startedAt?: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -1542,7 +1556,7 @@ export interface components {
             /** @enum {string} */
             expectedState: "PENDING";
             /** @enum {string} */
-            action: "ACCEPT_OBSERVED" | "RELEASE_UNCERTAIN";
+            action: "RELEASE_UNCERTAIN";
             reason: string;
         };
         UsageSummary: {

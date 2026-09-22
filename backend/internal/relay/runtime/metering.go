@@ -184,6 +184,9 @@ func (h *Handler) recordSettlement(observer *responseObserver, body *countingBod
 		transportComplete = transportComplete && !observer.tunnel.timedOut.Load() && !observer.tunnel.exceeded.Load()
 	}
 	usage := observation.finish(transportComplete)
+	if definitiveNoProviderConsumption(upstreamStatus, errorClass) {
+		usage = completeNoProviderConsumption(usage, observation.supportedMeters())
+	}
 	meters := meterValues(usage.Measurements)
 	completeness := settlementCompleteness(usage.Measurements)
 	state := usageingestapi.SETTLED
@@ -223,6 +226,46 @@ func (h *Handler) recordSettlement(observer *responseObserver, body *countingBod
 		DiagnosticCode: diagnosticCode, Details: detailsPointer,
 	}
 	return h.recorder.Record(settlement)
+}
+
+// A provider's explicit HTTP 400 and a connection failure before any response
+// headers are the two currently verified no-consumption outcomes. Keep any
+// exact request-side facts, but close provider-side unknown meters at zero so
+// these requests do not create operator reconciliation work.
+func definitiveNoProviderConsumption(upstreamStatus *int, errorClass string) bool {
+	return upstreamStatus != nil && *upstreamStatus == http.StatusBadRequest ||
+		upstreamStatus == nil && errorClass == "UPSTREAM_UNAVAILABLE"
+}
+
+func completeNoProviderConsumption(result protocolusage.Result, supported []string) protocolusage.Result {
+	byMeter := make(map[protocolusage.Meter]protocolusage.Measurement, len(result.Measurements))
+	for _, measurement := range result.Measurements {
+		if measurement.Value == nil || measurement.Completeness != protocolusage.Exact {
+			zero, _ := protocolusage.NewQuantity(0, 1)
+			measurement.Value = &zero
+			measurement.Completeness = protocolusage.Exact
+			measurement.Source = "provider_no_consumption"
+		}
+		byMeter[measurement.Meter] = measurement
+	}
+	for _, name := range supported {
+		meter := protocolusage.Meter(name)
+		if _, ok := byMeter[meter]; ok {
+			continue
+		}
+		value, _ := protocolusage.NewQuantity(0, 1)
+		if meter == protocolusage.Requests {
+			value, _ = protocolusage.NewQuantity(1, 1)
+		}
+		byMeter[meter] = protocolusage.Measurement{
+			Meter: meter, Value: &value, Source: "provider_no_consumption", Completeness: protocolusage.Exact,
+		}
+	}
+	measurements := make([]protocolusage.Measurement, 0, len(byMeter))
+	for _, name := range supported {
+		measurements = append(measurements, byMeter[protocolusage.Meter(name)])
+	}
+	return protocolusage.Result{Measurements: measurements, Details: result.Details}
 }
 
 func settlementHash(requestID string, meters []usageingestapi.MeterValue, fact usageingestapi.RequestUsageFact, completeness usageingestapi.UsageCompleteness, state usageingestapi.UsageSettlementState) string {

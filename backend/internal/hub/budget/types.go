@@ -89,10 +89,8 @@ const (
 type DecisionCode string
 
 const (
-	DecisionAllowed          DecisionCode = "ALLOWED"
-	DecisionBudgetExhausted  DecisionCode = "BUDGET_EXHAUSTED"
-	DecisionMeterUnavailable DecisionCode = "USAGE_METER_UNAVAILABLE"
-	DecisionInFlightLimit    DecisionCode = "IN_FLIGHT_LIMIT"
+	DecisionAllowed         DecisionCode = "ALLOWED"
+	DecisionBudgetExhausted DecisionCode = "BUDGET_EXHAUSTED"
 )
 
 var (
@@ -114,13 +112,10 @@ var (
 	ErrAssignmentNotFound         = errors.New("budget template assignment not found")
 )
 
-const DefaultMaxInFlight int64 = 32
-
 type Service struct {
-	Client      *ent.Client
-	Location    *time.Location
-	Now         func() time.Time
-	MaxInFlight int64
+	Client   *ent.Client
+	Location *time.Location
+	Now      func() time.Time
 }
 
 // NewService fixes natural budget periods to one deployment IANA timezone.
@@ -135,10 +130,9 @@ func NewService(client *ent.Client, ianaTimeZone string) (*Service, error) {
 		return nil, err
 	}
 	return &Service{
-		Client:      client,
-		Location:    location,
-		Now:         time.Now,
-		MaxInFlight: DefaultMaxInFlight,
+		Client:   client,
+		Location: location,
+		Now:      time.Now,
 	}, nil
 }
 
@@ -364,6 +358,11 @@ type ReconciliationRecord struct {
 	ClientProtocol         ClientProtocol             `json:"clientProtocol"`
 	RequestState           RequestState               `json:"requestState"`
 	Reason                 string                     `json:"reason"`
+	Forwarded              *bool                      `json:"forwarded,omitempty"`
+	HTTPStatus             *int                       `json:"httpStatus,omitempty"`
+	UpstreamHTTPStatus     *int                       `json:"upstreamHttpStatus,omitempty"`
+	ErrorClass             *string                    `json:"errorClass,omitempty"`
+	Completeness           *string                    `json:"completeness,omitempty"`
 	LastSettlementRevision int64                      `json:"lastSettlementRevision"`
 	Allocations            []ReconciliationAllocation `json:"allocations"`
 	AdmittedAt             time.Time                  `json:"admittedAt"`

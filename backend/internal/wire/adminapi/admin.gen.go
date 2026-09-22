@@ -2439,27 +2439,30 @@ type ReconciliationPage struct {
 
 // ReconciliationView defines model for ReconciliationView.
 type ReconciliationView struct {
-	AdmittedAt           time.Time               `json:"admittedAt"`
-	Capability           BudgetCapability        `json:"capability"`
-	ClientProtocol       UsageClientProtocol     `json:"clientProtocol"`
-	Completeness         *UsageCompleteness      `json:"completeness,omitempty"`
-	CreatedAt            time.Time               `json:"createdAt"`
-	ErrorClass           *string                 `json:"errorClass,omitempty"`
-	Forwarded            *bool                   `json:"forwarded,omitempty"`
-	HttpStatus           *int                    `json:"httpStatus,omitempty"`
-	Observed             []MeterQuantity         `json:"observed"`
-	ReconciliationReason string                  `json:"reconciliationReason"`
-	RequestId            RequestId               `json:"requestId"`
-	Reservation          []MeterQuantity         `json:"reservation"`
-	ResolutionReason     *string                 `json:"resolutionReason,omitempty"`
-	ResolvedAt           *time.Time              `json:"resolvedAt,omitempty"`
-	ResolvedBy           *string                 `json:"resolvedBy,omitempty"`
-	ResourceId           string                  `json:"resourceId"`
-	StartedAt            *time.Time              `json:"startedAt,omitempty"`
-	State                ReconciliationViewState `json:"state"`
-	UpdatedAt            time.Time               `json:"updatedAt"`
-	UpstreamHttpStatus   *int                    `json:"upstreamHttpStatus,omitempty"`
-	UserId               UserId                  `json:"userId"`
+	AdmittedAt           time.Time           `json:"admittedAt"`
+	Capability           BudgetCapability    `json:"capability"`
+	ClientProtocol       UsageClientProtocol `json:"clientProtocol"`
+	Completeness         *UsageCompleteness  `json:"completeness,omitempty"`
+	CreatedAt            time.Time           `json:"createdAt"`
+	ErrorClass           *string             `json:"errorClass,omitempty"`
+	Forwarded            *bool               `json:"forwarded,omitempty"`
+	HttpStatus           *int                `json:"httpStatus,omitempty"`
+	Observed             []MeterQuantity     `json:"observed"`
+	ReconciliationReason string              `json:"reconciliationReason"`
+
+	// Request Existing request audit projection for operator context and detail inspection. Absent only when the request usage projection is not yet available.
+	Request            *RequestUsageView       `json:"request,omitempty"`
+	RequestId          RequestId               `json:"requestId"`
+	Reservation        []MeterQuantity         `json:"reservation"`
+	ResolutionReason   *string                 `json:"resolutionReason,omitempty"`
+	ResolvedAt         *time.Time              `json:"resolvedAt,omitempty"`
+	ResolvedBy         *string                 `json:"resolvedBy,omitempty"`
+	ResourceId         string                  `json:"resourceId"`
+	StartedAt          *time.Time              `json:"startedAt,omitempty"`
+	State              ReconciliationViewState `json:"state"`
+	UpdatedAt          time.Time               `json:"updatedAt"`
+	UpstreamHttpStatus *int                    `json:"upstreamHttpStatus,omitempty"`
+	UserId             UserId                  `json:"userId"`
 }
 
 // ReconciliationViewState defines model for ReconciliationView.State.

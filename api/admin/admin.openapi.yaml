@@ -3722,6 +3722,10 @@ components:
           type: string
         completeness:
           $ref: '#/components/schemas/UsageCompleteness'
+        request:
+          allOf:
+            - $ref: '#/components/schemas/RequestUsageView'
+          description: Existing request audit projection for operator context and detail inspection. Absent only when the request usage projection is not yet available.
         reservation:
           type: array
           items:

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import {
   ClosePopup, QBanner, QBtn, QCard, QCardActions, QCardSection, QChip,
-  QDialog, QIcon, QInput, QItem, QItemLabel, QItemSection, QList,
+  QDialog, QIcon, QInput, QItem, QItemLabel, QItemSection, QList, QMarkupTable,
   QSpinner, Quasar,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
@@ -29,7 +29,7 @@ function mountPanel() {
         [Quasar, {
           components: {
             QBanner, QBtn, QCard, QCardActions, QCardSection, QChip,
-            QDialog, QIcon, QInput, QItem, QItemLabel, QItemSection, QList,
+            QDialog, QIcon, QInput, QItem, QItemLabel, QItemSection, QList, QMarkupTable,
             QSpinner,
           },
           directives: { ClosePopup },
@@ -73,6 +73,15 @@ describe('UsageReconciliationPanel', () => {
               forwarded: true, httpStatus: 499, errorClass: 'CLIENT_CANCELLED', completeness: 'UNKNOWN',
               reservation: [{ meter: 'TOTAL_TOKENS', quantity: '100' }],
               observed: [{ meter: 'TOTAL_TOKENS', quantity: '75' }],
+              request: {
+                requestId: 'req_1', deploymentId: 'dep_1', userId: 'usr_1', userDisplayName: 'Alice',
+                deviceId: 'dev_1', deviceName: 'Alice phone', resourceId: 'model_1', resourceDisplayName: 'Managed model',
+                resourceKind: 'MODEL', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', runtimeRouteId: 'rte_1', upstreamId: 'ups_1',
+                managedGeneration: 3, controlRevision: 7, startedAt: '2026-09-20T00:00:00Z', completedAt: '2026-09-20T00:00:01Z',
+                forwarded: true, httpStatus: 499, requestBytes: 10, responseBytes: 20, durationMs: 1000,
+                errorClass: 'CLIENT_CANCELLED', requestCompleteness: 'UNKNOWN', settlementState: 'RECONCILIATION_REQUIRED',
+                semanticMeters: [{ meter: 'TOTAL_TOKENS', quantity: '75', confidence: 'PARTIAL' }],
+              },
               admittedAt: '2026-09-20T00:00:00Z', createdAt: '2026-09-20T00:00:00Z', updatedAt: '2026-09-20T00:00:00Z',
             }],
           }
@@ -81,13 +90,21 @@ describe('UsageReconciliationPanel', () => {
     const panel = mountPanel()
     await flushPromises()
 
-    expect(panel.text()).toContain('req_1')
-    expect(panel.text()).toContain('model_1')
+    expect(panel.text()).toContain('Managed model')
+    expect(panel.text()).toContain('Alice')
+    expect(panel.text()).toContain('Alice phone')
     expect(panel.text()).toContain('Forwarded')
-    expect(panel.text()).toContain('HTTP 499 · Client cancelled · Unknown')
+    expect(panel.text()).toContain('Client cancelled')
+    expect(panel.text()).toContain('HTTP 499')
+    expect(panel.text()).toContain('Reconciliation required')
     expect(panel.text()).toContain('Metering data was incomplete when the request ended')
     expect(panel.text()).toContain('Observed Total tokens: 75 tokens')
     expect(panel.text()).toContain('Unconfirmed reservation Total tokens: 100 tokens')
+    await panel.find('[data-cy="reconciliation-row"]').trigger('click')
+    await flushPromises()
+    expect(panel.find('[data-cy="usage-detail"]').text()).toContain('req_1')
+    expect(panel.find('[data-cy="usage-detail"]').text()).toContain('Managed model')
+    expect(panel.find('[data-cy="usage-detail"]').text()).toContain('Alice')
     await panel.findAllComponents(QBtn).find(button => button.props('label') === 'Confirm')!.trigger('click')
     await flushPromises()
     const dialog = document.body.querySelector('[data-cy="reconciliation-dialog"]')!

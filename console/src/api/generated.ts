@@ -1533,6 +1533,8 @@ export interface components {
             upstreamHttpStatus?: number;
             errorClass?: string;
             completeness?: components["schemas"]["UsageCompleteness"];
+            /** @description Existing request audit projection for operator context and detail inspection. Absent only when the request usage projection is not yet available. */
+            request?: components["schemas"]["RequestUsageView"];
             reservation: components["schemas"]["MeterQuantity"][];
             observed: components["schemas"]["MeterQuantity"][];
             /** Format: date-time */

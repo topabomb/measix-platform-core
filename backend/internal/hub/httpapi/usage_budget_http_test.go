@@ -46,6 +46,7 @@ func TestAdminUsageReconciliationHTTPClosedLoop(t *testing.T) {
 		page.Items[0].ResourceId == "" || page.Items[0].ClientProtocol != adminapi.UsageClientProtocolOPENAIRESPONSES ||
 		page.Items[0].Forwarded == nil || !*page.Items[0].Forwarded || page.Items[0].HttpStatus == nil || *page.Items[0].HttpStatus != http.StatusOK ||
 		page.Items[0].Completeness == nil || *page.Items[0].Completeness != adminapi.UsageCompletenessPARTIAL ||
+		page.Items[0].Request == nil || page.Items[0].Request.UserDisplayName != "Reconcile Member" || page.Items[0].Request.RequestId != requestID ||
 		len(page.Items[0].Reservation) != 0 || len(page.Items[0].Observed) != 1 || page.Items[0].Observed[0].Quantity != "1" {
 		t.Fatalf("unexpected reconciliation page: %+v", page)
 	}

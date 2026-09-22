@@ -1044,6 +1044,7 @@ export default {
       notForwarded: 'Not forwarded',
       upstream: 'Upstream HTTP',
       reasonLabel: 'Reconciliation reason',
+      contextTitle: 'Reconciliation context',
       reasons: {
         incompleteSettlement: 'Metering data was incomplete when the request ended',
       },

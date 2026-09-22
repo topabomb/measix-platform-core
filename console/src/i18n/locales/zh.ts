@@ -1044,6 +1044,7 @@ export default {
       notForwarded: '未转发',
       upstream: '上游 HTTP',
       reasonLabel: '待核对原因',
+      contextTitle: '待核对信息',
       reasons: {
         incompleteSettlement: '请求结束时计量数据不完整',
       },

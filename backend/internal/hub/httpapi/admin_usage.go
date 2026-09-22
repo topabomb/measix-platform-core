@@ -150,9 +150,23 @@ func (h *fullAdminHandler) ListUsageReconciliations(w http.ResponseWriter, r *ht
 		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 		return
 	}
+	requestIDs := make([]string, 0, len(page.Items))
+	for _, item := range page.Items {
+		requestIDs = append(requestIDs, item.RequestID)
+	}
+	requestsByID, err := h.services.Usage.GetRequests(r.Context(), requestIDs)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
 	items := make([]adminapi.ReconciliationView, 0, len(page.Items))
 	for _, item := range page.Items {
-		items = append(items, reconciliationWire(item, adminapi.ReconciliationViewStatePENDING, nil, nil, nil))
+		view := reconciliationWire(item, adminapi.ReconciliationViewStatePENDING, nil, nil, nil)
+		if request, ok := requestsByID[item.RequestID]; ok {
+			requestView := requestUsageWire(request)
+			view.Request = &requestView
+		}
+		items = append(items, view)
 	}
 	var next *string
 	if page.NextCursor != "" {

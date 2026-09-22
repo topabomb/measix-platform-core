@@ -413,6 +413,43 @@ func (s *Service) GetRequest(ctx context.Context, requestID string) (RequestView
 	return views[0], err
 }
 
+// GetRequests resolves request audit projections in one batch. Reconciliation
+// uses this to show the same user, device and immutable resource names as the
+// ordinary request list without issuing one query per row.
+func (s *Service) GetRequests(ctx context.Context, requestIDs []string) (map[string]RequestView, error) {
+	unique := make([]string, 0, len(requestIDs))
+	seen := make(map[string]struct{}, len(requestIDs))
+	for _, requestID := range requestIDs {
+		if platformid.Validate(platformid.Request, requestID) != nil {
+			return nil, ErrInvalidBatch
+		}
+		if _, ok := seen[requestID]; ok {
+			continue
+		}
+		seen[requestID] = struct{}{}
+		unique = append(unique, requestID)
+	}
+	result := make(map[string]RequestView, len(unique))
+	if len(unique) == 0 {
+		return result, nil
+	}
+	rows, err := s.Client.RequestUsage.Query().Where(requestusage.RequestIDIn(unique...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]RequestView, 0, len(rows))
+	for _, row := range rows {
+		views = append(views, requestView(row))
+	}
+	if err := s.enrich(ctx, views); err != nil {
+		return nil, err
+	}
+	for _, view := range views {
+		result[view.RequestID] = view
+	}
+	return result, nil
+}
+
 func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 	if err := filter.Validate(); err != nil {
 		return Summary{}, err

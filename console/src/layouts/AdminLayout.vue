@@ -115,6 +115,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
       <q-toolbar class="orchelm-toolbar">
         <q-btn
           flat round dense
+          color="primary"
           :icon="$q.screen.lt.md ? 'menu' : (drawerMini ? 'menu_open' : 'menu')"
           :aria-label="$q.screen.lt.md ? $t('nav.menu') : $t(drawerMini ? 'nav.expand' : 'nav.collapse')"
           @click="toggleNavigation"

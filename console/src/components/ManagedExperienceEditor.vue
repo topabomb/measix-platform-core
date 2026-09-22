@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { components } from '../api/generated'
 import { useDraftStore } from '../stores/draft'
+import ValidationIssueItem from './ValidationIssueItem.vue'
+
+type ValidationIssue = components['schemas']['ValidationIssue']
 
 defineProps<{ disabled: boolean }>()
 const draft = useDraftStore()
@@ -9,6 +13,7 @@ const { t } = useI18n()
 const selectedId = ref<string>()
 const search = ref('')
 const selectedSection = ref<'basic' | 'prompt' | 'memory' | 'connections' | 'starters'>('basic')
+const editorRoot = ref<HTMLElement>()
 const assistants = computed(() => draft.localContent?.assistants ?? [])
 const filteredAssistants = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
@@ -29,6 +34,14 @@ const sections = computed(() => [
 ])
 const modelUnavailable = computed(() => Boolean(selected.value?.modelId && !models.value.some(model => model.value === selected.value?.modelId)))
 const unavailableMcps = computed(() => selected.value?.mcpServerIds.filter(id => !mcps.value.some(mcp => mcp.value === id)) ?? [])
+function issuesForAssistant(assistantId: string): ValidationIssue[] {
+  const starterIds = new Set((draft.localContent?.starters ?? []).filter(item => item.assistantDefinitionId === assistantId).map(item => item.starterId))
+  const result = draft.validationResult
+  return [...(result?.errors ?? []), ...(result?.warnings ?? [])].filter(issue =>
+    issue.resourceId === assistantId || Boolean(issue.resourceId && starterIds.has(issue.resourceId)),
+  )
+}
+const selectedIssues = computed(() => selected.value ? issuesForAssistant(selected.value.assistantDefinitionId) : [])
 const seedKeys = ref<Record<string, string[]>>({})
 let nextSeedKey = 0
 
@@ -88,10 +101,40 @@ function removeAssistant() {
   selectedId.value = undefined
   selectedSection.value = 'basic'
 }
+
+async function focusIssue(kind: 'ASSISTANT' | 'STARTER', resourceId?: string, field?: string, path = '') {
+  if (!resourceId) return
+  if (kind === 'STARTER') {
+    const starter = draft.localContent?.starters.find(item => item.starterId === resourceId)
+    if (!starter) return
+    selectedId.value = starter.assistantDefinitionId
+    selectedSection.value = 'starters'
+  } else {
+    selectedId.value = resourceId
+    selectedSection.value = field === 'systemPrompt' ? 'prompt'
+      : field === 'memorySeed' ? 'memory'
+        : field === 'modelId' || field === 'mcpServerIds' ? 'connections'
+          : 'basic'
+  }
+  await nextTick()
+  let element: HTMLElement | null = null
+  if (kind === 'STARTER') {
+    element = editorRoot.value?.querySelector<HTMLElement>(`[data-starter-id="${resourceId}"] [data-field="${field ?? ''}"]`) ?? null
+  } else if (field === 'memorySeed') {
+    const index = /memorySeed\[(\d+)\]/.exec(path)?.[1]
+    element = index === undefined ? null : editorRoot.value?.querySelector<HTMLElement>(`[data-seed-index="${index}"]`) ?? null
+  } else if (field) {
+    element = editorRoot.value?.querySelector<HTMLElement>(`[data-field="${field}"]`) ?? null
+  }
+  element?.scrollIntoView?.({ block: 'center' })
+  element?.querySelector<HTMLElement>('input, textarea, [tabindex]')?.focus()
+}
+
+defineExpose({ focusIssue })
 </script>
 
 <template>
-  <section data-cy="experience-editor">
+  <section ref="editorRoot" data-cy="experience-editor">
     <q-banner class="bg-blue-1 q-mb-xs rounded-borders">
       <div class="text-weight-medium">{{ t('experience.managedSource') }}</div>
       <div class="text-body2">{{ t('experience.hint') }}</div>
@@ -118,7 +161,10 @@ function removeAssistant() {
                 <q-item-label>{{ a.displayName }}</q-item-label>
                 <q-item-label caption>{{ a.enabled ? t('common.enabled') : t('common.disabled') }} · {{ a.memorySeed.length }} {{ t('experience.seedCount') }}</q-item-label>
               </q-item-section>
-              <q-item-section side><q-icon name="chevron_right" /></q-item-section>
+              <q-item-section side>
+                <q-badge v-if="issuesForAssistant(a.assistantDefinitionId).length" color="negative" :label="issuesForAssistant(a.assistantDefinitionId).length" />
+                <q-icon v-else name="chevron_right" />
+              </q-item-section>
             </q-item>
             <q-item v-if="!assistants.length"><q-item-section class="text-grey-7">{{ t('experience.noAssistants') }}</q-item-section></q-item>
           </q-list>
@@ -151,7 +197,7 @@ function removeAssistant() {
             <q-card-section class="assistant-settings-detail q-gutter-xs">
               <template v-if="selectedSection === 'basic'">
                 <div class="text-subtitle1">{{ t('experience.sections.basic') }}</div>
-                <q-input v-model="selected.displayName" outlined :label="t('experience.name')" :disable="disabled" data-cy="assistant-name" @update:model-value="draft.markDirty" />
+                <q-input v-model="selected.displayName" outlined :label="t('experience.name')" :disable="disabled" data-cy="assistant-name" data-field="displayName" @update:model-value="draft.markDirty" />
                 <q-input v-model="selected.description" outlined :label="t('experience.description')" :disable="disabled" @update:model-value="draft.markDirty" />
                 <q-btn flat color="negative" icon="delete" :label="t('experience.removeAssistant')" :disable="disabled" @click="removeAssistant" />
               </template>
@@ -159,14 +205,14 @@ function removeAssistant() {
               <template v-else-if="selectedSection === 'prompt'">
                 <div class="text-subtitle1">{{ t('experience.sections.prompt') }}</div>
                 <div class="text-body2 text-grey-7">{{ t('experience.promptHint') }}</div>
-                <q-input v-model="selected.systemPrompt" outlined autogrow type="textarea" :label="t('experience.systemPrompt')" :disable="disabled" data-cy="assistant-prompt" @update:model-value="draft.markDirty" />
+                <q-input v-model="selected.systemPrompt" outlined autogrow type="textarea" :label="t('experience.systemPrompt')" :disable="disabled" data-cy="assistant-prompt" data-field="systemPrompt" @update:model-value="draft.markDirty" />
               </template>
 
               <template v-else-if="selectedSection === 'memory'">
                 <div class="text-subtitle1">{{ t('experience.memorySeed') }}</div>
                 <div class="text-body2 text-grey-7">{{ t('experience.memoryHint') }}</div>
                 <div v-for="(_, i) in selected.memorySeed" :key="seedKeyAt(i)" class="seed-row">
-                  <q-input v-model="selected.memorySeed[i]" outlined autogrow type="textarea" :label="t('experience.seedEntry', { index: i + 1 })" :disable="disabled" :data-cy="'seed-input-' + i" @update:model-value="draft.markDirty" />
+                  <q-input v-model="selected.memorySeed[i]" outlined autogrow type="textarea" :label="t('experience.seedEntry', { index: i + 1 })" :disable="disabled" :data-cy="'seed-input-' + i" data-field="memorySeed" :data-seed-index="i" @update:model-value="draft.markDirty" />
                   <div class="row no-wrap">
                     <q-btn flat icon="arrow_upward" :aria-label="t('experience.moveUp')" :disable="disabled || i === 0" :data-cy="'seed-up-' + i" @click="moveSeed(i, -1)" />
                     <q-btn flat icon="arrow_downward" :aria-label="t('experience.moveDown')" :disable="disabled || i === selected.memorySeed.length - 1" @click="moveSeed(i, 1)" />
@@ -179,9 +225,9 @@ function removeAssistant() {
               <template v-else-if="selectedSection === 'connections'">
                 <div class="text-subtitle1">{{ t('experience.sections.connections') }}</div>
                 <div class="text-body2 text-grey-7">{{ t('experience.connectionsHint') }}</div>
-                <q-select data-cy="assistant-model" v-model="selected.modelId" outlined :options="models" emit-value map-options :label="t('experience.model')" :disable="disabled" @update:model-value="draft.markDirty" />
+                <q-select data-cy="assistant-model" v-model="selected.modelId" outlined :options="models" emit-value map-options :label="t('experience.model')" :disable="disabled" data-field="modelId" @update:model-value="draft.markDirty" />
                 <q-banner v-if="modelUnavailable" class="bg-red-1 rounded-borders text-negative">{{ t('experience.unavailableModel', { id: selected.modelId }) }}</q-banner>
-                <q-select v-model="selected.mcpServerIds" outlined :options="mcps" multiple use-chips emit-value map-options :label="t('experience.mcps')" :disable="disabled" @update:model-value="draft.markDirty" />
+                <q-select v-model="selected.mcpServerIds" outlined :options="mcps" multiple use-chips emit-value map-options :label="t('experience.mcps')" :disable="disabled" data-field="mcpServerIds" @update:model-value="draft.markDirty" />
                 <q-banner v-if="unavailableMcps.length" class="bg-red-1 rounded-borders text-negative">{{ t('experience.unavailableMcps', { ids: unavailableMcps.join(', ') }) }}</q-banner>
               </template>
 
@@ -193,12 +239,12 @@ function removeAssistant() {
                   </div>
                   <q-btn outline icon="add" :label="t('experience.addStarter')" :disable="disabled" data-cy="starter-add" @click="draft.addStarter(selected.assistantDefinitionId, t('experience.newStarter'))" />
                 </div>
-                <q-card v-for="s in starters" :key="s.starterId" flat bordered>
+                <q-card v-for="s in starters" :key="s.starterId" flat bordered :data-starter-id="s.starterId">
                   <q-card-section class="q-gutter-xs">
                     <details class="text-caption text-grey-7"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ s.starterId }}</details>
-                    <q-input data-cy="starter-title" v-model="s.title" outlined :label="t('experience.title')" :disable="disabled" @update:model-value="draft.markDirty" />
+                    <q-input data-cy="starter-title" v-model="s.title" outlined :label="t('experience.title')" :disable="disabled" data-field="title" @update:model-value="draft.markDirty" />
                     <q-input v-model="s.description" outlined :label="t('experience.description')" :disable="disabled" @update:model-value="draft.markDirty" />
-                    <q-input data-cy="starter-prompt" v-model="s.prompt" outlined autogrow type="textarea" :label="t('experience.starterPrompt')" :disable="disabled" @update:model-value="draft.markDirty" />
+                    <q-input data-cy="starter-prompt" v-model="s.prompt" outlined autogrow type="textarea" :label="t('experience.starterPrompt')" :disable="disabled" data-field="prompt" @update:model-value="draft.markDirty" />
                     <div class="row items-center q-col-gutter-xs">
                       <q-input v-model.number="s.sortOrder" outlined dense type="number" step="1" :label="t('experience.sortOrder')" :disable="disabled" class="col-12 col-sm-6" @update:model-value="draft.markDirty" />
                       <q-toggle v-model="s.enabled" :label="t('experience.enabled')" :disable="disabled" class="col-12 col-sm-6" @update:model-value="draft.markDirty" />
@@ -209,6 +255,14 @@ function removeAssistant() {
               </template>
             </q-card-section>
           </div>
+          <q-separator v-if="draft.validationResult" />
+          <q-card-section v-if="draft.validationResult">
+            <div class="text-subtitle2">{{ t('resources.model.validation') }}</div>
+            <q-list v-if="selectedIssues.length" dense>
+              <ValidationIssueItem v-for="issue in selectedIssues" :key="issue.path + issue.code" :issue="issue" />
+            </q-list>
+            <div v-else class="text-positive q-mt-xs">{{ t('resources.model.noIssues') }}</div>
+          </q-card-section>
         </q-card>
       </div>
     </div>

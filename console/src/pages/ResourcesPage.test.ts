@@ -221,6 +221,47 @@ describe('ResourcesPage', () => {
     }
   })
 
+  it('localizes validation issues and opens the exact assistant field', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    const draft = useDraftStore(pinia)
+    draft.localContent!.assistants.push({
+      assistantDefinitionId: 'asd_helper',
+      displayName: 'Workshop helper',
+      description: '',
+      systemPrompt: 'Help the operator.',
+      memorySeed: [],
+      modelId: 'mdl_missing',
+      mcpServerIds: [],
+      enabled: true,
+    })
+    draft.validationResult = {
+      valid: false,
+      errors: [{
+        code: 'invalid_model_ref',
+        path: 'assistants[0].modelId',
+        message: 'assistant references an unknown or disabled model',
+        severity: 'ERROR',
+        resourceKind: 'ASSISTANT',
+        resourceId: 'asd_helper',
+        field: 'modelId',
+      }],
+      warnings: [],
+    }
+    await flushPromises()
+
+    const issue = wrapper.get('[data-validation-code="invalid_model_ref"]')
+    expect(issue.text()).toContain('Select an enabled model. The current model is missing or disabled.')
+    expect(issue.text()).not.toContain('assistant references an unknown or disabled model')
+
+    await issue.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-field="modelId"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Workshop helper')
+  })
+
   it('presents Android-familiar configuration sections with current summaries', async () => {
     const { wrapper, pinia } = mountResourcesPage()
     setupSession(pinia)

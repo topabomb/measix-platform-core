@@ -116,7 +116,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
     <q-tabs v-model="activeTab" dense align="left" class="q-mb-xs">
       <q-tab name="overview" icon="dashboard" :label="$t('system.tabs.overview')" data-cy="system-tab-overview" />
       <q-tab name="runtime" icon="sync_alt" :label="$t('system.tabs.runtime')" data-cy="system-tab-runtime" />
-      <q-tab name="metering" icon="monitoring" :label="$t('system.tabs.metering')" data-cy="system-tab-metering" />
+      <q-tab name="metering" icon="speed" :label="$t('system.tabs.metering')" data-cy="system-tab-metering" />
       <q-tab name="events" icon="receipt_long" :label="$t('system.tabs.events')" data-cy="system-tab-events" />
     </q-tabs>
     <ProblemBanner :error="error" class="q-mb-xs" />

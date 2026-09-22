@@ -15,6 +15,7 @@ import StatusChip from '../components/StatusChip.vue'
 import ConfigurationSectionNav, { type ConfigurationSection } from '../components/ConfigurationSectionNav.vue'
 import { useResourceDiff } from '../composables/useResourceDiff'
 import PagedEntityPicker from '../components/PagedEntityPicker.vue'
+import ValidationIssueItem from '../components/ValidationIssueItem.vue'
 import { fetchUpstreamPickerPage, resolveUpstreamPickerOption } from '../api/entityPickerSources'
 
 type Activation = components['schemas']['Activation']
@@ -37,7 +38,7 @@ type ReleaseDiffKind = components['schemas']['ReleaseDiffKind']
 type ResourceDiff = components['schemas']['ResourceDiff']
 type ValidationIssue = components['schemas']['ValidationIssue']
 
-const { t: $t } = useI18n()
+const { t: $t, te: $te } = useI18n()
 const draft = useDraftStore()
 const session = useSessionStore()
 const activation = useActivationStore()
@@ -53,6 +54,8 @@ const upstreams = ref<Upstream[]>([])
 const upstreamsLoading = ref(false)
 const upstreamError = ref<unknown>()
 const activeTab = ref<'overview' | 'models' | 'image-generation' | 'tts' | 'asr' | 'mcp' | 'assistants' | 'policy'>('overview')
+const experienceEditor = ref<InstanceType<typeof ManagedExperienceEditor>>()
+const asrAudioSettingsOpen = ref(false)
 const canMutate = computed(() => Boolean(session.csrfToken))
 const reviewTotalChanges = computed(() => {
   const summary = preview.value?.diffSummary
@@ -545,6 +548,45 @@ function selectTts(id: string) { selectedResourceId.value = id }
 function selectAsr(id: string) { selectedResourceId.value = id }
 function selectMcp(id: string) { selectedResourceId.value = id }
 
+function managedKindForId(resourceId: string | undefined): ValidationIssue['resourceKind'] | undefined {
+  if (!resourceId || !draft.localContent) return undefined
+  if (draft.localContent.models.some(item => item.modelId === resourceId)) return 'MODEL'
+  if (draft.localContent.imageGenerators?.some(item => item.imageId === resourceId)) return 'IMAGE_GENERATION'
+  if (draft.localContent.tts.some(item => item.ttsId === resourceId)) return 'TTS'
+  if (draft.localContent.asr.some(item => item.asrId === resourceId)) return 'ASR'
+  if (draft.localContent.mcp.some(item => item.mcpServerId === resourceId)) return 'MCP'
+  return undefined
+}
+
+function validationResourceName(issue: ValidationIssue): string {
+  const content = draft.localContent
+  const kind = issue.resourceKind === 'BINDING' ? managedKindForId(issue.resourceId) : issue.resourceKind
+  const fallback = kind && $te(`resources.validation.resourceKinds.${kind}`)
+    ? $t(`resources.validation.resourceKinds.${kind}`)
+    : $t('resources.validation.configuration')
+  if (!content || !issue.resourceId || kind === 'POLICY') return fallback
+  if (kind === 'PROVIDER') return content.providers.find(item => item.providerId === issue.resourceId)?.displayName || fallback
+  if (kind === 'MODEL') return content.models.find(item => item.modelId === issue.resourceId)?.displayName || fallback
+  if (kind === 'IMAGE_GENERATION') return content.imageGenerators?.find(item => item.imageId === issue.resourceId)?.displayName || fallback
+  if (kind === 'TTS') return content.tts.find(item => item.ttsId === issue.resourceId)?.displayName || fallback
+  if (kind === 'ASR') return content.asr.find(item => item.asrId === issue.resourceId)?.displayName || fallback
+  if (kind === 'MCP') return content.mcp.find(item => item.mcpServerId === issue.resourceId)?.displayName || fallback
+  if (kind === 'ASSISTANT') return content.assistants.find(item => item.assistantDefinitionId === issue.resourceId)?.displayName || fallback
+  if (kind === 'STARTER') return content.starters.find(item => item.starterId === issue.resourceId)?.title || fallback
+  return fallback
+}
+
+function validationIssueTarget(issue: ValidationIssue): string {
+  const fieldKey = issue.field ? `resources.validation.fields.${issue.field}` : ''
+  const field = fieldKey && $te(fieldKey) ? $t(fieldKey) : $t('resources.validation.configuration')
+  return $t('resources.validation.target', { resource: validationResourceName(issue), field })
+}
+
+function validationIssueNavigable(issue: ValidationIssue): boolean {
+  const kind = issue.resourceKind === 'BINDING' ? managedKindForId(issue.resourceId) : issue.resourceKind
+  return Boolean(kind && ['PROVIDER', 'MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP', 'ASSISTANT', 'STARTER', 'POLICY'].includes(kind))
+}
+
 function beforeUnload(event: BeforeUnloadEvent) {
   if (!draft.dirty) return
   event.preventDefault()
@@ -552,23 +594,35 @@ function beforeUnload(event: BeforeUnloadEvent) {
 }
 
 async function goToValidationIssue(issue: ValidationIssue) {
-  const section = issue.resourceKind === 'MODEL' ? 'models'
-    : issue.resourceKind === 'IMAGE_GENERATION' ? 'image-generation'
-      : issue.resourceKind === 'TTS' ? 'tts'
-        : issue.resourceKind === 'ASR' ? 'asr'
-          : issue.resourceKind === 'MCP' ? 'mcp'
-            : issue.resourceKind === 'ASSISTANT' || issue.resourceKind === 'STARTER' ? 'assistants'
-              : issue.resourceKind === 'POLICY' ? 'policy'
-                : issue.resourceKind === 'PROVIDER' ? 'overview' : undefined
+  const kind = issue.resourceKind === 'BINDING' ? managedKindForId(issue.resourceId) : issue.resourceKind
+  const section = kind === 'MODEL' ? 'models'
+    : kind === 'IMAGE_GENERATION' ? 'image-generation'
+      : kind === 'TTS' ? 'tts'
+        : kind === 'ASR' ? 'asr'
+          : kind === 'MCP' ? 'mcp'
+            : kind === 'ASSISTANT' || kind === 'STARTER' ? 'assistants'
+              : kind === 'POLICY' ? 'policy'
+                : kind === 'PROVIDER' ? 'overview' : undefined
   if (!section) return
   activeTab.value = section
-  if (issue.resourceId && ['MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP'].includes(issue.resourceKind ?? '')) {
+  if (issue.resourceId && ['MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP'].includes(kind ?? '')) {
     selectedResourceId.value = issue.resourceId
   }
+  if (kind === 'ASR' && ['sampleRate', 'vadThreshold', 'silenceDurationMs', 'prefixPaddingMs', 'prompt'].includes(issue.field ?? '')) {
+    asrAudioSettingsOpen.value = true
+  }
   await nextTick()
-  if (issue.field) {
-    const element = document.querySelector<HTMLElement>(`[data-field="${issue.field}"]`)
-    element?.scrollIntoView({ block: 'center' })
+  if (kind === 'ASSISTANT' || kind === 'STARTER') {
+    await experienceEditor.value?.focusIssue(kind, issue.resourceId, issue.field, issue.path)
+    return
+  }
+  const focusField = issue.resourceKind === 'BINDING' && !['upstreamId', 'runtimePath'].includes(issue.field ?? '')
+    ? 'runtimePath'
+    : issue.field
+  if (focusField) {
+    const scope = kind === 'PROVIDER' && issue.resourceId ? `[data-resource-id="${issue.resourceId}"] ` : ''
+    const element = document.querySelector<HTMLElement>(`${scope}[data-field="${focusField}"]`)
+    element?.scrollIntoView?.({ block: 'center' })
     element?.querySelector<HTMLElement>('input, textarea, [tabindex]')?.focus()
   }
 }
@@ -624,11 +678,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <q-badge v-if="draft.dirty" color="orange" :label="$t('common.dirty').toLowerCase()" class="q-ml-xs" />
           </div>
           <div class="row items-center q-gutter-xs">
-            <q-chip v-if="draft.validationResult?.errors.length" color="negative" outline dense icon="error">
-              {{ draft.validationResult.errors.length }} {{ $t('common.error') }}(s)
-            </q-chip>
-            <q-chip v-else-if="draft.validationResult?.warnings.length" color="amber" outline dense icon="warning">
-              {{ draft.validationResult.warnings.length }} {{ $t('common.warning') }}(s)
+            <q-chip v-if="draft.validationResult && (draft.validationResult.errors.length || draft.validationResult.warnings.length)" :color="draft.validationResult.errors.length ? 'negative' : 'amber'" outline dense :icon="draft.validationResult.errors.length ? 'error' : 'warning'">
+              {{ $t('resources.errorsWarnings', { errors: draft.validationResult.errors.length, warnings: draft.validationResult.warnings.length }) }}
             </q-chip>
             <q-chip v-else-if="draft.validationResult" color="positive" outline dense icon="check_circle">
               {{ $t('resources.valid').toLowerCase() }}
@@ -656,10 +707,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <q-btn flat dense icon="add" :label="$t('resources.overview.addProvider')" size="sm" data-cy="add-provider-btn" @click="addProvider()" />
             </div>
             <q-list dense class="q-mt-xs">
-              <q-item v-for="provider in draft.localContent.providers" :key="provider.providerId">
+              <q-item v-for="provider in draft.localContent.providers" :key="provider.providerId" :data-resource-id="provider.providerId">
                 <q-item-section>
-                  <q-input v-model="provider.displayName" dense outlined :label="$t('users.displayName')" @update:model-value="draft.markDirty()" />
-                  <q-select v-model="provider.clientProtocol" dense outlined class="q-mt-xs" :label="$t('resources.model.protocolLabel')" :hint="$t('resources.model.protocolHint')" :options="modelProtocols" emit-value map-options data-cy="provider-protocol" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="provider.displayName" dense outlined :label="$t('users.displayName')" data-field="displayName" @update:model-value="draft.markDirty()" />
+                  <q-select v-model="provider.clientProtocol" dense outlined class="q-mt-xs" :label="$t('resources.model.protocolLabel')" :hint="$t('resources.model.protocolHint')" :options="modelProtocols" emit-value map-options data-cy="provider-protocol" data-field="clientProtocol" @update:model-value="draft.markDirty()" />
                   <div class="text-caption text-grey-7">{{ $t('resources.overview.modelCount', { count: modelCountForProvider(provider.providerId) }) }}</div>
                   <details class="text-caption text-grey-7"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ provider.providerId }} · {{ provider.clientProtocol }}</details>
                 </q-item-section>
@@ -798,7 +849,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.model.identity') }}</div>
                 <div class="row q-gutter-xs">
                   <q-input v-model="selectedModel.displayName" dense outlined :label="$t('resources.model.displayName')" class="col" data-cy="model-display-name" data-field="displayName" @update:model-value="draft.markDirty()" />
-                  <q-select v-model="selectedModel.providerId" dense outlined :label="$t('resources.model.provider')" :options="draft.localContent.providers.map((p) => ({ label: p.displayName, value: p.providerId }))" emit-value map-options class="col" data-cy="model-provider-select" @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.providerId" dense outlined :label="$t('resources.model.provider')" :options="draft.localContent.providers.map((p) => ({ label: p.displayName, value: p.providerId }))" emit-value map-options class="col" data-cy="model-provider-select" data-field="providerId" @update:model-value="draft.markDirty()" />
                 </div>
               </q-card-section>
               <q-separator />
@@ -815,7 +866,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <div class="row q-gutter-xs">
                   <q-select v-model="selectedModel.inputModalities" dense outlined :label="$t('resources.model.inputModalities')" multiple :options="INPUT_MODS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" data-cy="model-input-modalities" data-field="inputModalities" emit-value map-options @update:model-value="draft.markDirty()" />
                   <q-select v-model="selectedModel.outputModalities" dense outlined :label="$t('resources.model.outputModalities')" multiple :options="OUTPUT_MODS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" data-field="outputModalities" emit-value map-options @update:model-value="draft.markDirty()" />
-                  <q-select v-model="selectedModel.capabilities" dense outlined :label="$t('resources.model.capabilities')" multiple :options="MODEL_CAPS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" emit-value map-options @update:model-value="draft.markDirty()" />
+                  <q-select v-model="selectedModel.capabilities" dense outlined :label="$t('resources.model.capabilities')" multiple :options="MODEL_CAPS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" data-field="capabilities" emit-value map-options @update:model-value="draft.markDirty()" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.model.capabilityHint') }}</div>
               </q-card-section>
@@ -826,7 +877,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.model.execution') }}</div>
                 <div class="row q-gutter-xs">
                   <PagedEntityPicker :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="model-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
-                  <q-input :model-value="selectedModel.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="model-runtime-path" @update:model-value="v => draft.setRuntimePath(selectedModel!.modelId, String(v ?? ''))" />
+                  <q-input :model-value="selectedModel.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="model-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedModel!.modelId, String(v ?? ''))" />
                 </div>
                 <div v-if="draft.localContent.providers.find(provider => provider.providerId === selectedModel!.providerId)?.clientProtocol === 'GOOGLE_GENERATE_CONTENT'" class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.model.geminiPathHint') }}</div>
                 <div class="text-caption text-grey-7 q-mt-xs">
@@ -842,14 +893,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section v-if="draft.validationResult">
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.model.validation') }}</div>
                 <q-list dense>
-                  <q-item v-for="e in validationIssuesFor(selectedModel.modelId).errors" :key="e.path + e.code">
-                    <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
-                    <q-item-section><span class="text-negative">{{ e.code }} — {{ e.message }}</span> <span class="text-caption text-grey-7">{{ e.path }}</span></q-item-section>
-                  </q-item>
-                  <q-item v-for="w in validationIssuesFor(selectedModel.modelId).warnings" :key="w.path + w.code">
-                    <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
-                    <q-item-section><span class="text-amber-8">{{ w.code }} — {{ w.message }}</span> <span class="text-caption text-grey-7">{{ w.path }}</span></q-item-section>
-                  </q-item>
+                  <ValidationIssueItem v-for="e in validationIssuesFor(selectedModel.modelId).errors" :key="e.path + e.code" :issue="e" />
+                  <ValidationIssueItem v-for="w in validationIssuesFor(selectedModel.modelId).warnings" :key="w.path + w.code" :issue="w" />
                   <q-item v-if="!validationIssuesFor(selectedModel.modelId).errors.length && !validationIssuesFor(selectedModel.modelId).warnings.length">
                     <q-item-section class="text-positive">{{ $t('resources.model.noIssues') }}</q-item-section>
                   </q-item>
@@ -906,25 +951,36 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-separator />
               <q-card-section class="q-gutter-xs">
                 <div class="text-subtitle2">{{ $t('resources.imageGeneration.identity') }}</div>
-                <q-input v-model="selectedImageGeneration.displayName" dense outlined :label="$t('resources.imageGeneration.displayName')" data-cy="image-generation-display-name" @update:model-value="draft.markDirty()" />
-                <q-select :model-value="selectedImageGeneration.clientProtocol" :options="imageGenerationProtocols" emit-value map-options dense outlined :label="$t('resources.imageGeneration.protocol')" data-cy="image-generation-protocol" @update:model-value="value => draft.setImageGenerationProtocol(selectedImageGeneration!.imageId, value as ImageGenerationProtocol)" />
+                <q-input v-model="selectedImageGeneration.displayName" dense outlined :label="$t('resources.imageGeneration.displayName')" data-cy="image-generation-display-name" data-field="displayName" @update:model-value="draft.markDirty()" />
+                <q-select :model-value="selectedImageGeneration.clientProtocol" :options="imageGenerationProtocols" emit-value map-options dense outlined :label="$t('resources.imageGeneration.protocol')" data-cy="image-generation-protocol" data-field="clientProtocol" @update:model-value="value => draft.setImageGenerationProtocol(selectedImageGeneration!.imageId, value as ImageGenerationProtocol)" />
                 <div class="text-caption text-grey-7">{{ $t('resources.imageGeneration.protocolHint') }}</div>
-                <q-input v-model="selectedImageGeneration.upstreamModelKey" dense outlined :label="$t('resources.imageGeneration.modelKey')" data-cy="image-generation-model-key" @update:model-value="draft.markDirty()" />
+                <q-input v-model="selectedImageGeneration.upstreamModelKey" dense outlined :label="$t('resources.imageGeneration.modelKey')" data-cy="image-generation-model-key" data-field="upstreamModelKey" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
               <q-card-section class="q-gutter-xs">
                 <div class="text-subtitle2">{{ $t('resources.imageGeneration.requestLimits') }}</div>
-                <q-input v-model.number="selectedImageGeneration.maxImagesPerRequest" type="number" min="1" max="6" dense outlined :label="$t('resources.imageGeneration.maxImages')" data-cy="image-generation-max-images" :rules="[(value: number) => Number.isInteger(value) && value >= 1 && value <= 6 || $t('resources.imageGeneration.maxImagesInvalid')]" @update:model-value="draft.markDirty()" />
-                <q-select v-model="selectedImageGeneration.allowedSizes" multiple use-chips use-input new-value-mode="add-unique" dense outlined :options="imageSizeOptions" :label="$t('resources.imageGeneration.allowedSizes')" data-cy="image-generation-allowed-sizes" :rules="[(value: string[]) => value.length > 0 || $t('resources.imageGeneration.allowedSizesRequired')]" @update:model-value="draft.markDirty()" />
+                <q-input v-model.number="selectedImageGeneration.maxImagesPerRequest" type="number" min="1" max="6" dense outlined :label="$t('resources.imageGeneration.maxImages')" data-cy="image-generation-max-images" data-field="maxImagesPerRequest" :rules="[(value: number) => Number.isInteger(value) && value >= 1 && value <= 6 || $t('resources.imageGeneration.maxImagesInvalid')]" @update:model-value="draft.markDirty()" />
+                <q-select v-model="selectedImageGeneration.allowedSizes" multiple use-chips use-input new-value-mode="add-unique" dense outlined :options="imageSizeOptions" :label="$t('resources.imageGeneration.allowedSizes')" data-cy="image-generation-allowed-sizes" data-field="allowedSizes" :rules="[(value: string[]) => value.length > 0 || $t('resources.imageGeneration.allowedSizesRequired')]" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.imageGeneration.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <PagedEntityPicker :model-value="draft.bindingFor(selectedImageGeneration.imageId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="image-generation-upstream-select" @update:model-value="value => value && draft.setBinding(selectedImageGeneration!.imageId, value, 'HTTP_REQUEST_RESPONSE')" />
-                  <q-input :model-value="selectedImageGeneration.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="image-generation-runtime-path" @update:model-value="value => draft.setRuntimePath(selectedImageGeneration!.imageId, String(value ?? ''))" />
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedImageGeneration.imageId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="image-generation-upstream-select" data-field="upstreamId" @update:model-value="value => value && draft.setBinding(selectedImageGeneration!.imageId, value, 'HTTP_REQUEST_RESPONSE')" />
+                  <q-input :model-value="selectedImageGeneration.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="image-generation-runtime-path" data-field="runtimePath" @update:model-value="value => draft.setRuntimePath(selectedImageGeneration!.imageId, String(value ?? ''))" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ imageGenerationTransportHint }}</div>
+              </q-card-section>
+              <q-separator />
+              <q-card-section v-if="draft.validationResult">
+                <div class="text-subtitle2 q-mb-xs">{{ $t('resources.model.validation') }}</div>
+                <q-list dense>
+                  <ValidationIssueItem v-for="e in validationIssuesFor(selectedImageGeneration.imageId).errors" :key="e.path + e.code" :issue="e" />
+                  <ValidationIssueItem v-for="w in validationIssuesFor(selectedImageGeneration.imageId).warnings" :key="w.path + w.code" :issue="w" />
+                  <q-item v-if="!validationIssuesFor(selectedImageGeneration.imageId).errors.length && !validationIssuesFor(selectedImageGeneration.imageId).warnings.length">
+                    <q-item-section class="text-positive">{{ $t('resources.imageGeneration.noIssues') }}</q-item-section>
+                  </q-item>
+                </q-list>
               </q-card-section>
             </q-card>
             <q-card v-else flat bordered><q-card-section class="text-grey-7 text-center"><q-icon name="image" size="3rem" /><div>{{ $t('resources.imageGeneration.selectOrAdd') }}</div></q-card-section></q-card>
@@ -984,17 +1040,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.tts.speechProfile') }}</div>
                 <div v-if="selectedTts.clientProtocol === 'SYSTEM_TTS'" class="row q-gutter-xs">
-                  <q-input v-model.number="selectedTts.speechRate" type="number" min="0.1" step="0.1" dense outlined :label="$t('resources.tts.speechRate')" class="col" data-cy="tts-speech-rate" @update:model-value="draft.markDirty()" />
-                  <q-input v-model.number="selectedTts.pitch" type="number" min="0.1" step="0.1" dense outlined :label="$t('resources.tts.pitch')" class="col" data-cy="tts-pitch" @update:model-value="draft.markDirty()" />
+                  <q-input v-model.number="selectedTts.speechRate" type="number" min="0.1" step="0.1" dense outlined :label="$t('resources.tts.speechRate')" class="col" data-cy="tts-speech-rate" data-field="speechRate" @update:model-value="draft.markDirty()" />
+                  <q-input v-model.number="selectedTts.pitch" type="number" min="0.1" step="0.1" dense outlined :label="$t('resources.tts.pitch')" class="col" data-cy="tts-pitch" data-field="pitch" @update:model-value="draft.markDirty()" />
                 </div>
                 <template v-else>
                 <div class="row q-gutter-xs q-mb-xs">
-                  <q-input v-model="selectedTts.upstreamModelKey" dense outlined :label="$t('resources.tts.modelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" class="col" data-cy="tts-model-key" @update:model-value="updateTtsModel" />
-                  <q-input v-if="!isVoiceDesign(selectedTts)" v-model="selectedTts.voice" dense outlined :label="$t('resources.tts.voice')" :hint="$t('resources.tts.voiceHint')" class="col" data-cy="tts-voice"
+                  <q-input v-model="selectedTts.upstreamModelKey" dense outlined :label="$t('resources.tts.modelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" class="col" data-cy="tts-model-key" data-field="upstreamModelKey" @update:model-value="updateTtsModel" />
+                  <q-input v-if="!isVoiceDesign(selectedTts)" v-model="selectedTts.voice" dense outlined :label="$t('resources.tts.voice')" :hint="$t('resources.tts.voiceHint')" class="col" data-cy="tts-voice" data-field="voice"
                     :rules="[(v: string) => !!v || $t('resources.tts.voiceRequired')]"
                     @update:model-value="draft.markDirty()" />
                 </div>
-                <q-input v-if="selectedTts.clientProtocol === 'MIMO_CHAT_COMPLETIONS_TTS'" :model-value="selectedTts.voiceDesignPrompt" type="textarea" autogrow dense outlined :label="$t('resources.tts.voiceDesignPrompt')" :hint="$t(isVoiceDesign(selectedTts) ? 'resources.tts.designPromptRequired' : 'resources.tts.stylePromptOptional')" data-cy="tts-voice-design" @update:model-value="updateVoiceDesignPrompt" />
+                <q-input v-if="selectedTts.clientProtocol === 'MIMO_CHAT_COMPLETIONS_TTS'" :model-value="selectedTts.voiceDesignPrompt" type="textarea" autogrow dense outlined :label="$t('resources.tts.voiceDesignPrompt')" :hint="$t(isVoiceDesign(selectedTts) ? 'resources.tts.designPromptRequired' : 'resources.tts.stylePromptOptional')" data-cy="tts-voice-design" data-field="voiceDesignPrompt" @update:model-value="updateVoiceDesignPrompt" />
                 <div class="row q-gutter-xs items-center">
                   <div class="col">
                     <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.tts.outputBaseline') }}</div>
@@ -1012,8 +1068,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section v-if="selectedTts.clientProtocol !== 'SYSTEM_TTS'">
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.tts.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <PagedEntityPicker :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="tts-upstream-select" @update:model-value="(v) => v && draft.setBinding(selectedTts!.ttsId, v, ttsTransport(selectedTts!.clientProtocol))" />
-                  <q-input :model-value="selectedTts.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="tts-runtime-path" @update:model-value="v => draft.setRuntimePath(selectedTts!.ttsId, String(v ?? ''))" />
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="tts-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedTts!.ttsId, v, ttsTransport(selectedTts!.clientProtocol))" />
+                  <q-input :model-value="selectedTts.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="tts-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedTts!.ttsId, String(v ?? ''))" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.tts.cloudHint') }}</div>
               </q-card-section>
@@ -1022,14 +1078,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section v-if="draft.validationResult">
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.tts.validation') }}</div>
                 <q-list dense>
-                  <q-item v-for="e in validationIssuesFor(selectedTts.ttsId).errors" :key="e.path + e.code">
-                    <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
-                    <q-item-section><span class="text-negative">{{ e.code }} — {{ e.message }}</span> <span class="text-caption text-grey-7">{{ e.path }}</span></q-item-section>
-                  </q-item>
-                  <q-item v-for="w in validationIssuesFor(selectedTts.ttsId).warnings" :key="w.path + w.code">
-                    <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
-                    <q-item-section><span class="text-amber-8">{{ w.code }} — {{ w.message }}</span> <span class="text-caption text-grey-7">{{ w.path }}</span></q-item-section>
-                  </q-item>
+                  <ValidationIssueItem v-for="e in validationIssuesFor(selectedTts.ttsId).errors" :key="e.path + e.code" :issue="e" />
+                  <ValidationIssueItem v-for="w in validationIssuesFor(selectedTts.ttsId).warnings" :key="w.path + w.code" :issue="w" />
                   <q-item v-if="!validationIssuesFor(selectedTts.ttsId).errors.length && !validationIssuesFor(selectedTts.ttsId).warnings.length">
                     <q-item-section class="text-positive">{{ $t('resources.tts.noIssues') }}</q-item-section>
                   </q-item>
@@ -1090,15 +1140,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.asr.identity') }}</div>
                 <q-input v-model="selectedAsr.displayName" dense outlined :label="$t('resources.asr.displayName')" data-cy="asr-display-name" data-field="displayName" @update:model-value="draft.markDirty()" />
-                <q-select :model-value="selectedAsr.clientProtocol" :options="asrProtocols" emit-value map-options dense outlined class="q-mt-xs" :label="$t('resources.asr.service')" :hint="$t('resources.asr.switchHint')" data-cy="asr-protocol" @update:model-value="(v: AsrProtocol) => draft.setAsrProtocol(selectedAsr!.asrId, v)" />
+                <q-select :model-value="selectedAsr.clientProtocol" :options="asrProtocols" emit-value map-options dense outlined class="q-mt-xs" :label="$t('resources.asr.service')" :hint="$t('resources.asr.switchHint')" data-cy="asr-protocol" data-field="clientProtocol" @update:model-value="(v: AsrProtocol) => draft.setAsrProtocol(selectedAsr!.asrId, v)" />
               </q-card-section>
               <q-separator />
 
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.asr.transcriptionProfile') }}</div>
                 <div class="row q-gutter-xs q-mb-xs">
-                  <q-input v-model="selectedAsr.upstreamModelKey" dense outlined :label="$t('resources.asr.modelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" class="col" data-cy="asr-model-key" @update:model-value="draft.markDirty()" />
-                  <q-input :model-value="selectedAsr.language" dense outlined :label="$t('resources.asr.optionalLanguage')" :hint="$t('resources.asr.optionalLanguageHint')" class="col" @update:model-value="value => { if (selectedAsr) { if (value) selectedAsr.language = String(value); else delete selectedAsr.language; draft.markDirty() } }" />
+                  <q-input v-model="selectedAsr.upstreamModelKey" dense outlined :label="$t('resources.asr.modelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" class="col" data-cy="asr-model-key" data-field="upstreamModelKey" @update:model-value="draft.markDirty()" />
+                  <q-input :model-value="selectedAsr.language" dense outlined :label="$t('resources.asr.optionalLanguage')" :hint="$t('resources.asr.optionalLanguageHint')" class="col" data-field="language" @update:model-value="value => { if (selectedAsr) { if (value) selectedAsr.language = String(value); else delete selectedAsr.language; draft.markDirty() } }" />
                 </div>
                 <div class="row q-gutter-xs items-center">
                   <div class="col">
@@ -1107,14 +1157,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   </div>
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t(isRealtimeAsr(selectedAsr.clientProtocol) ? 'resources.asr.realtimeHint' : selectedAsr.clientProtocol === 'DASHSCOPE_HTTP_ASR' ? 'resources.asr.dashscopeHttpHint' : 'resources.asr.notRealtimeHint') }}</div>
-                <q-expansion-item v-if="isRealtimeAsr(selectedAsr.clientProtocol)" :label="$t('resources.asr.audioSettings')" class="q-mt-xs" data-cy="asr-audio-settings">
+                <q-expansion-item v-if="isRealtimeAsr(selectedAsr.clientProtocol)" v-model="asrAudioSettingsOpen" :label="$t('resources.asr.audioSettings')" class="q-mt-xs" data-cy="asr-audio-settings">
                   <div class="q-pa-sm q-gutter-xs">
-                    <q-select v-model="selectedAsr.sampleRate" :options="selectedAsr.clientProtocol === 'OPENAI_REALTIME_TRANSCRIPTION' ? [24000] : [16000, 8000]" dense outlined :label="$t('resources.asr.sampleRate')" data-cy="asr-sample-rate" @update:model-value="draft.markDirty()" />
-                    <q-input v-model.number="selectedAsr.vadThreshold" type="number" min="0" max="1" step="0.1" dense outlined :label="$t('resources.asr.vadThreshold')" @update:model-value="draft.markDirty()" />
-                    <q-input v-model.number="selectedAsr.silenceDurationMs" type="number" min="1" step="100" dense outlined :label="$t('resources.asr.silenceDuration')" @update:model-value="draft.markDirty()" />
+                    <q-select v-model="selectedAsr.sampleRate" :options="selectedAsr.clientProtocol === 'OPENAI_REALTIME_TRANSCRIPTION' ? [24000] : [16000, 8000]" dense outlined :label="$t('resources.asr.sampleRate')" data-cy="asr-sample-rate" data-field="sampleRate" @update:model-value="draft.markDirty()" />
+                    <q-input v-model.number="selectedAsr.vadThreshold" type="number" min="0" max="1" step="0.1" dense outlined :label="$t('resources.asr.vadThreshold')" data-field="vadThreshold" @update:model-value="draft.markDirty()" />
+                    <q-input v-model.number="selectedAsr.silenceDurationMs" type="number" min="1" step="100" dense outlined :label="$t('resources.asr.silenceDuration')" data-field="silenceDurationMs" @update:model-value="draft.markDirty()" />
                     <template v-if="selectedAsr.clientProtocol === 'OPENAI_REALTIME_TRANSCRIPTION'">
-                      <q-input v-model.number="selectedAsr.prefixPaddingMs" type="number" min="0" step="100" dense outlined :label="$t('resources.asr.prefixPadding')" @update:model-value="draft.markDirty()" />
-                      <q-input v-model="selectedAsr.prompt" type="textarea" dense outlined :label="$t('resources.asr.prompt')" @update:model-value="(v) => { if (!v) delete selectedAsr!.prompt; draft.markDirty() }" />
+                      <q-input v-model.number="selectedAsr.prefixPaddingMs" type="number" min="0" step="100" dense outlined :label="$t('resources.asr.prefixPadding')" data-field="prefixPaddingMs" @update:model-value="draft.markDirty()" />
+                      <q-input v-model="selectedAsr.prompt" type="textarea" dense outlined :label="$t('resources.asr.prompt')" data-field="prompt" @update:model-value="(v) => { if (!v) delete selectedAsr!.prompt; draft.markDirty() }" />
                     </template>
                   </div>
                 </q-expansion-item>
@@ -1124,8 +1174,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.asr.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <PagedEntityPicker :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="asr-upstream-select" @update:model-value="(v) => v && draft.setBinding(selectedAsr!.asrId, v, asrTransport(selectedAsr!.clientProtocol))" />
-                  <q-input :model-value="selectedAsr.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="asr-runtime-path" @update:model-value="v => draft.setRuntimePath(selectedAsr!.asrId, String(v ?? ''))" />
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="asr-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedAsr!.asrId, v, asrTransport(selectedAsr!.clientProtocol))" />
+                  <q-input :model-value="selectedAsr.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="asr-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedAsr!.asrId, String(v ?? ''))" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.asr.bindingHint') }}</div>
               </q-card-section>
@@ -1134,14 +1184,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section v-if="draft.validationResult">
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.asr.validation') }}</div>
                 <q-list dense>
-                  <q-item v-for="e in validationIssuesFor(selectedAsr.asrId).errors" :key="e.path + e.code">
-                    <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
-                    <q-item-section><span class="text-negative">{{ e.code }} — {{ e.message }}</span> <span class="text-caption text-grey-7">{{ e.path }}</span></q-item-section>
-                  </q-item>
-                  <q-item v-for="w in validationIssuesFor(selectedAsr.asrId).warnings" :key="w.path + w.code">
-                    <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
-                    <q-item-section><span class="text-amber-8">{{ w.code }} — {{ w.message }}</span> <span class="text-caption text-grey-7">{{ w.path }}</span></q-item-section>
-                  </q-item>
+                  <ValidationIssueItem v-for="e in validationIssuesFor(selectedAsr.asrId).errors" :key="e.path + e.code" :issue="e" />
+                  <ValidationIssueItem v-for="w in validationIssuesFor(selectedAsr.asrId).warnings" :key="w.path + w.code" :issue="w" />
                   <q-item v-if="!validationIssuesFor(selectedAsr.asrId).errors.length && !validationIssuesFor(selectedAsr.asrId).warnings.length">
                     <q-item-section class="text-positive">{{ $t('resources.asr.noIssues') }}</q-item-section>
                   </q-item>
@@ -1210,7 +1254,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <div class="row q-gutter-xs items-center q-mb-xs">
                   <div class="col">
                     <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.mcp.authOwnership') }}</div>
-                    <q-select v-model="selectedMcp.authOwnership" dense outlined :label="$t('resources.mcp.authOwnership')" :options="AUTH_OWNERSHIPS.map(value => ({ label: $t(`authOwnership.${value}`), value }))" emit-value map-options @update:model-value="draft.markDirty()" />
+                    <q-select v-model="selectedMcp.authOwnership" dense outlined :label="$t('resources.mcp.authOwnership')" :options="AUTH_OWNERSHIPS.map(value => ({ label: $t(`authOwnership.${value}`), value }))" data-field="authOwnership" emit-value map-options @update:model-value="draft.markDirty()" />
                   </div>
                 </div>
                 <q-banner v-if="selectedMcp.authOwnership === 'ENTERPRISE_MANAGED'" class="bg-blue-1 q-mt-xs rounded-borders">
@@ -1225,8 +1269,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.mcp.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <PagedEntityPicker :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="mcp-upstream-select" @update:model-value="(v) => v && draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
-                  <q-input :model-value="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="mcp-runtime-path" @update:model-value="v => draft.setRuntimePath(selectedMcp!.mcpServerId, String(v ?? ''))" />
+                  <PagedEntityPicker :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="mcp-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
+                  <q-input :model-value="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="mcp-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedMcp!.mcpServerId, String(v ?? ''))" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.mcp.transportSummary') }}</div>
               </q-card-section>
@@ -1235,14 +1279,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section v-if="draft.validationResult">
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.mcp.validation') }}</div>
                 <q-list dense>
-                  <q-item v-for="e in validationIssuesFor(selectedMcp.mcpServerId).errors" :key="e.path + e.code">
-                    <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
-                    <q-item-section><span class="text-negative">{{ e.code }} — {{ e.message }}</span> <span class="text-caption text-grey-7">{{ e.path }}</span></q-item-section>
-                  </q-item>
-                  <q-item v-for="w in validationIssuesFor(selectedMcp.mcpServerId).warnings" :key="w.path + w.code">
-                    <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
-                    <q-item-section><span class="text-amber-8">{{ w.code }} — {{ w.message }}</span> <span class="text-caption text-grey-7">{{ w.path }}</span></q-item-section>
-                  </q-item>
+                  <ValidationIssueItem v-for="e in validationIssuesFor(selectedMcp.mcpServerId).errors" :key="e.path + e.code" :issue="e" />
+                  <ValidationIssueItem v-for="w in validationIssuesFor(selectedMcp.mcpServerId).warnings" :key="w.path + w.code" :issue="w" />
                   <q-item v-if="!validationIssuesFor(selectedMcp.mcpServerId).errors.length && !validationIssuesFor(selectedMcp.mcpServerId).warnings.length">
                     <q-item-section class="text-positive">{{ $t('resources.mcp.noIssues') }}</q-item-section>
                   </q-item>
@@ -1260,7 +1298,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </template>
 
       <!-- ===== Policy Editor ===== -->
-      <ManagedExperienceEditor v-if="activeTab === 'assistants'" :disabled="!canMutate || draft.saving || publishing" />
+      <ManagedExperienceEditor ref="experienceEditor" v-if="activeTab === 'assistants'" :disabled="!canMutate || draft.saving || publishing" />
       <template v-if="activeTab === 'policy'">
         <q-card flat bordered>
           <q-card-section class="row items-center justify-between">
@@ -1300,23 +1338,23 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div class="text-subtitle2 q-mb-xs">{{ $t('resources.policy.primaryDefaults') }}</div>
             <div class="row q-col-gutter-xs">
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultModelId" dense outlined :label="$t('resources.policy.defaultModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-model" @update:model-value="value => setPolicyDefault('defaultModelId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultModelId" dense outlined :label="$t('resources.policy.defaultModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-model" data-field="defaultModelId" @update:model-value="value => setPolicyDefault('defaultModelId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledModelsHint') }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultImageGenerationId" dense outlined :label="$t('resources.policy.defaultImageGeneration')" :options="enabledImageGenerators" emit-value map-options clearable data-cy="policy-default-image-generation" @update:model-value="value => setPolicyDefault('defaultImageGenerationId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultImageGenerationId" dense outlined :label="$t('resources.policy.defaultImageGeneration')" :options="enabledImageGenerators" emit-value map-options clearable data-cy="policy-default-image-generation" data-field="defaultImageGenerationId" @update:model-value="value => setPolicyDefault('defaultImageGenerationId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledImageGenerationHint') }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultTtsId" dense outlined :label="$t('resources.policy.defaultTts')" :options="enabledTts" emit-value map-options clearable data-cy="policy-default-tts" @update:model-value="value => setPolicyDefault('defaultTtsId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultTtsId" dense outlined :label="$t('resources.policy.defaultTts')" :options="enabledTts" emit-value map-options clearable data-cy="policy-default-tts" data-field="defaultTtsId" @update:model-value="value => setPolicyDefault('defaultTtsId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledTtsHint') }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultAsrId" dense outlined :label="$t('resources.policy.defaultAsr')" :options="enabledAsr" emit-value map-options clearable data-cy="policy-default-asr" @update:model-value="value => setPolicyDefault('defaultAsrId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultAsrId" dense outlined :label="$t('resources.policy.defaultAsr')" :options="enabledAsr" emit-value map-options clearable data-cy="policy-default-asr" data-field="defaultAsrId" @update:model-value="value => setPolicyDefault('defaultAsrId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledAsrHint') }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultAssistantId" dense outlined :label="$t('resources.policy.defaultAssistant')" :options="enabledAssistants" emit-value map-options clearable data-cy="policy-default-assistant" @update:model-value="value => setPolicyDefault('defaultAssistantId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultAssistantId" dense outlined :label="$t('resources.policy.defaultAssistant')" :options="enabledAssistants" emit-value map-options clearable data-cy="policy-default-assistant" data-field="defaultAssistantId" @update:model-value="value => setPolicyDefault('defaultAssistantId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledAssistantsHint') }}</div>
               </div>
             </div>
@@ -1325,20 +1363,20 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div class="text-body2 text-grey-7 q-mb-xs">{{ $t('resources.policy.auxiliaryModelDefaultsHint') }}</div>
             <div class="row q-col-gutter-xs">
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultFastModelId" dense outlined :label="$t('resources.policy.defaultFastModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-fast-model" @update:model-value="value => setPolicyDefault('defaultFastModelId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultFastModelId" dense outlined :label="$t('resources.policy.defaultFastModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-fast-model" data-field="defaultFastModelId" @update:model-value="value => setPolicyDefault('defaultFastModelId', value)" />
               </div>
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultTitleModelId" dense outlined :label="$t('resources.policy.defaultTitleModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-title-model" @update:model-value="value => setPolicyDefault('defaultTitleModelId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultTitleModelId" dense outlined :label="$t('resources.policy.defaultTitleModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-title-model" data-field="defaultTitleModelId" @update:model-value="value => setPolicyDefault('defaultTitleModelId', value)" />
               </div>
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultAttachmentInspectionModelId" dense outlined :label="$t('resources.policy.defaultAttachmentInspectionModel')" :options="enabledVisionModels" emit-value map-options clearable data-cy="policy-default-attachment-inspection-model" @update:model-value="value => setPolicyDefault('defaultAttachmentInspectionModelId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultAttachmentInspectionModelId" dense outlined :label="$t('resources.policy.defaultAttachmentInspectionModel')" :options="enabledVisionModels" emit-value map-options clearable data-cy="policy-default-attachment-inspection-model" data-field="defaultAttachmentInspectionModelId" @update:model-value="value => setPolicyDefault('defaultAttachmentInspectionModelId', value)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.policy.enabledVisionModelsHint') }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultSuggestionModelId" dense outlined :label="$t('resources.policy.defaultSuggestionModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-suggestion-model" @update:model-value="value => setPolicyDefault('defaultSuggestionModelId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultSuggestionModelId" dense outlined :label="$t('resources.policy.defaultSuggestionModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-suggestion-model" data-field="defaultSuggestionModelId" @update:model-value="value => setPolicyDefault('defaultSuggestionModelId', value)" />
               </div>
               <div class="col-12 col-md-4">
-                <q-select :model-value="draft.localContent.policy.defaultCompressModelId" dense outlined :label="$t('resources.policy.defaultCompressModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-compress-model" @update:model-value="value => setPolicyDefault('defaultCompressModelId', value)" />
+                <q-select :model-value="draft.localContent.policy.defaultCompressModelId" dense outlined :label="$t('resources.policy.defaultCompressModel')" :options="enabledModels" emit-value map-options clearable data-cy="policy-default-compress-model" data-field="defaultCompressModelId" @update:model-value="value => setPolicyDefault('defaultCompressModelId', value)" />
               </div>
             </div>
           </q-card-section>
@@ -1357,14 +1395,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <div>{{ $t('resources.errorsWarnings', { errors: draft.validationResult.errors.length, warnings: draft.validationResult.warnings.length }) }}</div>
             </q-banner>
             <q-list dense class="q-mt-xs">
-              <q-item v-for="e in draft.validationResult.errors" :key="e.path + e.code" :clickable="!!e.resourceKind" @click="goToValidationIssue(e)">
-                <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
-                <q-item-section>{{ e.path }}: {{ e.code }} — {{ e.message }}</q-item-section>
-              </q-item>
-              <q-item v-for="w in draft.validationResult.warnings" :key="w.path + w.code" :clickable="!!w.resourceKind" @click="goToValidationIssue(w)">
-                <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
-                <q-item-section>{{ w.path }}: {{ w.code }} — {{ w.message }}</q-item-section>
-              </q-item>
+              <ValidationIssueItem v-for="e in draft.validationResult.errors" :key="e.path + e.code" :issue="e" :target="validationIssueTarget(e)" :clickable="validationIssueNavigable(e)" @activate="goToValidationIssue(e)" />
+              <ValidationIssueItem v-for="w in draft.validationResult.warnings" :key="w.path + w.code" :issue="w" :target="validationIssueTarget(w)" :clickable="validationIssueNavigable(w)" @activate="goToValidationIssue(w)" />
             </q-list>
           </div>
         </q-card-section>
@@ -1394,13 +1426,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <q-banner v-if="hasBlockingErrors" class="bg-red-1 q-mb-xs rounded-borders">
               <div class="text-weight-medium text-negative">{{ $t('resources.review.blockingErrors', { count: draft.validationResult!.errors.length }) }}</div>
               <q-list dense class="q-mt-xs">
-                <q-item v-for="e in draft.validationResult!.errors" :key="e.path + e.code" :clickable="!!e.resourceKind" @click="goToValidationIssue(e)">
-                  <q-item-section avatar><q-icon name="error" color="negative" /></q-item-section>
-                  <q-item-section>
-                    <span class="text-negative">{{ e.code }} — {{ e.message }}</span>
-                    <span class="text-caption text-grey-7">{{ e.path }}</span>
-                  </q-item-section>
-                </q-item>
+                <ValidationIssueItem v-for="e in draft.validationResult!.errors" :key="e.path + e.code" :issue="e" :target="validationIssueTarget(e)" :clickable="validationIssueNavigable(e)" @activate="goToValidationIssue(e)" />
               </q-list>
             </q-banner>
 
@@ -1444,13 +1470,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <!-- Warnings -->
             <div v-if="reviewWarnings.length" class="text-subtitle2 q-mb-xs">{{ $t('resources.review.warningsAck') }}</div>
             <q-list v-if="reviewWarnings.length" dense class="q-mb-xs">
-              <q-item v-for="w in reviewWarnings" :key="w.path + w.code">
-                <q-item-section avatar><q-icon name="warning" color="amber-8" /></q-item-section>
-                <q-item-section>
-                  <span class="text-amber-8">{{ w.code }} — {{ w.message }}</span>
-                  <span class="text-caption text-grey-7">{{ w.path }}</span>
-                </q-item-section>
-              </q-item>
+              <ValidationIssueItem v-for="w in reviewWarnings" :key="w.path + w.code" :issue="w" :target="validationIssueTarget(w)" />
             </q-list>
 
             <!-- Snapshot hash -->

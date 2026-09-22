@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -965,7 +967,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			continue
 		}
 		if err != nil {
-			addError("upstream_lookup_failed", path+".upstreamId", err.Error(), &kindBinding, ptrStr(binding.ResourceId), ptrStr("upstreamId"))
+			addError("upstream_lookup_failed", path+".upstreamId", "upstream could not be checked", &kindBinding, ptrStr(binding.ResourceId), ptrStr("upstreamId"))
 			continue
 		}
 		if row.Status == "DISABLED" {
@@ -1146,7 +1148,18 @@ func validImageSize(value string) bool {
 }
 
 func validRuntimePath(value string) bool {
-	return strings.HasPrefix(value, "/") && !strings.Contains(value, "..") && !strings.Contains(value, "//")
+	if value == "" || !strings.HasPrefix(value, "/") || strings.ContainsAny(value, "?#\\") {
+		return false
+	}
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	unescaped, err := url.PathUnescape(value)
+	if err != nil || strings.Contains(unescaped, `\`) || strings.Count(unescaped, "/") != strings.Count(value, "/") {
+		return false
+	}
+	return path.Clean(unescaped) == unescaped
 }
 
 func runtimePathAllowed(path string, prefixes []string) bool {

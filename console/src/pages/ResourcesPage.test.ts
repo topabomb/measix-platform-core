@@ -203,6 +203,26 @@ describe('ResourcesPage', () => {
     }
     wrapper.unmount()
   })
+  it('shows the effective downstream model key and keeps the provider key explicit', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="add-provider-btn"]').trigger('click')
+    await switchTab(wrapper, 'models')
+    await wrapper.get('[data-cy="add-model-btn"]').trigger('click')
+    await flushPromises()
+
+    const draft = useDraftStore(pinia)
+    await wrapper.get('[data-cy="model-upstream-key"]').setValue('provider-model-v1')
+    expect(wrapper.text()).toContain('Device uses provider-model-v1 → Core forwards provider-model-v1')
+    await wrapper.get('[data-cy="model-published-key"]').setValue('workshop-assistant')
+    expect(draft.localContent!.models[0]).toMatchObject({
+      publishedModelKey: 'workshop-assistant',
+      upstreamModelKey: 'provider-model-v1',
+    })
+    expect(wrapper.text()).toContain('Device uses workshop-assistant → Core forwards provider-model-v1')
+    wrapper.unmount()
+  })
   beforeEach(() => {
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
       if (path === '/api/admin/v1/draft') return structuredClone(EMPTY_DRAFT)

@@ -29,6 +29,7 @@ var (
 	ErrNotFound          = errors.New("identity not found")
 	ErrConflict          = errors.New("identity conflict")
 	ErrCredential        = errors.New("invalid credential")
+	ErrCurrentPassword   = errors.New("invalid current password")
 	ErrExpired           = errors.New("credential expired")
 	ErrRevoked           = errors.New("identity revoked")
 	ErrUserDisabled      = errors.New("user disabled")
@@ -190,6 +191,60 @@ func (s *Service) SetPassword(ctx context.Context, userID, password string) erro
 		ClearPreviousRefreshDigest().ClearRefreshRequestKey().ClearRefreshReplayUntil().ClearRefreshResponseCiphertext().
 		Save(ctx)
 	if err != nil {
+		return rollback(err)
+	}
+	return tx.Commit()
+}
+
+// ChangeOwnPassword verifies the currently stored credential and atomically
+// replaces it while revoking every Admin Web session owned by the caller.
+func (s *Service) ChangeOwnPassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	current, err := s.Client.User.Get(ctx, userID)
+	if ent.IsNotFound(err) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if current.PasswordHash == nil || !security.VerifyPassword(*current.PasswordHash, currentPassword) {
+		return ErrCurrentPassword
+	}
+	hash, err := security.HashPassword(newPassword)
+	if errors.Is(err, security.ErrInvalidPassword) {
+		return ErrInvalidInput
+	}
+	if err != nil {
+		return err
+	}
+	now := s.Now().UTC()
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	rollback := func(cause error) error {
+		_ = tx.Rollback()
+		return cause
+	}
+	fresh, err := tx.User.Get(ctx, userID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return rollback(ErrNotFound)
+		}
+		return rollback(err)
+	}
+	if fresh.PasswordHash == nil || *fresh.PasswordHash != *current.PasswordHash {
+		return rollback(ErrCurrentPassword)
+	}
+	if _, err = tx.User.UpdateOneID(userID).SetPasswordHash(hash).SetUpdatedAt(now).Save(ctx); err != nil {
+		return rollback(err)
+	}
+	if _, err = tx.Session.Update().Where(
+		session.UserIDEQ(userID),
+		session.ChannelEQ("ADMIN_WEB"),
+		session.StatusEQ("ACTIVE"),
+	).SetStatus("REVOKED").SetRevokedAt(now).
+		ClearPreviousRefreshDigest().ClearRefreshRequestKey().ClearRefreshReplayUntil().ClearRefreshResponseCiphertext().
+		Save(ctx); err != nil {
 		return rollback(err)
 	}
 	return tx.Commit()

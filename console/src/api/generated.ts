@@ -52,6 +52,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/session:change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changeOwnPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/users/{userId}": {
         parameters: {
             query?: never;
@@ -892,6 +908,9 @@ export interface components {
             modelId: components["schemas"]["ModelId"];
             providerId: components["schemas"]["ProviderId"];
             displayName: string;
+            /** @description Optional enterprise-published model selector. Missing or blank draft values are normalized to upstreamModelKey and only the effective published value is projected to clients. */
+            publishedModelKey?: string;
+            /** @description Provider/Adapter model selector retained inside Core and translated by Runtime Relay for MODEL resources. */
             upstreamModelKey: string;
             runtimePath: string;
             inputModalities: ("TEXT" | "IMAGE")[];
@@ -1069,6 +1088,11 @@ export interface components {
         };
         SetPasswordRequest: {
             newPassword: string;
+        };
+        ChangeOwnPasswordRequest: {
+            currentPassword: string;
+            newPassword: string;
+            confirmPassword: string;
         };
         CreateEnrollmentRequest: {
             /** @default 3600 */
@@ -1963,6 +1987,33 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    changeOwnPassword: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeOwnPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password changed; all Admin Web sessions were revoked and the current cookie was cleared. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
         };
     };
     getUser: {

@@ -1946,6 +1946,13 @@ type BudgetTemplateRule struct {
 	Mode       BudgetMode              `json:"mode"`
 }
 
+// ChangeOwnPasswordRequest defines model for ChangeOwnPasswordRequest.
+type ChangeOwnPasswordRequest struct {
+	ConfirmPassword string `json:"confirmPassword"`
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 // CreateBudgetTemplateRequest defines model for CreateBudgetTemplateRequest.
 type CreateBudgetTemplateRequest struct {
 	Description string               `json:"description"`
@@ -2277,8 +2284,13 @@ type ModelDefinition struct {
 	ModelId          ModelId                           `json:"modelId"`
 	OutputModalities []ModelDefinitionOutputModalities `json:"outputModalities"`
 	ProviderId       ProviderId                        `json:"providerId"`
-	RuntimePath      string                            `json:"runtimePath"`
-	UpstreamModelKey string                            `json:"upstreamModelKey"`
+
+	// PublishedModelKey Optional enterprise-published model selector. Missing or blank draft values are normalized to upstreamModelKey and only the effective published value is projected to clients.
+	PublishedModelKey *string `json:"publishedModelKey,omitempty"`
+	RuntimePath       string  `json:"runtimePath"`
+
+	// UpstreamModelKey Provider/Adapter model selector retained inside Core and translated by Runtime Relay for MODEL resources.
+	UpstreamModelKey string `json:"upstreamModelKey"`
 }
 
 // ModelDefinitionCapabilities defines model for ModelDefinition.Capabilities.
@@ -3138,6 +3150,11 @@ type LogoutAdminParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// ChangeOwnPasswordParams defines parameters for ChangeOwnPassword.
+type ChangeOwnPasswordParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // SystemEventsParams defines parameters for SystemEvents.
 type SystemEventsParams struct {
 	Service     *SystemEventsParamsService `form:"service,omitempty" json:"service,omitempty"`
@@ -3440,6 +3457,9 @@ type ReplaceSecretJSONRequestBody = ReplaceSecretRequest
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
+// ChangeOwnPasswordJSONRequestBody defines body for ChangeOwnPassword for application/json ContentType.
+type ChangeOwnPasswordJSONRequestBody = ChangeOwnPasswordRequest
+
 // CreateUpstreamJSONRequestBody defines body for CreateUpstream for application/json ContentType.
 type CreateUpstreamJSONRequestBody = CreateUpstreamRequest
 
@@ -3574,6 +3594,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/session/login)
 	Login(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/admin/v1/session:change-password)
+	ChangeOwnPassword(w http.ResponseWriter, r *http.Request, params ChangeOwnPasswordParams)
 
 	// (GET /api/admin/v1/system/events)
 	SystemEvents(w http.ResponseWriter, r *http.Request, params SystemEventsParams)
@@ -3849,6 +3872,11 @@ func (_ Unimplemented) GetSession(w http.ResponseWriter, r *http.Request) {
 
 // (POST /api/admin/v1/session/login)
 func (_ Unimplemented) Login(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/session:change-password)
+func (_ Unimplemented) ChangeOwnPassword(w http.ResponseWriter, r *http.Request, params ChangeOwnPasswordParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5558,6 +5586,51 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Login(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeOwnPassword operation middleware
+func (siw *ServerInterfaceWrapper) ChangeOwnPassword(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeOwnPasswordParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeOwnPassword(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7972,6 +8045,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/users", wrapper.CreateUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/session:change-password", wrapper.ChangeOwnPassword)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/admin/v1/users/{userId}", wrapper.DeleteUser)

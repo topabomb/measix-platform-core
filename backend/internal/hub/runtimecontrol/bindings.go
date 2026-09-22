@@ -3,6 +3,7 @@ package runtimecontrol
 import (
 	"sort"
 
+	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/wire/adminapi"
 )
 
@@ -10,7 +11,13 @@ type resourceMeterProfile struct {
 	kind, protocol string
 	audio          *resourceAudioProfile
 	llm            *resourceLLMProfile
+	modelMapping   *resourceModelMapping
 	image          *resourceImageProfile
+}
+
+type resourceModelMapping struct {
+	publishedModelKey, upstreamModelKey    string
+	clientRuntimePath, upstreamRuntimePath string
 }
 
 type resourceImageProfile struct {
@@ -62,7 +69,7 @@ func enabledBindings(content adminapi.ManagedDraftContent) []adminapi.RuntimeBin
 	return bindings
 }
 
-func meterProfiles(content adminapi.ManagedDraftContent) map[string]resourceMeterProfile {
+func meterProfiles(content adminapi.ManagedDraftContent) (map[string]resourceMeterProfile, error) {
 	imageCount := 0
 	if content.ImageGenerators != nil {
 		imageCount = len(*content.ImageGenerators)
@@ -80,7 +87,15 @@ func meterProfiles(content adminapi.ManagedDraftContent) map[string]resourceMete
 			}
 		}
 		protocol := providerProtocols[model.ProviderId]
-		profiles[model.ModelId] = resourceMeterProfile{kind: "MODEL", protocol: protocol, llm: &resourceLLMProfile{
+		publishedKey := capability.EffectivePublishedModelKey(model)
+		clientPath, err := capability.ModelClientRuntimePath(adminapi.ProviderDefinitionClientProtocol(protocol), model.RuntimePath, model.UpstreamModelKey, publishedKey)
+		if err != nil {
+			return nil, err
+		}
+		profiles[model.ModelId] = resourceMeterProfile{kind: "MODEL", protocol: protocol, modelMapping: &resourceModelMapping{
+			publishedModelKey: publishedKey, upstreamModelKey: model.UpstreamModelKey,
+			clientRuntimePath: clientPath, upstreamRuntimePath: model.RuntimePath,
+		}, llm: &resourceLLMProfile{
 			geminiThoughtsMayBeAbsent:       protocol == "GOOGLE_GENERATE_CONTENT" && !reasoning,
 			anthropicCacheFieldsMayBeAbsent: protocol == "ANTHROPIC_MESSAGES",
 		}}
@@ -108,7 +123,7 @@ func meterProfiles(content adminapi.ManagedDraftContent) map[string]resourceMete
 	for _, mcp := range content.Mcp {
 		profiles[mcp.McpServerId] = resourceMeterProfile{kind: "MCP", protocol: string(mcp.ClientProtocol)}
 	}
-	return profiles
+	return profiles, nil
 }
 
 func asrAudioProfile(asr adminapi.AsrDefinition) *resourceAudioProfile {

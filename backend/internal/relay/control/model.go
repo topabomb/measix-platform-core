@@ -24,6 +24,7 @@ type Resource struct {
 	ClientProtocol relaycontrolapi.ResourceRouteClientProtocol
 	AudioProfile   *relaycontrolapi.RuntimeAudioProfile
 	LLMProfile     *relaycontrolapi.RuntimeLlmProfile
+	ModelMapping   *relaycontrolapi.RuntimeModelMapping
 	ImageProfile   *relaycontrolapi.RuntimeImageProfile
 }
 

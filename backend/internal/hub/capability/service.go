@@ -703,6 +703,13 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		if strings.TrimSpace(model.UpstreamModelKey) == "" {
 			addError("missing_model_key", fmt.Sprintf("models[%d].upstreamModelKey", i), "model upstreamModelKey is required", &kindModel, ptrStr(model.ModelId), ptrStr("upstreamModelKey"))
 		}
+		if len(model.UpstreamModelKey) > 256 || strings.TrimSpace(model.UpstreamModelKey) != model.UpstreamModelKey {
+			addError("invalid_upstream_model_key", fmt.Sprintf("models[%d].upstreamModelKey", i), "上游模型标识不能包含首尾空白且最多 256 个字符 / Upstream model key must not have surrounding whitespace and may contain at most 256 characters", &kindModel, ptrStr(model.ModelId), ptrStr("upstreamModelKey"))
+		}
+		publishedKey := EffectivePublishedModelKey(model)
+		if model.PublishedModelKey != nil && strings.TrimSpace(*model.PublishedModelKey) != "" && !ValidPublishedModelKey(*model.PublishedModelKey) {
+			addError("invalid_published_model_key", fmt.Sprintf("models[%d].publishedModelKey", i), "下发模型标识只能包含字母、数字、点、下划线和连字符，且最多 128 个字符 / Published model key may contain only letters, numbers, dots, underscores and hyphens, up to 128 characters", &kindModel, ptrStr(model.ModelId), ptrStr("publishedModelKey"))
+		}
 		if len(model.InputModalities) == 0 {
 			addError("missing_input_modalities", fmt.Sprintf("models[%d].inputModalities", i), "model requires at least one input modality", &kindModel, ptrStr(model.ModelId), ptrStr("inputModalities"))
 		}
@@ -714,6 +721,11 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 		if !validRuntimePath(model.RuntimePath) {
 			addError("invalid_runtime_path", fmt.Sprintf("models[%d].runtimePath", i), "runtimePath must be an absolute normalized path", &kindModel, ptrStr(model.ModelId), ptrStr("runtimePath"))
+		}
+		if provider, ok := providers[model.ProviderId]; ok {
+			if _, err := ModelClientRuntimePath(provider.ClientProtocol, model.RuntimePath, model.UpstreamModelKey, publishedKey); err != nil {
+				addError("invalid_model_mapping", fmt.Sprintf("models[%d].runtimePath", i), "Google 接口路径中的模型标识必须与上游模型标识一致 / The model selector in the Google runtime path must match the upstream model key", &kindModel, ptrStr(model.ModelId), ptrStr("runtimePath"))
+			}
 		}
 		for j, c := range model.Capabilities {
 			if !c.Valid() {

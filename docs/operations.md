@@ -79,6 +79,8 @@ Use restricted secret files and persistent, explicitly resolved DB/spool paths. 
 
 `control-hub` has `run`, `migrate`, `bootstrap-admin`, `check` and `backup` subcommands. Inspect each subcommand's flags with `--help`; maintenance commands do not use the full run configuration. Default bootstrap refuses an existing deployment; `--if-empty` skips an initialized deployment without resetting credentials, while `--add-admin` explicitly adds an administrator. They are mutually exclusive. Initial bootstrap accepts `--timezone <IANA zone>` (default UTC) for Enterprise Update date boundaries. Use its password-file input, not a password printed into shared logs.
 
+An authenticated administrator can change their own password from the account menu. The operation requires the current password and CSRF token, clears the current Cookie and revokes every Admin Web Session owned by that administrator; sign in again with the replacement password. It does not alter Client/Android sessions. Lost credentials still require the documented `bootstrap-admin --add-admin` recovery path rather than database editing.
+
 Run `migrate` before bootstrap/startup; it initializes an empty database or applies pending append-only migrations. `run` does not create or alter schema. Startup verifies recorded versions/checksums, opens the database, requires the deployment invariant and initializes runtime services. See [database migrations](database-migrations.md).
 
 Start Hub/Relay, wait for explicit readiness, verify desired/applied control state, then expose traffic. Relay cannot serve authorized runtime traffic before valid control state is applied. Process liveness does not prove activation, usage delivery or static hosting.

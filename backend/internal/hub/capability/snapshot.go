@@ -63,6 +63,10 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 		providers = append(providers, clientapi.ProviderDefinition{ProviderId: value.ProviderId, DisplayName: value.DisplayName, ClientProtocol: clientapi.ProviderDefinitionClientProtocol(value.ClientProtocol), Enabled: value.Enabled})
 	}
 	models := make([]clientapi.ModelDefinition, 0, len(input.Content.Models))
+	providerProtocols := make(map[string]adminapi.ProviderDefinitionClientProtocol, len(input.Content.Providers))
+	for _, provider := range input.Content.Providers {
+		providerProtocols[provider.ProviderId] = provider.ClientProtocol
+	}
 	for _, value := range input.Content.Models {
 		capabilities := make([]clientapi.ModelDefinitionCapabilities, 0, len(value.Capabilities))
 		for _, c := range value.Capabilities {
@@ -79,9 +83,14 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 		sort.Slice(capabilities, func(i, j int) bool { return capabilities[i] < capabilities[j] })
 		sort.Slice(inputs, func(i, j int) bool { return inputs[i] < inputs[j] })
 		sort.Slice(outputs, func(i, j int) bool { return outputs[i] < outputs[j] })
+		publishedKey := EffectivePublishedModelKey(value)
+		clientPath, err := ModelClientRuntimePath(providerProtocols[value.ProviderId], value.RuntimePath, value.UpstreamModelKey, publishedKey)
+		if err != nil {
+			return clientapi.ManagedSnapshot{}, "", ErrInvalidDraft
+		}
 		models = append(models, clientapi.ModelDefinition{
 			ModelId: value.ModelId, ProviderId: value.ProviderId, DisplayName: value.DisplayName,
-			UpstreamModelKey: value.UpstreamModelKey, RuntimePath: value.RuntimePath, Enabled: value.Enabled,
+			UpstreamModelKey: publishedKey, RuntimePath: clientPath, Enabled: value.Enabled,
 			Capabilities: capabilities, InputModalities: inputs, OutputModalities: outputs,
 		})
 	}
@@ -323,6 +332,7 @@ func projectionToAdminModels(src []clientapi.ModelDefinition) []adminapi.ModelDe
 			UpstreamModelKey: v.UpstreamModelKey, RuntimePath: v.RuntimePath, Enabled: v.Enabled,
 			Capabilities: caps, InputModalities: inputs, OutputModalities: outputs,
 		}
+		dst[i].PublishedModelKey = &dst[i].UpstreamModelKey
 	}
 	return dst
 }

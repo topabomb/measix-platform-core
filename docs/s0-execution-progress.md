@@ -1,6 +1,12 @@
 # S0 Platform Core 当前实现状态
 
-> 状态日期：2026-09-21。本文是唯一 living implementation/stage status。后文历史证据以本节最新状态为准。
+> 状态日期：2026-09-22。本文是唯一 living implementation/stage status。后文历史证据以本节最新状态为准。
+
+## 枢策品牌、管理员改密与模型标识映射（2026-09-22）
+
+Admin 产品壳已按官网统一为“枢策 Orchelm · 企业智能体治理与协同平台”和紫色品牌体系，保留原有紧凑全宽工作台及宽窄屏同一状态。登录管理员可在桌面或移动账号菜单验证当前密码并修改自己的密码；成功后服务端原子撤销该账号全部 Admin Web Session，页面清理本地会话并要求使用新密码重新登录。明确错误使用稳定 Problem code，并由中英文 locale 给出面向用户的提示。
+
+Model 草稿新增可选 `publishedModelKey`。留空按 `upstreamModelKey` 下发；配置别名时，Client Snapshot 仍使用既有字段承载有效下发标识，Android 契约形状和版本不变，也不会获知真实上游 key。Hub Runtime Control 为四种模型协议生成显式双向映射；Relay 对 OpenAI Chat/Responses/Anthropic 只替换顶层 JSON `model`，对 Google 只替换精确模型路径，并在转发前拒绝错误别名、重复字段、非 JSON/压缩请求或不匹配路径。数据库无需新增表或列：草稿与不可变 Release 内容原本就是 JSON 聚合，旧内容缺字段时由编译器执行确定性回退。
 
 ## S0.2 生产用量与用户额度闭环（2026-09-20，当前状态）
 

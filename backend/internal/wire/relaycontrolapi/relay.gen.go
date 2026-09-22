@@ -569,6 +569,7 @@ type ResourceRoute struct {
 	ClientProtocol ResourceRouteClientProtocol `json:"clientProtocol"`
 	ImageProfile   *RuntimeImageProfile        `json:"imageProfile,omitempty"`
 	LlmProfile     *RuntimeLlmProfile          `json:"llmProfile,omitempty"`
+	ModelMapping   *RuntimeModelMapping        `json:"modelMapping,omitempty"`
 	ResourceId     string                      `json:"resourceId"`
 	ResourceKind   ResourceRouteResourceKind   `json:"resourceKind"`
 	RuntimeRouteId RuntimeRouteId              `json:"runtimeRouteId"`
@@ -620,6 +621,14 @@ type RuntimeImageProfile struct {
 type RuntimeLlmProfile struct {
 	AnthropicCacheFieldsMayBeAbsent bool `json:"anthropicCacheFieldsMayBeAbsent"`
 	GeminiThoughtsMayBeAbsent       bool `json:"geminiThoughtsMayBeAbsent"`
+}
+
+// RuntimeModelMapping defines model for RuntimeModelMapping.
+type RuntimeModelMapping struct {
+	ClientRuntimePath   string `json:"clientRuntimePath"`
+	PublishedModelKey   string `json:"publishedModelKey"`
+	UpstreamModelKey    string `json:"upstreamModelKey"`
+	UpstreamRuntimePath string `json:"upstreamRuntimePath"`
 }
 
 // RuntimeRouteId defines model for RuntimeRouteId.

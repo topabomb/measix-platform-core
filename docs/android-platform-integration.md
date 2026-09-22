@@ -52,7 +52,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | userId/deviceId/sessionId | 用户域归属与认证会话分别保存；重登可以同 user/device，但必须采用服务端新 Session，不复活旧文档或旧任务 |
 | managedGeneration / releaseId / snapshotHash | generation 映射 EnterpriseConfiguration.generation；同时保存用于一致性验证的 release/hash，整个候选验证后原子替换 |
 | Provider.providerId/displayName/clientProtocol/enabled | 适配层保留 Provider 与协议元信息；现有 EnterpriseModel 没有完整 Provider 表，不能丢失后猜测协议。禁用 Provider 下的资源不可执行 |
-| Model.modelId / upstreamModelKey | 前者是稳定平台资源 ID，映射 EnterpriseModel.id；后者映射其请求模型名 modelId，写到请求 body 的 model。不能互换 |
+| Model.modelId / upstreamModelKey | 前者是稳定平台资源 ID，映射 EnterpriseModel.id；后者虽沿用既有 wire 字段名，语义是 Core 发布给设备的有效模型标识（管理员别名，未配置则等于真实上游 key），映射请求模型名 modelId。真实上游 key 只在 Core 内部，不能与资源 ID 互换 |
 | Model.displayName/modalities/capabilities | name 与显式 enum 映射。S0.2 为 CHAT；不映射成图片生成/附件等未声明 profile。未知 enum 拒绝候选，不能默认为普通文本模型 |
 | Provider.clientProtocol + Model.runtimePath | 保存在平台运行适配配置中，决定公开 Relay URL 与请求 profile；不塞入本地私有 binding，也不向用户存储注入企业上游地址/密钥 |
 | ImageGeneration.imageId/displayName/upstreamModelKey | 保持独立 `img_*` 企业资源身份；Android 只在统一图片选择目录中投影为 IMAGE 项，请求 body 的 `model` 使用 upstreamModelKey。不得并入 Provider/Model 表或借用 `mdl_*` |
@@ -93,7 +93,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | --- | --- | --- |
 | OPENAI_CHAT_COMPLETIONS | `/runtime/v1/resources/mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/v1/chat/completions` | JSON `{"model":"gpt-4o","messages":[{"role":"user","content":"你好"}],"stream":true,"stream_options":{"include_usage":true}}`；SSE 按事件读取，取消关闭响应流。非流式使用 stream=false。tools/tool_calls 和图片内容依照声明 profile，由客户端 SDK 构造；Relay 不翻译 body |
 | OPENAI_RESPONSES | 同一资源 URL 规则，runtimePath 通常为 `/v1/responses` | POST JSON + SSE；完整 input、store=false；回传 function_call_output.call_id 及相关 reasoning items，终止事件 response.completed |
-| GOOGLE_GENERATE_CONTENT | runtimePath 通常为 `/v1beta/models/{upstreamModelKey}:streamGenerateContent`，追加 `?alt=sse` | contents/parts、functionCall/functionResponse；保留模型返回的调用 ID 和 thoughtSignature；解析 candidates |
+| GOOGLE_GENERATE_CONTENT | runtimePath 使用 Core 发布的有效模型标识，例如 `/v1beta/models/{upstreamModelKey}:streamGenerateContent`，追加 `?alt=sse`；Core 再映射为真实上游路径 | contents/parts、functionCall/functionResponse；保留模型返回的调用 ID 和 thoughtSignature；解析 candidates |
 | ANTHROPIC_MESSAGES | runtimePath 通常为 `/v1/messages` | messages、独立 system、max_tokens、stream=true；tool_use/tool_result 配对；anthropic-version 公开协议头；解析命名 SSE 直至 message_stop |
 | OPENAI_IMAGES_GENERATIONS | `/runtime/v1/resources/img_ffffffff-ffff-4fff-8fff-ffffffffffff/v1/images/generations` | 同步 JSON `{"model":"gpt-image-1","prompt":"...","n":1,"size":"1024x1024"}`；响应只接受 `b64_json` 或安全 HTTPS URL，下载不携带平台 Bearer/Cookie，并在交给 `GeneratedMediaStore` 前执行有界读取与图片签名校验 |
 | DASHSCOPE_MULTIMODAL_GENERATION | `/runtime/v1/resources/img_ffffffff-ffff-4fff-8fff-ffffffffffff/api/v1/services/aigc/multimodal-generation/generation` | 同步 JSON `model/input.messages/parameters`；Android 将 canonical `1024x1024` 只在 wire builder 转为 `1024*1024`，显式发送 `n` 与 `watermark=false`，从 `output.choices[].message.content[].image` 读取安全 HTTPS URL |

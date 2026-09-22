@@ -164,6 +164,9 @@ func main() {
 		nativeContent.Providers[0].ClientProtocol = adminapi.ProviderDefinitionClientProtocol(profile.protocol)
 		for i := range nativeContent.Models {
 			nativeContent.Models[i].RuntimePath = profile.path
+			if profile.protocol == "GOOGLE_GENERATE_CONTENT" {
+				nativeContent.Models[i].UpstreamModelKey = "gemini-test"
+			}
 		}
 		nativeSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: nativeContent, PublishedAt: at, PublishedByUserID: user})
 		must(err)

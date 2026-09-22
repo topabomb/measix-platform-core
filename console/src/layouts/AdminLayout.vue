@@ -6,6 +6,8 @@ import { useI18n } from 'vue-i18n'
 import { useSessionStore } from '../stores/session'
 import { visibleNavItems } from '../router/navigation'
 import HealthIndicator from '../components/HealthIndicator.vue'
+import OrchelmBrand from '../components/OrchelmBrand.vue'
+import ChangePasswordDialog from '../components/ChangePasswordDialog.vue'
 import { switchLocale, currentLocale, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 
 // Layout strategy — leveraging Quasar's built-in responsive drawer logic:
@@ -28,6 +30,7 @@ const router = useRouter()
 const session = useSessionStore()
 const drawerOpen = ref(!$q.screen.lt.md)
 const drawerMini = ref(false)
+const changePasswordOpen = ref(false)
 const navItems = visibleNavItems()
 const deliveryNavItems = navItems.filter(item => item.group === 'configuration')
 const diagnosticNavItems = navItems.filter(item => item.group === 'operations')
@@ -62,6 +65,12 @@ function toggleNavigation() {
 async function logout() {
   await session.logout()
   await router.replace('/login')
+}
+
+async function passwordChanged() {
+  session.clear()
+  changePasswordOpen.value = false
+  await router.replace({ path: '/login', query: { passwordChanged: '1' } })
 }
 
 /** Map nav item id to i18n key.
@@ -102,15 +111,15 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
 
 <template>
   <q-layout view="hHh Lpr fFf" class="admin-shell">
-    <q-header bordered class="bg-white text-dark">
-      <q-toolbar>
+    <q-header bordered class="orchelm-header text-dark">
+      <q-toolbar class="orchelm-toolbar">
         <q-btn
           flat round dense
           :icon="$q.screen.lt.md ? 'menu' : (drawerMini ? 'menu_open' : 'menu')"
           :aria-label="$q.screen.lt.md ? $t('nav.menu') : $t(drawerMini ? 'nav.expand' : 'nav.collapse')"
           @click="toggleNavigation"
         />
-        <q-toolbar-title class="text-weight-bold" style="min-width: 0">MEASIX Admin</q-toolbar-title>
+        <q-toolbar-title style="min-width: 0"><OrchelmBrand compact /></q-toolbar-title>
 
         <!-- Language switcher -->
         <q-btn
@@ -139,6 +148,10 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
         >
           <q-menu>
             <q-list>
+              <q-item clickable v-close-popup data-cy="change-password-btn" @click="changePasswordOpen = true">
+                <q-item-section avatar><q-icon name="password" /></q-item-section>
+                <q-item-section>{{ $t('account.changePassword') }}</q-item-section>
+              </q-item>
               <q-item clickable v-close-popup data-cy="logout-btn" @click="logout">
                 <q-item-section avatar><q-icon name="logout" /></q-item-section>
                 <q-item-section>{{ $t('login.signOut') }}</q-item-section>
@@ -148,12 +161,24 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
         </q-btn>
         <q-btn
           v-if="session.authenticated"
-          flat dense round icon="logout"
+          flat dense round icon="account_circle"
           class="lt-md"
-          data-cy="logout-btn-mobile"
-          :aria-label="$t('login.signOut')"
-          @click="logout"
-        />
+          data-cy="user-menu-btn-mobile"
+          :aria-label="session.user?.displayName"
+        >
+          <q-menu>
+            <q-list>
+              <q-item clickable v-close-popup data-cy="change-password-btn-mobile" @click="changePasswordOpen = true">
+                <q-item-section avatar><q-icon name="password" /></q-item-section>
+                <q-item-section>{{ $t('account.changePassword') }}</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup data-cy="logout-btn-mobile" @click="logout">
+                <q-item-section avatar><q-icon name="logout" /></q-item-section>
+                <q-item-section>{{ $t('login.signOut') }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
       </q-toolbar>
     </q-header>
 
@@ -212,6 +237,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
            dead margins on wide screens. Page margin is the 4px .admin-page. -->
       <router-view />
     </q-page-container>
+    <ChangePasswordDialog v-model="changePasswordOpen" :csrf-token="session.csrfToken" @changed="passwordChanged" />
   </q-layout>
 </template>
 

@@ -34,6 +34,11 @@ func TestModelProtocolsSurviveDraftValidationAndSnapshot(t *testing.T) {
 			content.Providers[0].ClientProtocol = adminapi.ProviderDefinitionClientProtocol(protocol)
 			path := map[string]string{"OPENAI_CHAT_COMPLETIONS": "/v1/chat/completions", "OPENAI_RESPONSES": "/v1/responses", "GOOGLE_GENERATE_CONTENT": "/v1beta/models/gemini-test:streamGenerateContent", "ANTHROPIC_MESSAGES": "/v1/messages"}[protocol]
 			content.Models[0].RuntimePath = path
+			if protocol == "GOOGLE_GENERATE_CONTENT" {
+				content.Models[0].UpstreamModelKey = "gemini-test"
+			}
+			alias := "enterprise-model"
+			content.Models[0].PublishedModelKey = &alias
 			content.Bindings[0].AllowedPathPrefixes = []string{path}
 			service := capability.NewService(st.Client)
 			draft, err := service.GetDraft(ctx)
@@ -52,11 +57,31 @@ func TestModelProtocolsSurviveDraftValidationAndSnapshot(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if string(snapshot.Providers[0].ClientProtocol) != protocol || snapshot.Models[0].RuntimePath != content.Models[0].RuntimePath {
+			wantPath := path
+			if protocol == "GOOGLE_GENERATE_CONTENT" {
+				wantPath = "/v1beta/models/enterprise-model:streamGenerateContent"
+			}
+			if string(snapshot.Providers[0].ClientProtocol) != protocol || snapshot.Models[0].RuntimePath != wantPath || snapshot.Models[0].UpstreamModelKey != alias {
 				t.Fatal("protocol or endpoint changed during projection")
 			}
 			if !snapshot.Providers[0].ClientProtocol.Valid() {
 				t.Fatal("client contract cannot consume selected protocol")
+			}
+			if protocol == "OPENAI_CHAT_COMPLETIONS" {
+				content.Models[0].PublishedModelKey = nil
+				content.Models[0].UpstreamModelKey = "vendor/model:latest"
+				saved, err = service.PutDraft(ctx, boot.AdminUserID, saved.DraftRevision, content)
+				if err != nil {
+					t.Fatal(err)
+				}
+				validation, err = service.ValidateDraft(ctx, saved.DraftRevision)
+				if err != nil || !validation.Valid {
+					t.Fatalf("fallback selector rejected: %+v err=%v", validation, err)
+				}
+				snapshot, _, err = service.CompileSnapshot(capability.SnapshotInput{DeploymentID: platformid.New(platformid.Deployment), ReleaseID: platformid.New(platformid.Release), ManagedGeneration: 2, Content: saved.Content, PublishedAt: now})
+				if err != nil || snapshot.Models[0].UpstreamModelKey != "vendor/model:latest" {
+					t.Fatalf("fallback selector changed: %q err=%v", snapshot.Models[0].UpstreamModelKey, err)
+				}
 			}
 		})
 	}

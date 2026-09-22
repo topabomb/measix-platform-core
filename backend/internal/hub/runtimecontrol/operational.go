@@ -226,7 +226,10 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 		OperationalLimits: relaycontrolapi.OperationalLimits{MaxRequestBytes: defaultMaxRequestBytes},
 	}
 	upstreamSpecs := map[string]relaycontrolapi.RuntimeUpstreamSpec{}
-	profiles := meterProfiles(content)
+	profiles, err := meterProfiles(content)
+	if err != nil {
+		return relaycontrolapi.RuntimeControlState{}, err
+	}
 	ensureUpstream := func(id string) (adminapi.UpstreamConfig, error) {
 		row, err := s.Client.Upstream.Get(ctx, id)
 		if err != nil {
@@ -289,6 +292,14 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 			resourceRoute.LlmProfile = &relaycontrolapi.RuntimeLlmProfile{
 				GeminiThoughtsMayBeAbsent:       profile.llm.geminiThoughtsMayBeAbsent,
 				AnthropicCacheFieldsMayBeAbsent: profile.llm.anthropicCacheFieldsMayBeAbsent,
+			}
+		}
+		if profile.modelMapping != nil {
+			resourceRoute.ModelMapping = &relaycontrolapi.RuntimeModelMapping{
+				PublishedModelKey:   profile.modelMapping.publishedModelKey,
+				UpstreamModelKey:    profile.modelMapping.upstreamModelKey,
+				ClientRuntimePath:   profile.modelMapping.clientRuntimePath,
+				UpstreamRuntimePath: profile.modelMapping.upstreamRuntimePath,
 			}
 		}
 		if profile.image != nil {

@@ -150,6 +150,9 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		if !exists {
 			return nil, ErrInvalidControl
 		}
+		if value.ModelMapping != nil && !allowedRoutePath(value.ModelMapping.UpstreamRuntimePath, route.AllowedPathPrefixes) {
+			return nil, ErrInvalidControl
+		}
 		if value.ResourceKind == relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION {
 			_, postOnly := route.AllowedMethods[http.MethodPost]
 			if !postOnly || len(route.AllowedMethods) != 1 || route.TransportPolicy != relaycontrolapi.HTTPREQUESTRESPONSE ||
@@ -174,12 +177,41 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 			copyProfile.AllowedSizes = append([]string(nil), value.ImageProfile.AllowedSizes...)
 			image = &copyProfile
 		}
+		var modelMapping *relaycontrolapi.RuntimeModelMapping
+		if value.ModelMapping != nil {
+			copyMapping := *value.ModelMapping
+			modelMapping = &copyMapping
+		}
 		state.Resources[value.ResourceId] = Resource{
 			ID: value.ResourceId, RouteID: value.RuntimeRouteId, Kind: value.ResourceKind,
-			ClientProtocol: value.ClientProtocol, AudioProfile: audio, LLMProfile: llm, ImageProfile: image,
+			ClientProtocol: value.ClientProtocol, AudioProfile: audio, LLMProfile: llm, ModelMapping: modelMapping, ImageProfile: image,
 		}
 	}
 	return state, nil
+}
+
+func validModelMapping(resource relaycontrolapi.ResourceRoute, mapping relaycontrolapi.RuntimeModelMapping) bool {
+	if strings.TrimSpace(mapping.PublishedModelKey) != mapping.PublishedModelKey || mapping.PublishedModelKey == "" || len(mapping.PublishedModelKey) > 256 || strings.TrimSpace(mapping.UpstreamModelKey) != mapping.UpstreamModelKey || mapping.UpstreamModelKey == "" || len(mapping.UpstreamModelKey) > 256 ||
+		!safePath(mapping.ClientRuntimePath) || !safePath(mapping.UpstreamRuntimePath) {
+		return false
+	}
+	switch resource.ClientProtocol {
+	case relaycontrolapi.GOOGLEGENERATECONTENT:
+		return strings.Contains(mapping.ClientRuntimePath, "/models/"+mapping.PublishedModelKey+":") && strings.Contains(mapping.UpstreamRuntimePath, "/models/"+mapping.UpstreamModelKey+":")
+	case relaycontrolapi.OPENAICHATCOMPLETIONS, relaycontrolapi.OPENAIRESPONSES, relaycontrolapi.ANTHROPICMESSAGES:
+		return mapping.ClientRuntimePath == mapping.UpstreamRuntimePath
+	default:
+		return false
+	}
+}
+
+func allowedRoutePath(path string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if path == prefix || strings.HasSuffix(prefix, "/") && strings.HasPrefix(path, prefix) || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
@@ -190,7 +222,10 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 	protocol := string(value.ClientProtocol)
 	switch value.ResourceKind {
 	case relaycontrolapi.ResourceRouteResourceKindMODEL:
-		if kind != platformid.Model || value.AudioProfile != nil || value.LlmProfile == nil || value.ImageProfile != nil {
+		// modelMapping was added after the initial relay-control contract. A nil
+		// mapping keeps an already-applied legacy control state pass-through; all
+		// controls compiled by the current Hub include the explicit mapping.
+		if kind != platformid.Model || value.AudioProfile != nil || value.LlmProfile == nil || value.ImageProfile != nil || value.ModelMapping != nil && !validModelMapping(value, *value.ModelMapping) {
 			return false
 		}
 		switch protocol {
@@ -198,7 +233,7 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 			return true
 		}
 	case relaycontrolapi.ResourceRouteResourceKindTTS:
-		if kind != platformid.TTS || value.AudioProfile != nil || value.LlmProfile != nil || value.ImageProfile != nil {
+		if kind != platformid.TTS || value.AudioProfile != nil || value.LlmProfile != nil || value.ModelMapping != nil || value.ImageProfile != nil {
 			return false
 		}
 		switch protocol {
@@ -206,7 +241,7 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 			return true
 		}
 	case relaycontrolapi.ResourceRouteResourceKindASR:
-		if kind != platformid.ASR || value.LlmProfile != nil || value.ImageProfile != nil || value.AudioProfile == nil || value.AudioProfile.Channels != 1 ||
+		if kind != platformid.ASR || value.LlmProfile != nil || value.ModelMapping != nil || value.ImageProfile != nil || value.AudioProfile == nil || value.AudioProfile.Channels != 1 ||
 			!value.AudioProfile.Encoding.Valid() || len(value.AudioProfile.SampleRates) == 0 {
 			return false
 		}
@@ -222,9 +257,9 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 			return true
 		}
 	case relaycontrolapi.ResourceRouteResourceKindMCP:
-		return kind == platformid.MCP && protocol == "MCP_STREAMABLE_HTTP" && value.AudioProfile == nil && value.LlmProfile == nil && value.ImageProfile == nil
+		return kind == platformid.MCP && protocol == "MCP_STREAMABLE_HTTP" && value.AudioProfile == nil && value.LlmProfile == nil && value.ModelMapping == nil && value.ImageProfile == nil
 	case relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION:
-		if kind != platformid.ImageGeneration || protocol != "OPENAI_IMAGES_GENERATIONS" && protocol != "DASHSCOPE_MULTIMODAL_GENERATION" || value.AudioProfile != nil || value.LlmProfile != nil || value.ImageProfile == nil ||
+		if kind != platformid.ImageGeneration || protocol != "OPENAI_IMAGES_GENERATIONS" && protocol != "DASHSCOPE_MULTIMODAL_GENERATION" || value.AudioProfile != nil || value.LlmProfile != nil || value.ModelMapping != nil || value.ImageProfile == nil ||
 			value.ImageProfile.MaxImagesPerRequest < 1 || value.ImageProfile.MaxImagesPerRequest > 6 || len(value.ImageProfile.AllowedSizes) == 0 {
 			return false
 		}

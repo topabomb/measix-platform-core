@@ -124,6 +124,26 @@ paths:
               $ref: '#/components/schemas/CreateUserRequest'
       parameters:
       - *id001
+  /api/admin/v1/session:change-password:
+    post:
+      operationId: changeOwnPassword
+      responses:
+        '204':
+          description: Password changed; all Admin Web sessions were revoked and the current cookie was cleared.
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeOwnPasswordRequest'
+      parameters:
+      - *id001
   /api/admin/v1/users/{userId}:
     get:
       operationId: getUser
@@ -1930,9 +1950,16 @@ components:
         displayName:
           type: string
           minLength: 1
+        publishedModelKey:
+          type: string
+          maxLength: 128
+          pattern: '^$|^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+          description: Optional enterprise-published model selector. Missing or blank draft values are normalized to upstreamModelKey and only the effective published value is projected to clients.
         upstreamModelKey:
           type: string
           minLength: 1
+          maxLength: 256
+          description: Provider/Adapter model selector retained inside Core and translated by Runtime Relay for MODEL resources.
         runtimePath:
           type: string
           pattern: ^/[^?#]*$
@@ -2486,6 +2513,26 @@ components:
       - newPassword
       properties:
         newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+    ChangeOwnPasswordRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - currentPassword
+      - newPassword
+      - confirmPassword
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+          maxLength: 128
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+        confirmPassword:
           type: string
           minLength: 12
           maxLength: 128

@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import { ApiProblem } from '../api/client'
 import { useSessionStore } from '../stores/session'
+import OrchelmBrand from '../components/OrchelmBrand.vue'
 
 const { t: $t } = useI18n()
 const username = ref('')
@@ -59,10 +60,10 @@ async function submit() {
       <q-page class="row items-center justify-center q-pa-xs">
         <q-card flat bordered style="width: 100%; max-width: 420px">
           <q-card-section>
-            <div class="text-h5 text-weight-bold">{{ $t('login.title') }}</div>
-            <div class="text-body2 text-grey-7 q-mt-xs">{{ $t('login.subtitle') }}</div>
+            <OrchelmBrand subtitle />
           </q-card-section>
           <q-card-section class="q-gutter-xs">
+            <q-banner v-if="route.query.passwordChanged === '1'" dense class="bg-green-1 text-positive rounded-borders" data-cy="password-changed-message">{{ $t('account.changedSignInAgain') }}</q-banner>
             <ProblemBanner :error="error" />
             <q-input v-model="username" outlined :label="$t('login.username')" autocomplete="username" data-cy="login-username" @keyup.enter="submit" />
             <q-input v-model="password" outlined :type="showPassword ? 'text' : 'password'" :label="$t('login.password')" autocomplete="current-password" data-cy="login-password" @keyup.enter="submit">

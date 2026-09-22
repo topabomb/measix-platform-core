@@ -172,6 +172,18 @@ const upstreamStatus = (id?: string) => up(id)?.status
 const selectedModel = computed(() =>
   draft.localContent?.models.find((m) => m.modelId === selectedResourceId.value),
 )
+function effectivePublishedModelKey(model: ModelDefinition): string {
+  return model.publishedModelKey?.trim() || model.upstreamModelKey.trim()
+}
+function modelProtocol(model: ModelDefinition): ProviderDefinition['clientProtocol'] | undefined {
+  return draft.localContent?.providers.find(provider => provider.providerId === model.providerId)?.clientProtocol
+}
+function clientRuntimePath(model: ModelDefinition): string {
+  if (modelProtocol(model) !== 'GOOGLE_GENERATE_CONTENT') return model.runtimePath
+  const separator = model.runtimePath.lastIndexOf(':')
+  if (separator < 0) return model.runtimePath
+  return `/v1beta/models/${effectivePublishedModelKey(model)}${model.runtimePath.slice(separator)}`
+}
 const selectedImageGeneration = computed(() =>
   draft.localContent?.imageGenerators?.find(item => item.imageId === selectedResourceId.value),
 )
@@ -810,7 +822,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     <q-item-label>{{ model.displayName }}</q-item-label>
                     <q-item-label caption>
                       <q-badge v-for="m in model.inputModalities" :key="m" dense color="primary" :label="$t(`resources.model.${m.toLowerCase()}`)" class="q-mr-xs" />
-                      · {{ model.upstreamModelKey || $t('resources.model.noKey') }}
+                      · {{ effectivePublishedModelKey(model) || $t('resources.model.noKey') }}
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
@@ -858,11 +870,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.model.capability') }}</div>
                 <div class="row q-gutter-xs q-mb-xs">
-                  <div class="col">
-                    <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.model.upstreamModelKey') }}</div>
-                    <q-input v-model="selectedModel.upstreamModelKey" dense outlined :label="$t('resources.model.upstreamModelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" data-cy="model-upstream-key" data-field="upstreamModelKey" @update:model-value="draft.markDirty()" />
-                  </div>
+                  <q-input v-model="selectedModel.publishedModelKey" dense outlined clearable :label="$t('resources.model.publishedModelKey')" :hint="$t('resources.model.publishedModelKeyHint')" class="col" data-cy="model-published-key" data-field="publishedModelKey" @update:model-value="draft.markDirty()" />
+                  <q-input v-model="selectedModel.upstreamModelKey" dense outlined :label="$t('resources.model.upstreamModelKey')" :hint="$t('resources.model.upstreamModelKeyHint')" class="col" data-cy="model-upstream-key" data-field="upstreamModelKey" @update:model-value="draft.markDirty()" />
                 </div>
+                <q-banner dense class="bg-purple-1 text-purple-10 rounded-borders q-mb-xs">
+                  <div class="text-caption">{{ $t('resources.model.mappingSummary', { published: effectivePublishedModelKey(selectedModel), upstream: selectedModel.upstreamModelKey }) }}</div>
+                  <div v-if="modelProtocol(selectedModel) === 'GOOGLE_GENERATE_CONTENT'" class="text-caption">{{ $t('resources.model.pathMappingSummary', { client: clientRuntimePath(selectedModel), upstream: selectedModel.runtimePath }) }}</div>
+                </q-banner>
                 <div class="row q-gutter-xs">
                   <q-select v-model="selectedModel.inputModalities" dense outlined :label="$t('resources.model.inputModalities')" multiple :options="INPUT_MODS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" data-cy="model-input-modalities" data-field="inputModalities" emit-value map-options @update:model-value="draft.markDirty()" />
                   <q-select v-model="selectedModel.outputModalities" dense outlined :label="$t('resources.model.outputModalities')" multiple :options="OUTPUT_MODS.map(value => ({ label: $t(`resources.model.${value.toLowerCase()}`), value }))" class="col" data-field="outputModalities" emit-value map-options @update:model-value="draft.markDirty()" />

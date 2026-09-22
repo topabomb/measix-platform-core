@@ -138,6 +138,30 @@ func (h *adminHandler) LogoutAdmin(w http.ResponseWriter, r *http.Request, param
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *adminHandler) ChangeOwnPassword(w http.ResponseWriter, r *http.Request, params adminapi.ChangeOwnPasswordParams) {
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	var request adminapi.ChangeOwnPasswordRequest
+	if decodeStrictJSON(r, &request) != nil {
+		writeProblem(w, http.StatusBadRequest, "invalid_request", "Password change request is invalid")
+		return
+	}
+	if request.NewPassword != request.ConfirmPassword {
+		writeProblem(w, http.StatusBadRequest, "password_confirmation_mismatch", "New password confirmation does not match")
+		return
+	}
+	if err := h.identity.ChangeOwnPassword(r.Context(), admin.UserID, request.CurrentPassword, request.NewPassword); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: "/", MaxAge: -1, Secure: strings.HasPrefix(h.identity.PublicOrigin(), "https://"), HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *adminHandler) ListUsers(w http.ResponseWriter, r *http.Request, params adminapi.ListUsersParams) {
 	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
@@ -534,6 +558,8 @@ func writeIdentityError(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusConflict, "refresh_conflict", "Refresh conflict")
 	case errors.Is(err, identity.ErrCredential):
 		writeProblem(w, http.StatusUnauthorized, "invalid_credential", "Invalid credential")
+	case errors.Is(err, identity.ErrCurrentPassword):
+		writeProblem(w, http.StatusForbidden, "invalid_current_password", "Current password is incorrect")
 	case errors.Is(err, identity.ErrNotAuthorized):
 		writeProblem(w, http.StatusUnauthorized, "unauthenticated", "Unauthenticated")
 	case errors.Is(err, identity.ErrNotFound):

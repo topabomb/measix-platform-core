@@ -142,7 +142,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		state: state, claims: claims, resourceID: resourceID, interactionID: interactionID,
 		resource: resource, route: route, upstream: upstream, admittedAt: admittedAt, requestID: requestID,
 	}
-	if _, allowed := route.AllowedMethods[r.Method]; !allowed || !allowedPath(runtimePath, route.AllowedPathPrefixes) {
+	_, methodAllowed := route.AllowedMethods[r.Method]
+	pathAllowed := allowedPath(runtimePath, route.AllowedPathPrefixes)
+	if resource.ModelMapping != nil {
+		pathAllowed = runtimePath == resource.ModelMapping.ClientRuntimePath
+	}
+	if !methodAllowed || !pathAllowed {
 		writeProblem(observer, http.StatusForbidden, "resource_not_allowed", "Route policy denied request", requestID, nil, false)
 		return
 	}
@@ -159,6 +164,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	maxRequestBytes := int64(state.OperationalLimits.MaxRequestBytes)
 	if r.ContentLength > maxRequestBytes {
 		writeProblem(observer, http.StatusRequestEntityTooLarge, "request_too_large", "Request too large", requestID, nil, false)
+		return
+	}
+	outboundRuntimePath, err := prepareModelRequest(resource, r, runtimePath, maxRequestBytes)
+	if err != nil {
+		switch {
+		case errors.Is(err, errObservedRequestTooLarge):
+			writeProblem(observer, http.StatusRequestEntityTooLarge, "request_too_large", "Request too large", requestID, nil, false)
+		case errors.Is(err, errUnsupportedContentEncoding):
+			writeProblem(observer, http.StatusBadRequest, "unsupported_content_encoding", "Compressed model requests are not supported", requestID, nil, false)
+		case errors.Is(err, errInvalidModelSelector):
+			writeProblem(observer, http.StatusBadRequest, "invalid_model_selector", "Invalid model selector", requestID, nil, false)
+		default:
+			writeProblem(observer, http.StatusBadRequest, "invalid_model_request", "Invalid model request", requestID, nil, false)
+		}
 		return
 	}
 	observation, err := prepareUsageObservation(resource, r, runtimePath, maxRequestBytes)
@@ -226,7 +245,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = h.recordSettlement(observer, body, observation, attr, true, result.UpstreamStatus, result.ErrorClass)
 	}()
-	h.serveProxy(observer, r, route, upstream, runtimePath, requestID, result, maxRequestBytes)
+	h.serveProxy(observer, r, route, upstream, outboundRuntimePath, requestID, result, maxRequestBytes)
 }
 
 func lifecycleHash(requestID, action string, revision int, occurredAt time.Time) string {

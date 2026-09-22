@@ -320,8 +320,33 @@ components:
           $ref: '#/components/schemas/RuntimeAudioProfile'
         llmProfile:
           $ref: '#/components/schemas/RuntimeLlmProfile'
+        modelMapping:
+          $ref: '#/components/schemas/RuntimeModelMapping'
         imageProfile:
           $ref: '#/components/schemas/RuntimeImageProfile'
+    RuntimeModelMapping:
+      type: object
+      additionalProperties: false
+      required:
+      - publishedModelKey
+      - upstreamModelKey
+      - clientRuntimePath
+      - upstreamRuntimePath
+      properties:
+        publishedModelKey:
+          type: string
+          minLength: 1
+          maxLength: 256
+        upstreamModelKey:
+          type: string
+          minLength: 1
+          maxLength: 256
+        clientRuntimePath:
+          type: string
+          pattern: ^/[^?#]*$
+        upstreamRuntimePath:
+          type: string
+          pattern: ^/[^?#]*$
     RuntimeImageProfile:
       type: object
       additionalProperties: false

@@ -191,6 +191,43 @@ func TestAdminSessionLifetimeAndPasswordResetRevocation(t *testing.T) {
 	}
 }
 
+func TestAdminChangesOwnPasswordWithCurrentCredential(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newService(t)
+	boot, err := s.Bootstrap(ctx, "Example Corp", "admin", "Admin", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := s.LoginAdmin(ctx, "admin", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.LoginAdmin(ctx, "admin", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ChangeOwnPassword(ctx, boot.AdminUserID, "wrong current password", "new correct horse battery staple"); !errors.Is(err, identity.ErrCurrentPassword) {
+		t.Fatalf("wrong current password error=%v", err)
+	}
+	if _, err := s.LoginAdmin(ctx, "admin", "correct horse battery staple"); err != nil {
+		t.Fatalf("wrong current password changed credential: %v", err)
+	}
+	if err := s.ChangeOwnPassword(ctx, boot.AdminUserID, "correct horse battery staple", "new correct horse battery staple"); err != nil {
+		t.Fatal(err)
+	}
+	for _, login := range []identity.AdminSessionResult{first, second} {
+		if _, _, err := s.AuthenticateAdmin(ctx, login.CookieSecret, "", false); !errors.Is(err, identity.ErrNotAuthorized) {
+			t.Fatalf("password change left Admin session active: %v", err)
+		}
+	}
+	if _, err := s.LoginAdmin(ctx, "admin", "correct horse battery staple"); !errors.Is(err, identity.ErrCredential) {
+		t.Fatalf("old password login error=%v", err)
+	}
+	if _, err := s.LoginAdmin(ctx, "admin", "new correct horse battery staple"); err != nil {
+		t.Fatalf("new password login failed: %v", err)
+	}
+}
+
 func TestAdminLoginProgressiveAndSourceThrottling(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newService(t)

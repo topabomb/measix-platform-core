@@ -6,7 +6,17 @@
 
 Admin 产品壳已按官网统一为“枢策 Orchelm · 企业智能体治理与协同平台”和紫色品牌体系，保留原有紧凑全宽工作台及宽窄屏同一状态。登录管理员可在桌面或移动账号菜单验证当前密码并修改自己的密码；成功后服务端原子撤销该账号全部 Admin Web Session，页面清理本地会话并要求使用新密码重新登录。明确错误使用稳定 Problem code，并由中英文 locale 给出面向用户的提示。
 
+资源校验仍以 Hub 为唯一业务权威，但 Admin 不再把内部英文 message 直接当作用户提示：稳定 issue code/path 保留诊断，已知 issue 由中英文 locale 给出明确文案，并按 resourceKind/resourceId/field 导航到对应分区、对象和输入控件；Assistant、Starter、Memory Seed、Policy 及各资源编辑器使用同一 issue 呈现。Hub 的运行路径校验同时拒绝 query、fragment、反斜杠、编码斜杠、非规范路径和遍历段，上游查询异常不向浏览器泄露底层错误文本。
+
 Model 草稿新增可选 `publishedModelKey`。留空按 `upstreamModelKey` 下发；配置别名时，Client Snapshot 仍使用既有字段承载有效下发标识，Android 契约形状和版本不变，也不会获知真实上游 key。Hub Runtime Control 为四种模型协议生成显式双向映射；Relay 对 OpenAI Chat/Responses/Anthropic 只替换顶层 JSON `model`，对 Google 只替换精确模型路径，并在转发前拒绝错误别名、重复字段、非 JSON/压缩请求或不匹配路径。数据库无需新增表或列：草稿与不可变 Release 内容原本就是 JSON 聚合，旧内容缺字段时由编译器执行确定性回退。
+
+## 非阻断计量与可审计请求明细（2026-09-22）
+
+Runtime 已移除“计量生命周期积压达到固定数量即停止新请求”的错误耦合。只有 Hub 权威判定相应能力额度耗尽时才在转发前拒绝；预算准入不可用、Relay 计量落盘/解析失败和待核对积压只进入 degraded/诊断并继续已通过鉴权、control、资源和安全检查的业务请求。上游 HTTP 400 和未取得任何响应头的连接失败按当前已验证的无供应商语义消耗结果自动收口；客户端取消、超时及响应头后的断流仍可能产生上游消耗，缺失指标保留 UNKNOWN/PARTIAL 供管理员核对。人工确认只释放不确定预占，保留已观测用量、原始不完整事实和原因审计，不把未知改成零，也不承担“恢复服务”职责。
+
+Admin 的请求清单和待核对清单现以资源显示名、用户、设备、本地时间与结果状态为主信息，并复用同一请求详情查看 correlation、协议、转发/上游结果、耗时、流量、语义计量、完整度、结算和预算上下文；待核对行可在详情上下文中执行带原因的确认。Portal 同步采用枢策 Orchelm 品牌与紫色体系，用中文能力/协议/周期/状态和人可读单位呈现当前额度、历史分析、趋势、资源分布及请求列表，紧凑摘要仍可展开精确值和单请求结算上下文。
+
+生产预览 `0.2.0-preview.17` 由 Architecture `769347e`、Core `443d41e`、Portal `704c370` 与已部署 Android `b3bfda0` 组成；公开 live/ready、Portal HTML/JS/CSS/Logo、Hub/Relay 进程及空 stderr 已核对。无有效 Portal Session 的浏览器只验证了新品牌与会话失效页，不能据此宣称生产环境内的本人用量页已完成交互验收。
 
 ## S0.2 生产用量与用户额度闭环（2026-09-20，当前状态）
 
@@ -92,10 +102,10 @@ Android 集成导出只含客户端实际消费的内容：可执行 Client Open
 | --- | --- |
 | Core backend | `go test ./... -count=1` 通过；`go vet ./...` 通过 |
 | Core system smoke | `go test -tags=smoke ./test/system/scenarios/ -count=1 -timeout 5m` 通过；真实 Hub/Relay/SQLite + deterministic Adapter，覆盖同步 Image Generation 透明转发 |
-| Core Admin | 30 个 Vitest 文件、178 项测试通过；`vue-tsc --noEmit`、E2E TypeScript 检查与 Quasar production build 通过 |
+| Core Admin | 33 个 Vitest 文件、197 项测试通过；`vue-tsc --noEmit` 与 Quasar production build 通过 |
 | Core browser | `node scripts/e2e-harness.mjs` 使用隔离 SQLite、真实 Hub/Relay、production SPA 与 Chromium，通过模板创建/指派/实时传播/覆盖清除、Image Generation 配置发布、五类 runtime traffic、usage/system 和 topology security |
 | Current schema | 空库应用唯一一份 SQL 的 Go 测试通过（应用、业务读写、重复初始化、失败事务回滚） |
-| Portal | 11 个 Vitest 文件、87 项测试、typecheck、production build、format check 通过；真实 Hub + production Portal Chromium 生命周期及 Image Generation/DashScope 组合筛选通过 |
+| Portal | 12 个 Vitest 文件、93 项测试、typecheck、production build、format check 通过；`e2e/usage-readable.spec.ts` 的 production UI 可读性 E2E 通过；历史真实 Hub + production Portal Chromium 生命周期及 Image Generation/DashScope 组合筛选证据仍保留，但未在本次文档同步中重跑 |
 | Android | `test assembleDebug lintDebug assembleRelease` 通过；Pixel 10 Pro Fold Android 17 上 `connectedDebugAndroidTest` 通过；另以 opt-in live 用例完成 Core Relay → DashScope → 安全下载 → GeneratedMediaStore 真链路 |
 
 Windows 当前 Go 环境未启用 CGO，`go test -race` 在测试启动前被 Go 拒绝。历史 candidate system、Core/Admin 和浏览器证据不自动适用于本工作树最新候选；交付时必须记录本轮重跑结果。旧 Portal 双构建、本地包和 local-read 测试结果不再是当前证据。付费模型/语音供应商 qualification、独立 clean-source rebuild/replay 与最终 Freeze 仍需独立证明。Firecrawl 官方免密钥 MCP 的真实调用不能替代其他供应商证据。

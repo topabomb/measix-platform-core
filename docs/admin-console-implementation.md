@@ -72,7 +72,7 @@ css/          thin MEASIX semantic styling
 
 企业地址的页面预校验与 Hub 写边界遵循同一 Control Protocol host 语义：DNS host 在线协议中使用 ASCII/IDNA 形式，拒绝下划线、尾点和非法 label；浏览器可将用户输入的国际化域名转为 Punycode 后提交，Hub 不接受未编码 Unicode host。
 
-Usage 顶层只常驻时间、用户和上游等高频条件，其余资源类型、状态、完整性、协议、额度健康与精确资源 ID 收进带生效数量的“更多筛选”；汇总、请求、核对、定价保持独立页签。用户额度卡片固定覆盖 MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力；图片仅允许 REQUESTS/REQUESTED_IMAGES。卡片把来源/模式/状态/修订/当前活动请求保留为紧凑摘要，只在存在累计用量或有限规则时展开对应内容，审计仍按需加载。待核对项不计入活动并发且不得阻断 Runtime；列表直接展示资源、协议、是否转发、HTTP/上游状态、错误类别、完整性和原因，管理员只需填写核对说明并确认解除未确认占用，不提供把未知用量当作精确零值入账的动作。一级 `Budget Templates` 在 Users 与 Resources 之间，与用户额度复用 `BudgetRuleEditor`；每个用户最多一个 live-linked 模板，用户显式能力覆盖优先，清除覆盖即回到模板/部署默认。模板身份和指派只在 Admin 展示，不投影到 Client/Portal/Snapshot/Runtime。额度上限输入允许精确整数或简单十进制缩写 `k`/`M`（如 `100k`），保存前统一归一化为 API 和持久层已有的精确十进制整数字符串；缩写不进入协议或数据库。定价只有本地规则相对已加载 revision 发生变化时才能保存。
+Usage 顶层只常驻时间、用户和上游等高频条件，其余资源类型、状态、完整性、协议、额度健康与精确资源 ID 收进带生效数量的“更多筛选”；汇总、请求、核对、定价保持独立页签。用户额度卡片固定覆盖 MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力；图片仅允许 REQUESTS/REQUESTED_IMAGES。卡片把来源/模式/状态/修订/当前活动请求保留为紧凑摘要，只在存在累计用量或有限规则时展开对应内容，审计仍按需加载。`UsageRequestList.vue` 与待核对面板都以资源显示名、用户、设备、本地时间和结果为行摘要，并复用 `UsageRequestDetail.vue` 展示安全的 correlation、协议、转发/上游结果、耗时、流量、语义计量、完整度、结算与预算上下文；稳定 ID 不再代替人可读主信息。待核对项不计入活动并发且不得阻断 Runtime；管理员只需填写核对说明并确认解除未确认占用，不提供把未知用量当作精确零值入账的动作。一级 `Budget Templates` 在 Users 与 Resources 之间，与用户额度复用 `BudgetRuleEditor`；每个用户最多一个 live-linked 模板，用户显式能力覆盖优先，清除覆盖即回到模板/部署默认。模板身份和指派只在 Admin 展示，不投影到 Client/Portal/Snapshot/Runtime。额度上限输入允许精确整数或简单十进制缩写 `k`/`M`（如 `100k`），保存前统一归一化为 API 和持久层已有的精确十进制整数字符串；缩写不进入协议或数据库。定价只有本地规则相对已加载 revision 发生变化时才能保存。
 
 当前实现已有 App Shell、route/navigation registry、PageHeader/status/health primitives、Users/BudgetTemplates/Resources/Upstreams/Releases/Usage/System/EnterpriseUpdates 等 route-level pages。产品壳、登录页和浏览器标题统一使用“枢策 Orchelm · 企业智能体治理与协同平台”，品牌主色与官网保持同一紫色体系；仍维持紧凑全宽的数据界面和同一套宽窄屏业务状态。
 
@@ -87,7 +87,7 @@ Usage 顶层只常驻时间、用户和上游等高频条件，其余资源类�
 - 202 Accepted 不等于 ACTIVE；Activation 必须可刷新恢复；
 - Apply/Publish retry/recovery 在现有 ActivationStore 中按 kind + target/payload scope 重用同一 command Idempotency-Key；响应未确定时重试不清空 key，终态后的新命令另建 key。当前内存状态不提供跨浏览器重启的 pending-command journal；
 - 409 stale revision 必须保留可恢复的 local edits，而不是静默覆盖；
-- validation 以 Hub 返回为最终权威，前端可做即时提示但不能维护第二套业务规则；
+- validation 以 Hub 返回为最终权威，前端可做即时提示但不能维护第二套业务规则；明确 issue 以稳定 code/path 决定定位，在中英文 locale 中给出可行动的字段说明，原始 code 仅作为诊断补充；
 - Snapshot Preview 必须消费 Hub canonical compiler 的 projection；Review 的变更计数由 Hub 将保存的 Draft 与最新 immutable Release 比较后返回，浏览器不得把当前 Draft 克隆成所谓发布基线。
 
 ## 4. 实现范围与后续验证

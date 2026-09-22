@@ -191,7 +191,7 @@ Admin 在 UsersPage 用户详情增设“用量与额度”：MODEL/TTS/ASR/MCP/
 
 同一详情提供正式“删除用户”操作：操作者必须逐字输入当前用户名并填写原因，服务端再次核验；删除状态机先 deny 新的 Client/Runtime/refresh 请求，等待或拒绝活动请求，再以单一可恢复事务清除用户、设备、Session、配置、预算、用量、Feed/Portal 与审计外的用户私有事实。审计记录使用不可反查的主体摘要；旧 access/runtime credential 及 refresh credential 以不可逆摘要 tombstone 识别并稳定返回 `enterprise_identity_deleted`。删除失败不得呈现成功，重试保持幂等，Admin 显示最终 COMPLETED/FAILED 与可操作诊断。
 
-UsagePage 提供用户搜索/汇总、协议及资源分布、按日趋势；复用 UsageRequestList 的分页和详情，不另造第二套个人明细逻辑。详情含调用次数、token 等语义、完整度、预算周期和失败原因。常用数值本地化为万 token、字符、分钟；精确值在详情可查。
+UsagePage 提供用户搜索/汇总、协议及资源分布、按日趋势；请求清单与待核对清单以资源显示名、用户、设备、本地时间和结果为摘要，并复用 `UsageRequestDetail`，不另造两套详情逻辑。详情含 correlation、协议、转发/上游结果、耗时、流量、token 等语义、完整度、结算、预算周期和失败原因；待核对详情在同一上下文中追加已观测量、未确认占用和处理入口。常用数值本地化为万 token、字符、分钟；精确值在详情可查。
 
 Portal 增加首页额度摘要及“我的用量与额度”，与 Admin 同源服务计算但为不同权限 DTO。本人可以查看额度、个人趋势、资源分布和分页调用明细。无预算仍显示使用量；累计显示不自动恢复；额度恢复时间来自 Hub，页面不推算自己的时区边界。
 

@@ -102,6 +102,8 @@ Normal Relay shutdown attempts one final usage flush, capped at two seconds, and
 
 Runtime response cleanup records usage even when ReverseProxy aborts a mid-stream response. Such facts preserve the already-sent HTTP status and captured control/resource attribution, with `CLIENT_CANCELLED`, `UPSTREAM_TIMEOUT` or `UPSTREAM_UNAVAILABLE` distinguishing the failure. An upstream 200 alone does not prove a stream completed; inspect its error classification.
 
+An upstream HTTP 400, or a connection failure before any upstream response headers arrive, is automatically settled as the currently verified no-semantic-consumption outcome and does not create a manual reconciliation item. Client cancellation, timeout and interruption after response headers may have consumed provider resources; missing meters remain `UNKNOWN`/`PARTIAL` and stay visible for review. Reconciliation backlog has no request-admission threshold and never blocks Runtime service. The Admin confirmation action releases only the remaining uncertain reservation, preserves observed usage and the incomplete fact, and records the operator reason; it is not a service-recovery action and does not rewrite unknown usage to zero. Use the linked request detail to inspect user, device, resource, protocol, transfer result, error class and meters before confirming.
+
 ## 6. Persistence, backup and restore
 
 Hub owns its control/identity/usage SQLite database. Relay owns its local durable usage spool. Neither reads the other's database. Keep both outside replaceable binary directories; handle SQLite auxiliary files correctly when moving a stopped database.

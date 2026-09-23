@@ -147,6 +147,9 @@ describe('UpstreamsPage', () => {
     expect(JSON.parse(call![1]!.body as string).config.auth).toEqual({
       type: 'BEARER', secretRef: { secretId: secret.secretId, secretVersion: 3 },
     })
+    expect(JSON.parse(call![1]!.body as string).config.timeoutDefaults).toEqual({
+      connectMs: 1000, responseHeaderMs: 60000, idleMs: 30000,
+    })
     wrapper.unmount()
   })
 

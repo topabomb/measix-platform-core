@@ -159,6 +159,7 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 			return nil
 		},
 		ErrorHandler: func(writer http.ResponseWriter, request *http.Request, err error) {
+			var timeoutError net.Error
 			switch {
 			case errors.Is(err, errUpstreamRedirect):
 				result.ErrorClass = "UPSTREAM_PROTOCOL_ERROR"
@@ -166,7 +167,9 @@ func (h *Handler) serveProxy(w http.ResponseWriter, r *http.Request, route contr
 			case errors.Is(err, context.Canceled) || errors.Is(request.Context().Err(), context.Canceled):
 				result.ErrorClass = "CLIENT_CANCELLED"
 				writeProblem(writer, http.StatusBadGateway, "upstream_unavailable", "Upstream request cancelled", requestID, nil, true)
-			case errors.Is(err, context.DeadlineExceeded) || errors.Is(request.Context().Err(), context.DeadlineExceeded):
+			// HTTP/2 response-header timeouts implement net.Error but do not wrap context.DeadlineExceeded.
+			case errors.Is(err, context.DeadlineExceeded) || errors.Is(request.Context().Err(), context.DeadlineExceeded) ||
+				errors.As(err, &timeoutError) && timeoutError.Timeout():
 				result.ErrorClass = "UPSTREAM_TIMEOUT"
 				writeProblem(writer, http.StatusGatewayTimeout, "upstream_timeout", "Upstream timeout", requestID, nil, true)
 			default:

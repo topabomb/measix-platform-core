@@ -86,6 +86,7 @@ const editing = ref(false)
 // Detail dialog
 const detailOpen = ref(false)
 const detailItem = ref<EnterpriseUpdate | null>(null)
+const deletingId = ref<string | null>(null)
 
 const detailHtml = computed(() => {
   if (!detailItem.value) return ''
@@ -219,6 +220,29 @@ async function withdraw(item: EnterpriseUpdate) {
   }
 }
 
+async function deleteUpdate(item: EnterpriseUpdate) {
+  if (!session.csrfToken || deletingId.value) return
+  if (!window.confirm($t('enterpriseUpdates.deleteConfirm', { title: item.title }))) return
+  deletingId.value = item.enterpriseUpdateId
+  error.value = undefined
+  try {
+    await apiFetch<void>(
+      `/api/admin/v1/enterprise-updates/${encodeURIComponent(item.enterpriseUpdateId)}`,
+      { method: 'DELETE' },
+      session.csrfToken,
+    )
+    if (detailItem.value?.enterpriseUpdateId === item.enterpriseUpdateId) {
+      detailOpen.value = false
+      detailItem.value = null
+    }
+    await refresh()
+  } catch (cause) {
+    error.value = cause
+  } finally {
+    deletingId.value = null
+  }
+}
+
 onMounted(refresh)
 onBeforeUnmount(() => {
   if (searchTimer) clearTimeout(searchTimer)
@@ -269,6 +293,7 @@ onBeforeUnmount(() => {
               <q-btn v-if="item.status === 'DRAFT'" outline color="primary" icon="edit" size="sm" @click.stop="openEdit(item)" />
               <q-btn v-if="item.status === 'DRAFT'" outline color="positive" icon="publish" size="sm" :label="$t('enterpriseUpdates.publish')" @click.stop="publish(item)" />
               <q-btn v-if="item.status === 'PUBLISHED'" outline color="warning" icon="unpublished" size="sm" :label="$t('enterpriseUpdates.withdraw')" @click.stop="withdraw(item)" />
+              <q-btn v-if="item.status === 'DRAFT' || item.status === 'WITHDRAWN'" outline color="negative" icon="delete" size="sm" :label="$t('enterpriseUpdates.delete')" :loading="deletingId === item.enterpriseUpdateId" @click.stop="deleteUpdate(item)" />
             </div>
           </q-item-section>
         </q-item>
@@ -348,6 +373,7 @@ onBeforeUnmount(() => {
           <q-btn v-if="detailItem?.status === 'DRAFT'" outline color="primary" icon="edit" :label="$t('common.edit')" @click="editOpen = true; openEdit(detailItem!); detailOpen = false" />
           <q-btn v-if="detailItem?.status === 'DRAFT'" outline color="positive" icon="publish" :label="$t('enterpriseUpdates.publish')" @click="publish(detailItem!); detailOpen = false" />
           <q-btn v-if="detailItem?.status === 'PUBLISHED'" outline color="warning" icon="unpublished" :label="$t('enterpriseUpdates.withdraw')" @click="withdraw(detailItem!); detailOpen = false" />
+          <q-btn v-if="detailItem?.status === 'DRAFT' || detailItem?.status === 'WITHDRAWN'" outline color="negative" icon="delete" :label="$t('enterpriseUpdates.delete')" :loading="deletingId === detailItem.enterpriseUpdateId" @click="deleteUpdate(detailItem!)" />
         </q-card-actions>
       </q-card>
       </template>

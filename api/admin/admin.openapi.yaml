@@ -1701,6 +1701,23 @@ paths:
       parameters:
       - *id010
       - *id001
+    delete:
+      operationId: deleteEnterpriseUpdate
+      description: Permanently delete a DRAFT or WITHDRAWN update. PUBLISHED updates must be withdrawn first.
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id010
+      - *id001
   /api/admin/v1/enterprise-updates/{enterpriseUpdateId}:publish:
     post:
       operationId: publishEnterpriseUpdate

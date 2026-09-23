@@ -163,6 +163,30 @@ func (s *Service) Update(ctx context.Context, id, title, content, contentFormat,
 	return toView(updated), nil
 }
 
+// Delete removes only content that is already absent from the public Feed.
+// The status predicate is part of the DELETE statement so a concurrent publish
+// cannot turn a stale Admin view into deletion of a published update.
+func (s *Service) Delete(ctx context.Context, id string) error {
+	deleted, err := s.Client.EnterpriseUpdate.Delete().Where(
+		enterpriseupdate.IDEQ(id),
+		enterpriseupdate.StatusIn("DRAFT", "WITHDRAWN"),
+	).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	if deleted != 0 {
+		return nil
+	}
+	_, err = s.Client.EnterpriseUpdate.Get(ctx, id)
+	if ent.IsNotFound(err) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	return ErrInvalidStatus
+}
+
 func (s *Service) Publish(ctx context.Context, id string) (UpdateView, error) {
 	return s.transition(ctx, id, "DRAFT", "PUBLISHED")
 }

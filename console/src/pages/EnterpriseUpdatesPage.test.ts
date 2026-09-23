@@ -79,4 +79,33 @@ describe('EnterpriseUpdatesPage', () => {
     expect(wrapper.get('[data-cy="enterprise-update-detail"]').text()).toContain('Published')
     wrapper.unmount()
   })
+
+  it('offers deletion only for drafts and withdrawn updates and refreshes after confirmation', async () => {
+    const items = ['DRAFT', 'PUBLISHED', 'WITHDRAWN'].map((status, index) => ({
+      enterpriseUpdateId: `eup_${index}`, title: `${status} title`, content: 'Body',
+      contentFormat: 'PLAIN', category: 'NOTICE', severity: 'INFO', status,
+      createdAt: '2026-09-18T00:00:00Z',
+    }))
+    const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (_path, init) => {
+      if (init?.method === 'DELETE') {
+        items.splice(items.findIndex(item => item.enterpriseUpdateId === 'eup_2'), 1)
+        return undefined
+      }
+      return { items, feedRevision: 2 }
+    })
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const wrapper = mountUpdates()
+    await flushPromises()
+    const row = (status: string) => wrapper.findAllComponents(QItem).find(item => item.text().includes(`${status} title`))!
+    expect(row('DRAFT').findAllComponents(QBtn).some(button => button.props('label') === 'Delete')).toBe(true)
+    expect(row('WITHDRAWN').findAllComponents(QBtn).some(button => button.props('label') === 'Delete')).toBe(true)
+    expect(row('PUBLISHED').findAllComponents(QBtn).some(button => button.props('label') === 'Delete')).toBe(false)
+    await row('WITHDRAWN').findAllComponents(QBtn).find(button => button.props('label') === 'Delete')!.trigger('click')
+    await flushPromises()
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('WITHDRAWN title'))
+    expect(fetchSpy).toHaveBeenCalledWith('/api/admin/v1/enterprise-updates/eup_2', { method: 'DELETE' }, 'test-csrf')
+    expect(fetchSpy.mock.calls.filter(([path]) => String(path).startsWith('/api/admin/v1/enterprise-updates?'))).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('WITHDRAWN title')
+    wrapper.unmount()
+  })
 })

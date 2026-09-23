@@ -801,7 +801,8 @@ export interface paths {
         get: operations["getEnterpriseUpdate"];
         put: operations["updateEnterpriseUpdate"];
         post?: never;
-        delete?: never;
+        /** @description Permanently delete a DRAFT or WITHDRAWN update. PUBLISHED updates must be withdrawn first. */
+        delete: operations["deleteEnterpriseUpdate"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3789,6 +3790,32 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    deleteEnterpriseUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                enterpriseUpdateId: components["schemas"]["EnterpriseUpdateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];

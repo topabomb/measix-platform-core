@@ -2,6 +2,7 @@ package enterpriseupdate_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,58 @@ import (
 	"measix/platform/internal/hub/testutil"
 	"measix/platform/pkg/platformid"
 )
+
+func TestDeleteOnlyInvisibleUpdates(t *testing.T) {
+	svc, ctx, adminID := setupService(t)
+	draft, err := svc.Create(ctx, adminID, "Draft", "Body", "PLAIN", "NOTICE", "INFO")
+	if err != nil {
+		t.Fatal(err)
+	}
+	withdrawn, err := svc.Create(ctx, adminID, "Withdrawn", "Body", "PLAIN", "NOTICE", "INFO")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Publish(ctx, withdrawn.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Withdraw(ctx, withdrawn.ID); err != nil {
+		t.Fatal(err)
+	}
+	published, err := svc.Create(ctx, adminID, "Published", "Body", "PLAIN", "NOTICE", "INFO")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Publish(ctx, published.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	beforeItems, _, beforeFeed, err := svc.ListPublished(ctx, nil, nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Delete(ctx, published.ID); !errors.Is(err, enterpriseupdate.ErrInvalidStatus) {
+		t.Fatalf("published delete: want status conflict, got %v", err)
+	}
+	for _, id := range []string{draft.ID, withdrawn.ID} {
+		if err := svc.Delete(ctx, id); err != nil {
+			t.Fatalf("delete %s: %v", id, err)
+		}
+		if _, err := svc.Get(ctx, id); !errors.Is(err, enterpriseupdate.ErrNotFound) {
+			t.Fatalf("deleted %s must be absent, got %v", id, err)
+		}
+		if err := svc.Delete(ctx, id); !errors.Is(err, enterpriseupdate.ErrNotFound) {
+			t.Fatalf("repeated delete %s: want not found, got %v", id, err)
+		}
+	}
+	afterItems, _, afterFeed, err := svc.ListPublished(ctx, nil, nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(beforeItems) != 1 || len(afterItems) != 1 || afterItems[0].ID != published.ID ||
+		afterFeed.Revision != beforeFeed.Revision || afterFeed.ETag != beforeFeed.ETag {
+		t.Fatalf("delete changed published feed: before=%+v/%+v after=%+v/%+v", beforeItems, beforeFeed, afterItems, afterFeed)
+	}
+}
 
 func setupService(t *testing.T) (*enterpriseupdate.Service, context.Context, string) {
 	t.Helper()

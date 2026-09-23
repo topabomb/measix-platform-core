@@ -922,8 +922,10 @@ export default {
     markdownHint: 'Markdown supported: headings, bold, italic, lists, code blocks, links, blockquotes.',
     publish: 'Publish',
     withdraw: 'Withdraw',
+    delete: 'Delete',
     publishConfirm: 'Publish “{title}”? This will make it visible to all enrolled devices.',
     withdrawConfirm: 'Withdraw “{title}”? It will no longer be visible to devices.',
+    deleteConfirm: 'Permanently delete “{title}”? This cannot be undone.',
     noUpdates: 'No enterprise updates yet.',
     format: { plain: 'Plain text', markdown: 'Formatted text (Markdown)' },
     category: {

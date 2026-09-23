@@ -3128,6 +3128,11 @@ type CreateEnterpriseUpdateParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// DeleteEnterpriseUpdateParams defines parameters for DeleteEnterpriseUpdate.
+type DeleteEnterpriseUpdateParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // UpdateEnterpriseUpdateParams defines parameters for UpdateEnterpriseUpdate.
 type UpdateEnterpriseUpdateParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
@@ -3581,6 +3586,9 @@ type ServerInterface interface {
 	// (POST /api/admin/v1/enterprise-updates)
 	CreateEnterpriseUpdate(w http.ResponseWriter, r *http.Request, params CreateEnterpriseUpdateParams)
 
+	// (DELETE /api/admin/v1/enterprise-updates/{enterpriseUpdateId})
+	DeleteEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId, params DeleteEnterpriseUpdateParams)
+
 	// (GET /api/admin/v1/enterprise-updates/{enterpriseUpdateId})
 	GetEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId)
 
@@ -3826,6 +3834,11 @@ func (_ Unimplemented) ListEnterpriseUpdates(w http.ResponseWriter, r *http.Requ
 
 // (POST /api/admin/v1/enterprise-updates)
 func (_ Unimplemented) CreateEnterpriseUpdate(w http.ResponseWriter, r *http.Request, params CreateEnterpriseUpdateParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/admin/v1/enterprise-updates/{enterpriseUpdateId})
+func (_ Unimplemented) DeleteEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateId EnterpriseUpdateId, params DeleteEnterpriseUpdateParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4967,6 +4980,60 @@ func (siw *ServerInterfaceWrapper) CreateEnterpriseUpdate(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateEnterpriseUpdate(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteEnterpriseUpdate operation middleware
+func (siw *ServerInterfaceWrapper) DeleteEnterpriseUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "enterpriseUpdateId" -------------
+	var enterpriseUpdateId EnterpriseUpdateId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "enterpriseUpdateId", chi.URLParam(r, "enterpriseUpdateId"), &enterpriseUpdateId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enterpriseUpdateId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteEnterpriseUpdateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteEnterpriseUpdate(w, r, enterpriseUpdateId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8259,6 +8326,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/enterprise-updates", wrapper.CreateEnterpriseUpdate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/admin/v1/enterprise-updates/{enterpriseUpdateId}", wrapper.DeleteEnterpriseUpdate)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/enterprise-updates/{enterpriseUpdateId}", wrapper.GetEnterpriseUpdate)

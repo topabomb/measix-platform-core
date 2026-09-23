@@ -25,7 +25,7 @@ test('Admin remembered login works over HTTP with an explicit transport warning'
   await restoredContext.close()
 })
 
-test('ERX-UPD-001/002 Admin update authoring, safe preview, publish and withdraw', async ({ page }) => {
+test('ERX-UPD-001/002 Admin update authoring, safe preview, publish, withdraw and delete', async ({ page }) => {
   await login(page)
   await page.goto('/admin/enterprise-updates')
   const updates = page.locator('[data-cy="enterprise-updates-page"]')
@@ -63,6 +63,21 @@ test('ERX-UPD-001/002 Admin update authoring, safe preview, publish and withdraw
   await expect(row).toContainText('Withdrawn')
   await page.reload()
   await expect(row).toContainText('Withdrawn')
+  page.once('dialog', prompt => prompt.accept())
+  await row.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(row).toHaveCount(0)
+
+  const draftTitle = `Unused draft ${Date.now()}`
+  await updates.getByRole('button', { name: 'Create', exact: true }).click()
+  editor = updates.locator('[data-cy="enterprise-update-editor"]')
+  await editor.getByLabel('Title', { exact: true }).fill(draftTitle)
+  await editor.getByLabel('Content', { exact: true }).fill('Never published')
+  await editor.getByRole('button', { name: 'Create', exact: true }).click()
+  const draftRow = updates.locator('.q-list > .q-item').filter({ hasText: draftTitle })
+  await expect(draftRow).toContainText('Draft')
+  page.once('dialog', prompt => prompt.accept())
+  await draftRow.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(draftRow).toHaveCount(0)
   expect(embeddedRequests).toEqual([])
 })
 

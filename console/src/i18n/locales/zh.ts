@@ -922,8 +922,10 @@ export default {
     markdownHint: '支持 Markdown：标题、加粗、斜体、列表、代码块、链接、引用。',
     publish: '发布',
     withdraw: '撤回',
+    delete: '删除',
     publishConfirm: '发布“{title}”？发布后所有已接入设备都能看到。',
     withdrawConfirm: '撤回“{title}”？撤回后设备不再显示。',
+    deleteConfirm: '永久删除“{title}”？此操作无法撤销。',
     noUpdates: '暂无企业动态。',
     format: { plain: '纯文本', markdown: '富文本（Markdown）' },
     category: {

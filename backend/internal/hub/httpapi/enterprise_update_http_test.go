@@ -363,6 +363,63 @@ func TestERXUPDHTTP005AdminGetNotFound(t *testing.T) {
 	}
 }
 
+func TestAdminDeleteEnterpriseUpdateRequiresCSRFAndInvisibleStatus(t *testing.T) {
+	h, _, _, _, _ := setupFullHandler(t)
+	cookie, csrf := loginAdmin(t, h)
+	create := func(title string) string {
+		t.Helper()
+		resp := doJSON(t, h, http.MethodPost, "/api/admin/v1/enterprise-updates", map[string]string{
+			"Cookie": cookie, "X-CSRF-Token": csrf,
+		}, map[string]any{
+			"title": title, "content": "Body", "contentFormat": "PLAIN", "category": "NOTICE", "severity": "INFO",
+		})
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("create: %d %s", resp.Code, resp.Body.String())
+		}
+		var item struct {
+			ID string `json:"enterpriseUpdateId"`
+		}
+		decodeJSON(t, resp, &item)
+		return item.ID
+	}
+	draft := create("Draft")
+	published := create("Published")
+	path := func(id string) string { return "/api/admin/v1/enterprise-updates/" + id }
+	writeHeaders := map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf}
+	resp := doJSON(t, h, http.MethodDelete, path(draft), map[string]string{"Cookie": cookie}, nil)
+	if resp.Code != http.StatusBadRequest && resp.Code != http.StatusForbidden {
+		t.Fatalf("delete without CSRF: %d %s", resp.Code, resp.Body.String())
+	}
+	resp = doJSON(t, h, http.MethodDelete, path(draft), writeHeaders, nil)
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("delete draft: %d %s", resp.Code, resp.Body.String())
+	}
+	resp = doJSON(t, h, http.MethodGet, path(draft), map[string]string{"Cookie": cookie}, nil)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("get deleted draft: %d %s", resp.Code, resp.Body.String())
+	}
+	resp = doJSON(t, h, http.MethodDelete, path(draft), writeHeaders, nil)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("repeat delete: %d %s", resp.Code, resp.Body.String())
+	}
+	resp = doJSON(t, h, http.MethodPost, path(published)+":publish", writeHeaders, nil)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("publish: %d %s", resp.Code, resp.Body.String())
+	}
+	resp = doJSON(t, h, http.MethodDelete, path(published), writeHeaders, nil)
+	if resp.Code != http.StatusConflict {
+		t.Fatalf("delete published: %d %s", resp.Code, resp.Body.String())
+	}
+	resp = doJSON(t, h, http.MethodPost, path(published)+":withdraw", writeHeaders, nil)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("withdraw: %d %s", resp.Code, resp.Body.String())
+	}
+	resp = doJSON(t, h, http.MethodDelete, path(published), writeHeaders, nil)
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("delete withdrawn: %d %s", resp.Code, resp.Body.String())
+	}
+}
+
 // --- Client Enterprise Update HTTP Tests ---
 
 // TestERXUPDHTTP006ClientListPublishedOnly verifies client feed only shows PUBLISHED items.

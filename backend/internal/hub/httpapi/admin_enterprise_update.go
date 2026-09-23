@@ -112,6 +112,27 @@ func (h *fullAdminHandler) UpdateEnterpriseUpdate(w http.ResponseWriter, r *http
 	writeJSON(w, http.StatusOK, enterpriseUpdateWire(item))
 }
 
+func (h *fullAdminHandler) DeleteEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateID adminapi.EnterpriseUpdateId, params adminapi.DeleteEnterpriseUpdateParams) {
+	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	err := h.services.EnterpriseUpdate.Delete(r.Context(), string(enterpriseUpdateID))
+	if errors.Is(err, enterpriseupdate.ErrNotFound) {
+		writeProblem(w, http.StatusNotFound, "not_found", "Enterprise update not found")
+		return
+	}
+	if errors.Is(err, enterpriseupdate.ErrInvalidStatus) {
+		writeProblem(w, http.StatusConflict, "invalid_status", "Cannot delete a published enterprise update")
+		return
+	}
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *fullAdminHandler) PublishEnterpriseUpdate(w http.ResponseWriter, r *http.Request, enterpriseUpdateID adminapi.EnterpriseUpdateId, params adminapi.PublishEnterpriseUpdateParams) {
 	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
 		writeIdentityError(w, err)

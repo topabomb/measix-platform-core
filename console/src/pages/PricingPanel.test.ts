@@ -91,6 +91,8 @@ describe('PricingPanel', () => {
     expect(addBtn).toBeTruthy()
     await addBtn!.trigger('click')
     await flushPromises()
+    const effectiveTo = wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Effective until (optional)')!
+    await effectiveTo.setValue('2026-12-31T00:00:00Z')
 
     const saveBtn = findBtn(wrapper, 'Save')
     await saveBtn!.trigger('click')
@@ -101,6 +103,7 @@ describe('PricingPanel', () => {
     const body = JSON.parse((putCall![1] as RequestInit).body as string)
     expect(body.expectedPricingRevision).toBe(3)
     expect(body.rules.length).toBeGreaterThanOrEqual(1)
+    expect(body.rules[0].effectiveTo).toBe('2026-12-31T00:00:00Z')
   })
 
   it('removes a pricing rule from the local list', async () => {
@@ -126,5 +129,37 @@ describe('PricingPanel', () => {
     await delBtns[0].trigger('click')
     await flushPromises()
     expect(wrapper.text()).not.toContain('pr_a')
+  })
+
+  it('re-reads the estimate after saving and displays separate currencies', async () => {
+    let saved = false
+    const fetchSpy = vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/api/admin/v1/pricing' && init?.method === 'PUT') {
+        saved = true
+        return { pricingRevision: 2, rules: [] }
+      }
+      if (path === '/api/admin/v1/pricing') return { pricingRevision: saved ? 2 : 1, rules: [] }
+      if (path === '/api/admin/v1/usage/summary') return { cost: saved
+        ? { status: 'PARTIAL', amounts: [{ amount: '2', currency: 'CNY' }, { amount: '1', currency: 'USD' }], missingPricingRequests: 1 }
+        : { status: 'UNKNOWN', amounts: [] } }
+      return {}
+    })
+    const { wrapper } = mountPanel()
+    await flushPromises()
+    await wrapper.get('[data-cy="pricing-add-rule-btn"]').trigger('click')
+    await wrapper.get('[data-cy="pricing-save-btn"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-cy="pricing-cost-amount"]').text()).toContain('2 CNY · 1 USD')
+    expect(wrapper.text()).toContain('1 requests have no applicable price')
+    expect(fetchSpy.mock.calls.filter(call => call[0] === '/api/admin/v1/usage/summary')).toHaveLength(2)
+  })
+
+  it('offers every supported price meter in the editor', async () => {
+    const { wrapper } = mountPanel()
+    await flushPromises()
+    await wrapper.get('[data-cy="pricing-add-rule-btn"]').trigger('click')
+    const options = wrapper.getComponent(QSelect).props('options') as { value: string }[]
+    expect(options.map(item => item.value)).toContain('TOTAL_TOKENS')
+    expect(options.map(item => item.value)).toContain('REQUESTED_IMAGES')
   })
 })

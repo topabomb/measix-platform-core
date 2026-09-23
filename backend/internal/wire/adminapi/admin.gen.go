@@ -287,6 +287,27 @@ func (e BudgetTemplateAuditItemAction) Valid() bool {
 	}
 }
 
+// Defines values for CostAnalysisStatus.
+const (
+	CostAnalysisStatusKNOWN   CostAnalysisStatus = "KNOWN"
+	CostAnalysisStatusPARTIAL CostAnalysisStatus = "PARTIAL"
+	CostAnalysisStatusUNKNOWN CostAnalysisStatus = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the CostAnalysisStatus enum.
+func (e CostAnalysisStatus) Valid() bool {
+	switch e {
+	case CostAnalysisStatusKNOWN:
+		return true
+	case CostAnalysisStatusPARTIAL:
+		return true
+	case CostAnalysisStatusUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateUserRequestRole.
 const (
 	CreateUserRequestRoleADMIN  CreateUserRequestRole = "ADMIN"
@@ -1166,27 +1187,6 @@ func (e UsageCompleteness) Valid() bool {
 	}
 }
 
-// Defines values for UsageSummaryCostStatus.
-const (
-	UsageSummaryCostStatusKNOWN   UsageSummaryCostStatus = "KNOWN"
-	UsageSummaryCostStatusPARTIAL UsageSummaryCostStatus = "PARTIAL"
-	UsageSummaryCostStatusUNKNOWN UsageSummaryCostStatus = "UNKNOWN"
-)
-
-// Valid indicates whether the value is a known member of the UsageSummaryCostStatus enum.
-func (e UsageSummaryCostStatus) Valid() bool {
-	switch e {
-	case UsageSummaryCostStatusKNOWN:
-		return true
-	case UsageSummaryCostStatusPARTIAL:
-		return true
-	case UsageSummaryCostStatusUNKNOWN:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for UserRole.
 const (
 	UserRoleADMIN  UserRole = "ADMIN"
@@ -1971,6 +1971,52 @@ type ChangeOwnPasswordRequest struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+// CostAmount defines model for CostAmount.
+type CostAmount struct {
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
+}
+
+// CostAnalysis Current pricing-set estimate. Amounts in distinct currencies are never converted or added together.
+type CostAnalysis struct {
+	// Amount Set only when exactly one currency has a priced subtotal.
+	Amount  *string      `json:"amount,omitempty"`
+	Amounts []CostAmount `json:"amounts"`
+
+	// Currency Set only when exactly one currency has a priced subtotal.
+	Currency *string `json:"currency,omitempty"`
+
+	// Lines Populated for request details; aggregate views omit individual pricing lines.
+	Lines                  *[]CostLine        `json:"lines,omitempty"`
+	MissingPricingRequests int                `json:"missingPricingRequests"`
+	PartialRequests        int                `json:"partialRequests"`
+	PricedRequests         int                `json:"pricedRequests"`
+	Status                 CostAnalysisStatus `json:"status"`
+	UnknownMeterRequests   int                `json:"unknownMeterRequests"`
+	UnknownRequests        int                `json:"unknownRequests"`
+}
+
+// CostAnalysisStatus defines model for CostAnalysis.Status.
+type CostAnalysisStatus string
+
+// CostLine defines model for CostLine.
+type CostLine struct {
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
+
+	// Meter Standard meters per the S0.2 production usage and user budget contract.
+	// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
+	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
+	// ASR    → AUDIO_SECONDS + REQUESTS
+	// MCP    → REQUESTS
+	// IMAGE_GENERATION → REQUESTS + REQUESTED_IMAGES
+	Meter         PricingMeter  `json:"meter"`
+	PricingRuleId PricingRuleId `json:"pricingRuleId"`
+	Quantity      string        `json:"quantity"`
+	UnitPrice     string        `json:"unitPrice"`
+	UnitSize      string        `json:"unitSize"`
+}
+
 // CreateBudgetTemplateRequest defines model for CreateBudgetTemplateRequest.
 type CreateBudgetTemplateRequest struct {
 	Description string               `json:"description"`
@@ -2344,6 +2390,9 @@ type PricingRule struct {
 	Currency      string    `json:"currency"`
 	EffectiveFrom time.Time `json:"effectiveFrom"`
 
+	// EffectiveTo Exclusive end of this rule's effective interval; omitted for no end.
+	EffectiveTo *time.Time `json:"effectiveTo,omitempty"`
+
 	// Meter Standard meters per the S0.2 production usage and user budget contract.
 	// MODEL  → INPUT_TOKENS + OUTPUT_TOKENS + CACHED_TOKENS + TOTAL_TOKENS + REQUESTS
 	// TTS    → CHARACTERS + AUDIO_SECONDS + REQUESTS
@@ -2526,8 +2575,11 @@ type RequestUsageView struct {
 	ClientProtocol  UsageClientProtocol `json:"clientProtocol"`
 	CompletedAt     time.Time           `json:"completedAt"`
 	ControlRevision int                 `json:"controlRevision"`
-	DeploymentId    DeploymentId        `json:"deploymentId"`
-	DeviceId        *DeviceId           `json:"deviceId,omitempty"`
+
+	// Cost Current pricing-set estimate. Amounts in distinct currencies are never converted or added together.
+	Cost         *CostAnalysis `json:"cost,omitempty"`
+	DeploymentId DeploymentId  `json:"deploymentId"`
+	DeviceId     *DeviceId     `json:"deviceId,omitempty"`
 
 	// DeviceName Device name reported at enrollment; empty when the request carries no device. Display metadata, not authorization identity.
 	DeviceName          string                              `json:"deviceName,omitempty"`
@@ -2919,24 +2971,24 @@ type UsageDistribution struct {
 
 // UsageDistributionItem defines model for UsageDistributionItem.
 type UsageDistributionItem struct {
-	ClientProtocol      UsageClientProtocol `json:"clientProtocol"`
-	RequestCount        int                 `json:"requestCount"`
-	ResourceDisplayName *string             `json:"resourceDisplayName,omitempty"`
-	ResourceId          *string             `json:"resourceId,omitempty"`
-	ResourceKind        ResourceKind        `json:"resourceKind"`
-	SemanticMeters      []MeterQuantity     `json:"semanticMeters"`
+	ClientProtocol UsageClientProtocol `json:"clientProtocol"`
+
+	// Cost Current pricing-set estimate. Amounts in distinct currencies are never converted or added together.
+	Cost                *CostAnalysis   `json:"cost,omitempty"`
+	RequestCount        int             `json:"requestCount"`
+	ResourceDisplayName *string         `json:"resourceDisplayName,omitempty"`
+	ResourceId          *string         `json:"resourceId,omitempty"`
+	ResourceKind        ResourceKind    `json:"resourceKind"`
+	SemanticMeters      []MeterQuantity `json:"semanticMeters"`
 }
 
 // UsageSummary defines model for UsageSummary.
 type UsageSummary struct {
-	Cost struct {
-		Amount   *string                `json:"amount,omitempty"`
-		Currency *string                `json:"currency,omitempty"`
-		Status   UsageSummaryCostStatus `json:"status"`
-	} `json:"cost"`
-	ForwardedRequestCount int       `json:"forwardedRequestCount"`
-	From                  time.Time `json:"from"`
-	RequestBytes          int       `json:"requestBytes"`
+	// Cost Current pricing-set estimate. Amounts in distinct currencies are never converted or added together.
+	Cost                  CostAnalysis `json:"cost"`
+	ForwardedRequestCount int          `json:"forwardedRequestCount"`
+	From                  time.Time    `json:"from"`
+	RequestBytes          int          `json:"requestBytes"`
 
 	// RequestCompleteness Counts of whole requests within the same summary filter; sum equals requestCount.
 	RequestCompleteness RequestCompletenessCounts `json:"requestCompleteness"`
@@ -2945,9 +2997,6 @@ type UsageSummary struct {
 	SemanticMeters      []MeterQuantity           `json:"semanticMeters"`
 	To                  time.Time                 `json:"to"`
 }
-
-// UsageSummaryCostStatus defines model for UsageSummary.Cost.Status.
-type UsageSummaryCostStatus string
 
 // UsageTrend defines model for UsageTrend.
 type UsageTrend struct {
@@ -2959,6 +3008,8 @@ type UsageTrend struct {
 
 // UsageTrendPoint defines model for UsageTrendPoint.
 type UsageTrendPoint struct {
+	// Cost Current pricing-set estimate. Amounts in distinct currencies are never converted or added together.
+	Cost                  *CostAnalysis      `json:"cost,omitempty"`
 	Date                  openapi_types.Date `json:"date"`
 	ForwardedRequestCount int                `json:"forwardedRequestCount"`
 	RequestCount          int                `json:"requestCount"`

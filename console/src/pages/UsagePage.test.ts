@@ -307,6 +307,36 @@ describe('UsagePage', () => {
     expect(more.text()).toContain('(1)')
   })
 
+  it('shows missing price and meter counts with separate currency subtotals', async () => {
+    const baseFetch = vi.mocked(client.apiFetch).getMockImplementation()!
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      const result = await baseFetch(path)
+      if (path.startsWith('/api/admin/v1/usage/summary')) {
+        return { ...result as object, cost: { status: 'PARTIAL', amounts: [{ amount: '2', currency: 'CNY' }, { amount: '1', currency: 'USD' }], missingPricingRequests: 2, unknownMeterRequests: 1 } }
+      }
+      return result
+    })
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('2 CNY · 1 USD')
+    expect(wrapper.text()).toContain('2 requests have no applicable price')
+    expect(wrapper.text()).toContain('1 requests lack reliable metering')
+  })
+
+  it('shows zero for a known window containing only unforwarded requests', async () => {
+    const baseFetch = vi.mocked(client.apiFetch).getMockImplementation()!
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      const result = await baseFetch(path)
+      if (path.startsWith('/api/admin/v1/usage/summary')) {
+        return { ...result as object, cost: { status: 'KNOWN', pricedRequests: 1, amounts: [] } }
+      }
+      return result
+    })
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    expect(wrapper.get('[data-cy="usage-cost-amount"]').text()).toBe('0')
+  })
+
   it('sends the completeness filter in the query string', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string) => {

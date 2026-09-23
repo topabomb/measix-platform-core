@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import { costAmounts } from '../api/cost'
 import type { MeterQuantity, PricingMeter, UsageDistribution, UsageTrend, UserUsagePage } from '../api/usageBudget'
 import { clientProtocols } from '../api/usageBudget'
 import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
@@ -277,7 +278,7 @@ const costLabel = computed(() => {
   if (!summary.value) return '—'
   const cost = summary.value.cost
   if (cost.status === 'KNOWN' || cost.status === 'PARTIAL') {
-    return `${cost.amount ?? '0'} ${cost.currency ?? ''}`.trim()
+    return costAmounts(cost)
   }
   return $t('common.unknown').toLowerCase()
 })
@@ -424,8 +425,10 @@ onBeforeUnmount(() => {
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('overview.costStatus') }}</div>
-              <div class="text-h6">{{ costLabel }}</div>
+              <div class="text-h6" data-cy="usage-cost-amount">{{ costLabel }}</div>
               <q-chip dense :color="costStatusColor(costStatus)" :label="costStatusLabel(costStatus)" text-color="white" />
+              <div v-if="summary.cost.missingPricingRequests" class="text-caption text-grey-7">{{ $t('pricing.missingPricing', { count: summary.cost.missingPricingRequests }) }}</div>
+              <div v-if="summary.cost.unknownMeterRequests" class="text-caption text-grey-7">{{ $t('pricing.unknownMeters', { count: summary.cost.unknownMeterRequests }) }}</div>
             </q-card-section>
           </q-card>
         </div>
@@ -482,6 +485,7 @@ onBeforeUnmount(() => {
                 <q-item-label v-if="point.semanticMeters.length" caption class="text-break">
                   {{ point.semanticMeters.map(item => `${meterLabel(item.meter)} ${meterValue(item)}`).join(' · ') }}
                 </q-item-label>
+                <q-item-label v-if="point.cost" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(point.cost) }} · {{ costStatusLabel(point.cost.status) }}</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>
@@ -501,6 +505,7 @@ onBeforeUnmount(() => {
                 <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
                   {{ item.semanticMeters.map(meter => `${meterLabel(meter.meter)} ${meterValue(meter)}`).join(' · ') }}
                 </q-item-label>
+                <q-item-label v-if="item.cost" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost.status) }}</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>

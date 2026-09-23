@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
+import { costAmounts } from '../api/cost'
 import type { MeterQuantity, PricingMeter, RequestUsageS02 } from '../api/usageBudget'
 import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 
@@ -93,6 +94,19 @@ function meterValue(item: MeterQuantity): string {
         </div>
       </div>
       <div v-else class="text-body2 text-grey-7 q-mt-xs">{{ $t('usage.noSemanticMeters') }}</div>
+      <template v-if="request.cost">
+        <div class="text-subtitle2 q-mt-sm">{{ $t('pricing.estimatedCost') }}</div>
+        <div class="text-body2">{{ costAmounts(request.cost) }} · {{ $t(`usage.cost${request.cost.status === 'KNOWN' ? 'Known' : request.cost.status === 'PARTIAL' ? 'Partial' : 'Unknown'}`) }}</div>
+        <div v-if="request.cost.missingPricingRequests" class="text-caption text-grey-7">{{ $t('pricing.missingPricing', { count: request.cost.missingPricingRequests }) }}</div>
+        <div v-if="request.cost.unknownMeterRequests" class="text-caption text-grey-7">{{ $t('pricing.unknownMeters', { count: request.cost.unknownMeterRequests }) }}</div>
+        <div v-if="request.cost.lines?.length" class="usage-detail-meters q-mt-xs">
+          <div v-for="line in request.cost.lines" :key="line.pricingRuleId" class="usage-detail-meter">
+            <div>{{ meterLabel(line.meter) }}</div>
+            <div class="text-caption">{{ $t('pricing.pricingLine', line) }}</div>
+            <div class="text-caption text-grey-7">{{ line.pricingRuleId }}</div>
+          </div>
+        </div>
+      </template>
       <template v-if="request.budget">
         <div class="text-subtitle2 q-mt-sm">{{ $t('usage.detail.budget') }}</div>
         <div class="text-body2">

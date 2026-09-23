@@ -36,9 +36,10 @@ func (h *fullAdminHandler) UsageTrend(w http.ResponseWriter, r *http.Request, pa
 	}
 	points := make([]adminapi.UsageTrendPoint, 0, len(trend.Points))
 	for _, point := range trend.Points {
+		cost := adminCostWire(point.Cost)
 		points = append(points, adminapi.UsageTrendPoint{
 			Date: openapi_types.Date{Time: point.Date}, RequestCount: point.RequestCount,
-			ForwardedRequestCount: point.ForwardedRequestCount, SemanticMeters: adminMeterQuantities(point.Meters),
+			ForwardedRequestCount: point.ForwardedRequestCount, SemanticMeters: adminMeterQuantities(point.Meters), Cost: &cost,
 		})
 	}
 	writeJSON(w, http.StatusOK, adminapi.UsageTrend{From: trend.From, To: trend.To, Timezone: trend.Timezone, Points: points})
@@ -69,10 +70,11 @@ func (h *fullAdminHandler) UsageDistribution(w http.ResponseWriter, r *http.Requ
 	items := make([]adminapi.UsageDistributionItem, 0, len(distribution.Items))
 	for _, item := range distribution.Items {
 		resourceID, resourceName := item.ResourceID, item.ResourceName
+		cost := adminCostWire(item.Cost)
 		items = append(items, adminapi.UsageDistributionItem{
 			ResourceKind: adminapi.ResourceKind(item.ResourceKind), ClientProtocol: adminapi.UsageClientProtocol(item.ClientProtocol),
 			ResourceId: &resourceID, ResourceDisplayName: &resourceName, RequestCount: item.RequestCount,
-			SemanticMeters: adminMeterQuantities(item.Meters),
+			SemanticMeters: adminMeterQuantities(item.Meters), Cost: &cost,
 		})
 	}
 	writeJSON(w, http.StatusOK, adminapi.UsageDistribution{From: distribution.From, To: distribution.To, Items: items})
@@ -318,16 +320,7 @@ func (h *fullAdminHandler) UsageSummary(w http.ResponseWriter, r *http.Request, 
 			Confidence: confidence, Meter: adminapi.PricingMeter(meter.Meter), Quantity: meter.Quantity,
 		})
 	}
-	wire.Cost.Status = adminapi.UsageSummaryCostStatusUNKNOWN
-	if summary.Cost.State == usage.CostKnown || summary.Cost.State == usage.CostPartial {
-		amount, currency := summary.Cost.Amount, summary.Cost.Currency
-		wire.Cost.Amount, wire.Cost.Currency = &amount, &currency
-		if summary.Cost.State == usage.CostKnown {
-			wire.Cost.Status = adminapi.UsageSummaryCostStatusKNOWN
-		} else {
-			wire.Cost.Status = adminapi.UsageSummaryCostStatusPARTIAL
-		}
-	}
+	wire.Cost = adminCostWire(summary.Cost)
 	writeJSON(w, http.StatusOK, wire)
 }
 
@@ -365,7 +358,7 @@ func (h *fullAdminHandler) PutPricing(w http.ResponseWriter, r *http.Request, pa
 		rules = append(rules, usage.PricingRuleRecord{
 			ID: rule.PricingRuleId, ResourceID: resourceID, UpstreamID: upstreamID,
 			Meter: string(rule.Meter), UnitSize: rule.UnitSize, UnitPrice: rule.UnitPrice, Currency: rule.Currency,
-			EffectiveFrom: rule.EffectiveFrom,
+			EffectiveFrom: rule.EffectiveFrom, EffectiveTo: rule.EffectiveTo,
 		})
 	}
 	revision, rows, err := h.services.Usage.ReplacePricingSet(r.Context(), request.ExpectedPricingRevision, rules)
@@ -440,8 +433,34 @@ func requestUsageWire(row usage.RequestView) adminapi.RequestUsageView {
 		RequestCompleteness: adminapi.RequestUsageViewRequestCompleteness(row.RequestCompleteness),
 		SettlementState:     adminapi.RequestUsageViewSettlementState(row.SettlementState), SemanticMeters: semantic,
 	}
+	cost := adminCostWire(row.Cost)
+	result.Cost = &cost
 	if row.Budget != nil {
 		result.Budget = adminBudgetContext(*row.Budget)
+	}
+	return result
+}
+
+func adminCostWire(value usage.CostSummary) adminapi.CostAnalysis {
+	result := adminapi.CostAnalysis{
+		Status: adminapi.CostAnalysisStatus(value.State), Amounts: make([]adminapi.CostAmount, 0, len(value.Amounts)),
+		PricedRequests: value.PricedRequests, PartialRequests: value.PartialRequests, UnknownRequests: value.UnknownRequests,
+		MissingPricingRequests: value.MissingPricingRequests, UnknownMeterRequests: value.UnknownMeterRequests,
+	}
+	for _, item := range value.Amounts {
+		result.Amounts = append(result.Amounts, adminapi.CostAmount{Currency: item.Currency, Amount: item.Amount})
+	}
+	if len(value.Lines) > 0 {
+		lines := make([]adminapi.CostLine, 0, len(value.Lines))
+		for _, line := range value.Lines {
+			lines = append(lines, adminapi.CostLine{Meter: adminapi.PricingMeter(line.Meter), Quantity: line.Quantity,
+				UnitSize: line.UnitSize, UnitPrice: line.UnitPrice, Currency: line.Currency,
+				Amount: line.Amount, PricingRuleId: line.PricingRuleID})
+		}
+		result.Lines = &lines
+	}
+	if len(value.Amounts) == 1 {
+		result.Amount, result.Currency = &value.Amount, &value.Currency
 	}
 	return result
 }
@@ -549,7 +568,7 @@ func pricingSetWire(revision int, rows []usage.PricingRuleRecord) adminapi.Prici
 		items = append(items, adminapi.PricingRule{
 			PricingRuleId: row.ID, ResourceId: row.ResourceID, UpstreamId: upstreamID,
 			Meter: adminapi.PricingMeter(row.Meter), UnitSize: row.UnitSize, UnitPrice: row.UnitPrice, Currency: row.Currency,
-			EffectiveFrom: row.EffectiveFrom,
+			EffectiveFrom: row.EffectiveFrom, EffectiveTo: row.EffectiveTo,
 		})
 	}
 	return adminapi.PricingSet{PricingRevision: revision, Rules: items}

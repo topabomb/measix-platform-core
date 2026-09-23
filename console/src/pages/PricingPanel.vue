@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, createCandidateId } from '../api/client'
+import { costAmounts } from '../api/cost'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import { useSessionStore } from '../stores/session'
@@ -30,6 +31,8 @@ const METER_OPTIONS = [
   { label: 'INPUT_TOKENS', value: 'INPUT_TOKENS' },
   { label: 'OUTPUT_TOKENS', value: 'OUTPUT_TOKENS' },
   { label: 'CACHED_TOKENS', value: 'CACHED_TOKENS' },
+  { label: 'TOTAL_TOKENS', value: 'TOTAL_TOKENS' },
+  { label: 'REQUESTED_IMAGES', value: 'REQUESTED_IMAGES' },
   { label: 'REQUESTS', value: 'REQUESTS' },
   { label: 'CHARACTERS', value: 'CHARACTERS' },
   { label: 'AUDIO_SECONDS', value: 'AUDIO_SECONDS' },
@@ -39,14 +42,16 @@ async function refresh() {
   loading.value = true
   error.value = undefined
   try {
-    const [set, usage] = await Promise.all([
-      apiFetch<PricingSet>('/api/admin/v1/pricing'),
-      apiFetch<UsageSummary>('/api/admin/v1/usage/summary').catch(() => undefined as UsageSummary | undefined),
-    ])
+    const set = await apiFetch<PricingSet>('/api/admin/v1/pricing')
     revision.value = set.pricingRevision
     rules.value = set.rules ?? []
     savedRules.value = JSON.stringify(rules.value)
-    if (usage) usageCost.value = usage.cost
+    try {
+      usageCost.value = (await apiFetch<UsageSummary>('/api/admin/v1/usage/summary')).cost
+    } catch (cause) {
+      usageCost.value = undefined
+      error.value = cause
+    }
   } catch (cause) {
     error.value = cause
   } finally {
@@ -76,11 +81,12 @@ async function save() {
   try {
     const set = await apiFetch<PricingSet>('/api/admin/v1/pricing', {
       method: 'PUT',
-      body: JSON.stringify({ expectedPricingRevision: revision.value, rules: rules.value }),
+      body: JSON.stringify({ expectedPricingRevision: revision.value, rules: rules.value.map(rule => ({ ...rule, effectiveTo: rule.effectiveTo || undefined })) }),
     }, session.csrfToken)
     revision.value = set.pricingRevision
     rules.value = set.rules ?? []
     savedRules.value = JSON.stringify(rules.value)
+    await refresh()
   } catch (cause) {
     error.value = cause
   } finally {
@@ -132,8 +138,11 @@ onMounted(refresh)
           <div class="text-caption text-grey-7">{{ $t('pricing.currentCostStatus') }}</div>
           <q-chip dense :color="costStatusColor(usageCost.status)" text-color="white" :label="costStatusLabel(usageCost.status)" />
         </div>
-        <div v-if="usageCost.amount" class="text-h6">{{ usageCost.amount }} {{ usageCost.currency ?? '' }}</div>
-        <div class="text-caption text-grey-7">{{ $t('pricing.costUnknownHint') }}</div>
+        <div class="text-h6" data-cy="pricing-cost-amount">{{ costAmounts(usageCost) }}</div>
+        <div class="text-caption text-grey-7">{{ $t('pricing.costScope') }}</div>
+        <div v-if="usageCost.missingPricingRequests" class="text-caption text-grey-7">{{ $t('pricing.missingPricing', { count: usageCost.missingPricingRequests }) }}</div>
+        <div v-if="usageCost.unknownMeterRequests" class="text-caption text-grey-7">{{ $t('pricing.unknownMeters', { count: usageCost.unknownMeterRequests }) }}</div>
+        <div v-if="usageCost.status !== 'KNOWN'" class="text-caption text-grey-7">{{ $t('pricing.costUnknownHint') }}</div>
       </div>
     </q-banner>
 
@@ -164,6 +173,9 @@ onMounted(refresh)
             </div>
             <div class="col-6 col-md-2">
               <q-input v-model="rule.effectiveFrom" dense outlined :label="$t('pricing.effectiveFrom')" />
+            </div>
+            <div class="col-6 col-md-2">
+              <q-input v-model="rule.effectiveTo" dense outlined :label="$t('pricing.effectiveTo')" />
             </div>
             <div class="col-12 col-md-1 text-right">
               <q-btn flat dense color="negative" icon="delete" @click="removeRule(idx)" />

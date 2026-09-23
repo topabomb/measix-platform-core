@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import { costAmounts } from '../api/cost'
 import type { RequestUsageS02 } from '../api/usageBudget'
 import ProblemBanner from './ProblemBanner.vue'
 import DetailWorkspace from './DetailWorkspace.vue'
@@ -152,6 +153,7 @@ defineExpose({ refresh: reset })
           </q-item-section>
           <q-item-section side>
             <div class="row items-center q-gutter-xs">
+              <span v-if="req.cost" class="text-caption text-grey-7">{{ costAmounts(req.cost) }} · {{ $t(`usage.cost${req.cost.status === 'KNOWN' ? 'Known' : req.cost.status === 'PARTIAL' ? 'Partial' : 'Unknown'}`) }}</span>
               <q-chip dense :color="req.forwarded ? 'green-2' : 'orange-2'">{{ req.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }}</q-chip>
               <q-chip v-if="req.settlementState && req.settlementState !== 'NOT_REQUIRED'" dense :color="req.settlementState === 'SETTLED' ? 'green-2' : req.settlementState === 'RECONCILIATION_REQUIRED' ? 'red-2' : 'orange-2'">{{ $t(`usage.settlement.${req.settlementState}`) }}</q-chip>
               <q-chip v-if="req.requestCompleteness && req.requestCompleteness !== 'EXACT' && req.settlementState !== 'RECONCILIATION_REQUIRED'" dense :color="req.requestCompleteness === 'PARTIAL' ? 'orange-2' : 'grey-3'">{{ $t(`status.${req.requestCompleteness}`) }}</q-chip>

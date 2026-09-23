@@ -3,13 +3,10 @@ package usage
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
-	"sort"
 	"strings"
 	"time"
 
-	"measix/platform/ent"
 	"measix/platform/ent/pricingrule"
 	"measix/platform/pkg/platformid"
 )
@@ -113,41 +110,10 @@ func (s *Service) CalculateCost(ctx context.Context, input CostInput) (CostResul
 	if err != nil {
 		return CostResult{}, err
 	}
-	at := input.OccurredAt.UTC()
-	type candidate struct {
-		rule        *ent.PricingRule
-		specificity int
-	}
-	candidates := make([]candidate, 0, len(rules))
-	for _, rule := range rules {
-		if rule.EffectiveFrom.After(at) || rule.EffectiveTo != nil && !at.Before(*rule.EffectiveTo) {
-			continue
-		}
-		specificity := 0
-		if rule.ResourceID != nil {
-			if *rule.ResourceID != input.ResourceID {
-				continue
-			}
-			specificity += 2
-		}
-		if rule.UpstreamID != nil {
-			if *rule.UpstreamID != input.UpstreamID {
-				continue
-			}
-			specificity++
-		}
-		candidates = append(candidates, candidate{rule: rule, specificity: specificity})
-	}
-	if len(candidates) == 0 {
+	rule := selectPricingRule(rules, strings.TrimSpace(input.Meter), input.ResourceID, input.UpstreamID, input.OccurredAt.UTC())
+	if rule == nil {
 		return CostResult{State: CostUnknown}, nil
 	}
-	sort.SliceStable(candidates, func(i, j int) bool {
-		if candidates[i].specificity != candidates[j].specificity {
-			return candidates[i].specificity > candidates[j].specificity
-		}
-		return candidates[i].rule.EffectiveFrom.After(candidates[j].rule.EffectiveFrom)
-	})
-	rule := candidates[0].rule
 	unitSize, ok := decimalRat(rule.UnitSize)
 	if !ok || unitSize.Sign() <= 0 {
 		return CostResult{}, errors.New("invalid persisted pricing unit size")
@@ -227,7 +193,7 @@ func exactDecimal(value *big.Rat) (string, error) {
 	count2 := countFactor(two)
 	count5 := countFactor(five)
 	if denominator.Cmp(one) != 0 {
-		return "", fmt.Errorf("cost is not a finite decimal")
+		return strings.TrimRight(strings.TrimRight(value.FloatString(12), "0"), "."), nil
 	}
 	scale := count2
 	if count5 > scale {

@@ -1485,6 +1485,7 @@ export interface components {
             requestCount: number;
             forwardedRequestCount: number;
             semanticMeters: components["schemas"]["MeterQuantity"][];
+            cost?: components["schemas"]["CostAnalysis"];
         };
         UsageTrend: {
             /** Format: date-time */
@@ -1501,6 +1502,7 @@ export interface components {
             resourceDisplayName?: string;
             requestCount: number;
             semanticMeters: components["schemas"]["MeterQuantity"][];
+            cost?: components["schemas"]["CostAnalysis"];
         };
         UsageDistribution: {
             /** Format: date-time */
@@ -1573,12 +1575,37 @@ export interface components {
             requestBytes: number;
             responseBytes: number;
             semanticMeters: components["schemas"]["MeterQuantity"][];
-            cost: {
-                /** @enum {string} */
-                status: "KNOWN" | "PARTIAL" | "UNKNOWN";
-                amount?: string;
-                currency?: string;
-            };
+            cost: components["schemas"]["CostAnalysis"];
+        };
+        CostAmount: {
+            currency: string;
+            amount: string;
+        };
+        CostLine: {
+            meter: components["schemas"]["PricingMeter"];
+            quantity: string;
+            unitSize: string;
+            unitPrice: string;
+            currency: string;
+            amount: string;
+            pricingRuleId: components["schemas"]["PricingRuleId"];
+        };
+        /** @description Current pricing-set estimate. Amounts in distinct currencies are never converted or added together. */
+        CostAnalysis: {
+            /** @enum {string} */
+            status: "KNOWN" | "PARTIAL" | "UNKNOWN";
+            /** @description Set only when exactly one currency has a priced subtotal. */
+            amount?: string;
+            /** @description Set only when exactly one currency has a priced subtotal. */
+            currency?: string;
+            amounts: components["schemas"]["CostAmount"][];
+            /** @description Populated for request details; aggregate views omit individual pricing lines. */
+            lines?: components["schemas"]["CostLine"][];
+            pricedRequests: number;
+            partialRequests: number;
+            unknownRequests: number;
+            missingPricingRequests: number;
+            unknownMeterRequests: number;
         };
         /** @description Counts of whole requests within the same summary filter; sum equals requestCount. */
         RequestCompletenessCounts: {
@@ -1597,6 +1624,7 @@ export interface components {
             clientProtocol: components["schemas"]["UsageClientProtocol"];
             /** @description Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found. */
             resourceDisplayName?: string;
+            cost?: components["schemas"]["CostAnalysis"];
             /** @description Display name resolved from the users table. Always present, because a usage row cannot exist without its user. Display metadata, not authorization identity. */
             userDisplayName: string;
             /** @description Device name reported at enrollment; empty when the request carries no device. Display metadata, not authorization identity. */
@@ -1647,6 +1675,11 @@ export interface components {
             currency: string;
             /** Format: date-time */
             effectiveFrom: string;
+            /**
+             * Format: date-time
+             * @description Exclusive end of this rule's effective interval; omitted for no end.
+             */
+            effectiveTo?: string;
         };
         PricingSet: {
             pricingRevision: number;

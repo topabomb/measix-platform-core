@@ -46,9 +46,16 @@ type MeterSummary struct {
 }
 
 type CostSummary struct {
-	State    CostState
-	Amount   string
-	Currency string
+	State                  CostState
+	Amount                 string
+	Currency               string
+	Amounts                []CurrencyAmount
+	PricedRequests         int
+	PartialRequests        int
+	UnknownRequests        int
+	MissingPricingRequests int
+	UnknownMeterRequests   int
+	Lines                  []CostLine
 }
 
 type ResourceKind string
@@ -117,6 +124,7 @@ type RequestView struct {
 	SettlementState     string
 	SettlementRevision  int64
 	SemanticMeters      []MeterSummary
+	Cost                CostSummary
 	Budget              *budget.AdmissionDecision
 }
 
@@ -227,6 +235,17 @@ func (s *Service) usageFacts(ctx context.Context, views []RequestView) error {
 			views[i].SemanticMeters = []MeterSummary{}
 		}
 		views[i].Budget = decisions[views[i].RequestID]
+	}
+	rules, err := s.Client.PricingRule.Query().All(ctx)
+	if err != nil {
+		return err
+	}
+	for i := range views {
+		priced, err := priceRequest(views[i], rules)
+		if err != nil {
+			return err
+		}
+		views[i].Cost = priced.CostSummary
 	}
 	return nil
 }
@@ -579,6 +598,18 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 			quantity = millisecondsAsSeconds(row.QuantityUnits)
 		}
 		result.Meters = append(result.Meters, MeterSummary{Meter: row.Meter, Quantity: quantity, Confidence: confidence})
+	}
+	costFilter := filter
+	costFilter.From, costFilter.To = &from, &to
+	var costs costAccumulator
+	if err := (&Service{Client: tx.Client()}).analyzeCosts(ctx, costFilter, func(_ RequestView, priced CostBreakdown) error {
+		return costs.add(priced)
+	}); err != nil {
+		return Summary{}, err
+	}
+	result.Cost, err = costs.summary()
+	if err != nil {
+		return Summary{}, err
 	}
 	return result, nil
 }

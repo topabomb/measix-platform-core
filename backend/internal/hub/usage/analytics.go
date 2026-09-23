@@ -23,6 +23,7 @@ type TrendPoint struct {
 	RequestCount          int
 	ForwardedRequestCount int
 	Meters                []MeterSummary
+	Cost                  CostSummary
 }
 
 type Trend struct {
@@ -36,6 +37,7 @@ type DistributionItem struct {
 	ResourceID, ResourceName     string
 	RequestCount                 int
 	Meters                       []MeterSummary
+	Cost                         CostSummary
 }
 
 type Distribution struct {
@@ -178,6 +180,27 @@ func (s *Service) Trend(ctx context.Context, filter Filter, location *time.Locat
 			return result.Points[index].Meters[i].Meter < result.Points[index].Meters[j].Meter
 		})
 	}
+	byDay := make(map[string]*costAccumulator, len(result.Points))
+	if err := s.analyzeCosts(ctx, filter, func(view RequestView, priced CostBreakdown) error {
+		day := view.CompletedAt.In(location).Format("2006-01-02")
+		if byDay[day] == nil {
+			byDay[day] = &costAccumulator{}
+		}
+		return byDay[day].add(priced)
+	}); err != nil {
+		return Trend{}, err
+	}
+	for i := range result.Points {
+		bucket := byDay[result.Points[i].Date.Format("2006-01-02")]
+		if bucket == nil {
+			bucket = &costAccumulator{}
+		}
+		cost, err := bucket.summary()
+		if err != nil {
+			return Trend{}, err
+		}
+		result.Points[i].Cost = cost
+	}
 	return result, nil
 }
 
@@ -269,6 +292,28 @@ func (s *Service) Distribution(ctx context.Context, filter Filter) (Distribution
 		}
 		return result.Items[i].ResourceID < result.Items[j].ResourceID
 	})
+	byResource := make(map[distributionKey]*costAccumulator, len(result.Items))
+	if err := s.analyzeCosts(ctx, filter, func(view RequestView, priced CostBreakdown) error {
+		key := distributionKey{string(view.ResourceKind), view.ClientProtocol, view.ResourceID}
+		if byResource[key] == nil {
+			byResource[key] = &costAccumulator{}
+		}
+		return byResource[key].add(priced)
+	}); err != nil {
+		return Distribution{}, err
+	}
+	for i := range result.Items {
+		item := &result.Items[i]
+		bucket := byResource[distributionKey{item.ResourceKind, item.ClientProtocol, item.ResourceID}]
+		if bucket == nil {
+			bucket = &costAccumulator{}
+		}
+		cost, err := bucket.summary()
+		if err != nil {
+			return Distribution{}, err
+		}
+		item.Cost = cost
+	}
 	return result, nil
 }
 

@@ -3624,6 +3624,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MeterQuantity'
+        cost:
+          $ref: '#/components/schemas/CostAnalysis'
     UsageTrend:
       type: object
       additionalProperties: false
@@ -3661,6 +3663,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MeterQuantity'
+        cost:
+          $ref: '#/components/schemas/CostAnalysis'
     UsageDistribution:
       type: object
       additionalProperties: false
@@ -3834,21 +3838,74 @@ components:
           items:
             $ref: '#/components/schemas/MeterQuantity'
         cost:
-          type: object
-          additionalProperties: false
-          required:
-          - status
-          properties:
-            status:
-              type: string
-              enum:
-              - KNOWN
-              - PARTIAL
-              - UNKNOWN
-            amount:
-              type: string
-            currency:
-              type: string
+          $ref: '#/components/schemas/CostAnalysis'
+    CostAmount:
+      type: object
+      additionalProperties: false
+      required: [currency, amount]
+      properties:
+        currency:
+          type: string
+        amount:
+          type: string
+    CostLine:
+      type: object
+      additionalProperties: false
+      required: [meter, quantity, unitSize, unitPrice, currency, amount, pricingRuleId]
+      properties:
+        meter:
+          $ref: '#/components/schemas/PricingMeter'
+        quantity:
+          type: string
+        unitSize:
+          type: string
+        unitPrice:
+          type: string
+        currency:
+          type: string
+        amount:
+          type: string
+        pricingRuleId:
+          $ref: '#/components/schemas/PricingRuleId'
+    CostAnalysis:
+      type: object
+      additionalProperties: false
+      required: [status, amounts, pricedRequests, partialRequests, unknownRequests, missingPricingRequests, unknownMeterRequests]
+      description: Current pricing-set estimate. Amounts in distinct currencies are never converted or added together.
+      properties:
+        status:
+          type: string
+          enum: [KNOWN, PARTIAL, UNKNOWN]
+        amount:
+          type: string
+          description: Set only when exactly one currency has a priced subtotal.
+        currency:
+          type: string
+          description: Set only when exactly one currency has a priced subtotal.
+        amounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostAmount'
+        lines:
+          type: array
+          description: Populated for request details; aggregate views omit individual pricing lines.
+          items:
+            $ref: '#/components/schemas/CostLine'
+        pricedRequests:
+          type: integer
+          minimum: 0
+        partialRequests:
+          type: integer
+          minimum: 0
+        unknownRequests:
+          type: integer
+          minimum: 0
+        missingPricingRequests:
+          type: integer
+          minimum: 0
+        unknownMeterRequests:
+          type: integer
+          minimum: 0
     RequestCompletenessCounts:
       type: object
       additionalProperties: false
@@ -3908,6 +3965,8 @@ components:
           type: string
           x-go-type-skip-optional-pointer: true
           description: Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found.
+        cost:
+          $ref: '#/components/schemas/CostAnalysis'
         # An audit row must identify whose request it is without a second lookup,
         # so the display names travel with the row. Both are display metadata and
         # carry no authority. user_id is NOT NULL with a foreign key, so the user
@@ -4025,6 +4084,10 @@ components:
         effectiveFrom:
           type: string
           format: date-time
+        effectiveTo:
+          type: string
+          format: date-time
+          description: Exclusive end of this rule's effective interval; omitted for no end.
     PricingSet:
       type: object
       additionalProperties: false

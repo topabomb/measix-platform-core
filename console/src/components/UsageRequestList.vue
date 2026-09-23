@@ -71,6 +71,7 @@ function openDetail(req: RequestUsage) {
 
 function kindOf(resourceId: string | undefined): string | undefined {
   if (!resourceId) return undefined
+  if (resourceId.startsWith('prv_')) return 'PROVIDER'
   if (resourceId.startsWith('mdl_')) return 'MODEL'
   if (resourceId.startsWith('img_')) return 'IMAGE_GENERATION'
   if (resourceId.startsWith('tts_')) return 'TTS'
@@ -134,7 +135,7 @@ defineExpose({ refresh: reset })
         <q-item v-for="req in items" :key="req.requestId" clickable :active="selected?.requestId === req.requestId" active-class="bg-purple-1" data-cy="usage-row" @click="openDetail(req)">
           <q-item-section>
             <q-item-label>
-              {{ req.resourceDisplayName || $t('usage.unnamedResource') }}
+              {{ req.resourceDisplayName || req.resourceId || $t('usage.unnamedResource') }}
               <q-chip v-if="requestKind(req)" dense :color="kindColor(requestKind(req)!)" text-color="white" size="sm">{{ kindLabel(requestKind(req)!) }}</q-chip>
               <q-chip v-if="req.errorClass" dense color="negative" text-color="white" size="sm">{{ errorLabel(req.errorClass) }}</q-chip>
             </q-item-label>

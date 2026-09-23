@@ -69,7 +69,7 @@ function meterValue(item: MeterQuantity): string {
           <tr v-if="request.interactionId"><td class="text-grey-7">{{ $t('usage.detail.interactionId') }}</td><td class="text-break">{{ request.interactionId }}</td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.detail.user') }}</td><td>{{ identity() }} <span class="text-caption text-grey-7">({{ request.userId }})</span></td></tr>
           <tr v-if="request.deviceId"><td class="text-grey-7">{{ $t('usage.detail.device') }}</td><td>{{ request.deviceName || '—' }} <span class="text-caption text-grey-7">({{ request.deviceId }})</span></td></tr>
-          <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td>{{ request.resourceDisplayName || $t('usage.unnamedResource') }}<div class="text-caption text-break">{{ request.resourceId }}</div></td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td>{{ request.resourceDisplayName || request.resourceId || $t('usage.unnamedResource') }}<div v-if="request.resourceDisplayName && request.resourceId" class="text-caption text-break">{{ request.resourceId }}</div></td></tr>
           <tr v-if="request.resourceKind"><td class="text-grey-7">{{ $t('usage.filters.resourceKind') }}</td><td>{{ kindLabel(request.resourceKind) }}</td></tr>
           <tr v-if="request.clientProtocol"><td class="text-grey-7">{{ $t('usage.filters.protocol') }}</td><td class="text-break">{{ request.clientProtocol }}</td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.detail.upstream') }}</td><td class="text-break">{{ request.upstreamId }}</td></tr>

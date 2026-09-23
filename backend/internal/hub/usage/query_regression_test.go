@@ -121,6 +121,85 @@ func TestUsageFiltersCursorSummaryEnrichmentAndUnknownRegression(t *testing.T) {
 	}
 }
 
+func TestUsageNamesResolveEveryManagedResourceKind(t *testing.T) {
+	store := testutil.OpenStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+	deploymentID, userID, upstreamID := seedUsageParents(t, store.Client, now)
+	resources := []struct {
+		kind, id, name, snapshotKey, idKey string
+	}{
+		{"PROVIDER", platformid.New(platformid.Provider), "Provider A", "providers", "providerId"},
+		{"MODEL", platformid.New(platformid.Model), "Model A", "models", "modelId"},
+		{"IMAGE_GENERATION", platformid.New(platformid.ImageGeneration), "Image A", "imageGenerators", "imageId"},
+		{"TTS", platformid.New(platformid.TTS), "Voice A", "tts", "ttsId"},
+		{"ASR", platformid.New(platformid.ASR), "Transcriber A", "asr", "asrId"},
+		{"MCP", platformid.New(platformid.MCP), "Tool A", "mcp", "mcpServerId"},
+	}
+	releaseID := platformid.New(platformid.Release)
+	snapshot := map[string]any{"managedGeneration": 1, "releaseId": releaseID}
+	for _, resource := range resources {
+		snapshot[resource.snapshotKey] = []map[string]string{{resource.idKey: resource.id, "displayName": resource.name}}
+	}
+	snapshotJSON, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Client.ManagedRelease.Create().SetID(releaseID).SetManagedGeneration(1).SetStatus("ACTIVE").
+		SetReleaseContentJSON([]byte(`{}`)).SetSnapshotJSON(snapshotJSON).SetSnapshotHash("snapshot-hash").
+		SetSourceDraftRevision(1).SetCreatedByUserID(userID).SetCreatedAt(now).Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+	requestIDs := make(map[string]string, len(resources))
+	for _, resource := range resources {
+		requestIDs[resource.kind] = createUsageRequestRow(t, store.Client, requestRowInput{
+			DeploymentID: deploymentID, UserID: userID, ResourceID: resource.id, ResourceKind: resource.kind,
+			Protocol: "OPENAI_CHAT_COMPLETIONS", UpstreamID: upstreamID, CompletedAt: now,
+			Forwarded: true, HTTPStatus: 200, Completeness: "EXACT",
+		})
+	}
+	service := NewService(store.Client)
+	service.Now = func() time.Time { return now.Add(time.Second) }
+	requests, err := service.ListRequests(ctx, Filter{}, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	imageDetail, err := service.GetRequest(ctx, requestIDs["IMAGE_GENERATION"])
+	if err != nil || imageDetail.ResourceDisplayName != "Image A" {
+		t.Fatalf("image request detail name = %q, err=%v", imageDetail.ResourceDisplayName, err)
+	}
+	batch, err := service.GetRequests(ctx, []string{requestIDs["PROVIDER"], requestIDs["IMAGE_GENERATION"]})
+	if err != nil || batch[requestIDs["PROVIDER"]].ResourceDisplayName != "Provider A" || batch[requestIDs["IMAGE_GENERATION"]].ResourceDisplayName != "Image A" {
+		t.Fatalf("batched request names = %+v, err=%v", batch, err)
+	}
+	distribution, err := service.Distribution(ctx, Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, resource := range resources {
+		foundRequest, foundDistribution := false, false
+		for _, request := range requests {
+			if request.ResourceID == resource.id {
+				foundRequest = true
+				if request.ResourceDisplayName != resource.name {
+					t.Errorf("%s request name = %q, want %q", resource.kind, request.ResourceDisplayName, resource.name)
+				}
+			}
+		}
+		for _, item := range distribution.Items {
+			if item.ResourceID == resource.id {
+				foundDistribution = true
+				if item.ResourceName != resource.name {
+					t.Errorf("%s distribution name = %q, want %q", resource.kind, item.ResourceName, resource.name)
+				}
+			}
+		}
+		if !foundRequest || !foundDistribution {
+			t.Errorf("%s absent: request=%v distribution=%v", resource.kind, foundRequest, foundDistribution)
+		}
+	}
+}
+
 type requestRowInput struct {
 	DeploymentID, UserID, ResourceID, ResourceKind, Protocol, UpstreamID string
 	DeviceID                                                             *string

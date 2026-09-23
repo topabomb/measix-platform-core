@@ -80,6 +80,8 @@ test('CAP-C6-001-Usage Usage/System verification after five-capability traffic',
     const allText = allRowTexts.join('\n')
     expect(allText).toMatch(/MODEL|model/i)
     expect(allText).toMatch(/IMAGE_GENERATION|image generation/i)
+    expect(allText).toContain('E2E Image Generation')
+    expect(allText).not.toContain('Resource name unavailable')
     expect(allText).toMatch(/TTS|tts/i)
     expect(allText).toMatch(/ASR|asr/i)
     expect(allText).toMatch(/MCP|mcp/i)

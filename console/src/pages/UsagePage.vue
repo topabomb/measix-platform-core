@@ -496,7 +496,7 @@ onBeforeUnmount(() => {
           <q-list v-if="distribution?.items.length" dense separator class="usage-analysis__list">
             <q-item v-for="item in distribution.items" :key="`${item.resourceKind}:${item.clientProtocol}:${item.resourceId ?? ''}`">
               <q-item-section>
-                <q-item-label>{{ item.resourceDisplayName || $t(`usage.kind.${item.resourceKind}`) }}</q-item-label>
+                <q-item-label>{{ item.resourceDisplayName || item.resourceId || $t(`usage.kind.${item.resourceKind}`) }}</q-item-label>
                 <q-item-label caption class="text-break">{{ item.clientProtocol }} · {{ $t('usage.distribution.requests', { count: item.requestCount }) }}</q-item-label>
                 <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
                   {{ item.semanticMeters.map(meter => `${meterLabel(meter.meter)} ${meterValue(meter)}`).join(' · ') }}

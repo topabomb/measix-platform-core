@@ -195,13 +195,14 @@ describe('UsagePage', () => {
       if (path.startsWith('/api/admin/v1/usage/summary')) {
         return {
           from: '2026-08-01T00:00:00Z', to: '2026-08-20T00:00:00Z',
-          requestCount: 5, requestCompleteness: { exact: 0, partial: 0, unknown: 5 }, forwardedRequestCount: 4, requestBytes: 0, responseBytes: 0,
+          requestCount: 6, requestCompleteness: { exact: 0, partial: 0, unknown: 6 }, forwardedRequestCount: 5, requestBytes: 0, responseBytes: 0,
           semanticMeters: [], cost: { status: 'KNOWN', amount: '0', currency: 'USD' },
         }
       }
       return {
         items: [
           { requestId: 'req_1', resourceId: 'mdl_aaa', resourceDisplayName: 'Enterprise model', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
+          { requestId: 'req_prv', resourceId: 'prv_legacy', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
           { requestId: 'req_img', resourceId: 'img_picture', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
           { requestId: 'req_2', resourceId: 'tts_bbb', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
           { requestId: 'req_3', resourceId: 'asr_ccc', upstreamId: 'ups_a', startedAt: '2026-08-01T00:00:00Z', forwarded: true, httpStatus: 200 },
@@ -215,6 +216,8 @@ describe('UsagePage', () => {
     await openRequests(wrapper)
     const text = wrapper.text()
     expect(text).toContain('Model')
+    expect(text).toContain('Provider')
+    expect(text).not.toContain('usage.kind.PROVIDER')
     expect(text).toContain('Image generation')
     expect(text).toContain('TTS')
     expect(text).toContain('ASR')
@@ -224,6 +227,12 @@ describe('UsagePage', () => {
     expect(firstRow.text()).toContain('Enterprise model')
     expect(firstRow.text()).not.toContain('req_1')
     expect(firstRow.text()).not.toContain('ups_a')
+    const imageRow = wrapper.findAll('[data-cy="usage-row"]').find(row => row.text().includes('img_picture'))!
+    expect(imageRow).toBeDefined()
+    expect(imageRow.text()).not.toContain('Resource name unavailable')
+    await imageRow.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-cy="usage-detail"]').text()).not.toContain('Resource name unavailable')
   })
 
   it('shows error class and duration for a failed request', async () => {
@@ -496,7 +505,7 @@ describe('UsagePage', () => {
       }
       if (path.includes('/usage/distribution')) return {
         from: '2026-09-19T00:00:00Z', to: '2026-09-20T00:00:00Z',
-        items: [{ resourceKind: 'ASR', clientProtocol: 'OPENAI_REALTIME_TRANSCRIPTION', requestCount: 1, semanticMeters: [{ meter: 'AUDIO_SECONDS', quantity: '120', confidence: 'EXACT' }] }],
+        items: [{ resourceKind: 'ASR', resourceId: 'asr_legacy', clientProtocol: 'OPENAI_REALTIME_TRANSCRIPTION', requestCount: 1, semanticMeters: [{ meter: 'AUDIO_SECONDS', quantity: '120', confidence: 'EXACT' }] }],
       }
       if (path.includes('/usage/users')) return {
         items: [{ userId: 'usr_1', userDisplayName: 'Ada', requestCount: 2, semanticMeters: [], budget: { userId: 'usr_1', timezone: 'Asia/Shanghai', asOf: '2026-09-20T00:00:00Z', items: [{ capability: 'MODEL', mode: 'LIMITED', source: 'EXPLICIT', revision: 1, effectiveFrom: '2026-09-01T00:00:00Z', asOf: '2026-09-20T00:00:00Z', inFlightRequests: 0, limits: [], usageMeters: [], status: 'EXHAUSTED' }] } }],
@@ -508,6 +517,7 @@ describe('UsagePage', () => {
     expect(wrapper.text()).toContain('10K tokens')
     expect(wrapper.text()).toContain('2 min')
     expect(wrapper.text()).toContain('OPENAI_REALTIME_TRANSCRIPTION')
+    expect(wrapper.text()).toContain('asr_legacy')
     expect(wrapper.text()).toContain('Ada')
     expect(wrapper.text()).toContain('Exhausted')
 

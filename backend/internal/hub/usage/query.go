@@ -310,8 +310,16 @@ func (s *Service) resourceNames(ctx context.Context, views []RequestView) error 
 			return err
 		}
 		resources := make(map[string]string)
+		for _, provider := range snapshot.Providers {
+			resources[provider.ProviderId] = provider.DisplayName
+		}
 		for _, model := range snapshot.Models {
 			resources[model.ModelId] = model.DisplayName
+		}
+		if snapshot.ImageGenerators != nil {
+			for _, image := range *snapshot.ImageGenerators {
+				resources[image.ImageId] = image.DisplayName
+			}
 		}
 		for _, speech := range snapshot.Tts {
 			resources[speech.TtsId] = speech.DisplayName

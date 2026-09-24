@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useQuasar } from 'quasar'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useSessionStore } from '../stores/session'
 import { visibleNavItems } from '../router/navigation'
@@ -10,52 +10,16 @@ import OrchelmBrand from '../components/OrchelmBrand.vue'
 import ChangePasswordDialog from '../components/ChangePasswordDialog.vue'
 import { switchLocale, currentLocale, SUPPORTED_LOCALES, type LocaleCode } from '../i18n'
 
-// Layout strategy — leveraging Quasar's built-in responsive drawer logic:
-//
-//   • show-if-above="true"  →  Quasar auto-opens the drawer on wide screens
-//     (above the breakpoint) and auto-closes it when shrinking below.
-//   • breakpoint="1023"     →  the px threshold; screens > 1023px get a
-//     persistent rail, screens ≤ 1023px get an overlay drawer.
-//   • v-model="drawerOpen"  →  only tracks user toggles in overlay mode.
-//     On wide screens Quasar manages visibility internally.
-//
-// CRITICAL: do NOT set drawerOpen=false on route change when the screen
-// is above the breakpoint — that would close the persistent drawer.
-// Only close on narrow screens (overlay mode).
-
 const $t = useI18n().t
 const $q = useQuasar()
-const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
-const drawerOpen = ref(!$q.screen.lt.md)
+const drawerOpen = ref(false)
 const drawerMini = ref(false)
 const changePasswordOpen = ref(false)
 const navItems = visibleNavItems()
 const deliveryNavItems = navItems.filter(item => item.group === 'configuration')
 const diagnosticNavItems = navItems.filter(item => item.group === 'operations')
-
-// Close the overlay drawer after navigating — but ONLY on narrow screens.
-// On wide screens the drawer is persistent (managed by Quasar show-if-above).
-watch(
-  () => route?.fullPath,
-  () => {
-    // Quasar's md breakpoint starts at 1024px, matching the drawer's 1023px
-    // breakpoint. lg starts at 1440px and would incorrectly hide the drawer on
-    // common 1280/1366px desktop displays.
-    if ($q.screen.lt.md) {
-      drawerOpen.value = false
-    }
-  },
-)
-
-watch(
-  () => $q.screen.lt.md,
-  narrow => {
-    if (narrow) drawerOpen.value = false
-    else drawerOpen.value = true
-  },
-)
 
 function toggleNavigation() {
   if ($q.screen.lt.md) drawerOpen.value = !drawerOpen.value
@@ -183,15 +147,13 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
       </q-toolbar>
     </q-header>
 
-    <!-- Responsive navigation drawer:
-         • show-if-above: Quasar auto-opens on wide screens (> breakpoint)
-         • breakpoint: 1023px — above = persistent rail, below = overlay
-         • Quasar manages the belowBreakpoint ↔ aboveBreakpoint transition
-           internally, including auto-show when resizing narrow → wide. -->
+    <!-- Use Screen's breakpoint as the explicit behavior signal: QDrawer can
+         otherwise miss a width update while its mobile overlay locks scroll. -->
     <q-drawer
       v-model="drawerOpen"
       show-if-above
       :breakpoint="1023"
+      :behavior="$q.screen.lt.md ? 'mobile' : 'desktop'"
       bordered
       :width="196"
       :mini-width="56"
@@ -205,6 +167,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
           clickable
           :to="item.path"
           exact
+          :aria-label="navLabel(item.id)"
           active-class="bg-grey-2 text-primary"
           dense
         >
@@ -220,6 +183,7 @@ const LOCALE_LABELS: Record<LocaleCode, string> = {
           clickable
           :to="item.path"
           exact
+          :aria-label="navLabel(item.id)"
           active-class="bg-grey-2 text-primary"
           dense
         >

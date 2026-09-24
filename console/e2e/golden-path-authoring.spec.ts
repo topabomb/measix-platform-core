@@ -116,6 +116,34 @@ async function login(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/admin\/(overview)?$/)
 }
 
+test('Admin drawer returns to desktop layout after an open narrow overlay is resized', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await login(page)
+  await expect(page.locator('.q-drawer')).toHaveClass(/q-drawer--standard/)
+
+  await page.setViewportSize({ width: 800, height: 800 })
+  await expect(page.locator('.q-drawer')).toHaveClass(/q-drawer--mobile/)
+  await page.locator('.orchelm-toolbar .q-btn').first().click()
+  await expect(page.locator('.q-drawer__backdrop')).not.toHaveClass(/hidden/)
+
+  await page.setViewportSize({ width: 1280, height: 800 })
+  const drawer = page.locator('.q-drawer')
+  await expect(drawer).toHaveClass(/q-drawer--standard/)
+  await expect(page.locator('.q-drawer__backdrop')).toHaveCount(0)
+  await expect.poll(async () => page.locator('.q-page-container').evaluate(element => getComputedStyle(element).paddingLeft)).toBe('196px')
+
+  await page.locator('.orchelm-toolbar .q-btn').first().click()
+  await expect(drawer).toHaveClass(/q-drawer--mini/)
+  await page.locator('.orchelm-toolbar .q-btn').first().click()
+  await expect(drawer).toHaveClass(/q-drawer--standard/)
+
+  await page.setViewportSize({ width: 800, height: 800 })
+  await page.locator('.orchelm-toolbar .q-btn').first().click()
+  await page.locator('.q-drawer a[href="/admin/users"]').click()
+  await expect(page).toHaveURL(/\/admin\/users$/)
+  await expect(page.locator('.q-drawer__backdrop')).toHaveClass(/hidden/)
+})
+
 /**
  * Helper: select an option from a q-select identified by data-cy.
  */

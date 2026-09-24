@@ -1,0 +1,51 @@
+{
+  "name": "measix-platform-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "measix S0 platform-core monorepo: Go backend + Quasar admin console + OpenAPI wire contracts.",
+  "scripts": {
+    "setup": "node scripts/dev-setup.mjs",
+    "start": "concurrently -n hub,relay,console -c blue,magenta,green \"npm run start:hub\" \"npm run start:relay\" \"npm run start:console\"",
+    "start:hub": "cd backend && go run ./cmd/control-hub run --listen :8080 --db ../.data/hub.db --master-key-file ../.secrets/master.key --jwt-private-key-file ../.secrets/jwt-ed25519.seed --relay-internal-url http://127.0.0.1:8091 --relay-service-token-file ../.secrets/relay-service.token",
+    "start:relay": "cd backend && go run ./cmd/runtime-relay --public-listen :8090 --internal-listen 127.0.0.1:8091 --spool ../.data/relay-spool.db --hub-internal-url http://127.0.0.1:8081 --hub-service-token-file ../.secrets/relay-service.token",
+    "start:console": "pnpm -C console dev",
+    "install:console": "pnpm -C console install",
+    "dev": "npm run start",
+    "device:real": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-real-device-preset.ps1",
+    "device:real:reset": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-real-device-preset.ps1 -Reset",
+    "device:real:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-real-device-preset.ps1",
+    "build": "pnpm -C console build",
+    "build:backend": "cd backend && go build ./...",
+    "typecheck": "pnpm -C console typecheck",
+    "generate:api": "pnpm -C console generate:api",
+    "generate:go-admin": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/admin.yaml api/admin/admin.openapi.yaml",
+    "generate:go-client": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/client.yaml api/client/client-control.openapi.yaml",
+    "generate:go-relay": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/relay.yaml api/internal/relay-control.openapi.yaml",
+    "generate:go-usage": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 -config api/codegen/usage.yaml api/internal/usage-ingest.openapi.yaml",
+    "generate": "node scripts/checks.mjs generate",
+    "verify:preview-contract": "node scripts/verify-preview-contract.mjs",
+    "build:preview-release": "node scripts/build-preview-release.mjs",
+    "drift": "node scripts/checks.mjs drift",
+    "fmt": "cd backend && gofmt -w .",
+    "fmt:check": "node scripts/checks.mjs fmt",
+    "vet": "cd backend && go vet ./...",
+    "contract": "cd backend && go test ./internal/contract -count=1",
+    "test": "npm run test:backend && npm run test:console",
+    "test:backend": "cd backend && go test ./... -count=1",
+    "test:backend-race": "cd backend && go test -race ./pkg/platformid ./internal/common/health ./internal/common/observability ./internal/common/sqliteutil ./internal/relay/metering -count=1",
+    "test:console": "pnpm -C console test",
+    "test:relay": "cd backend && go test ./internal/relay/... -count=1",
+    "test:hub": "cd backend && go test ./internal/hub/... -count=1",
+    "ci": "make ci",
+    "test:tooling": "node --test scripts/checks.test.mjs scripts/freeze-manifest.test.mjs scripts/replay-freeze.test.mjs scripts/adapter-identity.test.mjs scripts/harness-cleanup.test.mjs scripts/harness-path.test.mjs scripts/scenario-definitions.test.mjs scripts/cli-contract.test.mjs scripts/freeze-producers.test.mjs scripts/preview-deploy.test.mjs",
+    "test:public-origin": "node --test scripts/public-origin.test.mjs"
+  },
+  "packageManager": "pnpm@11.0.0",
+  "engines": {
+    "node": ">=22.17.0",
+    "pnpm": ">=11"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -1,0 +1,140 @@
+#!/usr/bin/env node
+import { createHash } from 'node:crypto'
+import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { spawnSync } from 'node:child_process'
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const PORTAL = resolve(ROOT, '..', 'measix-enterprise-portal')
+const ARCHITECTURE = resolve(ROOT, '..', 'measix-architecture')
+const ANDROID = resolve(process.env.MEASIX_RELEASE_ANDROID_ROOT || resolve(ROOT, '..', '..', 'rikkahub_mcp'))
+const version = process.argv[2]
+if (!version || !/^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$/.test(version)) fail('Usage: node scripts/build-preview-release.mjs <version>')
+if (!existsSync(join(PORTAL, 'package.json'))) fail(`Portal repository not found: ${PORTAL}`)
+if (git(ROOT, ['status', '--porcelain']).trim()) fail('Core worktree must be clean before building a release')
+if (git(PORTAL, ['status', '--porcelain']).trim()) fail('Portal worktree must be clean before building a release')
+if (git(ARCHITECTURE, ['status', '--porcelain']).trim()) fail('Architecture worktree must be clean before building a release')
+if (git(ANDROID, ['status', '--porcelain']).trim()) fail('Android worktree must be clean before building a release')
+run('node', ['scripts/checks.mjs', 'generate'], ROOT)
+if (git(ROOT, ['status', '--porcelain']).trim()) fail('Generated contracts or dependencies drift from committed sources')
+run('pnpm', ['generate:api'], PORTAL)
+if (git(PORTAL, ['status', '--porcelain']).trim()) fail('Portal generated contracts drift from committed sources')
+run('node', ['scripts/verify-preview-contract.mjs'], ROOT)
+
+const packageName = `measix-core-${version}-linux-arm64`
+const outputDir = join(ROOT, '.artifacts', 'releases')
+const stage = join(outputDir, packageName)
+rmSync(stage, { recursive: true, force: true })
+mkdirSync(join(stage, 'bin'), { recursive: true })
+mkdirSync(join(stage, 'assets'), { recursive: true })
+mkdirSync(join(stage, 'deploy'), { recursive: true })
+
+run('pnpm', ['-C', 'console', 'build'], ROOT)
+run('pnpm', ['build'], PORTAL)
+run('go', ['build', '-trimpath', '-ldflags', `-s -w -X main.buildVersion=${version}`, '-o', join(stage, 'bin', 'control-hub'), './cmd/control-hub'], join(ROOT, 'backend'), { CGO_ENABLED: '0', GOOS: 'linux', GOARCH: 'arm64' })
+run('go', ['build', '-trimpath', '-ldflags', `-s -w -X main.buildVersion=${version}`, '-o', join(stage, 'bin', 'runtime-relay'), './cmd/runtime-relay'], join(ROOT, 'backend'), { CGO_ENABLED: '0', GOOS: 'linux', GOARCH: 'arm64' })
+
+cpSync(join(ROOT, 'console', 'dist', 'spa'), join(stage, 'assets', 'admin'), { recursive: true })
+cpSync(join(PORTAL, 'dist'), join(stage, 'assets', 'portal'), { recursive: true })
+cpSync(join(ROOT, 'deploy', 'preview'), join(stage, 'deploy'), { recursive: true })
+for (const path of walk(join(stage, 'deploy')).filter(path => path.endsWith('.sh'))) chmodSync(path, 0o755)
+chmodSync(join(stage, 'bin', 'control-hub'), 0o755)
+chmodSync(join(stage, 'bin', 'runtime-relay'), 0o755)
+
+const protocolFiles = [
+  'api/admin/admin.openapi.yaml',
+  'api/client/client-control.openapi.yaml',
+  'api/internal/relay-control.openapi.yaml',
+  'api/internal/usage-ingest.openapi.yaml',
+]
+const release = {
+  formatVersion: 1,
+  product: 'MEASIX Core S0.2 Preview',
+  version,
+  target: { os: 'linux', arch: 'arm64', platform: 'NVIDIA DGX Spark' },
+  builtAt: new Date().toISOString(),
+  source: {
+    architectureCommit: git(ARCHITECTURE, ['rev-parse', 'HEAD']).trim(),
+    coreCommit: git(ROOT, ['rev-parse', 'HEAD']).trim(),
+    portalCommit: git(PORTAL, ['rev-parse', 'HEAD']).trim(),
+    androidCommit: git(ANDROID, ['rev-parse', 'HEAD']).trim(),
+  },
+  protocols: Object.fromEntries(protocolFiles.map(path => [path, `sha256:${sha256(join(ROOT, path))}`])),
+  compatibility: compatibilityEvidence(),
+  schemaMigrationIdentity: migrationIdentity(),
+}
+writeFileSync(join(stage, 'release.json'), JSON.stringify(release, null, 2) + '\n')
+
+const files = walk(stage).filter(path => basename(path) !== 'SHA256SUMS').sort()
+writeFileSync(join(stage, 'SHA256SUMS'), files.map(path => `${sha256(path)}  ${relative(stage, path).split(sep).join('/')}`).join('\n') + '\n')
+const archive = join(outputDir, `${packageName}.tar.gz`)
+rmSync(archive, { force: true })
+createArchive(stage, archive)
+console.log(archive)
+
+function createArchive(stage, archive) {
+  if (process.platform !== 'win32') {
+    run('tar', ['-czf', archive, '-C', stage, '.'], ROOT)
+    return
+  }
+  // Windows file modes do not survive bsdtar consistently. Normalize inside
+  // the WSL filesystem so the uploaded production archive has executable
+  // binaries/scripts and non-executable assets/configuration.
+  const wslStage = command('wsl.exe', ['-e', 'wslpath', '-a', stage], ROOT).stdout.trim()
+  const wslArchive = command('wsl.exe', ['-e', 'wslpath', '-a', archive], ROOT).stdout.trim()
+  const script = `set -euo pipefail
+stage=$1
+archive=$2
+temp=$(mktemp -d /tmp/measix-release-XXXXXX)
+trap 'rm -rf -- "$temp"' EXIT
+cp -a -- "$stage/." "$temp/"
+find "$temp" -type d -exec chmod 0755 {} +
+find "$temp" -type f -exec chmod 0644 {} +
+chmod 0755 "$temp"/bin/* "$temp"/deploy/*.sh
+tar -czf "$archive" -C "$temp" .`
+  run('wsl.exe', ['-e', 'bash', '-lc', script, 'measix-release', wslStage, wslArchive], ROOT)
+}
+
+function migrationIdentity() {
+  const dir = join(ROOT, 'backend', 'migrations')
+  const files = readdirSync(dir).filter(name => /^\d{6}_.+\.sql$/.test(name)).sort()
+  const hash = createHash('sha256')
+  files.forEach((name, index) => hash.update(`${String(index + 1).padStart(6, '0')}\0${name}\0${sha256(join(dir, name))}\n`))
+  return `sha256:${hash.digest('hex')}`
+}
+
+function compatibilityEvidence() {
+  const portalContract = JSON.parse(readFileSync(join(PORTAL, 'src', 'api', 'contract.json'), 'utf8'))
+  const androidPortal = JSON.parse(readFileSync(join(ANDROID, 'app', 'src', 'test', 'resources', 'contracts', 'portal', 'manifest.json'), 'utf8'))
+  return {
+    baseline: JSON.parse(readFileSync(join(ROOT, 'api', 'protocol-baseline.json'), 'utf8')).baseline,
+    clientProtocolVersion: '1',
+    snapshotSchemaVersions: [4],
+    enrollmentFormatVersion: 1,
+    portalBridgeVersion: androidPortal.bridgeVersion,
+    portalArtifacts: portalContract.artifacts,
+    androidClientContract: `sha256:${sha256(join(ANDROID, 'app', 'src', 'test', 'resources', 'contracts', 'platform', 'client-control.openapi.yaml'))}`,
+    androidPortalArtifacts: androidPortal.artifacts,
+  }
+}
+
+function walk(dir) {
+  return readdirSync(dir).flatMap(name => {
+    const path = join(dir, name)
+    return statSync(path).isDirectory() ? walk(path) : [path]
+  })
+}
+function sha256(path) { return createHash('sha256').update(readFileSync(path)).digest('hex') }
+function git(cwd, args) { return command('git', args, cwd).stdout }
+function run(name, args, cwd, extraEnv = {}) {
+  const result = command(name, args, cwd, extraEnv)
+  if (result.stdout) process.stdout.write(result.stdout)
+  if (result.stderr) process.stderr.write(result.stderr)
+}
+function command(name, args, cwd, extraEnv = {}) {
+  const result = spawnSync(name, args, { cwd, encoding: 'utf8', env: { ...process.env, ...extraEnv }, shell: process.platform === 'win32' && name === 'pnpm', windowsHide: true, maxBuffer: 32 << 20 })
+  if (result.status !== 0) fail(`${name} ${args.join(' ')} failed\n${result.stdout ?? ''}${result.stderr ?? ''}`)
+  return result
+}
+function fail(message) { console.error(message); process.exit(1) }

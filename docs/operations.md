@@ -1,153 +1,147 @@
 # Operations
 
-This document owns the executable operating procedures for `measix-platform-core`. Architecture defines operational invariants and component semantics; this document records how the built software is configured, started, observed, backed up, restored and upgraded.
+This document owns concrete operating procedures, configuration and current limitations. Architecture owns required behavior; [current status](s0-execution-progress.md) records implemented behavior and remaining stage gates. A documented target is not an implemented production package.
 
-## 1. Scope
+## 1. Implemented topology
 
-Production S0 server-side artifacts are:
+Current daemons are `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. `devmigrate` and `generate-android-wire` are utilities, not services. The S0.2 internal Preview package targets NVIDIA DGX Spark Linux ARM64 and supplies a PM2 ecosystem, the service-root `run.sh`, a remote-Caddy reference template and runbooks under `deploy/preview`; it does not include the planned Enterprise Tool Gateway or multi-node/HA operation. See [S0.2 Preview deployment](s02-preview-deployment.md).
 
-```text
-control-hub     long-running Go process
-runtime-relay   long-running Go process
-Admin Console   static SPA build served by Control Hub/Ingress
-```
+Admin is a static Quasar SPA. Supply `--admin-assets-dir <console/dist/spa>` (or `HUB_ADMIN_ASSETS_DIR`) to the Hub daemon; startup rejects a missing `index.html`, and the existing static handler owns `/admin` and deep links. Omitting the option leaves static hosting disabled. Production ingress must route `/api/client/v1`, `/api/admin/v1`, `/admin` to Hub and `/runtime/v1` to Relay under one origin; test-library hosting does not qualify production TLS/ingress.
 
-This document must not redefine product state such as Publish, Activation or Managed Generation. It documents the operational actions around the implementation.
+`npm start`, `concurrently`, `go run`, and Node/Go harness process orchestration are development/test tools, not a production supervisor. See [development](development.md) for local startup; Relay usage delivery uses the private Hub listener.
 
-## 2. Configuration ownership
+### One public origin
 
-The complete implemented configuration surface belongs to source/config definitions plus this document. Architecture documents may require specific categories of configuration but should not maintain a duplicate exhaustive environment-variable list.
+The repository-root Caddy example below remains a local development recipe. The Spark Preview does not install Caddy: Hub public binds `0.0.0.0:9004`, Relay public binds `0.0.0.0:9002`, and the remote Tailscale ingress proxies those two ports. Hub/Relay internal ports `9001`/`9003` stay on loopback. Do not apply the development bind variables or local Caddy commands to the Spark runbook.
 
-When configuration code lands, document each production option here with:
+The checked-in [Caddyfile](../deploy/Caddyfile) routes Discovery, Admin, Client control and Portal to Hub, `/runtime/v1` to Relay, and rejects `/internal` and its children. With its loopback defaults, start Hub public on `127.0.0.1:9004` (private `9001`), Relay public on `127.0.0.1:9002` (private `9003`), then run from the repository root:
 
 ```text
-name
-component
-required/default
-format/range
-secret? yes/no
-restart required?
-operational effect
+caddy validate --config deploy/Caddyfile --adapter caddyfile
+caddy run --config deploy/Caddyfile --adapter caddyfile
 ```
 
-Do not document an environment variable until it actually exists in code.
+Clients use `http://127.0.0.1:9000`; they resolve `clientApiBase` and `runtimeApiBase` from `/.well-known/measix`, never the internal component ports. For the standard Portal, also set Hub `--public-origin http://127.0.0.1:9000 --portal-assets-dir ../../measix-enterprise-portal/dist` when running from `backend/`. To use an independently deployed enterprise Portal, set `--portal-upstream-url http://portal.example/` instead; Android still opens Hub `/portal/`. Admin assets remain `--admin-assets-dir ../console/dist/spa`.
 
-Production secrets are referenced through configured secret material/files/services as implemented; plaintext values never belong in Git, docs, CI logs or test artifacts.
+For a device deployment, set `MEASIX_PUBLIC_ADDRESS` to the device-reachable HTTP or HTTPS origin and `MEASIX_BIND` to the intended ingress interface. Set Hub `--public-origin` to that same origin for the first startup. For example, `http://192.0.2.20:9000` is a documentation-only LAN-shaped origin; replace it with the private deployment value. IP addresses, domain names and custom ports are supported. HTTP does not require DNS or certificates. HTTPS termination belongs to the ingress when selected. `MEASIX_HUB_UPSTREAM` and `MEASIX_RELAY_UPSTREAM` override the private backend addresses. Expose only the public ingress; loopback on Android refers to the device, not this computer. The application does not configure router forwarding or firewall rules; verify the selected address from the device network.
 
-## 3. Filesystem/persistence ownership
+The first successful Hub startup persists `--public-origin` into Deployment settings. Afterwards Admin **Global settings** is authoritative and can change it without restarting Hub; the startup flag remains a seed for a clean database, not an override of a reviewed Admin change. For a Caddy deployment, set the persisted value to the external address such as `https://core.example.com`, while Hub may continue listening on a private HTTP address. Configure and verify DNS, TLS and Caddy before saving: Core does not provision them. A change affects new enrollment material, Portal URLs/origin checks and Secure-cookie policy; it revokes existing Portal browser sessions but preserves Deployment, User, Device and Android Session identity. Existing Android clients can continue the same enterprise session after changing their enterprise address to the new origin.
 
-At minimum operations must distinguish:
+Use Caddy's native [WebSocket and streaming proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#streaming). No body buffering, retry or `flush_interval -1` override is required; SSE is flushed automatically, and forcing negative flush intervals disables upstream cancellation on client disconnect. The Caddy administration API is disabled. This recipe is ingress configuration, not the S0.3 production supervisor/package. Local HTTP evidence does not qualify public TLS or device connectivity.
 
-- Control Hub database and its migration/backup lifecycle;
-- Runtime Relay local durable spool and its restart/replay lifecycle;
-- static Admin build assets;
-- service credentials/configuration;
-- transient logs/temp/test data.
+## 2. Configuration actually implemented
 
-Concrete paths are documented here when implementation fixes them. Paths in source/config are the final implementation truth.
+Source: `backend/internal/hub/config/config.go`, `backend/internal/relay/config/config.go`. CLI flags override environment defaults; duration environment values are parsed before flags, so an invalid environment duration can fail loading even with a valid flag. All options except the persisted public origin are startup configuration; there is no general-purpose config hot reload.
 
-## 4. Health and readiness
+### Control Hub
 
-Both server binaries expose liveness/readiness endpoints according to their component implementation specs.
+| Flag | Environment | Default / requirement |
+| --- | --- | --- |
+| `--listen` | `HUB_LISTEN_ADDR` | `:8080` |
+| `--internal-listen` | `HUB_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8081`; keep private |
+| `--admin-assets-dir` | `HUB_ADMIN_ASSETS_DIR` | Optional production SPA directory |
+| `--diagnostics-log-dir` | `HUB_DIAGNOSTICS_LOG_DIR` | Optional fixed directory containing Hub/Relay PM2 log files for authenticated Admin diagnostics |
+| `--public-origin` | `HUB_PUBLIC_ORIGIN` | Initial public HTTP/HTTPS platform origin seed; later changes are persisted through Admin Global settings |
+| `--portal-assets-dir` | `HUB_PORTAL_ASSETS_DIR` | Standard `measix-enterprise-portal/dist`; requires approved origin |
+| `--portal-upstream-url` | `HUB_PORTAL_UPSTREAM_URL` | Optional custom enterprise HTTP/HTTPS static site; takes precedence over assets and does not fall back |
+| `--db` | `HUB_DB_PATH` | Required SQLite path |
+| `--master-key-file` | `HUB_MASTER_KEY_FILE` | Required AES-256 key file; secret |
+| `--jwt-private-key-file` | `HUB_JWT_PRIVATE_KEY_FILE` | Required Ed25519 key file; secret |
+| `--relay-internal-url` | `RELAY_INTERNAL_URL` | Required absolute HTTP(S) URL; private |
+| `--relay-service-token-file` | `HUB_RELAY_SERVICE_TOKEN_FILE` | Required token file; secret |
+| `--access-token-ttl` | `HUB_ACCESS_TOKEN_TTL` | `10m`; positive, at most `10m` |
+| `--reconcile-interval` | `HUB_RECONCILE_INTERVAL` | `10s`; positive |
 
-Operational checks must distinguish:
+Android sessions have a seven-day rolling idle deadline, renewed only by refresh. Refresh rotates credentials and requires a stable per-command `Idempotency-Key`; the same old credential/key recovers the identical encrypted response for two minutes without extending the lease twice. Rotation recovery survives Hub restart using master-key-derived encryption. Persist client pending refresh input/key before sending; a different key conflicts, and an expired recovery window requires re-enrollment. Old fixed-TTL and absolute Discovery URL flags were removed; Discovery returns same-origin paths.
 
-- process alive;
-- component ready to serve its public/internal responsibility;
-- degraded subsystems such as control synchronization or usage spool;
-- version/build identity.
+Admin user deletion is a deny-first destructive workflow, not ordinary disable/logout. The operator must enter the exact username and a reason. Hub first blocks new Client, Runtime and refresh operations, then completes the durable full purge of the user's devices, sessions, configuration, budgets, usage and Portal-private state. Audit keeps only the required non-reversible subject summary; credential digests are stored as irreversible tombstones so every old access/runtime or refresh credential returns `401 enterprise_identity_deleted` instead of entering refresh/retry or becoming a generic invalid credential. A failed purge remains visible and retryable; only `COMPLETED` means deletion succeeded. Reusing the username later creates a different principal ID with no inherited state; issue a new one-time enrollment. Because deletion removes the old Device, the same installation may bind the fresh principal, while all old credentials remain terminally rejected.
 
-A load balancer/readiness probe must not convert a meaningful degraded state into a false “healthy” interpretation.
+Logout revokes the durable Android session and clears rotation recovery. The existing Hub reconciler projects pending session denies through a SECURITY_CHANGE Activation; HTTP 204 is not Relay acknowledgement. Previously issued access may remain usable until the deny applies or its short expiry. Disable/revoke also invalidate sessions; enabling a user does not resurrect credentials. A new administrator-issued enrollment may replace sessions on the same ACTIVE installation/user, but cannot revive a revoked device or transfer another user's installation.
 
-## 5. Startup
+### Runtime Relay
 
-The production start sequence must be reproducible from a clean deployment:
+| Flag | Environment | Default / requirement |
+| --- | --- | --- |
+| `--public-listen` | `RELAY_PUBLIC_LISTEN_ADDR` | `:8090` |
+| `--internal-listen` | `RELAY_INTERNAL_LISTEN_ADDR` | `127.0.0.1:8091`; must differ from public listen string |
+| `--spool` | `RELAY_SPOOL_PATH` | `relay-spool.db`; nonempty |
+| `--hub-internal-url` | `RELAY_HUB_INTERNAL_URL` | Required Hub **private** API base for budget admission, lifecycle, and durable usage settlement |
+| `--hub-service-token-file` | `RELAY_HUB_SERVICE_TOKEN_FILE` | Required token file; secret |
+| `--usage-batch-size` | `RELAY_USAGE_BATCH_SIZE` | `100`; range `1..200` |
+| `--usage-flush-interval` | `RELAY_USAGE_FLUSH_INTERVAL` | `1s`; positive |
+| `--shutdown-grace` | `RELAY_SHUTDOWN_GRACE` | `30s`; positive |
+
+Both default private listeners are loopback-only. Isolate both internal listeners; never publish them through public ingress. The servers use HTTP listeners, not built-in TLS termination. Current wiring reuses one token for Hub→Relay control and Relay→Hub usage: separate configuration names do not establish separate trust scopes.
+
+Use restricted secret files and persistent, explicitly resolved DB/spool paths. Key decoding/accepted formats belong to `backend/internal/hub/security`; verify against it when provisioning. Never place secret values in command history, Git, logs or support bundles.
+
+## 3. Bootstrap and startup
+
+`control-hub` has `run`, `migrate`, `bootstrap-admin`, `check` and `backup` subcommands. Inspect each subcommand's flags with `--help`; maintenance commands do not use the full run configuration. Default bootstrap refuses an existing deployment; `--if-empty` skips an initialized deployment without resetting credentials, while `--add-admin` explicitly adds an administrator. They are mutually exclusive. Initial bootstrap accepts `--timezone <IANA zone>` (default UTC) for Enterprise Update date boundaries. Use its password-file input, not a password printed into shared logs.
+
+An authenticated administrator can change their own password from the account menu. The operation requires the current password and CSRF token, clears the current Cookie and revokes every Admin Web Session owned by that administrator; sign in again with the replacement password. It does not alter Client/Android sessions. Lost credentials still require the documented `bootstrap-admin --add-admin` recovery path rather than database editing.
+
+Run `migrate` before bootstrap/startup; it initializes an empty database or applies pending append-only migrations. `run` does not create or alter schema. Startup verifies recorded versions/checksums, opens the database, requires the deployment invariant and initializes runtime services. See [database migrations](database-migrations.md).
+
+Start Hub/Relay, wait for explicit readiness, verify desired/applied control state, then expose traffic. Relay cannot serve authorized runtime traffic before valid control state is applied. Process liveness does not prove activation, usage delivery or static hosting.
+
+## 4. Health and status
+
+| Component | Public probes | Status | Interpretation |
+| --- | --- | --- | --- |
+| Hub | `/live`, `/ready` | Authenticated Admin System API | Ready after initialization; Relay runtime can still be `DEGRADED` |
+| Relay | `/live`, `/ready` | Private `/internal/v1/control/status`, service authentication | Ready once control state exists; spool degradation is separate |
+
+OpenAPI/router registrations own exact responses. The unauthenticated System health endpoint only probes the local DB connection; full schema/Relay/usage diagnostics stay in authenticated System status and the maintenance command. Hub System reports the current schema identity expected by the binary, computed from the embedded initialization SQL. It forwards Relay spool state, pending count and oldest age; absent observations remain unknown, not zero. Ingest lag is separate from backlog. Hub build identity defaults to `dev` unless supplied at build time; release provenance must pin binaries and static assets.
+
+## 5. Shutdown and durability
+
+Shared HTTP serving handles SIGINT/SIGTERM and invokes bounded drain: Hub uses 30 seconds, Relay its configured grace. After drain/deadline it cancels request contexts, closes connections, rejects new admission and waits up to five seconds for handler cleanup before returning. Relay returns server errors through its owner so final flush and deferred spool close still run. Handlers must honor cancellation; production supervisor hard-stop qualification remains S0.3.
+
+Normal Relay shutdown attempts one final usage flush, capped at two seconds, and preserves the durable spool. It does not guarantee the entire backlog reaches Hub before exit. Sender retry/backoff and poison-batch splitting exist; the recorder degraded flag remains latched until restart. Diagnose failures before restart; never delete the spool as routine recovery.
+
+Runtime response cleanup records usage even when ReverseProxy aborts a mid-stream response. Such facts preserve the already-sent HTTP status and captured control/resource attribution, with `CLIENT_CANCELLED`, `UPSTREAM_TIMEOUT` or `UPSTREAM_UNAVAILABLE` distinguishing the failure. An upstream 200 alone does not prove a stream completed; inspect its error classification.
+
+An upstream HTTP 400, or a connection failure before any upstream response headers arrive, is automatically settled as the currently verified no-semantic-consumption outcome and does not create a manual reconciliation item. Client cancellation, timeout and interruption after response headers may have consumed provider resources; missing meters remain `UNKNOWN`/`PARTIAL` and stay visible for review. Reconciliation backlog has no request-admission threshold and never blocks Runtime service. The Admin confirmation action releases only the remaining uncertain reservation, preserves observed usage and the incomplete fact, and records the operator reason; it is not a service-recovery action and does not rewrite unknown usage to zero. Use the linked request detail to inspect user, device, resource, protocol, transfer result, error class and meters before confirming.
+
+## 6. Persistence, backup and restore
+
+Hub owns its control/identity/usage SQLite database. Relay owns its local durable usage spool. Neither reads the other's database. Keep both outside replaceable binary directories; handle SQLite auxiliary files correctly when moving a stopped database.
+
+Current commands, with paths supplied by the operator:
 
 ```text
-validate configuration
-→ apply/verify required DB migrations
-→ start Control Hub / Runtime Relay
-→ wait for bounded readiness
-→ verify desired/applied runtime state where applicable
-→ expose traffic
+control-hub check --db <hub.db>
+control-hub backup --db <hub.db> --output <new-backup.db>
 ```
 
-Runtime Relay restart begins fail-closed until valid control state is rehydrated, as defined by architecture. This document will record the exact commands once the binaries/tooling exist.
+Backup uses SQLite `VACUUM INTO` and writes an adjacent `.metadata.json`. Both targets are exclusively reserved; existing database or orphan metadata is not overwritten. Source and copied database pass migration-history, integrity, foreign-key and current-column checks before metadata is synced. Metadata records the binary schema identity and integer schema version. These checks do not replace an isolated restore/business replay.
 
-## 6. Graceful shutdown
+`check` derives required tables/columns from current Ent schema, including Enterprise Update and session recovery; it checks SQLite integrity/foreign keys. It does not attest every index or column type equivalence. Success is necessary but insufficient for release.
 
-Operational stop/restart uses the binaries' graceful shutdown behavior rather than process killing as the normal path.
+There is no in-place restore CLI. Restore uses a stopped-service file replacement described by the S0.2 Preview deployment runbook. First restore a copy in an isolated environment with matching binaries and required keys, run `check`, and verify identities, releases/generations and usage. Never experiment on the only production copy; keep the original recoverable until acceptance.
 
-Tests and runbooks must cover:
+## 7. Preview supervision, logging and recent telemetry
 
-- stop accepting new work;
-- bounded drain;
-- cancellation after grace timeout;
-- durable data/spool preservation;
-- restart and readiness recovery.
+The S0.2 Preview uses root-owned PM2 with one forked instance each for Hub and Relay. The root PM2 daemon calls the single service-root `run.sh hub|relay`; it does not assemble binary flags itself. Caddy is managed only on the separate Tailscale ingress server, not on Spark. This is intentionally smaller than the later Gateway/S0.3 topology. Concrete lifecycle and rotation settings are in the packaged ecosystem and [deployment runbook](s02-preview-deployment.md).
 
-Exact signals/timeouts are documented here when implemented/configurable.
+Hub and Relay run as the unprivileged `measix` user and retain independent failure domains. The Preview `run.sh` fixes public listeners to `0.0.0.0:9004` and `0.0.0.0:9002`, fixes internal listeners to loopback `9001` and `9003`, uses bounded restart delay/count and a 40-second kill timeout, and writes separate stdout/stderr files below the explicit deployment root. PM2 lifecycle state is not application readiness.
 
-## 7. Backup and restore
+Hub/Relay use the common safe JSON logger on stdout with `service`, `buildVersion` and stable `event`. HTTP completion middleware records route templates, method, status and duration, excludes successful health probes, and feeds fixed 60 one-minute in-memory buckets. Error values are reduced to safe classes, sensitive field names are redacted and text values are bounded/scrubbed.
 
-Before S0 RC, repository tooling and this document must provide a tested Control Hub backup/restore procedure.
+Authenticated Admin exposes 15/60-minute telemetry and up to 200 recent redacted events from exactly four fixed Hub/Relay stdout/stderr files. Reads are tail-bounded to 2 MiB per file and 4 KiB per line; arbitrary paths, PM2 manager logs and remote-Caddy logs are never accepted. The System page uses at most 60 lightweight SVG points and Quasar virtual scrolling. PM2 logrotate owns file rotation; no centralized log-search platform is required.
 
-The procedure must prove that after restore the facts required by the S0 System Testing Spec remain correct, including stable IDs, releases/generations and usage state where applicable.
+Never emit tokens, cookies, credentials, enrollment/session/signing material, private endpoints, toolRef/claims, raw prompts/bodies/tool arguments/results or direct personal identity. Test normal and failure diagnostics for forbidden material. References: [systemd service lifecycle](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [journald retention](https://www.freedesktop.org/software/systemd/man/252/journald.conf.html); documentation is not runtime qualification.
 
-A backup is not considered valid merely because a database file exists; restore must be exercised in automated/system testing.
+## 8. Troubleshooting and release gate
 
-Relay spool backup is not a substitute for its own durable replay semantics. Operational handling should avoid silently discarding pending usage.
+| Symptom | Safe first checks |
+| --- | --- |
+| Usage never arrives | URL must use Hub private port (default `8081`, not `8080`); inspect token, spool status and ingest errors |
+| Relay not ready after restart | Inspect Hub reconcile and Relay applied revision; do not bypass authentication/inject state |
+| Hub ready but runtime degraded | Compare desired/applied revision and activation; readiness is not convergence |
+| `/admin` missing or deep links fail | Check actual static host/ingress; verify `--admin-assets-dir`, `index.html` and same-origin ingress |
+| Schema/check disagreement | Preserve the database and migration error, compare the packaged migration set, and restore the pre-upgrade backup if needed; never edit history rows |
+| Repeated process crash | Preserve diagnostics/persistent data; no production restart-rate-limit package exists yet |
 
-## 8. Upgrade
-
-Upgrade procedure includes:
-
-```text
-pin release artifacts
-→ verify architecture/release manifest
-→ backup as required
-→ apply migrations
-→ deploy binaries/static assets
-→ readiness/control-state verification
-→ smoke/system checks
-```
-
-If rollback requires database restore or forward migration rather than binary downgrade, the release documentation must say so explicitly.
-
-## 9. Observability
-
-As implementation lands, document:
-
-- structured log fields and correlation IDs;
-- health/status endpoints;
-- relevant queue/spool/backlog indicators;
-- build/version identity;
-- diagnostics that are safe to collect in CI/operations.
-
-Never expose credentials, private signing material or secret plaintext through logs/status endpoints.
-
-## 10. Incident/troubleshooting entries
-
-Troubleshooting belongs here only for implementation/operations facts such as:
-
-- migration failure;
-- Relay not ready after restart;
-- control revision mismatch;
-- usage backlog not draining;
-- Admin static asset/routing failure.
-
-If troubleshooting requires explaining what a platform state *means*, link to `measix-architecture` instead of creating a local alternate semantic description.
-
-## 11. RC operational proof
-
-Before RC, operations are considered ready only when system tests exercise:
-
-- clean deployment/bootstrap;
-- migration replay/upgrade;
-- Hub/Relay restart;
-- backup/restore;
-- usage replay;
-- target-resource/load checks;
-- version/build/manifest traceability.
-
-See `docs/release.md` and `docs/testing.md`.
+Deployment must pin artifacts, verify checksums, back up, apply the packaged forward migrations, validate readiness/control/static routing and run smoke/recovery checks. Downgrade means restoring both the pre-upgrade release and its backup; migration files/history are never reversed in place. RC also needs isolated restore, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).

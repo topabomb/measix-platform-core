@@ -1,0 +1,564 @@
+openapi: 3.0.3
+info:
+  title: MEASIX Runtime Usage and Budget API
+  version: 1.0.0
+paths:
+  /internal/v1/budget/admissions:
+    post:
+      operationId: admitBudget
+      security:
+      - serviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetAdmissionRequest'
+      responses:
+        '200':
+          description: Idempotent authoritative decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetAdmissionDecision'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /internal/v1/budget/requests/{requestId}:start:
+    post:
+      operationId: markBudgetRequestStarted
+      security:
+      - serviceAuth: []
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetLifecycleEvent'
+      responses:
+        '204':
+          description: Started or already started with the same event
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /internal/v1/budget/requests/{requestId}:release:
+    post:
+      operationId: releaseBudgetRequest
+      security:
+      - serviceAuth: []
+      parameters:
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetReleaseRequest'
+      responses:
+        '204':
+          description: Proven-unforwarded reservation released
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /internal/v1/usage/settlements:batch:
+    post:
+      operationId: ingestUsageSettlements
+      security:
+      - serviceAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsageSettlementBatch'
+      responses:
+        '200':
+          description: Every settlement accepted or already present
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageBatchAck'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+components:
+  parameters:
+    RequestId:
+      name: requestId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/RequestId'
+  schemas:
+    DeploymentId:
+      type: string
+      pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    UserId:
+      type: string
+      pattern: ^usr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DeviceId:
+      type: string
+      pattern: ^dev_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    RequestId:
+      type: string
+      pattern: ^req_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    InteractionId:
+      type: string
+      pattern: ^int_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    RuntimeRouteId:
+      type: string
+      pattern: ^rte_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    UpstreamId:
+      type: string
+      pattern: ^ups_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    ResourceKind:
+      type: string
+      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
+    ClientProtocol:
+      type: string
+      enum:
+      - OPENAI_CHAT_COMPLETIONS
+      - OPENAI_RESPONSES
+      - GOOGLE_GENERATE_CONTENT
+      - OPENAI_IMAGES_GENERATIONS
+      - DASHSCOPE_MULTIMODAL_GENERATION
+      - ANTHROPIC_MESSAGES
+      - OPENAI_AUDIO_SPEECH
+      - GEMINI_GENERATE_CONTENT_TTS
+      - MIMO_CHAT_COMPLETIONS_TTS
+      - OPENAI_AUDIO_TRANSCRIPTIONS
+      - DASHSCOPE_HTTP_ASR
+      - OPENAI_REALTIME_TRANSCRIPTION
+      - DASHSCOPE_REALTIME_ASR
+      - MCP_STREAMABLE_HTTP
+    BudgetCapability:
+      type: string
+      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
+    BudgetMode:
+      type: string
+      enum: [UNLIMITED, LIMITED]
+    BudgetSource:
+      type: string
+      enum: [DEFAULT, EXPLICIT]
+    BudgetPeriod:
+      type: string
+      enum: [DAY, WEEK, MONTH, LIFETIME]
+    UsageMeter:
+      type: string
+      enum:
+      - INPUT_TOKENS
+      - OUTPUT_TOKENS
+      - CACHED_TOKENS
+      - TOTAL_TOKENS
+      - CHARACTERS
+      - AUDIO_SECONDS
+      - REQUESTS
+      - REQUESTED_IMAGES
+    UsageCompleteness:
+      type: string
+      enum: [EXACT, PARTIAL, UNKNOWN]
+    MeterValue:
+      type: object
+      additionalProperties: false
+      required: [meter, completeness]
+      properties:
+        meter:
+          $ref: '#/components/schemas/UsageMeter'
+        numerator:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Exact non-negative quantity numerator.
+        denominator:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Exact quantity denominator. Count meters use 1; AUDIO_SECONDS may use sample-rate fractions.
+        completeness:
+          $ref: '#/components/schemas/UsageCompleteness'
+        source:
+          type: string
+          minLength: 1
+    BudgetAdmissionRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - deploymentId
+      - userId
+      - resourceId
+      - resourceKind
+      - clientProtocol
+      - upstreamId
+      - managedGeneration
+      - controlRevision
+      - admittedAt
+      - requestHash
+      - supportedMeters
+      properties:
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        interactionId:
+          $ref: '#/components/schemas/InteractionId'
+        deploymentId:
+          $ref: '#/components/schemas/DeploymentId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        deviceId:
+          $ref: '#/components/schemas/DeviceId'
+        resourceId:
+          type: string
+          minLength: 1
+        resourceKind:
+          $ref: '#/components/schemas/ResourceKind'
+        clientProtocol:
+          $ref: '#/components/schemas/ClientProtocol'
+        upstreamId:
+          $ref: '#/components/schemas/UpstreamId'
+        managedGeneration:
+          type: integer
+          minimum: 0
+        controlRevision:
+          type: integer
+          minimum: 0
+        admittedAt:
+          type: string
+          format: date-time
+        requestHash:
+          type: string
+          pattern: ^sha256:[0-9a-f]{64}$
+        knownUsage:
+          type: array
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/MeterValue'
+        supportedMeters:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/UsageMeter'
+    BudgetLimitState:
+      type: object
+      additionalProperties: false
+      required: [meter, period, limit, used, reserved]
+      properties:
+        meter:
+          $ref: '#/components/schemas/UsageMeter'
+        period:
+          $ref: '#/components/schemas/BudgetPeriod'
+        limit:
+          type: integer
+          format: int64
+          minimum: 0
+        used:
+          type: integer
+          format: int64
+          minimum: 0
+        reserved:
+          type: integer
+          format: int64
+          minimum: 0
+        resetAt:
+          type: string
+          format: date-time
+    BudgetAdmissionDecision:
+      type: object
+      additionalProperties: false
+      required: [requestId, allowed, code, mode, source, revision, inFlightRequests, blockingLimits, asOf]
+      properties:
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        allowed:
+          type: boolean
+        code:
+          type: string
+          enum: [ALLOWED, BUDGET_EXHAUSTED, USAGE_METER_UNAVAILABLE, IN_FLIGHT_LIMIT]
+        mode:
+          $ref: '#/components/schemas/BudgetMode'
+        source:
+          $ref: '#/components/schemas/BudgetSource'
+        revision:
+          type: integer
+          minimum: 0
+        inFlightRequests:
+          type: integer
+          minimum: 0
+        blockingLimits:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetLimitState'
+        unavailableMeters:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageMeter'
+        resetAt:
+          type: string
+          format: date-time
+        asOf:
+          type: string
+          format: date-time
+    BudgetLifecycleEvent:
+      type: object
+      additionalProperties: false
+      required: [revision, occurredAt, eventHash]
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+        occurredAt:
+          type: string
+          format: date-time
+        eventHash:
+          type: string
+          pattern: ^sha256:[0-9a-f]{64}$
+    BudgetReleaseRequest:
+      type: object
+      additionalProperties: false
+      required: [revision, occurredAt, eventHash, reason]
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+        occurredAt:
+          type: string
+          format: date-time
+        eventHash:
+          type: string
+          pattern: ^sha256:[0-9a-f]{64}$
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 256
+    RequestUsageFact:
+      type: object
+      description: Immutable, fully attributed request fact. Proven-unforwarded admission denials carry the same deployment, resource, route and upstream attribution as forwarded requests; only their semantic meters are empty and forwarded is false.
+      additionalProperties: false
+      required:
+      - deploymentId
+      - userId
+      - resourceId
+      - runtimeRouteId
+      - upstreamId
+      - resourceKind
+      - clientProtocol
+      - managedGeneration
+      - controlRevision
+      - startedAt
+      - completedAt
+      - forwarded
+      - httpStatus
+      - requestBytes
+      - responseBytes
+      - durationMs
+      properties:
+        interactionId:
+          $ref: '#/components/schemas/InteractionId'
+        deploymentId:
+          $ref: '#/components/schemas/DeploymentId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        deviceId:
+          $ref: '#/components/schemas/DeviceId'
+        resourceId:
+          type: string
+        runtimeRouteId:
+          $ref: '#/components/schemas/RuntimeRouteId'
+        upstreamId:
+          $ref: '#/components/schemas/UpstreamId'
+        resourceKind:
+          $ref: '#/components/schemas/ResourceKind'
+        clientProtocol:
+          $ref: '#/components/schemas/ClientProtocol'
+        managedGeneration:
+          type: integer
+          minimum: 0
+        controlRevision:
+          type: integer
+          minimum: 0
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        forwarded:
+          type: boolean
+          description: False only for a proven-unforwarded durable denial. Such a fact still requires complete resource, runtime route and upstream attribution.
+        httpStatus:
+          type: integer
+          minimum: 100
+          maximum: 599
+        upstreamHttpStatus:
+          type: integer
+          minimum: 100
+          maximum: 599
+        requestBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        responseBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        durationMs:
+          type: integer
+          format: int64
+          minimum: 0
+        errorClass:
+          type: string
+    UsageSettlement:
+      type: object
+      description: Durable settlement or correction. A proven-unforwarded denial is SETTLED with EXACT completeness, no meters, and a fully attributed request fact.
+      additionalProperties: false
+      required:
+      - requestId
+      - revision
+      - eventHash
+      - sourceEventId
+      - occurredAt
+      - state
+      - completeness
+      - meters
+      - request
+      properties:
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        revision:
+          type: integer
+          minimum: 1
+        eventHash:
+          type: string
+          pattern: ^sha256:[0-9a-f]{64}$
+        sourceEventId:
+          type: string
+          minLength: 1
+        occurredAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum: [SETTLED, RECONCILIATION_REQUIRED]
+        completeness:
+          $ref: '#/components/schemas/UsageCompleteness'
+        meters:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/MeterValue'
+        details:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+            minimum: 0
+        diagnosticCode:
+          type: string
+        request:
+          $ref: '#/components/schemas/RequestUsageFact'
+    UsageSettlementBatch:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/UsageSettlement'
+    UsageBatchAck:
+      type: object
+      additionalProperties: false
+      required: [acceptedCount, duplicateCount, discardedCount]
+      properties:
+        acceptedCount:
+          type: integer
+          minimum: 0
+        duplicateCount:
+          type: integer
+          minimum: 0
+        discardedCount:
+          type: integer
+          minimum: 0
+    BudgetContext:
+      type: object
+      additionalProperties: false
+      properties:
+        capability:
+          $ref: '#/components/schemas/BudgetCapability'
+        resourceId:
+          type: string
+        mode:
+          $ref: '#/components/schemas/BudgetMode'
+        blockingLimits:
+          type: array
+          items:
+            $ref: '#/components/schemas/BudgetLimitState'
+        resetAt:
+          type: string
+          format: date-time
+        asOf:
+          type: string
+          format: date-time
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+        detail:
+          type: string
+        requestId:
+          $ref: '#/components/schemas/RequestId'
+        forwarded:
+          type: boolean
+        budget:
+          $ref: '#/components/schemas/BudgetContext'
+  responses:
+    Problem:
+      description: Problem response
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  securitySchemes:
+    serviceAuth:
+      type: http
+      scheme: bearer

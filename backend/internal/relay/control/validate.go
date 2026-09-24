@@ -1,0 +1,430 @@
+package control
+
+import (
+	"crypto/ed25519"
+	"encoding/base64"
+	"net/http"
+	"net/url"
+	"sort"
+	"strings"
+	"time"
+
+	"measix/platform/internal/wire/relaycontrolapi"
+	"measix/platform/internal/wire/relaystate"
+	"measix/platform/pkg/platformid"
+)
+
+func HashDescriptor(input relaycontrolapi.RuntimeControlState) (relaycontrolapi.Sha256Hash, error) {
+	return relaystate.HashDescriptor(input)
+}
+
+func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*State, error) {
+	if input.ControlRevision < 1 || input.ActiveManagedGeneration < 0 || input.OperationalLimits.MaxRequestBytes < 1 {
+		return nil, ErrInvalidControl
+	}
+	if err := platformid.Validate(platformid.Deployment, input.DeploymentId); err != nil {
+		return nil, ErrInvalidControl
+	}
+	hash, err := relaystate.HashDescriptor(input)
+	if err != nil || string(hash) != string(input.BundleHash) {
+		return nil, ErrInvalidControl
+	}
+
+	state := &State{
+		ControlRevision: input.ControlRevision, BundleHash: string(input.BundleHash),
+		ActiveManagedGeneration: input.ActiveManagedGeneration, DeploymentID: input.DeploymentId,
+		AuthKeys: make(map[string]ed25519.PublicKey), DisabledUsers: make(map[string]struct{}), DeletedUsers: make(map[string]struct{}),
+		RevokedDevices: make(map[string]struct{}), RevokedSessions: make(map[string]struct{}),
+		Resources: make(map[string]Resource), Routes: make(map[string]Route), Upstreams: make(map[string]Upstream),
+		OperationalLimits: input.OperationalLimits, AppliedAt: appliedAt,
+	}
+
+	for _, key := range input.AuthKeys {
+		if key.Kty != relaycontrolapi.OKP || key.Crv != relaycontrolapi.Ed25519 || key.Alg != relaycontrolapi.EdDSA || key.Use != relaycontrolapi.Sig || key.Kid == "" {
+			return nil, ErrInvalidControl
+		}
+		decoded, err := base64.RawURLEncoding.DecodeString(key.X)
+		if err != nil || len(decoded) != ed25519.PublicKeySize {
+			return nil, ErrInvalidControl
+		}
+		if _, exists := state.AuthKeys[key.Kid]; exists {
+			return nil, ErrInvalidControl
+		}
+		state.AuthKeys[key.Kid] = ed25519.PublicKey(append([]byte(nil), decoded...))
+	}
+	if err := addIDs(state.DisabledUsers, platformid.User, input.PrincipalState.DisabledUserIds); err != nil {
+		return nil, err
+	}
+	if err := addIDs(state.DeletedUsers, platformid.User, input.PrincipalState.DeletedUserIds); err != nil {
+		return nil, err
+	}
+	if err := addIDs(state.RevokedDevices, platformid.Device, input.PrincipalState.RevokedDeviceIds); err != nil {
+		return nil, err
+	}
+	if err := addIDs(state.RevokedSessions, platformid.Session, input.PrincipalState.RevokedSessionIds); err != nil {
+		return nil, err
+	}
+
+	for _, value := range input.Upstreams {
+		if err := platformid.Validate(platformid.Upstream, value.UpstreamId); err != nil || !value.Auth.Type.Valid() {
+			return nil, ErrInvalidControl
+		}
+		if _, exists := state.Upstreams[value.UpstreamId]; exists {
+			return nil, ErrInvalidControl
+		}
+		parsed, err := url.Parse(value.BaseUrl)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
+			return nil, ErrInvalidControl
+		}
+		auth, err := compileAuth(value.Auth)
+		if err != nil {
+			return nil, err
+		}
+		caps := make(map[string]struct{}, len(value.TransportCapabilities))
+		for _, capability := range value.TransportCapabilities {
+			if strings.TrimSpace(capability) == "" {
+				return nil, ErrInvalidControl
+			}
+			caps[capability] = struct{}{}
+		}
+		var secretRef *relaycontrolapi.SecretRef
+		if value.SecretRef != nil {
+			if err := platformid.Validate(platformid.Secret, value.SecretRef.SecretId); err != nil || value.SecretRef.SecretVersion < 1 {
+				return nil, ErrInvalidControl
+			}
+			copyRef := *value.SecretRef
+			secretRef = &copyRef
+		}
+		state.Upstreams[value.UpstreamId] = Upstream{
+			ID: value.UpstreamId, BaseURL: parsed, Enabled: value.Enabled,
+			TransportCapabilities: caps, SecretRef: secretRef, Auth: auth,
+		}
+	}
+
+	for _, value := range input.Routes {
+		if err := platformid.Validate(platformid.Route, value.RuntimeRouteId); err != nil || platformid.Validate(platformid.Upstream, value.UpstreamId) != nil {
+			return nil, ErrInvalidControl
+		}
+		if _, exists := state.Routes[value.RuntimeRouteId]; exists {
+			return nil, ErrInvalidControl
+		}
+		if _, exists := state.Upstreams[value.UpstreamId]; !exists || !value.TransportPolicy.Valid() || len(value.AllowedMethods) == 0 || len(value.AllowedPathPrefixes) == 0 {
+			return nil, ErrInvalidControl
+		}
+		methods := make(map[string]struct{}, len(value.AllowedMethods))
+		for _, method := range value.AllowedMethods {
+			method = strings.ToUpper(strings.TrimSpace(method))
+			if !validMethod(method) {
+				return nil, ErrInvalidControl
+			}
+			methods[method] = struct{}{}
+		}
+		prefixes := append([]string(nil), value.AllowedPathPrefixes...)
+		for _, prefix := range prefixes {
+			if !safePath(prefix) {
+				return nil, ErrInvalidControl
+			}
+		}
+		sort.Strings(prefixes)
+		if value.TimeoutPolicy.ConnectMs < 1 || value.TimeoutPolicy.ResponseHeaderMs < 1 || value.TimeoutPolicy.IdleMs < 1 {
+			return nil, ErrInvalidControl
+		}
+		if value.TimeoutPolicy.OverallMs != nil && *value.TimeoutPolicy.OverallMs < 1 {
+			return nil, ErrInvalidControl
+		}
+		state.Routes[value.RuntimeRouteId] = Route{
+			ID: value.RuntimeRouteId, UpstreamID: value.UpstreamId, AllowedMethods: methods,
+			AllowedPathPrefixes: prefixes, TransportPolicy: value.TransportPolicy, TimeoutPolicy: value.TimeoutPolicy,
+		}
+	}
+
+	for _, value := range input.ResourceRoutes {
+		if !runtimeResourceID(value.ResourceId) || platformid.Validate(platformid.Route, value.RuntimeRouteId) != nil ||
+			!value.ResourceKind.Valid() || !value.ClientProtocol.Valid() || !resourceProfileMatches(value) {
+			return nil, ErrInvalidControl
+		}
+		if _, exists := state.Resources[value.ResourceId]; exists {
+			return nil, ErrInvalidControl
+		}
+		route, exists := state.Routes[value.RuntimeRouteId]
+		if !exists {
+			return nil, ErrInvalidControl
+		}
+		if value.ModelMapping != nil && !allowedRoutePath(value.ModelMapping.UpstreamRuntimePath, route.AllowedPathPrefixes) {
+			return nil, ErrInvalidControl
+		}
+		if value.ResourceKind == relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION {
+			_, postOnly := route.AllowedMethods[http.MethodPost]
+			if !postOnly || len(route.AllowedMethods) != 1 || route.TransportPolicy != relaycontrolapi.HTTPREQUESTRESPONSE ||
+				len(route.AllowedPathPrefixes) != 1 || !validImageRoutePath(string(value.ClientProtocol), route.AllowedPathPrefixes[0]) {
+				return nil, ErrInvalidControl
+			}
+		}
+		var audio *relaycontrolapi.RuntimeAudioProfile
+		if value.AudioProfile != nil {
+			copyProfile := *value.AudioProfile
+			copyProfile.SampleRates = append([]relaycontrolapi.RuntimeAudioProfileSampleRates(nil), value.AudioProfile.SampleRates...)
+			audio = &copyProfile
+		}
+		var llm *relaycontrolapi.RuntimeLlmProfile
+		if value.LlmProfile != nil {
+			copyProfile := *value.LlmProfile
+			llm = &copyProfile
+		}
+		var image *relaycontrolapi.RuntimeImageProfile
+		if value.ImageProfile != nil {
+			copyProfile := *value.ImageProfile
+			copyProfile.AllowedSizes = append([]string(nil), value.ImageProfile.AllowedSizes...)
+			image = &copyProfile
+		}
+		var modelMapping *relaycontrolapi.RuntimeModelMapping
+		if value.ModelMapping != nil {
+			copyMapping := *value.ModelMapping
+			modelMapping = &copyMapping
+		}
+		state.Resources[value.ResourceId] = Resource{
+			ID: value.ResourceId, RouteID: value.RuntimeRouteId, Kind: value.ResourceKind,
+			ClientProtocol: value.ClientProtocol, AudioProfile: audio, LLMProfile: llm, ModelMapping: modelMapping, ImageProfile: image,
+		}
+	}
+	return state, nil
+}
+
+func validModelMapping(resource relaycontrolapi.ResourceRoute, mapping relaycontrolapi.RuntimeModelMapping) bool {
+	if strings.TrimSpace(mapping.PublishedModelKey) != mapping.PublishedModelKey || mapping.PublishedModelKey == "" || len(mapping.PublishedModelKey) > 256 || strings.TrimSpace(mapping.UpstreamModelKey) != mapping.UpstreamModelKey || mapping.UpstreamModelKey == "" || len(mapping.UpstreamModelKey) > 256 ||
+		!safePath(mapping.ClientRuntimePath) || !safePath(mapping.UpstreamRuntimePath) {
+		return false
+	}
+	switch resource.ClientProtocol {
+	case relaycontrolapi.GOOGLEGENERATECONTENT:
+		return strings.Contains(mapping.ClientRuntimePath, "/models/"+mapping.PublishedModelKey+":") && strings.Contains(mapping.UpstreamRuntimePath, "/models/"+mapping.UpstreamModelKey+":")
+	case relaycontrolapi.OPENAICHATCOMPLETIONS, relaycontrolapi.OPENAIRESPONSES, relaycontrolapi.ANTHROPICMESSAGES:
+		return mapping.ClientRuntimePath == mapping.UpstreamRuntimePath
+	default:
+		return false
+	}
+}
+
+func allowedRoutePath(path string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if path == prefix || strings.HasSuffix(prefix, "/") && strings.HasPrefix(path, prefix) || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
+	kind, err := platformid.KindOf(value.ResourceId)
+	if err != nil {
+		return false
+	}
+	protocol := string(value.ClientProtocol)
+	switch value.ResourceKind {
+	case relaycontrolapi.ResourceRouteResourceKindMODEL:
+		// modelMapping was added after the initial relay-control contract. A nil
+		// mapping keeps an already-applied legacy control state pass-through; all
+		// controls compiled by the current Hub include the explicit mapping.
+		if kind != platformid.Model || value.AudioProfile != nil || value.LlmProfile == nil || value.ImageProfile != nil || value.ModelMapping != nil && !validModelMapping(value, *value.ModelMapping) {
+			return false
+		}
+		switch protocol {
+		case "OPENAI_CHAT_COMPLETIONS", "OPENAI_RESPONSES", "GOOGLE_GENERATE_CONTENT", "ANTHROPIC_MESSAGES":
+			return true
+		}
+	case relaycontrolapi.ResourceRouteResourceKindTTS:
+		if kind != platformid.TTS || value.AudioProfile != nil || value.LlmProfile != nil || value.ModelMapping != nil || value.ImageProfile != nil {
+			return false
+		}
+		switch protocol {
+		case "OPENAI_AUDIO_SPEECH", "GEMINI_GENERATE_CONTENT_TTS", "MIMO_CHAT_COMPLETIONS_TTS":
+			return true
+		}
+	case relaycontrolapi.ResourceRouteResourceKindASR:
+		if kind != platformid.ASR || value.LlmProfile != nil || value.ModelMapping != nil || value.ImageProfile != nil || value.AudioProfile == nil || value.AudioProfile.Channels != 1 ||
+			!value.AudioProfile.Encoding.Valid() || len(value.AudioProfile.SampleRates) == 0 {
+			return false
+		}
+		seenRates := map[int]bool{}
+		for _, rate := range value.AudioProfile.SampleRates {
+			if rate != 8000 && rate != 16000 && rate != 24000 || seenRates[int(rate)] {
+				return false
+			}
+			seenRates[int(rate)] = true
+		}
+		switch protocol {
+		case "OPENAI_AUDIO_TRANSCRIPTIONS", "DASHSCOPE_HTTP_ASR", "OPENAI_REALTIME_TRANSCRIPTION", "DASHSCOPE_REALTIME_ASR":
+			return true
+		}
+	case relaycontrolapi.ResourceRouteResourceKindMCP:
+		return kind == platformid.MCP && protocol == "MCP_STREAMABLE_HTTP" && value.AudioProfile == nil && value.LlmProfile == nil && value.ModelMapping == nil && value.ImageProfile == nil
+	case relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION:
+		if kind != platformid.ImageGeneration || protocol != "OPENAI_IMAGES_GENERATIONS" && protocol != "DASHSCOPE_MULTIMODAL_GENERATION" || value.AudioProfile != nil || value.LlmProfile != nil || value.ModelMapping != nil || value.ImageProfile == nil ||
+			value.ImageProfile.MaxImagesPerRequest < 1 || value.ImageProfile.MaxImagesPerRequest > 6 || len(value.ImageProfile.AllowedSizes) == 0 {
+			return false
+		}
+		seen := map[string]bool{}
+		for _, size := range value.ImageProfile.AllowedSizes {
+			if !validImageSize(size) || protocol == "DASHSCOPE_MULTIMODAL_GENERATION" && size == "auto" || seen[size] {
+				return false
+			}
+			seen[size] = true
+		}
+		return true
+	}
+	return false
+}
+
+func validImageRoutePath(protocol string, path string) bool {
+	switch protocol {
+	case "OPENAI_IMAGES_GENERATIONS":
+		return strings.HasSuffix(path, "/images/generations")
+	case "DASHSCOPE_MULTIMODAL_GENERATION":
+		return path == "/api/v1/services/aigc/multimodal-generation/generation"
+	default:
+		return false
+	}
+}
+
+func compileAuth(input relaycontrolapi.RuntimeUpstreamAuth) (UpstreamAuth, error) {
+	result := UpstreamAuth{Type: input.Type}
+	switch input.Type {
+	case relaycontrolapi.NONE:
+		return result, nil
+	case relaycontrolapi.BEARER:
+		value, ok := stringProperty(input, "token")
+		if !ok || value == "" {
+			return UpstreamAuth{}, ErrInvalidControl
+		}
+		result.Token = value
+	case relaycontrolapi.STATICHEADER:
+		header, okHeader := stringProperty(input, "headerName")
+		value, okValue := stringProperty(input, "value")
+		if !okHeader || !okValue || !safeCredentialHeaderName(header) || value == "" || strings.ContainsAny(value, "\r\n") {
+			return UpstreamAuth{}, ErrInvalidControl
+		}
+		result.HeaderName, result.Value = strings.TrimSpace(header), value
+	case relaycontrolapi.BASIC:
+		username, okUser := stringProperty(input, "username")
+		password, okPassword := stringProperty(input, "password")
+		if !okUser || !okPassword || username == "" || password == "" {
+			return UpstreamAuth{}, ErrInvalidControl
+		}
+		result.Username, result.Password = username, password
+	default:
+		return UpstreamAuth{}, ErrInvalidControl
+	}
+	return result, nil
+}
+
+func stringProperty(input relaycontrolapi.RuntimeUpstreamAuth, name string) (string, bool) {
+	value, ok := input.AdditionalProperties[name]
+	if !ok {
+		return "", false
+	}
+	text, ok := value.(string)
+	return text, ok
+}
+
+func addIDs(target map[string]struct{}, kind platformid.Kind, values []string) error {
+	for _, value := range values {
+		if platformid.Validate(kind, value) != nil {
+			return ErrInvalidControl
+		}
+		if _, exists := target[value]; exists {
+			return ErrInvalidControl
+		}
+		target[value] = struct{}{}
+	}
+	return nil
+}
+
+func runtimeResourceID(value string) bool {
+	kind, err := platformid.KindOf(value)
+	if err != nil {
+		return false
+	}
+	switch kind {
+	case platformid.Model, platformid.ImageGeneration, platformid.TTS, platformid.ASR, platformid.MCP:
+		return true
+	default:
+		return false
+	}
+}
+
+func validImageSize(value string) bool {
+	if value == "auto" {
+		return true
+	}
+	parts := strings.Split(value, "x")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" || strings.HasPrefix(parts[0], "0") || strings.HasPrefix(parts[1], "0") {
+		return false
+	}
+	for _, part := range parts {
+		for _, ch := range part {
+			if ch < '0' || ch > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func validMethod(value string) bool {
+	switch value {
+	case "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS":
+		return true
+	default:
+		return false
+	}
+}
+
+func safePath(value string) bool {
+	decoded := value
+	for range 4 {
+		next, err := url.PathUnescape(decoded)
+		if err != nil {
+			return false
+		}
+		if next == decoded {
+			break
+		}
+		decoded = next
+	}
+	if strings.Contains(decoded, "%") || !strings.HasPrefix(decoded, "/") || strings.Contains(decoded, "//") || strings.Contains(decoded, "\\") {
+		return false
+	}
+	for _, segment := range strings.Split(decoded, "/") {
+		if segment == ".." || segment == "." {
+			return false
+		}
+	}
+	return true
+}
+
+func safeCredentialHeaderName(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	for _, ch := range value {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || strings.ContainsRune("!#$%&'*+-.^_`|~", ch) {
+			continue
+		}
+		return false
+	}
+	lower := strings.ToLower(value)
+	if lower == "host" || lower == "cookie" || strings.HasPrefix(lower, "x-forwarded-") || strings.HasPrefix(lower, "x-measix-") || hopByHopHeader(lower) {
+		return false
+	}
+	return true
+}
+
+func hopByHopHeader(lower string) bool {
+	switch lower {
+	case "connection", "proxy-connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade":
+		return true
+	default:
+		return false
+	}
+}

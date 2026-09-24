@@ -1,0 +1,11 @@
+{
+  "deploymentId": "dep_11111111-1111-4111-8111-111111111111",
+  "userId": "usr_11111111-1111-4111-8111-111111111111",
+  "deviceId": "dev_11111111-1111-4111-8111-111111111111",
+  "sessionId": "ses_11111111-1111-4111-8111-111111111111",
+  "enterpriseName": "Example Enterprise",
+  "userDisplayName": "Example User",
+  "expiresAt": "2026-09-07T08:10:00Z",
+  "sessionIdleExpiresAt": "2026-09-14T08:00:00Z",
+  "csrfToken": "synthetic-fixture-only"
+}

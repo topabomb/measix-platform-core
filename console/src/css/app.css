@@ -1,0 +1,52 @@
+:root {
+  --q-primary: #7558be;
+  --orchelm-primary-dark: #5e429f;
+}
+
+body { background: #f5f4f8; color: #241d2e; }
+.orchelm-header { background: rgba(255, 255, 255, .97); box-shadow: 0 1px 0 rgba(74, 52, 105, .08); }
+.orchelm-toolbar { min-height: 48px; }
+.admin-shell .q-drawer { background: #fbfaff; }
+.admin-shell .q-item.q-router-link--active { border-right: 3px solid var(--q-primary); background: #f1ecfa !important; }
+.admin-shell .q-card { border-color: #e1ddea; }
+.admin-shell .q-btn.bg-primary { background: linear-gradient(135deg, var(--q-primary), var(--orchelm-primary-dark)) !important; }
+
+/* Spacing policy — one gap unit.
+
+   Every margin/gutter between elements in the console uses Quasar's `xs`
+   token (4px): no sm/md/lg spacing classes remain in templates. Values below
+   are component internals (not element-to-element gaps) and are the compact
+   defaults every card, banner and dialog shares. */
+
+/* Page outer margin — replaces the per-page `padding` prop so all pages share
+   one value and no page overrides it locally. */
+.admin-page { padding: 4px; }
+
+/* Compact card/banner internals. 12px horizontal is the inset that
+   .card-inset aligns to for elements rendered directly inside a card. */
+.q-card > .q-card__section { padding: 8px 12px; }
+.q-card > .q-card__actions { padding: 4px 12px; }
+.q-banner { padding: 8px 12px; }
+
+.card-inset { margin-left: 12px; margin-right: 12px; }
+
+/* Dialogs — one sizing and scrolling pattern for the whole console.
+   Widths: --sm 480 / default 640 / --lg 760, always leaving 4px of viewport.
+   Height is capped at 90vh; the block marked .app-dialog__body scrolls so the
+   header and the actions of a long dialog stay reachable. */
+.app-dialog {
+  width: min(640px, calc(100vw - 8px));
+  max-width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-dialog--sm { width: min(480px, calc(100vw - 8px)); }
+.app-dialog--lg { width: min(760px, calc(100vw - 8px)); }
+
+.app-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}

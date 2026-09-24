@@ -1,0 +1,26 @@
+{
+  "asr": [],
+  "assistants": [],
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "imageGenerators": [],
+  "managedGeneration": 2,
+  "mcp": [],
+  "metadata": {
+    "publishedAt": "2026-09-07T00:00:00Z"
+  },
+  "models": [],
+  "policy": {
+    "allowLocalAsr": false,
+    "allowLocalAssistants": true,
+    "allowLocalMcp": true,
+    "allowLocalProviders": true,
+    "allowLocalTts": false,
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000"
+  },
+  "providers": [],
+  "releaseId": "rel_550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": 4,
+  "snapshotHash": "sha256:1bea7d831dd2ad10947702e05c209dbe4caee610a7614df01cb22a5f45749339",
+  "starters": [],
+  "tts": []
+}

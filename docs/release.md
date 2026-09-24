@@ -8,6 +8,12 @@ A candidate is a fixed, reproducible composition of source commits, generated co
 
 For the S0.2 internal Preview, `node scripts/build-preview-release.mjs <version>` is the production artifact owner. It requires clean pinned Core, Portal, architecture and Android worktrees, verifies the `S0.2/v4-preview` protocol baseline and regenerated artifacts, builds Admin/Portal assets, cross-compiles static Linux ARM64 binaries with a non-`dev` build identity, and emits `release.json` plus `SHA256SUMS`. When the active Android worktree contains unrelated local work, set `MEASIX_RELEASE_ANDROID_ROOT` to a clean detached worktree at the exact Android commit being recorded; the builder still rejects a dirty override. The target runbook is [S0.2 Preview deployment](s02-preview-deployment.md). This package is a Preview delivery vehicle, not proof of later S0.3/S0.4/final gates.
 
+### S0.2 sealed Preview composition
+
+The project designates `0.2.0-preview.22` as its S0.2 Preview baseline. The generated release package pins Architecture `a52a630c75f5a857ebf72834d6770cae1cef14b8`, Core `632ade34a14e64b266d86da9e4b034e5005f0713`, Portal `7e3f5fb90955a2a44bea925e4f44e62267aab9bd`, and Android `1914e4a894979bb5a2fc892a019b9342ff60a28f`. The Linux ARM64 archive SHA-256 is `ca7d480dccc6311923bcc024fd67ef7a42a82dca256567f25bb7b1212dfa2c28`. Its `release.json` and `SHA256SUMS` are under `.artifacts/releases/measix-core-0.2.0-preview.22-linux-arm64/`; preserve them with the archive when distributing this fixed composition.
+
+The user confirms that real-device S0.2 integration was performed. The release manifest proves source, protocol, build and archive identity; it does not enumerate `ERX-*` results or identify a device/APK run. Keep the real-device and browser execution records beside this fixed release when available, with their actual device/build identities and scenario outcomes. Do not manufacture PASS rows from the project decision or relabel the CAP-only `freeze-manifest.mjs` output as an ERX manifest. The current evidence-index boundary is summarized in [S0 status](s0-execution-progress.md).
+
 ```text
 S0.1 Client Contract Freeze Candidate
   → pre-Android server-side product closure
@@ -84,13 +90,13 @@ Full logs remain in the reported independent workspace; preserve that workspace 
 
 The writer validates current source/architecture cleanliness and identity, production build, four OpenAPI hashes, fixture/schema/Adapter pins, complete required scenario results, and every artifact plus metadata hash/exit/source. Qualification requires all four profiles in one run, each with observed adapter version, upstream/config revision, transport and forwarded usage evidence; unknown identity or an unexecuted profile fails. Partial diagnostic runs cannot be merged into qualification. Declared NONE/LEVEL_0 is not semantic Usage/header-echo qualification.
 
-This CAP manifest compiler verifies the resource baseline of current Snapshot v4 but does not replace the S0.2 ERX gate, which needs its own ERX/consumer evidence schema. The clean-source runner is implemented; passing runner fixture tests is not an executed candidate replay. Candidate promotion executes and records each required gate explicitly. Living completion/verification status is in [execution progress](s0-execution-progress.md).
+This CAP manifest compiler verifies the resource baseline of current Snapshot v4 but does not produce S0.2 ERX/consumer evidence. The clean-source runner is implemented; passing runner fixture tests is not an executed candidate replay. Candidate promotion records each required gate explicitly. The fixed S0.2 Preview identity and current evidence index are in [S0 status](s0-execution-progress.md).
 
-## 3. S0.2/S0.3/S0.4 candidates
+## 3. S0.2 evidence and later-stage candidates
 
-Each later sub-stage pins its own architecture/core/consumer/build/contract/scenario identities and consumes the previous valid freeze; a historical earlier manifest cannot prove a later candidate.
+The S0.2 Preview composition above is fixed; its ERX results and consumer evidence must be traceable to that exact composition. S0.3 and S0.4 each pin their own architecture/core/consumer/build/contract/scenario identities and consume the applicable earlier baseline; an earlier manifest cannot prove a later candidate.
 
-S0.3 specifically requires a real `enterprise-tool-gateway` production binary/build identity, Gateway Control OpenAPI/hash, Snapshot v5 and canonical surface/catalog fixtures, real Hub/Gateway/Relay + downstream MCP + Test Client traffic, production Admin browser evidence, and executable production supervision/graceful lifecycle/structured-log collection/redaction evidence. The current repository does not yet provide these artifacts. Only the current unpublished version is supported per Control Protocol §10.10.1; there is no historical Snapshot compatibility requirement.
+S0.3 specifically requires a real `enterprise-tool-gateway` production binary/build identity, Gateway Control OpenAPI/hash, Snapshot v5 and canonical surface/catalog fixtures, real Hub/Gateway/Relay + downstream MCP + Test Client traffic, production Admin browser evidence, and executable production supervision/graceful lifecycle/structured-log collection/redaction evidence. The current repository does not yet provide these artifacts. Only the current internal Preview protocol is supported per Control Protocol §10.10.1; there is no historical Snapshot compatibility requirement.
 
 S0.4 adds pinned real Android implementation/device evidence against the S0.3 baseline. Exact composition fields remain owned by architecture Testing Specs and executable harness schemas.
 

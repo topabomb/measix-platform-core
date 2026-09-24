@@ -185,22 +185,22 @@ See `docs/testing.md` for executable test organization, CI design, and the TDD c
 ### Local documents
 
 - `ARCHITECTURE.md` (this file) — implementation dependency/source ownership boundaries and documentation governance.
-- `docs/s0-execution-progress.md` — **living current implementation status and gaps only**.
+- `docs/s0-execution-progress.md` — fixed S0.2 Preview composition, delivered scope, evidence boundary and later-stage boundary.
 - `docs/admin-console-implementation.md` — concrete Admin implementation decisions/facts; does not restate Product/UX requirements.
 - `docs/api-contracts.md` — executable contract/codegen/freeze workflow.
 - `docs/development.md` — engineering workflow and actual local/system harness commands.
 - `docs/testing.md` — executable test organization, CI design, and TDD.
 - `docs/database-migrations.md` — current persistence initialization workflow.
 - `docs/operations.md` — runtime operations.
-- `docs/portal-implementation.md` — Hub support/configuration/persistence for the independent Portal frontend.
 - `docs/release.md` — freeze/RC evidence composition.
-- `docs/playwright-e2e-notes.md` — concrete browser entrypoints and evidence-based diagnosis.
+- `docs/usage-budget.md` — current metering and budget implementation.
+- `docs/pricing-cost.md` — current pricing and cost calculation.
 
 ### Documentation rule
 
 A local document contains only information needed to implement, run, test or operate this repository. If a paragraph merely re-explains an architecture requirement without adding a local implementation consequence, replace it with a reference.
 
-Do not maintain the same current-state claim in multiple documents. `docs/s0-execution-progress.md` is the only living implementation/stage status document; audit reports, CI runs and manifests are evidence inputs, not competing status authorities.
+Do not maintain the same current-state claim in multiple documents. `docs/s0-execution-progress.md` is the S0.2 implementation and seal summary; release manifests and actual runs carry the reproducible evidence.
 
 Stage-specific reading order is maintained only in `topabomb/measix-architecture/docs/measix-stage-document-index.md`.
 
@@ -233,11 +233,11 @@ Code layout, component decomposition, dependency choice, DB index, build tooling
 
 ### S0.1 Client Contract Freeze
 
-MEASIX is unpublished. Only the current protocol and initialization schema are supported; remove obsolete compatibility and upgrade paths. Current candidate acceptance still requires the actual source/build/contract/artifact chain; retained old reports never certify current work. See [release procedures](docs/release.md).
+MEASIX has an internal Preview and no formal public release. Only the current protocol and initialization schema are supported; remove obsolete compatibility and upgrade paths. Current candidate acceptance still requires the actual source/build/contract/artifact chain; retained old reports never certify current work. See [release procedures](docs/release.md).
 
 ## 8. Change boundary
 
-S0.2 的生产协议计量与用户额度已按 [实施方案](docs/usage-budget-implementation-plan.md) 落地，阶段语义由其引用的架构补充合同拥有。Relay 以隔离的只读协议观察器和 durable spool 形成请求事实，Hub 通过小型原子预算准入、幂等结算及 Admin/Client/Portal 投影拥有额度权威；Relay 仍不依赖 Hub domain/Ent，Hub 仍不承载 Runtime body。只有权威额度耗尽可以阻断对应 Runtime 请求；准入、计量持久化、解析和待核对链路故障进入可观察降级并保持业务服务可用。当前实现状态和未完成的正式 Gate 见 [S0 execution progress](docs/s0-execution-progress.md)。
+S0.2 的生产协议计量与用户额度见 [当前实现说明](docs/usage-budget.md)，阶段语义由其引用的架构合同拥有。Relay 以隔离的只读协议观察器和 durable spool 形成请求事实，Hub 通过原子预算准入、幂等结算及 Admin/Client/Portal 投影拥有额度权威；Relay 不依赖 Hub domain/Ent，Hub 不承载 Runtime body。当前封版组合与后续阶段边界见 [S0 状态](docs/s0-execution-progress.md)。
 
 Update `measix-architecture` first when a change alters:
 

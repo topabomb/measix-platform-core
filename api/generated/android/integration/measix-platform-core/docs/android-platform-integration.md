@@ -1,6 +1,6 @@
-# Android 真实平台接入说明
+# Android 平台协议消费说明
 
-本说明面向 Android 维护方。当前唯一组合是 Discovery protocolVersion="1"、Snapshot v4 与 Portal Bridge v3；Enrollment 资料 formatVersion=1 独立。MEASIX 从未发布，不做旧 Snapshot、旧数据库或配置转换。本说明约定目标接线和验收，不以某个 Android 历史版本的缺口代替当前源码审查；上游测试不代表设备联调已完成。
+本说明面向 Android 维护方，描述 S0.2 `preview.22` 固定组合的 Core 协议消费边界。Discovery protocolVersion="1"、Snapshot v4、Portal Bridge v3 与独立的 Enrollment formatVersion=1 是当前唯一组合；旧原型没有兼容或转换义务。封版身份和真机证据入口见 Core `docs/s0-execution-progress.md`。
 
 ## 权威与资料入口
 
@@ -22,9 +22,9 @@
 
 ## Android 消费模型映射
 
-### 现在能否开始，以及与个人空间的关系
+### 企业与个人空间的关系
 
-可以开始当前 v4 的真实平台适配与联调，依据 Foundation Contract §3；无需等待 Gateway 或把正式 S0.4 Freeze 当成 Runtime 开关。当前 Hub/Relay 没有“尚未 Freeze 禁止调用”的分支。正式阶段通过仍须完整门禁，不能用本地联调替代。
+当前 v4 平台执行不依赖后续 Gateway 或 Snapshot v5。Hub/Relay 没有以 S0.4 Freeze 为条件的 Runtime 开关；后续阶段的正式验收仍执行各自的门禁。
 
 企业域复用 Android 现有聊天、流式输出、推理展示、工具循环、图片理解、图片生成、朗读、录音转写、助手、对话和本域记忆 owner。平台改变资源来源、认证、准入和归属，不应另造一个删减的聊天或媒体运行器。图片理解须同时满足模型资源声明 IMAGE、上游模型支持和原生编码；图片生成使用独立 `img_*` 资源和现有 `ImageGenerationCoordinator` / `GeneratedMediaStore`，不伪装为聊天 Model。平台不提供 Embedding 资源，也不提供云端对话/附件同步。个人原配置和数据不被企业配置覆盖。
 
@@ -108,31 +108,10 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 
 Direct MCP 的平台路由允许 `POST`、`GET`、`DELETE` 到 Snapshot 给出的同一 `runtimePath`；Android 保留上游会话 header。GET 事件流是服务端可选能力，上游返回 405 应按“不提供该流”处理；不应收到 Core 的 `ROUTE_POLICY_DENIED` 403。会话终止时的 DELETE 结果依上游会话状态处理，不把无 Session ID 时的 400 误判为平台拦截。
 
-`DASHSCOPE_HTTP_ASR` 的协议客户端请求与按当前 Android 编码构造的有效 WAV 均已返回 200，但**设备录音是否普遍可用尚未确认**：一次模拟器录音经 Relay 转发后收到上游 400（同结构的纯静音 PCM 也能复现 400），这不是 Core 拒绝。设备维护方需核查录音的 RMS、WAV 头、实际采样率/声道/时长与非零样本数，用有声录音复测后再把设备级识别计为通过；不能仅凭平台编码单测或已知有效样本 200 推断所有设备录音可用。
-
 完整 428 body 使用 [现行 Problem 样例](../api/fixtures/problem/managed-snapshot-required.json)。这些是请求构造示例，不声称合成 profile 已取得真实供应商资格认证。
 
-## 验证职责与交接清单
+## 合同回归入口
 
-共享样例覆盖当前全部能力：`snapshot-v4.json`（基础与 OpenAI 文生图）、`snapshot-v4-dashscope-image.json`（DashScope 文生图）、`snapshot-v4-responses/gemini/claude.json`（三种模型协议）、`snapshot-v4-speech.json`（四种 TTS，默认系统朗读、个人 TTS 准入关闭）、`snapshot-v4-asr.json`（四种 ASR）、`snapshot-v4-denied.json`（全部策略禁止）。请求构造示例见 `http-examples.json` 与 `runtime-examples.json`。Android 应对全部样例补候选校验、映射和执行分派测试，再做设备消费验收；上游资料更新本身不表示原生接线已完成。
+`api/fixtures/client-integration/` 提供基础、四模型协议、两种文生图、四种 TTS、四种 ASR、策略拒绝、HTTP 时序及 Runtime 请求样例。接入资料、Portal Native Bridge 与 Feed 的正反例分别在 `api/fixtures/enrollment/` 和 `api/fixtures/portal/`。Android 应消费同一份 Core 导出并对当前资料进行严格解析、引用校验及执行分派；导出包本身不包含真机运行结果。
 
-上游协议证据入口在 Core 源码仓库，不在本包内：`contract` 复算 Snapshot hash；`httpapi/client_integration_test.go` 用真实身份/SQLite/HTTP 验证 pending、应用后状态、200/304 与撤销；`identity` 验证轮换幂等、并发与退出隔离；`relay` 的 `model_tool_roundtrip_test.go`、`provider_protocol_test.go`、`mcp_session_test.go`、`websocket_test.go` 覆盖四协议工具往返与 429、供应商认证边界、完整 MCP 会话以及握手/帧/超时/取消/准入。这些是上游证据，不替代 Android 设备验收；供应商付费账户权限与真实生成质量另行验证。
-
-Android 维护方按以下顺序实施，本批不修改 Android 仓库：
-
-1. 唯一 Platform source：解析完整接入材料、Discovery、Enrollment、安全令牌存储与单一刷新 owner；生产实现不存在本地企业来源或第二套接入分支，不能把个人配置的可用性当成平台接入已完成。
-2. 原子消费当前 Snapshot：完整 Provider/Model、四种 TTS、四种 ASR、MCP、五项策略、Assistant/Memory/Starter 映射；未知值、非法条件字段和失效引用拒绝整个候选，不改写成另一协议。切换企业/个人时资源和任务隔离。
-3. 统一平台 Runtime owner：从 Discovery 和稳定资源 ID 组装 URL；HTTP 与 WebSocket 都使用平台令牌、generation 和 interaction 上下文。供应商密钥仅由 Relay 注入，客户端不添加或持久化这些密钥。处理 typed 428、撤销、刷新和取消。
-4. 四模型分别验收文本流及工具往返；四 TTS 验收播放、停止和切换；三 ASR 验收录音、转写和取消。SYSTEM_TTS 在个人 TTS 禁止时仍能作为企业默认服务运行。工具结果保留 ID/签名，不重发已执行工具。
-5. Direct MCP 使用企业资源和助手 mcpServerIds；初始化、通知、发现、调用、会话头与 GET/DELETE 按当前协议。Firecrawl 可先使用官方免密钥 `/v2/mcp`、authOwnership=NONE；企业 Bearer 方案由服务端配置。Gateway 不在本批范围。
-6. 复用现有 Portal/退出 owner 完成远端站点、媒体、旧文档接收器清理。进程死亡、WebView、相机/麦克风和播放体验由 Android 设备验收，浏览器与本地协议测试不替代。
-
-## 公共 HTTP/IP 与应用报告：本次适配顺序
-
-1. **来源与网络**：接受共享接入材料中的 HTTP/HTTPS、IPv4/IPv6、ASCII/IDNA 域名及端口，拒绝下划线、尾点和非法 DNS label，展示规范化平台来源后沿用既有接入确认。Debug/Release 均允许所绑定 HTTP 平台的明文请求和 WebView 网络访问；不增加仅本机生效的开关或第二次 HTTP 特有确认。HTTPS 保持证书验证，不接受跨来源重定向。Android manifest 已有 `usesCleartextTraffic=true` 时无需再增加重复配置，但仍须检查各网络栈/WebView 的来源限制。
-2. **地址使用**：使用资料中的 `platformUrl`，Discovery 返回同源 API path。Portal 使用 `portal/grants` 返回的同源 `exchangeUrl` 原生 POST 换票，不从二维码自造 Portal 地址。HTTP 接受非 Secure 的 HttpOnly Portal Cookie，HTTPS 使用 Secure；不让网页读取 ticket 或平台令牌。WebSocket 对 HTTP 使用 `ws`，HTTPS 使用 `wss`，不丢端口。
-3. **同步触发**：进入企业空间、恢复前台、手动同步/Portal refresh 共用现有同步 owner；每次新顶层 Managed Runtime interaction 仍要 preflight。一次有效下载校验后整体提交配置及 generation/hash。网络失败保留完整已应用状态用于展示，按已有 guard 暂停新的企业运行请求；个人空间不受连带限制。
-4. **应用报告**：将 `PlatformControlClient.reportApplied` 接入原子提交成功后的应用层流程，而非下载回调。请求体和错误见本文接入步骤 5 / OpenAPI。已成功应用但报告丢失时，下次检查重报相同值；401 经单一刷新 owner 处理，撤销停止报告。重登从新 Session 当前真实已应用状态重新报告，不借用旧回执。不要建立后台推送/通知子系统。
-5. **设备验收顺序**：管理台发布 A → 手机扫码或粘贴 HTTP/IP 材料 → 同步并执行模型/语音/工具 → 管理台确认 A 已应用 → 管理台发布 B → 手机恢复前台或手动同步 → 确认 B 生效及报告 → 再测控制端断网、报告失败、428、退出/撤销和进程恢复。分别补 HTTPS 及 `ws`/`wss` 场景。设备报告不是当前在线证明，不是绕过 Runtime 准入的票据。
-
-Android 的 `PlatformControlClient`、`PlatformSnapshotMapper` 和契约样例已有工作区实现时应核对并接入现有 owner，不重复创建平行客户端。导出包只含当前契约，不提供旧版本 DTO、迁移或协议回退。
+Core 的合同、身份/会话与 Relay 测试证明服务端行为，Portal 生产浏览器测试证明网页及 Hub 生命周期；Android 的 Realm、WebView、相机/麦克风、系统朗读与资源运行仍以对应设备记录为准。封版记录只引用实际完成的场景结果，不把某次历史模拟器失败或浏览器替身当作当前设备状态。

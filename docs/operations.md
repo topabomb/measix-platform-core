@@ -1,10 +1,12 @@
 # Operations
 
-This document owns concrete operating procedures, configuration and current limitations. Architecture owns required behavior; [current status](s0-execution-progress.md) records implemented behavior and remaining stage gates. A documented target is not an implemented production package.
+This document owns concrete operating procedures, configuration and current limitations. Architecture owns required behavior; [S0.2 status](s0-execution-progress.md) records the fixed Preview composition and later-stage boundary. A documented target is not an implemented production package.
 
 ## 1. Implemented topology
 
 Current daemons are `backend/cmd/control-hub` and `backend/cmd/runtime-relay`. `devmigrate` and `generate-android-wire` are utilities, not services. The S0.2 internal Preview package targets NVIDIA DGX Spark Linux ARM64 and supplies a PM2 ecosystem, the service-root `run.sh`, a remote-Caddy reference template and runbooks under `deploy/preview`; it does not include the planned Enterprise Tool Gateway or multi-node/HA operation. See [S0.2 Preview deployment](s02-preview-deployment.md).
+
+Hub serves the independent Portal production build from `HUB_PORTAL_ASSETS_DIR` as STANDARD, or proxies the configured `HUB_PORTAL_UPSTREAM_URL` as CUSTOM through the same public `/portal/` origin. CUSTOM proxies static GET/HEAD only, strips identity headers, ignores upstream cookies and does not fall back to STANDARD on failure. When neither mode is configured, authenticated grant issuance fails explicitly. Portal Session and Feed APIs always terminate at Hub; Android never loads a custom upstream directly. Exact HTTP/session rules are in [API contracts](api-contracts.md), and the Portal UI/build belongs to the sibling Portal repository.
 
 Admin is a static Quasar SPA. Supply `--admin-assets-dir <console/dist/spa>` (or `HUB_ADMIN_ASSETS_DIR`) to the Hub daemon; startup rejects a missing `index.html`, and the existing static handler owns `/admin` and deep links. Omitting the option leaves static hosting disabled. Production ingress must route `/api/client/v1`, `/api/admin/v1`, `/admin` to Hub and `/runtime/v1` to Relay under one origin; test-library hosting does not qualify production TLS/ingress.
 

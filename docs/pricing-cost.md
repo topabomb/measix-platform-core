@@ -1,6 +1,6 @@
-# Pricing and cost analysis implementation plan
+# Pricing and cost analysis implementation
 
-This work completes the existing S0.2 Admin pricing surface. Product semantics live
+This describes the S0.2 `preview.22` Admin pricing implementation. Product semantics live
 in the sibling architecture Control Protocol §19; the Admin OpenAPI owns the wire.
 No database migration, Relay behavior change, currency conversion, or cost budget is
 introduced. Portal and Android contracts remain unchanged.
@@ -42,7 +42,7 @@ introduced. Portal and Android contracts remain unchanged.
   request detail shows each applied rule and arithmetic. Never call an estimate an
   invoice or claim that an unknown amount is zero.
 
-## Acceptance matrix
+## Regression coverage
 
 - Model: INPUT/OUTPUT/CACHED/TOTAL precedence; cached subset; missing rate; UNKNOWN
   and PARTIAL usage; repeating decimal; scoped/latest/effective interval.

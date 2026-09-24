@@ -2,6 +2,8 @@
 
 本手册对应单机 NVIDIA DGX Spark 的内部 Preview。Spark 只运行 MEASIX Hub/Relay，由现有的 root PM2 管理；Spark 不安装 Caddy。另一台已经加入同一 Tailscale 网络的入口服务器负责 TLS、子域名和反向代理，并由入口维护者独立配置和验收。
 
+S0.2 固定的 Preview 组合为 `0.2.0-preview.22`；其源码和归档摘要见[发布说明](release.md#s02-sealed-preview-composition)。本手册可用于该组合的部署和恢复。构建包存在不代表某台机器已安装此版本，现场须核对运行进程及私有部署记录。
+
 ## 1. 当前目标环境
 
 目标机实际 LAN/Tailscale 地址、主机名和 Public Origin 属于部署现场信息，不写入 Git；部署后记录在服务主目录中权限为 `0640 root:admin` 的 `deployment-local.md`。已确认的通用条件：
@@ -165,7 +167,7 @@ sudo ss -lntp | grep -E ':(9001|9002|9003|9004)\b'
 
 预期：9002/9004 为 `0.0.0.0`，9001/9003 为 `127.0.0.1`；两个新 PM2 app online，原有 PM2 app 状态不变。尚未发布 Managed Configuration 时 Relay `/ready` 返回 503 是预期状态；发布并收敛后必须为 200。
 
-Admin 登录后检查 System 四页签、当前 release、Relay ready、配置 revision、spool、近期遥测和事件。Android 模拟器验证视为本批 Android 验收。
+Admin 登录后检查 System 四页签、当前 release、Relay ready、配置 revision、spool、近期遥测和事件。Android 模拟器可用于冒烟排查；S0.2 设备验收使用固定 APK 的真机记录。
 
 ## 8. 远端 Caddy 交接与公共入口验收（不在 Spark 执行）
 
@@ -211,8 +213,8 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' https://<approved-subdomain>/int
 2. 在企业配置中至少建立一个真实模型、必要的系统 TTS 或 MCP、一个默认助手和一个 Starter；仅为实际可用的能力设置默认值。
 3. 保存草稿，依次执行 Validate、Snapshot Preview、Review、Publish，并等待 Activation `COMPLETED`。
 4. 确认 Relay `/ready` 为 200，Admin System 显示 active generation 与 control revision 已收敛。
-5. 接入前确认模拟器安装的是本批固定 Android commit 构建的候选 APK，并在私有记录中保存 applicationId 与 APK SHA-256；不得用历史安装包代表当前验收。
-6. 创建内部成员和一小时一次性接入资料，在 Android 模拟器粘贴或扫码接入；接入资料属于凭据，不写入 Git 或共享日志。
+5. 接入前确认真机安装的是 `preview.22` 固定 Android commit 构建的 APK，并在私有记录中保存 applicationId 与 APK SHA-256；不得用历史安装包代表当前验收。
+6. 创建内部成员和一小时一次性接入资料，在 Android 真机粘贴或扫码接入；接入资料属于凭据，不写入 Git 或共享日志。
 7. Android 完成同步、默认助手真实请求、Usage 回查和应用重启恢复后，才把该发布标为“可用”。
 
 上游地址、资源名称、模型 key、用户和现场验证结果记录在私有 `deployment-local.md`。Admin 对 token、字符、秒、请求数和图片数使用统一的人类可读格式；详情保留精确整数，额度模板和单用户额度允许用 `100k`、`2M` 这类简写输入并在保存时转换为精确整数，`LEVEL_0` 的未知 token/费用不得显示成零。
@@ -239,9 +241,9 @@ sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$backup" "$MEASIX_ROOT/curr
 
 `config/public-origin` 属于持久配置，升级不得被模板覆盖。新增 optional 配置不提升 config version；required 配置或语义改变必须提供明确转换步骤。
 
-## 12. 数据恢复（首发不保留旧版回退）
+## 12. 数据恢复（不依赖旧版回退）
 
-首次 Preview 不保留多版本二进制回退。故障恢复使用当前 release 与已验证备份，同时恢复 Hub DB、可选 Relay spool、config 和 secrets；不得只恢复数据库而继续使用不匹配的配置或密钥。后续版本若需要旧版回退，必须在对应升级说明中明确数据库兼容边界后再启用。
+故障恢复使用当前 release 与已验证备份，同时恢复 Hub DB、可选 Relay spool、config 和 secrets；不得只恢复数据库而继续使用不匹配的配置或密钥。旧版二进制回退须先明确数据库兼容边界，不能仅切换可执行文件。
 
 恢复一律先进入 `$MEASIX_ROOT/staging/recovery-<timestamp>`；当前数据移入 `original/`，不得直接删除。候选数据库先执行 `control-hub check`，验收前保留 `original/`。
 

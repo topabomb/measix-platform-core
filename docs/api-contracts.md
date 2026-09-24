@@ -4,7 +4,7 @@ This document defines executable-contract ownership in `measix-platform-core`. S
 
 ## Portal contract synchronization
 
-[Control Protocol §8](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) owns Bridge v3 document bootstrap and correlated native operations. Portal Session and Feed data use Core HTTP only; there are no native local-read methods or phone-side Portal data source. Native OpenAPI, shared cases, Android exports and Portal consumers implement this single profile. The [implementation status](s0-execution-progress.md) and [Android handoff](../../measix-enterprise-portal/docs/android-alignment-handoff.md) track remaining device evidence.
+[Control Protocol §8](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) owns Bridge v3 document bootstrap and correlated native operations. Portal Session and Feed data use Core HTTP only; there are no native local-read methods or phone-side Portal data source. Native OpenAPI, shared cases, Android exports and Portal consumers implement this single profile. The fixed Preview identity and evidence-index boundary are in [S0 status](s0-execution-progress.md).
 
 ## 1. Current and planned S0 OpenAPI surfaces
 
@@ -67,11 +67,11 @@ Admin reconciliation rows carry their request's safe `RequestUsageView` projecti
 
 The authenticated Admin self-service password endpoint requires Cookie Session plus CSRF, verifies the current password, checks the confirmed replacement, updates the Argon2id hash and revokes all Admin Web Sessions for that user in one transaction. Stable explicit failures are `403 invalid_current_password` and `400 password_confirmation_mismatch`; localized UI copy is not part of the wire compatibility key.
 
-Current implementation, verification results and remaining stage gates are maintained in [current status](s0-execution-progress.md).
+The fixed S0.2 Preview identity and later-stage boundaries are maintained in [S0 status](s0-execution-progress.md).
 
 ## 4. Canonical fixtures
 
-Portal grant/exchange/restricted Web Session operations are in the Client OpenAPI. Only the two canonical `/api/client/v1/enterprise/updates` GETs accept the additional Portal Cookie scheme; other Client/Admin/runtime operations retain their own authentication. The independent Portal generates TypeScript from this same file and records its input SHA256. See [Portal implementation](portal-implementation.md) for source/config/test ownership.
+Portal grant/exchange/restricted Web Session operations are in the Client OpenAPI. Only the two canonical `/api/client/v1/enterprise/updates` GETs accept the additional Portal Cookie scheme; other Client/Admin/runtime operations retain their own authentication. Hub stores ticket/cookie digests in `PortalSession` linked to the parent Android Session; exchange atomically consumes the ticket, and a Portal Cookie never acquires Admin or general Client privileges. The independent Portal generates TypeScript from this same OpenAPI and records its input SHA256. Hub distribution/configuration is documented in [operations](operations.md); Portal UI/build ownership remains in the sibling Portal repository.
 
 `PlatformEnrollmentMaterial` in the Client OpenAPI describes the native scan/paste document, not the HTTP Enrollment request. Its canonical sample is `api/fixtures/enrollment/platform-v1.json`; Android export and Admin's `generated-client.ts` derive from this same source. The Admin generator emits both surface type files; it imports only the native material type from the Client output and does not call Client HTTP APIs. Control Protocol §8 owns trust checks and byte limits. Private configuration-file import, if any, is an Android concern and is not an Enrollment or Portal protocol.
 

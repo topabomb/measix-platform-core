@@ -83,7 +83,7 @@ There are two real implementations of test orchestration, not one physical harne
 
 Keep orchestration out of feature tests. Share contracts/fixtures and align evidence, rather than declaring the two environments identical. A scenario requiring browser → traffic → Usage/System closure must run those steps against the **same** runtime, not combine unrelated Green runs.
 
-Bounded T3 is `make system-test`; the explicit S0.1 candidate lanes are `make s01-candidate-test` and `make s01-browser-candidate`. The browser entry builds production SPA and runs `node scripts/e2e-harness.mjs`; run it on an isolated candidate because it creates processes and artifacts. See [Playwright notes](playwright-e2e-notes.md).
+Bounded T3 is `make system-test`; the explicit S0.1 candidate lanes are `make s01-candidate-test` and `make s01-browser-candidate`. The browser entry builds production SPA and runs `node scripts/e2e-harness.mjs`; run it on an isolated candidate because it creates processes and artifacts. Browser entrypoints and failure diagnosis are in [testing](testing.md).
 
 Harness requirements: isolated DB/ports, real migrations and real component processes, synthetic secrets, deadline polling, reliable teardown, safe diagnostics. Bootstrap may create initial identity/keys; business objects under test must use the declared public/Admin product surface, not direct DB writes or Relay internal control shortcuts.
 

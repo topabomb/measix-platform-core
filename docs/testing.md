@@ -81,6 +81,10 @@ Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`
 
 ## 5. Determinism and real boundaries
 
+### Browser candidate execution
+
+`make s01-browser-candidate` builds the production Admin SPA and runs `node scripts/e2e-harness.mjs` with isolated SQLite, ports, keys, Hub/Relay processes and a deterministic Adapter. `golden-path-authoring.spec.ts` configures and publishes through the browser; the Test Client generates runtime traffic in the same environment; `golden-path-usage.spec.ts` then checks Usage/System. `topology-security.spec.ts` covers the public/private boundary. Do not combine results from unrelated databases into one business-flow claim. Playwright JSON defaults to `.artifacts/e2e-playwright.json`; failures retain traces. For a failure, record the exact commit, command, browser version, failing request/response and process teardown result before changing a timeout or assertion. This lane is browser evidence, not Android device or real supplier qualification.
+
 Every automated deterministic test must use isolated temp data/ports, avoid order dependency, default to no public-network access, use synthetic credentials, bound asynchronous waits and clean up processes/files.
 
 Do not mock away the behavior under test:
@@ -159,9 +163,9 @@ completedAt
 
 Historical audit/test mapping from older architecture baselines remains useful as regression evidence, but it is not a living status document and must never be used to infer that a newer architecture checkpoint is Green.
 
-Current checkpoint status lives only in `docs/s0-execution-progress.md`, backed by executable results for the current architecture baseline and current implementation SHA.
+The fixed S0.2 Preview composition and its evidence boundary are summarized in `docs/s0-execution-progress.md`. A future checkpoint needs its own fixed source, build and execution record.
 
-The [current status](s0-execution-progress.md) records implemented fixes and exact executed/unexecuted lanes. A script exit status or stored PASS field alone remains insufficient for Freeze acceptance.
+The [S0.2 status](s0-execution-progress.md) does not substitute for per-scenario device records. A script exit status or stored PASS field alone remains insufficient for Freeze acceptance.
 
 ## 11. TDD cycle
 

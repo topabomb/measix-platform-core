@@ -122,6 +122,7 @@ onMounted(refresh)
           <q-item-section>
             <q-item-label>{{ $t('releases.versionLabel', { generation: release.managedGeneration }) }}</q-item-label>
             <q-item-label caption>
+              {{ $t('releases.deliveryProtocol', { version: release.snapshotSchemaVersion }) }} ·
               {{ diffText(release.diffSummary) }} · {{ $t('releases.publishedAt') }} {{ localTime(release.publishedAt) }}
             </q-item-label>
           </q-item-section>
@@ -143,6 +144,7 @@ onMounted(refresh)
         <q-card-section class="row items-center justify-between">
           <div>
             <div class="text-h6">{{ $t('releases.versionLabel', { generation: detailRelease.managedGeneration }) }}</div>
+            <div class="text-caption text-grey-7" data-cy="release-snapshot-version">{{ $t('releases.deliveryProtocol', { version: detailRelease.snapshotSchemaVersion }) }}</div>
             <div class="text-caption text-grey-7">{{ $t('releases.publishedAt') }} {{ localTime(detailRelease.publishedAt) }}</div>
           </div>
           <StatusChip :value="detailRelease.status" />

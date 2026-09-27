@@ -1531,6 +1531,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <q-card-section class="text-h6">{{ $t('resources.preview.title') }}</q-card-section>
           <q-card-section v-if="preview">
             <div class="text-body2 q-mb-xs">{{ $t('resources.preview.intro') }}</div>
+            <div class="text-caption text-grey-7 q-mb-xs" data-cy="preview-snapshot-version">{{ $t('releases.deliveryProtocol', { version: preview.snapshotSchemaVersion }) }}</div>
             <details class="text-caption text-grey-7 q-mb-xs"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>
               {{ $t('resources.preview.hash') }}: <code style="overflow-wrap: anywhere">{{ preview.projectionHash }}</code><br>
               {{ $t('resources.draft.revision') }} {{ preview.draftRevision }}

@@ -59,6 +59,7 @@ const RELEASE = {
   sourceDraftRevision: 5,
   status: 'ACTIVE' as const,
   snapshotHash: 'sha256:abc',
+  snapshotSchemaVersion: 4,
   publishedAt: '2026-08-01T00:00:00Z',
   publishedBy: 'admin',
   diffSummary: { added: 2, changed: 1, removed: 0, details: [{ kind: 'Model', added: 2, changed: 1, removed: 0 }] },
@@ -87,6 +88,7 @@ describe('ReleasesPage', () => {
     await flushPromises()
     const text = wrapper.text()
     expect(text).toContain('Version 3')
+    expect(text).toContain('Delivery protocol v4')
     expect(text).toContain('2 added')
     expect(text).not.toContain('+2 added')
     expect(text).toContain('2026')
@@ -101,6 +103,7 @@ describe('ReleasesPage', () => {
     await flushPromises()
     const detail = wrapper.get('[data-cy="release-detail"]')
     expect(detail.text()).toContain('sha256:abc')
+    expect(detail.text()).toContain('Delivery protocol v4')
     expect(detail.text()).toContain('act_1')
     expect(detail.text().toLowerCase()).toContain('completed')
   })

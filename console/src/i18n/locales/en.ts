@@ -910,6 +910,7 @@ export default {
     replaceSecretHint: 'Creates a new immutable version; active runtime unchanged until Apply.',
   },
   releases: {
+    deliveryProtocol: 'Delivery protocol v{version}',
     deviceApplicationHint: 'Publishing applies server configuration. Devices must sync and report application separately; report time does not mean currently online.',
     viewDevices: 'View device application status',
     title: 'Releases',

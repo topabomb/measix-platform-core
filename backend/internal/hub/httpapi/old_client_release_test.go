@@ -111,6 +111,31 @@ func TestOldClientReleaseVersionAndAppliedBoundary(t *testing.T) {
 				t.Fatal(err)
 			}
 			next, nextBytes := storeRelease(2, tc.version, content)
+			cookie, csrf := loginAdmin(t, h)
+			adminHeaders := map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf}
+			for _, expected := range []clientapi.ManagedSnapshot{original, next} {
+				var detail map[string]any
+				decodeJSON(t, doJSON(t, h, http.MethodGet, "/api/admin/v1/releases/"+string(expected.ReleaseId), adminHeaders, nil), &detail)
+				if detail["snapshotSchemaVersion"] != float64(expected.SchemaVersion) {
+					t.Fatalf("Admin release version=%v want %d", detail["snapshotSchemaVersion"], expected.SchemaVersion)
+				}
+			}
+			var list struct {
+				Items []map[string]any `json:"items"`
+			}
+			decodeJSON(t, doJSON(t, h, http.MethodGet, "/api/admin/v1/releases", adminHeaders, nil), &list)
+			if len(list.Items) != 2 || list.Items[0]["snapshotSchemaVersion"] != float64(next.SchemaVersion) || list.Items[1]["snapshotSchemaVersion"] != float64(original.SchemaVersion) {
+				t.Fatalf("Admin release list lost actual versions: %+v", list.Items)
+			}
+			draft, err := cap.GetDraft(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var preview map[string]any
+			decodeJSON(t, doJSON(t, h, http.MethodPost, "/api/admin/v1/draft:preview", adminHeaders, map[string]int{"expectedDraftRevision": draft.DraftRevision}), &preview)
+			if preview["snapshotSchemaVersion"] != float64(5) {
+				t.Fatalf("preview schema=%v want 5", preview["snapshotSchemaVersion"])
+			}
 			wantVersion := tc.version
 			if wantVersion == 0 {
 				wantVersion = 5

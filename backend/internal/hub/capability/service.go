@@ -34,19 +34,20 @@ type DraftView struct {
 }
 
 type DraftPreview struct {
-	DraftRevision       int
-	ProjectionHash      string
-	PublishedGeneration *int
-	DiffSummary         adminapi.DiffSummary
-	Providers           []adminapi.ProviderDefinition
-	Models              []adminapi.ModelDefinition
-	ImageGenerators     []adminapi.ImageGenerationDefinition
-	TTS                 []adminapi.TtsDefinition
-	ASR                 []adminapi.AsrDefinition
-	MCP                 []adminapi.McpDefinition
-	Policy              adminapi.ManagedPolicy
-	Assistants          []adminapi.ManagedAssistantDefinition
-	Starters            []adminapi.AssistantStarterDefinition
+	SnapshotSchemaVersion int
+	DraftRevision         int
+	ProjectionHash        string
+	PublishedGeneration   *int
+	DiffSummary           adminapi.DiffSummary
+	Providers             []adminapi.ProviderDefinition
+	Models                []adminapi.ModelDefinition
+	ImageGenerators       []adminapi.ImageGenerationDefinition
+	TTS                   []adminapi.TtsDefinition
+	ASR                   []adminapi.AsrDefinition
+	MCP                   []adminapi.McpDefinition
+	Policy                adminapi.ManagedPolicy
+	Assistants            []adminapi.ManagedAssistantDefinition
+	Starters              []adminapi.AssistantStarterDefinition
 }
 
 type ValidationResult struct {
@@ -56,15 +57,16 @@ type ValidationResult struct {
 }
 
 type ReleaseView struct {
-	ReleaseID           string
-	ManagedGeneration   int
-	SnapshotHash        string
-	Status              string
-	CreatedAt           time.Time
-	SourceDraftRevision int
-	PublishedBy         string
-	DiffSummary         adminapi.DiffSummary
-	ActivationHistory   []adminapi.ActivationSummary
+	SnapshotSchemaVersion int
+	ReleaseID             string
+	ManagedGeneration     int
+	SnapshotHash          string
+	Status                string
+	CreatedAt             time.Time
+	SourceDraftRevision   int
+	PublishedBy           string
+	DiffSummary           adminapi.DiffSummary
+	ActivationHistory     []adminapi.ActivationSummary
 }
 
 // releaseContentDiff computes the Added / Changed / Removed summary between two
@@ -346,7 +348,7 @@ func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRe
 	if current == nil {
 		return ReleaseView{}, fmt.Errorf("invalid persisted release content")
 	}
-	normalizedCurrent, _, err := PublishedContent(*current, row.SnapshotJSON)
+	normalizedCurrent, snapshotSchemaVersion, err := PublishedContent(*current, row.SnapshotJSON)
 	if err != nil {
 		return ReleaseView{}, err
 	}
@@ -373,15 +375,16 @@ func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRe
 		return ReleaseView{}, err
 	}
 	return ReleaseView{
-		ReleaseID:           row.ID,
-		ManagedGeneration:   int(row.ManagedGeneration),
-		SnapshotHash:        row.SnapshotHash,
-		Status:              row.Status,
-		CreatedAt:           row.CreatedAt,
-		SourceDraftRevision: int(row.SourceDraftRevision),
-		PublishedBy:         row.CreatedByUserID,
-		DiffSummary:         diff,
-		ActivationHistory:   history,
+		SnapshotSchemaVersion: snapshotSchemaVersion,
+		ReleaseID:             row.ID,
+		ManagedGeneration:     int(row.ManagedGeneration),
+		SnapshotHash:          row.SnapshotHash,
+		Status:                row.Status,
+		CreatedAt:             row.CreatedAt,
+		SourceDraftRevision:   int(row.SourceDraftRevision),
+		PublishedBy:           row.CreatedByUserID,
+		DiffSummary:           diff,
+		ActivationHistory:     history,
 	}, nil
 }
 
@@ -575,16 +578,17 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	effectiveContent := draft.Content
 	effectiveContent.Starters = projectionToAdminStarters(snapshot.Starters)
 	return DraftPreview{
-		DraftRevision:       draft.DraftRevision,
-		ProjectionHash:      hash,
-		PublishedGeneration: publishedGeneration,
-		DiffSummary:         releaseContentDiff(&effectiveContent, previous),
-		Providers:           projectionToAdminProviders(snapshot.Providers),
-		Models:              projectionToAdminModels(snapshot.Models),
-		ImageGenerators:     projectionToAdminImages(snapshot.ImageGenerators),
-		TTS:                 projectionToAdminTts(snapshot.Tts),
-		ASR:                 projectionToAdminAsr(snapshot.Asr),
-		MCP:                 projectionToAdminMcp(snapshot.Mcp),
+		SnapshotSchemaVersion: int(snapshot.SchemaVersion),
+		DraftRevision:         draft.DraftRevision,
+		ProjectionHash:        hash,
+		PublishedGeneration:   publishedGeneration,
+		DiffSummary:           releaseContentDiff(&effectiveContent, previous),
+		Providers:             projectionToAdminProviders(snapshot.Providers),
+		Models:                projectionToAdminModels(snapshot.Models),
+		ImageGenerators:       projectionToAdminImages(snapshot.ImageGenerators),
+		TTS:                   projectionToAdminTts(snapshot.Tts),
+		ASR:                   projectionToAdminAsr(snapshot.Asr),
+		MCP:                   projectionToAdminMcp(snapshot.Mcp),
 		Policy: adminapi.ManagedPolicy{
 			PolicyId:                           snapshot.Policy.PolicyId,
 			AllowLocalProviders:                snapshot.Policy.AllowLocalProviders,

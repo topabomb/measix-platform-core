@@ -90,6 +90,8 @@ Usage 顶层只常驻时间、用户和上游等高频条件，其余资源类�
 - validation 以 Hub 返回为最终权威，前端可做即时提示但不能维护第二套业务规则；明确 issue 以稳定 code/path 决定定位，在中英文 locale 中给出可行动的字段说明，原始 code 仅作为诊断补充；
 - Snapshot Preview 必须消费 Hub canonical compiler 的 projection；Review 的变更计数由 Hub 将保存的 Draft 与最新 immutable Release 比较后返回，浏览器不得把当前 Draft 克隆成所谓发布基线。
 
+`Release.snapshotSchemaVersion` 由 `capability.buildReleaseView` 复用 `PublishedContent` 从该条不可变 `SnapshotJSON` 读取；`DraftPreviewResponse.snapshotSchemaVersion` 取同次 canonical compiler 的实际输出。`ReleasesPage` 在列表副标题与详情标题下显示“下发协议 vN”，`ResourcesPage` 在预览说明下显示相同标签，保持现有主从与窄屏布局，不增加筛选、选择器或第二个详情面。这里的版本与发布序号、设备应用状态不同；历史发布和重新发布均按实际 Snapshot 展示，不能使用当前默认常量替代。此只读 Admin 投影不修改 Client API、发布 bytes/hash 或数据库结构。
+
 ## 4. 实现范围与后续验证
 
 具体“必须做什么”只引用 architecture；当前实现与验证结果见 [当前状态](s0-execution-progress.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。

@@ -3032,6 +3032,7 @@ components:
       required:
       - draftRevision
       - projectionHash
+      - snapshotSchemaVersion
       - providers
       - models
       - tts
@@ -3047,6 +3048,10 @@ components:
           minimum: 0
         projectionHash:
           $ref: '#/components/schemas/Sha256Hash'
+        snapshotSchemaVersion:
+          type: integer
+          minimum: 1
+          description: Actual schemaVersion of the canonical Snapshot compiled for this preview.
         providers:
           type: array
           items:
@@ -3175,6 +3180,7 @@ components:
       - managedGeneration
       - status
       - snapshotHash
+      - snapshotSchemaVersion
       - createdAt
       - sourceDraftRevision
       - publishedAt
@@ -3196,6 +3202,10 @@ components:
           - SUPERSEDED
         snapshotHash:
           $ref: '#/components/schemas/Sha256Hash'
+        snapshotSchemaVersion:
+          type: integer
+          minimum: 1
+          description: Actual schemaVersion read from this immutable release Snapshot, including historical and republished releases.
         createdAt:
           type: string
           format: date-time

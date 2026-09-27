@@ -910,6 +910,7 @@ export default {
     replaceSecretHint: '创建新的不可变版本；在应用之前活跃运行时不变。',
   },
   releases: {
+    deliveryProtocol: '下发协议 v{version}',
     deviceApplicationHint: '发布成功表示服务端配置已生效。设备需同步并报告应用，才能确认更新；报告时间不表示当前在线。',
     viewDevices: '查看用户设备应用状态',
     title: '发布记录',

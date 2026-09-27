@@ -1267,6 +1267,8 @@ export interface components {
         DraftPreviewResponse: {
             draftRevision: number;
             projectionHash: components["schemas"]["Sha256Hash"];
+            /** @description Actual schemaVersion of the canonical Snapshot compiled for this preview. */
+            snapshotSchemaVersion: number;
             providers: components["schemas"]["ProviderDefinition"][];
             models: components["schemas"]["ModelDefinition"][];
             /** @description Additive Snapshot v4 preview field; omission means an empty list. */
@@ -1311,6 +1313,8 @@ export interface components {
             /** @enum {string} */
             status: "STAGED" | "ACTIVE" | "ACTIVATION_FAILED" | "SUPERSEDED";
             snapshotHash: components["schemas"]["Sha256Hash"];
+            /** @description Actual schemaVersion read from this immutable release Snapshot, including historical and republished releases. */
+            snapshotSchemaVersion: number;
             /** Format: date-time */
             createdAt: string;
             sourceDraftRevision: number;

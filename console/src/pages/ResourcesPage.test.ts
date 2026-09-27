@@ -1017,6 +1017,7 @@ describe('ResourcesPage', () => {
         return {
           draftRevision: 1,
           projectionHash: 'sha256:abc123',
+          snapshotSchemaVersion: 5,
           providers: [{ providerId: 'prv_1', displayName: 'Friendly Provider', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', enabled: true }],
           models: [{ modelId: 'mdl_1', displayName: 'Friendly Model', providerId: 'prv_1', upstreamModelKey: 'model', inputModalities: ['TEXT'], capabilities: ['TOOL'], enabled: false }],
           tts: [{ ttsId: 'tts_1', displayName: 'Friendly Voice', upstreamModelKey: 'speech', voice: 'alloy', enabled: true }],
@@ -1048,6 +1049,7 @@ describe('ResourcesPage', () => {
 
     const body = wrapper.get('[data-cy="snapshot-preview-surface"]').text()
     expect(body).toContain('sha256:abc123')
+    expect(body).toContain('Delivery protocol v5')
     expect(body).toContain('Snapshot Preview')
     expect(body).toContain('Policy ID')
     expect(body).toContain('Assistants, Memory seeds, Starters')

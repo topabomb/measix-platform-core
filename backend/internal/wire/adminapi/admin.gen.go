@@ -2180,9 +2180,12 @@ type DraftPreviewResponse struct {
 	Providers      []ProviderDefinition `json:"providers"`
 
 	// PublishedGeneration Latest immutable release generation used as the comparison baseline. Absent when no release exists.
-	PublishedGeneration *int                         `json:"publishedGeneration,omitempty"`
-	Starters            []AssistantStarterDefinition `json:"starters"`
-	Tts                 []TtsDefinition              `json:"tts"`
+	PublishedGeneration *int `json:"publishedGeneration,omitempty"`
+
+	// SnapshotSchemaVersion Actual schemaVersion of the canonical Snapshot compiled for this preview.
+	SnapshotSchemaVersion int                          `json:"snapshotSchemaVersion"`
+	Starters              []AssistantStarterDefinition `json:"starters"`
+	Tts                   []TtsDefinition              `json:"tts"`
 }
 
 // EnrollmentId defines model for EnrollmentId.
@@ -2536,16 +2539,19 @@ type ReconciliationViewState string
 // Release defines model for Release.
 type Release struct {
 	// ActivationHistory Most recent activation attempts for this release, newest first. Bounded, because one release can be republished repeatedly and this array is returned with every release in the list.
-	ActivationHistory   []ActivationSummary `json:"activationHistory"`
-	CreatedAt           time.Time           `json:"createdAt"`
-	DiffSummary         DiffSummary         `json:"diffSummary"`
-	ManagedGeneration   int                 `json:"managedGeneration"`
-	PublishedAt         time.Time           `json:"publishedAt"`
-	PublishedBy         string              `json:"publishedBy"`
-	ReleaseId           ReleaseId           `json:"releaseId"`
-	SnapshotHash        Sha256Hash          `json:"snapshotHash"`
-	SourceDraftRevision int                 `json:"sourceDraftRevision"`
-	Status              ReleaseStatus       `json:"status"`
+	ActivationHistory []ActivationSummary `json:"activationHistory"`
+	CreatedAt         time.Time           `json:"createdAt"`
+	DiffSummary       DiffSummary         `json:"diffSummary"`
+	ManagedGeneration int                 `json:"managedGeneration"`
+	PublishedAt       time.Time           `json:"publishedAt"`
+	PublishedBy       string              `json:"publishedBy"`
+	ReleaseId         ReleaseId           `json:"releaseId"`
+	SnapshotHash      Sha256Hash          `json:"snapshotHash"`
+
+	// SnapshotSchemaVersion Actual schemaVersion read from this immutable release Snapshot, including historical and republished releases.
+	SnapshotSchemaVersion int           `json:"snapshotSchemaVersion"`
+	SourceDraftRevision   int           `json:"sourceDraftRevision"`
+	Status                ReleaseStatus `json:"status"`
 }
 
 // ReleaseStatus defines model for Release.Status.

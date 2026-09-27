@@ -97,19 +97,20 @@ func (h *fullAdminHandler) PreviewDraft(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	writeJSON(w, http.StatusOK, adminapi.DraftPreviewResponse{
-		DraftRevision:       preview.DraftRevision,
-		ProjectionHash:      adminapi.Sha256Hash(preview.ProjectionHash),
-		PublishedGeneration: preview.PublishedGeneration,
-		DiffSummary:         preview.DiffSummary,
-		Providers:           preview.Providers,
-		Models:              preview.Models,
-		ImageGenerators:     &preview.ImageGenerators,
-		Tts:                 preview.TTS,
-		Asr:                 preview.ASR,
-		Mcp:                 preview.MCP,
-		Policy:              preview.Policy,
-		Assistants:          preview.Assistants,
-		Starters:            preview.Starters,
+		SnapshotSchemaVersion: preview.SnapshotSchemaVersion,
+		DraftRevision:         preview.DraftRevision,
+		ProjectionHash:        adminapi.Sha256Hash(preview.ProjectionHash),
+		PublishedGeneration:   preview.PublishedGeneration,
+		DiffSummary:           preview.DiffSummary,
+		Providers:             preview.Providers,
+		Models:                preview.Models,
+		ImageGenerators:       &preview.ImageGenerators,
+		Tts:                   preview.TTS,
+		Asr:                   preview.ASR,
+		Mcp:                   preview.MCP,
+		Policy:                preview.Policy,
+		Assistants:            preview.Assistants,
+		Starters:              preview.Starters,
 	})
 }
 
@@ -240,16 +241,17 @@ func activationWire(result runtimecontrol.ActivationResult) adminapi.Activation 
 
 func releaseWire(row capability.ReleaseView) adminapi.Release {
 	return adminapi.Release{
-		ReleaseId:           row.ReleaseID,
-		ManagedGeneration:   row.ManagedGeneration,
-		SnapshotHash:        row.SnapshotHash,
-		Status:              adminapi.ReleaseStatus(row.Status),
-		CreatedAt:           row.CreatedAt,
-		SourceDraftRevision: row.SourceDraftRevision,
-		PublishedAt:         row.CreatedAt,
-		PublishedBy:         row.PublishedBy,
-		DiffSummary:         row.DiffSummary,
-		ActivationHistory:   row.ActivationHistory,
+		SnapshotSchemaVersion: row.SnapshotSchemaVersion,
+		ReleaseId:             row.ReleaseID,
+		ManagedGeneration:     row.ManagedGeneration,
+		SnapshotHash:          row.SnapshotHash,
+		Status:                adminapi.ReleaseStatus(row.Status),
+		CreatedAt:             row.CreatedAt,
+		SourceDraftRevision:   row.SourceDraftRevision,
+		PublishedAt:           row.CreatedAt,
+		PublishedBy:           row.PublishedBy,
+		DiffSummary:           row.DiffSummary,
+		ActivationHistory:     row.ActivationHistory,
 	}
 }
 

@@ -71,6 +71,8 @@ The fixed S0.2 Preview identity and later-stage boundaries are maintained in [S0
 
 ## 4. Canonical fixtures
 
+Admin `Release` 与 `DraftPreviewResponse` 的必填 `snapshotSchemaVersion` 是只读下发协议诊断：分别来自不可变发布 Snapshot 和当前 canonical 编译结果；它不是发布序号或设备兼容性判定。该投影仅扩展 Admin OpenAPI/generated types，不变更 Client Snapshot 协议和已发布内容。
+
 Portal grant/exchange/restricted Web Session operations are in the Client OpenAPI. Only the two canonical `/api/client/v1/enterprise/updates` GETs accept the additional Portal Cookie scheme; other Client/Admin/runtime operations retain their own authentication. Hub stores ticket/cookie digests in `PortalSession` linked to the parent Android Session; exchange atomically consumes the ticket, and a Portal Cookie never acquires Admin or general Client privileges. The independent Portal generates TypeScript from this same OpenAPI and records its input SHA256. Hub distribution/configuration is documented in [operations](operations.md); Portal UI/build ownership remains in the sibling Portal repository.
 
 `PlatformEnrollmentMaterial` in the Client OpenAPI describes the native scan/paste document, not the HTTP Enrollment request. Its canonical sample is `api/fixtures/enrollment/platform-v1.json`; Android export and Admin's `generated-client.ts` derive from this same source. The Admin generator emits both surface type files; it imports only the native material type from the Client output and does not call Client HTTP APIs. Control Protocol §8 owns trust checks and byte limits. Private configuration-file import, if any, is an Android concern and is not an Enrollment or Portal protocol.

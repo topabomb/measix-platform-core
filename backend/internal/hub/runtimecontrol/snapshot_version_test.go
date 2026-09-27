@@ -100,6 +100,12 @@ func TestHistoricalRepublishPreservesSchemaAndSourceBytes(t *testing.T) {
 			}
 			old, _ := st.Client.ManagedRelease.Get(ctx, source.ID)
 			newRow, _ := st.Client.ManagedRelease.Get(ctx, next.ReleaseID)
+			for _, releaseID := range []string{old.ID, newRow.ID} {
+				releaseView, err := svc.Capability.GetRelease(ctx, releaseID)
+				if err != nil || releaseView.SnapshotSchemaVersion != version {
+					t.Fatalf("Admin version projection for historical/republished release: %+v %v", releaseView, err)
+				}
+			}
 			if !bytes.Equal(old.SnapshotJSON, raw) || !bytes.Equal(old.ReleaseContentJSON, contentRaw) || old.SnapshotHash != hash {
 				t.Fatal("republish mutated historical facts")
 			}

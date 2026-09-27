@@ -42,6 +42,21 @@ export function resolveRoot(scriptDir) {
   return parent
 }
 
+/** Read publication/support identities from the compiler; release tooling must not duplicate its version list. */
+export function snapshotVersions(root) {
+  const source = readFileSync(join(root, 'backend/internal/hub/capability/snapshot.go'), 'utf8')
+  const current = Number(source.match(/const CurrentSnapshotSchemaVersion = (\d+)/)?.[1])
+  const list = source.match(/func SupportedSnapshotSchemaVersions\(\) \[\]int\s*\{\s*return \[\]int\{([^}]*)\}\s*\}/)?.[1]
+  if (!Number.isSafeInteger(current) || current < 1 || !list || !/^\s*\d+(?:\s*,\s*\d+)*\s*,?\s*$/.test(list)) {
+    throw new Error('Cannot determine Snapshot compiler version identity')
+  }
+  const supported = list.split(',').map(v => v.trim()).filter(Boolean).map(Number)
+  if (supported.some(v => !Number.isSafeInteger(v) || v < 1) || new Set(supported).size !== supported.length || !supported.includes(current)) {
+    throw new Error('Invalid Snapshot compiler support identity')
+  }
+  return { current, supported }
+}
+
 // --- Git utilities ---
 
 export function gitCommit(cwd) {

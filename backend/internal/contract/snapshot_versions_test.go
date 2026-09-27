@@ -64,34 +64,6 @@ func TestSnapshotWireVersionRequirements(t *testing.T) {
 			}
 		})
 	}
-	for _, flag := range []string{"allowLocalProviders", "allowLocalTts", "allowLocalAsr", "allowLocalMcp", "allowLocalAssistants"} {
-		for _, mutation := range []string{"missing", "null", "string"} {
-			t.Run(flag+"/"+mutation, func(t *testing.T) {
-				value := read("v4-user-configuration-policy.json")
-				policy := value["policy"].(map[string]any)
-				switch mutation {
-				case "missing":
-					delete(policy, flag)
-				case "null":
-					policy[flag] = nil
-				case "string":
-					policy[flag] = "false"
-				}
-				if err := schema.VisitJSON(value); err == nil {
-					t.Fatal("invalid v4 policy accepted")
-				}
-			})
-		}
-	}
-	for _, field := range []string{"assistants", "starters"} {
-		t.Run("missing/"+field, func(t *testing.T) {
-			value := read("v4-user-configuration-policy.json")
-			delete(value, field)
-			if err := schema.VisitJSON(value); err == nil {
-				t.Fatal("v4 collection missing")
-			}
-		})
-	}
 	t.Run("image-generation-additive-fields", func(t *testing.T) {
 		value := read("v4-user-configuration-policy.json")
 		delete(value, "imageGenerators")

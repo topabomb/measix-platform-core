@@ -4,6 +4,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rm
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { snapshotVersions } from './lib/harness.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORTAL = resolve(ROOT, '..', 'measix-enterprise-portal')
@@ -110,7 +111,7 @@ function compatibilityEvidence() {
   return {
     baseline: JSON.parse(readFileSync(join(ROOT, 'api', 'protocol-baseline.json'), 'utf8')).baseline,
     clientProtocolVersion: '1',
-    snapshotSchemaVersions: [4],
+    snapshotSchemaVersions: snapshotVersions(ROOT).supported,
     enrollmentFormatVersion: 1,
     portalBridgeVersion: androidPortal.bridgeVersion,
     portalArtifacts: portalContract.artifacts,

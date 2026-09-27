@@ -12,6 +12,7 @@ import {
   adminBuildHash,
   deterministicAdapterVersion,
   sha256File,
+  snapshotVersions,
 } from './lib/harness.mjs'
 
 const ROOT = resolveRoot(import.meta.dirname)
@@ -146,6 +147,8 @@ function extractPlaywrightSpecs(suite, results) {
 // --- Scenario result compilation ---
 
 const MANIFEST_KIND = 'measix-s0-client-contract-freeze'
+// CAP-C0-010 proves this wire profile; a later protocol needs reviewed evidence selectors.
+const CAP_SNAPSHOT_VERSION = 5
 const PINNED_HASH_FIELDS = ['adminBuildHash', 'clientControlOpenApiHash', 'adminOpenApiHash', 'relayControlOpenApiHash', 'usageIngestOpenApiHash', 'canonicalFixtureHash']
 
 /**
@@ -161,7 +164,7 @@ export function manifestSelfEvidence(manifest) {
     if (!/^[a-f0-9]{40}$/.test(manifest[field] ?? '')) errors.push(`${field} is not a full commit SHA`)
   }
   if (manifest.workingTreeDirty !== false || manifest.architectureRepoDirty !== false) errors.push('Manifest source was dirty or unknown')
-  if (manifest.snapshotSchemaVersion !== 4) errors.push('Manifest is not pinned to current Snapshot v4')
+  if (manifest.snapshotSchemaVersion !== CAP_SNAPSHOT_VERSION) errors.push(`Manifest is not pinned to CAP Snapshot v${CAP_SNAPSHOT_VERSION}`)
   for (const field of PINNED_HASH_FIELDS) {
     if (!/^sha256:[a-f0-9]{64}$/.test(manifest[field] ?? '')) errors.push(`${field} is not a pinned hash`)
   }
@@ -302,9 +305,7 @@ export function validateReplay(replay, facts, candidateHash) {
 export const artifactNames = ['backend-test.json','system-test.json','console-test.json','candidate-test.json','e2e-playwright.json','static-contract.json','resource-baseline.json','real-adapter-qualification.json']
 function byteHash(path) { return 'sha256:' + createHash('sha256').update(readFileSync(path)).digest('hex') }
 export function sourceFacts(root = ROOT, architecture = ARCH_REPO) {
-  const source = readFileSync(join(root,'backend/internal/hub/capability/snapshot.go'),'utf8')
-  const version = source.match(/const CurrentSnapshotSchemaVersion = (\d+)/)?.[1]
-  if (!version) throw new Error('Cannot determine live Snapshot compiler schema')
+  const version = snapshotVersions(root).current
   return {
     platformCoreCommit: gitCommit(root), architectureCommit: gitCommit(architecture),
     snapshotSchemaVersion: Number(version), adminBuildHash: adminBuildHash(root),
@@ -338,7 +339,7 @@ export function validateCandidate(manifest, { allowPendingReplay = false } = {})
   const errors = [...validatePins(manifest,facts,SCENARIO_DEFS,allowPendingReplay), ...evidence.errors]
   if (gitDirty(ROOT) || gitDirty(ARCH_REPO)) errors.push('Current source checkout is dirty')
   if (facts.adminBuildHash === 'not-built') errors.push('Admin production build missing')
-  if (facts.snapshotSchemaVersion !== 4) errors.push(`This CAP runner requires current Snapshot v4; found v${facts.snapshotSchemaVersion}. Resource checks do not replace the S0.2 ERX gate`)
+  if (facts.snapshotSchemaVersion !== CAP_SNAPSHOT_VERSION) errors.push(`This CAP runner requires Snapshot v${CAP_SNAPSHOT_VERSION}; found v${facts.snapshotSchemaVersion}. Resource checks do not replace the S0.2 ERX gate`)
   for (const name of artifactNames) {
     const pin = manifest.artifactPins?.[name], current = evidence.pins[name]
     if (!pin || !current || pin.artifactSha256 !== current.artifactSha256 || pin.metaSha256 !== current.metaSha256) errors.push(name + ': manifest evidence pin mismatch')

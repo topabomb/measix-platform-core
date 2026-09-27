@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { snapshotVersions } from './lib/harness.mjs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { androidContractFailures } from './verify-preview-contract.mjs'
 
 const schema = Buffer.from('openapi: 3.0.3\ncomponents: {}\n')
@@ -24,4 +28,21 @@ test('Android identity normalizes checkout line endings but rejects malformed or
     assert.ok(androidContractFailures(schema, invalid, schema, invalid, header).some(value => value.includes('manifest')))
   }
   assert.ok(androidContractFailures(schema, manifest, schema, { ...manifest, source: 'untrusted-source' }, header).some(value => value.includes('manifest')))
+})
+
+test('release Snapshot versions come from the compiler and reject incomplete source identity', () => {
+  assert.deepEqual(snapshotVersions(resolve(import.meta.dirname, '..')), { current: 5, supported: [4, 5] })
+  const root = mkdtempSync(join(tmpdir(), 'measix-snapshot-identity-'))
+  try {
+    const directory = join(root, 'backend/internal/hub/capability')
+    mkdirSync(directory, { recursive: true })
+    const file = join(directory, 'snapshot.go')
+    const source = 'const CurrentSnapshotSchemaVersion = 7\nfunc SupportedSnapshotSchemaVersions() []int { return []int{5, 7} }\n'
+    writeFileSync(file, source)
+    assert.deepEqual(snapshotVersions(root), { current: 7, supported: [5, 7] })
+    for (const invalid of ['', source.replace('5, 7', '5'), source.replace('5, 7', '7, 7'), source.replace('5, 7', '5, unknown')]) {
+      writeFileSync(file, invalid)
+      assert.throws(() => snapshotVersions(root), /Snapshot/)
+    }
+  } finally { rmSync(root, { recursive: true, force: true }) }
 })

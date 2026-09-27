@@ -6,7 +6,7 @@ This document defines how implementation candidates are composed and proven repr
 
 A candidate is a fixed, reproducible composition of source commits, generated contracts, builds and test evidence — never an implicit moving branch head.
 
-For the S0.2 internal Preview, `node scripts/build-preview-release.mjs <version>` is the production artifact owner. It requires clean pinned Core, Portal, architecture and Android worktrees, verifies the `S0.2/v5-starter-preview` protocol baseline and regenerated artifacts, builds Admin/Portal assets, cross-compiles static Linux ARM64 binaries with a non-`dev` build identity, and emits `release.json` plus `SHA256SUMS`. When the active Android worktree contains unrelated local work, set `MEASIX_RELEASE_ANDROID_ROOT` to a clean detached worktree at the exact Android commit being recorded; the builder still rejects a dirty override. The target runbook is [S0.2 Preview deployment](s02-preview-deployment.md). This package is a Preview delivery vehicle, not proof of later S0.3/S0.4/final gates.
+For the S0.2 internal Preview, `node scripts/build-preview-release.mjs <version>` is the production artifact owner. It requires clean pinned Core, Portal, architecture and Android worktrees, verifies the `S0.2/v5-starter-preview` protocol baseline and regenerated artifacts, builds Admin/Portal assets, cross-compiles static Linux ARM64 binaries with a non-`dev` build identity, and emits `release.json` plus `SHA256SUMS`. Release compatibility records the compiler-owned supported Snapshot versions (currently `[4,5]`), read from `SupportedSnapshotSchemaVersions`; it is distinct from the new-publication version and is not device acceptance evidence. When the active Android worktree contains unrelated local work, set `MEASIX_RELEASE_ANDROID_ROOT` to a clean detached worktree at the exact Android commit being recorded; the builder still rejects a dirty override. The target runbook is [S0.2 Preview deployment](s02-preview-deployment.md). This package is a Preview delivery vehicle, not proof of later S0.3/S0.4/final gates.
 
 ### S0.2 sealed Preview composition
 
@@ -19,7 +19,7 @@ S0.1 Client Contract Freeze Candidate
   → pre-Android server-side product closure
 
 S0.2 Realm/Experience Freeze Candidate
-  → Snapshot v4 and product foundation with five user-configuration policy flags
+  → Snapshot v5 Starter opening and product foundation; published v4 preservation
 
 S0.3 Gateway Freeze Candidate
   → Snapshot v6 + three-daemon Gateway server closure
@@ -90,7 +90,7 @@ Full logs remain in the reported independent workspace; preserve that workspace 
 
 The writer validates current source/architecture cleanliness and identity, production build, four OpenAPI hashes, fixture/schema/Adapter pins, complete required scenario results, and every artifact plus metadata hash/exit/source. Qualification requires all four profiles in one run, each with observed adapter version, upstream/config revision, transport and forwarded usage evidence; unknown identity or an unexecuted profile fails. Partial diagnostic runs cannot be merged into qualification. Declared NONE/LEVEL_0 is not semantic Usage/header-echo qualification.
 
-This CAP manifest compiler verifies the resource baseline of current Snapshot v4 but does not produce S0.2 ERX/consumer evidence. The clean-source runner is implemented; passing runner fixture tests is not an executed candidate replay. Candidate promotion records each required gate explicitly. The fixed S0.2 Preview identity and current evidence index are in [S0 status](s0-execution-progress.md).
+This CAP manifest compiler pins Snapshot v5 and requires resource evidence plus CAP-C0-010 defaults/shared v4-v5 wire/strict opening isolation checks. The accepted CAP profile is explicit: a later version must add reviewed evidence before the compiler can accept it. These checks do not produce S0.2 ERX/consumer evidence. The clean-source runner is implemented; passing runner fixture tests is not an executed candidate replay. Candidate promotion records each required gate explicitly. The fixed S0.2 Preview identity and current evidence index are in [S0 status](s0-execution-progress.md).
 
 ## 3. S0.2 evidence and later-stage candidates
 

@@ -86,6 +86,21 @@
     "required": true
   },
   {
+    "id": "CAP-C0-010",
+    "name": "Current Snapshot defaults and versioned wire boundary",
+    "artifact": "backend-test.json",
+    "testNames": [
+      "TestSnapshotWireVersionRequirements",
+      "TestClientIntegrationSharedWireCases",
+      "TestStarterV5StrictWireAndV4Isolation",
+      "TestSnapshotV4PolicyGoldenHash",
+      "TestCurrentPolicyDefaultsAndCompiler",
+      "TestCAPC2041DefaultMustReferenceEnabled",
+      "TestAttachmentInspectionDefaultRequiresImageInput"
+    ],
+    "required": true
+  },
+  {
     "id": "CAP-C1-001",
     "name": "Browser creates NONE-auth Upstream",
     "artifact": "console-test.json",

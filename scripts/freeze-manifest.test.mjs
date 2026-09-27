@@ -19,7 +19,7 @@ function selfEvidenceManifest() {
     architectureCommit: 'b'.repeat(40),
     workingTreeDirty: false,
     architectureRepoDirty: false,
-    snapshotSchemaVersion: 4,
+    snapshotSchemaVersion: 5,
     adminBuildHash: SHA,
     clientControlOpenApiHash: SHA,
     adminOpenApiHash: SHA,
@@ -44,6 +44,8 @@ test('CAP-C7-001 is proven by manifest identity and evidence pins, not by the fi
     { ...good, artifactPins: {} },
     { ...good, artifactPins: { 'backend-test.json': { artifactSha256: SHA, metaSha256: SHA } } },
     { ...good, snapshotSchemaVersion: 3 },
+    { ...good, snapshotSchemaVersion: 4 },
+    { ...good, snapshotSchemaVersion: 6 },
     { ...good, manifest: 'something-else' },
   ]) {
     assert.ok(manifestSelfEvidence(bad).length > 0, 'expected evidence failure')

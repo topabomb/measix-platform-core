@@ -134,7 +134,7 @@ Before a later stage treats S0.1 as an accepted frozen dependency, the exact can
 
 The complete manifest evidence contract belongs to `measix-s0-capability-delivery-system-testing-spec.md` and `docs/release.md`; this document intentionally does **not** maintain a second partial field list.
 
-New draft evidence writes exclusively to `.artifacts/s0-freeze-candidate.json` (or an explicit new output), without overwriting an existing candidate. Current CAP tooling validates the resource baseline plus v5 Starter opening; C7 requires independent clean-source rebuild/replay and separate validated finalization. Final acceptance and unimplemented later-stage gates are defined in [release](release.md); do not infer them from the filename.
+New draft evidence writes exclusively to `.artifacts/s0-freeze-candidate.json` (or an explicit new output), without overwriting an existing candidate. Current CAP tooling pins Snapshot v5 and requires CAP-C0-010 evidence for defaults, shared v4/v5 wire cases and strict Starter opening/version isolation; these schema checks do not prove Starter authoring, Android execution or the S0.2 ERX gate; C7 requires independent clean-source rebuild/replay and separate validated finalization. Final acceptance and unimplemented later-stage gates are defined in [release](release.md); do not infer them from the filename.
 
 Current Starter output is Snapshot v5; supported immutable v4 releases retain their bytes and semantics. Bridge v3 is unchanged. Contract changes regenerate every consumer/export and explicitly preserve the supported version boundary; an old candidate report cannot certify current work. S0.3 additionally pins Gateway Control OpenAPI, Gateway build identity, surface/catalog fixtures and scenario evidence; current S0.2 evidence cannot prove those later capabilities.
 
@@ -142,7 +142,7 @@ Current Starter output is Snapshot v5; supported immutable v4 releases retain th
 
 S0 contract tests must prove architecture rules including (not a claim that all current tests already do):
 
-- clients tolerate added unknown optional response fields;
+- clients tolerate unknown optional fields only where the response contract permits extension; closed Snapshot objects reject undeclared fields and require coordinated producer/consumer contract changes;
 - undeclared request fields are rejected where strict request decoding is required;
 - programs branch on HTTP status + stable Problem `code`, not human `detail` text;
 - stable identifier format/ownership is not redefined by generated DTOs;

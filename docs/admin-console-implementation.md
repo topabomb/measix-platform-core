@@ -122,6 +122,8 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 
 响应式优先使用 Quasar breakpoint + CSS/Grid/Flex，只有交互模型真正变化时才分支；desktop/mobile 不维护两套业务逻辑。
 
+企业助手详情保留单行 `q-tabs`，窄屏缩减 tab 内边距，放不下时使用 Quasar 的外侧滚动箭头（包括移动设备）；不压缩文字或增加第二套导航。`ManagedExperienceEditor` 的长名称和技术标识允许换行，启用开关与入口编辑按钮不被文本挤出。资源页窄屏表单的整行 `.col` 规则只作用于可换行的 row，不能覆盖 `.no-wrap` 摘要/操作行。入口卡片仍只展示标题、两行提示词、开场摘要及原有操作；长文编辑继续使用共享滚动弹窗。真实浏览器回归分别验证 320/390/768/1280px 下五个详情分区、卡片编辑按钮边界和整页无横向溢出，不能仅以弹窗无溢出推断列表也正确。
+
 共享 primitive 只在出现真实复用后抽取。Shell、PageHeader、status/health、operation state 等跨页能力可以共享；Activation、未来 AgentRun、AgentSpaceOperation 等领域对象不能为了 UI 方便合并成万能 operation model。
 
 **间距与尺度**：控制台只有一套间距——元素之间的边距和栅格间距统一用 Quasar `xs`（4px），模板中不再出现 `sm`/`md`/`lg` 间距类。页面外边距由 `css/app.css` 的 `.admin-page`（4px）统一提供，页面不再使用 `q-page padding` 或局部覆盖。Shell 内容区为流式全宽，不设居中 max-width——管理台是数据界面而非阅读界面，居中列宽只会在宽屏下产生大片死白。卡片与横幅内部是 `8px 12px`（直接在卡片内渲染的元素用 `.card-inset` 与之对齐）。复杂详情、Review/Publish 和 Snapshot Preview 使用页面内工作区。Starter 单条长文本编制使用共享 `.app-dialog--lg` 独立编辑，替代多栏内完整表单；其他基础开关仍留在原页面，不将全站编辑弹窗化。对话框统一使用 `.app-dialog` 尺度及内部滚动，不另设内联尺寸或第二业务状态。

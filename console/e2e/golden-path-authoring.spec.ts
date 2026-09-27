@@ -598,6 +598,23 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.click('[data-cy="starter-editor-done"]')
 
 
+    // The list lives outside the dialog: its edit action must not be pushed
+    // beyond the card by responsive form-column rules.
+    for (const width of [390, 320, 768, 1280]) {
+      await page.setViewportSize({ width, height: 800 })
+      await expect.poll(() => page.locator('[data-cy="starter-summary"]').evaluate(root => {
+        const card = root.getBoundingClientRect()
+        const edit = root.querySelector('[data-cy="starter-edit"]')!.getBoundingClientRect()
+        return edit.left >= card.left && edit.right <= card.right
+          && document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      })).toBe(true)
+      for (const section of ['basic', 'prompt', 'memory', 'connections', 'starters']) {
+        await page.locator(`[data-cy="assistant-section-${section}"]`).click()
+        await expect(page.locator(`[data-cy="assistant-section-${section}"]`)).toHaveAttribute('aria-selected', 'true')
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+      }
+    }
+
     await page.click('[data-cy="config-section-policy"]')
     await selectOption(page, 'policy-default-assistant', 'E2E Assistant')
 

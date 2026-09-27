@@ -274,3 +274,13 @@ Core lane 可连接本地确定性 adapter，也可连接 `device:real` 的实�
 本轮真实 Core 首发及首次详情成功，Activity 重开后的详情加载再次超时。临时探针核对 access、runtime、投影与 UI emission；Mock 及真实 Core 探针运行通过，没有找到可确定的产品缺陷，探针已全部移除。Starter 端到端测试改用 Compose 1.12 的 v2 `createEmptyComposeRule`：其 StandardTestDispatcher 配合 UI 线程时钟推进，消除旧 Unconfined 调度器在后台线程续行的已观测差异。保留业务断言与原失败证据，不用重试包装通过，也不将该测试调度调整宣称为原 spinner 的确定性产品修复。
 
 最终无探针构建通过三轮独立 Mock 重开场景；`core-android-final.log` 的 6 个浏览器用例和实际 Core Android 用例（24.374 秒）全部通过，实际请求与重开详情截图已复查。该轮为 generation 2、release `rel_83874daf-3ce9-493b-b3a8-7cd62e4e033b`、hash `sha256:abe7fbb5c196f9c91555a3d7c8f24683edadb61b105b5bd202fb3a1f335a9991`。Android 最终串行 `test assembleDebug lintDebug assembleRelease` 再次通过（41 秒），生产 Debug APK SHA-256 为 `182d9e62bd6d829ac47c04dfd0e7f095301333acdbceffe4d083215e97a02490`，测试 APK 为 `53ff017ec79787fe298bbef5a197fcfc1fdddcf1a26e78e8d1b30cd5c16a5439`。原失败不计入通过结果，真实供应商及持续有声输入场景仍未验收。
+
+### 10.7 企业助手窄屏布局复核
+
+用户反馈后，在正在运行的 device:real production SPA（本地 9100 端口）实际复现 390px 下常用入口编辑按钮超出卡片、整页横向滚动。根因是 ResourcesPage 的窄屏通用规则把 `.no-wrap` 行内的摘要 `.col` 设为 `flex: 1 0 100%`；此前只检查开场弹窗的几何边界，没有覆盖弹窗外的列表。修复将整行表单规则限定为可换行的 row，保留摘要收缩和编辑按钮宽度。助手 tabs 保留原有结构，窄屏减少内边距并启用外侧滚动箭头；长名称、技术标识允许换行，启用开关不被挤压。未改变 API、Draft owner、保存发布语义或 Android 数据。
+
+实际网页检查覆盖基础名称/说明、助手启用、指令多行编辑、记忆新增/编辑/移动/移除、模型选择与 MCP 多选、入口新增/编辑/启用/移除、继承/独立 System 展示、背景新增/编辑/移动/移除、技术标识展开、关闭后重新编辑和快照预览。320px 使用临时长标题验证换行与按钮边界，390px 核对原企业助手两张入口卡片；临时编辑只留在浏览器草稿，检查后重新加载，已保存修订仍为 10、仍为原有 2 个助手。未发布测试内容或修改实际接入凭据。
+
+`golden-path-authoring.spec.ts` 在既有真实 Hub/Relay/production SPA 流程中增加 320/390/768/1280px 五个详情分区及入口卡片的几何断言。新增断言先在原构建失败，修复后整套 `node scripts/e2e-harness.mjs` 通过，包含保存/刷新、继承恢复、错误定位、Preview/Review、发布和真实确定性调用链。组件测试 33 文件、211 项通过；typecheck、e2e:typecheck、production build 通过。此为浏览器布局/功能验证，不代表过期供应商密钥恢复可用。
+
+本地证据为 `.artifacts/assistant-responsive-red.log`、`assistant-responsive-green.log`、`assistant-responsive-unit.log`、`assistant-responsive-typecheck.log`、`assistant-responsive-e2e-typecheck.log`、`assistant-responsive-build.log`；实操截图保存在 `.artifacts/assistant-responsive/`。失败日志保留，未放宽断言或加入自动重试。

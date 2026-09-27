@@ -1729,13 +1729,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     gap: 4px;
   }
 
-  .configuration-workbench__detail :deep(.row.q-gutter-xs),
-  .configuration-workbench__detail :deep(.row.q-gutter-xs) {
+  .configuration-workbench__detail :deep(.row.q-gutter-xs:not(.no-wrap)) {
     align-items: stretch;
   }
 
-  .configuration-workbench__detail :deep(.row.q-gutter-xs > .col),
-  .configuration-workbench__detail :deep(.row.q-gutter-xs > .col) {
+  .configuration-workbench__detail :deep(.row.q-gutter-xs:not(.no-wrap) > .col) {
     flex: 1 0 100%;
   }
 }

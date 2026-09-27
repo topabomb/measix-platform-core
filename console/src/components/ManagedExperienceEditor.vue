@@ -192,7 +192,7 @@ defineExpose({ focusIssue })
 </script>
 
 <template>
-  <section ref="editorRoot" data-cy="experience-editor">
+  <section ref="editorRoot" class="assistant-editor" data-cy="experience-editor">
     <q-banner class="bg-blue-1 q-mb-xs rounded-borders">
       <div class="text-weight-medium">{{ t('experience.managedSource') }}</div>
       <div class="text-body2">{{ t('experience.hint') }}</div>
@@ -231,8 +231,8 @@ defineExpose({ focusIssue })
 
       <div v-if="selected" class="col-12 col-md-8">
         <q-card flat bordered>
-          <q-card-section class="row items-start justify-between q-gutter-xs">
-            <div>
+          <q-card-section class="row items-start justify-between no-wrap q-gutter-xs">
+            <div class="assistant-heading">
               <div class="text-h6">{{ selected.displayName }}</div>
               <details class="text-caption text-grey-7" data-cy="assistant-identity"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ selected.assistantDefinitionId }}</details>
             </div>
@@ -241,7 +241,7 @@ defineExpose({ focusIssue })
           <q-separator />
 
           <div class="assistant-settings-workbench">
-            <q-tabs v-model="selectedSection" dense no-caps align="left" active-color="primary" indicator-color="primary" class="assistant-settings-sections">
+            <q-tabs v-model="selectedSection" dense no-caps mobile-arrows outside-arrows align="left" active-color="primary" indicator-color="primary" class="assistant-settings-sections">
               <q-tab v-for="section in sections" :key="section.id" :name="section.id" :label="section.label" :data-cy="`assistant-section-${section.id}`" />
             </q-tabs>
 
@@ -298,7 +298,7 @@ defineExpose({ focusIssue })
                         <div class="text-subtitle2">{{ s.title }}</div>
                         <div class="text-body2 ellipsis-2-lines">{{ s.prompt || t('experience.starterPromptEmpty') }}</div>
                       </div>
-                      <q-btn flat dense no-caps color="primary" icon="edit" :label="t('common.edit')" :disable="disabled" data-cy="starter-edit" @click="editingStarterId = s.starterId" />
+                      <q-btn flat dense no-caps class="starter-edit" color="primary" icon="edit" :label="t('common.edit')" :disable="disabled" data-cy="starter-edit" @click="editingStarterId = s.starterId" />
                     </div>
                     <div class="text-caption text-grey-7">{{ s.openingSnapshot ? t('experience.opening', { count: s.openingSnapshot.initialContexts.length }) : t('experience.openingMissing') }}</div>
                     <div class="row items-center justify-between q-gutter-xs">
@@ -326,7 +326,7 @@ defineExpose({ focusIssue })
       </div>
     </div>
     <q-dialog v-model="starterDialogOpen" :persistent="disabled">
-      <q-card v-if="editedStarter && selected" class="app-dialog app-dialog--lg" data-cy="starter-editor-dialog">
+      <q-card v-if="editedStarter && selected" class="app-dialog app-dialog--lg starter-editor" data-cy="starter-editor-dialog">
         <q-card-section class="row items-center justify-between no-wrap">
           <div class="text-h6">{{ t('experience.editStarter') }}</div>
           <q-btn flat round dense icon="close" :aria-label="t('common.close')" :disable="disabled" data-cy="starter-editor-close" @click="starterDialogOpen = false" />
@@ -386,13 +386,17 @@ defineExpose({ focusIssue })
 </template>
 
 <style scoped>
+.assistant-editor, .starter-editor { min-width: 0; overflow-wrap: anywhere; }
+.assistant-heading { flex: 1; min-width: 0; }
+.assistant-heading + .q-toggle { flex-shrink: 0; }
 .starter-opening { min-width: 0; overflow-wrap: anywhere; }
 .starter-literal { white-space: pre-wrap; max-height: 240px; overflow: auto; }
 .starter-context { border: 1px solid var(--q-separator-color, #ddd); border-radius: 8px; padding: 4px; min-width: 0; }
 .starter-summary-text { min-width: 0; }
+.starter-edit { flex-shrink: 0; }
 .starter-editor-footer { display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
 .assistant-settings-workbench { display: flex; flex-direction: column; min-width: 0; gap: 4px; padding: 4px; }
-.assistant-settings-sections { border-bottom: 1px solid var(--q-separator-color, #ddd); }
+.assistant-settings-sections { min-width: 0; max-width: 100%; border-bottom: 1px solid var(--q-separator-color, #ddd); }
 .assistant-settings-detail { min-width: 0; padding: 0; }
 
 .seed-row {
@@ -403,6 +407,7 @@ defineExpose({ focusIssue })
 }
 
 @media (max-width: 699px) {
+  .assistant-settings-sections :deep(.q-tab) { padding: 0 8px; }
   .seed-row {
     grid-template-columns: minmax(0, 1fr);
   }

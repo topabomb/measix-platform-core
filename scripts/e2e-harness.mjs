@@ -26,12 +26,15 @@
  *
  * Environment variables:
  *   MEASIX_E2E_TIMEOUT  — max time for the harness (default 600000ms = 10min)
+ *   MEASIX_E2E_ANDROID_SERIAL — opt-in isolated emulator with debug/test APKs already installed
+ *   ADB — optional adb binary path; Android lane never installs or clears app data
  */
-import { existsSync, mkdirSync, unlinkSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync, unlinkSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { assertInstrumentationPassed, validateAndroidSerial, verifyStarterRequest } from './lib/android-starter.mjs'
 
 import {
   resolveRoot,
@@ -46,6 +49,7 @@ import {
 const ROOT = resolveRoot(import.meta.dirname)
 const ARCH_REPO = join(ROOT, '..', 'measix-architecture')
 const KEEP = process.argv.includes('--keep')
+const ANDROID_SERIAL = process.env.MEASIX_E2E_ANDROID_SERIAL ? validateAndroidSerial(process.env.MEASIX_E2E_ANDROID_SERIAL) : undefined
 const TIMEOUT = parseInt(process.env.MEASIX_E2E_TIMEOUT || '600000', 10)
 
 const processes = []
@@ -127,7 +131,7 @@ if (!existsSync(spaDir)) {
 // Start HTTP servers (SPA proxy + Adapter) in a worker thread to avoid
 // blocking the Node.js event loop when using execSync for Playwright.
 const worker = new Worker(join(ROOT, 'scripts', '_server-worker.mjs'), {
-  workerData: { spaPort, spaDir, adapterPort, hubPort: env.hubPort, relayPort: env.relayPubPort },
+  workerData: { spaPort, spaDir, adapterPort, hubPort: env.hubPort, relayPort: env.relayPubPort, captureStarterRequests: Boolean(ANDROID_SERIAL) },
 })
 await new Promise((resolve, reject) => {
   worker.on('message', (msg) => { if (msg.ready) resolve() })
@@ -392,6 +396,123 @@ async function runFiveCapabilityTraffic() {
   })
   if (!mcpResp.ok) throw new Error(`mcp request failed: ${mcpResp.status}`)
   await mcpResp.text()
+  return snapJson
+}
+
+function starterCapture(command, prompt) {
+  const id = randomUUID()
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { worker.off('message', listener); reject(new Error('Adapter Starter capture timed out')) }, 5000)
+    function listener(message) {
+      if (message.starterCaptureId !== id) return
+      clearTimeout(timer)
+      worker.off('message', listener)
+      resolve(message)
+    }
+    worker.on('message', listener)
+    worker.postMessage({ starterCapture: command, id, prompt })
+  })
+}
+
+async function runAndroidStarter(snapshot) {
+  if (!ANDROID_SERIAL) return
+  if (snapshot.schemaVersion !== 5) throw new Error('Android lane requires the actual published v5 Snapshot')
+  const starter = snapshot.starters.find(item => item.enabled && item.openingSnapshot?.initialContexts?.length >= 2
+    && snapshot.assistants.some(assistant => assistant.assistantDefinitionId === item.assistantDefinitionId && assistant.enabled))
+  if (!starter) throw new Error('Published Snapshot has no enabled Starter with two backgrounds; author it through Admin')
+  const outputDir = join(artifactsDir, 'starter-v5', 'core-android')
+  // Keep each run's outcome independent; adb pull otherwise nests into an existing directory.
+  if (existsSync(outputDir)) renameSync(outputDir, `${outputDir}-${Date.now()}`)
+  mkdirSync(outputDir, { recursive: true })
+  const adbPath = process.env.ADB || 'D:/Android/platform-tools/adb.exe'
+  const remoteDir = '/sdcard/Android/data/net.weero.measix.pilot.debug/files'
+  const appPackage = 'net.weero.measix.pilot.debug'
+  const inputName = `core-starter-${randomUUID()}.json`
+  let remoteInput
+  let code = '', reversed = false, captureStarted = false, failure
+  const redact = text => code ? text.replaceAll(code, '[REDACTED_ENROLLMENT]') : text
+  function adb(args, timeoutMs = 30000, input) {
+    return new Promise((resolve, reject) => {
+      const proc = spawn(adbPath, ['-s', ANDROID_SERIAL, ...args], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+      let output = ''
+      const timer = setTimeout(() => { proc.kill(); reject(new Error('ADB operation timed out')) }, timeoutMs)
+      proc.stdout.on('data', chunk => { output += chunk.toString() })
+      proc.stderr.on('data', chunk => { output += chunk.toString() })
+      proc.stdin.on('error', cause => { clearTimeout(timer); reject(cause) })
+      proc.stdin.end(input)
+      proc.on('error', cause => { clearTimeout(timer); reject(cause) })
+      proc.on('close', exit => {
+        clearTimeout(timer)
+        if (args[0] === 'shell' && args[1] === 'am') writeFileSync(join(outputDir, 'android-instrumentation.log'), redact(output))
+        if (exit !== 0) reject(new Error(`ADB operation failed (${exit}): ${redact(output)}`))
+        else resolve(output)
+      })
+    })
+  }
+  try {
+    if ((await adb(['get-state'])).trim() !== 'device') throw new Error('Selected Android emulator is unavailable')
+    const appRoot = (await adb(['shell', 'run-as', appPackage, 'pwd'])).trim()
+    if (!/^\/data\/(?:user\/\d+|data)\/net\.weero\.measix\.pilot\.debug$/.test(appRoot)) throw new Error('Unexpected private directory for Android debug app')
+    remoteInput = `${appRoot}/cache/${inputName}`
+    await adb(['reverse', `tcp:${spaPort}`, `tcp:${spaPort}`])
+    reversed = true
+    const login = await fetch(`${spaBaseURL}/api/admin/v1/session/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password: adminPassword }),
+    })
+    if (!login.ok) throw new Error(`Android test Admin login failed: HTTP ${login.status}`)
+    const session = await login.json()
+    const headers = { 'Content-Type': 'application/json', Cookie: login.headers.get('set-cookie')?.split(';')[0] || '', 'X-CSRF-Token': session.csrfToken }
+    const userResponse = await fetch(`${spaBaseURL}/api/admin/v1/users`, {
+      method: 'POST', headers, body: JSON.stringify({ username: `android-starter-${Date.now()}`, displayName: 'Android Starter isolated E2E', role: 'MEMBER' }),
+    })
+    if (!userResponse.ok) throw new Error(`Android test user creation failed: HTTP ${userResponse.status}`)
+    const user = await userResponse.json()
+    const enrollmentResponse = await fetch(`${spaBaseURL}/api/admin/v1/users/${user.userId}/enrollments`, { method: 'POST', headers, body: '{}' })
+    if (!enrollmentResponse.ok) throw new Error(`Android test enrollment failed: HTTP ${enrollmentResponse.status}`)
+    const enrollment = await enrollmentResponse.json()
+    code = enrollment.code
+    if (enrollment.platformUrl !== spaBaseURL) throw new Error('Enrollment origin differs from the isolated harness public origin')
+    const material = { formatVersion: 1, kind: 'PLATFORM_ENROLLMENT', platformUrl: enrollment.platformUrl, code, expiresAt: enrollment.expiresAt }
+    const input = JSON.stringify({ enrollment: material, snapshot, expectedAnswer: 'hello', starterId: starter.starterId })
+    // Only the app UID creates its private input. Credentials travel over stdin,
+    // never through shell arguments or an externally owned application directory.
+    await adb(['shell', '-T', `run-as ${appPackage} sh -c 'umask 077; mkdir -p cache; cat > cache/${inputName}'`], 30000, input)
+    await starterCapture('start', starter.prompt)
+    captureStarted = true
+    const result = await adb(['shell', 'am', 'instrument', '-w', '-r', '-e', 'class',
+      'net.weero.measix.pilot.ui.pages.chat.StarterV5ChatFlowAndroidTest#syncedCoreV5CardSurvivesFirstSendDetailsRoomReadbackAndActivityReopen',
+      '-e', 'starterV5CoreLive', 'true', '-e', 'coreStarterInput', remoteInput,
+      'net.weero.measix.pilot.debug.test/androidx.test.runner.AndroidJUnitRunner'], 240000)
+    assertInstrumentationPassed(result)
+    const captured = await starterCapture('stop')
+    captureStarted = false
+    if (captured.overflow) throw new Error('Adapter Starter request capture exceeded its bound')
+    writeFileSync(join(outputDir, 'adapter-requests.json'), JSON.stringify(captured.requests, null, 2))
+    const assistant = snapshot.assistants.find(item => item.assistantDefinitionId === starter.assistantDefinitionId)
+    const verified = verifyStarterRequest(captured.requests, starter, assistant.systemPrompt)
+    writeFileSync(join(outputDir, 'verification.json'), JSON.stringify({
+      schemaVersion: snapshot.schemaVersion, releaseId: snapshot.releaseId, snapshotHash: snapshot.snapshotHash,
+      managedGeneration: snapshot.managedGeneration, starterId: verified.starterId, contextIds: verified.contextIds,
+      instrumentation: '1 passed', adapterRequestVerified: true,
+    }, null, 2))
+  } catch (cause) {
+    failure = cause
+  } finally {
+    const cleanupFailures = []
+    async function cleanupAction(action) { try { await action() } catch (cause) { cleanupFailures.push(cause) } }
+    if (captureStarted) await cleanupAction(async () => {
+      const captured = await starterCapture('stop')
+      writeFileSync(join(outputDir, 'adapter-requests.json'), JSON.stringify(captured.requests, null, 2))
+    })
+    if (remoteInput) await cleanupAction(() => adb(['shell', 'run-as', appPackage, 'rm', '-f', remoteInput]))
+    await cleanupAction(() => adb(['pull', `${remoteDir}/starter-v5-chat-evidence`, join(outputDir, 'device-evidence')]))
+    if (reversed) await cleanupAction(() => adb(['reverse', '--remove', `tcp:${spaPort}`]))
+    if (failure) {
+      if (cleanupFailures.length) log(`Android test cleanup also failed: ${cleanupFailures.map(item => redact(item.message)).join('; ')}`)
+      throw failure
+    }
+    if (cleanupFailures.length) throw new AggregateError(cleanupFailures, 'Android test evidence/cleanup failed')
+  }
 }
 
 async function waitForUsageIngestion(minRequests, maxWaitSeconds) {
@@ -432,8 +553,13 @@ try {
   // failure, not a warning: the complete capability path is the point of the run.
   log('Phase B: Five-capability runtime traffic...')
   try {
-    await runFiveCapabilityTraffic()
+    const publishedSnapshot = await runFiveCapabilityTraffic()
     log('Phase B PASSED')
+    if (ANDROID_SERIAL) {
+      log('Phase B Android: actual published Starter through native UI...')
+      await runAndroidStarter(publishedSnapshot)
+      log('Phase B Android PASSED')
+    }
   } catch (e) {
     throw new Error(`Phase B failed: ${e.message}`)
   }

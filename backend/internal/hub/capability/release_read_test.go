@@ -36,9 +36,15 @@ func TestPreviewDiffUsesLatestImmutableRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 	baselineJSON, _ := json.Marshal(draft.Content)
+	releaseID := platformid.New(platformid.Release)
+	snapshot, hash, err := cap.CompileSnapshot(capability.SnapshotInput{DeploymentID: boot.DeploymentID, ReleaseID: releaseID, ManagedGeneration: 7, Content: draft.Content, PublishedAt: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshotJSON, _ := json.Marshal(snapshot)
 	_, err = st.Client.ManagedRelease.Create().
-		SetID(platformid.New(platformid.Release)).SetManagedGeneration(7).SetStatus("ACTIVE").
-		SetReleaseContentJSON(baselineJSON).SetSnapshotJSON([]byte("{}")).SetSnapshotHash("sha256:baseline").
+		SetID(releaseID).SetManagedGeneration(7).SetStatus("ACTIVE").
+		SetReleaseContentJSON(baselineJSON).SetSnapshotJSON(snapshotJSON).SetSnapshotHash(hash).
 		SetSourceDraftRevision(int64(draft.DraftRevision)).SetCreatedByUserID(boot.AdminUserID).SetCreatedAt(now).Save(ctx)
 	if err != nil {
 		t.Fatal(err)

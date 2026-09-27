@@ -43,6 +43,9 @@ func TestAssistantUnknownModelReferenceRejected(t *testing.T) {
 	content.Assistants = []adminapi.ManagedAssistantDefinition{assistantContent}
 	content.Bindings = []adminapi.RuntimeBindingDefinition{} // remove bindings to simplify
 
+	for i := range content.Starters {
+		content.Starters[i].OpeningSnapshot = testOpening()
+	}
 	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +129,9 @@ func TestStagedReleaseContainsManagedAssistantAndStarter(t *testing.T) {
 		Enabled:               true,
 	}}
 
+	for i := range content.Starters {
+		content.Starters[i].OpeningSnapshot = testOpening()
+	}
 	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	if err != nil {
 		t.Fatal(err)
@@ -196,6 +202,9 @@ func TestDefaultAssistantMustBeEnabledAndPresent(t *testing.T) {
 	content := validDraft(up.UpstreamID)
 	missing := platformid.New(platformid.Assistant)
 	content.Policy.DefaultAssistantId = &missing
+	for i := range content.Starters {
+		content.Starters[i].OpeningSnapshot = testOpening()
+	}
 	updated, err := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	if err != nil {
 		t.Fatal(err)
@@ -264,6 +273,9 @@ func TestPreviewPreservesStarterContentAndCanonicalOrder(t *testing.T) {
 			Enabled:               true,
 		},
 	}
+	for i := range content.Starters {
+		content.Starters[i].OpeningSnapshot = testOpening()
+	}
 	updated, _ := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	preview, err := cap.PreviewDraft(ctx, updated.DraftRevision)
 	if err != nil {
@@ -320,6 +332,9 @@ func TestAssistantDisabledModelReferenceRejected(t *testing.T) {
 		Enabled:               true,
 	}}
 	content.Bindings = []adminapi.RuntimeBindingDefinition{} // clear bindings
+	for i := range content.Starters {
+		content.Starters[i].OpeningSnapshot = testOpening()
+	}
 	updated, _ := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	result, err := cap.ValidateDraft(ctx, updated.DraftRevision)
 	if err != nil {
@@ -353,6 +368,9 @@ func TestCurrentSnapshotWithoutExperienceHasDeterministicHash(t *testing.T) {
 	// Remove bindings to avoid upstream lookup errors — we only care about hash
 	content.Bindings = []adminapi.RuntimeBindingDefinition{}
 	content.Models[0].Enabled = false // disable to avoid missing binding error
+	for i := range content.Starters {
+		content.Starters[i].OpeningSnapshot = testOpening()
+	}
 	updated, _ := cap.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, content)
 	depID := platformid.New(platformid.Deployment)
 	relID := platformid.New(platformid.Release)
@@ -371,8 +389,8 @@ func TestCurrentSnapshotWithoutExperienceHasDeterministicHash(t *testing.T) {
 	if hash != hash2 {
 		t.Fatalf("hash mismatch: compiled=%s, recomputed=%s", hash, hash2)
 	}
-	if snapshot.SchemaVersion != 4 {
-		t.Fatalf("expected schemaVersion=4, got %d", snapshot.SchemaVersion)
+	if snapshot.SchemaVersion != 5 {
+		t.Fatalf("expected schemaVersion=5, got %d", snapshot.SchemaVersion)
 	}
 	if len(snapshot.Assistants) != 0 {
 		t.Fatalf("expected 0 assistants, got %d", len(snapshot.Assistants))

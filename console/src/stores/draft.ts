@@ -32,7 +32,7 @@ export const useDraftStore = defineStore('draft', () => {
   const loading = ref(false)
   const saving = ref(false)
   const validationResult = ref<ValidateDraftResponse>()
-  const conflictRevision = ref<number>()
+  const conflictRevision = ref<number | null>()
 
   function accept(draft: Draft) {
     const content = structuredClone(draft.content)
@@ -166,12 +166,15 @@ export const useDraftStore = defineStore('draft', () => {
 
   function addStarter(assistantDefinitionId: string, title: string): string {
     const content = requireContent()
-    if (!content.assistants.some(a => a.assistantDefinitionId === assistantDefinitionId)) throw new Error('assistant not found')
+    const assistant = content.assistants.find(a => a.assistantDefinitionId === assistantDefinitionId)
+    if (!assistant) throw new Error('assistant not found')
     const starterId = createCandidateId('str')
     const nextSortOrder = content.starters
       .filter(starter => starter.assistantDefinitionId === assistantDefinitionId)
       .reduce((highest, starter) => Math.max(highest, starter.sortOrder), -1) + 1
-    content.starters.push({ starterId, assistantDefinitionId, title, prompt: '', sortOrder: nextSortOrder, enabled: true })
+    content.starters.push({ starterId, assistantDefinitionId, title, prompt: '', sortOrder: nextSortOrder, enabled: true,
+      openingSnapshot: { format: 1, systemPrompt: '', initialContexts: [] },
+    })
     markDirty()
     return starterId
   }
@@ -179,6 +182,20 @@ export const useDraftStore = defineStore('draft', () => {
   function removeStarter(id: string) {
     const content = requireContent()
     content.starters = content.starters.filter(s => s.starterId !== id)
+    markDirty()
+  }
+
+  function moveStarter(id: string, offset: -1 | 1) {
+    const content = requireContent()
+    const starter = content.starters.find(item => item.starterId === id)
+    if (!starter) return
+    const ordered = content.starters.filter(item => item.assistantDefinitionId === starter.assistantDefinitionId)
+      .toSorted((a, b) => a.sortOrder - b.sortOrder || a.starterId.localeCompare(b.starterId))
+    const index = ordered.findIndex(item => item.starterId === id)
+    if (index + offset < 0 || index + offset >= ordered.length) return
+    const [moving] = ordered.splice(index, 1)
+    ordered.splice(index + offset, 0, moving!)
+    ordered.forEach((item, position) => { item.sortOrder = position })
     markDirty()
   }
 
@@ -379,7 +396,7 @@ export const useDraftStore = defineStore('draft', () => {
       accept(draft)
       return draft
     } catch (error) {
-      if (error instanceof ApiProblem && error.status === 409) conflictRevision.value = error.currentDraftRevision
+      if (error instanceof ApiProblem && error.status === 409) conflictRevision.value = error.currentDraftRevision ?? null
       throw error
     } finally {
       saving.value = false
@@ -397,7 +414,7 @@ export const useDraftStore = defineStore('draft', () => {
 
   return {
     baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
-    load, save, validate, addModel, addImageGeneration, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, markDirty,
+    load, save, validate, addModel, addImageGeneration, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, moveStarter, markDirty,
     bindingFor, setBinding, setRuntimePath, removeBinding, resourceReferences, removeResource, setImageGenerationProtocol, setTtsProtocol, setAsrProtocol,
   }
 })

@@ -110,7 +110,7 @@ func TestPublicHTTPAndHTTPSControlLifecycle(t *testing.T) {
 
 			// Arrange a published release; publication itself is covered by the
 			// Admin workflow suite and the real browser acceptance environment.
-			raw, err := os.ReadFile("../../../../api/fixtures/draft/s02-client-profile.json")
+			raw, err := os.ReadFile("../../../../api/fixtures/draft/starter-v5-profile.json")
 			if err != nil {
 				t.Fatal(err)
 			}

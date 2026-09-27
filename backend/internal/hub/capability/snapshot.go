@@ -13,10 +13,17 @@ import (
 	"measix/platform/pkg/platformid"
 )
 
-// CurrentSnapshotSchemaVersion is the only live compiler schema selection.
-const CurrentSnapshotSchemaVersion = 4
+// CurrentSnapshotSchemaVersion is the default for new draft publication.
+const CurrentSnapshotSchemaVersion = 5
+
+const MaxSnapshotBytes = 4 << 20
+
+func SupportedSnapshotSchemaVersions() []int { return []int{4, 5} }
 
 type SnapshotInput struct {
+	// Zero compiles a new draft, including System inheritance. An explicit version
+	// compiles historical, already materialized content without reinterpreting it.
+	SchemaVersion     int
 	DeploymentID      string
 	ReleaseID         string
 	ManagedGeneration int
@@ -49,6 +56,13 @@ type snapshotMetadata struct {
 
 func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapshot, string, error) {
 	input.Content = NormalizeManagedDraftContent(input.Content)
+	version := input.SchemaVersion
+	if version == 0 {
+		version = CurrentSnapshotSchemaVersion
+	}
+	if err := validateStarterVersion(input.Content.Starters, version); err != nil {
+		return clientapi.ManagedSnapshot{}, "", err
+	}
 	if err := platformid.Validate(platformid.Deployment, input.DeploymentID); err != nil {
 		return clientapi.ManagedSnapshot{}, "", ErrInvalidDraft
 	}
@@ -146,8 +160,20 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 		})
 	}
 	// Compile starters
+	assistantSystems := make(map[string]string, len(input.Content.Assistants))
+	for _, assistant := range input.Content.Assistants {
+		assistantSystems[assistant.AssistantDefinitionId] = assistant.SystemPrompt
+	}
 	starters := make([]clientapi.AssistantStarterDefinition, 0, len(input.Content.Starters))
 	for _, s := range input.Content.Starters {
+		opening := toClientOpening(s.OpeningSnapshot)
+		if input.SchemaVersion == 0 && opening != nil && strings.TrimSpace(opening.SystemPrompt) == "" {
+			system, found := assistantSystems[s.AssistantDefinitionId]
+			if !found {
+				return clientapi.ManagedSnapshot{}, "", ErrInvalidDraft
+			}
+			opening.SystemPrompt = system
+		}
 		starters = append(starters, clientapi.AssistantStarterDefinition{
 			StarterId:             s.StarterId,
 			AssistantDefinitionId: s.AssistantDefinitionId,
@@ -156,6 +182,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 			Description:           s.Description,
 			SortOrder:             s.SortOrder,
 			Enabled:               s.Enabled,
+			OpeningSnapshot:       opening,
 		})
 	}
 	sort.Slice(assistants, func(i, j int) bool { return assistants[i].AssistantDefinitionId < assistants[j].AssistantDefinitionId })
@@ -192,7 +219,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	}
 	metadata := snapshotMetadata{PublishedAt: input.PublishedAt.UTC(), PublishedByUserID: publishedBy}
 	descriptor := snapshotDescriptor{
-		DeploymentID: input.DeploymentID, SchemaVersion: CurrentSnapshotSchemaVersion, ManagedGeneration: input.ManagedGeneration,
+		DeploymentID: input.DeploymentID, SchemaVersion: version, ManagedGeneration: input.ManagedGeneration,
 		ReleaseID: input.ReleaseID, Providers: providers, Models: models, ImageGenerators: images, TTS: tts, ASR: asr, MCP: mcp, Policy: policy, Metadata: metadata,
 		Assistants: assistants, Starters: starters,
 	}
@@ -204,7 +231,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	hash := "sha256:" + hex.EncodeToString(sum[:])
 	var snapshot clientapi.ManagedSnapshot
 	snapshot.DeploymentId = input.DeploymentID
-	snapshot.SchemaVersion = clientapi.ManagedSnapshotSchemaVersion(CurrentSnapshotSchemaVersion)
+	snapshot.SchemaVersion = clientapi.ManagedSnapshotSchemaVersion(version)
 	snapshot.ManagedGeneration = input.ManagedGeneration
 	snapshot.ReleaseId = input.ReleaseID
 	snapshot.SnapshotHash = hash
@@ -219,6 +246,13 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 	snapshot.Metadata.PublishedByUserId = metadata.PublishedByUserID
 	snapshot.Assistants = assistants
 	snapshot.Starters = starters
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		return clientapi.ManagedSnapshot{}, "", err
+	}
+	if len(encoded) > MaxSnapshotBytes {
+		return clientapi.ManagedSnapshot{}, "", ErrSnapshotTooLarge
+	}
 	return snapshot, hash, nil
 }
 
@@ -226,8 +260,16 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (clientapi.ManagedSnapsho
 // It is shared by contract tests and downstream verification tooling so the
 // canonical descriptor is not reimplemented outside the capability boundary.
 func HashSnapshot(snapshot clientapi.ManagedSnapshot) (string, error) {
-	if snapshot.SchemaVersion != CurrentSnapshotSchemaVersion {
+	if snapshot.SchemaVersion != 4 && snapshot.SchemaVersion != 5 {
 		return "", ErrInvalidDraft
+	}
+	for _, starter := range snapshot.Starters {
+		if (snapshot.SchemaVersion == 4 && starter.OpeningSnapshot != nil) || (snapshot.SchemaVersion == 5 && starter.OpeningSnapshot == nil) {
+			return "", ErrInvalidDraft
+		}
+		if err := validateOpening(toAdminOpening(starter.OpeningSnapshot)); err != nil {
+			return "", err
+		}
 	}
 	metadata := snapshotMetadata{PublishedAt: snapshot.Metadata.PublishedAt}
 	if snapshot.Metadata.PublishedByUserId != nil {
@@ -292,6 +334,7 @@ func projectionToAdminStarters(src []clientapi.AssistantStarterDefinition) []adm
 			Description:           s.Description,
 			SortOrder:             s.SortOrder,
 			Enabled:               s.Enabled,
+			OpeningSnapshot:       toAdminOpening(s.OpeningSnapshot),
 		}
 	}
 	return dst

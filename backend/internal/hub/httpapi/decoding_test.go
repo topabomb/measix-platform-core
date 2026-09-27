@@ -79,3 +79,37 @@ func TestManagedStateHasNoZeroTargetGeneration(t *testing.T) {
 		t.Fatal("zero is not a valid target generation")
 	}
 }
+
+func TestDraftOpeningBodyLimitAndStrictPresence(t *testing.T) {
+	base := map[string]any{"providers": []any{}, "models": []any{}, "tts": []any{}, "asr": []any{}, "mcp": []any{}, "bindings": []any{}, "assistants": []any{}, "policy": map[string]any{"allowLocalProviders": false, "allowLocalTts": false, "allowLocalAsr": false, "allowLocalMcp": false, "allowLocalAssistants": false}}
+	for _, test := range []struct {
+		name           string
+		opening        any
+		present, valid bool
+	}{
+		{"unfinished", nil, false, true}, {"null", nil, true, false},
+		{"empty", map[string]any{"format": 1, "systemPrompt": "", "initialContexts": []any{}}, true, true},
+		{"missing system", map[string]any{"format": 1, "initialContexts": []any{}}, true, false},
+		{"null system", map[string]any{"format": 1, "systemPrompt": nil, "initialContexts": []any{}}, true, false},
+		{"over 1 MiB", map[string]any{"format": 1, "systemPrompt": strings.Repeat("x", 1<<20), "initialContexts": []any{}}, true, true},
+		{"over 4 MiB", map[string]any{"format": 1, "systemPrompt": strings.Repeat("x", 4<<20), "initialContexts": []any{}}, true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			starter := map[string]any{}
+			if test.present {
+				starter["openingSnapshot"] = test.opening
+			}
+			base["starters"] = []any{starter}
+			payload, _ := json.Marshal(map[string]any{"expectedDraftRevision": 1, "content": base})
+			request := httptest.NewRequest("PUT", "/api/admin/v1/draft", strings.NewReader(string(payload)))
+			var target adminapi.PutDraftRequest
+			err := decodeStrictJSON(request, &target)
+			if (err == nil) != test.valid {
+				t.Fatalf("valid=%v err=%v", test.valid, err)
+			}
+			if test.name == "over 4 MiB" && !strings.Contains(err.Error(), "4194304") {
+				t.Fatal("body limit detail lost")
+			}
+		})
+	}
+}

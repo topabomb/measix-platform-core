@@ -337,7 +337,7 @@ func (h *clientHandler) Discover(w http.ResponseWriter, r *http.Request) {
 		DeploymentName:                  view.DeploymentName,
 		ClientApiBase:                   "/api/client/v1",
 		RuntimeApiBase:                  "/runtime/v1",
-		SupportedSnapshotSchemaVersions: []int{capability.CurrentSnapshotSchemaVersion},
+		SupportedSnapshotSchemaVersions: capability.SupportedSnapshotSchemaVersions(),
 	})
 }
 
@@ -429,7 +429,7 @@ func (h *clientHandler) Bootstrap(w http.ResponseWriter, r *http.Request) {
 	response.Session.ExpiresAt = view.SessionExpiresAt
 	response.Session.SessionIdleExpiresAt = view.SessionExpiresAt
 	response.ManagedState = managedStateWire(view.ManagedState, nil)
-	response.SupportedSnapshotSchemaVersions = []int{capability.CurrentSnapshotSchemaVersion}
+	response.SupportedSnapshotSchemaVersions = capability.SupportedSnapshotSchemaVersions()
 	writeJSON(w, http.StatusOK, response)
 }
 
@@ -492,12 +492,16 @@ func bearerToken(r *http.Request) (string, bool) {
 }
 
 func decodeStrictJSON(r *http.Request, target any) error {
-	payload, err := io.ReadAll(io.LimitReader(r.Body, (1<<20)+1))
+	limit := 1 << 20
+	if _, draftWrite := target.(*adminapi.PutDraftRequest); draftWrite {
+		limit = capability.MaxSnapshotBytes
+	}
+	payload, err := io.ReadAll(io.LimitReader(r.Body, int64(limit)+1))
 	if err != nil {
 		return err
 	}
-	if len(payload) > 1<<20 {
-		return errors.New("request body too large")
+	if len(payload) > limit {
+		return fmt.Errorf("request body exceeds %d bytes", limit)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
@@ -517,6 +521,9 @@ func decodeStrictJSON(r *http.Request, target any) error {
 			return err
 		}
 		if err := json.Unmarshal(envelope["content"], &content); err != nil {
+			return err
+		}
+		if err := capability.ValidateDraftOpeningJSON(envelope["content"]); err != nil {
 			return err
 		}
 		if err := json.Unmarshal(content["policy"], &policy); err != nil {

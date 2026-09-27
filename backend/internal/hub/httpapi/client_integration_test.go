@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -41,6 +42,9 @@ func TestClientIntegrationPendingSnapshotAndLogout(t *testing.T) {
 	}
 	var boot clientapi.Bootstrap
 	decodeJSON(t, bootstrap, &boot)
+	if !slices.Equal(boot.SupportedSnapshotSchemaVersions, []int{4, 5}) {
+		t.Fatalf("Bootstrap versions=%v", boot.SupportedSnapshotSchemaVersions)
+	}
 	if boot.ManagedState != pending {
 		t.Fatalf("pending bootstrap=%+v want=%+v", boot.ManagedState, pending)
 	}
@@ -65,7 +69,7 @@ func TestClientIntegrationPendingSnapshotAndLogout(t *testing.T) {
 		t.Fatal(err)
 	}
 	releaseID := platformid.New(platformid.Release)
-	snap, _, err := cap.CompileSnapshot(capability.SnapshotInput{DeploymentID: id.Signer.DeploymentID, ReleaseID: releaseID, ManagedGeneration: 42, Content: content, PublishedAt: id.Now(), PublishedByUserID: adminID})
+	snap, _, err := cap.CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: id.Signer.DeploymentID, ReleaseID: releaseID, ManagedGeneration: 42, Content: content, PublishedAt: id.Now(), PublishedByUserID: adminID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +163,7 @@ func TestClientIntegrationPendingSnapshotAndLogout(t *testing.T) {
 		t.Fatal("new publication did not expose pending application")
 	}
 	nextReleaseID := platformid.New(platformid.Release)
-	nextSnapshot, _, err := cap.CompileSnapshot(capability.SnapshotInput{DeploymentID: id.Signer.DeploymentID, ReleaseID: nextReleaseID, ManagedGeneration: 43, Content: content, PublishedAt: id.Now(), PublishedByUserID: adminID})
+	nextSnapshot, _, err := cap.CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: id.Signer.DeploymentID, ReleaseID: nextReleaseID, ManagedGeneration: 43, Content: content, PublishedAt: id.Now(), PublishedByUserID: adminID})
 	if err != nil {
 		t.Fatal(err)
 	}

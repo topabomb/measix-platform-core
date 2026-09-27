@@ -36,11 +36,12 @@ body { background: #f5f4f8; color: #241d2e; }
    header and the actions of a long dialog stay reachable. */
 .app-dialog {
   width: min(640px, calc(100vw - 8px));
-  max-width: 100%;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
 }
+
+.q-dialog__inner > .app-dialog { max-width: 100%; }
 
 .app-dialog--sm { width: min(480px, calc(100vw - 8px)); }
 .app-dialog--lg { width: min(760px, calc(100vw - 8px)); }

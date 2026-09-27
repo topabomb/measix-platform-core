@@ -50,6 +50,9 @@ const preview = ref<DraftPreviewResponse>()
 const previewOpen = ref(false)
 const reviewOpen = ref(false)
 const reviewing = ref(false)
+const validating = ref(false)
+const workspaceBusy = computed(() => draft.loading || draft.saving || validating.value || previewing.value || reviewing.value || publishing.value)
+const workspaceVisible = computed(() => !reviewOpen.value && !previewOpen.value)
 const upstreams = ref<Upstream[]>([])
 const upstreamsLoading = ref(false)
 const upstreamError = ref<unknown>()
@@ -361,6 +364,7 @@ function confirmDiscard(): boolean {
 }
 
 async function refresh(force = false) {
+  if (!force && workspaceBusy.value) return
   if (!force && !confirmDiscard()) return
   error.value = undefined
   try {
@@ -390,20 +394,23 @@ async function loadUpstreams() {
 }
 
 async function save() {
-  if (!session.csrfToken) return
+  if (!session.csrfToken || workspaceBusy.value) return
   error.value = undefined
   try { await draft.save(session.csrfToken) } catch (cause) { error.value = cause }
 }
 
 async function validate() {
-  if (!session.csrfToken) return
+  if (!session.csrfToken || workspaceBusy.value || draft.dirty) return
+  validating.value = true
   error.value = undefined
   try { await draft.validate(session.csrfToken) } catch (cause) { error.value = cause }
+  finally { validating.value = false }
 }
 
 async function openReview() {
-  if (!session.csrfToken) return
+  if (!session.csrfToken || workspaceBusy.value || draft.dirty) return
   if (draft.baselineRevision === undefined) return
+  const revision = draft.baselineRevision
   reviewing.value = true
   error.value = undefined
   try {
@@ -420,6 +427,7 @@ async function openReview() {
         session.csrfToken,
       )
     }
+    if (draft.dirty || draft.baselineRevision !== revision) throw new Error($t('experience.reviewChanged'))
     reviewOpen.value = true
   } catch (cause) {
     error.value = cause
@@ -429,7 +437,11 @@ async function openReview() {
 }
 
 async function publish() {
-  if (!session.csrfToken) return
+  if (!session.csrfToken || workspaceBusy.value) return
+  if (draft.dirty || preview.value?.draftRevision !== draft.baselineRevision) {
+    error.value = new Error($t('experience.reviewChanged'))
+    return
+  }
   if (draft.baselineRevision === undefined) return
   const warnings = draft.validationResult?.warnings ?? []
   publishing.value = true
@@ -459,8 +471,9 @@ async function publish() {
 }
 
 async function previewSnapshot() {
-  if (!session.csrfToken) return
+  if (!session.csrfToken || workspaceBusy.value || draft.dirty) return
   if (draft.baselineRevision === undefined) return
+  const revision = draft.baselineRevision
   previewing.value = true
   error.value = undefined
   try {
@@ -469,6 +482,7 @@ async function previewSnapshot() {
       { method: 'POST', body: JSON.stringify({ expectedDraftRevision: draft.baselineRevision }) },
       session.csrfToken,
     )
+    if (draft.dirty || draft.baselineRevision !== revision) throw new Error($t('experience.reviewChanged'))
     previewOpen.value = true
   } catch (cause) {
     error.value = cause
@@ -606,6 +620,7 @@ function beforeUnload(event: BeforeUnloadEvent) {
 }
 
 async function goToValidationIssue(issue: ValidationIssue) {
+  if (workspaceBusy.value) return
   const kind = issue.resourceKind === 'BINDING' ? managedKindForId(issue.resourceId) : issue.resourceKind
   const section = kind === 'MODEL' ? 'models'
     : kind === 'IMAGE_GENERATION' ? 'image-generation'
@@ -616,6 +631,8 @@ async function goToValidationIssue(issue: ValidationIssue) {
               : kind === 'POLICY' ? 'policy'
                 : kind === 'PROVIDER' ? 'overview' : undefined
   if (!section) return
+  reviewOpen.value = false
+  previewOpen.value = false
   activeTab.value = section
   if (issue.resourceId && ['MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP'].includes(kind ?? '')) {
     selectedResourceId.value = issue.resourceId
@@ -651,11 +668,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   <q-page class="admin-page" data-cy="resources-page">
     <PageHeader :title="$t('nav.resources')" :subtitle="$t('resources.subtitle')">
       <template #actions>
-        <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="draft.loading" @click="refresh()" />
-        <q-btn outline color="primary" :label="$t('common.save')" :disable="!canMutate || !draft.dirty" :loading="draft.saving" @click="save" data-cy="draft-save-btn" />
-        <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || draft.loading || draft.dirty" @click="validate" data-cy="draft-validate-btn" />
-        <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate || draft.dirty" :loading="previewing" @click="previewSnapshot" data-cy="draft-preview-btn" />
-        <q-btn color="positive" icon="rocket_launch" :label="$t('resources.draft.review')" :disable="!canMutate || draft.dirty" :loading="reviewing" @click="openReview" data-cy="draft-review-btn" />
+        <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="draft.loading" :disable="workspaceBusy" @click="refresh()" />
+        <q-btn outline color="primary" :label="$t('common.save')" :disable="!canMutate || workspaceBusy || !draft.dirty" :loading="draft.saving" @click="save" data-cy="draft-save-btn" />
+        <q-btn outline color="primary" :label="$t('resources.draft.validate')" :disable="!canMutate || workspaceBusy || draft.dirty" :loading="validating" @click="validate" data-cy="draft-validate-btn" />
+        <q-btn outline color="secondary" :label="$t('resources.draft.preview')" :disable="!canMutate || workspaceBusy || draft.dirty" :loading="previewing" @click="previewSnapshot" data-cy="draft-preview-btn" />
+        <q-btn color="positive" icon="rocket_launch" :label="$t('resources.draft.review')" :disable="!canMutate || workspaceBusy || draft.dirty" :loading="reviewing" @click="openReview" data-cy="draft-review-btn" />
       </template>
     </PageHeader>
 
@@ -667,7 +684,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     </q-banner>
     <q-banner v-if="draft.conflictRevision !== undefined" class="bg-orange-1 q-mb-xs rounded-borders">
       <div class="text-weight-medium">{{ $t('resources.staleDraft', { rev: draft.baselineRevision }) }}</div>
-      <div class="text-body2">{{ $t('resources.staleHint', { rev: draft.conflictRevision }) }}</div>
+      <div class="text-body2">{{ draft.conflictRevision === null ? $t('resources.staleRevisionUnknown') : $t('resources.staleHint', { rev: draft.conflictRevision }) }}</div>
       <template #action><q-btn flat :label="$t('resources.reload')" @click="refresh()" /></template>
     </q-banner>
     <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-xs rounded-borders">
@@ -700,7 +717,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </q-card-section>
       </q-card>
 
-      <div v-if="!reviewOpen && !previewOpen" class="configuration-workbench">
+      <div v-show="workspaceVisible" class="configuration-workbench" :inert="workspaceBusy || !workspaceVisible || undefined">
         <ConfigurationSectionNav
           v-model="activeTab"
           :title="$t('resources.navigation.title')"
@@ -1312,7 +1329,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </template>
 
       <!-- ===== Policy Editor ===== -->
-      <ManagedExperienceEditor ref="experienceEditor" v-if="activeTab === 'assistants'" :disabled="!canMutate || draft.saving || publishing" />
+      <ManagedExperienceEditor ref="experienceEditor" v-if="activeTab === 'assistants'" :active="workspaceVisible" :disabled="!canMutate || workspaceBusy || !workspaceVisible" />
       <template v-if="activeTab === 'policy'">
         <q-card flat bordered>
           <q-card-section class="row items-center justify-between">
@@ -1501,7 +1518,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               color="positive"
               icon="rocket_launch"
               :label="reviewWarnings.length ? $t('resources.review.publishWithWarnings', { count: reviewWarnings.length }) : $t('resources.draft.publish')"
-              :disable="hasBlockingErrors || unchangedPublishedDraft || publishing"
+              :disable="hasBlockingErrors || unchangedPublishedDraft || workspaceBusy || draft.dirty"
               :loading="publishing"
               @click="publish"
               data-cy="draft-publish-btn"
@@ -1624,6 +1641,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     <div v-if="s.description" data-cy="preview-starter-description" class="text-body2 q-mt-xs">{{ s.description }}</div>
                     <q-item-label caption>{{ $t('resources.preview.forAssistant') }}: {{ previewAssistantName(s.assistantDefinitionId) }}</q-item-label>
                     <p class="q-my-xs" style="white-space: pre-wrap">{{ s.prompt }}</p>
+                    <details v-if="s.openingSnapshot" data-cy="preview-starter-opening" class="q-my-xs" style="overflow-wrap: anywhere">
+                      <summary class="cursor-pointer text-body2">{{ $t('experience.opening', { count: s.openingSnapshot.initialContexts.length }) }}</summary>
+                      <div class="text-caption text-grey-7 q-mt-xs">{{ $t('experience.systemPrompt') }}</div>
+                      <div data-cy="preview-starter-system" style="white-space: pre-wrap">{{ s.openingSnapshot.systemPrompt || $t('experience.emptySystem') }}</div>
+                      <div v-for="context in s.openingSnapshot.initialContexts" :key="context.id" data-cy="preview-starter-context" class="q-mt-xs">
+                        <div class="text-weight-medium">{{ context.title }}</div>
+                        <div style="white-space: pre-wrap">{{ context.content }}</div>
+                      </div>
+                    </details>
+
                     <details class="text-caption text-grey-7"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ s.starterId }} · {{ s.sortOrder }}</details>
                   </q-item-section>
                 </q-item>

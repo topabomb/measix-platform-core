@@ -15,8 +15,10 @@ import (
 	"time"
 
 	"measix/platform/internal/common/sqliteutil"
+	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/maintenance"
 	"measix/platform/internal/hub/security"
+	"measix/platform/internal/wire/clientapi"
 	"measix/platform/migrations"
 )
 
@@ -640,5 +642,91 @@ func TestHUBDB001EmptyDBInitializesCurrentSchema(t *testing.T) {
 		if count != 1 {
 			t.Fatalf("required table %s is missing after initialization", table)
 		}
+	}
+}
+
+func TestBackupRestoresV4BytesAndV5OpeningsWithoutSchemaRewrite(t *testing.T) {
+	ctx := context.Background()
+	db, _ := openCurrentDB(t)
+	defer db.Close()
+	schemaBefore := dbSchemaHash(t, db)
+	now := time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC)
+	for _, version := range []int{4, 5} {
+		raw, err := os.ReadFile(fmt.Sprintf("../../../../api/fixtures/client-integration/snapshot-v%d.json", version))
+		if err != nil {
+			t.Fatal(err)
+		}
+		draftFile := "s02-client-profile.json"
+		if version == 5 {
+			draftFile = "starter-v5-profile.json"
+		}
+		draft, err := os.ReadFile("../../../../api/fixtures/draft/" + draftFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var snapshot clientapi.ManagedSnapshot
+		if err := json.Unmarshal(raw, &snapshot); err != nil {
+			t.Fatal(err)
+		}
+		_, err = db.ExecContext(ctx, `INSERT INTO managed_releases (id,managed_generation,status,release_content_json,snapshot_json,snapshot_hash,source_draft_revision,created_by_user_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)`, snapshot.ReleaseId, snapshot.ManagedGeneration, "SUPERSEDED", draft, raw, snapshot.SnapshotHash, 1, "usr_fixture", now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version == 4 {
+			_, err = db.ExecContext(ctx, `INSERT INTO managed_drafts (id,draft_revision,content_json,updated_by_user_id,updated_at) VALUES (?,?,?,?,?)`, "drf_fixture", 7, draft, "usr_fixture", now)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	tables := "managed_releases,managed_drafts"
+	before := dbDataHash(t, db, tables)
+	// Reapplying the existing migration history is a no-op for JSON additions.
+	applied, err := migrations.Apply(ctx, db)
+	if err != nil || len(applied.Applied) != 0 {
+		t.Fatalf("unexpected migration: %+v %v", applied, err)
+	}
+	backup := filepath.Join(t.TempDir(), "starter-backup.db")
+	if _, err := maintenance.Backup(ctx, db, backup, "starter-v5-test", now); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := sqliteutil.Open(backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restored.Close()
+	if _, err := maintenance.Check(ctx, restored); err != nil {
+		t.Fatal(err)
+	}
+	if dbSchemaHash(t, restored) != schemaBefore || dbDataHash(t, restored, tables) != before {
+		t.Fatal("restore changed schema or draft/release bytes")
+	}
+	rows, err := restored.QueryContext(ctx, `SELECT snapshot_json,snapshot_hash FROM managed_releases ORDER BY managed_generation`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	count := 0
+	for rows.Next() {
+		var raw []byte
+		var storedHash string
+		if err := rows.Scan(&raw, &storedHash); err != nil {
+			t.Fatal(err)
+		}
+		var value clientapi.ManagedSnapshot
+		if err := json.Unmarshal(raw, &value); err != nil {
+			t.Fatal(err)
+		}
+		hash, err := capability.HashSnapshot(value)
+		if err != nil || hash != storedHash {
+			t.Fatalf("restored hash %v", err)
+		}
+		if value.SchemaVersion == 5 && value.Starters[0].OpeningSnapshot == nil {
+			t.Fatal("opening lost")
+		}
+		count++
+	}
+	if rows.Err() != nil || count != 2 {
+		t.Fatalf("restore rows=%d err=%v", count, rows.Err())
 	}
 }

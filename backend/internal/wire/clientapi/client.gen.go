@@ -4,6 +4,7 @@
 package clientapi
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -310,11 +311,26 @@ func (e ImageGenerationDefinitionClientProtocol) Valid() bool {
 
 // Defines values for ManagedSnapshotSchemaVersion.
 const (
-	N4 ManagedSnapshotSchemaVersion = 4
+	N5 ManagedSnapshotSchemaVersion = 5
 )
 
 // Valid indicates whether the value is a known member of the ManagedSnapshotSchemaVersion enum.
 func (e ManagedSnapshotSchemaVersion) Valid() bool {
+	switch e {
+	case N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ManagedSnapshotV4SchemaVersion.
+const (
+	N4 ManagedSnapshotV4SchemaVersion = 4
+)
+
+// Valid indicates whether the value is a known member of the ManagedSnapshotV4SchemaVersion enum.
+func (e ManagedSnapshotV4SchemaVersion) Valid() bool {
 	switch e {
 	case N4:
 		return true
@@ -560,6 +576,21 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 	}
 }
 
+// Defines values for StarterOpeningSnapshotFormat.
+const (
+	StarterOpeningSnapshotFormatN1 StarterOpeningSnapshotFormat = 1
+)
+
+// Valid indicates whether the value is a known member of the StarterOpeningSnapshotFormat enum.
+func (e StarterOpeningSnapshotFormat) Valid() bool {
+	switch e {
+	case StarterOpeningSnapshotFormatN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TtsDefinitionClientProtocol.
 const (
 	TtsDefinitionClientProtocolGEMINIGENERATECONTENTTTS TtsDefinitionClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
@@ -746,6 +777,18 @@ type AssistantDefinitionId = string
 
 // AssistantStarterDefinition defines model for AssistantStarterDefinition.
 type AssistantStarterDefinition struct {
+	AssistantDefinitionId AssistantDefinitionId   `json:"assistantDefinitionId"`
+	Description           *string                 `json:"description,omitempty"`
+	Enabled               bool                    `json:"enabled"`
+	OpeningSnapshot       *StarterOpeningSnapshot `json:"openingSnapshot,omitempty"`
+	Prompt                string                  `json:"prompt"`
+	SortOrder             int                     `json:"sortOrder"`
+	StarterId             StarterId               `json:"starterId"`
+	Title                 string                  `json:"title"`
+}
+
+// AssistantStarterDefinitionV4 defines model for AssistantStarterDefinitionV4.
+type AssistantStarterDefinitionV4 struct {
 	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
 	Description           *string               `json:"description,omitempty"`
 	Enabled               bool                  `json:"enabled"`
@@ -1033,6 +1076,35 @@ type ManagedSnapshot struct {
 // ManagedSnapshotSchemaVersion defines model for ManagedSnapshot.SchemaVersion.
 type ManagedSnapshotSchemaVersion int
 
+// ManagedSnapshotV4 defines model for ManagedSnapshotV4.
+type ManagedSnapshotV4 struct {
+	Asr          []AsrDefinition              `json:"asr"`
+	Assistants   []ManagedAssistantDefinition `json:"assistants"`
+	DeploymentId DeploymentId                 `json:"deploymentId"`
+
+	// ImageGenerators Additive Snapshot v4 field; omission means an empty list.
+	ImageGenerators   *[]ImageGenerationDefinition `json:"imageGenerators,omitempty"`
+	ManagedGeneration int                          `json:"managedGeneration"`
+	Mcp               []McpDefinition              `json:"mcp"`
+	Metadata          struct {
+		PublishedAt       time.Time `json:"publishedAt"`
+		PublishedByUserId *UserId   `json:"publishedByUserId,omitempty"`
+	} `json:"metadata"`
+	Models []ModelDefinition `json:"models"`
+
+	// Policy Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted.
+	Policy        ManagedPolicy                  `json:"policy"`
+	Providers     []ProviderDefinition           `json:"providers"`
+	ReleaseId     ReleaseId                      `json:"releaseId"`
+	SchemaVersion ManagedSnapshotV4SchemaVersion `json:"schemaVersion"`
+	SnapshotHash  Sha256Hash                     `json:"snapshotHash"`
+	Starters      []AssistantStarterDefinitionV4 `json:"starters"`
+	Tts           []TtsDefinition                `json:"tts"`
+}
+
+// ManagedSnapshotV4SchemaVersion defines model for ManagedSnapshotV4.SchemaVersion.
+type ManagedSnapshotV4SchemaVersion int
+
 // ManagedState defines model for ManagedState.
 type ManagedState struct {
 	ActiveManagedGeneration int                       `json:"activeManagedGeneration"`
@@ -1272,6 +1344,27 @@ type Sha256Hash = string
 // StarterId defines model for StarterId.
 type StarterId = string
 
+// StarterInitialContext defines model for StarterInitialContext.
+type StarterInitialContext struct {
+	Content string `json:"content"`
+	Id      string `json:"id"`
+	Title   string `json:"title"`
+}
+
+// StarterOpeningSnapshot defines model for StarterOpeningSnapshot.
+type StarterOpeningSnapshot struct {
+	Format StarterOpeningSnapshotFormat `json:"format"`
+
+	// InitialContexts Ordered context blocks; IDs must be unique within this opening.
+	InitialContexts []StarterInitialContext `json:"initialContexts"`
+
+	// SystemPrompt Frozen effective System resolved at publication. Consume verbatim, including empty text; never inherit or append the current assistant System on the client.
+	SystemPrompt string `json:"systemPrompt"`
+}
+
+// StarterOpeningSnapshotFormat defines model for StarterOpeningSnapshot.Format.
+type StarterOpeningSnapshotFormat int
+
 // TimeoutPolicy defines model for TimeoutPolicy.
 type TimeoutPolicy struct {
 	ConnectMs        int  `json:"connectMs"`
@@ -1390,6 +1483,11 @@ type GetManagedSnapshotParams struct {
 	IfNoneMatch *string `json:"If-None-Match,omitempty"`
 }
 
+// GetManagedSnapshot200JSONResponseBody defines parameters for GetManagedSnapshot.
+type GetManagedSnapshot200JSONResponseBody struct {
+	union json.RawMessage
+}
+
 // GetManagedStateParams defines parameters for GetManagedState.
 type GetManagedStateParams struct {
 	XMeasixAppliedManagedGeneration *int `json:"X-Measix-Applied-Managed-Generation,omitempty"`
@@ -1459,6 +1557,68 @@ type RefreshSessionJSONRequestBody = RefreshRequest
 
 // ExchangePortalGrantFormdataRequestBody defines body for ExchangePortalGrant for application/x-www-form-urlencoded ContentType.
 type ExchangePortalGrantFormdataRequestBody ExchangePortalGrantFormdataBody
+
+// AsManagedSnapshot returns the union data inside the GetManagedSnapshot200JSONResponseBody as a ManagedSnapshot
+func (t GetManagedSnapshot200JSONResponseBody) AsManagedSnapshot() (ManagedSnapshot, error) {
+	var body ManagedSnapshot
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromManagedSnapshot overwrites any union data inside the GetManagedSnapshot200JSONResponseBody as the provided ManagedSnapshot
+func (t *GetManagedSnapshot200JSONResponseBody) FromManagedSnapshot(v ManagedSnapshot) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeManagedSnapshot performs a merge with any union data inside the GetManagedSnapshot200JSONResponseBody, using the provided ManagedSnapshot
+func (t *GetManagedSnapshot200JSONResponseBody) MergeManagedSnapshot(v ManagedSnapshot) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsManagedSnapshotV4 returns the union data inside the GetManagedSnapshot200JSONResponseBody as a ManagedSnapshotV4
+func (t GetManagedSnapshot200JSONResponseBody) AsManagedSnapshotV4() (ManagedSnapshotV4, error) {
+	var body ManagedSnapshotV4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromManagedSnapshotV4 overwrites any union data inside the GetManagedSnapshot200JSONResponseBody as the provided ManagedSnapshotV4
+func (t *GetManagedSnapshot200JSONResponseBody) FromManagedSnapshotV4(v ManagedSnapshotV4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeManagedSnapshotV4 performs a merge with any union data inside the GetManagedSnapshot200JSONResponseBody, using the provided ManagedSnapshotV4
+func (t *GetManagedSnapshot200JSONResponseBody) MergeManagedSnapshotV4(v ManagedSnapshotV4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetManagedSnapshot200JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetManagedSnapshot200JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {

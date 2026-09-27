@@ -76,6 +76,43 @@ describe('SessionStore', () => {
 })
 
 describe('DraftStore', () => {
+  it('preserves missing and authored Starter openings across save, reload and revision conflict', async () => {
+    const initial = emptyDraft()
+    initial.content.assistants.push({ assistantDefinitionId: 'asd_1', displayName: 'A', systemPrompt: 'Base', modelId: 'mdl_1', mcpServerIds: [], memorySeed: [], enabled: true })
+    initial.content.starters.push({ starterId: 'str_old', assistantDefinitionId: 'asd_1', title: 'Old', prompt: 'Q', enabled: false, sortOrder: 0 })
+    let savedDraft: Draft
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(async (_path, init) => {
+        const body = JSON.parse(init.body)
+        expect(body.expectedDraftRevision).toBe(1)
+        savedDraft = { ...initial, draftRevision: 2, content: body.content }
+        return new Response(JSON.stringify(savedDraft))
+      })
+      .mockImplementationOnce(async () => new Response(JSON.stringify(savedDraft)))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 409, code: 'stale_draft_revision', currentDraftRevision: 3 }), { status: 409, headers: { 'Content-Type': 'application/problem+json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDraftStore()
+    await store.load()
+    expect(store.localContent!.starters[0]!.openingSnapshot).toBeUndefined()
+    const id = store.addStarter('asd_1', 'New')
+    const starter = store.localContent!.starters.find(item => item.starterId === id)!
+    starter.openingSnapshot!.systemPrompt = ''
+    starter.openingSnapshot!.initialContexts = [{ id: 'b2', title: 'Two', content: '' }, { id: 'b1', title: 'One', content: '{{value}} <raw>' }]
+    await store.save('csrf')
+    await store.load()
+    expect(store.localContent!.starters[0]!.openingSnapshot).toBeUndefined()
+    expect(store.localContent!.starters[1]!.openingSnapshot).toEqual({ format: 1, systemPrompt: '', initialContexts: [{ id: 'b2', title: 'Two', content: '' }, { id: 'b1', title: 'One', content: '{{value}} <raw>' }] })
+    expect(store.dirty).toBe(false)
+    store.localContent!.starters[1]!.openingSnapshot!.systemPrompt = 'Unsaved'
+    store.markDirty()
+    await expect(store.save('csrf')).rejects.toMatchObject({ code: 'stale_draft_revision' })
+    expect(store.localContent!.starters[1]!.openingSnapshot!.systemPrompt).toBe('Unsaved')
+    expect(store.localContent!.starters[1]!.openingSnapshot!.initialContexts.map(item => item.id)).toEqual(['b2', 'b1'])
+    expect(store.dirty).toBe(true)
+    expect(store.baselineRevision).toBe(2)
+  })
+
   it('upserts a runtime binding for a resource and reuses its stable runtimeRouteId', async () => {
     const initial = emptyDraft()
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))

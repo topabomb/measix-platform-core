@@ -845,6 +845,21 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 	}
 }
 
+// Defines values for StarterOpeningSnapshotFormat.
+const (
+	N1 StarterOpeningSnapshotFormat = 1
+)
+
+// Valid indicates whether the value is a known member of the StarterOpeningSnapshotFormat enum.
+func (e StarterOpeningSnapshotFormat) Valid() bool {
+	switch e {
+	case N1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SystemEventService.
 const (
 	SystemEventServiceHUB   SystemEventService = "HUB"
@@ -1790,13 +1805,14 @@ type AssistantDefinitionId = string
 
 // AssistantStarterDefinition defines model for AssistantStarterDefinition.
 type AssistantStarterDefinition struct {
-	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
-	Description           *string               `json:"description,omitempty"`
-	Enabled               bool                  `json:"enabled"`
-	Prompt                string                `json:"prompt"`
-	SortOrder             int                   `json:"sortOrder"`
-	StarterId             StarterId             `json:"starterId"`
-	Title                 string                `json:"title"`
+	AssistantDefinitionId AssistantDefinitionId   `json:"assistantDefinitionId"`
+	Description           *string                 `json:"description,omitempty"`
+	Enabled               bool                    `json:"enabled"`
+	OpeningSnapshot       *StarterOpeningSnapshot `json:"openingSnapshot,omitempty"`
+	Prompt                string                  `json:"prompt"`
+	SortOrder             int                     `json:"sortOrder"`
+	StarterId             StarterId               `json:"starterId"`
+	Title                 string                  `json:"title"`
 }
 
 // BudgetAuditItem defines model for BudgetAuditItem.
@@ -2692,6 +2708,29 @@ type Sha256Hash = string
 
 // StarterId defines model for StarterId.
 type StarterId = string
+
+// StarterInitialContext defines model for StarterInitialContext.
+type StarterInitialContext struct {
+	Content string `json:"content"`
+	Id      string `json:"id"`
+
+	// Title May remain blank in a draft; validation requires a nonblank title before publication.
+	Title string `json:"title"`
+}
+
+// StarterOpeningSnapshot defines model for StarterOpeningSnapshot.
+type StarterOpeningSnapshot struct {
+	Format StarterOpeningSnapshotFormat `json:"format"`
+
+	// InitialContexts Ordered context blocks; IDs must be unique within this opening.
+	InitialContexts []StarterInitialContext `json:"initialContexts"`
+
+	// SystemPrompt Draft System override. Empty or whitespace-only inherits the referenced assistant System at preview/publication; a nonblank override is preserved verbatim. Preview returns the resolved literal. Published snapshots never re-resolve inheritance.
+	SystemPrompt string `json:"systemPrompt"`
+}
+
+// StarterOpeningSnapshotFormat defines model for StarterOpeningSnapshot.Format.
+type StarterOpeningSnapshotFormat int
 
 // SystemEvent defines model for SystemEvent.
 type SystemEvent struct {

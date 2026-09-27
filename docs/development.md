@@ -25,7 +25,7 @@ Gateway source/OpenAPI and production service packaging are S0.3 work, not curre
 
 ## 2. Local bootstrap and startup
 
-Install dependencies from the root and console lockfiles. `npm run setup` invokes `scripts/dev-setup.mjs`: exclusively creates missing synthetic key files, initializes or verifies the single current development schema and bootstraps with `--if-empty`. A repeat against a current managed development DB preserves keys/credentials. It reports the protected password-file location, not plaintext. This is not a production installer or reset tool; obsolete development databases/configuration are deleted and recreated, without adoption or conversion.
+Install dependencies from the root and console lockfiles. `npm run setup` invokes `scripts/dev-setup.mjs`: exclusively creates missing synthetic key files, applies or verifies the shared migration history and bootstraps with `--if-empty`. A repeat against a current managed development DB preserves keys/credentials. It reports the protected password-file location, not plaintext. This is not a production installer or reset tool. It uses the shared append-only migration owner described in [Database migrations](database-migrations.md); unrecognized data or checksum conflicts stop startup without deleting business data.
 
 `npm start`/`npm run dev` starts the development Hub, Relay and console; usage ingestion targets private Hub port 8081. Alternatively, run these in separate terminals **from backend/** using setup's synthetic files:
 
@@ -42,6 +42,16 @@ pnpm -C console dev
 ```
 
 These are development HTTP endpoints, not production origin/TLS qualification. To exercise the complete same-origin path, build the console and Portal, configure their Hub asset directories, then use the checked-in [Caddy ingress recipe](operations.md#one-public-origin). Discovery, enrollment, Snapshot, Runtime and Portal must use this public origin. `go run`/`concurrently` provide no production restart/rate-limit/log-retention guarantee.
+
+### Actual Android / Admin development environment
+
+Run `npm run device:real` from the Core root. It builds production Admin/Portal assets, runs shared database migrations, preserves deployment credentials, starts the local same-origin Hub/Relay, and publishes the explicit v5 preset. The actual origin is printed after readiness and stored in `.data/device-real/process.json`; do not reuse an old LAN address. The Admin password is in ignored `.secrets/device-real-admin-password.txt`.
+
+The preset owns the isolated `.data/device-real` draft: rerunning restores its predefined resources and three complete Starter openings. Do not point it at a shared or production database. Manual Admin publications remain immutable releases, but their edits are not the preset's next draft. `npm run device:real:stop` stops its owned process. `device:real:reset` deletes isolated data and is only for an explicit decision to discard it, never an upgrade/checksum repair.
+
+Supplier credentials come from ignored `.secrets/supplier-keys.env`; existing ACTIVE upstreams and their Secret references are reused. Changing the file does not rotate a saved Secret: use normal Admin Secret/upstream candidate/apply actions for intentional rotation. ACTIVE and `/ready` prove configuration activation and process readiness, not supplier authorization or model availability. Verify actual resource invocation separately and retain the provider diagnostic on failure. Missing Starter opening, validation or migration errors stop publication/startup with their original code and path.
+
+Use actual Admin authoring and a dedicated Android emulator for UI/context verification. Keep the retained production demo separate. [Starter verification](starter-opening-snapshots.md#10-实施及验收记录) records browser, device, deterministic-adapter and supplier boundaries separately.
 
 ## 3. Normal checks
 

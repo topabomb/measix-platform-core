@@ -349,3 +349,11 @@ This turns TDD from a convention into an enforceable development loop: Red may e
 ## 19. Secrets and artifacts
 
 No production token, Secret, enrollment code, refresh credential, real conversation or sensitive prompt may appear in fixtures, logs or artifacts. Security scenarios additionally assert that protected material does not appear in responses, DOM/persistent browser state, managed Snapshot or usage events.
+
+## 20. Starter v5 cross-consumer verification
+
+`MEASIX_E2E_ANDROID_SERIAL=emulator-5562 node scripts/e2e-harness.mjs` adds an opt-in native lane after the real Admin authoring/publish flow. Install the matching debug and androidTest APKs on a dedicated, fresh unbound emulator first; the harness never installs or clears app data and rejects the retained production-demo emulator. `ADB` may select the executable. The public Admin API issues temporary enrollment, adb reverse preserves canonical origin, and Android performs the actual HTTP sync, UI prefill/send, Room readback and context-detail reopen. The deterministic adapter verifies the exact published opening and absence of an additional Assistant System. Only synthetic request bodies are captured; transient enrollment files and reverse mapping are removed in finally. This is local Core/Android evidence, not a production-model or physical-device gate.
+
+Use `npm run test:tooling` for instrumentation-result and wire-verifier negative cases, and the normal Go/Console gates for old-release preservation and authoring conflicts. Evidence and supported data boundaries are recorded in [Starter opening snapshots](starter-opening-snapshots.md).
+
+`device:real` adds a separate actual-supplier lane. Its preset must contain complete v5 openings, fail closed on validation/migration errors, and preserve existing database and Secret identities. Tooling regressions cover these behaviors. Readiness/ACTIVE and connectivity tests do not prove successful model invocation. Record credential/entitlement failures separately from deterministic end-to-end results. Correlate the browser-authored opening, release/hash, device Applied report and response/error; credentials never enter evidence. The Starter verification document records the current run boundary.

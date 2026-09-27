@@ -47,7 +47,7 @@ func TestClientIntegrationSharedWireCases(t *testing.T) {
 			}
 		})
 	}
-	for _, file := range []string{"snapshot-v4.json", "snapshot-v4-dashscope-image.json", "snapshot-v4-denied.json"} {
+	for _, file := range []string{"snapshot-v5.json", "snapshot-v4.json", "snapshot-v4-dashscope-image.json", "snapshot-v4-denied.json"} {
 		raw, err := os.ReadFile(filepath.Join(root, file))
 		if err != nil {
 			t.Fatal(err)

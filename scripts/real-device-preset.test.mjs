@@ -1,0 +1,124 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
+import { spawn } from 'node:child_process'
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+
+const root = resolve(import.meta.dirname, '..')
+
+async function runPreset(t, { validationErrors = [], changed = true } = {}) {
+  const directory = mkdtempSync(join(tmpdir(), 'measix-preset-test-'))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const password = join(directory, 'password.txt')
+  const keys = join(directory, 'keys.env')
+  const state = join(directory, 'state.json')
+  writeFileSync(password, 'synthetic-password')
+  writeFileSync(keys, ['DEEPSEEK_API_KEY', 'MIMO_API_KEY', 'FIRECRAWL_API_KEY', 'DASHSCOPE_API_KEY']
+    .map(key => `${key}=synthetic-key`).concat('ALIBABA_TOKEN_PLAN_BASE_URL=https://example.invalid/compatible-mode/v1').join('\n'))
+  const originalState = JSON.stringify({ upstreams: Object.fromEntries(
+    ['deepseek', 'mimo', 'firecrawl', 'alibaba'].map(kind => [kind, { upstreamId: `up_${kind}` }]),
+  ) })
+  writeFileSync(state, originalState)
+  const requests = []
+  let content
+  const server = createServer(async (request, response) => {
+    const chunks = []
+    for await (const chunk of request) chunks.push(chunk)
+    const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined
+    const path = request.url.replace('/api/admin/v1', '')
+    requests.push({ method: request.method, path, body })
+    let result
+    if (path === '/session/login') {
+      response.setHeader('Set-Cookie', 'measix_admin_session=synthetic; HttpOnly')
+      result = { csrfToken: 'synthetic-csrf' }
+    } else if (path.startsWith('/upstreams/') && request.method === 'GET') {
+      result = { upstreamId: path.split('/').at(-1), status: 'ACTIVE' }
+    } else if (path === '/draft' && request.method === 'GET') {
+      result = { draftRevision: 41, content: { policy: { retainedPolicy: true } } }
+    } else if (path === '/draft' && request.method === 'PUT') {
+      content = body.content
+      result = { draftRevision: 42 }
+    } else if (path === '/draft:validate') {
+      const missing = content.starters.flatMap((starter, i) => starter.openingSnapshot ? [] : [
+        { code: 'missing_starter_opening', path: `starters[${i}].openingSnapshot` },
+      ])
+      const errors = [...missing, ...validationErrors]
+      result = { valid: errors.length === 0, errors, warnings: [] }
+    } else if (path === '/draft:preview') {
+      result = { publishedGeneration: 7, diffSummary: { added: 0, changed: changed ? 3 : 0, removed: 0 } }
+    } else if (path === '/draft:publish') {
+      result = { activationId: 'activation-test' }
+    } else if (path === '/activations/activation-test') {
+      result = { state: 'COMPLETED' }
+    } else {
+      response.statusCode = 500
+      result = { code: 'unexpected_test_request' }
+    }
+    response.setHeader('Content-Type', 'application/json')
+    response.end(JSON.stringify(result))
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise(resolve => server.close(resolve)))
+  const child = spawn(process.execPath, [join(root, 'scripts/real-device-preset.mjs')], {
+    env: { ...process.env, MEASIX_REAL_DEVICE_ORIGIN: `http://127.0.0.1:${server.address().port}`,
+      MEASIX_REAL_DEVICE_ADMIN_PASSWORD_FILE: password, MEASIX_REAL_DEVICE_SUPPLIER_KEYS: keys,
+      MEASIX_REAL_DEVICE_STATE: state },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let output = ''
+  child.stdout.on('data', chunk => { output += chunk })
+  child.stderr.on('data', chunk => { output += chunk })
+  const code = await new Promise((resolve, reject) => { child.on('error', reject); child.on('close', resolve) })
+  assert.equal(readFileSync(state, 'utf8'), originalState, 'existing upstream identities must not be rewritten')
+  assert.ok(!requests.some(item => ['/secrets', '/upstreams'].includes(item.path)), 'existing credentials must be reused')
+  assert.ok(!output.includes('synthetic-password') && !output.includes('synthetic-key'), 'do not print secrets')
+  return { code, output, content, requests }
+}
+
+test('real-device preset publishes complete authored v5 openings with existing upstreams', async t => {
+  const result = await runPreset(t)
+  assert.equal(result.code, 0, result.output)
+  assert.equal(result.content.starters.length, 3)
+  for (const starter of result.content.starters) {
+    const opening = starter.openingSnapshot
+    assert.equal(opening.format, 1)
+    assert.ok(opening.systemPrompt.trim())
+    assert.ok(Array.isArray(opening.initialContexts))
+    assert.equal(new Set(opening.initialContexts.map(item => item.id)).size, opening.initialContexts.length)
+    for (const block of opening.initialContexts) {
+      assert.ok(block.id.trim() && block.title.trim())
+      assert.equal(typeof block.content, 'string')
+    }
+  }
+  assert.ok(result.content.starters[0].openingSnapshot.initialContexts.length >= 2, 'exercise ordered opening backgrounds on device')
+  assert.deepEqual(result.content.models.map(model => model.upstreamModelKey), ['deepseek-flash', 'qwen3.8-flash'])
+  assert.equal(result.content.policy.retainedPolicy, true)
+  const mutations = result.requests.filter(item => item.path === '/draft' && item.method === 'PUT' || item.path === '/draft:publish')
+  assert.equal(mutations[0].body.expectedDraftRevision, 41)
+  assert.equal(mutations[1].body.expectedDraftRevision, 42)
+})
+
+test('unchanged preset does not publish another release', async t => {
+  const result = await runPreset(t, { changed: false })
+  assert.equal(result.code, 0, result.output)
+  assert.ok(!result.requests.some(item => item.path === '/draft:publish'))
+})
+
+test('validation failure reports authoritative field path and prevents preview/publish', async t => {
+  const result = await runPreset(t, { validationErrors: [
+    { code: 'invalid_starter_opening', path: 'starters[1].openingSnapshot.initialContexts[0].title' },
+  ] })
+  assert.notEqual(result.code, 0)
+  assert.match(result.output, /invalid_starter_opening:starters\[1\]\.openingSnapshot\.initialContexts\[0\]\.title/)
+  assert.ok(!result.requests.some(item => ['/draft:preview', '/draft:publish'].includes(item.path)))
+})
+
+test('database upgrade failure guidance preserves existing real-device data', () => {
+  const source = readFileSync(join(root, 'scripts/start-real-device-preset.ps1'), 'utf8')
+  const failure = source.split(/\r?\n/).find(line => line.includes('throw') && /database .*failed/i.test(line))
+  assert.ok(failure, 'launcher must diagnose database preparation failure')
+  assert.doesNotMatch(failure, /device:real:reset|delete and recreate/i)
+  assert.match(failure, /preserv|backup/i)
+})

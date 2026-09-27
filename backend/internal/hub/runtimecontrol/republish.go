@@ -22,10 +22,13 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 		return ActivationResult{}, err
 	}
 	var content adminapi.ManagedDraftContent
-	if err := json.Unmarshal(source.ReleaseContentJSON, &content); err != nil {
+	if err := capability.DecodeManagedDraftContent(source.ReleaseContentJSON, &content); err != nil {
 		return ActivationResult{}, err
 	}
-	content = capability.NormalizeManagedDraftContent(content)
+	content, sourceVersion, err := capability.PublishedContent(content, source.SnapshotJSON)
+	if err != nil {
+		return ActivationResult{}, err
+	}
 	path := "/api/admin/v1/releases/" + sourceReleaseID + ":republish"
 	requestHash := hashOperation(struct {
 		ReleaseID string `json:"releaseId"`
@@ -46,7 +49,7 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	activationID := platformid.New(platformid.Activation)
 	now := s.Now().UTC()
 	snapshot, snapshotHash, err := s.Capability.CompileSnapshot(capability.SnapshotInput{
-		DeploymentID: s.Signer.DeploymentID, ReleaseID: newReleaseID, ManagedGeneration: generation,
+		DeploymentID: s.Signer.DeploymentID, ReleaseID: newReleaseID, ManagedGeneration: generation, SchemaVersion: sourceVersion,
 		Content: content, PublishedAt: now, PublishedByUserID: adminUserID,
 	})
 	if err != nil {

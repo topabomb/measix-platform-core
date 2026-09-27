@@ -23,6 +23,7 @@ import (
 var (
 	ErrRevisionConflict = errors.New("draft revision conflict")
 	ErrInvalidDraft     = errors.New("invalid managed draft")
+	ErrSnapshotTooLarge = errors.New("compiled snapshot exceeds 4 MiB")
 	ErrReleaseNotFound  = errors.New("managed release not found")
 )
 
@@ -336,22 +337,34 @@ func (s *Service) previousRelease(ctx context.Context, row *ent.ManagedRelease) 
 
 func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRelease) (ReleaseView, error) {
 	var current, previous *adminapi.ManagedDraftContent
+	if err := ValidateDraftOpeningJSON(row.ReleaseContentJSON); err != nil {
+		return ReleaseView{}, err
+	}
 	if err := json.Unmarshal(row.ReleaseContentJSON, &current); err != nil {
 		return ReleaseView{}, err
 	}
 	if current == nil {
 		return ReleaseView{}, fmt.Errorf("invalid persisted release content")
 	}
-	normalizedCurrent := NormalizeManagedDraftContent(*current)
+	normalizedCurrent, _, err := PublishedContent(*current, row.SnapshotJSON)
+	if err != nil {
+		return ReleaseView{}, err
+	}
 	current = &normalizedCurrent
 	if prev != nil {
+		if err := ValidateDraftOpeningJSON(prev.ReleaseContentJSON); err != nil {
+			return ReleaseView{}, err
+		}
 		if err := json.Unmarshal(prev.ReleaseContentJSON, &previous); err != nil {
 			return ReleaseView{}, err
 		}
 		if previous == nil {
 			return ReleaseView{}, fmt.Errorf("invalid previous release content")
 		}
-		normalizedPrevious := NormalizeManagedDraftContent(*previous)
+		normalizedPrevious, _, err := PublishedContent(*previous, prev.SnapshotJSON)
+		if err != nil {
+			return ReleaseView{}, err
+		}
 		previous = &normalizedPrevious
 	}
 	diff := releaseContentDiff(current, previous)
@@ -452,7 +465,7 @@ func (s *Service) GetDraft(ctx context.Context) (DraftView, error) {
 		return DraftView{}, err
 	}
 	var content adminapi.ManagedDraftContent
-	if err := json.Unmarshal(row.ContentJSON, &content); err != nil {
+	if err := DecodeManagedDraftContent(row.ContentJSON, &content); err != nil {
 		return DraftView{}, err
 	}
 	content = NormalizeManagedDraftContent(content)
@@ -461,6 +474,11 @@ func (s *Service) GetDraft(ctx context.Context) (DraftView, error) {
 
 func (s *Service) PutDraft(ctx context.Context, updatedBy string, expectedRevision int, content adminapi.ManagedDraftContent) (DraftView, error) {
 	content = NormalizeManagedDraftContent(content)
+	for _, starter := range content.Starters {
+		if err := validateDraftOpening(starter.OpeningSnapshot); err != nil {
+			return DraftView{}, err
+		}
+	}
 	if err := validateCandidateIDs(content); err != nil {
 		return DraftView{}, err
 	}
@@ -518,10 +536,13 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	latest, err := s.Client.ManagedRelease.Query().Order(ent.Desc(managedrelease.FieldManagedGeneration)).First(ctx)
 	if err == nil {
 		var content adminapi.ManagedDraftContent
-		if err := json.Unmarshal(latest.ReleaseContentJSON, &content); err != nil {
+		if err := DecodeManagedDraftContent(latest.ReleaseContentJSON, &content); err != nil {
 			return DraftPreview{}, fmt.Errorf("decode latest release content: %w", err)
 		}
-		content = NormalizeManagedDraftContent(content)
+		content, _, err = PublishedContent(content, latest.SnapshotJSON)
+		if err != nil {
+			return DraftPreview{}, err
+		}
 		previous = &content
 		generation := int(latest.ManagedGeneration)
 		publishedGeneration = &generation
@@ -551,11 +572,13 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	}
 	// Return the canonical projection (sorted arrays from compiler output),
 	// not the raw Draft arrays. This ensures Preview == actual Snapshot shape.
+	effectiveContent := draft.Content
+	effectiveContent.Starters = projectionToAdminStarters(snapshot.Starters)
 	return DraftPreview{
 		DraftRevision:       draft.DraftRevision,
 		ProjectionHash:      hash,
 		PublishedGeneration: publishedGeneration,
-		DiffSummary:         releaseContentDiff(&draft.Content, previous),
+		DiffSummary:         releaseContentDiff(&effectiveContent, previous),
 		Providers:           projectionToAdminProviders(snapshot.Providers),
 		Models:              projectionToAdminModels(snapshot.Models),
 		ImageGenerators:     projectionToAdminImages(snapshot.ImageGenerators),
@@ -906,6 +929,16 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	// Validate starters
 	for i, s := range content.Starters {
 		path := fmt.Sprintf("starters[%d]", i)
+		if s.OpeningSnapshot == nil {
+			addError("missing_starter_opening", path+".openingSnapshot", "Create the starter opening before publishing", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("openingSnapshot"))
+		} else if err := validateOpening(s.OpeningSnapshot); err != nil {
+			issuePath := path + ".openingSnapshot"
+			var detail *openingValidationError
+			if errors.As(err, &detail) {
+				issuePath += "." + detail.Path
+			}
+			addError("invalid_starter_opening", issuePath, err.Error(), &kindStarter, ptrStr(string(s.StarterId)), ptrStr("openingSnapshot"))
+		}
 		if strings.TrimSpace(s.Title) == "" {
 			addError("missing_title", path+".title", "starter title is required", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("title"))
 		}

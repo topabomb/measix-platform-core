@@ -37,6 +37,7 @@ function mountResourcesPage() {
     },
     {
       global: {
+        stubs: { QDialog: { props: ['modelValue'], template: '<div v-if="modelValue" role="dialog"><slot /></div>' } },
         plugins: [[Quasar, {
           components: {
             QLayout, QPage, QPageContainer, QCard, QCardSection, QCardActions,
@@ -99,6 +100,214 @@ async function switchTab(wrapper: ReturnType<typeof mount>, name: string) {
 }
 
 describe('ResourcesPage', () => {
+  it.each(['preview', 'review'] as const)('returns from %s to the editable Starter field when a validation issue is activated', async surface => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+    const assistantId = draft.addAssistant('Assistant')
+    const starterId = draft.addStarter(assistantId, 'Starter')
+    draft.localContent!.starters[0]!.openingSnapshot!.initialContexts = [{ id: 'background', title: 'Background', content: 'Original' }]
+    draft.dirty = false
+    vi.mocked(client.apiFetch).mockImplementation(async path => {
+      if (path === '/api/admin/v1/draft:validate') return { valid: true, errors: [], warnings: [] }
+      if (path === '/api/admin/v1/draft:preview') return {
+        draftRevision: 1, providers: [], models: [], tts: [], asr: [], mcp: [], assistants: [], starters: [],
+        policy: EMPTY_DRAFT.content.policy, projectionHash: 'hash', diffSummary: { added: 1, changed: 0, removed: 0 },
+      }
+      return {}
+    })
+    await wrapper.get(`[data-cy="draft-${surface}-btn"]`).trigger('click')
+    await flushPromises()
+    draft.validationResult = { valid: false, warnings: [], errors: [{ severity: 'ERROR', code: 'invalid_starter_opening', path: 'starters[0].openingSnapshot.initialContexts[0].title', resourceKind: 'STARTER', resourceId: starterId, field: 'openingSnapshot', message: 'title required' }] }
+    await flushPromises()
+    const issue = wrapper.findAll('[data-validation-code="invalid_starter_opening"]').find(item => item.classes().includes('q-item--clickable'))!
+    await issue.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-cy="snapshot-preview-surface"]').exists()).toBe(false)
+    expect(wrapper.find('[data-cy="publish-review-surface"]').exists()).toBe(false)
+    expect(wrapper.get('.configuration-workbench').isVisible()).toBe(true)
+    expect(wrapper.get('.configuration-workbench').attributes('inert')).toBeUndefined()
+    expect(wrapper.get('[data-cy="starter-opening"]').attributes('open')).toBeDefined()
+    expect(wrapper.get('[data-cy="starter-context-title"]').attributes('disabled')).toBeUndefined()
+    expect(draft.dirty).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each(['preview', 'review'] as const)('retains the selected assistant and section when returning from %s', async (surface) => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+    draft.addAssistant('First assistant')
+    const selectedId = draft.addAssistant('Second assistant')
+    draft.addStarter(selectedId, 'Selected starter')
+    draft.dirty = false
+    await switchTab(wrapper, 'assistants')
+    const selectedRow = wrapper.findAllComponents(QItem).find(item => item.text().includes('Second assistant'))!
+    await selectedRow.trigger('click')
+    await wrapper.get('[data-cy="assistant-section-starters"]').trigger('click')
+    vi.mocked(client.apiFetch).mockImplementation(async path => {
+      if (path === '/api/admin/v1/draft:validate') return { valid: true, errors: [], warnings: [] }
+      if (path === '/api/admin/v1/draft:preview') return {
+        draftRevision: 1, providers: [], models: [], tts: [], asr: [], mcp: [], assistants: [], starters: [],
+        policy: EMPTY_DRAFT.content.policy, projectionHash: 'hash', diffSummary: { added: 1, changed: 0, removed: 0 },
+      }
+      return {}
+    })
+    // A dialog may already be open when the page switches surfaces; its teleport must be hidden too.
+    await wrapper.get('[data-cy="starter-edit"]').trigger('click')
+    expect(wrapper.find('[data-cy="starter-editor-dialog"]').exists()).toBe(true)
+    await wrapper.get(`[data-cy="draft-${surface}-btn"]`).trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.configuration-workbench').isVisible()).toBe(false)
+    expect(wrapper.get('.configuration-workbench').attributes('inert')).toBeDefined()
+    expect(wrapper.get('[data-cy="starter-edit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-cy="starter-editor-dialog"]').exists()).toBe(false)
+    const panel = wrapper.get(`[data-cy="${surface === 'preview' ? 'snapshot-preview' : 'publish-review'}-surface"]`)
+    const close = wrapper.findAllComponents(QBtn).find(button => panel.element.contains(button.element) && button.props('icon') === 'arrow_back')!
+    await close.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-cy="assistant-identity"]').text()).toContain(selectedId)
+    expect(wrapper.get('.configuration-workbench').attributes('style')).not.toContain('display: none')
+    expect(wrapper.get('.configuration-workbench').attributes('inert')).toBeUndefined()
+    expect(wrapper.get('[data-cy="assistant-section-starters"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('[data-cy="starter-edit"]').attributes('disabled')).toBeUndefined()
+    expect(draft.dirty).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('offers conflict recovery when the server omits the current draft revision', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+    const id = draft.addAssistant('Unsaved assistant')
+    await flushPromises()
+    vi.mocked(client.apiFetch).mockRejectedValueOnce(new client.ApiProblem(409, 'stale_draft_revision', 'Draft revision conflict'))
+    await wrapper.get('[data-cy="draft-save-btn"]').trigger('click')
+    await flushPromises()
+    expect(client.apiFetch).toHaveBeenCalledWith('/api/admin/v1/draft', expect.objectContaining({ method: 'PUT' }), 'test-csrf')
+    const reload = wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'Reload')
+    expect(reload).toBeDefined()
+    expect(wrapper.text()).not.toContain('revision null')
+    expect(wrapper.text()).not.toContain('revision undefined')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    await reload!.trigger('click')
+    expect(draft.localContent!.assistants[0]!.assistantDefinitionId).toBe(id)
+    expect(draft.dirty).toBe(true)
+    await reload!.trigger('click')
+    await flushPromises()
+    expect(draft.dirty).toBe(false)
+    expect(draft.conflictRevision).toBeUndefined()
+    expect(confirm).toHaveBeenCalledTimes(2)
+    confirm.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('defaults to assistant instructions and preserves background when restoring inheritance', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    await switchTab(wrapper, 'assistants')
+    await wrapper.get('[data-cy="assistant-add"]').trigger('click')
+    const draft = useDraftStore(pinia)
+    draft.localContent!.assistants[0]!.systemPrompt = 'Original system'
+    await wrapper.get('[data-cy="assistant-section-starters"]').trigger('click')
+    await wrapper.get('[data-cy="starter-add"]').trigger('click')
+    const starter = draft.localContent!.starters[0]!
+    expect(starter).toMatchObject({ openingSnapshot: { format: 1, systemPrompt: '', initialContexts: [] } })
+    draft.localContent!.assistants[0]!.systemPrompt = 'Changed assistant'
+    const opening = wrapper.get('[data-cy="starter-opening"]')
+    expect(opening.attributes('open')).toBeUndefined()
+    await opening.get('summary').trigger('click')
+    expect(wrapper.get('[data-cy="starter-assistant-system"]').text()).toContain('Changed assistant')
+    expect(wrapper.find('[data-cy="starter-opening-reset"]').exists()).toBe(false)
+    await wrapper.get('[data-cy="starter-opening-system"]').setValue('Custom literal {{raw}}')
+    await wrapper.get('[data-cy="starter-context-add"]').trigger('click')
+    await wrapper.get('[data-cy="starter-context-add"]').trigger('click')
+    await wrapper.findAll('[data-cy="starter-context-title"]')[0]!.setValue('First')
+    await wrapper.findAll('[data-cy="starter-context-content"]')[0]!.setValue('{{literal}} <context>')
+    await wrapper.findAll('[data-cy="starter-context-title"]')[1]!.setValue('Second')
+    const ids = starter.openingSnapshot!.initialContexts.map(item => item.id)
+    await wrapper.findAll('[data-cy="starter-context-up"]')[1]!.trigger('click')
+    expect(starter.openingSnapshot!.initialContexts.map(item => item.id)).toEqual(ids.toReversed())
+    expect(starter.openingSnapshot!.systemPrompt).toBe('Custom literal {{raw}}')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    await wrapper.get('[data-cy="starter-opening-reset"]').trigger('click')
+    expect(starter.openingSnapshot!.systemPrompt).toBe('Custom literal {{raw}}')
+    await wrapper.get('[data-cy="starter-opening-reset"]').trigger('click')
+    expect(starter.openingSnapshot!.systemPrompt).toBe('')
+    expect(starter.openingSnapshot!.initialContexts[1]!.content).toBe('{{literal}} <context>')
+    expect(confirm).toHaveBeenCalledTimes(2)
+    confirm.mockRestore()
+    await wrapper.get('[data-cy="starter-opening-system"]').setValue('  \n ')
+    expect(wrapper.find('[data-cy="starter-opening-reset"]').exists()).toBe(false)
+    expect(wrapper.get('[data-cy="starter-assistant-system"]').text()).toContain('Changed assistant')
+    expect(starter.openingSnapshot!.systemPrompt).toBe('  \n ')
+    wrapper.unmount()
+  })
+
+  it('keeps an old disabled Starter missing until explicit creation and focuses its nested error', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+    const assistantId = draft.addAssistant('Old assistant')
+    draft.localContent!.assistants[0]!.systemPrompt = 'Adopt this explicitly'
+    draft.localContent!.starters.push({ starterId: 'str_old', assistantDefinitionId: assistantId, title: 'Old', prompt: 'Question', sortOrder: 0, enabled: false })
+    await switchTab(wrapper, 'assistants')
+    await wrapper.get('[data-cy="assistant-section-starters"]').trigger('click')
+    const starter = draft.localContent!.starters[0]!
+    expect(starter.openingSnapshot).toBeUndefined()
+    await wrapper.get('[data-cy="starter-edit"]').trigger('click')
+    expect(wrapper.get('[data-cy="starter-opening"]').text()).toContain('not set')
+    await wrapper.get('[data-cy="starter-opening-create"]').trigger('click')
+    expect(starter.openingSnapshot).toEqual({ format: 1, systemPrompt: '', initialContexts: [] })
+    expect(starter.enabled).toBe(false)
+    await wrapper.get('[data-cy="starter-context-add"]').trigger('click')
+    draft.validationResult = { valid: false, warnings: [], errors: [{ severity: 'ERROR', code: 'invalid_starter_opening', path: 'starters[0].openingSnapshot.initialContexts[0].title', resourceKind: 'STARTER', resourceId: 'str_old', field: 'openingSnapshot', message: 'title required' }] }
+    await flushPromises()
+    const issue = wrapper.findAll('[data-validation-code="invalid_starter_opening"]').find(item => item.classes().includes('q-item--clickable'))!
+    await issue.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-cy="starter-opening"]').attributes('open')).toBeDefined()
+    expect(wrapper.find('[data-cy="starter-context-title"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('locks authoring during Review and rejects a changed draft after the pending response', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+    const assistantId = draft.addAssistant('Assistant')
+    draft.addStarter(assistantId, 'Starter')
+    draft.dirty = false
+    await switchTab(wrapper, 'assistants')
+    await wrapper.get('[data-cy="assistant-section-starters"]').trigger('click')
+    let resolveValidation!: (value: unknown) => void
+    vi.mocked(client.apiFetch).mockImplementation(async path => {
+      if (path === '/api/admin/v1/draft:validate') return new Promise(resolve => { resolveValidation = resolve })
+      if (path === '/api/admin/v1/draft:preview') return { draftRevision: 1, providers: [], models: [], tts: [], asr: [], mcp: [], assistants: [], starters: [], policy: EMPTY_DRAFT.content.policy, projectionHash: 'hash', diffSummary: { added: 1, changed: 0, removed: 0 } }
+      return {}
+    })
+    await wrapper.get('[data-cy="draft-review-btn"]').trigger('click')
+    expect(wrapper.get('.configuration-workbench').attributes('inert')).toBeDefined()
+    expect(wrapper.get('[data-cy="starter-edit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-cy="draft-preview-btn"]').attributes('disabled')).toBeDefined()
+    // An owner update after the request started must not silently publish the old candidate.
+    draft.localContent!.starters[0]!.prompt = 'Unsaved change'
+    draft.markDirty()
+    resolveValidation({ valid: true, errors: [], warnings: [] })
+    await flushPromises()
+    expect(wrapper.find('[data-cy="publish-review-surface"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('The draft changed')
+    expect(draft.localContent!.starters[0]!.prompt).toBe('Unsaved change')
+    expect(draft.dirty).toBe(true)
+    wrapper.unmount()
+  })
+
   it('switches ASR settings and binding transport together', async () => {
     const { wrapper, pinia } = mountResourcesPage()
     setupSession(pinia)
@@ -376,9 +585,22 @@ describe('ResourcesPage', () => {
     await wrapper.get('[data-cy="assistant-add"]').trigger('click')
     await wrapper.get('[data-cy="assistant-section-starters"]').trigger('click')
     await wrapper.get('[data-cy="starter-add"]').trigger('click')
+    await wrapper.get('[data-cy="starter-editor-done"]').trigger('click')
     await wrapper.get('[data-cy="starter-add"]').trigger('click')
 
     expect(draft.localContent!.starters.map(starter => starter.sortOrder)).toEqual([0, 1])
+    await wrapper.get('[data-cy="starter-prompt"]').setValue('Kept after closing')
+    const [first, second] = draft.localContent!.starters
+    const otherAssistant = draft.addAssistant('Other')
+    const otherId = draft.addStarter(otherAssistant, 'Other starter')
+    draft.localContent!.starters.find(item => item.starterId === otherId)!.sortOrder = 42
+    await wrapper.get('[data-cy="starter-editor-close"]').trigger('click')
+    expect(wrapper.find('[data-cy="starter-editor-dialog"]').exists()).toBe(false)
+    expect(second!.prompt).toBe('Kept after closing')
+    await wrapper.findAll('[data-cy="starter-up"]')[1]!.trigger('click')
+    expect(wrapper.findAll('[data-cy="starter-summary"]').map(item => item.attributes('data-starter-id'))).toEqual([second!.starterId, first!.starterId])
+    expect(draft.localContent!.starters.find(item => item.starterId === otherId)!.sortOrder).toBe(42)
+    expect(draft.dirty).toBe(true)
     wrapper.unmount()
   })
 
@@ -802,7 +1024,7 @@ describe('ResourcesPage', () => {
           mcp: [{ mcpServerId: 'mcp_1', displayName: 'Tools', authOwnership: 'ENTERPRISE_MANAGED', enabled: true }],
           policy: { policyId: 'pol_draft', allowLocalProviders: true, allowLocalTts: false, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true, defaultModelId: 'mdl_missing', defaultTtsId: 'tts_1' },
           assistants: [{ assistantDefinitionId: 'asd_1', displayName: 'Field Helper', description: 'Helps field engineers', enabled: true, modelId: 'mdl_1', mcpServerIds: ['mcp_1'], systemPrompt: 'Help safely', memorySeed: ['Check safety'] }],
-          starters: [{ starterId: 'str_1', assistantDefinitionId: 'asd_1', title: 'Inspect device', description: 'Start a safety inspection', prompt: 'Please inspect', sortOrder: 0, enabled: true }],
+          starters: [{ starterId: 'str_1', assistantDefinitionId: 'asd_1', title: 'Inspect device', description: 'Start a safety inspection', prompt: 'Please inspect', sortOrder: 0, enabled: true, openingSnapshot: { format: 1, systemPrompt: '', initialContexts: [{ id: 'b2', title: 'Second', content: '{{literal}} <tag>' }, { id: 'b1', title: 'First', content: '' }] } }],
           diffSummary: { added: 0, changed: 0, removed: 0 },
         }
       }
@@ -857,6 +1079,9 @@ describe('ResourcesPage', () => {
     await sections.find(item => String(item.props('label')).startsWith('Starters ('))!.trigger('click')
     await flushPromises()
     expect(wrapper.get('[data-cy="preview-starter-description"]').text()).toContain('Start a safety inspection')
+    expect(wrapper.get('[data-cy="preview-starter-opening"]').attributes('open')).toBeUndefined()
+    expect(wrapper.get('[data-cy="preview-starter-system"]').text()).toBe('Empty system prompt')
+    expect(wrapper.findAll('[data-cy="preview-starter-context"]').map(item => item.text())).toEqual(['Second{{literal}} <tag>', 'First'])
     wrapper.unmount()
   })
 })

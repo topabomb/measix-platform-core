@@ -1,5 +1,5 @@
 // generate-client-fixtures projects the authored S0.2 profile through the real
-// compiler. Only the current unpublished protocol is supported.
+// compiler. Historical v4 fixtures are regenerated only with the explicit v4 profile.
 package main
 
 import (
@@ -52,7 +52,7 @@ func main() {
 	device := "dev_550e8400-e29b-41d4-a716-446655440000"
 	session := "ses_550e8400-e29b-41d4-a716-446655440000"
 	at := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
-	snapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: content, PublishedAt: at, PublishedByUserID: user})
+	snapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: content, PublishedAt: at, PublishedByUserID: user})
 	must(err)
 	write("snapshot-v4.json", snapshot)
 	var dashScopeImageContent adminapi.ManagedDraftContent
@@ -66,7 +66,7 @@ func main() {
 	dashScopeImage.AllowedSizes = []string{"1024x1024"}
 	dashScopeImageID := dashScopeImage.ImageId
 	dashScopeImageContent.Policy.DefaultImageGenerationId = &dashScopeImageID
-	dashScopeImageSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: dashScopeImageContent, PublishedAt: at, PublishedByUserID: user})
+	dashScopeImageSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: dashScopeImageContent, PublishedAt: at, PublishedByUserID: user})
 	must(err)
 	write("snapshot-v4-dashscope-image.json", dashScopeImageSnapshot)
 	emptyImages := []adminapi.ImageGenerationDefinition{}
@@ -76,7 +76,7 @@ func main() {
 		Assistants: []adminapi.ManagedAssistantDefinition{}, Starters: []adminapi.AssistantStarterDefinition{}, Bindings: []adminapi.RuntimeBindingDefinition{},
 		Policy: adminapi.ManagedPolicy{PolicyId: "pol_550e8400-e29b-41d4-a716-446655440000", AllowLocalProviders: true, AllowLocalMcp: true, AllowLocalAssistants: true},
 	}
-	policySnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 2, Content: policyOnly, PublishedAt: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)})
+	policySnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 2, Content: policyOnly, PublishedAt: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)})
 	must(err)
 	writeTo(filepath.Join(root, "snapshot"), "v4-user-configuration-policy.json", policySnapshot)
 	denied := content
@@ -85,12 +85,19 @@ func main() {
 	denied.Policy.AllowLocalAsr = false
 	denied.Policy.AllowLocalMcp = false
 	denied.Policy.AllowLocalAssistants = false
-	deniedSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_660e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 43, Content: denied, PublishedAt: at, PublishedByUserID: user})
+	deniedSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: deployment, ReleaseID: "rel_660e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 43, Content: denied, PublishedAt: at, PublishedByUserID: user})
 	must(err)
 	write("snapshot-v4-denied.json", deniedSnapshot)
 	// Reference validity is a semantic check, separate from JSON shape. These
 	// public projection recipes intentionally have no private runtime bindings.
-	references := []object{{"name": "complete-references", "expectedCode": "", "content": content}}
+	v5Raw, err := os.ReadFile(filepath.Join(root, "draft", "starter-v5-profile.json"))
+	must(err)
+	var v5Content adminapi.ManagedDraftContent
+	must(json.Unmarshal(v5Raw, &v5Content))
+	v5Snapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440005", ManagedGeneration: 44, Content: v5Content, PublishedAt: at, PublishedByUserID: user})
+	must(err)
+	write("snapshot-v5.json", v5Snapshot)
+	references := []object{{"name": "complete-references", "expectedCode": "", "content": v5Content}}
 	mutations := []struct {
 		name, code string
 		change     func(object)
@@ -134,7 +141,7 @@ func main() {
 		{"default-disabled-assistant", "invalid_default_assistant", func(v object) { v["assistants"].([]any)[0].(map[string]any)["enabled"] = false }},
 	}
 	for _, mutation := range mutations {
-		value := clone(content)
+		value := clone(v5Content)
 		mutation.change(value)
 		references = append(references, object{"name": mutation.name, "expectedCode": mutation.code, "content": value})
 	}
@@ -143,18 +150,19 @@ func main() {
 	add := func(name, schema string, valid bool, value any) {
 		cases = append(cases, wireCase{name, schema, valid, value})
 	}
-	add("v4-full", "ManagedSnapshot", true, snapshot)
-	add("v4-dashscope-image", "ManagedSnapshot", true, dashScopeImageSnapshot)
+	add("v5-full", "ManagedSnapshot", true, v5Snapshot)
+	add("v4-full", "ManagedSnapshotV4", true, snapshot)
+	add("v4-dashscope-image", "ManagedSnapshotV4", true, dashScopeImageSnapshot)
 	var responsesContent adminapi.ManagedDraftContent
 	must(json.Unmarshal(raw, &responsesContent))
 	responsesContent.Providers[0].ClientProtocol = adminapi.ProviderDefinitionClientProtocolOPENAIRESPONSES
 	for i := range responsesContent.Models {
 		responsesContent.Models[i].RuntimePath = "/v1/responses"
 	}
-	responsesSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: responsesContent, PublishedAt: at, PublishedByUserID: user})
+	responsesSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: responsesContent, PublishedAt: at, PublishedByUserID: user})
 	must(err)
 	write("snapshot-v4-responses.json", responsesSnapshot)
-	add("v4-responses", "ManagedSnapshot", true, responsesSnapshot)
+	add("v4-responses", "ManagedSnapshotV4", true, responsesSnapshot)
 	for _, profile := range []struct{ name, protocol, path string }{
 		{"gemini", "GOOGLE_GENERATE_CONTENT", "/v1beta/models/gemini-test:streamGenerateContent"},
 		{"claude", "ANTHROPIC_MESSAGES", "/v1/messages"},
@@ -168,10 +176,10 @@ func main() {
 				nativeContent.Models[i].UpstreamModelKey = "gemini-test"
 			}
 		}
-		nativeSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: nativeContent, PublishedAt: at, PublishedByUserID: user})
+		nativeSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: nativeContent, PublishedAt: at, PublishedByUserID: user})
 		must(err)
 		write("snapshot-v4-"+profile.name+".json", nativeSnapshot)
-		add("v4-"+profile.name, "ManagedSnapshot", true, nativeSnapshot)
+		add("v4-"+profile.name, "ManagedSnapshotV4", true, nativeSnapshot)
 	}
 	// Compile every Android speech profile, including an enterprise-owned
 	// device voice while user-created local TTS remains forbidden.
@@ -186,10 +194,10 @@ func main() {
 	]`), &speechContent.Tts))
 	speechContent.Policy.DefaultTtsId = &speechContent.Tts[4].TtsId
 	speechContent.Policy.AllowLocalTts = false
-	speechSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: speechContent, PublishedAt: at, PublishedByUserID: user})
+	speechSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: speechContent, PublishedAt: at, PublishedByUserID: user})
 	must(err)
 	write("snapshot-v4-speech.json", speechSnapshot)
-	add("v4-speech", "ManagedSnapshot", true, speechSnapshot)
+	add("v4-speech", "ManagedSnapshotV4", true, speechSnapshot)
 	var asrContent adminapi.ManagedDraftContent
 	must(json.Unmarshal(raw, &asrContent))
 	must(json.Unmarshal([]byte(`[
@@ -199,11 +207,11 @@ func main() {
 		{"asrId":"asr_33333333-3333-4333-8333-333333333333","displayName":"DashScope realtime","clientProtocol":"DASHSCOPE_REALTIME_ASR","enabled":true,"upstreamModelKey":"qwen3-asr-flash-realtime","runtimePath":"/api-ws/v1/realtime","sampleRate":16000,"vadThreshold":0,"silenceDurationMs":400}
 	]`), &asrContent.Asr))
 	asrContent.Policy.DefaultAsrId = &asrContent.Asr[1].AsrId
-	asrSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: asrContent, PublishedAt: at, PublishedByUserID: user})
+	asrSnapshot, _, err := capability.NewService(nil).CompileSnapshot(capability.SnapshotInput{SchemaVersion: 4, DeploymentID: deployment, ReleaseID: "rel_550e8400-e29b-41d4-a716-446655440000", ManagedGeneration: 42, Content: asrContent, PublishedAt: at, PublishedByUserID: user})
 	must(err)
 	write("snapshot-v4-asr.json", asrSnapshot)
-	add("v4-asr", "ManagedSnapshot", true, asrSnapshot)
-	add("v4-policy-denied", "ManagedSnapshot", true, deniedSnapshot)
+	add("v4-asr", "ManagedSnapshotV4", true, asrSnapshot)
+	add("v4-policy-denied", "ManagedSnapshotV4", true, deniedSnapshot)
 	for _, flag := range []string{"allowLocalProviders", "allowLocalTts", "allowLocalAsr", "allowLocalMcp", "allowLocalAssistants"} {
 		for _, mutation := range []string{"missing", "null", "string"} {
 			value := clone(snapshot)
@@ -216,26 +224,26 @@ func main() {
 			case "string":
 				policy[flag] = "true"
 			}
-			add("v4-policy-"+flag+"-"+mutation, "ManagedSnapshot", false, value)
+			add("v4-policy-"+flag+"-"+mutation, "ManagedSnapshotV4", false, value)
 		}
 	}
 	for _, field := range []string{"assistants", "starters"} {
 		value := clone(snapshot)
 		delete(value, field)
-		add("v4-missing-"+field, "ManagedSnapshot", false, value)
+		add("v4-missing-"+field, "ManagedSnapshotV4", false, value)
 	}
 	value := clone(snapshot)
-	value["schemaVersion"] = 5
-	add("gateway-version-not-s02", "ManagedSnapshot", false, value)
+	value["schemaVersion"] = 6
+	add("unknown-snapshot-version", "ManagedSnapshotV4", false, value)
 	value = clone(snapshot)
 	value["models"].([]any)[0].(map[string]any)["credential"] = "forbidden-synthetic-secret"
-	add("v4-secret-leak", "ManagedSnapshot", false, value)
+	add("v4-secret-leak", "ManagedSnapshotV4", false, value)
 	for _, field := range []string{"upstreamUrl", "runtimeRouteId", "resolvedCredential"} {
 		value := clone(snapshot)
 		value["models"].([]any)[0].(map[string]any)[field] = "forbidden-synthetic-internal-value"
-		add("v4-internal-"+field, "ManagedSnapshot", false, value)
+		add("v4-internal-"+field, "ManagedSnapshotV4", false, value)
 	}
-	discovery := object{"product": "MEASIX_AGENT_PLATFORM", "protocolVersion": "1", "deploymentId": deployment, "deploymentName": "S0.2 Integration", "clientApiBase": "/api/client/v1", "runtimeApiBase": "/runtime/v1", "supportedSnapshotSchemaVersions": []int{4}}
+	discovery := object{"product": "MEASIX_AGENT_PLATFORM", "protocolVersion": "1", "deploymentId": deployment, "deploymentName": "S0.2 Integration", "clientApiBase": "/api/client/v1", "runtimeApiBase": "/runtime/v1", "supportedSnapshotSchemaVersions": capability.SupportedSnapshotSchemaVersions()}
 	enrollmentRequest := object{"code": "synthetic-single-use-code", "installationId": "ins_550e8400-e29b-41d4-a716-446655440000", "deviceName": "Android contract fixture", "appVersion": "0.0.20", "platform": "ANDROID"}
 	enrollment := object{"deploymentId": deployment, "userId": user, "deviceId": device, "sessionId": session, "accessToken": "synthetic.access.token", "accessTokenExpiresAt": at.Add(15 * time.Minute).Format(time.RFC3339), "refreshToken": "synthetic-refresh-token", "refreshExpiresAt": at.Add(7 * 24 * time.Hour).Format(time.RFC3339), "sessionIdleExpiresAt": at.Add(7 * 24 * time.Hour).Format(time.RFC3339)}
 	ready := object{"runtimeStatus": "READY", "activeManagedGeneration": 42, "managedStateRevision": 77, "syncRequired": false, "runtimeBlocked": false}
@@ -243,7 +251,7 @@ func main() {
 	syncRequired := object{"runtimeStatus": "READY", "activeManagedGeneration": 43, "targetManagedGeneration": 43, "managedStateRevision": 78, "syncRequired": true, "runtimeBlocked": true}
 	bootstrapState := clone(ready)
 	bootstrapState["syncRequired"], bootstrapState["runtimeBlocked"], bootstrapState["targetManagedGeneration"] = true, true, 42
-	bootstrap := object{"deployment": object{"deploymentId": deployment, "name": "S0.2 Integration"}, "user": object{"userId": user, "displayName": "Contract User"}, "device": object{"deviceId": device, "status": "ACTIVE"}, "session": object{"sessionId": session, "expiresAt": enrollment["sessionIdleExpiresAt"], "sessionIdleExpiresAt": enrollment["sessionIdleExpiresAt"]}, "supportedSnapshotSchemaVersions": []int{4}, "managedState": bootstrapState}
+	bootstrap := object{"deployment": object{"deploymentId": deployment, "name": "S0.2 Integration"}, "user": object{"userId": user, "displayName": "Contract User"}, "device": object{"deviceId": device, "status": "ACTIVE"}, "session": object{"sessionId": session, "expiresAt": enrollment["sessionIdleExpiresAt"], "sessionIdleExpiresAt": enrollment["sessionIdleExpiresAt"]}, "supportedSnapshotSchemaVersions": capability.SupportedSnapshotSchemaVersions(), "managedState": bootstrapState}
 	refresh := object{"accessToken": "synthetic.rotated.access", "accessTokenExpiresAt": at.Add(time.Hour + 15*time.Minute).Format(time.RFC3339), "refreshToken": "synthetic-rotated-refresh", "refreshExpiresAt": at.Add(time.Hour + 7*24*time.Hour).Format(time.RFC3339), "sessionIdleExpiresAt": at.Add(time.Hour + 7*24*time.Hour).Format(time.RFC3339)}
 	for _, entry := range []struct {
 		name, schema string

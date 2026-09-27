@@ -773,7 +773,7 @@ export interface components {
         ManagedSnapshot: {
             deploymentId: components["schemas"]["DeploymentId"];
             /** @enum {integer} */
-            schemaVersion: 4;
+            schemaVersion: 5;
             managedGeneration: number;
             releaseId: components["schemas"]["ReleaseId"];
             snapshotHash: components["schemas"]["Sha256Hash"];
@@ -793,6 +793,29 @@ export interface components {
             assistants: components["schemas"]["ManagedAssistantDefinition"][];
             starters: components["schemas"]["AssistantStarterDefinition"][];
         };
+        ManagedSnapshotV4: {
+            deploymentId: components["schemas"]["DeploymentId"];
+            /** @enum {integer} */
+            schemaVersion: 4;
+            managedGeneration: number;
+            releaseId: components["schemas"]["ReleaseId"];
+            snapshotHash: components["schemas"]["Sha256Hash"];
+            providers: components["schemas"]["ProviderDefinition"][];
+            models: components["schemas"]["ModelDefinition"][];
+            /** @description Additive Snapshot v4 field; omission means an empty list. */
+            imageGenerators?: components["schemas"]["ImageGenerationDefinition"][];
+            tts: components["schemas"]["TtsDefinition"][];
+            asr: components["schemas"]["AsrDefinition"][];
+            mcp: components["schemas"]["McpDefinition"][];
+            policy: components["schemas"]["ManagedPolicy"];
+            metadata: {
+                /** Format: date-time */
+                publishedAt: string;
+                publishedByUserId?: components["schemas"]["UserId"];
+            };
+            assistants: components["schemas"]["ManagedAssistantDefinition"][];
+            starters: components["schemas"]["AssistantStarterDefinitionV4"][];
+        };
         ManagedAssistantDefinition: {
             assistantDefinitionId: components["schemas"]["AssistantDefinitionId"];
             displayName: string;
@@ -811,6 +834,29 @@ export interface components {
             description?: string;
             sortOrder: number;
             enabled: boolean;
+            openingSnapshot: components["schemas"]["StarterOpeningSnapshot"];
+        };
+        AssistantStarterDefinitionV4: {
+            starterId: components["schemas"]["StarterId"];
+            assistantDefinitionId: components["schemas"]["AssistantDefinitionId"];
+            title: string;
+            prompt: string;
+            description?: string;
+            sortOrder: number;
+            enabled: boolean;
+        };
+        StarterOpeningSnapshot: {
+            /** @enum {integer} */
+            format: 1;
+            /** @description Frozen effective System resolved at publication. Consume verbatim, including empty text; never inherit or append the current assistant System on the client. */
+            systemPrompt: string;
+            /** @description Ordered context blocks; IDs must be unique within this opening. */
+            initialContexts: components["schemas"]["StarterInitialContext"][];
+        };
+        StarterInitialContext: {
+            id: string;
+            title: string;
+            content: string;
         };
         /** @enum {string} */
         EnterpriseUpdateCategory: "ANNOUNCEMENT" | "MAINTENANCE" | "NOTICE";
@@ -1330,7 +1376,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ManagedSnapshot"];
+                    "application/json": components["schemas"]["ManagedSnapshot"] | components["schemas"]["ManagedSnapshotV4"];
                 };
             };
             /** @description Not Modified */

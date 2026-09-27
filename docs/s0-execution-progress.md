@@ -30,4 +30,8 @@ Core 提供 Hub/Relay、Admin、同源 Portal 分发、Managed Release/Snapshot�
 
 ## 后续阶段边界
 
-S0.3 的 Enterprise Tool Gateway、Snapshot v5、Gateway Control API、Catalog 与三 daemon 监管仍是后续工作。S0.4 的完整 Gateway/Android profile 及最终 S0 Exit 不由本次 S0.2 Preview 封版声明。S0.2 固定的现有功能可继续作为后续阶段回归基线。
+S0.3 的 Enterprise Tool Gateway、Snapshot v6、Gateway Control API、Catalog 与三 daemon 监管仍是后续工作。S0.4 的完整 Gateway/Android profile 及最终 S0 Exit 不由本次 S0.2 Preview 封版声明。S0.2 固定的现有功能可继续作为后续阶段回归基线。
+
+## 当前 Starter 源码增量
+
+本地源码在上述固定发布之后增加 Snapshot v5 Starter 开场编制，保全已发布 v4。方案、兼容和本次实际验证统一见 [Starter 开场快照](starter-opening-snapshots.md)。此增量未部署生产，不改变 preview.22 的固定身份与历史记录；Gateway 为后续 v6。

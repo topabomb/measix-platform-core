@@ -20,6 +20,9 @@ func TestSnapshotPreservesSeedOrderAndCanonicalStarterIDs(t *testing.T) {
 	if content.Starters[0].StarterId < content.Starters[1].StarterId {
 		content.Starters[0].StarterId, content.Starters[1].StarterId = content.Starters[1].StarterId, content.Starters[0].StarterId
 	}
+	for i := range content.Starters {
+		content.Starters[i].OpeningSnapshot = testOpening()
+	}
 	input := capability.SnapshotInput{DeploymentID: platformid.New(platformid.Deployment), ReleaseID: platformid.New(platformid.Release), ManagedGeneration: 1, PublishedAt: time.Now(), Content: content}
 	s := capability.NewService(nil)
 	snapshot, hash, err := s.CompileSnapshot(input)

@@ -12,7 +12,8 @@
         "protocolVersion": "1",
         "runtimeApiBase": "/runtime/v1",
         "supportedSnapshotSchemaVersions": [
-          4
+          4,
+          5
         ]
       },
       "status": 200
@@ -75,7 +76,8 @@
           "sessionIdleExpiresAt": "2026-09-19T00:00:00Z"
         },
         "supportedSnapshotSchemaVersions": [
-          4
+          4,
+          5
         ],
         "user": {
           "displayName": "Contract User",

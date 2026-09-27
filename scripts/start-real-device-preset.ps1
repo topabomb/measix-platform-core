@@ -81,7 +81,7 @@ try {
     Push-Location $backendRoot
     try {
         & go run ./cmd/devmigrate --db $dbPath
-        if ($LASTEXITCODE -ne 0) { throw "Current database initialization failed. If the error reports a non-current schema or checksum, this environment's database predates the current schema: run 'npm run device:real:reset' to delete and recreate only .data/device-real." }
+        if ($LASTEXITCODE -ne 0) { throw "Database migration failed; startup stopped. Preserve $dbPath and its SQLite sidecar files. Inspect the migration error above and docs/database-migrations.md; verify a backup before repairing migration history or using a compatible binary. Do not reset existing data to resolve a schema or checksum mismatch." }
         & go run ./cmd/control-hub bootstrap-admin --if-empty --db $dbPath --master-key-file $masterKeyPath --jwt-private-key-file $jwtKeyPath --deployment-name 'MEASIX Device Demo' --username admin --display-name 'Device Demo Admin' --password-file $passwordPath
         if ($LASTEXITCODE -ne 0) { throw 'Admin bootstrap failed.' }
         & go build -o $binaryPath ./cmd/device-demo

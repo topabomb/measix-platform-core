@@ -47,7 +47,7 @@ A semantic wire/state/ID/security change requires architecture authority first. 
 OpenAPI → fixtures → generated artifacts → tests → implementation
 ```
 
-MEASIX has never been released. Only the current protocol and database schema are supported. Remove obsolete prototypes, migration/adoption paths and historical compatibility tests; obsolete development databases/configuration can be deleted and recreated. Preserve current-version initialization, integrity and recovery checks. Android is outside this repository's ownership.
+Support the protocol versions explicitly defined by architecture: current Starter Snapshot v5 and retained published v4. Preserve durable drafts, immutable release bytes/hashes and append-only SQL migration history; never delete or recreate existing data as an upgrade strategy. Remove unsupported prototypes, not supported-version recovery or compatibility tests. Android changes belong to its own repository and require consumer verification.
 
 ## Frontend dependencies
 

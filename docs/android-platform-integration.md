@@ -1,6 +1,6 @@
 # Android 平台协议消费说明
 
-本说明面向 Android 维护方，描述 S0.2 `preview.22` 固定组合的 Core 协议消费边界。Discovery protocolVersion="1"、Snapshot v4、Portal Bridge v3 与独立的 Enrollment formatVersion=1 是当前唯一组合；旧原型没有兼容或转换义务。封版身份和真机证据入口见 Core `docs/s0-execution-progress.md`。
+本说明面向 Android 维护方，描述当前源码的协议消费边界。Discovery protocolVersion="1"、Snapshot v4/v5、Portal Bridge v3 与 Enrollment formatVersion=1 是当前支持组合；新草稿发布 v5，保全已发布 v4。历史封版身份见 `docs/s0-execution-progress.md`，当前 Starter 实施及验证见 Core 源仓库的 `docs/starter-opening-snapshots.md`，两者不能混作同一部署证据。
 
 ## 权威与资料入口
 
@@ -24,7 +24,7 @@
 
 ### 企业与个人空间的关系
 
-当前 v4 平台执行不依赖后续 Gateway 或 Snapshot v5。Hub/Relay 没有以 S0.4 Freeze 为条件的 Runtime 开关；后续阶段的正式验收仍执行各自的门禁。
+当前 v4/v5 平台执行不依赖后续 Gateway（预留 Snapshot v6）。Hub/Relay 没有以 S0.4 Freeze 为条件的 Runtime 开关；后续阶段的正式验收仍执行各自的门禁。
 
 企业域复用 Android 现有聊天、流式输出、推理展示、工具循环、图片理解、图片生成、朗读、录音转写、助手、对话和本域记忆 owner。平台改变资源来源、认证、准入和归属，不应另造一个删减的聊天或媒体运行器。图片理解须同时满足模型资源声明 IMAGE、上游模型支持和原生编码；图片生成使用独立 `img_*` 资源和现有 `ImageGenerationCoordinator` / `GeneratedMediaStore`，不伪装为聊天 Model。平台不提供 Embedding 资源，也不提供云端对话/附件同步。个人原配置和数据不被企业配置覆盖。
 
@@ -64,11 +64,12 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | MCP.mcpServerId/displayName/enabled/authOwnership | EnterpriseMcpResource.id/name/enabled；适配层保留 MCP_STREAMABLE_HTTP、runtimePath 和实际 authOwnership（ENTERPRISE_MANAGED 或 NONE）；均使用 Relay，无 OAuth/上游凭据下发 |
 | Assistant.assistantDefinitionId/displayName/description/modelId/systemPrompt/mcpServerIds/enabled | EnterpriseAssistant 对应字段；缺省 description 可展示为空字符串；引用的 modelId 是平台稳定 ID，不是请求模型名 |
 | Assistant.memorySeed[] | 按作者顺序转换为只读 Seed。内部 ID 从 deploymentId、助手 ID、generation、索引确定；空数组有效，条目不得为空白。不按内容去重、不建立可变 Assistant Memory 副本，配置替换时整体换代 |
-| Starter.starterId/assistantDefinitionId/title/prompt/description/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击只进入原生输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
+| Starter.starterId/assistantDefinitionId/title/prompt/description/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击预填输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
+| Starter.openingSnapshot（v5 required；v4 不允许） | 消费 Core 编译后已固化的 System 与有序背景；Core Draft 的空白继承在编译时完成，Android 不从当前助手重新补空值。v5 选择时绑定 Draft，首发原子保存来源与背景；背景按字面处理，领域 System 沿 Android 既有 START 模板规则渲染。额外内容默认折叠、详情按需展开；v4 仍只预填。Core 编制与历史发布边界见 Core 源仓库 `docs/starter-opening-snapshots.md` |
 | policy 五项 allowLocal* | EnterprisePolicy 五项必填 Boolean；缺失/null/错误类型均拒绝。只控制本企业域内用户原配置准入，不复制用户定义、端点和密钥 |
 | defaultModelId/defaultFastModelId/defaultTitleModelId/defaultAttachmentInspectionModelId/defaultSuggestionModelId/defaultCompressModelId | 分别映射 defaults.chatModelId/fastModelId/titleModelId/attachmentInspectionModelId/suggestionModelId/compressModelId。六项都可省略且互不推导，非空引用必须指向已启用模型；附件检查默认还必须支持 IMAGE 输入 |
 | defaultImageGenerationId/defaultTtsId/defaultAsrId/defaultAssistantId | 分别映射 defaults.imageGenerationModelId/ttsId/asrId/assistantId；显式无效引用不回退首项。没有用户已选助手时采用 defaultAssistantId；用户已选助手失效时呈现选择与修复入口，不静默改选默认助手。未提供的默认值保持未指定，由既有本域选择规则处理 |
-| allowAsSubAssistant/allowedSubAssistantIds、gateways | v4 不下发企业子助手关系或 Gateway；平台适配输出 false/空集合。用户自有子助手仍按现有五项准入和执行权限处理，不扩展 wire |
+| allowAsSubAssistant/allowedSubAssistantIds、gateways | v4/v5 不下发企业子助手关系或 Gateway；平台适配输出 false/空集合。用户自有子助手仍按现有五项准入和执行权限处理，不扩展 wire |
 
 ## 认证、同步与恢复时序
 

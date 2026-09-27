@@ -2393,6 +2393,45 @@ components:
           minimum: 0
         enabled:
           type: boolean
+        openingSnapshot:
+          $ref: '#/components/schemas/StarterOpeningSnapshot'
+    StarterOpeningSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+      - format
+      - systemPrompt
+      - initialContexts
+      properties:
+        format:
+          type: integer
+          enum: [1]
+        systemPrompt:
+          type: string
+          description: Draft System override. Empty or whitespace-only inherits the referenced assistant System at preview/publication; a nonblank override is preserved verbatim. Preview returns the resolved literal. Published snapshots never re-resolve inheritance.
+        initialContexts:
+          type: array
+          x-uniqueProperty: id
+          description: Ordered context blocks; IDs must be unique within this opening.
+          items:
+            $ref: '#/components/schemas/StarterInitialContext'
+    StarterInitialContext:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - title
+      - content
+      properties:
+        id:
+          type: string
+          minLength: 1
+          pattern: '\S'
+        title:
+          type: string
+          description: May remain blank in a draft; validation requires a nonblank title before publication.
+        content:
+          type: string
     AdminUserSummary:
       type: object
       additionalProperties: false

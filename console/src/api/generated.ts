@@ -1039,6 +1039,21 @@ export interface components {
             description?: string;
             sortOrder: number;
             enabled: boolean;
+            openingSnapshot?: components["schemas"]["StarterOpeningSnapshot"];
+        };
+        StarterOpeningSnapshot: {
+            /** @enum {integer} */
+            format: 1;
+            /** @description Draft System override. Empty or whitespace-only inherits the referenced assistant System at preview/publication; a nonblank override is preserved verbatim. Preview returns the resolved literal. Published snapshots never re-resolve inheritance. */
+            systemPrompt: string;
+            /** @description Ordered context blocks; IDs must be unique within this opening. */
+            initialContexts: components["schemas"]["StarterInitialContext"][];
+        };
+        StarterInitialContext: {
+            id: string;
+            /** @description May remain blank in a draft; validation requires a nonblank title before publication. */
+            title: string;
+            content: string;
         };
         AdminUserSummary: {
             userId: components["schemas"]["UserId"];

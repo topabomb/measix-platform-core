@@ -6,7 +6,7 @@ This document defines how implementation candidates are composed and proven repr
 
 A candidate is a fixed, reproducible composition of source commits, generated contracts, builds and test evidence — never an implicit moving branch head.
 
-For the S0.2 internal Preview, `node scripts/build-preview-release.mjs <version>` is the production artifact owner. It requires clean pinned Core, Portal, architecture and Android worktrees, verifies the `S0.2/v4-preview` protocol baseline and regenerated artifacts, builds Admin/Portal assets, cross-compiles static Linux ARM64 binaries with a non-`dev` build identity, and emits `release.json` plus `SHA256SUMS`. When the active Android worktree contains unrelated local work, set `MEASIX_RELEASE_ANDROID_ROOT` to a clean detached worktree at the exact Android commit being recorded; the builder still rejects a dirty override. The target runbook is [S0.2 Preview deployment](s02-preview-deployment.md). This package is a Preview delivery vehicle, not proof of later S0.3/S0.4/final gates.
+For the S0.2 internal Preview, `node scripts/build-preview-release.mjs <version>` is the production artifact owner. It requires clean pinned Core, Portal, architecture and Android worktrees, verifies the `S0.2/v5-starter-preview` protocol baseline and regenerated artifacts, builds Admin/Portal assets, cross-compiles static Linux ARM64 binaries with a non-`dev` build identity, and emits `release.json` plus `SHA256SUMS`. When the active Android worktree contains unrelated local work, set `MEASIX_RELEASE_ANDROID_ROOT` to a clean detached worktree at the exact Android commit being recorded; the builder still rejects a dirty override. The target runbook is [S0.2 Preview deployment](s02-preview-deployment.md). This package is a Preview delivery vehicle, not proof of later S0.3/S0.4/final gates.
 
 ### S0.2 sealed Preview composition
 
@@ -22,7 +22,7 @@ S0.2 Realm/Experience Freeze Candidate
   → Snapshot v4 and product foundation with five user-configuration policy flags
 
 S0.3 Gateway Freeze Candidate
-  → Snapshot v5 + three-daemon Gateway server closure
+  → Snapshot v6 + three-daemon Gateway server closure
 
 S0.4 Android Integration Candidate
   → real Android full managed runtime profile
@@ -96,7 +96,7 @@ This CAP manifest compiler verifies the resource baseline of current Snapshot v4
 
 The S0.2 Preview composition above is fixed; its ERX results and consumer evidence must be traceable to that exact composition. S0.3 and S0.4 each pin their own architecture/core/consumer/build/contract/scenario identities and consume the applicable earlier baseline; an earlier manifest cannot prove a later candidate.
 
-S0.3 specifically requires a real `enterprise-tool-gateway` production binary/build identity, Gateway Control OpenAPI/hash, Snapshot v5 and canonical surface/catalog fixtures, real Hub/Gateway/Relay + downstream MCP + Test Client traffic, production Admin browser evidence, and executable production supervision/graceful lifecycle/structured-log collection/redaction evidence. The current repository does not yet provide these artifacts. Only the current internal Preview protocol is supported per Control Protocol §10.10.1; there is no historical Snapshot compatibility requirement.
+S0.3 specifically requires a real `enterprise-tool-gateway` production binary/build identity, Gateway Control OpenAPI/hash, Snapshot v6 and canonical surface/catalog fixtures, real Hub/Gateway/Relay + downstream MCP + Test Client traffic, production Admin browser evidence, and executable production supervision/graceful lifecycle/structured-log collection/redaction evidence. The current repository does not yet provide these artifacts. Current supported v4/v5 data preservation follows Control Protocol §10.10.1; future Gateway requires its own candidate and evidence.
 
 S0.4 adds pinned real Android implementation/device evidence against the S0.3 baseline. Exact composition fields remain owned by architecture Testing Specs and executable harness schemas.
 

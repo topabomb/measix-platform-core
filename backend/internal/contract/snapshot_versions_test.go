@@ -19,7 +19,7 @@ func TestSnapshotWireVersionRequirements(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	schema := doc.Components.Schemas["ManagedSnapshot"].Value
+	schema := doc.Components.Schemas["ManagedSnapshotV4"].Value
 	t.Run("compiler empty experience", func(t *testing.T) {
 		draft := decodeFixture[adminapi.Draft](t, "draft/minimal.json", true)
 		allow := false
@@ -41,7 +41,7 @@ func TestSnapshotWireVersionRequirements(t *testing.T) {
 		if err := json.Unmarshal(raw, &value); err != nil {
 			t.Fatal(err)
 		}
-		if err := schema.VisitJSON(value); err != nil {
+		if err := doc.Components.Schemas["ManagedSnapshot"].Value.VisitJSON(value); err != nil {
 			t.Fatal(err)
 		}
 	})

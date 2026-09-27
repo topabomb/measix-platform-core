@@ -27,7 +27,7 @@ func TestCurrentPolicyDefaultsAndCompiler(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if snapshot.SchemaVersion != 4 || snapshot.Policy.AllowLocalAssistants != allow {
+		if snapshot.SchemaVersion != 5 || snapshot.Policy.AllowLocalAssistants != allow {
 			t.Fatal("current policy not preserved")
 		}
 	}

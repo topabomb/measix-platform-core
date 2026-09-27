@@ -10,7 +10,8 @@ import { existsSync } from 'node:fs'
 import http from 'node:http'
 import { readFileSync, statSync } from 'node:fs'
 
-const { spaPort, spaDir, adapterPort, hubPort, relayPort } = workerData
+const { spaPort, spaDir, adapterPort, hubPort, relayPort, captureStarterRequests = false } = workerData
+let starterCapture = null
 
 // --- MIME types ---
 const MIME_TYPES = {
@@ -48,6 +49,14 @@ const adapterServer = http.createServer((req, res) => {
 
     const path = url.pathname
     if (path === '/v1/chat/completions') {
+      if (captureStarterRequests && starterCapture && Array.isArray(bodyJSON?.messages)) {
+        const userTexts = bodyJSON.messages.filter(message => message.role === 'user').flatMap(message =>
+          typeof message.content === 'string' ? [message.content] : Array.isArray(message.content) ? message.content.filter(part => typeof part.text === 'string').map(part => part.text) : [])
+        if (userTexts.some(text => text === starterCapture.prompt || text.endsWith('\n' + starterCapture.prompt))) {
+          if (starterCapture.requests.length >= 16) starterCapture.overflow = true
+          else starterCapture.requests.push({ model: bodyJSON.model, messages: bodyJSON.messages.map(message => ({ role: message.role, content: message.content })) })
+        }
+      }
       const streaming = bodyJSON?.stream === true
       if (streaming) {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
@@ -218,6 +227,14 @@ await Promise.all([once(adapterServer, 'listening'), once(spaServer, 'listening'
 parentPort.postMessage({ ready: true })
 
 parentPort.on('message', (msg) => {
+  if (captureStarterRequests && msg.starterCapture === 'start') {
+    starterCapture = { prompt: msg.prompt, requests: [], overflow: false }
+    parentPort.postMessage({ starterCaptureId: msg.id, started: true })
+  }
+  if (captureStarterRequests && msg.starterCapture === 'stop') {
+    parentPort.postMessage({ starterCaptureId: msg.id, requests: starterCapture?.requests ?? [], overflow: starterCapture?.overflow ?? false })
+    starterCapture = null
+  }
   if (msg.shutdown) {
     adapterServer.close()
     spaServer.close()

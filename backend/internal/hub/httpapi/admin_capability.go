@@ -32,7 +32,7 @@ func (h *fullAdminHandler) PutDraft(w http.ResponseWriter, r *http.Request, para
 	}
 	var request adminapi.PutDraftRequest
 	if err := decodeStrictJSON(r, &request); err != nil {
-		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
+		writeProblem(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 	view, err := h.services.Capability.PutDraft(r.Context(), admin.UserID, request.ExpectedDraftRevision, request.Content)
@@ -82,6 +82,10 @@ func (h *fullAdminHandler) PreviewDraft(w http.ResponseWriter, r *http.Request, 
 	preview, err := h.services.Capability.PreviewDraft(r.Context(), request.ExpectedDraftRevision)
 	if errors.Is(err, capability.ErrRevisionConflict) {
 		writeProblem(w, http.StatusConflict, "stale_draft_revision", "Draft revision conflict")
+		return
+	}
+	if errors.Is(err, capability.ErrSnapshotTooLarge) {
+		writeProblem(w, http.StatusUnprocessableEntity, "snapshot_too_large", err.Error())
 		return
 	}
 	if errors.Is(err, capability.ErrInvalidDraft) {
@@ -259,6 +263,8 @@ func writeRuntimeControlError(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusConflict, "activation_in_progress", "Activation in progress")
 	case errors.Is(err, capability.ErrRevisionConflict):
 		writeProblem(w, http.StatusConflict, "stale_draft_revision", "Draft revision conflict")
+	case errors.Is(err, capability.ErrSnapshotTooLarge):
+		writeProblem(w, http.StatusUnprocessableEntity, "snapshot_too_large", err.Error())
 	case errors.Is(err, capability.ErrInvalidDraft):
 		writeProblem(w, http.StatusUnprocessableEntity, "invalid_draft", "Invalid draft")
 	default:

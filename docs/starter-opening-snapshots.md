@@ -37,7 +37,7 @@ Starter 是管理员编排的任务起点，不是已执行过的对话。它包
 - 尚未实施的 Gateway 不能继续占用 v5；架构将其预留为 v6，当前不声明或提供。
 - HTTP API v1、Portal Bridge v3、接入资料 formatVersion=1 不因此变化。SQLite schema 和 Android manifest 版本也不跟随 Snapshot 版本递增。
 
-没有按请求协商降级 Snapshot 的新 header。目标 generation 的版本属于该不可变发布：旧客户端面对 v5 应明确提示版本不支持，不能由服务器删字段伪造同 hash 的 v4。
+没有按请求协商降级 Snapshot 的新 header。目标 generation 的版本属于该不可变发布：旧客户端面对 v5 应明确提示版本不支持，不能由服务器删字段伪造同 hash 的 v4。新草稿发布没有 Starter 时也使用 v5；“服务端保留 v4 发布”不表示“只支持 v4 的旧 Android 能消费新草稿发布”。
 
 ### 3.2 四种存量状态
 
@@ -284,3 +284,30 @@ Core lane 可连接本地确定性 adapter，也可连接 `device:real` 的实�
 `golden-path-authoring.spec.ts` 在既有真实 Hub/Relay/production SPA 流程中增加 320/390/768/1280px 五个详情分区及入口卡片的几何断言。新增断言先在原构建失败，修复后整套 `node scripts/e2e-harness.mjs` 通过，包含保存/刷新、继承恢复、错误定位、Preview/Review、发布和真实确定性调用链。组件测试 33 文件、211 项通过；typecheck、e2e:typecheck、production build 通过。此为浏览器布局/功能验证，不代表过期供应商密钥恢复可用。
 
 本地证据为 `.artifacts/assistant-responsive-red.log`、`assistant-responsive-green.log`、`assistant-responsive-unit.log`、`assistant-responsive-typecheck.log`、`assistant-responsive-e2e-typecheck.log`、`assistant-responsive-build.log`；实操截图保存在 `.artifacts/assistant-responsive/`。失败日志保留，未放宽断言或加入自动重试。
+
+### 10.8 旧 Android 对新 Core 发布的服务端兼容边界复验
+
+2026-09-27 针对研究文档创建前的 Android `29ecc109335c536c6f2b60841e3d4aace35b0dd3`，审查 Core `2daa739d336c2f03cf631dae00bb9fbebf8a06eb`。这里区分 Core 程序升级与管理员发布配置；Android 版本名 `0.0.20` 不能识别具体协议实现，验收必须固定提交和 APK。以下是当前 Core 的 HTTP/SQLite/Relay 实测边界，不能单独代替旧 APK 验收。
+
+| 服务端状态 | 对只支持 v4 的旧客户端意味着什么 | 已执行的服务端证据 |
+| --- | --- | --- |
+| 新 Core 继续提供既有 v4 发布 | 接入/下载仍提供原版本，generation 与客户端相同时允许进入 ready | enrollment 旧字段及 `appVersion=0.0.20` 返回 201；v4 Applied 返回 204；Managed State 不阻断 |
+| 重新发布历史 v4 | 新 release/generation 仍为 v4，需正常同步后继续 | `TestHistoricalRepublishPreservesSchemaAndSourceBytes`、`TestRepublishV4WithoutStartersRemainsV4` |
+| 从草稿发布 v5，包含 Starter | 返回真实 v5；不针对旧 appVersion 删除 opening 或改成 v4 | 新矩阵中的 `new-v5-with-starters`；compiler、download body/hash/ETag 一致 |
+| 从草稿发布 v5，没有 Starter | 同样返回 v5；空 Starter 不构成降级条件 | 新矩阵中的 `new-v5-without-starters` |
+| 已应用 v4 的客户端遇到新的 v5 generation | 新下载不替它上报 Applied；原上报保留，设备显示 PENDING；旧 generation 的新企业运行请求被阻断 | 新矩阵断言 session 原 generation/hash 保留、Managed State runtimeBlocked；Relay 实测旧 generation 返回 428 `managed_snapshot_required`，上游调用数为 0 |
+| 新发布后读取历史 v4 | 原 bytes/hash/ETag 不变，持有正确 ETag 时为 304；这不授权继续用旧 generation 运行 | 新矩阵及 `TestClientIntegrationPendingSnapshotAndLogout`；后者同时验证退出后 ETag 不能绕过撤权 |
+
+Discovery/Bootstrap 固定声明 `[4,5]`，版本交集只证明服务端能保存和提供这些发布格式。Enrollment 的 appVersion 用于设备记录，不选择发布或修改 Snapshot。当前所有用户面对同一个 active generation；不存在按设备保留旧 generation 的运行通道。
+
+本次新增 `TestOldClientReleaseVersionAndAppliedBoundary`，通过真实身份、SQLite 与 HTTP handler 覆盖三种后续发布。它只编排测试发布记录；发布/激活/历史重新发布分别由同轮 `runtimecontrol` 测试覆盖。没有编写简化的“旧 Android 解码器”冒充原客户端，也没有改动产品协议、持久化或部署状态。
+
+执行 `go test -p 1 ./internal/hub/httpapi ./internal/hub/capability ./internal/hub/runtimecontrol ./internal/relay -count=1 -json`：四包通过，224 个顶层测试通过，无失败或跳过。原始报告为 `.artifacts/old-android-compat/core-integration.jsonl`，环境 Go 1.26.4 / Windows amd64。对应新矩阵的三个子场景均通过。此结果不包含旧 APK 的实际 UI、缓存落盘、历史会话或真实模型供应商验收；这些消费端结果应与 Android 的精确构建和设备记录一起判断。
+
+消费端随后完成实际旧 APK 验证：从 Android `29ecc1093` 构建未修改生产代码的 Debug APK，SHA-256 为 `7b294d52501ab6c3580f95cb82129fbb4b2f5f70ed36af55f350642c5aba52f5`，专用 API 36 模拟器通过真实 HTTP 连接隔离 `device-demo`。旧 Core `1b70fcb` 正式发布 v4 后，同库迁移到当前 Core，随后分别实际发布含 Starter/不含 Starter 的 v5，并实际 Republish 历史 v4；没有手改 Snapshot 版本或生产数据库。
+
+最终 11 个设备场景均满足预期：v4 接入/重开及历史 v4 恢复成功；两种 v5 的已有绑定同步/重开、新接入/重开均被旧 APK 明确拒绝。含 Starter 的 v5 首先触发旧严格字段校验 `unknown_platform_field`；无 Starter 的 v5 触发 `invalid_platform_ManagedSnapshot_schemaVersion`。已有 v4 的 Applied/config 保留，但执行准入被拒；直接接入 v5 无 Applied，停在 CONFIGURATION_PENDING。实际旧 UI 点击缓存 Starter 可预填，发送显示 `Message generation failed / unknown_platform_field`，不能将缓存仍可见当成运行兼容。恢复历史 v4 后原 session 不变，无需清数据或重复接入，READY、Starter 和执行准入恢复。
+
+设备证据位于 `.artifacts/compat-old-android-20260927/`；11 场景使用同一最终旧 APK/测试 APK，无自动重试。真实发布为原始 v4 generation 1、v5 generation 2（3 个 Starter）/3（无 Starter）；最终矩阵从重新发布的 v4 generation 5 开始，经过 v5 generation 6/7/8，恢复到 v4 generation 9。Android 研究文档第 14.9 节及 `tools/compatibility/` 保存精确探针、构建身份、场景和边界。外部供应商调用、OEM 真机及历史签名 Release/R8 不计入本次验收。
+
+操作结论：继续使用旧 Android 时应保留/重新发布历史 v4；新草稿发布前先升级客户端。所有用户共享 active release，历史 Republish 需要评估全平台资源/策略退回影响。当前产品不提供按客户端能力自动降级或独立旧代际；不得通过删除 opening 或改写已发布 hash 来冒充兼容。

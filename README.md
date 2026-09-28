@@ -29,4 +29,4 @@ Product semantics, stage scope, stable IDs, cross-component behavior and require
 - `docs/usage-budget.md` — protocol metering and user-budget implementation
 - `docs/pricing-cost.md` — pricing and cost calculation
 - `docs/real-device-preset.md` — local LAN real-supplier preset for Android device validation
-- `docs/remote-workspace-integration-plan.md` — planned optional Agent Space integration, live configuration, managed MCP, file management/previews and upgrade compatibility
+- `docs/remote-workspace-integration-plan.md` — planned integration using existing Agent Space APIs, managed MCP, WebDAV file management/previews and administrator-provided DAV connection details

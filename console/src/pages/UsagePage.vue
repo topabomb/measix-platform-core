@@ -14,7 +14,7 @@ import ProblemBanner from '../components/ProblemBanner.vue'
 import UsageRequestList from '../components/UsageRequestList.vue'
 import PricingPanel from './PricingPanel.vue'
 import UsageReconciliationPanel from '../components/UsageReconciliationPanel.vue'
-import PagedEntityPicker, { type EntityPickerOption } from '../components/PagedEntityPicker.vue'
+import PagedEntityPicker from '../components/PagedEntityPicker.vue'
 import CursorPager from '../components/CursorPager.vue'
 import { fetchUpstreamPickerPage, fetchUserPickerPage, resolveUpstreamPickerOption, resolveUserPickerOption } from '../api/entityPickerSources'
 import { useCursorPager } from '../composables/useCursorPager'
@@ -39,20 +39,28 @@ let summarySequence = 0
 // whole history. The window is always explicit and starts at the last 24 hours.
 const fromISO = ref<string>()
 const toISO = ref<string>()
-const allTime = ref(false)
+const rangeError = computed(() => {
+  const from = Date.parse(fromISO.value ?? '')
+  const to = Date.parse(toISO.value ?? '')
+  return !Number.isFinite(from) || !Number.isFinite(to) || to <= from || to - from > 92 * 86400000
+})
+function parseLocal(value: string): string | undefined {
+  const time = Date.parse(value)
+  return Number.isFinite(time) ? new Date(time).toISOString() : undefined
+}
 
 function localDateTime(value: string | undefined): string {
-  if (!value) return ''
+  if (!value || !Number.isFinite(Date.parse(value))) return ''
   const date = new Date(value)
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 }
 const fromLocal = computed({
   get: () => localDateTime(fromISO.value),
-  set: (value: string) => { fromISO.value = value ? new Date(value).toISOString() : undefined },
+  set: (value: string) => { fromISO.value = parseLocal(value) },
 })
 const toLocal = computed({
   get: () => localDateTime(toISO.value),
-  set: (value: string) => { toISO.value = value ? new Date(value).toISOString() : undefined },
+  set: (value: string) => { toISO.value = parseLocal(value) },
 })
 
 const userId = ref<string>()
@@ -84,49 +92,23 @@ const {
   return { ...page, items: (page.items ?? []).filter(item => item.budget?.items) }
 })
 
-const selectedUserOption = ref<EntityPickerOption>()
-const selectedUpstreamOption = ref<EntityPickerOption>()
 const advancedFiltersOpen = ref(false)
+const customRangeOpen = ref(false)
+const rangeLabel = ref('usage.range24h')
 const advancedFilterCount = computed(() => [
   resourceId.value,
   resourceKind.value,
   status.value,
   completeness.value,
   clientProtocol.value,
-  budgetStatus.value,
 ].filter(Boolean).length)
 
-const activeFilters = computed(() => {
-  const parts: string[] = []
-  if (allTime.value) parts.push($t('usage.rangeAll'))
-  else {
-    if (fromISO.value) parts.push(`${$t('usage.filters.startTime')} ${new Date(fromISO.value).toLocaleString()}`)
-    if (toISO.value) parts.push(`${$t('usage.filters.endTime')} ${new Date(toISO.value).toLocaleString()}`)
-  }
-  if (userId.value) {
-    parts.push(`${$t('usage.filters.user')} ${selectedUserOption.value?.label ?? userId.value}`)
-  }
-  if (resourceId.value) parts.push(`${$t('usage.filters.resource')} ${resourceId.value}`)
-  if (resourceKind.value) parts.push(`${$t('usage.filters.resourceKind')} ${resourceKind.value}`)
-  if (upstreamId.value) parts.push(`${$t('usage.filters.upstream')} ${selectedUpstreamOption.value?.label ?? upstreamId.value}`)
-  if (status.value) parts.push(`${$t('status.' + status.value)}`)
-  if (completeness.value) parts.push(`${$t('usage.filters.completeness')} ${$t('status.' + completeness.value)}`)
-  if (clientProtocol.value) parts.push(`${$t('usage.filters.protocol')} ${clientProtocol.value}`)
-  if (budgetStatus.value) parts.push(`${$t('usage.filters.budgetStatus')} ${$t('budgets.status.' + budgetStatus.value)}`)
-  return parts
-})
-
 function applyRange(days: number) {
+  rangeLabel.value = days === 90 ? 'usage.range90d' : days === 7 ? 'usage.range7d' : days === 30 ? 'usage.range30d' : 'usage.range24h'
+  customRangeOpen.value = false
   const now = new Date()
-  allTime.value = false
   fromISO.value = new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
   toISO.value = now.toISOString()
-}
-
-function applyAllTime() {
-  allTime.value = true
-  fromISO.value = undefined
-  toISO.value = undefined
 }
 
 function resetFilters() {
@@ -159,12 +141,12 @@ const filterQuery = computed(() => {
 
 async function refresh() {
   const sequence = ++summarySequence
+  if (rangeError.value) { loading.value = false; return }
   loading.value = true
   error.value = undefined
   try {
     const encoded = filterQuery.value.replace(/^&/, '')
     const userQuery = new URLSearchParams(encoded)
-    userQuery.delete('userId')
     userQuery.set('limit', '25')
     if (budgetStatus.value) userQuery.set('budgetStatus', budgetStatus.value)
     usageUsersPath.value = `/api/admin/v1/usage/users?${userQuery.toString()}`
@@ -206,7 +188,7 @@ watch(textFilters, () => {
   if (textTimer) clearTimeout(textTimer)
   textTimer = setTimeout(() => { if (activeTab.value === 'summary') void refresh() }, 300)
 })
-watch([fromISO, toISO, userId, resourceKind, status, completeness, clientProtocol, budgetStatus, pageSize, allTime], () => {
+watch([fromISO, toISO, userId, resourceKind, status, completeness, clientProtocol, budgetStatus, pageSize], () => {
   if (activeTab.value === 'summary') void refresh()
 })
 watch(activeTab, tab => { if (tab === 'summary') void refresh() })
@@ -221,6 +203,11 @@ watch([filterQuery, budgetStatus, pageSize, activeTab], () => {
   if (activeTab.value !== 'summary') query.tab = activeTab.value
   void router.replace({ query }).catch(() => {})
 })
+
+function compactMeters(items: MeterQuantity[]): string {
+  return items.filter(item => ['TOTAL_TOKENS', 'CHARACTERS', 'AUDIO_SECONDS', 'REQUESTED_IMAGES'].includes(item.meter))
+    .map(item => `${meterLabel(item.meter)} ${item.confidence === 'UNKNOWN' ? '—' : meterValue(item)}${item.confidence === 'EXACT' ? '' : ` (${$t(`status.${item.confidence}`)})`}`).join(' · ')
+}
 
 const semanticMeters = computed(() => summary.value?.semanticMeters ?? [])
 const hasStaleData = computed(() => Boolean(error.value && summary.value))
@@ -280,7 +267,7 @@ const costLabel = computed(() => {
   if (cost.status === 'KNOWN' || cost.status === 'PARTIAL') {
     return costAmounts(cost)
   }
-  return $t('common.unknown').toLowerCase()
+  return '—'
 })
 
 const costStatus = computed(() => summary.value?.cost.status ?? 'UNKNOWN')
@@ -319,6 +306,7 @@ onMounted(async () => {
   if (typeof initial.from === 'string' && typeof initial.to === 'string') {
     fromISO.value = initial.from
     toISO.value = initial.to
+    rangeLabel.value = 'usage.analytics.customRange'
   } else {
     applyRange(1)
   }
@@ -350,14 +338,13 @@ onBeforeUnmount(() => {
 
     <template v-else>
       <div class="usage-filters usage-filters--primary q-mb-xs">
-        <q-input v-model="fromLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.startTime')" :disable="allTime" />
-        <q-input v-model="toLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.endTime')" :disable="allTime" />
-        <q-btn-dropdown dense outline no-caps class="usage-filters__cell-btn" :label="$t('usage.filters.quickRange')" :no-icon-animation="true">
+        <q-btn-dropdown dense outline no-caps class="usage-filters__cell-btn" :label="$t(rangeLabel)" :no-icon-animation="true">
           <q-list>
             <q-item clickable v-close-popup @click="applyRange(1)"><q-item-section>{{ $t('usage.range24h') }}</q-item-section></q-item>
             <q-item clickable v-close-popup @click="applyRange(7)"><q-item-section>{{ $t('usage.range7d') }}</q-item-section></q-item>
             <q-item clickable v-close-popup @click="applyRange(30)"><q-item-section>{{ $t('usage.range30d') }}</q-item-section></q-item>
-            <q-item clickable v-close-popup @click="applyAllTime"><q-item-section>{{ $t('usage.rangeAll') }}</q-item-section></q-item>
+            <q-item clickable v-close-popup @click="applyRange(90)"><q-item-section>{{ $t('usage.range90d') }}</q-item-section></q-item>
+            <q-item clickable v-close-popup @click="customRangeOpen = !customRangeOpen; rangeLabel = 'usage.analytics.customRange'"><q-item-section>{{ $t('usage.analytics.customRange') }}</q-item-section></q-item>
           </q-list>
         </q-btn-dropdown>
         <!-- The user picker filters like the others; it is not a companion of
@@ -370,7 +357,6 @@ onBeforeUnmount(() => {
           :fetch-page="fetchUserPickerPage"
           :resolve-option="resolveUserPickerOption"
           data-cy="usage-user-filter"
-          @selected="selectedUserOption = $event"
         />
         <PagedEntityPicker
           v-model="upstreamId"
@@ -379,17 +365,23 @@ onBeforeUnmount(() => {
           :fetch-page="fetchUpstreamPickerPage"
           :resolve-option="resolveUpstreamPickerOption"
           data-cy="usage-upstream-filter"
-          @selected="selectedUpstreamOption = $event"
         />
         <q-btn outline dense no-caps align="left" class="usage-filters__cell-btn" icon="tune" :label="$t('usage.filters.more', { count: advancedFilterCount })" :aria-expanded="advancedFiltersOpen" data-cy="usage-more-filters" @click="advancedFiltersOpen = !advancedFiltersOpen" />
-        <q-btn flat dense align="left" class="usage-filters__cell-btn" icon="filter_alt_off" :label="$t('usage.filters.reset')" :disable="!activeFilters.length" @click="resetFilters" />
+
+      </div>
+      <div class="usage-scope text-caption text-grey-7">
+        <span>{{ `${fromISO ? new Date(fromISO).toLocaleString() : '—'} — ${toISO ? new Date(toISO).toLocaleString() : '—'}` }}</span>
+        <q-btn flat dense no-caps icon="filter_alt_off" :label="$t('usage.filters.reset')" @click="resetFilters" />
+      </div>
+      <div v-show="customRangeOpen" class="usage-filters q-mb-xs">
+        <q-input v-model="fromLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.startTime')" />
+        <q-input v-model="toLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.endTime')" />
       </div>
       <div v-show="advancedFiltersOpen" class="usage-filters usage-filters--advanced q-mb-xs" data-cy="usage-advanced-filters">
         <q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable />
         <q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable />
         <q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable />
         <q-select v-model="clientProtocol" outlined dense :label="$t('usage.filters.protocol')" :options="clientProtocols" clearable data-cy="usage-protocol-filter" />
-        <q-select v-model="budgetStatus" outlined dense :label="$t('usage.filters.budgetStatus')" :options="budgetStatuses.map(value => ({ label: $t('budgets.status.' + value), value }))" emit-value map-options clearable data-cy="usage-budget-status-filter" />
         <q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." />
       </div>
       <ProblemBanner :error="error" class="q-mb-xs" />
@@ -400,10 +392,11 @@ onBeforeUnmount(() => {
         {{ $t('usage.stale', { time: lastSuccessfulAt?.toLocaleString() ?? '—' }) }}
       </q-banner>
 
-      <template v-if="activeTab === 'summary'">
+      <q-banner v-if="rangeError" class="bg-orange-1 q-mb-xs" data-cy="usage-range-error">{{ $t('usage.analytics.rangeError') }}</q-banner>
+      <template v-else-if="activeTab === 'summary'">
       <LoadingState v-if="loading && !summary" />
-      <div v-else-if="summary" class="row q-col-gutter-xs q-mb-xs">
-        <div class="col-xs-12 col-sm-6 col-md-3">
+      <div v-else-if="summary" class="usage-metrics q-mb-xs">
+        <div>
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('usage.requests') }}</div>
@@ -412,16 +405,7 @@ onBeforeUnmount(() => {
             </q-card-section>
           </q-card>
         </div>
-        <div class="col-xs-12 col-sm-6 col-md-3">
-          <q-card flat bordered>
-            <q-card-section>
-              <div class="text-caption text-grey-7">{{ $t('usage.bytes') }}</div>
-              <div class="text-h6">{{ fmtBytes(summary.requestBytes) }}</div>
-              <div class="text-caption">{{ $t('usage.responseBytes') }} {{ fmtBytes(summary.responseBytes) }}</div>
-            </q-card-section>
-          </q-card>
-        </div>
-        <div class="col-xs-12 col-sm-6 col-md-3">
+        <div class="usage-metric">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('overview.costStatus') }}</div>
@@ -432,7 +416,7 @@ onBeforeUnmount(() => {
             </q-card-section>
           </q-card>
         </div>
-        <div class="col-xs-12 col-sm-6 col-md-3">
+        <div class="usage-metric">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('usage.blocked') }}</div>
@@ -441,7 +425,114 @@ onBeforeUnmount(() => {
             </q-card-section>
           </q-card>
         </div>
-        <div class="col-xs-12 col-sm-6 col-md-3">
+        <div class="usage-metric">
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="text-caption text-grey-7">{{ $t('overview.usageCompleteness') }}</div>
+              <div class="row q-gutter-xs items-center" data-cy="request-completeness">
+                <q-chip dense color="green" text-color="white">{{ summary.requestCompleteness.exact }} {{ $t('status.EXACT').toLowerCase() }}</q-chip>
+                <q-chip dense color="amber" text-color="white">{{ summary.requestCompleteness.partial }} {{ $t('status.PARTIAL').toLowerCase() }}</q-chip>
+                <q-chip dense color="grey" text-color="white">{{ summary.requestCompleteness.unknown }} {{ $t('status.UNKNOWN').toLowerCase() }}</q-chip>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+      </div>
+
+      <div v-if="summary" class="usage-analysis q-mb-xs" data-cy="usage-analysis">
+        <q-card flat bordered class="usage-analysis__card usage-analysis__users">
+          <q-card-section class="q-pb-xs">
+            <div class="text-subtitle2">{{ $t('usage.users.title') }}</div>
+            <div class="text-caption text-grey-7">{{ $t('usage.analytics.usersHint') }}</div>
+            <q-select v-model="budgetStatus" class="q-mt-xs" outlined dense :label="$t('usage.filters.budgetStatus')" :options="budgetStatuses.map(value => ({ label: $t('budgets.status.' + value), value }))" emit-value map-options clearable data-cy="usage-budget-status-filter" />
+            <div v-if="userId" class="row q-gutter-xs q-mt-xs">
+              <q-btn outline dense no-caps :label="$t('usage.requests')" @click="activeTab = 'requests'" />
+              <q-btn flat dense no-caps :label="$t('usage.analytics.manageBudget')" :to="{ name: 'Users', query: { userId, section: 'budgets' } }" />
+              <q-btn flat dense no-caps :label="$t('usage.filters.anyUser')" @click="userId = undefined" />
+            </div>
+          </q-card-section>
+          <ProblemBanner :error="usageUsersError" class="card-inset q-mb-xs" />
+          <q-list v-if="usageUserItems.length" dense separator class="usage-analysis__list">
+            <q-item v-for="item in usageUserItems" :key="item.userId" clickable data-cy="usage-user-row" @click="userId = item.userId">
+              <q-item-section>
+                <q-item-label class="text-weight-medium">{{ item.userDisplayName }}</q-item-label>
+                <q-item-label caption>{{ $t('usage.users.requests', { count: item.requestCount }) }} · {{ $t('usage.analytics.httpErrors') }} {{ item.errorRequestCount ?? '—' }}</q-item-label>
+                <q-item-label class="text-primary">{{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost?.status ?? 'UNKNOWN') }}</q-item-label>
+                <q-item-label caption>{{ $t('usage.analytics.currentBudget') }}: {{ userBudgetStatus(item) }}</q-item-label>
+                <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
+                  {{ compactMeters(item.semanticMeters) }}
+                </q-item-label>
+              </q-item-section>
+              <q-item-section side><q-icon name="chevron_right" /></q-item-section>
+            </q-item>
+          </q-list>
+          <q-card-section v-else-if="!usageUsersLoading" class="text-grey-7">{{ $t('usage.users.empty') }}</q-card-section>
+          <CursorPager
+            :page="usageUsersPage"
+            :count="usageUserItems.length"
+            :has-next="Boolean(usageUsersNextCursor)"
+            :loading="usageUsersLoading"
+            @previous="previousUsageUsersPage"
+            @next="nextUsageUsersPage"
+          />
+        </q-card>
+        <q-card flat bordered class="usage-analysis__card">
+          <q-card-section class="q-pb-xs">
+            <div class="text-subtitle2">{{ $t('usage.trend.title') }}</div>
+            <div class="text-caption text-grey-7">{{ trend ? $t('usage.trend.timezone', { timezone: trend.timezone }) : $t('common.loading') }}</div>
+          </q-card-section>
+          <q-list v-if="trend?.points.length" dense separator class="usage-analysis__list">
+            <q-item v-for="point in [...trend.points].reverse()" :key="point.date">
+              <q-item-section>
+                <q-item-label>{{ new Date(`${point.date}T00:00:00`).toLocaleDateString() }}</q-item-label>
+                <q-item-label caption>{{ $t('usage.trend.requestsLine', { requests: point.requestCount, forwarded: point.forwardedRequestCount }) }}</q-item-label>
+                <div class="usage-bar" aria-hidden="true"><span :style="{ width: `${point.requestCount / Math.max(1, ...trend.points.map(p => p.requestCount)) * 100}%` }" /></div>
+                <q-item-label v-if="point.semanticMeters.length" caption class="text-break">
+                  {{ compactMeters(point.semanticMeters) }}
+                </q-item-label>
+                <q-item-label v-if="point.requestCount && point.cost" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(point.cost) }} · {{ costStatusLabel(point.cost.status) }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+          <q-card-section v-else class="text-grey-7">{{ $t('usage.trend.empty') }}</q-card-section>
+        </q-card>
+
+        <q-card flat bordered class="usage-analysis__card">
+          <q-card-section class="q-pb-xs">
+            <div class="text-subtitle2">{{ $t('usage.distribution.title') }}</div>
+            <div class="text-caption text-grey-7">{{ $t('usage.distribution.hint') }}</div>
+          </q-card-section>
+          <q-list v-if="distribution?.items.length" dense separator class="usage-analysis__list">
+            <q-item v-for="item in distribution.items" :key="`${item.resourceKind}:${item.clientProtocol}:${item.resourceId ?? ''}`" clickable data-cy="usage-resource-row" @click="resourceId = item.resourceId; resourceKind = item.resourceKind; clientProtocol = item.clientProtocol; activeTab = 'requests'">
+              <q-item-section>
+                <q-item-label>{{ item.resourceDisplayName || item.resourceId || $t(`usage.kind.${item.resourceKind}`) }}</q-item-label>
+                <q-item-label caption class="text-break">{{ $t(`usage.kind.${item.resourceKind}`) }} · {{ $t('usage.distribution.requests', { count: item.requestCount }) }}</q-item-label>
+                <details class="text-caption text-grey-7" @click.stop><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ item.clientProtocol }}<div v-for="meter in item.semanticMeters" :key="meter.meter">{{ meterLabel(meter.meter) }}: {{ meterValue(meter, false) }} · {{ $t(`status.${meter.confidence}`) }}</div></details>
+                <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
+                  {{ compactMeters(item.semanticMeters) }}
+                </q-item-label>
+                <q-item-label v-if="item.cost" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost.status) }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+          <q-card-section v-else class="text-grey-7">{{ $t('usage.distribution.empty') }}</q-card-section>
+        </q-card>
+
+
+      </div>
+
+      <details v-if="summary" class="usage-measurements q-mb-xs">
+        <summary>{{ $t('usage.analytics.meterDetails') }}</summary>
+        <div class="usage-metrics q-mt-xs">        <div class="usage-metric">
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="text-caption text-grey-7">{{ $t('usage.bytes') }}</div>
+              <div class="text-h6">{{ fmtBytes(summary.requestBytes) }}</div>
+              <div class="text-caption">{{ $t('usage.responseBytes') }} {{ fmtBytes(summary.responseBytes) }}</div>
+            </q-card-section>
+          </q-card>
+        </div>
+        <div class="usage-metric">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('usage.semanticMeters') }}</div>
@@ -457,90 +548,8 @@ onBeforeUnmount(() => {
             </q-card-section>
           </q-card>
         </div>
-        <div class="col-xs-12 col-sm-6 col-md-3">
-          <q-card flat bordered>
-            <q-card-section>
-              <div class="text-caption text-grey-7">{{ $t('overview.usageCompleteness') }}</div>
-              <div class="row q-gutter-xs items-center" data-cy="request-completeness">
-                <q-chip dense color="green" text-color="white">{{ summary.requestCompleteness.exact }} {{ $t('status.EXACT').toLowerCase() }}</q-chip>
-                <q-chip dense color="amber" text-color="white">{{ summary.requestCompleteness.partial }} {{ $t('status.PARTIAL').toLowerCase() }}</q-chip>
-                <q-chip dense color="grey" text-color="white">{{ summary.requestCompleteness.unknown }} {{ $t('status.UNKNOWN').toLowerCase() }}</q-chip>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-      </div>
-
-      <div v-if="summary" class="usage-analysis q-mb-xs" data-cy="usage-analysis">
-        <q-card flat bordered class="usage-analysis__card">
-          <q-card-section class="q-pb-xs">
-            <div class="text-subtitle2">{{ $t('usage.trend.title') }}</div>
-            <div class="text-caption text-grey-7">{{ trend ? $t('usage.trend.timezone', { timezone: trend.timezone }) : $t('common.loading') }}</div>
-          </q-card-section>
-          <q-list v-if="trend?.points.length" dense separator class="usage-analysis__list">
-            <q-item v-for="point in trend.points" :key="point.date">
-              <q-item-section>
-                <q-item-label>{{ new Date(`${point.date}T00:00:00`).toLocaleDateString() }}</q-item-label>
-                <q-item-label caption>{{ $t('usage.trend.requestsLine', { requests: point.requestCount, forwarded: point.forwardedRequestCount }) }}</q-item-label>
-                <q-item-label v-if="point.semanticMeters.length" caption class="text-break">
-                  {{ point.semanticMeters.map(item => `${meterLabel(item.meter)} ${meterValue(item)}`).join(' · ') }}
-                </q-item-label>
-                <q-item-label v-if="point.cost" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(point.cost) }} · {{ costStatusLabel(point.cost.status) }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-          <q-card-section v-else class="text-grey-7">{{ $t('usage.trend.empty') }}</q-card-section>
-        </q-card>
-
-        <q-card flat bordered class="usage-analysis__card">
-          <q-card-section class="q-pb-xs">
-            <div class="text-subtitle2">{{ $t('usage.distribution.title') }}</div>
-            <div class="text-caption text-grey-7">{{ $t('usage.distribution.hint') }}</div>
-          </q-card-section>
-          <q-list v-if="distribution?.items.length" dense separator class="usage-analysis__list">
-            <q-item v-for="item in distribution.items" :key="`${item.resourceKind}:${item.clientProtocol}:${item.resourceId ?? ''}`">
-              <q-item-section>
-                <q-item-label>{{ item.resourceDisplayName || item.resourceId || $t(`usage.kind.${item.resourceKind}`) }}</q-item-label>
-                <q-item-label caption class="text-break">{{ item.clientProtocol }} · {{ $t('usage.distribution.requests', { count: item.requestCount }) }}</q-item-label>
-                <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
-                  {{ item.semanticMeters.map(meter => `${meterLabel(meter.meter)} ${meterValue(meter)}`).join(' · ') }}
-                </q-item-label>
-                <q-item-label v-if="item.cost" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost.status) }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-          <q-card-section v-else class="text-grey-7">{{ $t('usage.distribution.empty') }}</q-card-section>
-        </q-card>
-
-        <q-card flat bordered class="usage-analysis__card">
-          <q-card-section class="q-pb-xs">
-            <div class="text-subtitle2">{{ $t('usage.users.title') }}</div>
-            <div class="text-caption text-grey-7">{{ $t('usage.users.hint') }}</div>
-          </q-card-section>
-          <ProblemBanner :error="usageUsersError" class="card-inset q-mb-xs" />
-          <q-list v-if="usageUserItems.length" dense separator class="usage-analysis__list">
-            <q-item v-for="item in usageUserItems" :key="item.userId">
-              <q-item-section>
-                <q-item-label>{{ item.userDisplayName }}</q-item-label>
-                <q-item-label caption>{{ $t('usage.users.requests', { count: item.requestCount }) }} · {{ userBudgetStatus(item) }}</q-item-label>
-                <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
-                  {{ item.semanticMeters.map(meter => `${meterLabel(meter.meter)} ${meterValue(meter)}`).join(' · ') }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-          <q-card-section v-else-if="!usageUsersLoading" class="text-grey-7">{{ $t('usage.users.empty') }}</q-card-section>
-          <CursorPager
-            :page="usageUsersPage"
-            :count="usageUserItems.length"
-            :has-next="Boolean(usageUsersNextCursor)"
-            :loading="usageUsersLoading"
-            @previous="previousUsageUsersPage"
-            @next="nextUsageUsersPage"
-          />
-        </q-card>
-      </div>
-
+</div>
+      </details>
       </template>
 
       <UsageRequestList v-else ref="requestList" :query="filterQuery" :page-size="pageSize" allow-filter-resource @filter-resource="value => { resourceId = value }">
@@ -553,45 +562,28 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Equal filter cells: controls stretch to the cell, the grid wraps in whole
-   columns, and buttons match the 40px dense field height so the row reads as
-   one line of same-shaped controls. */
-.usage-filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 4px;
-  align-items: end;
-}
-
-.usage-filters__cell-btn {
-  width: 100%;
-  height: 40px;
-}
-
-.usage-analysis {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.usage-analysis__card {
-  min-width: 0;
-}
-
-.usage-analysis__list {
-  max-height: 22rem;
-  overflow-y: auto;
-}
-
-@media (max-width: 900px) {
-  .usage-analysis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 420px) {
-  .usage-filters {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.usage-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.usage-filters--advanced { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.usage-filters__cell-btn { width: 100%; min-height: 40px; }
+.usage-scope { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px; margin: 4px 0 8px; }
+.usage-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.usage-metrics > div, .usage-analysis__card { min-width: 0; }
+.usage-metrics .q-card { height: 100%; }
+.usage-metrics .text-h6 { font-size: 1.2rem; overflow-wrap: anywhere; }
+.usage-analysis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.usage-analysis__users { grid-column: 1 / -1; }
+.usage-analysis__users :deep(.q-list) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.usage-analysis__list { max-height: 28rem; overflow-y: auto; }
+.usage-measurements { padding: 12px; border: 1px solid #e1ddea; border-radius: 4px; background: white; }
+.usage-measurements summary { cursor: pointer; color: var(--q-primary); }
+.usage-measurements .usage-metrics { grid-template-columns: 1fr 2fr; }
+.usage-bar { background: #f1ecfa; height: 5px; margin-top: 8px; border-radius: 3px; }
+.usage-bar span { display: block; height: 100%; background: var(--q-primary); border-radius: inherit; }
+@media (max-width: 700px) {
+  .usage-filters, .usage-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .usage-analysis, .usage-measurements .usage-metrics { grid-template-columns: minmax(0, 1fr); }
+  .usage-analysis__users :deep(.q-list) { grid-template-columns: minmax(0, 1fr); }
+  .usage-filters--primary > :first-child { order: -2; }
+  .usage-filters--primary > :last-child { order: -1; }
 }
 </style>

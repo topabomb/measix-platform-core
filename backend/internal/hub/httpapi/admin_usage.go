@@ -93,7 +93,7 @@ func (h *fullAdminHandler) ListUsageUsers(w http.ResponseWriter, r *http.Request
 	if params.Cursor != nil {
 		cursor = *params.Cursor
 	}
-	filter, err := usageFilterFromParams(params.From, params.To, nil, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status), strPtr(params.ClientProtocol))
+	filter, err := usageFilterFromParams(params.From, params.To, params.UserId, params.ResourceId, strPtr(params.ResourceKind), params.UpstreamId, strPtr(params.Status), strPtr(params.ClientProtocol))
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "invalid_usage_filter", err.Error())
 		return
@@ -117,7 +117,10 @@ func (h *fullAdminHandler) ListUsageUsers(w http.ResponseWriter, r *http.Request
 			writeProblem(w, http.StatusInternalServerError, "internal_error", "Internal error")
 			return
 		}
+		cost := adminCostWire(item.Cost)
+		forwarded, failed := item.ForwardedRequestCount, item.ErrorRequestCount
 		items = append(items, adminapi.UserUsageView{
+			Cost: &cost, ForwardedRequestCount: &forwarded, ErrorRequestCount: &failed,
 			UserId: item.UserID, UserDisplayName: item.DisplayName, RequestCount: item.RequestCount,
 			SemanticMeters: adminMeterQuantities(item.Meters),
 			Budget:         adminBudgetView(item.UserID, h.services.Budget.Location.String(), item.Budget, item.UsageMeters, assignment),

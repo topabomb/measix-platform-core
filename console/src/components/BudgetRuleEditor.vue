@@ -71,7 +71,7 @@ function removeLimit(index: number) {
       <div v-for="(limit, index) in limits" :key="index" class="budget-rule">
         <q-select :model-value="limit.period" outlined dense emit-value map-options :label="$t('budgets.periodLabel')" :options="budgetPeriods.map(value => ({ value, label: $t(`budgets.period.${value}`) }))" @update:model-value="value => updateLimit(index, 'period', value)" />
         <q-select :model-value="limit.meter" outlined dense emit-value map-options :label="$t('budgets.meterLabel')" :options="metersForCapability(capability).map(value => ({ value, label: $t(`usage.meters.${value}`) }))" @update:model-value="value => updateLimit(index, 'meter', value as PricingMeter)" />
-        <q-input :model-value="limit.limit" outlined dense inputmode="text" :label="$t('budgets.limitLabel')" :hint="$t('budgets.limitHint')" :error="Boolean(limit.limit) && normalizeBudgetLimitInput(limit.limit) === undefined" @update:model-value="value => updateLimit(index, 'limit', String(value ?? ''))" @blur="normalizeLimit(index)" />
+        <q-input :model-value="limit.limit" outlined dense inputmode="text" :label="$t('budgets.limitLabel')" :hint="$t('budgets.limitHint')" hide-hint :error="Boolean(limit.limit) && normalizeBudgetLimitInput(limit.limit) === undefined" @update:model-value="value => updateLimit(index, 'limit', String(value ?? ''))" @blur="normalizeLimit(index)" />
         <q-btn flat dense round icon="delete" color="negative" :aria-label="$t('common.remove')" @click="removeLimit(index)" />
       </div>
       <q-btn flat dense no-caps icon="add" :label="$t('budgets.addLimit')" @click="addLimit" />
@@ -87,6 +87,8 @@ function removeLimit(index: number) {
   align-items: start;
 }
 @media (max-width: 700px) {
-  .budget-rule { grid-template-columns: minmax(0, 1fr); }
+  .budget-rule { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; padding: 8px 0; border-bottom: 1px solid #e1ddea; }
+  .budget-rule > :nth-child(2) { grid-column: 2 / 4; }
+  .budget-rule > :nth-child(3) { grid-column: 1 / 3; }
 }
 </style>

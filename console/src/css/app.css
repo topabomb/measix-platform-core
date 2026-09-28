@@ -11,17 +11,7 @@ body { background: #f5f4f8; color: #241d2e; }
 .admin-shell .q-card { border-color: #e1ddea; }
 .admin-shell .q-btn.bg-primary { background: linear-gradient(135deg, var(--q-primary), var(--orchelm-primary-dark)) !important; }
 
-/* Spacing policy — one gap unit.
-
-   Every margin/gutter between elements in the console uses Quasar's `xs`
-   token (4px): no sm/md/lg spacing classes remain in templates. Values below
-   are component internals (not element-to-element gaps) and are the compact
-   defaults every card, banner and dialog shares. */
-
-/* Page outer margin — replaces the per-page `padding` prop so all pages share
-   one value and no page overrides it locally. */
-.admin-page { padding: 4px; }
-
+/* Shared spacing and responsive sizing for management pages. */
 /* Compact card/banner internals. 12px horizontal is the inset that
    .card-inset aligns to for elements rendered directly inside a card. */
 .q-card > .q-card__section { padding: 8px 12px; }
@@ -51,3 +41,27 @@ body { background: #f5f4f8; color: #241d2e; }
   min-height: 0;
   overflow-y: auto;
 }
+
+.admin-page { padding: 12px; min-width: 0; }
+.admin-page .q-card, .admin-page .q-field { min-width: 0; }
+.admin-page details, .admin-page .text-break { overflow-wrap: anywhere; }
+.admin-page .q-item__section--main { min-width: 0; overflow-wrap: anywhere; }
+.admin-page .q-markup-table { max-width: 100%; }
+.admin-page .q-table td { white-space: normal; overflow-wrap: anywhere; }
+.admin-page .q-tabs { max-width: 100%; }
+.admin-page .q-tab { min-height: 44px; }
+.app-dialog .q-card__actions { flex-wrap: wrap; gap: 4px; }
+@media (max-width: 599px) {
+  .admin-page { padding: 8px; }
+  .admin-page .q-btn--dense { min-height: 36px; }
+  .admin-page .q-chip { max-width: 100%; }
+  .admin-page .q-chip__content { white-space: normal; overflow-wrap: anywhere; }
+  .admin-page .q-chip { height: auto; min-height: 24px; }
+  .admin-page .q-tab { padding: 0 10px; }
+  .admin-page .q-tab__label { font-size: 13px; }
+  .admin-page .q-table td { padding: 8px; }
+}
+
+/* Multi-line field help must reserve its actual height. */
+.admin-page .q-field--with-bottom { padding-bottom: 0; }
+.admin-page .q-field__bottom { position: relative; top: auto; bottom: auto; transform: none; min-height: 20px; }

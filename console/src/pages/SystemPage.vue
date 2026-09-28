@@ -33,6 +33,8 @@ const eventLevel = ref('')
 const eventPaused = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | undefined
 let pollInFlight = false
+let diagnosticsSequence = 0
+const diagnosticsLoading = ref(false)
 
 const noPublishedConfiguration = computed(() => !!status.value && !hasPublishedConfiguration(status.value))
 const converged = computed(() => isManagedRuntimeConverged(status.value))
@@ -63,18 +65,24 @@ async function refresh() {
 
 async function refreshDiagnostics(force = false) {
   if (document.hidden) return
+  const sequence = ++diagnosticsSequence
+  diagnosticsLoading.value = true
   diagnosticsError.value = undefined
   try {
     if (activeTab.value === 'metering') {
-      telemetry.value = await apiFetch<SystemTelemetry>(`/api/admin/v1/system/telemetry?window=${telemetryWindow.value}`)
+      const result = await apiFetch<SystemTelemetry>(`/api/admin/v1/system/telemetry?window=${telemetryWindow.value}`)
+      if (sequence === diagnosticsSequence) telemetry.value = result
     } else if (activeTab.value === 'events' && (!eventPaused.value || force)) {
       const query = new URLSearchParams({ limit: '100' })
       if (eventService.value !== 'ALL') query.set('service', eventService.value)
       if (eventLevel.value.trim()) query.set('level', eventLevel.value.trim())
-      events.value = await apiFetch<SystemEventPage>(`/api/admin/v1/system/events?${query}`)
+      const result = await apiFetch<SystemEventPage>(`/api/admin/v1/system/events?${query}`)
+      if (sequence === diagnosticsSequence) events.value = result
     }
   } catch (reason) {
-    diagnosticsError.value = reason
+    if (sequence === diagnosticsSequence) diagnosticsError.value = reason
+  } finally {
+    if (sequence === diagnosticsSequence) diagnosticsLoading.value = false
   }
 }
 
@@ -97,20 +105,25 @@ function requestPoints(process: ProcessTelemetry | undefined): string {
   return values.map((value, index) => `${(index / divisor) * 100},${28 - (value / max) * 24}`).join(' ')
 }
 
-watch([activeTab, telemetryWindow, eventService, eventLevel, eventPaused], () => refreshDiagnostics())
+watch([activeTab, telemetryWindow, eventService, eventLevel], () => {
+  telemetry.value = undefined
+  events.value = undefined
+  void refreshDiagnostics()
+})
+watch(eventPaused, () => refreshDiagnostics())
 onMounted(async () => {
   await refresh()
   await refreshDiagnostics()
   pollTimer = setInterval(() => { void pollVisible() }, 15_000)
 })
-onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
+onBeforeUnmount(() => { diagnosticsSequence++; if (pollTimer) clearInterval(pollTimer) })
 </script>
 
 <template>
   <q-page class="admin-page" data-cy="system-page">
     <PageHeader :title="$t('system.title')" :subtitle="$t('system.subtitle')">
       <template #actions>
-        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
+        <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="pollVisible" />
       </template>
     </PageHeader>
     <q-tabs v-model="activeTab" dense align="left" class="q-mb-xs">
@@ -130,6 +143,46 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
     </q-banner>
     <LoadingState v-if="loading && !status" />
     <template v-else-if="status">
+      <div v-show="activeTab === 'overview'" data-cy="system-health-summary" class="system-health-summary q-mb-xs">
+        <q-card flat bordered><q-card-section>
+          <div class="text-caption text-grey-7">{{ $t('overview.managedRuntime') }}</div>
+          <StatusChip :value="status.runtimeStatus" />
+          <div class="text-caption q-mt-xs">Relay · {{ status.relayReady ? $t('status.READY') : $t('status.NOT_READY') }}</div>
+        </q-card-section></q-card>
+        <q-card flat bordered><q-card-section>
+          <div class="text-caption text-grey-7">{{ $t('system.tabs.runtime') }}</div>
+          <StatusChip :value="converged ? 'CONVERGED' : 'NOT_CONVERGED'" />
+          <div><q-btn flat dense no-caps :label="$t('system.analytics.inspectDelivery')" @click="activeTab = 'runtime'" /></div>
+        </q-card-section></q-card>
+        <q-card flat bordered><q-card-section>
+          <div class="text-caption text-grey-7">{{ $t('system.spoolPending') }}</div>
+          <div class="text-h6" :class="status.spoolPendingCount ? 'text-warning' : ''">{{ status.spoolPendingCount ?? '—' }}</div>
+          <q-btn flat dense no-caps data-cy="open-metering" :label="$t('system.tabs.metering')" @click="activeTab = 'metering'" />
+        </q-card-section></q-card>
+        <q-card flat bordered><q-card-section>
+          <div class="text-caption text-grey-7">{{ $t('system.dbHealth') }}</div>
+          <div class="text-h6" :class="status.dbHealth === 'OK' ? 'text-positive' : 'text-negative'">{{ status.dbHealth }}</div>
+          <div class="text-caption">Hub · {{ health ? (health.ready ? $t('status.READY') : $t('status.NOT_READY')) : $t('common.unknown') }}</div>
+        </q-card-section></q-card>
+      </div>
+      <q-banner v-if="activeTab === 'overview' && (status.currentActivation || status.lastActivation?.state === 'FAILED')" class="bg-orange-1 q-mb-xs">
+        <div v-if="status.currentActivation">{{ $t('system.currentActivation') }} · {{ $t(`status.${status.currentActivation.state}`) }}</div>
+        <div v-if="status.lastActivation?.state === 'FAILED'">{{ $t('system.lastActivation') }} · {{ $t('status.FAILED') }}</div>
+        <q-btn flat dense :label="$t('system.analytics.inspectDelivery')" @click="activeTab = 'runtime'" />
+      </q-banner>
+      <q-card v-show="activeTab === 'overview'" flat bordered class="q-mb-xs">
+        <q-card-section>
+          <div class="text-subtitle2">{{ $t('system.semanticUnknown') }} · {{ status.semanticUnknownRequestCount ?? '—' }}</div>
+          <div class="text-caption text-grey-7">{{ $t('system.semanticUnknownHint') }}</div>
+          <div class="row q-gutter-xs q-mt-xs">
+            <q-btn outline dense no-caps :label="$t('usage.reconciliation.tab')" :to="{ name: 'Usage', query: { tab: 'reconciliation' } }" />
+            <q-btn flat dense no-caps :label="$t('nav.usage')" :to="{ name: 'Usage' }" />
+            <q-btn flat dense no-caps :label="$t('nav.upstreams')" :to="{ name: 'Upstreams' }" />
+          </div>
+        </q-card-section>
+      </q-card>
+      <details v-show="activeTab === 'overview'" class="system-deployment q-mb-xs">
+        <summary>{{ $t('system.analytics.deploymentDetails') }}</summary>
       <div v-show="activeTab === 'overview'" class="system-overview-grid q-mb-xs">
       <q-card flat bordered data-cy="platform-public-origin">
         <q-card-section>
@@ -187,10 +240,13 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
               <div class="text-caption q-mt-xs">{{ $t('overview.desiredRevision') }} {{ status.desiredControlRevision }} · {{ $t('overview.appliedRevision') }} {{ status.appliedControlRevision ?? '—' }}</div>
               <div class="text-caption">{{ $t('system.bundle').toLowerCase() }} {{ status.appliedBundleHash ? status.appliedBundleHash.slice(7, 19) : '—' }}</div>
               <div v-if="!converged" class="text-caption text-warning q-mt-xs">{{ $t('status.NOT_CONVERGED') }}</div>
-              <div class="text-caption text-grey-7 q-mt-xs">{{ $t('system.lastRelaySeen') }}: {{ status.lastRelaySeenAt ?? '—' }}</div>
+              <div class="text-caption text-grey-7 q-mt-xs">{{ $t('system.lastRelaySeen') }}: {{ status.lastRelaySeenAt ? new Date(status.lastRelaySeenAt).toLocaleString() : '—' }}</div>
             </q-card-section>
           </q-card>
         </div>
+      </div>
+      </details>
+      <div class="row q-col-gutter-xs q-mb-xs">
       <!-- Metering & spool state -->
         <div v-show="activeTab === 'metering'" class="col-12">
           <div class="row items-center q-gutter-xs q-mb-xs">
@@ -303,7 +359,8 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
             </q-item>
           </template>
         </q-virtual-scroll>
-        <q-card-section v-else class="text-grey-7">{{ $t('system.noEvents') }}</q-card-section>
+        <LoadingState v-else-if="diagnosticsLoading" />
+        <q-card-section v-else-if="events && !diagnosticsError" class="text-grey-7">{{ $t('system.noEvents') }}</q-card-section>
       </q-card>
     </div>
 
@@ -323,6 +380,12 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 </template>
 
 <style scoped>
+.system-health-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.system-health-summary > *, .system-overview-grid > * { min-width: 0; overflow-wrap: anywhere; }
+.system-deployment { border: 1px solid #e1ddea; background: white; border-radius: 4px; padding: 12px; }
+.system-deployment > summary { color: var(--q-primary); cursor: pointer; margin-bottom: 8px; }
+@media (max-width: 700px) { .system-health-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 .system-overview-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

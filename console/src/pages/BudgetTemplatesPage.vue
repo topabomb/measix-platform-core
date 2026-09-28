@@ -9,6 +9,7 @@ import { useSessionStore } from '../stores/session'
 import DetailWorkspace from '../components/DetailWorkspace.vue'
 import BudgetRuleEditor from '../components/BudgetRuleEditor.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
+import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import CursorPager from '../components/CursorPager.vue'
 import { useCursorPager } from '../composables/useCursorPager'
@@ -273,13 +274,9 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer) })
 
 <template>
   <div class="admin-page">
-    <div class="row items-center justify-between q-mb-xs">
-      <div>
-        <h1 class="text-h5 q-my-none">{{ $t('budgetTemplates.title') }}</h1>
-        <div class="text-caption text-grey-7">{{ $t('budgetTemplates.subtitle') }}</div>
-      </div>
-      <q-btn color="primary" icon="add" no-caps :label="$t('budgetTemplates.create')" @click="beginCreate" />
-    </div>
+    <PageHeader :title="$t('budgetTemplates.title')" :subtitle="$t('budgetTemplates.subtitle')">
+      <template #actions><q-btn color="primary" icon="add" no-caps :label="$t('budgetTemplates.create')" @click="beginCreate" /></template>
+    </PageHeader>
     <q-banner v-if="conflict" class="bg-orange-1 q-mb-xs" data-cy="budget-template-conflict">
       <div class="row items-center justify-between q-gutter-xs">
         <span>{{ $t('budgetTemplates.conflictReloaded') }}</span>

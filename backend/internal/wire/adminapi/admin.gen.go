@@ -3104,11 +3104,18 @@ type UserUsagePage struct {
 
 // UserUsageView defines model for UserUsageView.
 type UserUsageView struct {
-	Budget          UserBudgetView  `json:"budget"`
-	RequestCount    int             `json:"requestCount"`
-	SemanticMeters  []MeterQuantity `json:"semanticMeters"`
-	UserDisplayName string          `json:"userDisplayName"`
-	UserId          UserId          `json:"userId"`
+	Budget UserBudgetView `json:"budget"`
+
+	// Cost Current pricing-set estimate. Amounts in distinct currencies are never converted or added together.
+	Cost *CostAnalysis `json:"cost,omitempty"`
+
+	// ErrorRequestCount Forwarded requests with HTTP status at least 400, using the existing ERROR filter semantics.
+	ErrorRequestCount     *int            `json:"errorRequestCount,omitempty"`
+	ForwardedRequestCount *int            `json:"forwardedRequestCount,omitempty"`
+	RequestCount          int             `json:"requestCount"`
+	SemanticMeters        []MeterQuantity `json:"semanticMeters"`
+	UserDisplayName       string          `json:"userDisplayName"`
+	UserId                UserId          `json:"userId"`
 }
 
 // ValidateDraftRequest defines model for ValidateDraftRequest.
@@ -3447,6 +3454,7 @@ type ListUsageUsersParams struct {
 	Cursor         *string                           `form:"cursor,omitempty" json:"cursor,omitempty"`
 	From           *time.Time                        `form:"from,omitempty" json:"from,omitempty"`
 	To             *time.Time                        `form:"to,omitempty" json:"to,omitempty"`
+	UserId         *string                           `form:"userId,omitempty" json:"userId,omitempty"`
 	ResourceId     *string                           `form:"resourceId,omitempty" json:"resourceId,omitempty"`
 	ResourceKind   *ListUsageUsersParamsResourceKind `form:"resourceKind,omitempty" json:"resourceKind,omitempty"`
 	UpstreamId     *string                           `form:"upstreamId,omitempty" json:"upstreamId,omitempty"`
@@ -7055,6 +7063,19 @@ func (siw *ServerInterfaceWrapper) ListUsageUsers(w http.ResponseWriter, r *http
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "userId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
 		}
 		return
 	}

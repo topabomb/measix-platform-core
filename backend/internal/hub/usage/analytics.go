@@ -46,11 +46,14 @@ type Distribution struct {
 }
 
 type UserUsage struct {
-	UserID, DisplayName string
-	RequestCount        int
-	Meters              []MeterSummary
-	UsageMeters         CapabilityMeters
-	Budget              []budget.EffectiveState
+	Cost                  CostSummary
+	ForwardedRequestCount int
+	ErrorRequestCount     int
+	UserID, DisplayName   string
+	RequestCount          int
+	Meters                []MeterSummary
+	UsageMeters           CapabilityMeters
+	Budget                []budget.EffectiveState
 }
 
 type CapabilityMeters map[budget.Capability][]MeterSummary
@@ -401,12 +404,38 @@ func (s *Service) ListUsers(ctx context.Context, filter Filter, budgetService *b
 		return UserUsagePage{}, err
 	}
 	page := UserUsagePage{Items: []UserUsage{}}
+	byUser := make(map[string]*costAccumulator, len(userIDs))
+	forwarded, failed := make(map[string]int), make(map[string]int)
+	if len(userIDs) > 0 {
+		if err := s.analyzeCosts(ctx, filter, func(view RequestView, priced CostBreakdown) error {
+			if byUser[view.UserID] == nil {
+				byUser[view.UserID] = &costAccumulator{}
+			}
+			if view.Forwarded {
+				forwarded[view.UserID]++
+				if view.HTTPStatus >= 400 {
+					failed[view.UserID]++
+				}
+			}
+			return byUser[view.UserID].add(priced)
+		}, userIDs...); err != nil {
+			return UserUsagePage{}, err
+		}
+	}
 	for _, value := range visible {
 		meters := metersByUser[value.UserID]
 		if meters == nil {
 			meters = []MeterSummary{}
 		}
-		page.Items = append(page.Items, UserUsage{UserID: value.UserID, DisplayName: names[value.UserID], RequestCount: value.Count, Meters: meters, UsageMeters: usageMetersByUser[value.UserID], Budget: statesByUser[value.UserID]})
+		bucket := byUser[value.UserID]
+		if bucket == nil {
+			bucket = &costAccumulator{}
+		}
+		cost, err := bucket.summary()
+		if err != nil {
+			return UserUsagePage{}, err
+		}
+		page.Items = append(page.Items, UserUsage{UserID: value.UserID, DisplayName: names[value.UserID], RequestCount: value.Count, Meters: meters, UsageMeters: usageMetersByUser[value.UserID], Budget: statesByUser[value.UserID], Cost: cost, ForwardedRequestCount: forwarded[value.UserID], ErrorRequestCount: failed[value.UserID]})
 	}
 	if len(selected) > pageSize && len(visible) > 0 {
 		page.NextCursor = visible[len(visible)-1].UserID

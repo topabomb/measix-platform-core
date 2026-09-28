@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
       </q-card-section>
       <q-separator />
       <q-list separator>
-        <q-item v-for="item in updates" :key="item.enterpriseUpdateId" clickable @click="openDetail(item)">
+        <q-item class="update-list-row" v-for="item in updates" :key="item.enterpriseUpdateId" clickable @click="openDetail(item)">
           <q-item-section>
             <q-item-label>{{ item.title }}</q-item-label>
             <div data-cy="update-list-preview" class="markdown-body text-body2 text-grey-7" style="max-height: 3em; overflow: hidden;" v-html="renderContent(item.content, item.contentFormat)" />
@@ -382,6 +382,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+@media(max-width:599px) { .update-list-row { flex-wrap:wrap; gap:8px; } .update-list-row > .q-item__section--side { width:100%; padding-left:0; align-items:flex-start; } }
 .markdown-body :deep(h1) { font-size: 1.5rem; font-weight: 500; margin: 0.5em 0; }
 .markdown-body :deep(h2) { font-size: 1.25rem; font-weight: 500; margin: 0.5em 0; }
 .markdown-body :deep(h3) { font-size: 1.1rem; font-weight: 500; margin: 0.5em 0; }

@@ -736,7 +736,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <q-btn flat dense icon="add" :label="$t('resources.overview.addProvider')" size="sm" data-cy="add-provider-btn" @click="addProvider()" />
             </div>
             <q-list dense class="q-mt-xs">
-              <q-item v-for="provider in draft.localContent.providers" :key="provider.providerId" :data-resource-id="provider.providerId">
+              <q-item class="provider-editor-row" v-for="provider in draft.localContent.providers" :key="provider.providerId" :data-resource-id="provider.providerId">
                 <q-item-section>
                   <q-input v-model="provider.displayName" dense outlined :label="$t('users.displayName')" data-field="displayName" @update:model-value="draft.markDirty()" />
                   <q-select v-model="provider.clientProtocol" dense outlined class="q-mt-xs" :label="$t('resources.model.protocolLabel')" :hint="$t('resources.model.protocolHint')" :options="modelProtocols" emit-value map-options data-cy="provider-protocol" data-field="clientProtocol" @update:model-value="draft.markDirty()" />
@@ -859,7 +859,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <div class="col-12 col-md-8 resource-split__detail">
             <q-card v-if="selectedModel" flat bordered>
               <!-- Header: Identity -->
-              <q-card-section class="row items-start justify-between">
+              <q-card-section class="resource-editor-heading row items-start justify-between">
                 <q-btn class="resource-detail-back" flat dense no-caps icon="arrow_back" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
                 <div>
                   <div class="text-h6">{{ selectedModel.displayName }}</div>
@@ -972,7 +972,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <div class="col-12 col-md-8 resource-split__detail">
             <q-btn flat dense icon="arrow_back" class="resource-detail-back q-mb-xs" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
             <q-card v-if="selectedImageGeneration" flat bordered>
-              <q-card-section class="row items-start justify-between">
+              <q-card-section class="resource-editor-heading row items-start justify-between">
                 <div>
                   <div class="text-subtitle1 text-weight-medium">{{ selectedImageGeneration.displayName }}</div>
                   <details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selectedImageGeneration.imageId }} · {{ selectedImageGeneration.clientProtocol }}</details>
@@ -1051,7 +1051,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
           <div class="col-12 col-md-8 resource-split__detail">
             <q-card v-if="selectedTts" flat bordered>
-              <q-card-section class="row items-start justify-between">
+              <q-card-section class="resource-editor-heading row items-start justify-between">
                 <q-btn class="resource-detail-back" flat dense no-caps icon="arrow_back" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
                 <div>
                   <div class="text-h6">{{ selectedTts.displayName }}</div>
@@ -1158,7 +1158,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
           <div class="col-12 col-md-8 resource-split__detail">
             <q-card v-if="selectedAsr" flat bordered>
-              <q-card-section class="row items-start justify-between">
+              <q-card-section class="resource-editor-heading row items-start justify-between">
                 <q-btn class="resource-detail-back" flat dense no-caps icon="arrow_back" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
                 <div>
                   <div class="text-h6">{{ selectedAsr.displayName }}</div>
@@ -1264,7 +1264,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
           <div class="col-12 col-md-8 resource-split__detail">
             <q-card v-if="selectedMcp" flat bordered>
-              <q-card-section class="row items-start justify-between">
+              <q-card-section class="resource-editor-heading row items-start justify-between">
                 <q-btn class="resource-detail-back" flat dense no-caps icon="arrow_back" :label="$t('resources.backToList')" @click="selectedResourceId = undefined" />
                 <div>
                   <div class="text-h6">{{ selectedMcp.displayName }}</div>
@@ -1686,6 +1686,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </template>
 
 <style scoped>
+@media (max-width: 599px) {
+  .provider-editor-row { flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+  .provider-editor-row > .q-item__section--main { flex-basis: 100%; }
+  .provider-editor-row > .q-item__section--side { flex-direction: row; width: 100%; padding-left: 0; justify-content: space-between; }
+}
+.resource-editor-heading { gap: 8px; }
+.resource-editor-heading > div { min-width: 0; overflow-wrap: anywhere; }
+.resource-editor-heading > div:first-of-type { flex: 1; }
+@media (max-width: 599px) { .resource-editor-heading > div:first-of-type { flex-basis: 100%; } }
+@media (max-width: 899px) { .resource-editor-heading > .resource-detail-back { flex-basis: 100%; justify-content: flex-start; } }
+
 .configuration-workbench {
   display: grid;
   grid-template-columns: minmax(196px, 232px) minmax(0, 1fr);

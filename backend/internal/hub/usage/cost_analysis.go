@@ -320,7 +320,7 @@ func (a *costAccumulator) summary() (CostSummary, error) {
 // analyzeCosts walks the filtered ledger in bounded batches and joins only the
 // current settlement revision. The callback can build summary, day, or resource
 // buckets without loading retained usage history into memory.
-func (s *Service) analyzeCosts(ctx context.Context, filter Filter, visit func(RequestView, CostBreakdown) error) error {
+func (s *Service) analyzeCosts(ctx context.Context, filter Filter, visit func(RequestView, CostBreakdown) error, users ...string) error {
 	rules, err := s.Client.PricingRule.Query().All(ctx)
 	if err != nil {
 		return err
@@ -328,6 +328,9 @@ func (s *Service) analyzeCosts(ctx context.Context, filter Filter, visit func(Re
 	lastID := 0
 	for {
 		q := s.Client.RequestUsage.Query().Where(requestFilterPreds(filter)...)
+		if len(users) > 0 {
+			q = q.Where(requestusage.UserIDIn(users...))
+		}
 		if lastID != 0 {
 			q = q.Where(requestusage.IDGT(lastID))
 		}

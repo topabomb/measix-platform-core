@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { copyToClipboard } from 'quasar'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import { costAmounts } from '../api/cost'
 import { encodeEnrollmentMaterial } from '../api/enrollment'
 import { cursorPath } from '../api/pagination'
 import PageHeader from '../components/PageHeader.vue'
@@ -22,6 +23,7 @@ import { useSessionStore } from '../stores/session'
 
 const { t: $t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 
 type User = components['schemas']['User']
 type UserPage = components['schemas']['UserPage']
@@ -193,7 +195,7 @@ function fmtBytes(n: number | undefined): string {
 const usageCost = computed(() => {
   const cost = usage.value?.cost
   if (cost && (cost.status === 'KNOWN' || cost.status === 'PARTIAL')) {
-    return `${cost.amount ?? '0'} ${cost.currency ?? ''}`.trim()
+    return costAmounts(cost)
   }
   return $t('usage.costUnknown')
 })
@@ -320,7 +322,16 @@ async function copyEnrollment() {
   } catch (cause) { error.value = cause }
 }
 
-onMounted(refresh)
+onMounted(async () => {
+  await refresh()
+  if (typeof route.query.userId === 'string') {
+    try {
+      const user = await apiFetch<User>(`/api/admin/v1/users/${encodeURIComponent(route.query.userId)}`)
+      await openUser(user)
+      if (route.query.section === 'budgets' || route.query.section === 'usage') activeUserSection.value = route.query.section
+    } catch (cause) { error.value = cause }
+  }
+})
 onBeforeUnmount(() => {
   deviceSequence++
   usageSequence++
@@ -450,7 +461,7 @@ defineExpose({ beginDeleteUser })
             <div class="text-subtitle2">{{ $t('users.usage') }}</div>
             <q-select v-model="usagePeriod" :options="periodOptions" :label="$t('users.usagePeriod')" outlined dense emit-value map-options data-cy="user-usage-period" style="width: 180px" />
           </div>
-          <div class="row q-col-gutter-xs" data-cy="user-usage-summary">
+          <div class="user-usage-summary" data-cy="user-usage-summary">
             <div><div class="text-caption text-grey-7">{{ $t('usage.requests') }}</div><div class="text-h6">{{ usage?.requestCount ?? '—' }}</div></div>
             <div><div class="text-caption text-grey-7">{{ $t('usage.detail.forwarded') }}</div><div class="text-h6">{{ usage?.forwardedRequestCount ?? '—' }}</div></div>
             <div><div class="text-caption text-grey-7">{{ $t('usage.bytes') }}</div><div class="text-h6">{{ usage ? fmtBytes(usage.requestBytes) : '—' }}</div></div>
@@ -498,3 +509,8 @@ defineExpose({ beginDeleteUser })
     </q-dialog>
   </q-page>
 </template>
+
+<style scoped>
+.user-usage-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 12px 0; }
+.user-usage-summary > div { min-width: 0; overflow-wrap: anywhere; }
+</style>

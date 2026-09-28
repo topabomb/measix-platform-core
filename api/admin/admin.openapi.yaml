@@ -1317,6 +1317,7 @@ paths:
       - *id005
       - *uf_from
       - *uf_to
+      - *uf_userId
       - *uf_resourceId
       - *uf_resourceKind
       - *uf_upstreamId
@@ -3741,6 +3742,15 @@ components:
         requestCount:
           type: integer
           minimum: 0
+        forwardedRequestCount:
+          type: integer
+          minimum: 0
+        errorRequestCount:
+          description: Forwarded requests with HTTP status at least 400, using the existing ERROR filter semantics.
+          type: integer
+          minimum: 0
+        cost:
+          $ref: '#/components/schemas/CostAnalysis'
         semanticMeters:
           type: array
           items:

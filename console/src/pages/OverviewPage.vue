@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
+import { costAmounts } from '../api/cost'
 import { apiFetch } from '../api/client'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -61,9 +62,11 @@ async function refresh() {
   loading.value = true
   error.value = undefined
   try {
+    const now = new Date()
+    const query = new URLSearchParams({ from: new Date(now.getTime() - 86400000).toISOString(), to: now.toISOString() })
     const [systemStatus, usageSummary, upstreamPage, draftData] = await Promise.all([
       apiFetch<SystemStatus>('/api/admin/v1/system/status'),
-      apiFetch<UsageSummary>('/api/admin/v1/usage/summary'),
+      apiFetch<UsageSummary>(`/api/admin/v1/usage/summary?${query}`),
       fetchAllPages<Upstream>('/api/admin/v1/upstreams?limit=200'),
       apiFetch<Draft>('/api/admin/v1/draft').catch(() => undefined as Draft | undefined),
     ])
@@ -116,6 +119,25 @@ onMounted(refresh)
       <q-banner v-if="recentActivationFailures.length" class="bg-red-1 text-negative q-mb-xs rounded-borders">
         {{ $t('overview.recentFailureAction') }}
       </q-banner>
+      <div data-cy="overview-operations" class="overview-operations q-mb-xs">
+        <q-card flat bordered><q-card-section>
+          <div class="text-caption text-grey-7">{{ $t('usage.range24h') }} · {{ $t('usage.requests') }}</div>
+          <div class="text-h5">{{ usage?.requestCount ?? '—' }}</div>
+          <div class="text-caption">{{ $t('usage.blocked') }} {{ usage ? Math.max(0, usage.requestCount - usage.forwardedRequestCount) : '—' }}</div>
+          <q-btn flat dense no-caps to="/usage" :label="$t('usage.users.title')" icon="insights" />
+        </q-card-section></q-card>
+        <q-card flat bordered><q-card-section>
+          <div class="text-caption text-grey-7">{{ $t('usage.range24h') }} · {{ $t('overview.costStatus') }}</div>
+          <div class="text-h6 text-break">{{ costAmounts(usage?.cost) }}</div>
+          <StatusChip :value="costCompleteness" />
+        </q-card-section></q-card>
+        <q-card flat bordered><q-card-section>
+          <div class="text-caption text-grey-7">{{ $t('system.title') }}</div>
+          <StatusChip :value="converged ? 'READY' : 'NOT_CONVERGED'" />
+          <div class="text-caption">{{ $t('system.dbHealth') }} {{ system.dbHealth }}</div>
+          <q-btn flat dense no-caps to="/system" :label="$t('system.analytics.inspectDelivery')" icon="monitor_heart" />
+        </q-card-section></q-card>
+      </div>
       <details data-cy="overview-diagnostics" class="overview-diagnostics q-mt-xs">
         <summary class="text-primary cursor-pointer q-mb-xs">{{ $t('overview.showDiagnostics') }}</summary>
       <div class="row q-col-gutter-xs">
@@ -213,5 +235,8 @@ onMounted(refresh)
 </template>
 
 <style scoped>
+.overview-operations { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.overview-operations > * { min-width:0; }
+@media(max-width:599px) { .overview-operations { grid-template-columns:repeat(2,minmax(0,1fr)); } .overview-operations > :last-child { grid-column:1 / -1; } }
 .overview-diagnostics .row > [class*='col-'] { box-sizing: border-box; min-width: 0; }
 </style>

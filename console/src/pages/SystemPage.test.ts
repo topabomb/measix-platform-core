@@ -67,6 +67,37 @@ const BASE = {
 }
 
 describe('SystemPage', () => {
+  it('does not present unavailable events as a successful empty result', async () => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async path => {
+      if (path.includes('/events?')) throw new Error('Events unavailable')
+      if (path.endsWith('/health')) return { live: true, ready: true }
+      return BASE
+    })
+    const { wrapper } = mountSystem()
+    await flushPromises()
+    await wrapper.get('[data-cy="system-tab-events"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Events unavailable')
+    expect(wrapper.get('[data-cy="system-events"]').text()).not.toContain('No matching recent events.')
+    wrapper.unmount()
+  })
+  it('puts actionable delivery and metering state on the overview without claiming missing observations are zero', async () => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/system/status') return { ...BASE, appliedControlRevision: 4, spoolPendingCount: 8 }
+      if (path === '/api/admin/v1/system/health') return { live: true, ready: true }
+      if (path.startsWith('/api/admin/v1/system/telemetry')) throw new Error('Telemetry unavailable')
+      return { items: [] }
+    })
+    const { wrapper } = mountSystem()
+    await flushPromises()
+    const overview = wrapper.get('[data-cy="system-health-summary"]')
+    expect(overview.text()).toContain('8')
+    expect(overview.text()).toContain('Not converged')
+    await overview.get('[data-cy="open-metering"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAllComponents(QTab).find(tab => tab.props('name') === 'metering')!.attributes('aria-selected')).toBe('true')
+    wrapper.unmount()
+  })
   it('shows the configured HTTP client address, independent of the browser origin', async () => {
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
       if (path === '/api/admin/v1/system/status') return { ...BASE, publicOrigin: 'http://192.168.1.20:9000' }

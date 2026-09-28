@@ -133,7 +133,7 @@ defineExpose({ refresh: reset })
          filter controls and the rest of the page out of reach. -->
     <div :style="{ maxHeight, overflowY: 'auto' }" class="q-mt-xs">
       <q-list separator>
-        <q-item v-for="req in items" :key="req.requestId" clickable :active="selected?.requestId === req.requestId" active-class="bg-purple-1" data-cy="usage-row" @click="openDetail(req)">
+        <q-item v-for="req in items" :key="req.requestId" clickable :active="selected?.requestId === req.requestId" active-class="bg-purple-1" class="usage-request-row" data-cy="usage-row" @click="openDetail(req)">
           <q-item-section>
             <q-item-label>
               {{ req.resourceDisplayName || req.resourceId || $t('usage.unnamedResource') }}
@@ -148,14 +148,14 @@ defineExpose({ refresh: reset })
             <q-item-label caption>
               {{ new Date(req.startedAt).toLocaleString() }}
               <template v-if="req.durationMs !== undefined"> · {{ req.durationMs }} ms</template>
-              <template v-if="req.clientProtocol"> · {{ req.clientProtocol }}</template>
+
             </q-item-label>
           </q-item-section>
           <q-item-section side>
             <div class="row items-center q-gutter-xs">
               <span v-if="req.cost" class="text-caption text-grey-7">{{ costAmounts(req.cost) }} · {{ $t(`usage.cost${req.cost.status === 'KNOWN' ? 'Known' : req.cost.status === 'PARTIAL' ? 'Partial' : 'Unknown'}`) }}</span>
-              <q-chip dense :color="req.forwarded ? 'green-2' : 'orange-2'">{{ req.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }}</q-chip>
-              <q-chip v-if="req.settlementState && req.settlementState !== 'NOT_REQUIRED'" dense :color="req.settlementState === 'SETTLED' ? 'green-2' : req.settlementState === 'RECONCILIATION_REQUIRED' ? 'red-2' : 'orange-2'">{{ $t(`usage.settlement.${req.settlementState}`) }}</q-chip>
+              <q-chip v-if="!req.forwarded" dense color="orange-2">{{ $t('usage.blocked') }}</q-chip>
+              <q-chip v-if="req.settlementState && req.settlementState !== 'NOT_REQUIRED' && req.settlementState !== 'SETTLED'" dense :color="req.settlementState === 'RECONCILIATION_REQUIRED' ? 'red-2' : 'orange-2'">{{ $t(`usage.settlement.${req.settlementState}`) }}</q-chip>
               <q-chip v-if="req.requestCompleteness && req.requestCompleteness !== 'EXACT' && req.settlementState !== 'RECONCILIATION_REQUIRED'" dense :color="req.requestCompleteness === 'PARTIAL' ? 'orange-2' : 'grey-3'">{{ $t(`status.${req.requestCompleteness}`) }}</q-chip>
               <q-chip dense :class="req.httpStatus >= 400 ? 'text-negative' : 'text-grey-8'">HTTP {{ req.httpStatus }}</q-chip>
               <q-chip v-if="req.upstreamHttpStatus && req.upstreamHttpStatus !== req.httpStatus" dense class="text-grey-8">{{ $t('usage.reconciliation.upstream') }} {{ req.upstreamHttpStatus }}</q-chip>
@@ -187,3 +187,12 @@ defineExpose({ refresh: reset })
     </template>
   </DetailWorkspace>
 </template>
+
+<style scoped>
+.usage-request-row { container-type: inline-size; flex-wrap: wrap; gap: 6px; }
+.usage-request-row > .q-item__section--main { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.usage-request-row > .q-item__section--side { flex: 0 1 auto; max-width: 100%; padding-left: 0; white-space: normal; }
+.usage-request-row :deep(.q-chip) { max-width: 100%; height: auto; min-height: 24px; }
+.usage-request-row :deep(.q-chip__content) { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .usage-request-row > .q-item__section--side { flex-basis: 100%; align-items: flex-start; } }
+</style>

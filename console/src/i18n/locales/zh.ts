@@ -968,6 +968,8 @@ export default {
     },
   },
   usage: {
+    range90d: '最近 90 天',
+    analytics: { rangeError: '请选择完整的起止时间，结束时间须晚于开始时间，且范围不超过 92 天。', customRange: '自定义时间', httpErrors: 'HTTP 错误', currentBudget: '当前额度', usersHint: '所选范围内有请求的用户，按用户分页；额度状态为当前值。点击用户查看其分析。', manageBudget: '管理用户额度', meterDetails: '详细计量与传输用量' },
     unnamedResource: '资源名称不可用',
     filterThisResource: '查看此资源的请求',
     title: '用量与额度',
@@ -1133,6 +1135,7 @@ export default {
     pricingLine: '{quantity} ÷ {unitSize} × {unitPrice} {currency} = {amount} {currency}',
   },
   system: {
+    analytics: { inspectDelivery: '查看交付详情', deploymentDetails: '部署信息、地址与版本' },
     tabs: { overview: '概览', runtime: '配置交付', metering: '请求与计量', events: '近期事件' },
     publicOrigin: '企业地址',
     publicOriginMissing: '尚未配置，请在全局设置中填写企业地址。',

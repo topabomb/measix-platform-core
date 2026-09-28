@@ -1534,6 +1534,10 @@ export interface components {
             userId: components["schemas"]["UserId"];
             userDisplayName: string;
             requestCount: number;
+            forwardedRequestCount?: number;
+            /** @description Forwarded requests with HTTP status at least 400, using the existing ERROR filter semantics. */
+            errorRequestCount?: number;
+            cost?: components["schemas"]["CostAnalysis"];
             semanticMeters: components["schemas"]["MeterQuantity"][];
             budget: components["schemas"]["UserBudgetView"];
         };
@@ -3385,6 +3389,7 @@ export interface operations {
                 cursor?: string;
                 from?: string;
                 to?: string;
+                userId?: string;
                 resourceId?: string;
                 resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP";
                 upstreamId?: string;

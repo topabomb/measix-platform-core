@@ -8,9 +8,50 @@ import (
 
 	"measix/platform/ent"
 	"measix/platform/ent/requestusage"
+	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/hub/testutil"
 	"measix/platform/pkg/platformid"
 )
+
+func TestUserAnalyticsKeepsScopedCostAndRequestOutcomes(t *testing.T) {
+	store := testutil.OpenStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
+	dep, usr, ups := seedUsageParents(t, store.Client, now)
+	budgets, err := budget.NewService(store.Client, "UTC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	budgets.Now = func() time.Time { return now }
+	svc := NewService(store.Client, budgets)
+	svc.Now = func() time.Time { return now.Add(time.Second) }
+	resource := platformid.New(platformid.MCP)
+	for _, sample := range []struct {
+		forwarded bool
+		status    int
+		at        time.Time
+	}{{true, 200, now}, {true, 502, now}, {false, 429, now}, {true, 200, now.Add(-48 * time.Hour)}} {
+		id := createUsageRequestRow(t, store.Client, requestRowInput{DeploymentID: dep, UserID: usr, UpstreamID: ups, ResourceID: resource, ResourceKind: "MCP", Protocol: "MCP_STREAMABLE_HTTP", Forwarded: sample.forwarded, HTTPStatus: sample.status, CompletedAt: sample.at, Completeness: "EXACT"})
+		createSemanticUsageRow(t, store.Client, id, "REQUESTS", 1, "EXACT", sample.at)
+	}
+	_, err = svc.CreatePricingRule(ctx, PricingRuleInput{Meter: "REQUESTS", UnitSizeDecimal: "1", UnitPriceDecimal: "0.125", Currency: "CNY", EffectiveFrom: now.Add(-72 * time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	from, to := now.Add(-time.Hour), now.Add(time.Hour)
+	page, err := svc.ListUsers(ctx, Filter{From: &from, To: &to, UserID: usr}, budgets, "", 1, "")
+	if err != nil || len(page.Items) != 1 {
+		t.Fatalf("user page=%+v err=%v", page, err)
+	}
+	got := page.Items[0]
+	if got.RequestCount != 3 || got.ForwardedRequestCount != 2 || got.ErrorRequestCount != 1 || got.Cost.State != CostKnown || got.Cost.Amount != "0.25" {
+		t.Fatalf("scoped user totals=%+v", got)
+	}
+	filtered, err := svc.ListUsers(ctx, Filter{From: &from, To: &to, UserID: usr, Status: RequestStatusError}, budgets, "", 1, "")
+	if err != nil || len(filtered.Items) != 1 || filtered.Items[0].Cost.Amount != "0.125" || filtered.Items[0].ErrorRequestCount != 1 {
+		t.Fatalf("filtered user totals=%+v err=%v", filtered, err)
+	}
+}
 
 func TestSummaryPricesSettledModelTokensWithoutChargingCacheTwice(t *testing.T) {
 	store := testutil.OpenStore(t)

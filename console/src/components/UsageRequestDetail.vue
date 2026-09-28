@@ -53,38 +53,31 @@ function meterLabel(meter: PricingMeter): string {
 }
 
 function meterValue(item: MeterQuantity): string {
+  if (item.confidence === 'UNKNOWN') return '—'
   return formatMeter(item.quantity, item.meter, locale.value, unitLabels.value, false)
 }
 </script>
 
 <template>
   <q-card flat bordered data-cy="usage-detail">
-    <q-card-section>
+    <q-card-section class="row items-center justify-between">
       <div class="text-h6">{{ $t('usage.detail.title') }}</div>
-      <div class="text-caption text-grey-7 text-break">{{ request.requestId }}</div>
+      <q-btn flat dense no-caps icon="arrow_back" :label="$t('common.close')" @click="emit('close')" />
     </q-card-section>
     <q-card-section>
-      <q-markup-table flat dense>
-        <tbody>
-          <tr><td class="text-grey-7">{{ $t('usage.detail.requestId') }}</td><td class="text-break">{{ request.requestId }}</td></tr>
-          <tr v-if="request.interactionId"><td class="text-grey-7">{{ $t('usage.detail.interactionId') }}</td><td class="text-break">{{ request.interactionId }}</td></tr>
-          <tr><td class="text-grey-7">{{ $t('usage.detail.user') }}</td><td>{{ identity() }} <span class="text-caption text-grey-7">({{ request.userId }})</span></td></tr>
-          <tr v-if="request.deviceId"><td class="text-grey-7">{{ $t('usage.detail.device') }}</td><td>{{ request.deviceName || '—' }} <span class="text-caption text-grey-7">({{ request.deviceId }})</span></td></tr>
-          <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td>{{ request.resourceDisplayName || request.resourceId || $t('usage.unnamedResource') }}<div v-if="request.resourceDisplayName && request.resourceId" class="text-caption text-break">{{ request.resourceId }}</div></td></tr>
+      <div class="text-caption text-grey-7 q-mb-xs">{{ new Date(request.startedAt).toLocaleString() }}</div>
+      <q-markup-table flat dense class="usage-detail-table"><tbody>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.user') }}</td><td>{{ identity() }}</td></tr>
+          <tr v-if="request.deviceId"><td class="text-grey-7">{{ $t('usage.detail.device') }}</td><td>{{ request.deviceName || '—' }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td>{{ request.resourceDisplayName || request.resourceId || $t('usage.unnamedResource') }}</td></tr>
           <tr v-if="request.resourceKind"><td class="text-grey-7">{{ $t('usage.filters.resourceKind') }}</td><td>{{ kindLabel(request.resourceKind) }}</td></tr>
-          <tr v-if="request.clientProtocol"><td class="text-grey-7">{{ $t('usage.filters.protocol') }}</td><td class="text-break">{{ request.clientProtocol }}</td></tr>
-          <tr><td class="text-grey-7">{{ $t('usage.detail.upstream') }}</td><td class="text-break">{{ request.upstreamId }}</td></tr>
-          <tr><td class="text-grey-7">{{ $t('usage.detail.runtimeRoute') }}</td><td class="text-break">{{ request.runtimeRouteId }}</td></tr>
-          <tr><td class="text-grey-7">{{ $t('usage.detail.generation') }}</td><td>{{ $t('releases.generation') }} {{ request.managedGeneration }}</td></tr>
-          <tr><td class="text-grey-7">{{ $t('overview.desiredRevision') }}</td><td>{{ request.controlRevision }}</td></tr>
           <tr><td class="text-grey-7">{{ $t('common.status') }}</td><td>{{ request.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }} · HTTP {{ request.httpStatus }}<template v-if="request.upstreamHttpStatus"> · {{ $t('usage.detail.upstream') }} HTTP {{ request.upstreamHttpStatus }}</template></td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.detail.duration') }}</td><td>{{ request.durationMs }} ms</td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.bytes') }}</td><td>{{ fmtBytes(request.requestBytes) }} in · {{ fmtBytes(request.responseBytes) }} out</td></tr>
           <tr v-if="request.requestCompleteness"><td class="text-grey-7">{{ $t('usage.detail.usageCompleteness') }}</td><td>{{ $t(`status.${request.requestCompleteness}`) }}</td></tr>
           <tr v-if="request.settlementState"><td class="text-grey-7">{{ $t('usage.detail.settlement') }}</td><td>{{ $t(`usage.settlement.${request.settlementState}`) }}</td></tr>
           <tr v-if="request.errorClass"><td class="text-grey-7">{{ $t('usage.errorClass') }}</td><td>{{ errorLabel(request.errorClass) }} <span class="text-caption text-grey-7">({{ request.errorClass }})</span></td></tr>
-        </tbody>
-      </q-markup-table>
+      </tbody></q-markup-table>
       <div class="text-subtitle2 q-mt-sm">{{ $t('usage.detail.semanticMeters') }}</div>
       <div v-if="request.semanticMeters?.length" class="usage-detail-meters q-mt-xs">
         <div v-for="meter in request.semanticMeters" :key="meter.meter" class="usage-detail-meter">
@@ -119,6 +112,21 @@ function meterValue(item: MeterQuantity): string {
           </div>
         </div>
       </template>
+      <details class="q-mt-sm">
+        <summary class="text-primary cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>
+        <q-markup-table flat dense class="usage-detail-table"><tbody>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.requestId') }}</td><td class="text-break">{{ request.requestId }}</td></tr>
+          <tr v-if="request.interactionId"><td class="text-grey-7">{{ $t('usage.detail.interactionId') }}</td><td class="text-break">{{ request.interactionId }}</td></tr>
+          <tr v-if="request.clientProtocol"><td class="text-grey-7">{{ $t('usage.filters.protocol') }}</td><td class="text-break">{{ request.clientProtocol }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.upstream') }}</td><td class="text-break">{{ request.upstreamId }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.runtimeRoute') }}</td><td class="text-break">{{ request.runtimeRouteId }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.generation') }}</td><td>{{ $t('releases.generation') }} {{ request.managedGeneration }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('overview.desiredRevision') }}</td><td>{{ request.controlRevision }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.user') }}</td><td class="text-break">{{ request.userId }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.device') }}</td><td class="text-break">{{ request.deviceId }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td class="text-break">{{ request.resourceId }}</td></tr>
+        </tbody></q-markup-table>
+      </details>
       <div class="text-caption text-grey-7 q-mt-xs">{{ $t('usage.detail.secretHint') }}</div>
       <slot />
     </q-card-section>
@@ -145,7 +153,6 @@ function meterValue(item: MeterQuantity): string {
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 420px) {
-  .usage-detail-meters { grid-template-columns: minmax(0, 1fr); }
-}
+.usage-detail-table :deep(td:first-child) { width: 30%; }
+.usage-detail-table :deep(td) { vertical-align: top; }
 </style>

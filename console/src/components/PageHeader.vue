@@ -2,22 +2,6 @@
 import { useRouter } from 'vue-router'
 import StatusChip from './StatusChip.vue'
 
-// PageHeader — consistent page header for every business page.
-//
-// Design:
-//   - Left: title + optional subtitle, breadcrumbs, status chip.
-//   - Right: #actions slot — all page-level action buttons go here.
-//   - Wide screens (sm+): actions rendered inline.
-//   - Narrow screens (xs): actions collapsed into an overflow dropdown.
-//
-// Usage:
-//   <PageHeader title="..." :subtitle="...">
-//     <template #actions>
-//       <q-btn ... />
-//       <q-btn ... />
-//     </template>
-//   </PageHeader>
-
 defineProps<{
   title: string
   subtitle?: string
@@ -29,7 +13,7 @@ const router = useRouter()
 </script>
 
 <template>
-  <div class="page-header row items-center justify-between q-mb-xs q-gutter-xs">
+  <div class="page-header q-mb-xs">
     <div class="col-grow" style="min-width: 0">
       <q-breadcrumbs v-if="breadcrumbs?.length" class="q-mb-xs text-grey-6">
         <q-breadcrumbs-el
@@ -41,10 +25,10 @@ const router = useRouter()
         />
       </q-breadcrumbs>
       <div class="row items-center q-gutter-xs">
-        <div class="text-h5 text-weight-bold text-no-wrap" style="min-width: 0">{{ title }}</div>
+        <div class="page-header__title text-h5 text-weight-bold" style="min-width: 0">{{ title }}</div>
         <StatusChip v-if="status" :value="status" />
       </div>
-      <div v-if="subtitle" class="text-body2 text-grey-7">{{ subtitle }}</div>
+      <div v-if="subtitle" class="page-header__subtitle text-body2 text-grey-7">{{ subtitle }}</div>
     </div>
     <!-- Actions: visible inline on sm+, collapsed into dropdown on xs -->
     <div v-if="$slots.actions" class="row items-center q-gutter-xs gt-xs">
@@ -53,7 +37,7 @@ const router = useRouter()
     <!-- Narrow screens: the same actions, one per row. The column wrapper is
          what gives a slotted button its own row and a full-width hit area
          instead of letting buttons flow inline inside the list. -->
-    <q-btn-dropdown v-if="$slots.actions" flat dense no-caps auto-close :label="$t('common.actions')" icon="more_vert" class="xs">
+    <q-btn-dropdown v-if="$slots.actions" flat dense no-caps auto-close :aria-label="$t('common.actions')" icon="more_vert" dropdown-icon="none" class="xs">
       <q-list>
         <div class="column q-gutter-xs q-pa-xs">
           <slot name="actions" />
@@ -62,3 +46,14 @@ const router = useRouter()
     </q-btn-dropdown>
   </div>
 </template>
+<style scoped>
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.page-header > :first-child { flex: 1; min-width: 0; }
+.page-header > :last-child:not(:first-child) { flex-shrink: 0; }
+.page-header__title { white-space: normal; overflow-wrap: anywhere; }
+.page-header__subtitle { margin-top: 2px; }
+@media (max-width: 599px) {
+ .page-header__title { font-size: 1.3rem; line-height: 1.5; }
+ .page-header__subtitle { font-size: .8rem; line-height: 1.5; }
+}
+</style>

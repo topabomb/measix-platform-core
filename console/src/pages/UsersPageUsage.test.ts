@@ -64,7 +64,7 @@ describe('UsersPage per-user usage and list safety', () => {
       paths.push(path)
       if (path.startsWith('/api/admin/v1/users?')) return { items: [userA], nextCursor: undefined }
       if (path.includes('/devices')) return { items: [device('dev_A', 'Ana phone')], nextCursor: undefined }
-      if (path.includes('/usage/summary')) return summary
+      if (path.includes('/usage/summary')) return { ...summary, cost: { status: 'PARTIAL', amounts: [{ currency: 'CNY', amount: '1.25' }, { currency: 'USD', amount: '0.50' }] } }
       if (path.includes('/usage/requests')) return { items: [], nextCursor: undefined }
       return {}
     })
@@ -86,6 +86,7 @@ describe('UsersPage per-user usage and list safety', () => {
     const requestsPath = paths.find(path => path.includes('/usage/requests'))
     expect(requestsPath).toContain('userId=usr_A')
     expect(wrapper.text()).toContain('Ana Ruiz')
+    expect(wrapper.text()).toContain('1.25 CNY · 0.50 USD')
   })
 
   it('never shows one user\'s devices under another user\'s name', async () => {

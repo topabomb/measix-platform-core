@@ -43,6 +43,21 @@ function mountPanel() {
 }
 
 describe('UsageReconciliationPanel', () => {
+  it('replaces a reconciliation page and supports returning to the previous page', async () => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async path => ({
+      items: [{ requestId: path.includes('cursor=') ? 'req_second' : 'req_first', userId: 'usr_a', resourceId: path.includes('cursor=') ? 'Second' : 'First', capability: 'MODEL', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', state: 'PENDING', reservation: [], observed: [], reconciliationReason: 'incomplete', admittedAt: '2026-09-20T00:00:00Z' }],
+      nextCursor: path.includes('cursor=') ? undefined : 'next',
+    }))
+    const panel = mountPanel()
+    await flushPromises()
+    await panel.get('[aria-label="Next page"]').trigger('click')
+    await flushPromises()
+    expect(panel.text()).toContain('Second')
+    expect(panel.text()).not.toContain('First')
+    await panel.get('[aria-label="Previous page"]').trigger('click')
+    await flushPromises()
+    expect(panel.text()).toContain('First')
+  })
   beforeEach(() => {
     vi.restoreAllMocks()
     i18n.global.locale.value = 'en'

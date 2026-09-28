@@ -968,6 +968,8 @@ export default {
     },
   },
   usage: {
+    range90d: 'Last 90 days',
+    analytics: { rangeError: 'Choose a complete period, with the end after the start and at most 92 days.', customRange: 'Custom period', httpErrors: 'HTTP errors', currentBudget: 'Current budget', usersHint: 'Users with requests in this period, paged by user; budgets reflect current state. Select a user to drill down.', manageBudget: 'Manage user budget', meterDetails: 'Detailed meters and transfer usage' },
     unnamedResource: 'Resource name unavailable',
     filterThisResource: 'View requests for this resource',
     title: 'Usage',
@@ -1133,6 +1135,7 @@ export default {
     pricingLine: '{quantity} ÷ {unitSize} × {unitPrice} {currency} = {amount} {currency}',
   },
   system: {
+    analytics: { inspectDelivery: 'Inspect delivery', deploymentDetails: 'Deployment, addresses and versions' },
     tabs: { overview: 'Overview', runtime: 'Configuration delivery', metering: 'Requests and metering', events: 'Recent events' },
     publicOrigin: 'Enterprise address',
     publicOriginMissing: 'Not configured. Set the enterprise address in Global settings.',

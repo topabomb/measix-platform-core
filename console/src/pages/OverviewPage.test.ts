@@ -68,6 +68,15 @@ const STATUS = {
 }
 
 describe('OverviewPage', () => {
+  it('shows operational usage outside diagnostics with an explicit 24 hour scope', async () => {
+    const { wrapper } = mountOverview()
+    await flushPromises()
+    expect(wrapper.get('[data-cy="overview-operations"]').text()).toContain('5')
+    const path = vi.mocked(client.apiFetch).mock.calls.find(([path]) => path.includes('/usage/summary'))![0]
+    const params = new URL(path, 'http://localhost').searchParams
+    expect(new Date(params.get('to')!).getTime() - new Date(params.get('from')!).getTime()).toBe(86400000)
+    wrapper.unmount()
+  })
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {

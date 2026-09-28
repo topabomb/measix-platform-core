@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch, createCandidateId } from '../api/client'
 import { costAmounts } from '../api/cost'
+import PagedEntityPicker from '../components/PagedEntityPicker.vue'
+import { fetchUpstreamPickerPage, resolveUpstreamPickerOption } from '../api/entityPickerSources'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
 import { useSessionStore } from '../stores/session'
@@ -27,7 +29,7 @@ const dirty = computed(() => JSON.stringify(rules.value) !== savedRules.value)
 // One option per meter value. A meter is scoped by the rule's resourceId, not
 // by a static kind — AUDIO_SECONDS and REQUESTS are used by more than one
 // resource kind, so a single option per value cannot mis-select the other.
-const METER_OPTIONS = [
+const METER_OPTIONS = computed(() => [
   { label: 'INPUT_TOKENS', value: 'INPUT_TOKENS' },
   { label: 'OUTPUT_TOKENS', value: 'OUTPUT_TOKENS' },
   { label: 'CACHED_TOKENS', value: 'CACHED_TOKENS' },
@@ -36,7 +38,7 @@ const METER_OPTIONS = [
   { label: 'REQUESTS', value: 'REQUESTS' },
   { label: 'CHARACTERS', value: 'CHARACTERS' },
   { label: 'AUDIO_SECONDS', value: 'AUDIO_SECONDS' },
-]
+].map(option => ({ ...option, label: $t(`usage.meters.${option.value}`) })))
 
 async function refresh() {
   loading.value = true
@@ -152,15 +154,15 @@ onMounted(refresh)
     <q-list v-else separator>
       <q-item v-for="(rule, idx) in rules" :key="rule.pricingRuleId">
         <q-item-section>
-          <div class="row q-col-gutter-xs items-center">
+          <div class="pricing-rule">
             <div class="col-12 col-md-2">
               <q-select v-model="rule.meter" dense outlined :options="METER_OPTIONS" emit-value map-options :label="$t('pricing.meter')" />
             </div>
             <div class="col-6 col-md-2">
-              <q-input v-model="rule.resourceId" dense outlined :label="$t('pricing.resourceId')" placeholder="(global)" :hint="$t('pricing.resourceIdHint')" />
+              <q-input v-model="rule.resourceId" dense outlined :label="$t('pricing.resourceId')" placeholder="(global)" :hint="$t('pricing.resourceIdHint')" hide-hint />
             </div>
             <div class="col-6 col-md-2">
-              <q-input v-model="rule.upstreamId" dense outlined :label="$t('pricing.upstreamId')" placeholder="(all)" :hint="$t('pricing.upstreamIdHint')" />
+              <PagedEntityPicker v-model="rule.upstreamId" :label="$t('usage.filters.upstream')" :empty-label="$t('common.all')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" />
             </div>
             <div class="col-6 col-md-1">
               <q-input v-model="rule.unitSize" dense outlined :label="$t('pricing.unitSize')" />
@@ -171,14 +173,14 @@ onMounted(refresh)
             <div class="col-6 col-md-1">
               <q-input v-model="rule.currency" dense outlined :label="$t('pricing.currency')" />
             </div>
-            <div class="col-6 col-md-2">
+            <div class="pricing-date">
               <q-input v-model="rule.effectiveFrom" dense outlined :label="$t('pricing.effectiveFrom')" />
             </div>
-            <div class="col-6 col-md-2">
+            <div class="pricing-date">
               <q-input v-model="rule.effectiveTo" dense outlined :label="$t('pricing.effectiveTo')" />
             </div>
             <div class="col-12 col-md-1 text-right">
-              <q-btn flat dense color="negative" icon="delete" @click="removeRule(idx)" />
+              <q-btn flat dense color="negative" icon="delete" :aria-label="$t('common.delete')" @click="removeRule(idx)" />
             </div>
           </div>
           <div class="text-caption text-grey-7 q-mt-xs">{{ rule.pricingRuleId }}</div>
@@ -190,3 +192,9 @@ onMounted(refresh)
     </q-list>
   </q-card>
 </template>
+
+<style scoped>
+.pricing-rule { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; align-items:start; }
+.pricing-rule > div { width:auto; min-width:0; }
+@media(max-width:599px) { .pricing-rule { grid-template-columns:repeat(2,minmax(0,1fr)); } .pricing-date { grid-column:1 / -1; } }
+</style>

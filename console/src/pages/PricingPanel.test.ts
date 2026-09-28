@@ -66,7 +66,7 @@ describe('PricingPanel', () => {
     const { wrapper } = mountPanel()
     await flushPromises()
     expect(wrapper.text()).toContain('7')
-    expect(wrapper.text()).toContain('INPUT_TOKENS')
+    expect(wrapper.text()).toContain('Input tokens')
   })
 
   it('enables save only after the local pricing set changes', async () => {

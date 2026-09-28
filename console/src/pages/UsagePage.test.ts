@@ -59,6 +59,35 @@ async function openRequests(wrapper: ReturnType<typeof mountUsagePage>['wrapper'
 }
 
 describe('UsagePage', () => {
+  it('rejects an incomplete custom period without querying mismatched analytics', async () => {
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    vi.mocked(client.apiFetch).mockClear()
+    const start = wrapper.findAllComponents(QInput).find(input => input.props('type') === 'datetime-local')!
+    await start.setValue('')
+    await flushPromises()
+    expect(wrapper.find('[data-cy="usage-range-error"]').exists()).toBe(true)
+    expect(vi.mocked(client.apiFetch).mock.calls.filter(([path]) => path.includes('/usage/'))).toHaveLength(0)
+    wrapper.unmount()
+  })
+  it('drills a user aggregate into the same scoped summary and requests', async () => {
+    const original = vi.mocked(client.apiFetch).getMockImplementation()!
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path.includes('/usage/users')) return { items: [{ userId: 'usr_alice', userDisplayName: 'Alice', requestCount: 12, semanticMeters: [], budget: { items: [] }, cost: { status: 'PARTIAL', amounts: [{ amount: '1.25', currency: 'CNY' }] } }] }
+      return original(path)
+    })
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    const row = wrapper.get('[data-cy="usage-user-row"]')
+    expect(row.text()).toContain('1.25 CNY')
+    await row.trigger('click')
+    await flushPromises()
+    expect(vi.mocked(client.apiFetch).mock.calls.some(([path]) => path.includes('/usage/users?') && path.includes('userId=usr_alice'))).toBe(true)
+    await openRequests(wrapper)
+    expect(vi.mocked(client.apiFetch).mock.calls.some(([path]) => path.includes('/usage/requests?') && path.includes('userId=usr_alice'))).toBe(true)
+    wrapper.unmount()
+  })
+
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {

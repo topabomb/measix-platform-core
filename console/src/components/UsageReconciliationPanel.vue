@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { apiFetch } from '../api/client'
-import { cursorPath } from '../api/pagination'
+import { useCursorPager } from '../composables/useCursorPager'
+import CursorPager from './CursorPager.vue'
 import type { PricingMeter, ReconciliationPage, ReconciliationView, ResolveReconciliationRequest } from '../api/usageBudget'
 import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 import { useSessionStore } from '../stores/session'
@@ -21,11 +22,9 @@ const unitLabels = computed<MeterUnitLabels>(() => ({
   images: $t('usage.units.images'),
 }))
 const session = useSessionStore()
-const page = ref<ReconciliationPage>({ items: [] })
-const loading = ref(false)
-const loadingMore = ref(false)
+const listPath = ref('/api/admin/v1/usage/reconciliations?limit=50')
+const { items, nextCursor, pageNumber, loading, error, reset: load, nextPage, previousPage } = useCursorPager<ReconciliationView, ReconciliationPage>(listPath, path => apiFetch<ReconciliationPage>(path))
 const resolving = ref(false)
-const error = ref<unknown>()
 const selected = ref<ReconciliationView>()
 const detail = ref<ReconciliationView>()
 const dialogOpen = ref(false)
@@ -49,30 +48,8 @@ function errorClassText(value: string): string {
 }
 
 async function refresh() {
-  loading.value = true
-  error.value = undefined
-  try {
-    const result = await apiFetch<ReconciliationPage>('/api/admin/v1/usage/reconciliations?limit=50')
-    page.value = result
-    if (detail.value && !result.items.some(item => item.requestId === detail.value?.requestId)) detail.value = undefined
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    loading.value = false
-  }
-}
-
-async function loadMore() {
-  if (!page.value.nextCursor || loadingMore.value) return
-  loadingMore.value = true
-  try {
-    const next = await apiFetch<ReconciliationPage>(cursorPath('/api/admin/v1/usage/reconciliations?limit=50', page.value.nextCursor))
-    page.value = { items: [...page.value.items, ...next.items], nextCursor: next.nextCursor }
-  } catch (cause) {
-    error.value = cause
-  } finally {
-    loadingMore.value = false
-  }
+  await load()
+  if (!error.value && detail.value && !items.value.some(item => item.requestId === detail.value?.requestId)) detail.value = undefined
 }
 
 function openResolve(item: ReconciliationView) {
@@ -132,10 +109,10 @@ onMounted(refresh)
           <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
         </q-card-section>
         <ProblemBanner :error="error" class="q-mx-md q-mb-sm" />
-        <LoadingState v-if="loading && !page.items.length" />
-        <q-list v-else-if="page.items.length" separator>
+        <LoadingState v-if="loading && !items.length" />
+        <q-list v-else-if="items.length" separator>
           <q-item
-            v-for="item in page.items"
+            v-for="item in items"
             :key="item.requestId"
             :clickable="Boolean(item.request)"
             :active="detail?.requestId === item.requestId"
@@ -156,7 +133,7 @@ onMounted(refresh)
               <q-item-label caption>
                 {{ new Date(item.request?.startedAt || item.startedAt || item.admittedAt).toLocaleString() }}
                 <template v-if="item.request?.durationMs !== undefined"> · {{ item.request.durationMs }} ms</template>
-                · {{ item.clientProtocol }}
+                <template v-if="!item.request"> · {{ item.clientProtocol }}</template>
               </q-item-label>
               <q-item-label caption class="text-break q-mt-xs">
                 {{ $t('usage.reconciliation.reasonLabel') }}: {{ reasonText(item.reconciliationReason) }}
@@ -185,9 +162,7 @@ onMounted(refresh)
           </q-item>
         </q-list>
         <q-card-section v-else class="text-grey-7">{{ $t('usage.reconciliation.empty') }}</q-card-section>
-        <q-card-actions v-if="page.nextCursor" align="center">
-          <q-btn flat :label="$t('common.loadMore')" :loading="loadingMore" @click="loadMore" />
-        </q-card-actions>
+        <CursorPager :page="pageNumber" :count="items.length" :has-next="Boolean(nextCursor)" :loading="loading" @previous="previousPage" @next="nextPage" />
       </q-card>
     </template>
 

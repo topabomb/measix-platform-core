@@ -968,6 +968,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/users/{userId}/workspace/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Admin-only read-only observations. Never activates a VM. Independent of MCP/DAV availability; disabled services and disconnected spaces remain inspectable. Revalidates original space, configuration and administrator before returning. Does not mutate workspace state. */
+        get: operations["getAdminWorkspaceResources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/workspace-operations/{operationId}": {
         parameters: {
             query?: never;
@@ -1099,6 +1116,57 @@ export interface components {
             managementSecret: components["schemas"]["SecretRef"];
             connectTimeoutMs: number;
             idleTimeoutMs: number;
+        };
+        /** @enum {string} */
+        WorkspaceObservationStatus: "current" | "historical" | "unavailable" | "error";
+        /** @enum {string} */
+        WorkspaceAllocationSource: "sandbox" | "volume" | "default" | "unknown";
+        WorkspaceResourceAllocation: {
+            /** Format: int64 */
+            value: number | null;
+            source: components["schemas"]["WorkspaceAllocationSource"];
+            error: string | null;
+        };
+        WorkspaceRuntimeObservation: {
+            status: components["schemas"]["WorkspaceObservationStatus"];
+            /** Format: int64 */
+            observedAt: number | null;
+            reason: string | null;
+            /** @description running, stopped, paused, transitioning, notfound, unknown */
+            value: string | null;
+        };
+        WorkspaceMemoryObservation: {
+            status: components["schemas"]["WorkspaceObservationStatus"];
+            /** Format: int64 */
+            observedAt: number | null;
+            reason: string | null;
+            /** Format: int64 */
+            value: number | null;
+        };
+        WorkspaceDiskUsage: {
+            /** Format: int64 */
+            usedBytes: number;
+            /** Format: int64 */
+            availableBytes: number;
+        };
+        WorkspaceDiskObservation: {
+            status: components["schemas"]["WorkspaceObservationStatus"];
+            /** Format: int64 */
+            observedAt: number | null;
+            reason: string | null;
+            value: components["schemas"]["WorkspaceDiskUsage"] | null;
+        };
+        WorkspaceResourceConfiguration: {
+            cpuCores: components["schemas"]["WorkspaceResourceAllocation"];
+            memoryLimitBytes: components["schemas"]["WorkspaceResourceAllocation"];
+            workspaceCapacityBytes: components["schemas"]["WorkspaceResourceAllocation"];
+        };
+        WorkspaceResources: {
+            agentSpaceId: string;
+            runtime: components["schemas"]["WorkspaceRuntimeObservation"];
+            allocation: components["schemas"]["WorkspaceResourceConfiguration"];
+            memory: components["schemas"]["WorkspaceMemoryObservation"];
+            disk: components["schemas"]["WorkspaceDiskObservation"];
         };
         WorkspaceProjection: {
             /** @enum {integer} */
@@ -4574,6 +4642,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceOperation"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAdminWorkspaceResources: {
+        parameters: {
+            query: {
+                agentSpaceId: string;
+            };
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-metric observations, including partial failures. Unix millisecond timestamps; no-store. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceResources"];
+                };
+            };
+            /** @description workspace_space_mismatch or workspace_revision_conflict; discard stale observations. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             default: components["responses"]["Problem"];

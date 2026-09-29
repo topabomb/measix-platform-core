@@ -1973,6 +1973,33 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/WorkspaceCommand'
+  /api/admin/v1/users/{userId}/workspace/resources:
+    get:
+      operationId: getAdminWorkspaceResources
+      description: Admin-only read-only observations. Never activates a VM. Independent of MCP/DAV availability; disabled services and disconnected spaces remain inspectable. Revalidates original space, configuration and administrator before returning. Does not mutate workspace state.
+      parameters:
+      - *workspace_id004
+      - name: agentSpaceId
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: '^spc_[0-9a-f-]{36}$'
+      responses:
+        '200':
+          description: Per-metric observations, including partial failures. Unix millisecond timestamps; no-store.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceResources'
+        '409':
+          description: workspace_space_mismatch or workspace_revision_conflict; discard stale observations.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/workspace-operations/{operationId}:
     get:
       operationId: getWorkspaceOperation
@@ -2842,6 +2869,145 @@ components:
           type: integer
           minimum: 1000
           maximum: 600000
+    WorkspaceObservationStatus:
+      type: string
+      enum:
+      - current
+      - historical
+      - unavailable
+      - error
+    WorkspaceAllocationSource:
+      type: string
+      enum:
+      - sandbox
+      - volume
+      - default
+      - unknown
+    WorkspaceResourceAllocation:
+      type: object
+      additionalProperties: false
+      required:
+      - value
+      - source
+      - error
+      properties:
+        value: &resource_id004
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          nullable: true
+        source:
+          $ref: '#/components/schemas/WorkspaceAllocationSource'
+        error:
+          type: string
+          nullable: true
+    WorkspaceRuntimeObservation:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - observedAt
+      - reason
+      - value
+      properties:
+        status: &resource_id001
+          $ref: '#/components/schemas/WorkspaceObservationStatus'
+        observedAt: &resource_id002
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          nullable: true
+        reason: &resource_id003
+          type: string
+          nullable: true
+        value:
+          type: string
+          nullable: true
+          description: running, stopped, paused, transitioning, notfound, unknown
+    WorkspaceMemoryObservation:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - observedAt
+      - reason
+      - value
+      properties:
+        status: *resource_id001
+        observedAt: *resource_id002
+        reason: *resource_id003
+        value: *resource_id004
+    WorkspaceDiskUsage:
+      type: object
+      additionalProperties: false
+      required:
+      - usedBytes
+      - availableBytes
+      properties:
+        usedBytes:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          nullable: false
+        availableBytes:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9007199254740991
+          nullable: false
+    WorkspaceDiskObservation:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - observedAt
+      - reason
+      - value
+      properties:
+        status: *resource_id001
+        observedAt: *resource_id002
+        reason: *resource_id003
+        value:
+          allOf:
+          - $ref: '#/components/schemas/WorkspaceDiskUsage'
+          nullable: true
+    WorkspaceResourceConfiguration:
+      type: object
+      additionalProperties: false
+      required:
+      - cpuCores
+      - memoryLimitBytes
+      - workspaceCapacityBytes
+      properties:
+        cpuCores:
+          $ref: '#/components/schemas/WorkspaceResourceAllocation'
+        memoryLimitBytes:
+          $ref: '#/components/schemas/WorkspaceResourceAllocation'
+        workspaceCapacityBytes:
+          $ref: '#/components/schemas/WorkspaceResourceAllocation'
+    WorkspaceResources:
+      type: object
+      additionalProperties: false
+      required:
+      - agentSpaceId
+      - runtime
+      - allocation
+      - memory
+      - disk
+      properties:
+        agentSpaceId:
+          type: string
+        runtime:
+          $ref: '#/components/schemas/WorkspaceRuntimeObservation'
+        allocation:
+          $ref: '#/components/schemas/WorkspaceResourceConfiguration'
+        memory:
+          $ref: '#/components/schemas/WorkspaceMemoryObservation'
+        disk:
+          $ref: '#/components/schemas/WorkspaceDiskObservation'
     WorkspaceProjection:
       type: object
       additionalProperties: false

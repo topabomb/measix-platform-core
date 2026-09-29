@@ -17,7 +17,7 @@ describe('workspace file prerequisites', () => {
     }) as never)
     const wrapper = mount(WorkspacePanel, {
       props: { userId: 'usr_test', serviceEnabled: false },
-      global: { plugins: [createPinia(), [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceFiles: true, ProblemBanner: true } },
+      global: { plugins: [createPinia(), [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, WorkspaceFiles: true, ProblemBanner: true } },
     })
     try {
       await flushPromises()
@@ -35,7 +35,7 @@ describe('workspace file prerequisites', () => {
     })
     const wrapper = mount(WorkspacePanel, {
       props: { userId: 'usr_test', serviceEnabled: true },
-      global: { plugins: [createPinia(), [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceFiles: true, ProblemBanner: true } },
+      global: { plugins: [createPinia(), [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, WorkspaceFiles: true, ProblemBanner: true } },
     })
     try {
       await flushPromises()

@@ -1,6 +1,36 @@
 # 远程工作区 Core / Admin 验收记录
 
-验证日期：2026-09-29。范围为当前 Core / Relay / Admin 候选、隔离 Agent Space 实际管理/MCP/VM/WebDAV 链路和浏览器管理操作；不是生产部署或完整 S1 验收。当前操作说明见 [实现参考](remote-workspace-implementation.md)。
+最近验证日期：2026-09-30。范围为当前 Core / Relay / Admin 候选、隔离 Agent Space 实际管理/MCP/VM/WebDAV 链路和浏览器管理操作；不是生产部署或完整 S1 验收。当前操作说明见 [实现参考](remote-workspace-implementation.md)。
+
+## 资源摘要集成验收（2026-09-30）
+
+执行计划见 [资源摘要计划](remote-workspace-integration-plan.md#2026-09-30-资源摘要执行计划)，六项已完成。基于 Core `35e3ac9`、架构 `e6ea18a` 的工作树实现；Agent Space 固定为已提交 `661d20d8bfe1fb7630a879383257e61602fb6df6`，本轮未修改其源码。其既有 `docker/build.sh` 模式差异原样保留。
+
+| 身份 | 本次实际验证 |
+|---|---|
+| Agent Space 构建输入 | `sha256:8429f3398403d5ebaa527bc1243035bb6b1e4cd9fa654b9dd30f7b1ea2ab6ace` |
+| 实际新建 Docker 镜像 | `sha256:a427de819c17b13db57078bec5d9e79fb8416cb0cea2824d3dc5cb9fc966e7c6`；镜像 label 对应上述提交和输入 |
+| Core 输入 | 917 个文件，`sha256:9a8ff5ae960369280288187c1c8c3bdc8d02dfd4b34063fc54a2c105098ece53` |
+| Hub / Relay | `sha256:0449bed26d921c7306ddddd73ca1692a48f09ac845e6d7726fa9d23997b519f0` / `sha256:786de779c3e16a4d1046b7d2f2a1b4c3e86aee4a449f6cd0dfdb4d3b88b944d1` |
+| 最终 Admin 构建 | `sha256:16651200b32d32689460be36332410fa2422647dcdb23b3b3eaf7daf68e786f2` |
+| 最终 Admin 合同 | `sha256:8054cbb32a64f175e030b5519c4990b315ec68cde515edce14ae0b18da9003c6`；Client/Relay/Usage 合同未变 |
+
+环境为独立容器/卷 `measix-resources-20260930`，管理/MCP `127.0.0.1:20932`、DAV `127.0.0.1:20933`。没有改动旧联调容器或生产。测试凭据仅在忽略目录中；可复用命令为 `node scripts/workspace-integration.mjs --config <本机私有配置> --output <证据目录> [--keep-ui]`，配置结构见脚本头部。
+
+- Agent Space：本轮重跑资源单元 9 项、管理 API 7 项，全部通过；其提交附带的完整 218 项真实 VM 记录另作独立证据，不冒充本轮完整重跑。
+- Core：全量 `go test ./... -count=1`、`go vet ./...`、合同测试和格式检查通过。资源专项覆盖管理员撤销、空间/绑定/配置在途变化、停用后可读、有效零值、部分失败与诊断脱敏。
+- Admin：40 个文件、245 项测试通过；类型检查和生产构建通过。专项覆盖历史/错误/零值、空间切换迟到响应、隐藏页面与卸载停止轮询。容量修复先观察到测试中 24 KiB 被显示为 0.0 MiB，再统一格式后通过。
+- 工具与生成：41 项 tooling 通过；417 个生成输入/产物重复生成无变化。审查修复新增 YAML anchor 与既有名称冲突，修复前后生成类型不变，最终合同重新验证并更新基线。
+- 实际链路：**19 组通过**。包括重复查看未创建 VM 不启动、管理员鉴权/空间隔离、未发布 MCP 时磁盘/客户机内存正常、64 MiB 文件占用增长、停止后保留历史时间、服务关闭后可查、同用户删除重建拒绝旧空间 ID/清空历史；并回归原 MCP/DAV/Client 文件条件、撤销、恢复、重启和删除。
+- 实际浏览器：内置浏览器默认 1265×712 与 390×844；两个入口均查看，实际浏览文件、新建 UTF-8 文本、断开、恢复、刷新。验证未创建/运行/停止、历史磁盘、无内存样本、容器暂停导致的不可达与恢复。窄屏无横向溢出，临时视口已复原。资源查询未干扰编辑或偷偷恢复 DAV 授权。
+
+提交前审查修复两项问题，均先取得 Red 再验证 Green：单项指标或配置的 JSON 类型错误不再导致整份摘要失败；保存配置时不沿用其他版本的确认，必须重新确认并保存当前支持版本。另修正计划正文沿用旧远端版本的表述。修复后全量 Go、前端、vet、类型、构建与格式检查通过，并以新建测试空间完整重跑 19 组实际联调。
+
+最终证据在 `.artifacts/resources-review-final/`：`evidence.json`、`browser-evidence.json`、`source-inputs.json` 对应上表的同一源码、后端、页面构建与合同。最终页面重新检查了冷空间、浏览文件启动、真实磁盘和内存、手动刷新以及宽窄布局；截图为 `admin-wide.png`、`admin-narrow.png`。此前完整生命周期和不可达界面操作证据保留在 `.artifacts/resources-integration/` 与 `.artifacts/resources-final/`。
+
+审查重跑中的一次 64 MiB PUT 收到远端 502，Hub 已传输 34,996,224 字节，正确返回 `workspace_result_unknown`，没有自动重放原写入。失败数据库和日志保留在 `.artifacts/resources-review/`。另建新测试空间后完整链路通过；这不证明 Agent Space/SDK 偶发传输失败的底层根因已修复，本轮未修改独立项目。
+
+剩余边界：`verify:preview-contract` 的 Core 合同基线一致，但独立 Portal 的 `generated.ts`、`client-feed.schemas.json` 仍有既有 source hash 未同步；本轮未修改 Portal 或 Android。没有新增 CPU 使用率、历史监控、计费、资源配额写入或生产部署。
 
 ## 首次集成验收（历史记录）
 

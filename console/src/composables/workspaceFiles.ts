@@ -1,6 +1,12 @@
 import { ApiProblem, apiResponse } from '../api/client'
 
 export const textLimit = 2 * 1024 * 1024
+export function workspaceBytes(value: number | null | undefined): string {
+ if (value == null) return '—'
+ const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']; let n = value, i = 0
+ while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
+ return `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: i ? 1 : 0 }).format(n)} ${units[i]}`
+}
 export function workspaceFileUrl(base: string, spaceId: string, resource: 'files'|'content', path='') {
  return `${base}/${resource}?${new URLSearchParams({agentSpaceId:spaceId,path})}`
 }

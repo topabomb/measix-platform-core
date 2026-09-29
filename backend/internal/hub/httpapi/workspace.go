@@ -164,6 +164,21 @@ func (h *fullAdminHandler) GetUserWorkspace(w http.ResponseWriter, r *http.Reque
 	}
 	writeJSON(w, 200, out)
 }
+func (h *fullAdminHandler) GetAdminWorkspaceResources(w http.ResponseWriter, r *http.Request, id adminapi.UserId, p adminapi.GetAdminWorkspaceResourcesParams) {
+	if _, ok := h.workspaceAuth(w, r, "", false); !ok {
+		return
+	}
+	out, err := h.services.Workspace.Resources(r.Context(), id, p.AgentSpaceId, h.adminFileAuth(r))
+	// Authentication may have been revoked while the remote read was in flight.
+	if _, ok := h.workspaceAuth(w, r, "", false); !ok {
+		return
+	}
+	if err != nil {
+		writeWorkspaceError(w, err)
+		return
+	}
+	writeJSON(w, 200, out)
+}
 func (h *fullAdminHandler) GetWorkspaceOperation(w http.ResponseWriter, r *http.Request, id adminapi.WorkspaceOperationId) {
 	if _, ok := h.workspaceAuth(w, r, "", false); !ok {
 		return

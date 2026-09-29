@@ -24,7 +24,7 @@ func TestSaveConfigurationDoesNotContactRemoteAndIsCAS(t *testing.T) {
 	}
 	svc := NewService(st.Client, secrets)
 	st.Client.ManagedDraft.Create().SetID("current").SetDraftRevision(1).SetContentJSON([]byte(`{"mcp":[],"bindings":[]}`)).SetUpdatedByUserID(actor).SetUpdatedAt(svc.Now()).SaveX(context.Background())
-	request := adminapi.SaveWorkspaceServiceRequest{Name: "Test", Config: adminapi.AgentSpaceConfig{AdminOrigin: "http://127.0.0.1:1", McpOrigin: "http://127.0.0.1:1", ReleaseIdentity: "3ea01c167fb263f8ef2467b5fe3103353f9a5ddc", ManagementSecret: adminapi.SecretRef{SecretId: secret.SecretID, SecretVersion: secret.SecretVersion}, ConnectTimeoutMs: 10000, IdleTimeoutMs: 60000}}
+	request := adminapi.SaveWorkspaceServiceRequest{Name: "Test", Config: adminapi.AgentSpaceConfig{AdminOrigin: "http://127.0.0.1:1", McpOrigin: "http://127.0.0.1:1", ReleaseIdentity: "661d20d8bfe1fb7630a879383257e61602fb6df6", ManagementSecret: adminapi.SecretRef{SecretId: secret.SecretID, SecretVersion: secret.SecretVersion}, ConnectTimeoutMs: 10000, IdleTimeoutMs: 60000}}
 	got, err := svc.Save(context.Background(), actor, platformid.New(platformid.Idempotency), "", request)
 	if err != nil {
 		t.Fatal(err)

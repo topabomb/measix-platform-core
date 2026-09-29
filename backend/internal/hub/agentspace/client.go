@@ -50,6 +50,7 @@ type User struct {
 	HasDAVCredential bool            `json:"hasDavCredential"`
 	StopPending      bool            `json:"stopPending"`
 	WorkspaceStatus  json.RawMessage `json:"workspaceStatus"`
+	Resources        json.RawMessage `json:"resources"`
 }
 type Credential struct {
 	Username     string `json:"username"`

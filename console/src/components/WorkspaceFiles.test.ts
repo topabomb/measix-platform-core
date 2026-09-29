@@ -7,9 +7,10 @@ import * as client from '../api/client'
 
 describe('workspace file confirmation', () => {
   it.each(['file', 'directory', 'version'])('requires a new overwrite confirmation after changing the %s', async change => {
-    const fetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ entries: [{ path: 'a.txt', kind: 'FILE', etag: '"a"' }, { path: 'b.txt', kind: 'FILE', etag: '"b"' }, { path: 'folder', kind: 'DIRECTORY' }] })
+    const fetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ usedBytes: 24576, entries: [{ path: 'a.txt', kind: 'FILE', etag: '"a"' }, { path: 'b.txt', kind: 'FILE', etag: '"b"' }, { path: 'folder', kind: 'DIRECTORY' }] })
     const wrapper = mount(WorkspaceFiles, { props: { baseUrl: '/workspace', spaceId: 'spc_test' }, global: { plugins: [createPinia(), [Quasar, { components: { QFile, QCheckbox, QBtn, QSeparator, QCardSection, QBanner, QLinearProgress, QList, QItem, QItemSection, QItemLabel, QIcon, QMenu, QDialog, QCard, QCardActions, QInput }, directives: { ClosePopup } }]] } })
     await flushPromises()
+    expect(wrapper.text()).toContain('已用 24 KiB')
     await wrapper.findComponent(QFile).setValue(new File(['a'], 'a.txt'))
     await wrapper.findComponent(QCheckbox).setValue(true)
     expect(wrapper.findComponent(QCheckbox).props('modelValue')).toBe(true)

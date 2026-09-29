@@ -7,6 +7,35 @@ import (
 	"testing"
 )
 
+func TestWorkspaceResourceFixtureIsAdminOnly(t *testing.T) {
+	doc := loadContractDoc(t, "api/admin/admin.openapi.yaml")
+	schema := doc.Components.Schemas["WorkspaceResources"].Value
+	raw, err := os.ReadFile("../../../api/fixtures/workspace/resources.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value map[string]any
+	json.Unmarshal(raw, &value)
+	if err = schema.VisitJSON(value); err != nil {
+		t.Fatal(err)
+	}
+	disk := value["disk"].(map[string]any)
+	disk["status"] = "historical"
+	disk["reason"] = "stopped"
+	if err = schema.VisitJSON(value); err != nil {
+		t.Fatal(err)
+	}
+	disk["status"] = "error"
+	disk["value"] = nil
+	disk["observedAt"] = nil
+	if err = schema.VisitJSON(value); err != nil {
+		t.Fatal(err)
+	}
+	if loadContractDoc(t, "api/client/client-control.openapi.yaml").Components.Schemas["WorkspaceResources"] != nil {
+		t.Fatal("admin observations leaked to client contract")
+	}
+}
+
 func TestWorkspaceClientProjectionFixtures(t *testing.T) {
 	for _, contract := range []string{"api/client/client-control.openapi.yaml", "api/admin/admin.openapi.yaml"} {
 		doc := loadContractDoc(t, contract)

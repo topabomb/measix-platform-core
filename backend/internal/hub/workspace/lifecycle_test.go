@@ -23,6 +23,8 @@ type lifecycleRemote struct {
 	exists, enabled, failDAV, failCreate bool
 	failCheck                            bool
 	creates, rotates, davWrites          int
+	resources                            any
+	onGet                                func()
 }
 
 func (f *lifecycleRemote) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +107,14 @@ func (f *lifecycleRemote) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.exists = false
 		w.WriteHeader(202)
 	default:
-		json.NewEncoder(w).Encode(f.identity(false))
+		if f.onGet != nil {
+			f.onGet()
+		}
+		out := f.identity(false)
+		if f.resources != nil {
+			out["resources"] = f.resources
+		}
+		json.NewEncoder(w).Encode(out)
 	}
 }
 func (f *lifecycleRemote) identity(credential bool) map[string]any {
@@ -138,7 +147,7 @@ func lifecycleFixture(t *testing.T) (*Service, *lifecycleRemote, string, string)
 	if e != nil {
 		t.Fatal(e)
 	}
-	cfg := adminapi.AgentSpaceConfig{AdminOrigin: server.URL, McpOrigin: server.URL, DavOrigin: &server.URL, ManagementSecret: adminapi.SecretRef{SecretId: secret.SecretID, SecretVersion: secret.SecretVersion}, ReleaseIdentity: "3ea01c167fb263f8ef2467b5fe3103353f9a5ddc", ConnectTimeoutMs: 1000, IdleTimeoutMs: 1000}
+	cfg := adminapi.AgentSpaceConfig{AdminOrigin: server.URL, McpOrigin: server.URL, DavOrigin: &server.URL, ManagementSecret: adminapi.SecretRef{SecretId: secret.SecretID, SecretVersion: secret.SecretVersion}, ReleaseIdentity: "661d20d8bfe1fb7630a879383257e61602fb6df6", ConnectTimeoutMs: 1000, IdleTimeoutMs: 1000}
 	workspaceService, e := svc.Save(ctx, actor, platformid.New(platformid.Idempotency), "", adminapi.SaveWorkspaceServiceRequest{Name: "test", Config: cfg})
 	if e != nil {
 		t.Fatal(e)

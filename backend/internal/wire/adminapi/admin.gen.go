@@ -1331,6 +1331,30 @@ func (e ValidationIssueSeverity) Valid() bool {
 	}
 }
 
+// Defines values for WorkspaceAllocationSource.
+const (
+	Default WorkspaceAllocationSource = "default"
+	Sandbox WorkspaceAllocationSource = "sandbox"
+	Unknown WorkspaceAllocationSource = "unknown"
+	Volume  WorkspaceAllocationSource = "volume"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceAllocationSource enum.
+func (e WorkspaceAllocationSource) Valid() bool {
+	switch e {
+	case Default:
+		return true
+	case Sandbox:
+		return true
+	case Unknown:
+		return true
+	case Volume:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WorkspaceCommandAction.
 const (
 	WorkspaceCommandActionCONTINUE   WorkspaceCommandAction = "CONTINUE"
@@ -1430,6 +1454,30 @@ func (e WorkspaceFileResultOutcome) Valid() bool {
 	case WorkspaceFileResultOutcomeSUCCEEDED:
 		return true
 	case WorkspaceFileResultOutcomeUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceObservationStatus.
+const (
+	Current     WorkspaceObservationStatus = "current"
+	Error       WorkspaceObservationStatus = "error"
+	Historical  WorkspaceObservationStatus = "historical"
+	Unavailable WorkspaceObservationStatus = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceObservationStatus enum.
+func (e WorkspaceObservationStatus) Valid() bool {
+	switch e {
+	case Current:
+		return true
+	case Error:
+		return true
+	case Historical:
+		return true
+	case Unavailable:
 		return true
 	default:
 		return false
@@ -3490,6 +3538,9 @@ type ValidationIssueResourceKind string
 // ValidationIssueSeverity defines model for ValidationIssue.Severity.
 type ValidationIssueSeverity string
 
+// WorkspaceAllocationSource defines model for WorkspaceAllocationSource.
+type WorkspaceAllocationSource string
+
 // WorkspaceCommand defines model for WorkspaceCommand.
 type WorkspaceCommand struct {
 	Action           WorkspaceCommandAction `json:"action"`
@@ -3509,6 +3560,20 @@ type WorkspaceDAVConnection struct {
 	DavUrl   string `json:"davUrl"`
 	Token    string `json:"token"`
 	Username string `json:"username"`
+}
+
+// WorkspaceDiskObservation defines model for WorkspaceDiskObservation.
+type WorkspaceDiskObservation struct {
+	ObservedAt *int64                     `json:"observedAt"`
+	Reason     *string                    `json:"reason"`
+	Status     WorkspaceObservationStatus `json:"status"`
+	Value      *WorkspaceDiskUsage        `json:"value"`
+}
+
+// WorkspaceDiskUsage defines model for WorkspaceDiskUsage.
+type WorkspaceDiskUsage struct {
+	AvailableBytes int64 `json:"availableBytes"`
+	UsedBytes      int64 `json:"usedBytes"`
 }
 
 // WorkspaceFileEntry defines model for WorkspaceFileEntry.
@@ -3575,6 +3640,17 @@ type WorkspaceListItem struct {
 	Workspace      WorkspaceProjection `json:"workspace"`
 }
 
+// WorkspaceMemoryObservation defines model for WorkspaceMemoryObservation.
+type WorkspaceMemoryObservation struct {
+	ObservedAt *int64                     `json:"observedAt"`
+	Reason     *string                    `json:"reason"`
+	Status     WorkspaceObservationStatus `json:"status"`
+	Value      *int64                     `json:"value"`
+}
+
+// WorkspaceObservationStatus defines model for WorkspaceObservationStatus.
+type WorkspaceObservationStatus string
+
 // WorkspaceOperation defines model for WorkspaceOperation.
 type WorkspaceOperation struct {
 	Action             string                  `json:"action"`
@@ -3620,6 +3696,39 @@ type WorkspaceProjectionServiceState string
 
 // WorkspaceProjectionState defines model for WorkspaceProjection.State.
 type WorkspaceProjectionState string
+
+// WorkspaceResourceAllocation defines model for WorkspaceResourceAllocation.
+type WorkspaceResourceAllocation struct {
+	Error  *string                   `json:"error"`
+	Source WorkspaceAllocationSource `json:"source"`
+	Value  *int64                    `json:"value"`
+}
+
+// WorkspaceResourceConfiguration defines model for WorkspaceResourceConfiguration.
+type WorkspaceResourceConfiguration struct {
+	CpuCores               WorkspaceResourceAllocation `json:"cpuCores"`
+	MemoryLimitBytes       WorkspaceResourceAllocation `json:"memoryLimitBytes"`
+	WorkspaceCapacityBytes WorkspaceResourceAllocation `json:"workspaceCapacityBytes"`
+}
+
+// WorkspaceResources defines model for WorkspaceResources.
+type WorkspaceResources struct {
+	AgentSpaceId string                         `json:"agentSpaceId"`
+	Allocation   WorkspaceResourceConfiguration `json:"allocation"`
+	Disk         WorkspaceDiskObservation       `json:"disk"`
+	Memory       WorkspaceMemoryObservation     `json:"memory"`
+	Runtime      WorkspaceRuntimeObservation    `json:"runtime"`
+}
+
+// WorkspaceRuntimeObservation defines model for WorkspaceRuntimeObservation.
+type WorkspaceRuntimeObservation struct {
+	ObservedAt *int64                     `json:"observedAt"`
+	Reason     *string                    `json:"reason"`
+	Status     WorkspaceObservationStatus `json:"status"`
+
+	// Value running, stopped, paused, transitioning, notfound, unknown
+	Value *string `json:"value"`
+}
 
 // WorkspaceService defines model for WorkspaceService.
 type WorkspaceService struct {
@@ -4166,6 +4275,11 @@ type MutateAdminWorkspaceFileParams struct {
 	XCSRFToken   string       `json:"X-CSRF-Token"`
 }
 
+// GetAdminWorkspaceResourcesParams defines parameters for GetAdminWorkspaceResources.
+type GetAdminWorkspaceResourcesParams struct {
+	AgentSpaceId string `form:"agentSpaceId" json:"agentSpaceId"`
+}
+
 // DisableUserParams defines parameters for DisableUser.
 type DisableUserParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
@@ -4524,6 +4638,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/users/{userId}/workspace/files)
 	MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params MutateAdminWorkspaceFileParams)
+
+	// (GET /api/admin/v1/users/{userId}/workspace/resources)
+	GetAdminWorkspaceResources(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceResourcesParams)
 
 	// (POST /api/admin/v1/users/{userId}:disable)
 	DisableUser(w http.ResponseWriter, r *http.Request, userId UserId, params DisableUserParams)
@@ -4959,6 +5076,11 @@ func (_ Unimplemented) ListAdminWorkspaceFiles(w http.ResponseWriter, r *http.Re
 
 // (POST /api/admin/v1/users/{userId}/workspace/files)
 func (_ Unimplemented) MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params MutateAdminWorkspaceFileParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/users/{userId}/workspace/resources)
+func (_ Unimplemented) GetAdminWorkspaceResources(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceResourcesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -9859,6 +9981,48 @@ func (siw *ServerInterfaceWrapper) MutateAdminWorkspaceFile(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminWorkspaceResources operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminWorkspaceResources(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminWorkspaceResourcesParams
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminWorkspaceResources(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DisableUser operation middleware
 func (siw *ServerInterfaceWrapper) DisableUser(w http.ResponseWriter, r *http.Request) {
 
@@ -10448,6 +10612,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace", wrapper.CommandWorkspace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/resources", wrapper.GetAdminWorkspaceResources)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/workspace-operations/{operationId}", wrapper.GetWorkspaceOperation)

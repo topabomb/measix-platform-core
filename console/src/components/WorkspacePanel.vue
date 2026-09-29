@@ -6,6 +6,7 @@ import type { components } from '../api/generated'
 import { useSessionStore } from '../stores/session'
 import ProblemBanner from './ProblemBanner.vue'
 import WorkspaceFiles from './WorkspaceFiles.vue'
+import WorkspaceResources from './WorkspaceResources.vue'
 import { workspaceLabel } from '../composables/workspaceLabels'
 
 const props=withDefaults(defineProps<{userId:string;displayName?:string;serviceEnabled?:boolean}>(),{serviceEnabled:false})
@@ -75,6 +76,7 @@ onBeforeUnmount(()=>{alive=false;controller.abort();if(timer)clearTimeout(timer)
     <details v-if="view.agentSpaceId" class="text-caption text-grey-7 q-mt-sm"><summary>空间标识与最近观测</summary><div class="text-break">{{view.agentSpaceId}}</div><div>{{view.observedAt?new Date(view.observedAt).toLocaleString():'未观测'}} · 绑定版本 {{view.bindingRevision}}</div></details>
    </template>
   </q-card-section>
+  <WorkspaceResources v-if="view?.agentSpaceId" :key="view.agentSpaceId" :base-url="url" :space-id="view.agentSpaceId" :revision="`${view.bindingRevision}:${view.state}:${view.serviceState}`"/>
   <WorkspaceFiles v-if="showFiles&&view?.agentSpaceId" :key="view.agentSpaceId" :base-url="url" :space-id="view.agentSpaceId" :available="serviceEnabled&&view.filesAvailable"/>
   <q-dialog :model-value="!!confirm" :persistent="busy" @update:model-value="v=>{if(!v){confirm=undefined;recoveryBearer='';recoverySecret=undefined}}"><q-card style="width:520px;max-width:95vw"><q-card-section class="text-h6">{{actionLabels[confirm??'']}}</q-card-section><q-card-section class="q-gutter-sm"><ProblemBanner :error="error"/>
    <div v-if="confirm==='CREATE'">为此用户创建独立空间。首次工具或文件访问时启动运行环境。</div>

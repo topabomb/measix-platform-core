@@ -12,6 +12,7 @@ import WorkspacePanel from '../components/WorkspacePanel.vue'
 import { workspaceLabel } from '../composables/workspaceLabels'
 
 type Operation = components['schemas']['WorkspaceOperation']
+const supportedRelease = '661d20d8bfe1fb7630a879383257e61602fb6df6'
 const session = useSessionStore(), remoteWorkspace = useRemoteWorkspaceStore(), router = useRouter()
 const current = computed(() => remoteWorkspace.current)
 const desiredEnabled = ref(false), saving = ref(false), error = ref<unknown>(), notice = ref('')
@@ -27,7 +28,7 @@ const running = computed(() => !!operation.value && ['PENDING', 'RUNNING'].inclu
 const blocked = computed(() => !!operation.value && ['UNKNOWN', 'NEEDS_ATTENTION'].includes(operation.value.state))
 const busy = computed(() => saving.value || running.value || remoteWorkspace.loading)
 const originChanged = computed(() => !!current.value && (adminOrigin.value.trim() !== current.value.config.adminOrigin || (mcpOrigin.value.trim() || adminOrigin.value.trim()) !== current.value.config.mcpOrigin || davOrigin.value.trim() !== (current.value.config.davOrigin ?? '')))
-const hasChanges = computed(() => desiredEnabled.value !== !!current.value?.enabled || name.value.trim() !== current.value?.name || originChanged.value || !!bearer.value || !!savedSecret.value || current.value?.activeConfigRevision !== current.value?.configRevision)
+const hasChanges = computed(() => desiredEnabled.value !== !!current.value?.enabled || name.value.trim() !== current.value?.name || originChanged.value || !!bearer.value || !!savedSecret.value || current.value?.config.releaseIdentity !== supportedRelease || current.value?.activeConfigRevision !== current.value?.configRevision)
 const canSave = computed(() => !busy.value && !blocked.value && (desiredEnabled.value
   ? !!adminOrigin.value.trim() && confirmedRelease.value && (!originChanged.value || sameDeployment.value) && (!!current.value || !!bearer.value || !!savedSecret.value) && (hasChanges.value || !remoteWorkspace.enabled)
   : !!current.value?.enabled))
@@ -43,7 +44,7 @@ function fillForm() {
   if (!value) return
   name.value = value.name; adminOrigin.value = value.config.adminOrigin
   mcpOrigin.value = value.config.mcpOrigin; davOrigin.value = value.config.davOrigin ?? ''
-  confirmedRelease.value = true; sameDeployment.value = false
+  confirmedRelease.value = value.config.releaseIdentity === supportedRelease; sameDeployment.value = false
 }
 async function loadSpaces(cursor?: string) {
   if (!current.value) return
@@ -83,10 +84,10 @@ async function save() {
         adminOrigin: adminOrigin.value.trim().replace(/\/$/, ''),
         mcpOrigin: (mcpOrigin.value.trim() || adminOrigin.value.trim()).replace(/\/$/, ''),
         ...(davOrigin.value.trim() ? { davOrigin: davOrigin.value.trim().replace(/\/$/, '') } : {}),
-        managementSecret: secret, releaseIdentity: '3ea01c167fb263f8ef2467b5fe3103353f9a5ddc',
+        managementSecret: secret, releaseIdentity: supportedRelease,
         connectTimeoutMs: value?.config.connectTimeoutMs ?? 90000, idleTimeoutMs: value?.config.idleTimeoutMs ?? 120000,
       }
-      if (!value || name.value.trim() !== value.name || originChanged.value || secret.secretId !== value.config.managementSecret.secretId || secret.secretVersion !== value.config.managementSecret.secretVersion) {
+      if (!value || name.value.trim() !== value.name || originChanged.value || value.config.releaseIdentity !== supportedRelease || secret.secretId !== value.config.managementSecret.secretId || secret.secretVersion !== value.config.managementSecret.secretVersion) {
         const body = { expectedRevision: value?.configRevision ?? 0, name: name.value.trim() || '远程工作区', confirmSameDeployment: sameDeployment.value, config }
         const payload = JSON.stringify(body)
         value = await apiFetch<WorkspaceService>('/api/admin/v1/remote-workspace/services' + (value ? '/' + value.workspaceServiceId : ''), {
@@ -162,9 +163,9 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
             <details>
               <summary class="cursor-pointer text-primary">工具地址与兼容性</summary>
               <q-input v-model="mcpOrigin" outlined dense label="MCP 服务地址" hint="留空使用管理服务地址。填写地址不等于发布 MCP 工具。" class="q-mt-sm" :disable="busy || !desiredEnabled" />
-              <p class="text-caption q-mt-sm">当前适配 Agent Space 的管理 API 与指定 WebDAV 凭据能力（3ea01c1）。</p>
+              <p class="text-caption q-mt-sm">当前适配 Agent Space 的管理 API、资源摘要与指定 WebDAV 凭据能力（661d20d）。</p>
             </details>
-            <q-checkbox v-model="confirmedRelease" dense label="已确认工作区服务支持指定 WebDAV 凭据" :disable="busy || !desiredEnabled" />
+            <q-checkbox v-model="confirmedRelease" dense label="已确认工作区服务版本支持资源摘要及指定 WebDAV 凭据" :disable="busy || !desiredEnabled" />
             <q-checkbox v-if="originChanged" v-model="sameDeployment" dense label="新地址仍指向原服务和原有空间" :disable="busy || !desiredEnabled" />
           </q-card-section>
         </template>

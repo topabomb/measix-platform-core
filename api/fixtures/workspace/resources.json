@@ -1,0 +1,41 @@
+{
+  "agentSpaceId": "spc_550e8400-e29b-41d4-a716-446655440000",
+  "runtime": {
+    "status": "current",
+    "value": "running",
+    "observedAt": 1790697577596,
+    "reason": null
+  },
+  "allocation": {
+    "cpuCores": {
+      "value": 1,
+      "source": "sandbox",
+      "error": null
+    },
+    "memoryLimitBytes": {
+      "value": 268435456,
+      "source": "sandbox",
+      "error": null
+    },
+    "workspaceCapacityBytes": {
+      "value": 268435456,
+      "source": "volume",
+      "error": null
+    }
+  },
+  "memory": {
+    "status": "unavailable",
+    "value": null,
+    "observedAt": null,
+    "reason": "guest_memory_unavailable"
+  },
+  "disk": {
+    "status": "current",
+    "value": {
+      "usedBytes": 0,
+      "availableBytes": 189628416
+    },
+    "observedAt": 1790697577596,
+    "reason": null
+  }
+}

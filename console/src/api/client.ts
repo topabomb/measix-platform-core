@@ -47,7 +47,7 @@ function isMutation(method?: string): boolean {
   return normalized !== 'GET' && normalized !== 'HEAD' && normalized !== 'OPTIONS'
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}, csrfToken?: string): Promise<T> {
+export async function apiResponse(path: string, init: RequestInit = {}, csrfToken?: string): Promise<Response> {
   const headers = new Headers(init.headers)
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   if (csrfToken && isMutation(init.method)) headers.set('X-CSRF-Token', csrfToken)
@@ -73,6 +73,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, csrfToke
       extra,
     )
   }
+  return response
+}
+
+export async function apiFetch<T>(path: string, init: RequestInit = {}, csrfToken?: string): Promise<T> {
+  const response = await apiResponse(path, init, csrfToken)
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }

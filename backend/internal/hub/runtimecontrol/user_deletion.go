@@ -30,6 +30,8 @@ import (
 	"measix/platform/ent/usagedetail"
 	"measix/platform/ent/usageevent"
 	"measix/platform/ent/userbudget"
+	"measix/platform/internal/hub/workspace"
+	"time"
 )
 
 const deletedActorID = "deleted_principal"
@@ -40,6 +42,9 @@ const deletedActorID = "deleted_principal"
 // historical actor attribution is anonymized so it no longer retains the
 // deleted principal identifier.
 func purgeUserData(ctx context.Context, tx *ent.Tx, userID, deletionActivationID string) error {
+	if err := workspace.PreserveDeletionTx(ctx, tx, userID, time.Now().UTC()); err != nil {
+		return err
+	}
 	active, err := tx.BudgetRequest.Query().Where(
 		budgetrequest.UserIDEQ(userID),
 		budgetrequest.StateIn(budgetrequest.StateADMITTED, budgetrequest.StateSTARTED, budgetrequest.StateRECONCILIATION),

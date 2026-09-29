@@ -16,10 +16,12 @@ import DetailWorkspace from '../components/DetailWorkspace.vue'
 import CursorPager from '../components/CursorPager.vue'
 import UsageRequestList from '../components/UsageRequestList.vue'
 import UserBudgetPanel from '../components/UserBudgetPanel.vue'
+import WorkspacePanel from '../components/WorkspacePanel.vue'
 import { useCursorPager } from '../composables/useCursorPager'
 import { useActivationStore } from '../stores/activation'
 import QRCode from 'qrcode'
 import { useSessionStore } from '../stores/session'
+import { useRemoteWorkspaceStore } from '../stores/remoteWorkspace'
 
 const { t: $t } = useI18n()
 const router = useRouter()
@@ -34,6 +36,9 @@ type Activation = components['schemas']['Activation']
 type UsageSummary = components['schemas']['UsageSummary']
 
 const session = useSessionStore()
+const remoteWorkspace = useRemoteWorkspaceStore()
+const hasUserWorkspace = ref(false)
+const showUserWorkspace = computed(() => remoteWorkspace.enabled || hasUserWorkspace.value)
 const activation = useActivationStore()
 const listPath = ref('/api/admin/v1/users?limit=50')
 // A paginated list without a search box is the worst of both: an operator can
@@ -56,7 +61,8 @@ const devicesPath = ref('')
 const loadingDevices = ref(false)
 let deviceSequence = 0
 const selected = ref<User>()
-const activeUserSection = ref<'devices' | 'budgets' | 'usage'>('devices')
+const activeUserSection = ref<'devices' | 'budgets' | 'usage' | 'workspace'>('devices')
+watch(showUserWorkspace, visible => { if (!visible && activeUserSection.value === 'workspace') activeUserSection.value = 'devices' })
 const createOpen = ref(false)
 const enrollmentOpen = ref(false)
 const deleteOpen = ref(false)
@@ -72,7 +78,7 @@ async function refresh() {
   const query = new URLSearchParams({ limit: '50' })
   if (search.value.trim()) query.set('query', search.value.trim())
   listPath.value = `/api/admin/v1/users?${query.toString()}`
-  await resetUsers()
+  await Promise.all([resetUsers(), remoteWorkspace.load()])
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
@@ -96,10 +102,17 @@ async function createUser() {
 
 async function openUser(user: User) {
   selected.value = user
+  hasUserWorkspace.value = false
   activeUserSection.value = 'devices'
   error.value = undefined
   applyUsagePeriod()
   await loadDevices(user)
+  if (remoteWorkspace.current) {
+    try {
+      const view = await apiFetch<components['schemas']['WorkspaceProjection']>(`/api/admin/v1/users/${encodeURIComponent(user.userId)}/workspace`)
+      if (selected.value?.userId === user.userId) hasUserWorkspace.value = view.state !== 'UNPROVISIONED'
+    } catch (cause) { if (selected.value?.userId === user.userId) error.value = cause }
+  }
 }
 
 // The previous user's devices are cleared and every response is checked against
@@ -328,7 +341,7 @@ onMounted(async () => {
     try {
       const user = await apiFetch<User>(`/api/admin/v1/users/${encodeURIComponent(route.query.userId)}`)
       await openUser(user)
-      if (route.query.section === 'budgets' || route.query.section === 'usage') activeUserSection.value = route.query.section
+      if (route.query.section === 'budgets' || route.query.section === 'usage' || route.query.section === 'workspace' && showUserWorkspace.value) activeUserSection.value = route.query.section
     } catch (cause) { error.value = cause }
   }
 })
@@ -423,6 +436,7 @@ defineExpose({ beginDeleteUser })
         <q-tabs v-model="activeUserSection" dense align="left" active-color="primary" class="user-detail-tabs" data-cy="user-detail-tabs">
           <q-tab name="devices" :label="$t('users.devices')" />
           <q-tab name="budgets" :label="$t('budgets.title')" />
+          <q-tab v-if="showUserWorkspace" name="workspace" label="远程工作区" />
           <q-tab name="usage" :label="$t('users.usage')" />
         </q-tabs>
         <q-separator />
@@ -456,6 +470,7 @@ defineExpose({ beginDeleteUser })
         <q-card-section v-else-if="activeUserSection === 'budgets'">
           <UserBudgetPanel :user-id="selected.userId" />
         </q-card-section>
+        <q-card-section v-else-if="activeUserSection === 'workspace'"><WorkspacePanel :key="selected.userId" :user-id="selected.userId" :display-name="selected.displayName" :service-enabled="remoteWorkspace.enabled" /></q-card-section>
         <q-card-section v-else data-cy="user-usage">
           <div class="row items-center justify-between q-mb-xs">
             <div class="text-subtitle2">{{ $t('users.usage') }}</div>

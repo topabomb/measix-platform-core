@@ -1,21 +1,21 @@
 # 远程工作区与 Agent Space 集成实施方案
 
-状态：**待实施方案**。本文记录已确认的产品目标、具体选择、实现依赖和验收要求，不代表接口、数据库或跨项目集成已经交付。
+状态：**Core / Relay / Admin 已落入当前候选源码**。本文保留产品选择、独立服务边界和验收要求；具体实现与恢复操作见 [实现参考](remote-workspace-implementation.md)，当前执行证据见 [联调记录](remote-workspace-verification.md)。Android P4 与完整 S1 compute/storage 计量不在本次 Core/Admin 交付范围。
 
-调研日期：2026-09-28；按独立服务接入约定复核：2026-09-29。本文属于 Core 的实施规划；跨组件语义变更必须先落入架构权威，再按 OpenAPI → fixtures → generated artifacts → tests → implementation 实施。跨组件边界以 [S1 远程工作区合同](../../measix-architecture/docs/10-runtime-foundation/s1/measix-s1-remote-workspace-contract-spec.md) 为准，也不修改历史发布内容。文中的新增字段、路由及状态语义均为 Core/客户端实施要求，不能按现有接口直接调用；Agent Space 仅使用已有接口。
+调研日期：2026-09-28；按独立服务接入约定复核：2026-09-29。本文属于 Core 的实施规划；跨组件语义变更必须先落入架构权威，再按 OpenAPI → fixtures → generated artifacts → tests → implementation 实施。跨组件边界以 [S1 远程工作区合同](../../measix-architecture/docs/10-runtime-foundation/s1/measix-s1-remote-workspace-contract-spec.md) 为准，也不修改历史发布内容。已落地 HTTP 方法、字段和生成类型以仓库 OpenAPI 为准；Agent Space 仅使用已有接口。
 
 ## 1. 目标、范围与确定选择
 
 Core 将“远程工作区”作为可选企业能力。Admin 可以配置并热更新 Agent Space 集成，为指定企业用户创建、断开、恢复或删除远程工作区，并管理其中的文件。开通用户通过现有企业托管 MCP 使用远程执行工具；Android 后续增加工作区状态识别及网盘式文件界面。
 
-接入结论：按本方案约定范围，Agent Space 已提交并完成独立验证的 `3ea01c1` 版本已覆盖所需远端能力，包括调用方指定 DAV token，无需再为 Core 或 Android 增加接口、文件服务或状态协议。目录/文件管理使用 WebDAV；账号创建、启用/禁用、删除及凭据管理使用管理 API；执行工具使用 MCP。Core/Android 的集成、界面和验收仍需实施，不能把远端能力齐备等同于整个功能或生产部署已交付；验证身份见 2.1。
+接入结论：按本方案约定范围，Agent Space 已提交并完成独立验证的 `3ea01c1` 版本已覆盖所需远端能力，包括调用方指定 DAV token，无需再为 Core 或 Android 增加接口、文件服务或状态协议。目录/文件管理使用 WebDAV；账号创建、启用/禁用、删除及凭据管理使用管理 API；执行工具使用 MCP。Core/Admin 集成已实现并单独验证；Android 后续界面仍需实施，不能把远端能力齐备或本地联调通过等同于生产部署已交付。
 
 | 项目 | 本方案确定选择 |
 |---|---|
 | 产品名称 | Core Admin、Android 和 MCP 展示统一使用“远程工作区” |
 | 领域概念 | 沿用路线图中的 `AgentSpace`、`agentSpaceId = spc_<uuid>`，不另建 `RemoteWorkspace` 实体或第二套空间 ID |
 | 服务边界 | Agent Space 是独立部署、独立持久化的第三方服务；本次不修改该项目，Core 复用现有管理 API、MCP 和 WebDAV |
-| 集成管理 | Admin 新增“集成管理”；Agent Space 为首个类型；配置保存、检查、应用和停用无需重启 Core |
+| 管理入口 | Admin 使用“远程工作区”，路由、代码领域名使用专门语义；启用开关在“保存配置”后生效，通用第三方集成管理留待后续 |
 | 初始规模 | 首期一个生效的 Agent Space 集成，每个企业用户最多一个未删除的远程工作区；不引入集群调度或多工作区选择 |
 | 账号规则 | 新账号使用 `measix_<用户 UUID>`，保留完整 UUID 和连字符；不使用部署 UUID 拼接、Base32 或截断哈希 |
 | 开通方式 | 管理员显式开通，不因企业登录或一次 MCP 探测自动创建账号；VM 在实际工具或文件访问时按需启动 |
@@ -33,9 +33,11 @@ Core 将“远程工作区”作为可选企业能力。Admin 可以配置并热
 
 S1 路线图还要求 compute/storage usage 和资源限额。现有 VM profile/磁盘限制可以复用，但不等于平台计量和每用户 quota 已完成。本方案交付应称“远程工作区集成”；完整 S1 的剩余要求须保留在阶段清单中，不能用集成验收替代。
 
-## 2. 调研基线与当前实现
+## 2. 原始调研基线与第三方依赖
 
-### 2.1 仓库及证据边界
+### 2.1 原始调研记录（历史证据）
+
+本节保留 2026-09-28/29 实施前的基线，表中的“本轮”指当时的方案复核；当前 Core 源码及新增联调证据见实现参考，不用本节替代。
 
 | 仓库 | 本轮读取基线 | 当前事实 |
 |---|---|---|
@@ -75,17 +77,17 @@ Agent Space 的 `docs/webdav-execution.md` 对应当前固定版本：镜像 `ag
 | 域名边界 | MCP/admin、DAV、每空间临时网页按实际 Host/authority 隔离；不能只改返回 URL 或伪造转发头 |
 | helper | guest 中由 Host 分发，具有实例归属、摘要及有界日志；禁止另建第二份 helper 或通配终止用户进程 |
 
-### 2.3 集成方需要补齐的能力
+### 2.3 集成方责任与实现对应
 
-1. Core 尚无集成管理、用户空间绑定、管理 API adapter、文件 API 和相应界面；这些由 Core 实现。
-2. Relay 当前按共享 resource → route → upstream 解析目标和凭据，需要增加每用户绑定及关联在途请求取消。发布、预算和 Usage 的 upstreamId 依赖须同步扩展。
+1. Core 已增加远程工作区管理、用户空间绑定、管理 API adapter、文件 API 和 Admin 界面；具体所有者见实现参考。
+2. Relay 保留原共享 resource → route → upstream 分支，并增加显式 integration target、每用户绑定和在途撤销；发布、预算与 Usage 使用同一版本化归属。
 3. Core 文件功能通过已有 DAV 协议实现。DAV 需由 Agent Space 部署方启用并配置合法独立 origin；Core 不远程改写其配置。
 4. 现有管理 API 不提供持久服务实例身份、创建关联或条件修订。Core 不以新增这些字段为接入前提，异常按 7.3–7.4 核实和处理，不承诺所有故障自动恢复。
 5. Agent Space 文档中的裸 usr 账号接入约定不是 username 校验限制。新 measix_ 映射由本 Core 方案定义，历史账号显式绑定原值；本次不修改 Agent Space 文档或代码。
 
 ### 2.4 关键实现核对位置
 
-以下位置用于开发者复核本方案依赖，不把规划能力写成当前实现：
+以下保留原调研定位；新增实现位置以实现参考为准：
 
 | 所在仓库/文件 | 本轮确认内容与实施影响 |
 |---|---|
@@ -142,9 +144,9 @@ Agent Space: measix_550e8400-e29b-41d4-a716-446655440000
 
 ### 4.2 绑定与接管
 
-`integrationId = itg_<uuid>` 标识 Hub 的第三方连接配置，`workspaceOperationId = wop_<uuid>` 标识持久工作区操作，均按标识合同使用。`agentSpaceId` 由 Agent Space 创建；Core 保存 integrationId、remoteUsername、spc 和配置目标，不再生成平行空间 ID。
+`workspaceServiceId = wss_<uuid>` 标识 Hub 的第三方连接配置，`workspaceOperationId = wop_<uuid>` 标识持久工作区操作，均按标识合同使用。`agentSpaceId` 由 Agent Space 创建；Core 保存 workspaceServiceId、remoteUsername、spc 和配置目标，不再生成平行空间 ID。
 
-Core 当前 platformid 尚未登记 itg/wop/spc；实施时补齐本地 ID 生成/校验和导入 spc 的格式校验，Core 不生成远端 spc。OpenAPI、数据库约束及 fixtures 使用同一标识合同。
+Core 的 platformid 已登记 wss/wop/spc，校验导入的 spc 格式；Core 不生成远端 spc。OpenAPI、数据库约束及 fixtures 使用同一标识合同。
 
 configRevision 是 Hub 配置版本，bindingRevision 是 Hub 用户绑定/授权意图版本，controlRevision 属于既有 Relay 控制投影。它们都不是 Agent Space 的条件写入参数。现有单账号管理变更携带原 spc，可防止操作同名重建的空间，但不能阻止同一空间上的迟到写入。
 
@@ -152,13 +154,13 @@ configRevision 是 Hub 配置版本，bindingRevision 是 Hub 用户绑定/授�
 
 接管须确认原控制方停止编排且旧管理请求已结束，保存接管意图，使用现有禁用 API 撤销旧 MCP/DAV key 并等待停止，再按原 spc 恢复、签发并保存 MCP 凭据。需要文件访问时由管理员显式签发并交付新的 DAV 连接信息。数据库克隆或独立服务迁移需显式移交；不按前缀自动认领或批量删除，不以相同 URL/账号证明控制权。
 
-## 5. Admin 集成管理与热更新
+## 5. Admin 远程工作区管理与热更新
 
 ### 5.1 页面与配置
 
-Admin 新增“集成管理 → Agent Space”，提供配置、连接检查、保存并应用、停用、用户空间列表、操作进度和脱敏诊断。用户详情增加“远程工作区”，复用同一后端操作，不创建另一套状态。
+Admin 新增“远程工作区”（`/admin/remote-workspaces`），以启用开关和“保存配置”为主流程，保存后应用启用或关闭意图，另有已保存连接检查、用户空间、操作进度和诊断。用户详情复用同一后端操作。服务关闭时隐藏未开通用户的工作区页签及 MCP 新增入口；已有空间、待处理操作和现有 MCP 定义仍可查看、清理，不把保存的配置和文件隐藏丢失。
 
-公共集成结构只包含 ID、类型、名称、配置版本、启用意图、生效状态和诊断。Agent Space 使用类型化配置，首期不引入动态插件加载、任意脚本、通用 JSON 编辑器或自动发现服务。
+专用 WorkspaceService 结构包含 ID、类型、名称、配置版本、启用意图、生效状态和诊断。Agent Space 使用类型化配置，首期不引入动态插件加载、任意脚本、通用 JSON 编辑器或自动发现服务。
 
 运行配置包含管理/MCP 地址、用于文件功能的 DAV origin、管理凭据版本引用及必要超时。DAV origin 必须符合远端部署配置，外部客户端使用可达的 DAV 地址；临时网页域名仍由 Agent Space 独立管理。DAV 未启用时显示文件不可用，不阻止独立满足条件的 MCP 使用。
 
@@ -172,7 +174,7 @@ Admin 新增“集成管理 → Agent Space”，提供配置、连接检查、�
 4. Relay 原子应用并返回精确确认；Hub 在持久化确认后更新 activeConfigRevision，并开放与该配置一致的文件准入。
 5. Hub 重启或确认丢失时查询已应用版本收敛，不盲目重发旧配置覆盖新状态。
 
-尚无 Release 或集成尚未发布/无运行绑定时，连接检查和配置应用在 Hub 内以数据库事务生效，标记“MCP 待发布/无运行绑定”，不依赖现有要求 activeReleaseContent 的 Upstream 应用入口，不伪造 generation=0 的发布。首个关联 Release 仍由现有 Publish 应用 Relay 控制；发布之前禁止创建并连接新用户工作区。已有工作区在撤下 MCP 后仍可进行文件和生命周期管理。
+尚无 Release 或集成尚未发布/无运行绑定时，连接检查和配置应用在 Hub 内以数据库事务生效，标记“MCP 待发布/无运行绑定”，不依赖现有要求 activeReleaseContent 的 Upstream 应用入口，不伪造 generation=0 的发布。首个关联 Release 仍由现有 Publish 应用 Relay 控制；发布之前即可开通新用户工作区和管理文件，MCP 为可选后续步骤。已有工作区在撤下 MCP 后仍可进行文件和生命周期管理。
 
 跨 Hub/Relay 切换不宣称分布式原子事务。发送控制前持久化目标及待应用状态；发生目标、凭据或撤销语义变化时先关闭相关 Hub 文件准入，再应用 Relay，确认后重开。只影响后续请求的普通超时参数变更可让已准入请求按旧配置完成。Relay 重启当前状态为空、拒绝运行请求，Hub reconcile 从持久权威重新下发；ACK 不是 Relay 落盘、远端身份有效或 VM 停止的证明。
 
@@ -182,7 +184,7 @@ Admin 新增“集成管理 → Agent Space”，提供配置、连接检查、�
 
 配置校验失败且尚未发送应用时，可确定旧版本继续有效；发送后结果未知时必须标记 APPLYING/UNKNOWN 并对账，不能报告已回滚。新凭据如果已在远端轮换，旧凭据可能已无效，也不能承诺透明退回旧值。
 
-已有绑定时，更换地址必须由管理员确认仍指向原部署，并逐一核对原账号/spc；无法核实则不应用。迁移到另一服务走显式移交流程，不把本地 integrationId、TLS 或相同 spc 当成远端实例身份证明。使用合法 authority/TLS 名称，不靠伪造 X-Forwarded-Host 绕过校验。远端返回的 mcpUrl/davUrl 必须与已配置 origin 和目标账号匹配，不作为任意带凭据请求或重定向的来源。
+已有绑定时，更换地址必须由管理员确认仍指向原部署，并逐一核对原账号/spc；无法核实则不应用。迁移到另一服务走显式移交流程，不把本地 workspaceServiceId、TLS 或相同 spc 当成远端实例身份证明。使用合法 authority/TLS 名称，不靠伪造 X-Forwarded-Host 绕过校验。远端返回的 mcpUrl/davUrl 必须与已配置 origin 和目标账号匹配，不作为任意带凭据请求或重定向的来源。
 
 ### 5.3 生效与停用
 
@@ -200,15 +202,15 @@ Admin 新增“集成管理 → Agent Space”，提供配置、连接检查、�
 
 每个集成生成一个稳定 `mcpServerId`，展示名“远程工作区”，协议 MCP_STREAMABLE_HTTP，authOwnership 保持 ENTERPRISE_MANAGED。它不是 USER_MANAGED OAuth，也不使用管理员 Bearer 执行用户工具。
 
-首次接入把生成的定义及内部运行关联加入现有能力草稿，经过 Validate/Publish 后可供用户开通。自动生成不等于自动发布所有未完成草稿；Admin 明确显示“集成已配置，MCP 待发布”。不要建立旁路发布，也不要为每个用户复制 MCP 定义、Assistant 或 Release。
+保存服务配置不修改能力草稿。管理员需要助手工具时，在 MCP 页面显式添加该服务的稳定定义及内部运行关联，再经过 Validate/Publish 启用工具入口；用户开通和文件管理不依赖此步骤。Admin 明确显示“MCP 未发布（可选）”。不要建立旁路发布，也不要为每个用户复制 MCP 定义、Assistant 或 Release。
 
 集成维护连接和凭据；公开名称/Assistant 引用按现有能力发布权限管理。用户开通/断开和明确操作触发的凭据轮换只更新用户绑定与 controlRevision，不改变共享 Snapshot。配置更新不改变 mcpServerId；替换独立服务须显式处理。
 
 未开通用户可能仍在共享企业目录看到该 MCP：新 Android 结合工作区投影显示“未开通”，Relay 始终拒绝执行。不得因共享目录可见推断已授权。需要工作区的 Assistant 未获得可调用资源时报告明确准备失败；不静默跳过固定引用或回退本地 shell。未引用该服务的普通 Assistant 不受工作区不可用影响。
 
-当前 Admin `RuntimeBindingDefinition` 强制要求 upstreamId，能力校验和发布编译也直接查共享 Upstream，因此这里需要同步扩展服务器端发布合同，不能仅在 Relay 加一张表。增加显式 INTEGRATION 目标分支，引用 integrationId，与 UPSTREAM 分支互斥，首期仅允许绑定该集成的 MCP 资源；历史缺少判别的绑定按原 upstreamId 解释，不重写历史 Release 字节/hash。新集成定义按受支持接口、已配置目标和 MCP 路径校验。不要创建一个 Auth=NONE 的假 Upstream 或放入管理员 Token 来绕过校验。新 wire 版本和对应读取/发布 fixtures 须在 P0 固定；客户端 McpDefinition 无需暴露此分支。发布回滚和工作区 reconcile 均要以当前有效 Release 为准，不得复活已从发布中撤下的资源。
+当前 Admin `RuntimeBindingDefinition` 强制要求 upstreamId，能力校验和发布编译也直接查共享 Upstream，因此这里需要同步扩展服务器端发布合同，不能仅在 Relay 加一张表。增加显式 REMOTE_WORKSPACE 目标分支，引用 workspaceServiceId，与 UPSTREAM 分支互斥，首期仅允许绑定该集成的 MCP 资源；历史缺少判别的绑定按原 upstreamId 解释，不重写历史 Release 字节/hash。新集成定义按受支持接口、已配置目标和 MCP 路径校验。不要创建一个 Auth=NONE 的假 Upstream 或放入管理员 Token 来绕过校验。新 wire 版本和对应读取/发布 fixtures 须在 P0 固定；客户端 McpDefinition 无需暴露此分支。发布回滚和工作区 reconcile 均要以当前有效 Release 为准，不得复活已从发布中撤下的资源。
 
-该绑定分支是必需的服务端合同扩展，不能在保持 upstreamId 必填的旧 DTO 中塞入 integrationId。旧 Upstream 分支保持原字段含义；新分支有显式类型判别和协议支持检查，并覆盖草稿编辑、校验、发布、回滚、控制重建与历史读取。不得为了让旧服务端接受而生成占位 Upstream ID。
+该绑定分支是必需的服务端合同扩展，不能在保持 upstreamId 必填的旧 DTO 中塞入 workspaceServiceId。旧 Upstream 分支保持原字段含义；新分支有显式类型判别和协议支持检查，并覆盖草稿编辑、校验、发布、回滚、控制重建与历史读取。不得为了让旧服务端接受而生成占位 Upstream ID。
 
 ### 6.2 Relay 解析与撤销
 
@@ -234,7 +236,7 @@ POST、GET/SSE、DELETE、协议/session header 全部经过同一绑定；保�
 
 ### 6.3 预算与用量归属
 
-现有 `BudgetAdmissionRequest`、`RequestUsageFact` 和准入校验要求合法 upstreamId；发布与 Relay 改为集成目标后，这条链路也必须同步扩展。选择类型化目标归属：保留历史 Upstream 分支，新分支保存 integrationId 和固定的用户空间/绑定身份；协议版本、确切字段及 Admin 投影在 P0 一起冻结。不把 integrationId 填进 upstreamId，不造虚构 Upstream，不跳过原有 MCP 预算准入。
+现有 `BudgetAdmissionRequest`、`RequestUsageFact` 和准入校验要求合法 upstreamId；发布与 Relay 改为集成目标后，这条链路也必须同步扩展。选择类型化目标归属：保留历史 Upstream 分支，新分支保存 workspaceServiceId 和固定的用户空间/绑定身份；协议版本、确切字段及 Admin 投影在 P0 一起冻结。不把 workspaceServiceId 填进 upstreamId，不造虚构 Upstream，不跳过原有 MCP 预算准入。
 
 准入摘要、预算请求持久化、Relay spool、Usage ingest/ledger、请求详情及对账都必须保存请求发生时的不可变目标，不能在集成改名、用户删除或空间重建后查询当前绑定补历史事实。旧 spool/账本按原合同读取，追加迁移保留历史归属；新事件不下发给不支持该分支的消费者。用户未开通等权限拒绝仍由授权层拒绝，不能套用计量降级策略放行。
 
@@ -266,7 +268,7 @@ UI 至少区分未开通、开通中、已连接、断开中、已断开、恢�
 
 | 操作 | 必须执行与完成条件 |
 |---|---|
-| 创建并连接 | 检查集成/MCP 已发布及用户资格 → 保存创建意图 → 创建远端账号 → 保存 spc/加密 MCP 凭据 → 应用用户绑定 → 确认 MCP 生效；文件凭据按 8.2 准备，分别显示可用性；创建不启动 VM |
+| 创建并连接 | 检查服务已启用及用户资格 → 保存创建意图 → 创建远端账号 → 保存 spc/加密 MCP 凭据 → 如有已发布 MCP 则应用用户绑定并确认生效；文件凭据按 8.2 准备，分别显示可用性；创建不启动 VM |
 | 断开 | 保存断开意图、立即阻断 Hub 用户文件请求 → 撤销 Relay、禁用远端账号并停止 VM → 双侧确认；保留文件 |
 | 恢复 | 复验用户资格、配置目标/原 spc 且停止完成 → 恢复账号 → 签发并保存 MCP Token → 应用绑定；DAV 保持不可用，由管理员显式重新签发并交付 |
 | 删除空间 | 保存原 spc 的删除意图并撤销访问 → 远端 DELETE → 查询原目标至确认不存在 → 清除秘密和活动绑定 |
@@ -304,7 +306,7 @@ MCP 凭据由 Core 管理用于 Relay。DAV 凭据由 Core 保管并可由管理
 
 Admin 的处理入口沿原操作提供“重新查询”“显式接管”“核实后重试/继续”，记录核实依据、操作者和固定目标；不提供跳过核实的“标记成功”。涉及控制权变更或不同值写入的接管/重试前，由部署管理方确认旧控制方及在途写入已结束；DAV 同值继续按 8.2 处理。必要时按 Agent Space 现有运维方式处理，Core 不自动重启服务。不能仅凭账号 active、一次 404 或经过一段时间解除未知状态，证据不足继续待处理。
 
-操作固定实际配置修订、地址及管理 Secret 版本，不能只保存 integrationId 后改读最新配置；有未确认写入时禁止迁移目标。地址迁移须在处理完这些操作后核对原空间，再显式更新后续操作目标。管理凭据失效时允许管理员在核实同一目标后显式更新待处理操作的凭据引用并留下记录，不因此换目标或重发结果未知的写入。
+操作固定实际配置修订、地址及管理 Secret 版本，不能只保存 workspaceServiceId 后改读最新配置；有未确认写入时禁止迁移目标。地址迁移须在处理完这些操作后核对原空间，再显式更新后续操作目标。管理凭据失效时允许管理员在核实同一目标后显式更新待处理操作的凭据引用并留下记录，不因此换目标或重发结果未知的写入。
 
 企业用户删除须接入当前 finalizeSecurityChange → purgeUserData：在同一 Hub 事务先保存独立远端清理记录，再清除用户私有数据。记录仅保留目标配置、账号、原 spc、未完成操作及必要秘密引用，不保存文件树或正文；创建未获 spc 时也必须保留未知创建目标。用户行删除后仍能收尾，不能把 Core 身份删除完成解释为远端磁盘删除完成。
 
@@ -430,13 +432,13 @@ UI 名称为“远程工作区 → 文件”。个人域不注册企业 MCP 或�
 
 ## 11. 协议面与兼容策略
 
-### 11.1 拟新增/扩展的接口
+### 11.1 接口范围（确切路径以 OpenAPI 为准）
 
-以下为职责与路由草案，不是当前可调用 API；最终方法、枚举、错误和 schema 在架构审定后由 OpenAPI 固定，不在前后端手写平行 DTO。
+以下为当前接口职责索引；确切方法、枚举、错误和 schema 由 OpenAPI 维护，不在本文复制完整定义，也不在前后端手写平行 DTO。
 
-| 接口面 | 拟增加内容 |
+| 接口面 | 当前职责 |
 |---|---|
-| Core Admin `/api/admin/v1/integrations` | 集成创建/查询/更新、check、apply、disable，预期版本和幂等操作引用 |
+| Core Admin `/api/admin/v1/remote-workspace/services` | 集成创建/查询/更新、check、apply、disable，预期版本和幂等操作引用 |
 | Core Admin 用户工作区子资源 | 开通、断开、恢复、删除、状态/进度、显式接管旧空间 |
 | Core Admin 工作区文件/连接信息子资源 | 文件列表/内容与修改操作；受控查看/复制 DAV 连接信息及签发、轮换、撤销 |
 | Core Client `/api/client/v1/workspace` | 单一用户工作区投影及其文件子资源，身份从 Session 获取 |
@@ -475,8 +477,8 @@ UI 名称为“远程工作区 → 文件”。个人域不注册企业 MCP 或�
 
 新增持久结构仅覆盖真实新事实，命名由实现仓库确定：
 
-- Integration 与不可变配置修订：类型、候选/生效配置、管理/MCP/DAV 目标、Secret 版本引用。
-- 用户工作区绑定：userId、integrationId、remoteUsername、spc、连接意图、MCP/DAV 有效凭据引用及可用状态、本地绑定修订、远端观测及已应用控制修订。
+- WorkspaceService 与不可变配置修订：类型、候选/生效配置、管理/MCP/DAV 目标、Secret 版本引用。
+- 用户工作区绑定：userId、workspaceServiceId、remoteUsername、spc、连接意图、MCP/DAV 有效凭据引用及可用状态、本地绑定修订、远端观测及已应用控制修订。
 - 未完成操作：本地命令引用、原配置/秘密版本及目标、本地意图版本、DAV 候选 Secret 引用、步骤发送/确认状态、最近错误及核实信息；复用现有持久化/Idempotency 和后台处理，远端操作不能冒充单次 Relay Activation，不另建 DAV 凭据状态表。
 - 预算/用量的目标归属：增加集成分支所需字段和约束，历史 upstreamId 不改写；不以重新计算旧事件/hash 迁移数据。
 
@@ -492,7 +494,7 @@ UI 名称为“远程工作区 → 文件”。个人域不注册企业 MCP 或�
 
 ### 12.3 部署次序与回滚
 
-推荐顺序：备份并验证恢复能力 → 准备 Agent Space 已完成独立验证、支持指定 DAV token 的版本及管理/MCP/DAV 配置 → 升级兼容的新 Relay → Core migrate/check → 启动新版 Hub/Admin → 验证原功能 → 配置并检查集成 → 首次发布 MCP → 显式开通测试用户 → 验证 Core 文件及管理员交付后的 DAV 直连 → Android 适配/兼容验证 → 扩大开通范围。旧部署可能需要升级到该支持版本，本方案不再要求 Agent Space 增加其他接口或 schema。
+推荐顺序：备份并验证恢复能力 → 准备 Agent Space 已完成独立验证、支持指定 DAV token 的版本及管理/MCP/DAV 配置 → 升级兼容的新 Relay → Core migrate/check → 启动新版 Hub/Admin → 验证原功能 → 保存并启用远程工作区服务 → 显式开通测试用户 → 验证 Core 文件及管理员交付后的 DAV 直连 → 按需添加并发布 MCP、验证工具 → Android 适配/兼容验证 → 扩大开通范围。旧部署可能需要升级到该支持版本，本方案不再要求 Agent Space 增加其他接口或 schema。
 
 Core 继续显式执行 `control-hub migrate`、`control-hub check`，Hub 启动不自动修改 schema。部署包声明最低组件协议能力，具体命令和受支持起点由发行手册固定；不能依赖某个会变化的分支或相同 SDK 标签。
 
@@ -524,7 +526,7 @@ Core 的具体包拆分保持直接：集成配置、工作区操作及一个 Ag
 | P4 Android | 状态识别先交付，随后文件与预览界面 | 新旧组合、真实设备传输、切域/退出、附件闭环和持久迁移 |
 | P5 升级交付 | 历史部署演练、备份恢复、发布包和证据 | 固定源码/镜像/合同/客户端版本的完整证据及明确限制 |
 
-P0 是合同落地工作，不是实施中任意选择语义的占位阶段。退出前必须确定：Core 新增接口的版本/方法/路径、本地幂等与错误 schema；目标绑定与预算/用量分支的版本；文件元信息/部分结果/条件头与传输限制配置；客户端投影/旧服务探测；用户删除清理记录；各历史迁移起点。普通库选型、包名和具体 UI 排版由各实现仓库决定。P1 可先完成配置保存和检查，端到端启用等待 P2 的发布及每用户转发；文件按 P3 独立验收。不设置 Agent Space 改造阶段。
+P0 是合同落地工作，不是实施中任意选择语义的占位阶段。退出前必须确定：Core 新增接口的版本/方法/路径、本地幂等与错误 schema；目标绑定与预算/用量分支的版本；文件元信息/部分结果/条件头与传输限制配置；客户端投影/旧服务探测；用户删除清理记录；各历史迁移起点。普通库选型、包名和具体 UI 排版由各实现仓库决定。P1 完成配置保存、启用和用户生命周期；文件按 P3 独立验收，P2 的 MCP 发布与每用户转发是可选后续工具链路。不设置 Agent Space 改造阶段。
 
 以下矩阵是本实施方案检查清单，不冒充已登记的架构测试 ID：
 

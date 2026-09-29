@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"measix/platform/ent/session"
 	"measix/platform/pkg/platformid"
+	"slices"
 	"strings"
 
 	"measix/platform/ent"
@@ -52,7 +53,7 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 			return nil, err
 		}
 		generation := int64(state.ActiveManagedGeneration)
-		if relayMatches(status, pending.ControlRevision, pending.BundleHash, &generation) {
+		if relayMatches(status, pending.ControlRevision, pending.BundleHash, &generation) && (state.ProtocolVersion == nil || *state.ProtocolVersion < 2 || status.ProtocolVersion != nil && *status.ProtocolVersion >= 2) {
 			return s.finalizePending(ctx, pending.ID)
 		}
 		if !status.Ready || status.AppliedControlRevision < int(pending.ControlRevision) {
@@ -73,6 +74,19 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 		return nil, nil
 	}
 	if relayMatches(status, managed.DesiredControlRevision, stringPointer(managed.DesiredBundleHash), &managed.ActiveManagedGeneration) {
+		// An older Relay can echo the descriptor hash without understanding v2
+		// user bindings. Its protocol capability remains part of the ACK proof.
+		if status.ProtocolVersion == nil || *status.ProtocolVersion < 2 {
+			row, e := s.Client.Activation.Query().Where(activation.ControlRevisionEQ(managed.DesiredControlRevision), activation.BundleHashEQ(stringPointer(managed.DesiredBundleHash)), activation.StateEQ("COMPLETED")).Only(ctx)
+			if e != nil {
+				return nil, e
+			}
+			var descriptor relaycontrolapi.RuntimeControlState
+			if json.Unmarshal(row.TargetDescriptorJSON, &descriptor) != nil || descriptor.ProtocolVersion != nil && *descriptor.ProtocolVersion >= 2 {
+				_ = s.setRuntimeStatus(ctx, "DEGRADED")
+				return nil, ErrRelayDiverged
+			}
+		}
 		if managed.RuntimeStatus != "READY" {
 			if err := s.setRuntimeStatus(ctx, "READY"); err != nil {
 				return nil, err
@@ -120,6 +134,10 @@ func (s *Service) finalizePending(ctx context.Context, activationID string) (*Ac
 		return nil, err
 	}
 	switch row.Kind {
+	case "WORKSPACE":
+		if err := s.finalizeWorkspace(ctx, row.ID); err != nil {
+			return nil, err
+		}
 	case "PUBLISH":
 		if row.SubjectID == nil || row.TargetGeneration == nil {
 			return nil, fmt.Errorf("publish activation missing target")
@@ -184,7 +202,7 @@ func (s *Service) reapplyPending(ctx context.Context, activationID string) error
 		_ = s.markUnknown(ctx, row.ID, "relay_reapply_unknown")
 		return err
 	}
-	if ack.AppliedControlRevision != int(row.ControlRevision) || string(ack.BundleHash) != row.BundleHash || ack.ActiveManagedGeneration != state.ActiveManagedGeneration {
+	if !ackProtocolMatches(state, ack) || ack.AppliedControlRevision != int(row.ControlRevision) || string(ack.BundleHash) != row.BundleHash || ack.ActiveManagedGeneration != state.ActiveManagedGeneration {
 		_ = s.markFailed(ctx, row.ID, "relay_ack_mismatch")
 		return ErrRelayAckMismatch
 	}
@@ -225,6 +243,24 @@ func (s *Service) stateFromActivationDescriptor(ctx context.Context, row *ent.Ac
 			return state, fmt.Errorf("unsupported persisted auth type %s", value.Auth.Type)
 		}
 	}
+	if state.UserBindings != nil {
+		for i := range *state.UserBindings {
+			binding := &(*state.UserBindings)[i]
+			if !slices.Contains(state.PrincipalState.DisabledUserIds, binding.UserId) && !slices.Contains(state.PrincipalState.DeletedUserIds, binding.UserId) {
+				if s.Workspace == nil {
+					return state, fmt.Errorf("workspace runtime authority unavailable")
+				}
+				if e := s.Workspace.ValidateRuntimeBinding(ctx, *binding); e != nil {
+					return state, e
+				}
+			}
+			secret, e := s.Upstream.ResolveSecret(ctx, binding.SecretRef.SecretId, binding.SecretRef.SecretVersion)
+			if e != nil {
+				return state, e
+			}
+			binding.Token = string(secret)
+		}
+	}
 	return state, nil
 }
 
@@ -249,7 +285,7 @@ func (s *Service) rehydrateActive(ctx context.Context, generation, revision int,
 	if err != nil {
 		return err
 	}
-	if ack.AppliedControlRevision != revision || string(ack.BundleHash) != expectedHash || ack.ActiveManagedGeneration != generation {
+	if !ackProtocolMatches(state, ack) || ack.AppliedControlRevision != revision || string(ack.BundleHash) != expectedHash || ack.ActiveManagedGeneration != generation {
 		return ErrRelayAckMismatch
 	}
 	return nil
@@ -309,4 +345,8 @@ func (s *Service) reconcileSessionDenies(ctx context.Context, revision int64) (*
 		return nil, err
 	}
 	return &result, nil
+}
+
+func ackProtocolMatches(state relaycontrolapi.RuntimeControlState, ack relaycontrolapi.ControlAck) bool {
+	return state.ProtocolVersion == nil || *state.ProtocolVersion < 2 || ack.ProtocolVersion != nil && *ack.ProtocolVersion >= 2
 }

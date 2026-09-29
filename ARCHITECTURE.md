@@ -193,6 +193,7 @@ See `docs/testing.md` for executable test organization, CI design, and the TDD c
 - `docs/database-migrations.md` — persistence initialization, migration and recovery workflow.
 - `docs/operations.md` — runtime operations.
 - `docs/release.md` — freeze/RC evidence composition.
+- `docs/remote-workspace-implementation.md` — optional Agent Space integration owners, recovery, file access and protocol implementation.
 - `docs/usage-budget.md` — current metering and budget implementation.
 - `docs/pricing-cost.md` — current pricing and cost calculation.
 

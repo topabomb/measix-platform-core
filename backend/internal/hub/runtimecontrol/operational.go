@@ -129,7 +129,7 @@ func (s *Service) ApplyUpstream(ctx context.Context, adminUserID, idempotencyKey
 		_, _ = s.Client.Upstream.UpdateOneID(upstreamID).SetStatus("DEGRADED").SetUpdatedAt(s.Now().UTC()).Save(ctx)
 		return s.loadActivation(ctx, activationID)
 	}
-	if ack.AppliedControlRevision != controlRevision || string(ack.BundleHash) != string(hash) || ack.ActiveManagedGeneration != generation {
+	if !ackProtocolMatches(state, ack) || ack.AppliedControlRevision != controlRevision || string(ack.BundleHash) != string(hash) || ack.ActiveManagedGeneration != generation {
 		_ = s.markFailed(ctx, activationID, "relay_ack_mismatch")
 		_, _ = s.Client.Upstream.UpdateOneID(upstreamID).SetStatus("DEGRADED").SetUpdatedAt(s.Now().UTC()).Save(ctx)
 		return ActivationResult{}, ErrRelayAckMismatch
@@ -258,6 +258,29 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 		return config, nil
 	}
 	for _, binding := range enabledBindings(content) {
+		if binding.TargetKind != nil && *binding.TargetKind == "REMOTE_WORKSPACE" {
+			if binding.WorkspaceServiceId == nil || s.Workspace == nil {
+				return state, fmt.Errorf("integration control unavailable")
+			}
+			status, e := s.Relay.Status(ctx)
+			if e != nil || status.ProtocolVersion == nil || *status.ProtocolVersion < 2 {
+				return state, fmt.Errorf("relay requires workspace control v2")
+			}
+			cfg, bindings, e := s.Workspace.RuntimeBindings(ctx, *binding.WorkspaceServiceId, binding.ResourceId)
+			if e != nil {
+				return state, e
+			}
+			version := relaycontrolapi.RuntimeControlStateProtocolVersion(2)
+			state.ProtocolVersion = &version
+			if state.UserBindings == nil {
+				empty := []relaycontrolapi.UserRuntimeBinding{}
+				state.UserBindings = &empty
+			}
+			*state.UserBindings = append(*state.UserBindings, bindings...)
+			state.ResourceRoutes = append(state.ResourceRoutes, relaycontrolapi.ResourceRoute{ResourceId: binding.ResourceId, RuntimeRouteId: binding.RuntimeRouteId, ResourceKind: "MCP", ClientProtocol: "MCP_STREAMABLE_HTTP"})
+			state.Routes = append(state.Routes, relaycontrolapi.RuntimeRouteSpec{RuntimeRouteId: binding.RuntimeRouteId, WorkspaceServiceId: binding.WorkspaceServiceId, AllowedMethods: []string{"POST", "GET", "DELETE"}, AllowedPathPrefixes: []string{"/mcp"}, TransportPolicy: "HTTP_STREAMING_SSE", TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: cfg.ConnectTimeoutMs, ResponseHeaderMs: cfg.ConnectTimeoutMs, IdleMs: cfg.IdleTimeoutMs}})
+			continue
+		}
 		config, err := ensureUpstream(binding.UpstreamId)
 		if err != nil {
 			return relaycontrolapi.RuntimeControlState{}, err

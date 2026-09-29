@@ -109,6 +109,7 @@ type RequestView struct {
 	DeviceName          string
 	RuntimeRouteID      string
 	UpstreamID          string
+	WorkspaceTargetJSON []byte
 	ManagedGeneration   int
 	ControlRevision     int
 	StartedAt           time.Time
@@ -137,7 +138,7 @@ func requestView(row *ent.RequestUsage) RequestView {
 	return RequestView{
 		RequestID: row.RequestID, InteractionID: row.InteractionID, DeploymentID: row.DeploymentID, UserID: row.UserID, DeviceID: row.DeviceID,
 		ResourceID: row.ResourceID, ResourceKind: ResourceKind(row.ResourceKind), ClientProtocol: row.ClientProtocol,
-		RuntimeRouteID: row.RuntimeRouteID, UpstreamID: row.UpstreamID, ManagedGeneration: int(row.ManagedGeneration), ControlRevision: int(row.ControlRevision),
+		RuntimeRouteID: row.RuntimeRouteID, UpstreamID: row.UpstreamID, WorkspaceTargetJSON: row.WorkspaceTargetJSON, ManagedGeneration: int(row.ManagedGeneration), ControlRevision: int(row.ControlRevision),
 		StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, Forwarded: row.Forwarded, HTTPStatus: row.HTTPStatus, UpstreamHTTPStatus: upstreamStatus,
 		RequestBytes: int(row.RequestBytes), ResponseBytes: int(row.ResponseBytes), DurationMs: int(row.DurationMs), ErrorClass: row.ErrorClass,
 		RequestCompleteness: Completeness(row.RequestCompleteness), SettlementState: row.SettlementState, SettlementRevision: row.SettlementRevision,

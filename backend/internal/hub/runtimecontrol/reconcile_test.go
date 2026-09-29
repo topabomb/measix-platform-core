@@ -3,7 +3,9 @@ package runtimecontrol_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"measix/platform/ent/activation"
 	"testing"
 	"time"
 
@@ -181,5 +183,30 @@ func TestLogoutConvergesAndRelayRestartUsesPersistedDescriptor(t *testing.T) {
 	}
 	if _, denied := relay.store.Current().RevokedSessions[sessionID]; !denied {
 		t.Fatal("recovered bundle lost session deny")
+	}
+}
+
+// A downgraded Relay must not be trusted merely because it echoes a v2 hash.
+func TestMatchingHashCannotHideRelayProtocolDowngrade(t *testing.T) {
+	ctx := context.Background()
+	st, svc, _, server, _, admin, _, revision := newRuntimeControlEnv(t)
+	defer server.Close()
+	published := publishAndFinalize(t, svc, admin, revision)
+	row := st.Client.Activation.Query().Where(activation.ControlRevisionEQ(int64(published.DesiredControlRevision))).OnlyX(ctx)
+	var descriptor map[string]any
+	if err := json.Unmarshal(row.TargetDescriptorJSON, &descriptor); err != nil {
+		t.Fatal(err)
+	}
+	descriptor["protocolVersion"] = 2
+	data, _ := json.Marshal(descriptor)
+	st.Client.Activation.UpdateOneID(row.ID).SetTargetDescriptorJSON(data).ExecX(ctx)
+	status, err := svc.Relay.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status.ProtocolVersion = nil
+	svc.Relay = divergentRelay{status: status}
+	if _, err := svc.Reconcile(ctx); !errors.Is(err, runtimecontrol.ErrRelayDiverged) {
+		t.Fatalf("downgraded Relay accepted: %v", err)
 	}
 }

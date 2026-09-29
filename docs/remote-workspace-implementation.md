@@ -1,0 +1,86 @@
+# 远程工作区集成实现
+
+本文是 Core/Relay/Admin 当前源码的实现参考。跨组件语义以 [S1 合同](../../measix-architecture/docs/10-runtime-foundation/s1/measix-s1-remote-workspace-contract-spec.md) 为准；产品选择、异常边界及完整验收矩阵保留在 [实施方案](remote-workspace-integration-plan.md)。本次实现不等于 Android 文件界面、完整 S1 compute/storage 计量或生产部署已交付。
+
+## 所有者和入口
+
+| 所有者 | 源码 / 责任 |
+|---|---|
+| Hub workspace | `backend/internal/hub/workspace/`：服务配置修订、用户连接意图、持久操作、文件租约与审计 |
+| Agent Space adapter | `backend/internal/hub/agentspace/`：固定管理 API、MCP/DAV origin 校验、条件文件操作、流式 IO；不读取远端状态目录或磁盘 |
+| Runtime Control | `backend/internal/hub/runtimecontrol/workspace.go`：复用原全局 Activation、revision/hash/ACK；工作区不另建运行状态写入者 |
+| Relay | `internal/relay/control/`、`runtime/`：按已验证用户及 MCP ID 选择 immutable binding，取消失效在途请求 |
+| Secret | `internal/hub/upstream/secret_transaction.go`：在业务事务中复用 SecretBox/SecretVersion；不建立派生密钥或第二份凭据表 |
+| Admin | `RemoteWorkspacesPage.vue`、`WorkspacePanel.vue`、`WorkspaceFiles.vue`、`WorkspacePreview.vue`：全部通过同源 Admin API |
+| 第三方服务 | Agent Space 拥有账号、空间、VM、磁盘和文件；本轮未修改其源码 |
+
+使用固定 Agent Space `3ea01c167fb263f8ef2467b5fe3103353f9a5ddc` 的管理 v1/MCP/WebDAV 能力。Core 当前版本门禁接受这一完整 release identity；升级远端版本需先核对指定 DAV token、禁用清理和条件文件语义，再更新适配与验收。管理凭据保存为版本化 Secret 引用。
+
+## 配置、发布和用户生命周期
+
+1. 在“远程工作区”（`/admin/remote-workspaces`）打开启用开关，填写管理服务地址、管理凭据和可选的独立 DAV 地址，点击“保存配置”。开关仅表达待保存意图，页面同时显示服务实际状态；检查已保存连接是单独的只读操作。
+2. 页面保存不可变配置修订，再提交启用操作并显示进度。服务 API 位于 `/api/admin/v1/remote-workspace/services`；配置保存本身不改能力草稿，也不发布 MCP。地址变更必须确认仍指向原服务，否则保存按钮不可用；应用时再逐一核对已有账号和原空间 ID。
+3. 服务启用后选择有效用户开通空间，也可在用户详情的“远程工作区”操作。开通和文件管理无需发布 MCP。首次配置 DAV 后，确认有效凭据才显示“浏览文件”；打开详情本身不启动 VM。
+4. 需要助手工具时，进入“企业配置 → MCP”，显式“添加远程工作区 MCP”，再按原流程审查、发布。草稿存在未保存修改时先保存或放弃，避免覆盖。共享 Snapshot 只有稳定 MCP 定义，不包含用户空间或凭据。已有空间在发布后获得工具入口，无需重新开通。
+5. 关闭开关后仍需点击“保存配置”并确认关闭。关闭会撤销访问并停止工作区，保留文件。未开通用户隐藏工作区页签，已有空间保留核查和删除入口；MCP 页面隐藏新增入口，但保留现有定义和服务已关闭提示。
+6. 断开先撤销 Core/Relay 访问，再禁用原远端账号并等待 stopPending 收敛；文件保留。恢复只启用原空间、重新签发 MCP；DAV 必须另行显式签发。MCP 凭据维护与 WebDAV 连接信息分开呈现。
+7. 停用用户或服务保留原连接意图；重新启用仅恢复此前 CONNECTED 意图，手动断开保持断开。删除用户在原用户清理事务中保留无用户外键的远端清理目标。远端删除 202 后仍需查询确认完成。
+
+打开工作区详情不读取文件、不启动 VM；点击“浏览文件”或实际执行工具才可能启动运行环境。MCP 和文件可用性分别投影。DAV 返回认证失败仅使该版本 DAV 不可用，不触发 Core 登出或清除 MCP 能力。
+
+## 操作与恢复
+
+`WorkspaceOperation` 保存 actor、幂等键、固定目标、配置/绑定修订、步骤、诊断和核实依据。管理写入前提交 `*_SENT`；重启见到 SENT 进入 UNKNOWN，不自动重放。原 Hub reconcile 循环投递到一个有界工作执行器，远端 IO 不占住全局 Activation 事务。
+
+- **创建响应丢失**：重新查询并核实用户名及原空间；确认旧管理请求结束后显式接管。不得重新创建或把同名账号直接标为已连接。
+- **MCP 写入结果未知**：核实旧请求结束后继续，恢复可编译状态再走原 Activation。明文只能由成功管理响应写入 SecretVersion。
+- **DAV 设置**：随机候选值先在同一事务持久化，再发送指定 token；响应必须逐字匹配。候选未确认不交付。显式继续使用原候选，不生成新随机值。DAV 变更不修改 MCP binding revision。
+- **用户停用/删除**：已知空间的凭据操作可由当前撤销意图替代，保留原 UNKNOWN 证据；远端禁用状态阻止迟到的凭据设置重新授权。尚可能在途的 CREATE/ENABLE 不能按此方式跳过，显示 `revocation_requires_remote_confirmation`，管理员确认原请求结束后继续当前清理，不重放启用。
+- **未知创建后的清理**：已停用/删除用户可在“核实后继续”填写原账号、原空间及核实依据。Core 验证与原创建目标一致后仅继续停用/删除；仍有资格的用户走显式接管，不直接恢复未知凭据。
+- **管理凭据失效**：上述继续操作可填写新的管理凭据，先保存为 Secret 引用，再核对原目标。仅替换当前操作引用，不改服务地址或有效服务配置；操作收敛后再同步服务连接配置。
+- **启用和控制失败**：只读启用检查失败恢复操作前的启用状态，已关闭服务不会被误启用。Relay 控制失败保留原工作区操作及绑定意图，由原 Activation 持续对账；不重发已确认的远端创建或凭据写入。
+- **重启恢复**：恢复固定 descriptor 前复验当前 workspace 意图、目标、配置及 SecretVersion；已撤销意图不得复活。新工作区命令与全局待确认 Activation 互斥。控制 v2 要求 Relay status 和 ACK 明确支持 v2。
+- **远端已删除、同名重建或身份不匹配**：保留诊断及原目标，不能改绑新 `spc_*`。人工核实不是后台自动恢复的替代名词。
+
+管理 API 不提供远端请求幂等键或条件账号修订，因此未知创建/启用仍有明确的人工收敛边界。不要通过修改数据库跳过操作，或在旧请求未确认结束前宣告撤销完成。
+
+## 文件、预览与审计
+
+Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/workspace` 下的 `files`、`content` 进入同一个应用服务。Client 用户来自已验证令牌，不接受请求提供的 userId；Admin 每次验证会话、角色及写请求 CSRF。
+
+- `GET files?path=` 列目录、元信息和卷容量；`POST files` 仅接受 MKCOL/MOVE/COPY/DELETE 的类型化 JSON。
+- `GET/HEAD content?path=` 返回流、ETag、Range 元信息；`PUT content` 直接流式传输，创建要求 `If-None-Match: *`，覆盖要求单个源 `If-Match`。
+- COPY/MOVE 分别校验源 ETag、目标 tagged If；普通文件覆盖需目标 ETag，目录覆盖禁止。目录删除需显式递归确认。不把 DAV Destination/If 或浏览器 Cookie/Origin 任意转发。
+- 相对路径禁止根修改、编码穿越、反斜线和保留区。DAV XML 有大小/数量限制，拒绝指令和跨账号/跨 origin href；207 的失败 propstat 保留为有界 PARTIAL/UNKNOWN 结果。
+- PROPFIND 裸 opaque ETag 规范化为 HTTP 引号形式，随后仍由远端条件请求验证。404 必须通过已认证根目录探测区分文件不存在和文件服务失效。
+- 并发文件请求最多 8；连接/响应头与传输无进展超时受服务配置控制，目录及多状态 XML 响应正文同样受空闲超时约束。请求取消、会话撤销、用户/服务停用、绑定或凭据修订变化均取消原租约。旧请求失败不能撤销新 Token。
+- 审计保存 actor、用户、原空间、路径、实际操作、字节数和结束结果；外部 DAV 直连不冒充 Core 审计。连接信息领取是显式 POST/no-store；列表不返回明文，查看不轮换。
+- 网页下载通过原生浏览器下载，不把整个大文件读入 JavaScript。上传显示进度并可取消；断流提示刷新核实，不自动重试写入。
+- 文件服务地址未配置时不提供 Token 签发入口，后端在持久化操作前拒绝该请求。上传更换文件、目录或刷新发现目标版本变化时，必须重新确认覆盖。
+
+预览纯文本/Markdown 上限 2 MiB，PDF/图片上限 24 MiB；图片头在解码前限制 1600 万像素，PDF 每次渲染画布同样有像素上限。Markdown 禁用原始 HTML 执行、外部图片和危险链接，原文可切换，相对图片通过当前授权文件 API 加载（每张 4 MiB，最多 20 张）。PDF 使用 pdf.js 模块 worker 和 canvas，支持翻页/缩放；不执行文件作为网页。HTML/SVG 等只下载。关闭预览会取消读取、渲染并释放对象 URL。
+
+## 数据与合同
+
+- `000002_remote_workspace.sql` 增加 WorkspaceService、WorkspaceServiceConfig、AgentSpace、WorkspaceOperation、WorkspaceAudit；`000003_workspace_usage_target.sql` 保留旧归属，增加互斥 workspaceTarget。既有 `000001` 不变。
+- 旧 upstream 归属保持原字段和序列化；新分支使用 `targetVersion: 2` 与 workspaceServiceId、agentSpaceId、remoteUsername、bindingRevision，仅用于 MCP。预算准入、spool、结算和 Admin 历史详情携带同一固定归属，不引用可变空间表补写历史。
+- migration 003 重建表时保留所有原列、索引和引用；结束前完整 foreign_key_check。测试覆盖已有请求、结算引用、原始字节/哈希的升级及重复执行。
+- `WorkspaceProjection` 的 `schemaVersion: 1` 是独立 Client 控制接口。Android generated 导出已同步，不代表 Android 消费端 UI 或真实设备传输完成。
+- 共享历史 Snapshot v4/v5 的发布字节、hash、republish 保持原协议；不在旧实体中填造假的 Upstream。
+
+## 验证和边界
+
+当前候选的执行记录见 [联调验收记录](remote-workspace-verification.md)。确定性异常测试与真实服务测试各有责任：Go 测试覆盖响应丢失、恢复、身份/版本、租约、XML/路径/条件和历史升级；真实固定镜像验证管理、Relay MCP、VM/DAV、双用户隔离和传输；生产构建 Admin 通过实际浏览器操作审查。
+
+可重复联调入口：
+
+```powershell
+pnpm -C console build
+node scripts/workspace-integration.mjs --config .artifacts/workspace-test.json
+```
+
+配置文件包含 `adminOrigin`、`mcpOrigin`、`davOrigin`、`managementTokenFile`（只含 token 的文件）、`releaseIdentity`、`imageIdentity`。脚本只允许 loopback 服务，创建独立临时 Core 库和 带独立 UUID 的用户，最后删除本次新建的远端空间并停止测试进程；数据库、日志与脱敏 evidence 保留用于诊断。失败的远端写入不得自动重放，失败时保留数据库、日志及未完成的远端目标供核查，停止本次 Core 进程。凭据输入文件及测试数据库不得提交。
+
+该脚本不部署第三方服务、不核验真实生产版本、不替代浏览器/Android 验收，也不宣称整个 S1 已完成。部署及回滚仍遵循现有 Core 数据库备份和 Agent Space 独立发布流程。
+
+`--ui-only --output <目录>` 启动全新、未配置的隔离 Admin 环境供实际网页操作；`--keep-ui` 在脚本通过后保留一个已开通的审查用户。两种模式把测试登录资料写入输出目录的私有 `ui-env.json`，不把凭据打印到终端。

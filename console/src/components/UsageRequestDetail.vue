@@ -118,7 +118,7 @@ function meterValue(item: MeterQuantity): string {
           <tr><td class="text-grey-7">{{ $t('usage.detail.requestId') }}</td><td class="text-break">{{ request.requestId }}</td></tr>
           <tr v-if="request.interactionId"><td class="text-grey-7">{{ $t('usage.detail.interactionId') }}</td><td class="text-break">{{ request.interactionId }}</td></tr>
           <tr v-if="request.clientProtocol"><td class="text-grey-7">{{ $t('usage.filters.protocol') }}</td><td class="text-break">{{ request.clientProtocol }}</td></tr>
-          <tr><td class="text-grey-7">{{ $t('usage.detail.upstream') }}</td><td class="text-break">{{ request.upstreamId }}</td></tr>
+          <tr><td class="text-grey-7">{{ $t('usage.detail.upstream') }}</td><td class="text-break"><template v-if="request.workspaceTarget">Agent Space · {{ request.workspaceTarget.agentSpaceId }}<div class="text-caption">{{request.workspaceTarget.workspaceServiceId}} · {{request.workspaceTarget.remoteUsername}} · 绑定版本 {{request.workspaceTarget.bindingRevision}}</div></template><template v-else>{{ request.upstreamId }}</template></td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.detail.runtimeRoute') }}</td><td class="text-break">{{ request.runtimeRouteId }}</td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.detail.generation') }}</td><td>{{ $t('releases.generation') }} {{ request.managedGeneration }}</td></tr>
           <tr><td class="text-grey-7">{{ $t('overview.desiredRevision') }}</td><td>{{ request.controlRevision }}</td></tr>

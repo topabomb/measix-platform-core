@@ -10,6 +10,7 @@ describe('navigation registry', () => {
       'BudgetTemplates',
       'Resources',
       'Upstreams',
+	  'RemoteWorkspaces',
       'Releases',
       'EnterpriseUpdates',
       'Settings',

@@ -11,6 +11,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'budget-templates', name: 'BudgetTemplates', component: () => import('../pages/BudgetTemplatesPage.vue') },
       { path: 'resources', name: 'Resources', component: () => import('../pages/ResourcesPage.vue') },
       { path: 'upstreams', name: 'Upstreams', component: () => import('../pages/UpstreamsPage.vue') },
+      { path: 'remote-workspaces', name: 'RemoteWorkspaces', component: () => import('../pages/RemoteWorkspacesPage.vue') },
       { path: 'releases', name: 'Releases', component: () => import('../pages/ReleasesPage.vue') },
       { path: 'enterprise-updates', name: 'EnterpriseUpdates', component: () => import('../pages/EnterpriseUpdatesPage.vue') },
       { path: 'settings', name: 'Settings', component: () => import('../pages/SettingsPage.vue') },

@@ -163,11 +163,14 @@ func assertBudgetUsageMetersRequired(t *testing.T, doc *openapi3.T, name string)
 func TestUnforwardedUsageFactsRetainCompleteAttribution(t *testing.T) {
 	usage := loadContractDoc(t, "api/internal/usage-ingest.openapi.yaml")
 	fact := usage.Components.Schemas["RequestUsageFact"].Value
+	if fact.Not == nil || fact.Not.Value.Not == nil || len(fact.Not.Value.Not.Value.OneOf) != 2 {
+		t.Fatal("usage target must have exactly two exclusive branches")
+	}
 	required := make(map[string]bool, len(fact.Required))
 	for _, name := range fact.Required {
 		required[name] = true
 	}
-	for _, name := range []string{"deploymentId", "userId", "resourceId", "runtimeRouteId", "upstreamId", "resourceKind", "clientProtocol", "forwarded"} {
+	for _, name := range []string{"deploymentId", "userId", "resourceId", "runtimeRouteId", "resourceKind", "clientProtocol", "forwarded"} {
 		if !required[name] {
 			t.Fatalf("RequestUsageFact attribution %s must be required for every settlement", name)
 		}

@@ -8,6 +8,7 @@ import (
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/enterpriseupdate"
 	"measix/platform/internal/hub/usage"
+	"measix/platform/internal/hub/workspace"
 	"measix/platform/internal/wire/clientapi"
 )
 
@@ -17,6 +18,7 @@ type fullClientHandler struct {
 	enterpriseUpdate *enterpriseupdate.Service
 	budget           *budget.Service
 	usage            *usage.Service
+	workspace        *workspace.Service
 }
 
 func (h *fullClientHandler) GetManagedSnapshot(w http.ResponseWriter, r *http.Request, generation int, params clientapi.GetManagedSnapshotParams) {

@@ -1761,8 +1761,838 @@ paths:
       parameters:
       - *id010
       - *id001
+  /api/admin/v1/remote-workspace/services:
+    get:
+      operationId: listWorkspaceServices
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceServiceList'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createWorkspaceService
+      parameters:
+      - &workspace_id002
+        name: X-CSRF-Token
+        in: header
+        required: true
+        schema:
+          type: string
+      - &workspace_id003
+        name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          $ref: '#/components/schemas/IdempotencyKey'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceService'
+        default:
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveWorkspaceServiceRequest'
+  /api/admin/v1/remote-workspace/services/{workspaceServiceId}:
+    get:
+      operationId: getWorkspaceService
+      parameters:
+      - &workspace_id001
+        name: workspaceServiceId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/WorkspaceServiceId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceService'
+        default:
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: updateWorkspaceService
+      parameters:
+      - *workspace_id001
+      - *workspace_id002
+      - *workspace_id003
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceService'
+        default:
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveWorkspaceServiceRequest'
+  /api/admin/v1/remote-workspace/services/{workspaceServiceId}/check:
+    post:
+      operationId: checkWorkspaceService
+      parameters:
+      - *workspace_id001
+      - *workspace_id002
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceServiceCheck'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply:
+    post:
+      operationId: applyWorkspaceService
+      parameters:
+      - *workspace_id001
+      - *workspace_id002
+      - *workspace_id003
+      responses:
+        '202':
+          description: Accepted durable intent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceOperation'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/remote-workspace/services/{workspaceServiceId}/disable:
+    post:
+      operationId: disableWorkspaceService
+      parameters:
+      - *workspace_id001
+      - *workspace_id002
+      - *workspace_id003
+      responses:
+        '202':
+          description: Accepted durable intent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceOperation'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/remote-workspace/services/{workspaceServiceId}/mcp-draft:
+    post:
+      operationId: stageWorkspaceMCP
+      parameters:
+      - *workspace_id001
+      - *workspace_id002
+      - *workspace_id003
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StageWorkspaceMCPRequest'
+      responses:
+        '204':
+          description: Workspace MCP added to the existing draft without publishing
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/remote-workspace/services/{workspaceServiceId}/workspaces:
+    get:
+      operationId: listWorkspaces
+      parameters:
+      - *workspace_id001
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceList'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/users/{userId}/workspace:
+    get:
+      operationId: getUserWorkspace
+      parameters:
+      - &workspace_id004
+        name: userId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UserId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceProjection'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: commandWorkspace
+      parameters:
+      - *workspace_id004
+      - *workspace_id002
+      - *workspace_id003
+      responses:
+        '202':
+          description: Accepted durable intent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceOperation'
+        default:
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceCommand'
+  /api/admin/v1/workspace-operations/{operationId}:
+    get:
+      operationId: getWorkspaceOperation
+      parameters:
+      - name: operationId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/WorkspaceOperationId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceOperation'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/users/{userId}/workspace/dav-connection:
+    post:
+      operationId: revealWorkspaceDAV
+      parameters:
+      - *workspace_id004
+      - *workspace_id002
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceDAVConnection'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/users/{userId}/workspace/files:
+    get:
+      operationId: listAdminWorkspaceFiles
+      parameters:
+      - *workspace_id004
+      - &workspace_id005
+        name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileList'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: mutateAdminWorkspaceFile
+      parameters:
+      - *workspace_id004
+      - *workspace_id002
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResult'
+        default:
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceFileMutation'
+  /api/admin/v1/users/{userId}/workspace/content:
+    get:
+      operationId: downloadAdminWorkspaceFile
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UserId'
+      - name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: Range
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: uploadAdminWorkspaceFile
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UserId'
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResult'
+        default:
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+    head:
+      operationId: headAdminWorkspaceFile
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UserId'
+      - name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: Range
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+        default:
+          $ref: '#/components/responses/Problem'
 components:
   schemas:
+    WorkspaceServiceId:
+      type: string
+      pattern: ^wss_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AgentSpaceId:
+      type: string
+      pattern: ^spc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    WorkspaceOperationId:
+      type: string
+      pattern: ^wop_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    WorkspaceTarget:
+      type: object
+      additionalProperties: false
+      required:
+      - workspaceServiceId
+      - agentSpaceId
+      - remoteUsername
+      - bindingRevision
+      properties:
+        workspaceServiceId:
+          $ref: '#/components/schemas/WorkspaceServiceId'
+        agentSpaceId:
+          $ref: '#/components/schemas/AgentSpaceId'
+        remoteUsername:
+          type: string
+        bindingRevision:
+          type: integer
+          minimum: 1
+    WorkspaceFileEntry:
+      type: object
+      additionalProperties: false
+      required:
+      - path
+      - kind
+      properties:
+        path:
+          type: string
+        kind:
+          type: string
+          enum:
+          - FILE
+          - DIRECTORY
+        size:
+          type: integer
+          format: int64
+          minimum: 0
+        modifiedAt:
+          type: string
+          format: date-time
+        etag:
+          type: string
+    WorkspaceFileList:
+      type: object
+      additionalProperties: false
+      required:
+      - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceFileEntry'
+        usedBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        availableBytes:
+          type: integer
+          format: int64
+          minimum: 0
+    WorkspaceFileMutation:
+      type: object
+      additionalProperties: false
+      required:
+      - action
+      - path
+      properties:
+        action:
+          type: string
+          enum:
+          - MKCOL
+          - MOVE
+          - COPY
+          - DELETE
+        path:
+          type: string
+        destination:
+          type: string
+        sourceEtag:
+          type: string
+        targetEtag:
+          type: string
+        overwrite:
+          type: boolean
+        recursiveConfirmed:
+          type: boolean
+    WorkspaceFileFailure:
+      type: object
+      additionalProperties: false
+      required:
+      - path
+      - status
+      - code
+      properties:
+        path:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+    WorkspaceFileResult:
+      type: object
+      additionalProperties: false
+      required:
+      - outcome
+      - failures
+      - truncated
+      properties:
+        outcome:
+          type: string
+          enum:
+          - SUCCEEDED
+          - PARTIAL
+          - UNKNOWN
+        failures:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceFileFailure'
+        truncated:
+          type: boolean
+    AgentSpaceConfig:
+      type: object
+      additionalProperties: false
+      required:
+      - adminOrigin
+      - mcpOrigin
+      - releaseIdentity
+      - managementSecret
+      - connectTimeoutMs
+      - idleTimeoutMs
+      properties:
+        adminOrigin:
+          type: string
+          format: uri
+        mcpOrigin:
+          type: string
+          format: uri
+        davOrigin:
+          type: string
+          format: uri
+        releaseIdentity:
+          type: string
+          minLength: 1
+        managementSecret:
+          $ref: '#/components/schemas/SecretRef'
+        connectTimeoutMs:
+          type: integer
+          minimum: 1000
+          maximum: 120000
+        idleTimeoutMs:
+          type: integer
+          minimum: 1000
+          maximum: 600000
+    WorkspaceProjection:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - state
+      - bindingRevision
+      - mcpAvailable
+      - filesAvailable
+      - mcpReason
+      - filesReason
+      properties:
+        schemaVersion:
+          type: integer
+          enum:
+          - 1
+        state:
+          type: string
+          enum:
+          - UNPROVISIONED
+          - CONNECTING
+          - CONNECTED
+          - DISCONNECTING
+          - DISCONNECTED
+          - RESTORING
+          - DELETING
+          - DELETED
+          - NEEDS_ATTENTION
+        bindingRevision:
+          type: integer
+          minimum: 0
+        agentSpaceId:
+          $ref: '#/components/schemas/AgentSpaceId'
+        mcpServerId:
+          $ref: '#/components/schemas/McpServerId'
+        mcpAvailable:
+          type: boolean
+        filesAvailable:
+          type: boolean
+        mcpReason:
+          type: string
+        filesReason:
+          type: string
+        observedAt:
+          type: string
+          format: date-time
+        operationId:
+          $ref: '#/components/schemas/WorkspaceOperationId'
+    WorkspaceService:
+      type: object
+      additionalProperties: false
+      required:
+      - workspaceServiceId
+      - type
+      - name
+      - configRevision
+      - enabled
+      - state
+      - config
+      - mcpServerId
+      - mcpPublished
+      properties:
+        workspaceServiceId:
+          $ref: '#/components/schemas/WorkspaceServiceId'
+        type:
+          type: string
+          enum:
+          - AGENT_SPACE
+        name:
+          type: string
+        configRevision:
+          type: integer
+          minimum: 1
+        activeConfigRevision:
+          type: integer
+          minimum: 1
+        enabled:
+          type: boolean
+        state:
+          type: string
+          enum:
+          - SAVED
+          - APPLYING
+          - ACTIVE
+          - DISABLING
+          - DISABLED
+          - NEEDS_ATTENTION
+        config:
+          $ref: '#/components/schemas/AgentSpaceConfig'
+        mcpServerId:
+          $ref: '#/components/schemas/McpServerId'
+        mcpPublished:
+          type: boolean
+        operationId:
+          $ref: '#/components/schemas/WorkspaceOperationId'
+        diagnosticCode:
+          type: string
+    StageWorkspaceMCPRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedDraftRevision]
+      properties:
+        expectedDraftRevision:
+          type: integer
+          minimum: 1
+    WorkspaceServiceList:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceService'
+    SaveWorkspaceServiceRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedRevision
+      - name
+      - config
+      properties:
+        expectedRevision:
+          type: integer
+          minimum: 0
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        config:
+          $ref: '#/components/schemas/AgentSpaceConfig'
+        confirmSameDeployment:
+          type: boolean
+    WorkspaceServiceCheck:
+      type: object
+      additionalProperties: false
+      required:
+      - managementReady
+      - filesStatus
+      properties:
+        managementReady:
+          type: boolean
+        filesStatus:
+          type: string
+          enum:
+          - NOT_CONFIGURED
+          - UNVERIFIED
+          - VERIFIED
+        diagnosticCode:
+          type: string
+    WorkspaceCommand:
+      type: object
+      additionalProperties: false
+      required:
+      - action
+      - expectedRevision
+      properties:
+        managementSecret:
+          # CONTINUE only: verified replacement for this operation, never a change of target.
+          $ref: '#/components/schemas/SecretRef'
+        action:
+          type: string
+          enum:
+          - CREATE
+          - DISCONNECT
+          - RESTORE
+          - DELETE
+          - TAKEOVER
+          - REQUERY
+          - CONTINUE
+          - RESET_MCP
+          - SET_DAV
+          - REVOKE_DAV
+        expectedRevision:
+          type: integer
+          minimum: 0
+        remoteUsername:
+          type: string
+        agentSpaceId:
+          $ref: '#/components/schemas/AgentSpaceId'
+        confirmation:
+          type: string
+        evidence:
+          type: string
+          maxLength: 2000
+    WorkspaceOperation:
+      type: object
+      additionalProperties: false
+      required:
+      - operationId
+      - workspaceServiceId
+      - action
+      - state
+      - step
+      - createdAt
+      - updatedAt
+      properties:
+        operationId:
+          $ref: '#/components/schemas/WorkspaceOperationId'
+        workspaceServiceId:
+          $ref: '#/components/schemas/WorkspaceServiceId'
+        userId:
+          $ref: '#/components/schemas/UserId'
+        action:
+          type: string
+        state:
+          type: string
+          enum:
+          - PENDING
+          - RUNNING
+          - UNKNOWN
+          - NEEDS_ATTENTION
+          - COMPLETED
+        step:
+          type: string
+        diagnosticCode:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    WorkspaceListItem:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - displayName
+      - remoteUsername
+      - workspace
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        displayName:
+          type: string
+        remoteUsername:
+          type: string
+        workspace:
+          $ref: '#/components/schemas/WorkspaceProjection'
+    WorkspaceList:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceListItem'
+        nextCursor:
+          type: string
+    WorkspaceDAVConnection:
+      type: object
+      additionalProperties: false
+      required:
+      - davUrl
+      - username
+      - token
+      properties:
+        davUrl:
+          type: string
+          format: uri
+        username:
+          type: string
+        token:
+          type: string
     DeploymentId:
       type: string
       pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -2201,7 +3031,6 @@ components:
       required:
       - runtimeRouteId
       - resourceId
-      - upstreamId
       - allowedMethods
       - allowedPathPrefixes
       - transportPolicy
@@ -2212,6 +3041,7 @@ components:
           type: string
         upstreamId:
           $ref: '#/components/schemas/UpstreamId'
+          x-go-type-skip-optional-pointer: true
         allowedMethods:
           type: array
           minItems: 1
@@ -2233,6 +3063,37 @@ components:
           - WEBSOCKET
         timeoutPolicy:
           $ref: '#/components/schemas/TimeoutPolicy'
+        targetKind:
+          type: string
+          enum:
+          - UPSTREAM
+          - REMOTE_WORKSPACE
+        workspaceServiceId:
+          $ref: '#/components/schemas/WorkspaceServiceId'
+      description: 'Exactly one target: legacy upstreamId (targetKind omitted or UPSTREAM), or targetKind REMOTE_WORKSPACE
+        plus workspaceServiceId. WorkspaceService targets are MCP-only.'
+      not:
+        not:
+          oneOf:
+          - required:
+            - upstreamId
+            not:
+              required:
+              - workspaceServiceId
+            properties:
+              targetKind:
+                enum:
+                - UPSTREAM
+          - required:
+            - workspaceServiceId
+            - targetKind
+            not:
+              required:
+              - upstreamId
+            properties:
+              targetKind:
+                enum:
+                - REMOTE_WORKSPACE
     ManagedPolicy:
       type: object
       additionalProperties: false
@@ -4023,21 +4884,19 @@ components:
         resourceDisplayName:
           type: string
           x-go-type-skip-optional-pointer: true
-          description: Resource name from the immutable snapshot for this request's managedGeneration; omitted when not found.
+          description: Resource name from the immutable snapshot for this request's managedGeneration; omitted when
+            not found.
         cost:
           $ref: '#/components/schemas/CostAnalysis'
-        # An audit row must identify whose request it is without a second lookup,
-        # so the display names travel with the row. Both are display metadata and
-        # carry no authority. user_id is NOT NULL with a foreign key, so the user
-        # name always resolves; device_id is nullable, so a request that carries
-        # no device carries no device name.
         userDisplayName:
           type: string
-          description: Display name resolved from the users table. Always present, because a usage row cannot exist without its user. Display metadata, not authorization identity.
+          description: Display name resolved from the users table. Always present, because a usage row cannot exist
+            without its user. Display metadata, not authorization identity.
         deviceName:
           type: string
           x-go-type-skip-optional-pointer: true
-          description: Device name reported at enrollment; empty when the request carries no device. Display metadata, not authorization identity.
+          description: Device name reported at enrollment; empty when the request carries no device. Display metadata,
+            not authorization identity.
         runtimeRouteId:
           x-go-type-skip-optional-pointer: true
           $ref: '#/components/schemas/RuntimeRouteId'
@@ -4075,16 +4934,29 @@ components:
           type: string
         requestCompleteness:
           type: string
-          enum: [EXACT, PARTIAL, UNKNOWN]
+          enum:
+          - EXACT
+          - PARTIAL
+          - UNKNOWN
         settlementState:
           type: string
-          enum: [NOT_REQUIRED, PENDING, SETTLED, RECONCILIATION_REQUIRED]
+          enum:
+          - NOT_REQUIRED
+          - PENDING
+          - SETTLED
+          - RECONCILIATION_REQUIRED
         semanticMeters:
           type: array
           items:
             $ref: '#/components/schemas/MeterQuantity'
         budget:
           $ref: '#/components/schemas/BudgetContext'
+        workspaceTarget:
+          $ref: '#/components/schemas/WorkspaceTarget'
+        targetVersion:
+          type: integer
+          enum:
+          - 2
     RequestUsagePage:
       type: object
       additionalProperties: false

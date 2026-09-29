@@ -2,7 +2,9 @@ package metering_test
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -128,3 +130,47 @@ func (c *recoveryBudgetClient) Release(_ context.Context, id string, event usage
 }
 
 func ptr(value string) *string { return &value }
+
+func TestSpoolRestartPreservesWorkspaceServiceAttribution(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "spool.db")
+	spool, err := metering.OpenSpool(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var admission usageingestapi.BudgetAdmissionRequest
+	if err := json.Unmarshal([]byte(`{"requestId":"request","targetVersion":2,"resourceKind":"MCP","clientProtocol":"MCP_STREAMABLE_HTTP","workspaceTarget":{"workspaceServiceId":"integration","agentSpaceId":"original-space","bindingRevision":9}}`), &admission); err != nil {
+		t.Fatal(err)
+	}
+	admission.RequestId = platformid.New(platformid.Request)
+	admission.AdmittedAt = time.Now().UTC()
+	admission.SupportedMeters = []usageingestapi.UsageMeter{usageingestapi.REQUESTS}
+	recorder := metering.NewRecorder(spool)
+	if err := recorder.PersistAdmission(admission, platformid.New(platformid.Route)); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.MarkStarted(admission.RequestId, admission.AdmittedAt); err != nil {
+		t.Fatal(err)
+	}
+	spool.Close()
+	spool, err = metering.OpenSpool(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer spool.Close()
+	if err := metering.RecoverLifecycle(ctx, spool, &recoveryBudgetClient{}, metering.NewRecorder(spool)); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := spool.Pending(ctx, 10)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("pending: %v %v", rows, err)
+	}
+	var settlement usageingestapi.UsageSettlement
+	if err := json.Unmarshal(rows[0].Payload, &settlement); err != nil {
+		t.Fatal(err)
+	}
+	fact := settlement.Request
+	if fact.UpstreamId != "" || fact.TargetVersion == nil || *fact.TargetVersion != 2 || !reflect.DeepEqual(fact.WorkspaceTarget, admission.WorkspaceTarget) {
+		t.Fatalf("lost target: %+v", fact)
+	}
+}

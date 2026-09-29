@@ -444,7 +444,7 @@ func newEnv(t *testing.T) *env {
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{
 			{ResourceId: ids.model, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMODEL, ClientProtocol: relaycontrolapi.OPENAICHATCOMPLETIONS, RuntimeRouteId: modelRoute, LlmProfile: &relaycontrolapi.RuntimeLlmProfile{}},
 			{ResourceId: ids.tts, ResourceKind: relaycontrolapi.ResourceRouteResourceKindTTS, ClientProtocol: relaycontrolapi.OPENAIAUDIOSPEECH, RuntimeRouteId: ttsRoute},
-			{ResourceId: ids.asr, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.OPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: relaycontrolapi.N1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
+			{ResourceId: ids.asr, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.OPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: relaycontrolapi.RuntimeAudioProfileChannelsN1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
 			{ResourceId: ids.mcp, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMCP, ClientProtocol: relaycontrolapi.MCPSTREAMABLEHTTP, RuntimeRouteId: mcpRoute},
 		},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{

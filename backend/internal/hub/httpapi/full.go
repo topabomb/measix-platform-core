@@ -12,6 +12,7 @@ import (
 	"measix/platform/internal/hub/system"
 	"measix/platform/internal/hub/upstream"
 	"measix/platform/internal/hub/usage"
+	"measix/platform/internal/hub/workspace"
 	"measix/platform/internal/wire/adminapi"
 	"measix/platform/internal/wire/clientapi"
 )
@@ -26,6 +27,7 @@ type Services struct {
 	System           *system.Service
 	EnterpriseUpdate *enterpriseupdate.Service
 	BuildVersion     string
+	Workspace        *workspace.Service
 }
 
 type fullAdminHandler struct {
@@ -41,6 +43,7 @@ func RegisterFull(router chi.Router, services Services) {
 	client := &fullClientHandler{
 		clientHandler: &clientHandler{identity: services.Identity}, capability: services.Capability,
 		enterpriseUpdate: services.EnterpriseUpdate, budget: services.Budget, usage: services.Usage,
+		workspace: services.Workspace,
 	}
 	adminapi.HandlerFromMux(admin, router)
 	clientapi.HandlerWithOptions(client, clientapi.ChiServerOptions{BaseRouter: router, ErrorHandlerFunc: clientBindingError})

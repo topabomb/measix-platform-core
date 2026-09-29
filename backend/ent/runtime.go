@@ -79,25 +79,25 @@ func init() {
 	budgetrequestFields := schema.BudgetRequest{}.Fields()
 	_ = budgetrequestFields
 	// budgetrequestDescManagedGeneration is the schema descriptor for managed_generation field.
-	budgetrequestDescManagedGeneration := budgetrequestFields[10].Descriptor()
+	budgetrequestDescManagedGeneration := budgetrequestFields[11].Descriptor()
 	// budgetrequest.ManagedGenerationValidator is a validator for the "managed_generation" field. It is called by the builders before save.
 	budgetrequest.ManagedGenerationValidator = budgetrequestDescManagedGeneration.Validators[0].(func(int64) error)
 	// budgetrequestDescControlRevision is the schema descriptor for control_revision field.
-	budgetrequestDescControlRevision := budgetrequestFields[11].Descriptor()
+	budgetrequestDescControlRevision := budgetrequestFields[12].Descriptor()
 	// budgetrequest.ControlRevisionValidator is a validator for the "control_revision" field. It is called by the builders before save.
 	budgetrequest.ControlRevisionValidator = budgetrequestDescControlRevision.Validators[0].(func(int64) error)
 	// budgetrequestDescBudgetRevision is the schema descriptor for budget_revision field.
-	budgetrequestDescBudgetRevision := budgetrequestFields[13].Descriptor()
+	budgetrequestDescBudgetRevision := budgetrequestFields[14].Descriptor()
 	// budgetrequest.DefaultBudgetRevision holds the default value on creation for the budget_revision field.
 	budgetrequest.DefaultBudgetRevision = budgetrequestDescBudgetRevision.Default.(int64)
 	// budgetrequestDescLastSettlementRevision is the schema descriptor for last_settlement_revision field.
-	budgetrequestDescLastSettlementRevision := budgetrequestFields[21].Descriptor()
+	budgetrequestDescLastSettlementRevision := budgetrequestFields[22].Descriptor()
 	// budgetrequest.DefaultLastSettlementRevision holds the default value on creation for the last_settlement_revision field.
 	budgetrequest.DefaultLastSettlementRevision = budgetrequestDescLastSettlementRevision.Default.(int64)
 	// budgetrequest.LastSettlementRevisionValidator is a validator for the "last_settlement_revision" field. It is called by the builders before save.
 	budgetrequest.LastSettlementRevisionValidator = budgetrequestDescLastSettlementRevision.Validators[0].(func(int64) error)
 	// budgetrequestDescLastLifecycleRevision is the schema descriptor for last_lifecycle_revision field.
-	budgetrequestDescLastLifecycleRevision := budgetrequestFields[22].Descriptor()
+	budgetrequestDescLastLifecycleRevision := budgetrequestFields[23].Descriptor()
 	// budgetrequest.DefaultLastLifecycleRevision holds the default value on creation for the last_lifecycle_revision field.
 	budgetrequest.DefaultLastLifecycleRevision = budgetrequestDescLastLifecycleRevision.Default.(int64)
 	// budgetrequest.LastLifecycleRevisionValidator is a validator for the "last_lifecycle_revision" field. It is called by the builders before save.

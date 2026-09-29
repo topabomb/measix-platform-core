@@ -39,6 +39,8 @@ func (h *Handler) recordDenied(admission usageingestapi.BudgetAdmissionRequest, 
 		Request: fact, Meters: []usageingestapi.MeterValue{}, Completeness: usageingestapi.EXACT, State: usageingestapi.SETTLED,
 		DiagnosticCode: &code,
 	}
+	setWorkspaceServiceFact(&fact, attr.workspaceTarget)
+	settlement.Request = fact
 	settlement.EventHash = settlementHash(attr.requestID, settlement.Meters, fact, settlement.Completeness, settlement.State)
 	return h.recorder.RecordDenied(admission, attr.route.ID, settlement)
 }
@@ -112,6 +114,7 @@ func (r *countingBody) Read(value []byte) (int, error) {
 }
 
 type usageAttribution struct {
+	workspaceTarget   *usageingestapi.WorkspaceTarget
 	state             *control.State
 	claims            *accessClaims
 	resourceID        string
@@ -143,6 +146,11 @@ func admissionRequest(attr usageAttribution, observation *usageObservation, requ
 	}
 	if len(known) > 0 {
 		input.KnownUsage = &known
+	}
+	if attr.workspaceTarget != nil {
+		version := usageingestapi.BudgetAdmissionRequestTargetVersion(2)
+		input.TargetVersion = &version
+		input.WorkspaceTarget = attr.workspaceTarget
 	}
 	return input
 }
@@ -219,6 +227,7 @@ func (h *Handler) recordSettlement(observer *responseObserver, body *countingBod
 		RequestBytes: requestBytes, ResponseBytes: responseBytes,
 		DurationMs: completedAt.Sub(attr.startedAt).Milliseconds(), ErrorClass: errorValue,
 	}
+	setWorkspaceServiceFact(&fact, attr.workspaceTarget)
 	settlement := usageingestapi.UsageSettlement{
 		RequestId: attr.requestID, Revision: 1, SourceEventId: attr.requestID + ":settlement:1",
 		OccurredAt: completedAt, EventHash: settlementHash(attr.requestID, meters, fact, completeness, state),
@@ -226,6 +235,14 @@ func (h *Handler) recordSettlement(observer *responseObserver, body *countingBod
 		DiagnosticCode: diagnosticCode, Details: detailsPointer,
 	}
 	return h.recorder.Record(settlement)
+}
+
+func setWorkspaceServiceFact(fact *usageingestapi.RequestUsageFact, target *usageingestapi.WorkspaceTarget) {
+	if target != nil {
+		v := usageingestapi.RequestUsageFactTargetVersion(2)
+		fact.TargetVersion = &v
+		fact.WorkspaceTarget = target
+	}
 }
 
 // A provider's explicit HTTP 400 and a connection failure before any response

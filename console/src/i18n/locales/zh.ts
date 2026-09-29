@@ -115,6 +115,7 @@ export default {
     budgetTemplates: '额度模板',
     resources: '企业配置',
     upstreams: '上游连接',
+    remoteWorkspaces: '远程工作区',
     releases: '发布记录',
     enterpriseUpdates: '企业公告',
     settings: '全局设置',

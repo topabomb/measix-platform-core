@@ -42,6 +42,21 @@ func (e BudgetAdmissionDecisionCode) Valid() bool {
 	}
 }
 
+// Defines values for BudgetAdmissionRequestTargetVersion.
+const (
+	BudgetAdmissionRequestTargetVersionN2 BudgetAdmissionRequestTargetVersion = 2
+)
+
+// Valid indicates whether the value is a known member of the BudgetAdmissionRequestTargetVersion enum.
+func (e BudgetAdmissionRequestTargetVersion) Valid() bool {
+	switch e {
+	case BudgetAdmissionRequestTargetVersionN2:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BudgetCapability.
 const (
 	BudgetCapabilityASR             BudgetCapability = "ASR"
@@ -183,6 +198,21 @@ func (e ClientProtocol) Valid() bool {
 	}
 }
 
+// Defines values for RequestUsageFactTargetVersion.
+const (
+	RequestUsageFactTargetVersionN2 RequestUsageFactTargetVersion = 2
+)
+
+// Valid indicates whether the value is a known member of the RequestUsageFactTargetVersion enum.
+func (e RequestUsageFactTargetVersion) Valid() bool {
+	switch e {
+	case RequestUsageFactTargetVersionN2:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResourceKind.
 const (
 	ResourceKindASR             ResourceKind = "ASR"
@@ -285,6 +315,9 @@ func (e UsageSettlementState) Valid() bool {
 	}
 }
 
+// AgentSpaceId defines model for AgentSpaceId.
+type AgentSpaceId = string
+
 // BudgetAdmissionDecision defines model for BudgetAdmissionDecision.
 type BudgetAdmissionDecision struct {
 	Allowed           bool                        `json:"allowed"`
@@ -305,22 +338,27 @@ type BudgetAdmissionDecisionCode string
 
 // BudgetAdmissionRequest defines model for BudgetAdmissionRequest.
 type BudgetAdmissionRequest struct {
-	AdmittedAt        time.Time      `json:"admittedAt"`
-	ClientProtocol    ClientProtocol `json:"clientProtocol"`
-	ControlRevision   int            `json:"controlRevision"`
-	DeploymentId      DeploymentId   `json:"deploymentId"`
-	DeviceId          *DeviceId      `json:"deviceId,omitempty"`
-	InteractionId     *InteractionId `json:"interactionId,omitempty"`
-	KnownUsage        *[]MeterValue  `json:"knownUsage,omitempty"`
-	ManagedGeneration int            `json:"managedGeneration"`
-	RequestHash       string         `json:"requestHash"`
-	RequestId         RequestId      `json:"requestId"`
-	ResourceId        string         `json:"resourceId"`
-	ResourceKind      ResourceKind   `json:"resourceKind"`
-	SupportedMeters   []UsageMeter   `json:"supportedMeters"`
-	UpstreamId        UpstreamId     `json:"upstreamId"`
-	UserId            UserId         `json:"userId"`
+	AdmittedAt        time.Time                            `json:"admittedAt"`
+	ClientProtocol    ClientProtocol                       `json:"clientProtocol"`
+	ControlRevision   int                                  `json:"controlRevision"`
+	DeploymentId      DeploymentId                         `json:"deploymentId"`
+	DeviceId          *DeviceId                            `json:"deviceId,omitempty"`
+	InteractionId     *InteractionId                       `json:"interactionId,omitempty"`
+	KnownUsage        *[]MeterValue                        `json:"knownUsage,omitempty"`
+	ManagedGeneration int                                  `json:"managedGeneration"`
+	RequestHash       string                               `json:"requestHash"`
+	RequestId         RequestId                            `json:"requestId"`
+	ResourceId        string                               `json:"resourceId"`
+	ResourceKind      ResourceKind                         `json:"resourceKind"`
+	SupportedMeters   []UsageMeter                         `json:"supportedMeters"`
+	TargetVersion     *BudgetAdmissionRequestTargetVersion `json:"targetVersion,omitempty"`
+	UpstreamId        UpstreamId                           `json:"upstreamId,omitempty"`
+	UserId            UserId                               `json:"userId"`
+	WorkspaceTarget   *WorkspaceTarget                     `json:"workspaceTarget,omitempty"`
 }
+
+// BudgetAdmissionRequestTargetVersion defines model for BudgetAdmissionRequest.TargetVersion.
+type BudgetAdmissionRequestTargetVersion int
 
 // BudgetCapability defines model for BudgetCapability.
 type BudgetCapability string
@@ -420,20 +458,25 @@ type RequestUsageFact struct {
 	ErrorClass      *string        `json:"errorClass,omitempty"`
 
 	// Forwarded False only for a proven-unforwarded durable denial. Such a fact still requires complete resource, runtime route and upstream attribution.
-	Forwarded          bool           `json:"forwarded"`
-	HttpStatus         int            `json:"httpStatus"`
-	InteractionId      *InteractionId `json:"interactionId,omitempty"`
-	ManagedGeneration  int            `json:"managedGeneration"`
-	RequestBytes       int64          `json:"requestBytes"`
-	ResourceId         string         `json:"resourceId"`
-	ResourceKind       ResourceKind   `json:"resourceKind"`
-	ResponseBytes      int64          `json:"responseBytes"`
-	RuntimeRouteId     RuntimeRouteId `json:"runtimeRouteId"`
-	StartedAt          time.Time      `json:"startedAt"`
-	UpstreamHttpStatus *int           `json:"upstreamHttpStatus,omitempty"`
-	UpstreamId         UpstreamId     `json:"upstreamId"`
-	UserId             UserId         `json:"userId"`
+	Forwarded          bool                           `json:"forwarded"`
+	HttpStatus         int                            `json:"httpStatus"`
+	InteractionId      *InteractionId                 `json:"interactionId,omitempty"`
+	ManagedGeneration  int                            `json:"managedGeneration"`
+	RequestBytes       int64                          `json:"requestBytes"`
+	ResourceId         string                         `json:"resourceId"`
+	ResourceKind       ResourceKind                   `json:"resourceKind"`
+	ResponseBytes      int64                          `json:"responseBytes"`
+	RuntimeRouteId     RuntimeRouteId                 `json:"runtimeRouteId"`
+	StartedAt          time.Time                      `json:"startedAt"`
+	TargetVersion      *RequestUsageFactTargetVersion `json:"targetVersion,omitempty"`
+	UpstreamHttpStatus *int                           `json:"upstreamHttpStatus,omitempty"`
+	UpstreamId         UpstreamId                     `json:"upstreamId,omitempty"`
+	UserId             UserId                         `json:"userId"`
+	WorkspaceTarget    *WorkspaceTarget               `json:"workspaceTarget,omitempty"`
 }
+
+// RequestUsageFactTargetVersion defines model for RequestUsageFact.TargetVersion.
+type RequestUsageFactTargetVersion int
 
 // ResourceKind defines model for ResourceKind.
 type ResourceKind string
@@ -484,6 +527,20 @@ type UsageSettlementBatch struct {
 
 // UserId defines model for UserId.
 type UserId = string
+
+// WorkspaceOperationId defines model for WorkspaceOperationId.
+type WorkspaceOperationId = string
+
+// WorkspaceServiceId defines model for WorkspaceServiceId.
+type WorkspaceServiceId = string
+
+// WorkspaceTarget defines model for WorkspaceTarget.
+type WorkspaceTarget struct {
+	AgentSpaceId       AgentSpaceId       `json:"agentSpaceId"`
+	BindingRevision    int                `json:"bindingRevision"`
+	RemoteUsername     string             `json:"remoteUsername"`
+	WorkspaceServiceId WorkspaceServiceId `json:"workspaceServiceId"`
+}
 
 // AdmitBudgetJSONRequestBody defines body for AdmitBudget for application/json ContentType.
 type AdmitBudgetJSONRequestBody = BudgetAdmissionRequest

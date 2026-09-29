@@ -91,6 +91,20 @@ func (_c *BudgetRequestCreate) SetUpstreamID(v string) *BudgetRequestCreate {
 	return _c
 }
 
+// SetNillableUpstreamID sets the "upstream_id" field if the given value is not nil.
+func (_c *BudgetRequestCreate) SetNillableUpstreamID(v *string) *BudgetRequestCreate {
+	if v != nil {
+		_c.SetUpstreamID(*v)
+	}
+	return _c
+}
+
+// SetWorkspaceTargetJSON sets the "workspace_target_json" field.
+func (_c *BudgetRequestCreate) SetWorkspaceTargetJSON(v []byte) *BudgetRequestCreate {
+	_c.mutation.SetWorkspaceTargetJSON(v)
+	return _c
+}
+
 // SetManagedGeneration sets the "managed_generation" field.
 func (_c *BudgetRequestCreate) SetManagedGeneration(v int64) *BudgetRequestCreate {
 	_c.mutation.SetManagedGeneration(v)
@@ -350,9 +364,6 @@ func (_c *BudgetRequestCreate) check() error {
 	if _, ok := _c.mutation.ClientProtocol(); !ok {
 		return &ValidationError{Name: "client_protocol", err: errors.New(`ent: missing required field "BudgetRequest.client_protocol"`)}
 	}
-	if _, ok := _c.mutation.UpstreamID(); !ok {
-		return &ValidationError{Name: "upstream_id", err: errors.New(`ent: missing required field "BudgetRequest.upstream_id"`)}
-	}
 	if _, ok := _c.mutation.ManagedGeneration(); !ok {
 		return &ValidationError{Name: "managed_generation", err: errors.New(`ent: missing required field "BudgetRequest.managed_generation"`)}
 	}
@@ -491,6 +502,10 @@ func (_c *BudgetRequestCreate) createSpec() (*BudgetRequest, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.UpstreamID(); ok {
 		_spec.SetField(budgetrequest.FieldUpstreamID, field.TypeString, value)
 		_node.UpstreamID = value
+	}
+	if value, ok := _c.mutation.WorkspaceTargetJSON(); ok {
+		_spec.SetField(budgetrequest.FieldWorkspaceTargetJSON, field.TypeBytes, value)
+		_node.WorkspaceTargetJSON = value
 	}
 	if value, ok := _c.mutation.ManagedGeneration(); ok {
 		_spec.SetField(budgetrequest.FieldManagedGeneration, field.TypeInt64, value)

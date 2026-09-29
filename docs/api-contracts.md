@@ -45,7 +45,7 @@ If an exact schema choice can change client interpretation, resolve architecture
 
 ## 3. Versioned contract state
 
-The internal Preview pins the four executable HTTP documents in `api/protocol-baseline.json` as `S0.2/v5-starter-preview`. `node scripts/verify-preview-contract.mjs` fails when a document changes without deliberate baseline review, and the ARM64 release manifest records every document hash. Within this baseline, additive optional response fields are allowed only after consumer review; removal, rename, type/meaning changes, enum narrowing, or a new required input require an architecture-approved protocol version and migration plan. Human error text is never a compatibility key; HTTP status plus stable Problem `code` is.
+The internal Preview pins the four executable HTTP documents in `api/protocol-baseline.json` under the candidate identity recorded in that file. `node scripts/verify-preview-contract.mjs` fails when a document changes without deliberate baseline review, and the ARM64 release manifest records every document hash. Within this baseline, additive optional response fields are allowed only after consumer review; removal, rename, type/meaning changes, enum narrowing, or a new required input require an architecture-approved protocol version and migration plan. Human error text is never a compatibility key; HTTP status plus stable Problem `code` is.
 
 New Draft Preview/Publish uses Snapshot v5; published v4 remains readable and republishable at v4. Starter opening details and executed verification are in [starter-opening-snapshots.md](starter-opening-snapshots.md). All five policy flags are required booleans. Policy exposes ten independent optional defaults: assistant, chat, fast, title, attachment inspection, suggestion, context compaction, Image Generation, TTS and ASR. Omission means unset; no default is inferred from another slot or from resource order. All six model defaults must reference enabled models, and attachment inspection additionally requires IMAGE input. `ManagedPolicy` is intentionally exposed on both Admin and Client surfaces; a contract test requires those two schema definitions to remain byte-equivalent after parsing. Standalone Image Generation remains part of the same v4 profile: `imageGenerators` and `policy.defaultImageGenerationId` may be absent only to represent an empty collection and an unset default; new writers emit the collection explicitly. Known values remain strict, and typed Snapshot consumers reject unknown fields. Shared Android materials, mappings and HTTP/runtime examples are maintained in [android-platform-integration.md](android-platform-integration.md).
 
@@ -179,3 +179,10 @@ Android export/generation consistency for the client-control contract
 ```
 
 Freeze identity generation is a candidate/C7 concern and must not be confused with ordinary pre-freeze contract drift checks.
+
+
+## 远程工作区合同扩展
+
+运行控制显式 v2 和 MCP workspaceTarget、独立 WorkspaceProjection v1，以及 Admin/Client 文件接口已加入相应 OpenAPI。新目标不填造假 upstreamId；旧字段缺省序列化和历史 Snapshot 保持原语义。共享正反例在 `api/fixtures/workspace/`，执行测试为 `workspace_contract_test.go`。
+
+详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。

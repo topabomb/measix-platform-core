@@ -18,6 +18,7 @@ import (
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/hub/upstream"
+	"measix/platform/internal/hub/workspace"
 	"measix/platform/internal/wire/adminapi"
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/internal/wire/relaystate"
@@ -56,6 +57,7 @@ type Service struct {
 	Client     *ent.Client
 	Capability *capability.Service
 	Upstream   *upstream.Service
+	Workspace  *workspace.Service
 	Signer     *security.AccessSigner
 	Relay      RelayClient
 	Now        func() time.Time
@@ -170,6 +172,9 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 	}
 	controlRevision := int(managed.DesiredControlRevision) + 1
 	for _, binding := range enabledBindings(draft.Content) {
+		if binding.TargetKind != nil && *binding.TargetKind == "REMOTE_WORKSPACE" {
+			continue
+		}
 		row, err := s.Client.Upstream.Get(ctx, binding.UpstreamId)
 		if err != nil {
 			return ActivationResult{}, err
@@ -252,7 +257,7 @@ func (s *Service) Publish(ctx context.Context, request PublishRequest) (Activati
 		}
 	}
 
-	if ack.AppliedControlRevision != controlRevision || string(ack.BundleHash) != string(hash) || ack.ActiveManagedGeneration != generation {
+	if !ackProtocolMatches(state, ack) || ack.AppliedControlRevision != controlRevision || string(ack.BundleHash) != string(hash) || ack.ActiveManagedGeneration != generation {
 		_ = s.markFailed(ctx, activationID, "relay_ack_mismatch")
 		return ActivationResult{}, ErrRelayAckMismatch
 	}

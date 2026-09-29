@@ -16,6 +16,7 @@ import PageHeader from '../components/PageHeader.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { useSessionStore } from '../stores/session'
 import * as client from '../api/client'
+import { useRemoteWorkspaceStore } from '../stores/remoteWorkspace'
 import QRCode from 'qrcode'
 
 // Mock qrcode — jsdom does not implement canvas getContext('2d')
@@ -428,4 +429,22 @@ describe('UsersPage', () => {
     expect(createBtn).toBeTruthy()
     expect(createBtn!.props('disable')).toBe(true)
   })
+  it.each([['UNPROVISIONED', false], ['DISCONNECTED', true]])('with the service disabled, %s keeps only existing workspace management', async (state, visible) => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.endsWith('/remote-workspace/services')) return { items: [{ workspaceServiceId: 'wss_test', enabled: false, state: 'DISABLED' }] }
+      if (path.endsWith('/workspace')) return { state, bindingRevision: 1, mcpAvailable: false, filesAvailable: false }
+      if (path.startsWith('/api/admin/v1/users?')) return { items: [{ userId: 'usr_member', username: 'member', displayName: 'Member', role: 'MEMBER', status: 'ACTIVE' }] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage(); setupSession(pinia); await flushPromises()
+    await wrapper.findComponent(QItem).trigger('click'); await flushPromises()
+    expect(wrapper.findAllComponents(QTab).some(tab => tab.props('name') === 'workspace')).toBe(visible)
+    if (!visible) {
+      const store = useRemoteWorkspaceStore(pinia)
+      store.current = { ...store.current!, enabled: true, state: 'ACTIVE' }; await flushPromises()
+      expect(wrapper.findAllComponents(QTab).some(tab => tab.props('name') === 'workspace')).toBe(true)
+    }
+    wrapper.unmount()
+  })
+
 })

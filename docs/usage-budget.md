@@ -187,3 +187,10 @@ UsagePage 提供用户搜索/汇总、协议及资源分布、按日趋势；请
 Portal 提供首页额度摘要及“我的用量与额度”，与 Admin 同源服务计算但为不同权限 DTO。本人可以查看额度、个人趋势、资源分布和分页调用明细。无预算仍显示使用量；累计显示不自动恢复；额度恢复时间来自 Hub，页面不推算自己的时区边界。
 
 Portal 本人数据读取复用 source/session 的取消和用户隔离。打开、回到前台及手动刷新；仅可见且存在在途状态时短间隔刷新，停止隐藏页面轮询。统一 updatedAt/asOf，失败保留明确陈旧提示，401/403 清空私有数据，迟到响应丢弃。小屏、空结果、部分未知、超额、加载失败都要有可操作表现。
+
+
+## 远程工作区归属
+
+MCP workspaceTarget 使用 v2 固定归属，贯穿准入、Relay spool、UsageFact 和历史详情；不从当前用户空间反查补写归属。旧 upstream 归属继续读取。源字段和恢复边界由远程工作区实现参考统一说明。
+
+详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。

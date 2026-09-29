@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"sort"
@@ -435,6 +436,14 @@ func requestUsageWire(row usage.RequestView) adminapi.RequestUsageView {
 		RequestBytes: row.RequestBytes, ResponseBytes: row.ResponseBytes, DurationMs: row.DurationMs, ErrorClass: row.ErrorClass,
 		RequestCompleteness: adminapi.RequestUsageViewRequestCompleteness(row.RequestCompleteness),
 		SettlementState:     adminapi.RequestUsageViewSettlementState(row.SettlementState), SemanticMeters: semantic,
+	}
+	if len(row.WorkspaceTargetJSON) > 0 {
+		var target adminapi.WorkspaceTarget
+		if json.Unmarshal(row.WorkspaceTargetJSON, &target) == nil {
+			version := adminapi.RequestUsageViewTargetVersion(2)
+			result.TargetVersion = &version
+			result.WorkspaceTarget = &target
+		}
 	}
 	cost := adminCostWire(row.Cost)
 	result.Cost = &cost

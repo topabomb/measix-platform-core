@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -31,6 +32,7 @@ import (
 	"measix/platform/internal/hub/system"
 	"measix/platform/internal/hub/upstream"
 	"measix/platform/internal/hub/usage"
+	"measix/platform/internal/hub/workspace"
 	"measix/platform/internal/wire/usageingestapi"
 )
 
@@ -166,6 +168,15 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	identityService.PortalStaticAvailable = portalHandler != nil
 	relayClient := runtimecontrol.NewHTTPRelayClient(cfg.RelayInternalURL, serviceCredential, client)
 	runtimeControl := runtimecontrol.NewService(st.Client, capabilityService, upstreamService, signer, relayClient)
+	workspaceService := workspace.NewService(st.Client, upstreamService)
+	runtimeControl.Workspace = workspaceService
+	workspaceService.ApplyControl = func(ctx context.Context, actor, operationID string) (string, bool, error) {
+		id, done, err := runtimeControl.ApplyWorkspace(ctx, actor, operationID)
+		if errors.Is(err, runtimecontrol.ErrActivationInProgress) {
+			err = workspace.ErrPending
+		}
+		return id, done, err
+	}
 	budgetService, err := budget.NewService(st.Client, deployment.Timezone)
 	if err != nil {
 		return closeOnError(fmt.Errorf("initialize budget service: %w", err))
@@ -185,9 +196,16 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 		Identity: identityService, Capability: capabilityService, Upstream: upstreamService,
 		RuntimeControl: runtimeControl, Usage: usageService, Budget: budgetService, System: systemService,
 		EnterpriseUpdate: enterpriseUpdateService, BuildVersion: options.BuildVersion,
+		Workspace: workspaceService,
 	}
 
 	router := chi.NewRouter()
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer workspaceService.CancelInvalidFiles(context.WithoutCancel(r.Context()))
+			next.ServeHTTP(w, r)
+		})
+	})
 	router.Use(observability.HTTPMiddleware(telemetry, observability.Logger{Log: slog.Default()}))
 	h := &health.State{}
 	router.Get("/live", h.Live)
@@ -236,11 +254,39 @@ func (r *Runtime) RunReconciler(ctx context.Context) error {
 	}
 	ticker := time.NewTicker(r.ReconcileInterval)
 	defer ticker.Stop()
+	// The existing scheduler owns one bounded remote-IO worker. A slow optional
+	// deployment cannot stall Relay convergence, token expiry or file revocation.
+	workerCtx, cancel := context.WithCancel(ctx)
+	work := make(chan struct{}, 1)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		for {
+			select {
+			case <-workerCtx.Done():
+				return
+			case <-work:
+				if r.Services.Workspace != nil {
+					if err := r.Services.Workspace.Reconcile(workerCtx); err != nil && workerCtx.Err() == nil {
+						slog.Error("workspace reconciliation failed", "event", "workspace.reconcile_failed")
+					}
+				}
+			}
+		}
+	}()
+	defer func() { cancel(); <-finished }()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
+			if r.Services.Workspace != nil {
+				r.Services.Workspace.CancelInvalidFiles(ctx)
+				select {
+				case work <- struct{}{}:
+				default:
+				}
+			}
 			if _, err := r.RuntimeControl.Reconcile(ctx); err != nil {
 				r.Telemetry.IncrementReconcileFailure()
 				slog.Error("runtime reconcile failed", "event", "runtime.reconcile_failed", "error", err)

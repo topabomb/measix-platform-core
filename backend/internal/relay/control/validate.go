@@ -19,6 +19,12 @@ func HashDescriptor(input relaycontrolapi.RuntimeControlState) (relaycontrolapi.
 }
 
 func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*State, error) {
+	if input.ProtocolVersion != nil && *input.ProtocolVersion != 1 && *input.ProtocolVersion != 2 {
+		return nil, ErrInvalidControl
+	}
+	if input.UserBindings != nil && (input.ProtocolVersion == nil || *input.ProtocolVersion != 2) {
+		return nil, ErrInvalidControl
+	}
 	if input.ControlRevision < 1 || input.ActiveManagedGeneration < 0 || input.OperationalLimits.MaxRequestBytes < 1 {
 		return nil, ErrInvalidControl
 	}
@@ -37,6 +43,10 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		RevokedDevices: make(map[string]struct{}), RevokedSessions: make(map[string]struct{}),
 		Resources: make(map[string]Resource), Routes: make(map[string]Route), Upstreams: make(map[string]Upstream),
 		OperationalLimits: input.OperationalLimits, AppliedAt: appliedAt,
+		UserBindings: make(map[string]relaycontrolapi.UserRuntimeBinding),
+	}
+	if input.ProtocolVersion != nil {
+		state.ProtocolVersion = int(*input.ProtocolVersion)
 	}
 
 	for _, key := range input.AuthKeys {
@@ -102,13 +112,21 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 	}
 
 	for _, value := range input.Routes {
-		if err := platformid.Validate(platformid.Route, value.RuntimeRouteId); err != nil || platformid.Validate(platformid.Upstream, value.UpstreamId) != nil {
+		if err := platformid.Validate(platformid.Route, value.RuntimeRouteId); err != nil {
+			return nil, ErrInvalidControl
+		}
+		isWorkspaceService := value.WorkspaceServiceId != nil
+		if isWorkspaceService {
+			if value.UpstreamId != "" || platformid.Validate(platformid.WorkspaceService, *value.WorkspaceServiceId) != nil || input.ProtocolVersion == nil || *input.ProtocolVersion != 2 {
+				return nil, ErrInvalidControl
+			}
+		} else if platformid.Validate(platformid.Upstream, value.UpstreamId) != nil {
 			return nil, ErrInvalidControl
 		}
 		if _, exists := state.Routes[value.RuntimeRouteId]; exists {
 			return nil, ErrInvalidControl
 		}
-		if _, exists := state.Upstreams[value.UpstreamId]; !exists || !value.TransportPolicy.Valid() || len(value.AllowedMethods) == 0 || len(value.AllowedPathPrefixes) == 0 {
+		if _, exists := state.Upstreams[value.UpstreamId]; (!isWorkspaceService && !exists) || !value.TransportPolicy.Valid() || len(value.AllowedMethods) == 0 || len(value.AllowedPathPrefixes) == 0 {
 			return nil, ErrInvalidControl
 		}
 		methods := make(map[string]struct{}, len(value.AllowedMethods))
@@ -136,6 +154,11 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 			ID: value.RuntimeRouteId, UpstreamID: value.UpstreamId, AllowedMethods: methods,
 			AllowedPathPrefixes: prefixes, TransportPolicy: value.TransportPolicy, TimeoutPolicy: value.TimeoutPolicy,
 		}
+		if isWorkspaceService {
+			r := state.Routes[value.RuntimeRouteId]
+			r.WorkspaceServiceID = *value.WorkspaceServiceId
+			state.Routes[value.RuntimeRouteId] = r
+		}
 	}
 
 	for _, value := range input.ResourceRoutes {
@@ -149,6 +172,16 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		route, exists := state.Routes[value.RuntimeRouteId]
 		if !exists {
 			return nil, ErrInvalidControl
+		}
+		if route.WorkspaceServiceID != "" && (value.ResourceKind != "MCP" || len(route.AllowedPathPrefixes) != 1 || route.AllowedPathPrefixes[0] != "/mcp" || len(route.AllowedMethods) != 3) {
+			return nil, ErrInvalidControl
+		}
+		if route.WorkspaceServiceID != "" {
+			for _, method := range []string{"GET", "POST", "DELETE"} {
+				if _, ok := route.AllowedMethods[method]; !ok {
+					return nil, ErrInvalidControl
+				}
+			}
 		}
 		if value.ModelMapping != nil && !allowedRoutePath(value.ModelMapping.UpstreamRuntimePath, route.AllowedPathPrefixes) {
 			return nil, ErrInvalidControl
@@ -187,7 +220,38 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 			ClientProtocol: value.ClientProtocol, AudioProfile: audio, LLMProfile: llm, ModelMapping: modelMapping, ImageProfile: image,
 		}
 	}
+	if input.UserBindings != nil {
+		for _, binding := range *input.UserBindings {
+			resource, ok := state.Resources[binding.McpServerId]
+			route := state.Routes[resource.RouteID]
+			endpoint, err := url.Parse(binding.Endpoint)
+			if !ok || resource.Kind != "MCP" || route.WorkspaceServiceID != binding.Target.WorkspaceServiceId || platformid.Validate(platformid.User, binding.UserId) != nil || platformid.Validate(platformid.AgentSpace, binding.Target.AgentSpaceId) != nil || binding.Target.BindingRevision < 1 || platformid.Validate(platformid.Secret, binding.SecretRef.SecretId) != nil || binding.SecretRef.SecretVersion < 1 || strings.TrimSpace(binding.Token) == "" || strings.ContainsAny(binding.Token, "\r\n") || err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.RawPath != "" || !safeUsername(binding.Target.RemoteUsername) || endpoint.Path != "/u/"+binding.Target.RemoteUsername+"/mcp" {
+				return nil, ErrInvalidControl
+			}
+			key := binding.UserId + "/" + binding.McpServerId
+			if _, exists := state.UserBindings[key]; exists {
+				return nil, ErrInvalidControl
+			}
+			state.UserBindings[key] = binding
+		}
+	}
 	return state, nil
+}
+
+func safeUsername(value string) bool {
+	if len(value) < 1 || len(value) > 64 {
+		return false
+	}
+	for i, c := range value {
+		if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
+			continue
+		}
+		if i > 0 && (c == '_' || c == '.' || c == '-') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func validModelMapping(resource relaycontrolapi.ResourceRoute, mapping relaycontrolapi.RuntimeModelMapping) bool {

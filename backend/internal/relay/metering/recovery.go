@@ -85,9 +85,14 @@ func recoverySettlement(journal JournalAdmission, startedAt time.Time) usageinge
 		DeploymentId: admission.DeploymentId, UserId: admission.UserId, DeviceId: admission.DeviceId,
 		InteractionId: admission.InteractionId, ResourceId: admission.ResourceId, ResourceKind: admission.ResourceKind,
 		ClientProtocol: admission.ClientProtocol, RuntimeRouteId: journal.RuntimeRouteID, UpstreamId: admission.UpstreamId,
+		WorkspaceTarget:   admission.WorkspaceTarget,
 		ManagedGeneration: admission.ManagedGeneration, ControlRevision: admission.ControlRevision,
 		StartedAt: startedAt, CompletedAt: startedAt, Forwarded: true, HttpStatus: 502,
 		RequestBytes: 0, ResponseBytes: 0, DurationMs: 0, ErrorClass: &errorClass,
+	}
+	if admission.TargetVersion != nil {
+		version := usageingestapi.RequestUsageFactTargetVersion(*admission.TargetVersion)
+		fact.TargetVersion = &version
 	}
 	settlement := usageingestapi.UsageSettlement{
 		RequestId: admission.RequestId, Revision: 1, SourceEventId: admission.RequestId + ":recovery:1",

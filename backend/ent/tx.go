@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// Activation is the client for interacting with the Activation builders.
 	Activation *ActivationClient
+	// AgentSpace is the client for interacting with the AgentSpace builders.
+	AgentSpace *AgentSpaceClient
 	// BudgetAllocation is the client for interacting with the BudgetAllocation builders.
 	BudgetAllocation *BudgetAllocationClient
 	// BudgetAudit is the client for interacting with the BudgetAudit builders.
@@ -82,6 +84,14 @@ type Tx struct {
 	User *UserClient
 	// UserBudget is the client for interacting with the UserBudget builders.
 	UserBudget *UserBudgetClient
+	// WorkspaceAudit is the client for interacting with the WorkspaceAudit builders.
+	WorkspaceAudit *WorkspaceAuditClient
+	// WorkspaceOperation is the client for interacting with the WorkspaceOperation builders.
+	WorkspaceOperation *WorkspaceOperationClient
+	// WorkspaceService is the client for interacting with the WorkspaceService builders.
+	WorkspaceService *WorkspaceServiceClient
+	// WorkspaceServiceConfig is the client for interacting with the WorkspaceServiceConfig builders.
+	WorkspaceServiceConfig *WorkspaceServiceConfigClient
 
 	// lazily loaded.
 	client     *Client
@@ -214,6 +224,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.Activation = NewActivationClient(tx.config)
+	tx.AgentSpace = NewAgentSpaceClient(tx.config)
 	tx.BudgetAllocation = NewBudgetAllocationClient(tx.config)
 	tx.BudgetAudit = NewBudgetAuditClient(tx.config)
 	tx.BudgetBucket = NewBudgetBucketClient(tx.config)
@@ -248,6 +259,10 @@ func (tx *Tx) init() {
 	tx.UsageEvent = NewUsageEventClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 	tx.UserBudget = NewUserBudgetClient(tx.config)
+	tx.WorkspaceAudit = NewWorkspaceAuditClient(tx.config)
+	tx.WorkspaceOperation = NewWorkspaceOperationClient(tx.config)
+	tx.WorkspaceService = NewWorkspaceServiceClient(tx.config)
+	tx.WorkspaceServiceConfig = NewWorkspaceServiceConfigClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

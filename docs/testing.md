@@ -357,3 +357,10 @@ No production token, Secret, enrollment code, refresh credential, real conversat
 Use `npm run test:tooling` for instrumentation-result and wire-verifier negative cases, and the normal Go/Console gates for old-release preservation and authoring conflicts. Evidence and supported data boundaries are recorded in [Starter opening snapshots](starter-opening-snapshots.md).
 
 `device:real` adds a separate actual-supplier lane. Its preset must contain complete v5 openings, fail closed on validation/migration errors, and preserve existing database and Secret identities. Tooling regressions cover these behaviors. Readiness/ACTIVE and connectivity tests do not prove successful model invocation. Record credential/entitlement failures separately from deterministic end-to-end results. Correlate the browser-authored opening, release/hash, device Applied report and response/error; credentials never enter evidence. The Starter verification document records the current run boundary.
+
+
+## 远程工作区专项验证
+
+`node scripts/workspace-integration.mjs --config <local-config.json>` 使用独立固定 Agent Space 服务和全新 Core 数据库执行真实双用户 MCP/DAV、预算、64 MiB 传输、取消、生命周期、重启和删除。浏览器审查另行操作生产构建页面，脚本通过不代替 UI 验收。
+
+详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。

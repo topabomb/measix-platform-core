@@ -115,6 +115,7 @@ export default {
     budgetTemplates: 'Budget Templates',
     resources: 'Resources',
     upstreams: 'Upstreams',
+    remoteWorkspaces: 'Remote Workspaces',
     releases: 'Releases',
     enterpriseUpdates: 'Enterprise Updates',
     settings: 'Settings',

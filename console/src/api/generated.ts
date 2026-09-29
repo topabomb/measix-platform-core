@@ -840,10 +840,351 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/remote-workspace/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorkspaceServices"];
+        put?: never;
+        post: operations["createWorkspaceService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/remote-workspace/services/{workspaceServiceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspaceService"];
+        put: operations["updateWorkspaceService"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/remote-workspace/services/{workspaceServiceId}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["checkWorkspaceService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["applyWorkspaceService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/remote-workspace/services/{workspaceServiceId}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disableWorkspaceService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/remote-workspace/services/{workspaceServiceId}/mcp-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["stageWorkspaceMCP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/remote-workspace/services/{workspaceServiceId}/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listWorkspaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/users/{userId}/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserWorkspace"];
+        put?: never;
+        post: operations["commandWorkspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/workspace-operations/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspaceOperation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/users/{userId}/workspace/dav-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revealWorkspaceDAV"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/users/{userId}/workspace/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminWorkspaceFiles"];
+        put?: never;
+        post: operations["mutateAdminWorkspaceFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/users/{userId}/workspace/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadAdminWorkspaceFile"];
+        put: operations["uploadAdminWorkspaceFile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head: operations["headAdminWorkspaceFile"];
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        WorkspaceServiceId: string;
+        AgentSpaceId: string;
+        WorkspaceOperationId: string;
+        WorkspaceTarget: {
+            workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            agentSpaceId: components["schemas"]["AgentSpaceId"];
+            remoteUsername: string;
+            bindingRevision: number;
+        };
+        WorkspaceFileEntry: {
+            path: string;
+            /** @enum {string} */
+            kind: "FILE" | "DIRECTORY";
+            /** Format: int64 */
+            size?: number;
+            /** Format: date-time */
+            modifiedAt?: string;
+            etag?: string;
+        };
+        WorkspaceFileList: {
+            entries: components["schemas"]["WorkspaceFileEntry"][];
+            /** Format: int64 */
+            usedBytes?: number;
+            /** Format: int64 */
+            availableBytes?: number;
+        };
+        WorkspaceFileMutation: {
+            /** @enum {string} */
+            action: "MKCOL" | "MOVE" | "COPY" | "DELETE";
+            path: string;
+            destination?: string;
+            sourceEtag?: string;
+            targetEtag?: string;
+            overwrite?: boolean;
+            recursiveConfirmed?: boolean;
+        };
+        WorkspaceFileFailure: {
+            path: string;
+            status: number;
+            code: string;
+        };
+        WorkspaceFileResult: {
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "PARTIAL" | "UNKNOWN";
+            failures: components["schemas"]["WorkspaceFileFailure"][];
+            truncated: boolean;
+        };
+        AgentSpaceConfig: {
+            /** Format: uri */
+            adminOrigin: string;
+            /** Format: uri */
+            mcpOrigin: string;
+            /** Format: uri */
+            davOrigin?: string;
+            releaseIdentity: string;
+            managementSecret: components["schemas"]["SecretRef"];
+            connectTimeoutMs: number;
+            idleTimeoutMs: number;
+        };
+        WorkspaceProjection: {
+            /** @enum {integer} */
+            schemaVersion: 1;
+            /** @enum {string} */
+            state: "UNPROVISIONED" | "CONNECTING" | "CONNECTED" | "DISCONNECTING" | "DISCONNECTED" | "RESTORING" | "DELETING" | "DELETED" | "NEEDS_ATTENTION";
+            bindingRevision: number;
+            agentSpaceId?: components["schemas"]["AgentSpaceId"];
+            mcpServerId?: components["schemas"]["McpServerId"];
+            mcpAvailable: boolean;
+            filesAvailable: boolean;
+            mcpReason: string;
+            filesReason: string;
+            /** Format: date-time */
+            observedAt?: string;
+            operationId?: components["schemas"]["WorkspaceOperationId"];
+        };
+        WorkspaceService: {
+            workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            /** @enum {string} */
+            type: "AGENT_SPACE";
+            name: string;
+            configRevision: number;
+            activeConfigRevision?: number;
+            enabled: boolean;
+            /** @enum {string} */
+            state: "SAVED" | "APPLYING" | "ACTIVE" | "DISABLING" | "DISABLED" | "NEEDS_ATTENTION";
+            config: components["schemas"]["AgentSpaceConfig"];
+            mcpServerId: components["schemas"]["McpServerId"];
+            mcpPublished: boolean;
+            operationId?: components["schemas"]["WorkspaceOperationId"];
+            diagnosticCode?: string;
+        };
+        StageWorkspaceMCPRequest: {
+            expectedDraftRevision: number;
+        };
+        WorkspaceServiceList: {
+            items: components["schemas"]["WorkspaceService"][];
+        };
+        SaveWorkspaceServiceRequest: {
+            expectedRevision: number;
+            name: string;
+            config: components["schemas"]["AgentSpaceConfig"];
+            confirmSameDeployment?: boolean;
+        };
+        WorkspaceServiceCheck: {
+            managementReady: boolean;
+            /** @enum {string} */
+            filesStatus: "NOT_CONFIGURED" | "UNVERIFIED" | "VERIFIED";
+            diagnosticCode?: string;
+        };
+        WorkspaceCommand: {
+            managementSecret?: components["schemas"]["SecretRef"];
+            /** @enum {string} */
+            action: "CREATE" | "DISCONNECT" | "RESTORE" | "DELETE" | "TAKEOVER" | "REQUERY" | "CONTINUE" | "RESET_MCP" | "SET_DAV" | "REVOKE_DAV";
+            expectedRevision: number;
+            remoteUsername?: string;
+            agentSpaceId?: components["schemas"]["AgentSpaceId"];
+            confirmation?: string;
+            evidence?: string;
+        };
+        WorkspaceOperation: {
+            operationId: components["schemas"]["WorkspaceOperationId"];
+            workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            userId?: components["schemas"]["UserId"];
+            action: string;
+            /** @enum {string} */
+            state: "PENDING" | "RUNNING" | "UNKNOWN" | "NEEDS_ATTENTION" | "COMPLETED";
+            step: string;
+            diagnosticCode?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        WorkspaceListItem: {
+            userId: components["schemas"]["UserId"];
+            displayName: string;
+            remoteUsername: string;
+            workspace: components["schemas"]["WorkspaceProjection"];
+        };
+        WorkspaceList: {
+            items: components["schemas"]["WorkspaceListItem"][];
+            nextCursor?: string;
+        };
+        WorkspaceDAVConnection: {
+            /** Format: uri */
+            davUrl: string;
+            username: string;
+            token: string;
+        };
         DeploymentId: string;
         UserId: string;
         DeviceId: string;
@@ -978,15 +1319,19 @@ export interface components {
             idleMs: number;
             overallMs?: number;
         };
+        /** @description Exactly one target: legacy upstreamId (targetKind omitted or UPSTREAM), or targetKind REMOTE_WORKSPACE plus workspaceServiceId. WorkspaceService targets are MCP-only. */
         RuntimeBindingDefinition: {
             runtimeRouteId: components["schemas"]["RuntimeRouteId"];
             resourceId: string;
-            upstreamId: components["schemas"]["UpstreamId"];
+            upstreamId?: components["schemas"]["UpstreamId"];
             allowedMethods: string[];
             allowedPathPrefixes: string[];
             /** @enum {string} */
             transportPolicy: "HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART" | "WEBSOCKET";
             timeoutPolicy?: components["schemas"]["TimeoutPolicy"];
+            /** @enum {string} */
+            targetKind?: "UPSTREAM" | "REMOTE_WORKSPACE";
+            workspaceServiceId?: components["schemas"]["WorkspaceServiceId"];
         };
         /** @description Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted. */
         ManagedPolicy: {
@@ -1673,6 +2018,9 @@ export interface components {
             settlementState: "NOT_REQUIRED" | "PENDING" | "SETTLED" | "RECONCILIATION_REQUIRED";
             semanticMeters: components["schemas"]["MeterQuantity"][];
             budget?: components["schemas"]["BudgetContext"];
+            workspaceTarget?: components["schemas"]["WorkspaceTarget"];
+            /** @enum {integer} */
+            targetVersion?: 2;
         };
         RequestUsagePage: {
             items: components["schemas"]["RequestUsageView"][];
@@ -3933,6 +4281,483 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    listWorkspaceServices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceServiceList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createWorkspaceService: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": components["schemas"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveWorkspaceServiceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceService"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getWorkspaceService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceService"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateWorkspaceService: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": components["schemas"]["IdempotencyKey"];
+            };
+            path: {
+                workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveWorkspaceServiceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceService"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    checkWorkspaceService: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceServiceCheck"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    applyWorkspaceService: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": components["schemas"]["IdempotencyKey"];
+            };
+            path: {
+                workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted durable intent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOperation"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    disableWorkspaceService: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": components["schemas"]["IdempotencyKey"];
+            };
+            path: {
+                workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted durable intent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOperation"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    stageWorkspaceMCP: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": components["schemas"]["IdempotencyKey"];
+            };
+            path: {
+                workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StageWorkspaceMCPRequest"];
+            };
+        };
+        responses: {
+            /** @description Workspace MCP added to the existing draft without publishing */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listWorkspaces: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                search?: string;
+            };
+            header?: never;
+            path: {
+                workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getUserWorkspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceProjection"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    commandWorkspace: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": components["schemas"]["IdempotencyKey"];
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspaceCommand"];
+            };
+        };
+        responses: {
+            /** @description Accepted durable intent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOperation"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getWorkspaceOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operationId: components["schemas"]["WorkspaceOperationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOperation"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    revealWorkspaceDAV: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceDAVConnection"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listAdminWorkspaceFiles: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceFileList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    mutateAdminWorkspaceFile: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspaceFileMutation"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceFileResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    downloadAdminWorkspaceFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: {
+                Range?: string;
+                "If-Match"?: string;
+                "If-None-Match"?: string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    uploadAdminWorkspaceFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header: {
+                "X-CSRF-Token": string;
+                "If-Match"?: string;
+                "If-None-Match"?: string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceFileResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    headAdminWorkspaceFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: {
+                Range?: string;
+                "If-Match"?: string;
+                "If-None-Match"?: string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
         };
     };
 }

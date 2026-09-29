@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -135,6 +137,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upstream, exists := state.Upstreams[route.UpstreamID]
+	var userBinding *relaycontrolapi.UserRuntimeBinding
+	if route.WorkspaceServiceID != "" {
+		binding, found := state.UserBindings[claims.Subject+"/"+resourceID]
+		if !found {
+			runtimeFailure(http.StatusForbidden, "workspace_not_connected", "Remote workspace is not connected", nil)
+			return
+		}
+		endpoint, _ := url.Parse(binding.Endpoint)
+		base := *endpoint
+		base.Path = ""
+		upstream = control.Upstream{BaseURL: &base, Enabled: true, Auth: control.UpstreamAuth{Type: relaycontrolapi.BEARER, Token: binding.Token}, SecretRef: &binding.SecretRef, TransportCapabilities: map[string]struct{}{"MCP_STREAMABLE_HTTP": {}}}
+		userBinding = &binding
+		exists = true
+	}
 	if !exists {
 		runtimeFailure(http.StatusServiceUnavailable, "runtime_control_unavailable", "Runtime upstream unavailable", nil)
 		return
@@ -143,8 +159,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		state: state, claims: claims, resourceID: resourceID, interactionID: interactionID,
 		resource: resource, route: route, upstream: upstream, admittedAt: admittedAt, requestID: requestID,
 	}
+	if userBinding != nil {
+		target := userBinding.Target
+		attr.workspaceTarget = &usageingestapi.WorkspaceTarget{WorkspaceServiceId: target.WorkspaceServiceId, AgentSpaceId: target.AgentSpaceId, RemoteUsername: target.RemoteUsername, BindingRevision: target.BindingRevision}
+	}
 	_, methodAllowed := route.AllowedMethods[r.Method]
 	pathAllowed := allowedPath(runtimePath, route.AllowedPathPrefixes)
+	if userBinding != nil {
+		pathAllowed = runtimePath == "/mcp" && r.URL.RawQuery == ""
+	}
 	if resource.ModelMapping != nil {
 		pathAllowed = runtimePath == resource.ModelMapping.ClientRuntimePath
 	}
@@ -152,6 +175,45 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeProblem(observer, http.StatusForbidden, "resource_not_allowed", "Route policy denied request", requestID, nil, false)
 		return
 	}
+	leaseCtx, releaseLease, err := h.store.Register(r.Context(), func(current *control.State) bool {
+		fresh, e := h.authenticate(current, bearer(r))
+		if e != nil || fresh.Subject != claims.Subject {
+			return false
+		}
+		if _, deny := current.DisabledUsers[claims.Subject]; deny {
+			return false
+		}
+		if _, deny := current.DeletedUsers[claims.Subject]; deny {
+			return false
+		}
+		if _, deny := current.RevokedDevices[claims.DeviceID]; deny {
+			return false
+		}
+		if _, deny := current.RevokedSessions[claims.SessionID]; deny {
+			return false
+		}
+		res, ok := current.Resources[resourceID]
+		if !ok || res.RouteID != resource.RouteID {
+			return false
+		}
+		if userBinding != nil {
+			b, ok := current.UserBindings[claims.Subject+"/"+resourceID]
+			return ok && reflect.DeepEqual(b, *userBinding)
+		}
+		u, ok := current.Upstreams[route.UpstreamID]
+		return ok && u.Enabled && reflect.DeepEqual(u.SecretRef, upstream.SecretRef) && u.Auth == upstream.Auth
+	})
+	if err != nil {
+		runtimeFailure(http.StatusForbidden, "runtime_access_revoked", "Runtime access was revoked", nil)
+		return
+	}
+	defer releaseLease()
+	if claims.ExpiresAt != nil {
+		var cancel context.CancelFunc
+		leaseCtx, cancel = context.WithTimeout(leaseCtx, claims.ExpiresAt.Time.Sub(h.store.Now()))
+		defer cancel()
+	}
+	r = r.WithContext(leaseCtx)
 	if !upstream.Enabled {
 		writeProblem(observer, http.StatusServiceUnavailable, "upstream_unavailable", "Upstream unavailable", requestID, nil, false)
 		return
@@ -168,6 +230,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	outboundRuntimePath, err := prepareModelRequest(resource, r, runtimePath, maxRequestBytes)
+	if userBinding != nil {
+		endpoint, _ := url.Parse(userBinding.Endpoint)
+		outboundRuntimePath = endpoint.Path
+	}
 	if err != nil {
 		switch {
 		case errors.Is(err, errObservedRequestTooLarge):
@@ -254,6 +320,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) serveWithMeteringDegraded(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string, maxRequestBytes int64, reason string) {
+	if route.WorkspaceServiceID != "" {
+		writeProblem(w, http.StatusServiceUnavailable, "workspace_budget_unavailable", "Workspace budget admission is unavailable", requestID, nil, false)
+		return
+	}
 	slog.Warn("runtime request proceeding while budget or metering is degraded", "event", "runtime.metering_degraded", "requestId", requestID, "reason", reason)
 	h.serveProxy(w, r, route, upstream, runtimePath, requestID, &proxyResult{}, maxRequestBytes)
 }

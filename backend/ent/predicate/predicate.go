@@ -9,6 +9,9 @@ import (
 // Activation is the predicate function for activation builders.
 type Activation func(*sql.Selector)
 
+// AgentSpace is the predicate function for agentspace builders.
+type AgentSpace func(*sql.Selector)
+
 // BudgetAllocation is the predicate function for budgetallocation builders.
 type BudgetAllocation func(*sql.Selector)
 
@@ -110,3 +113,15 @@ type User func(*sql.Selector)
 
 // UserBudget is the predicate function for userbudget builders.
 type UserBudget func(*sql.Selector)
+
+// WorkspaceAudit is the predicate function for workspaceaudit builders.
+type WorkspaceAudit func(*sql.Selector)
+
+// WorkspaceOperation is the predicate function for workspaceoperation builders.
+type WorkspaceOperation func(*sql.Selector)
+
+// WorkspaceService is the predicate function for workspaceservice builders.
+type WorkspaceService func(*sql.Selector)
+
+// WorkspaceServiceConfig is the predicate function for workspaceserviceconfig builders.
+type WorkspaceServiceConfig func(*sql.Selector)

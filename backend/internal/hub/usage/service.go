@@ -19,6 +19,7 @@ import (
 	"measix/platform/ent/usageevent"
 	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/wire/usageingestapi"
+	"measix/platform/internal/wire/usagetarget"
 	"measix/platform/pkg/platformid"
 )
 
@@ -147,12 +148,15 @@ func validateSettlement(event usageingestapi.UsageSettlement) error {
 		value string
 	}{
 		{platformid.Deployment, fact.DeploymentId}, {platformid.User, fact.UserId},
-		{platformid.Route, fact.RuntimeRouteId}, {platformid.Upstream, fact.UpstreamId},
+		{platformid.Route, fact.RuntimeRouteId},
 	}
 	for _, check := range checks {
 		if platformid.Validate(check.kind, check.value) != nil {
 			return ErrInvalidBatch
 		}
+	}
+	if !usagetarget.Valid(fact.UpstreamId, string(fact.ResourceKind), factTargetVersion(fact), fact.WorkspaceTarget) {
+		return ErrInvalidBatch
 	}
 	if fact.InteractionId != nil && platformid.Validate(platformid.Interaction, *fact.InteractionId) != nil {
 		return ErrInvalidBatch
@@ -199,6 +203,9 @@ func validateSettlement(event usageingestapi.UsageSettlement) error {
 
 func validateAttribution(event usageingestapi.UsageSettlement, admission *ent.BudgetRequest) error {
 	fact := event.Request
+	if !bytes.Equal(admission.WorkspaceTargetJSON, usagetarget.JSON(fact.WorkspaceTarget)) {
+		return ErrAttributionMismatch
+	}
 	if admission.UserID != fact.UserId || admission.DeploymentID != fact.DeploymentId || admission.ResourceID != fact.ResourceId ||
 		admission.ClientProtocol != string(fact.ClientProtocol) || admission.UpstreamID != fact.UpstreamId ||
 		admission.ManagedGeneration != int64(fact.ManagedGeneration) || admission.ControlRevision != int64(fact.ControlRevision) ||
@@ -224,7 +231,7 @@ func upsertRequestFact(ctx context.Context, tx *ent.Tx, event usageingestapi.Usa
 	applyCreate := func(create *ent.RequestUsageCreate) *ent.RequestUsageCreate {
 		return create.SetRequestID(event.RequestId).SetNillableInteractionID(fact.InteractionId).SetDeploymentID(fact.DeploymentId).
 			SetUserID(fact.UserId).SetNillableDeviceID(fact.DeviceId).SetResourceID(fact.ResourceId).SetResourceKind(string(fact.ResourceKind)).
-			SetClientProtocol(string(fact.ClientProtocol)).SetRuntimeRouteID(fact.RuntimeRouteId).SetUpstreamID(fact.UpstreamId).
+			SetClientProtocol(string(fact.ClientProtocol)).SetRuntimeRouteID(fact.RuntimeRouteId).SetNillableUpstreamID(usagetarget.Upstream(fact.UpstreamId)).SetWorkspaceTargetJSON(usagetarget.JSON(fact.WorkspaceTarget)).
 			SetManagedGeneration(int64(fact.ManagedGeneration)).SetControlRevision(int64(fact.ControlRevision)).SetStartedAt(fact.StartedAt.UTC()).
 			SetCompletedAt(fact.CompletedAt.UTC()).SetForwarded(fact.Forwarded).SetHTTPStatus(fact.HttpStatus).SetNillableUpstreamHTTPStatus(fact.UpstreamHttpStatus).
 			SetRequestBytes(fact.RequestBytes).SetResponseBytes(fact.ResponseBytes).SetDurationMs(fact.DurationMs).SetNillableErrorClass(fact.ErrorClass).
@@ -243,6 +250,9 @@ func upsertRequestFact(ctx context.Context, tx *ent.Tx, event usageingestapi.Usa
 }
 
 func sameImmutableRequestFact(existing *ent.RequestUsage, fact usageingestapi.RequestUsageFact, budgetRevision int64) bool {
+	if !bytes.Equal(existing.WorkspaceTargetJSON, usagetarget.JSON(fact.WorkspaceTarget)) {
+		return false
+	}
 	return existing.DeploymentID == fact.DeploymentId &&
 		existing.UserID == fact.UserId &&
 		valueOrEmpty(existing.InteractionID) == valueOrEmpty(fact.InteractionId) &&

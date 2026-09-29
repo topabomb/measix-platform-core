@@ -1010,6 +1010,33 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		if runtimePath, ok := runtimePaths[binding.ResourceId]; ok && validRuntimePath(runtimePath) && !runtimePathAllowed(runtimePath, binding.AllowedPathPrefixes) {
 			addError("runtime_path_not_allowed", path+".allowedPathPrefixes", "resource runtimePath must be covered by its binding path policy", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedPathPrefixes"))
 		}
+		if binding.WorkspaceServiceId != nil && (binding.TargetKind == nil || *binding.TargetKind != "REMOTE_WORKSPACE") {
+			addError("invalid_workspace_binding", path, "integration target requires its explicit target kind", &kindBinding, ptrStr(binding.ResourceId), ptrStr("workspaceServiceId"))
+			continue
+		}
+		if binding.TargetKind != nil && *binding.TargetKind == "REMOTE_WORKSPACE" {
+			if binding.WorkspaceServiceId == nil || binding.UpstreamId != "" || resourceKinds[binding.ResourceId] != kindMCP {
+				addError("invalid_workspace_binding", path, "integration target must reference its MCP without an upstream", &kindBinding, ptrStr(binding.ResourceId), ptrStr("workspaceServiceId"))
+				continue
+			}
+			workspaceService, e := s.Client.WorkspaceService.Get(ctx, *binding.WorkspaceServiceId)
+			if e != nil || workspaceService.McpServerID != binding.ResourceId || workspaceService.RuntimeRouteID != binding.RuntimeRouteId || workspaceService.ActiveConfigRevision == nil {
+				addError("workspace_service_unavailable", path, "integration must be configured and active", &kindBinding, ptrStr(binding.ResourceId), ptrStr("workspaceServiceId"))
+				continue
+			}
+			if !workspaceService.Enabled {
+				addWarning("workspace_service_disabled", path, "integration is disabled; its runtime target will reject user access", &kindBinding, ptrStr(binding.ResourceId), ptrStr("workspaceServiceId"))
+			}
+			for _, mcp := range content.Mcp {
+				if mcp.McpServerId == binding.ResourceId && mcp.AuthOwnership != "ENTERPRISE_MANAGED" {
+					addError("invalid_workspace_auth", path, "workspace MCP must retain enterprise-managed authentication", &kindBinding, ptrStr(binding.ResourceId), ptrStr("workspaceServiceId"))
+				}
+			}
+			if runtimePaths[binding.ResourceId] != "/mcp" || len(binding.AllowedPathPrefixes) != 1 || binding.AllowedPathPrefixes[0] != "/mcp" {
+				addError("invalid_workspace_path", path, "integration MCP uses its fixed endpoint", &kindBinding, ptrStr(binding.ResourceId), ptrStr("allowedPathPrefixes"))
+			}
+			continue
+		}
 		row, err := s.Client.Upstream.Get(ctx, binding.UpstreamId)
 		if ent.IsNotFound(err) {
 			addError("missing_upstream", path+".upstreamId", "binding references an unknown upstream", &kindBinding, ptrStr(binding.ResourceId), ptrStr("upstreamId"))
@@ -1160,6 +1187,15 @@ func validateCandidateIDs(content adminapi.ManagedDraftContent) error {
 	for i, value := range content.Bindings {
 		if err := check(platformid.Route, value.RuntimeRouteId, fmt.Sprintf("bindings[%d]", i)); err != nil {
 			return err
+		}
+		if value.TargetKind != nil && *value.TargetKind == "REMOTE_WORKSPACE" {
+			if value.WorkspaceServiceId == nil || platformid.Validate(platformid.WorkspaceService, *value.WorkspaceServiceId) != nil || value.UpstreamId != "" {
+				return fmt.Errorf("bindings[%d] has invalid integration target", i)
+			}
+			continue
+		}
+		if value.WorkspaceServiceId != nil || value.TargetKind != nil && *value.TargetKind != "UPSTREAM" {
+			return fmt.Errorf("bindings[%d] has conflicting target", i)
 		}
 		if err := platformid.Validate(platformid.Upstream, value.UpstreamId); err != nil {
 			return fmt.Errorf("bindings[%d] has invalid upstream id", i)

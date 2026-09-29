@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"measix/platform/ent"
+	"measix/platform/internal/wire/usageingestapi"
 )
 
 type Capability string
@@ -180,6 +181,8 @@ type MeterQuantity struct {
 }
 
 type AdmitInput struct {
+	TargetVersion     int
+	WorkspaceTarget   *usageingestapi.WorkspaceTarget
 	RequestID         string
 	RequestHash       string
 	DeploymentID      string

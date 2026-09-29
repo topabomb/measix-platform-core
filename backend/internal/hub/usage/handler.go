@@ -46,6 +46,7 @@ func (h *Handler) AdmitBudget(w http.ResponseWriter, r *http.Request) {
 		RequestID: input.RequestId, RequestHash: input.RequestHash, DeploymentID: input.DeploymentId, UserID: input.UserId,
 		InteractionID: input.InteractionId, DeviceID: input.DeviceId, Capability: budget.Capability(input.ResourceKind),
 		ResourceID: input.ResourceId, ClientProtocol: budget.ClientProtocol(input.ClientProtocol), UpstreamID: input.UpstreamId,
+		WorkspaceTarget: input.WorkspaceTarget, TargetVersion: admissionTargetVersion(input),
 		ManagedGeneration: int64(input.ManagedGeneration), ControlRevision: int64(input.ControlRevision), AdmittedAt: input.AdmittedAt,
 		KnownQuantities: known, SupportedMeters: supported,
 	})

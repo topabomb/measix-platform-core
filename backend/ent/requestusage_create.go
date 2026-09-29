@@ -96,6 +96,20 @@ func (_c *RequestUsageCreate) SetUpstreamID(v string) *RequestUsageCreate {
 	return _c
 }
 
+// SetNillableUpstreamID sets the "upstream_id" field if the given value is not nil.
+func (_c *RequestUsageCreate) SetNillableUpstreamID(v *string) *RequestUsageCreate {
+	if v != nil {
+		_c.SetUpstreamID(*v)
+	}
+	return _c
+}
+
+// SetWorkspaceTargetJSON sets the "workspace_target_json" field.
+func (_c *RequestUsageCreate) SetWorkspaceTargetJSON(v []byte) *RequestUsageCreate {
+	_c.mutation.SetWorkspaceTargetJSON(v)
+	return _c
+}
+
 // SetManagedGeneration sets the "managed_generation" field.
 func (_c *RequestUsageCreate) SetManagedGeneration(v int64) *RequestUsageCreate {
 	_c.mutation.SetManagedGeneration(v)
@@ -269,9 +283,6 @@ func (_c *RequestUsageCreate) check() error {
 	if _, ok := _c.mutation.RuntimeRouteID(); !ok {
 		return &ValidationError{Name: "runtime_route_id", err: errors.New(`ent: missing required field "RequestUsage.runtime_route_id"`)}
 	}
-	if _, ok := _c.mutation.UpstreamID(); !ok {
-		return &ValidationError{Name: "upstream_id", err: errors.New(`ent: missing required field "RequestUsage.upstream_id"`)}
-	}
 	if _, ok := _c.mutation.ManagedGeneration(); !ok {
 		return &ValidationError{Name: "managed_generation", err: errors.New(`ent: missing required field "RequestUsage.managed_generation"`)}
 	}
@@ -385,6 +396,10 @@ func (_c *RequestUsageCreate) createSpec() (*RequestUsage, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.UpstreamID(); ok {
 		_spec.SetField(requestusage.FieldUpstreamID, field.TypeString, value)
 		_node.UpstreamID = value
+	}
+	if value, ok := _c.mutation.WorkspaceTargetJSON(); ok {
+		_spec.SetField(requestusage.FieldWorkspaceTargetJSON, field.TypeBytes, value)
+		_node.WorkspaceTargetJSON = value
 	}
 	if value, ok := _c.mutation.ManagedGeneration(); ok {
 		_spec.SetField(requestusage.FieldManagedGeneration, field.TypeInt64, value)

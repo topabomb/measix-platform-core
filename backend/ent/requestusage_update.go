@@ -180,6 +180,24 @@ func (_u *RequestUsageUpdate) SetNillableUpstreamID(v *string) *RequestUsageUpda
 	return _u
 }
 
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (_u *RequestUsageUpdate) ClearUpstreamID() *RequestUsageUpdate {
+	_u.mutation.ClearUpstreamID()
+	return _u
+}
+
+// SetWorkspaceTargetJSON sets the "workspace_target_json" field.
+func (_u *RequestUsageUpdate) SetWorkspaceTargetJSON(v []byte) *RequestUsageUpdate {
+	_u.mutation.SetWorkspaceTargetJSON(v)
+	return _u
+}
+
+// ClearWorkspaceTargetJSON clears the value of the "workspace_target_json" field.
+func (_u *RequestUsageUpdate) ClearWorkspaceTargetJSON() *RequestUsageUpdate {
+	_u.mutation.ClearWorkspaceTargetJSON()
+	return _u
+}
+
 // SetManagedGeneration sets the "managed_generation" field.
 func (_u *RequestUsageUpdate) SetManagedGeneration(v int64) *RequestUsageUpdate {
 	_u.mutation.ResetManagedGeneration()
@@ -556,6 +574,15 @@ func (_u *RequestUsageUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.UpstreamID(); ok {
 		_spec.SetField(requestusage.FieldUpstreamID, field.TypeString, value)
 	}
+	if _u.mutation.UpstreamIDCleared() {
+		_spec.ClearField(requestusage.FieldUpstreamID, field.TypeString)
+	}
+	if value, ok := _u.mutation.WorkspaceTargetJSON(); ok {
+		_spec.SetField(requestusage.FieldWorkspaceTargetJSON, field.TypeBytes, value)
+	}
+	if _u.mutation.WorkspaceTargetJSONCleared() {
+		_spec.ClearField(requestusage.FieldWorkspaceTargetJSON, field.TypeBytes)
+	}
 	if value, ok := _u.mutation.ManagedGeneration(); ok {
 		_spec.SetField(requestusage.FieldManagedGeneration, field.TypeInt64, value)
 	}
@@ -806,6 +833,24 @@ func (_u *RequestUsageUpdateOne) SetNillableUpstreamID(v *string) *RequestUsageU
 	if v != nil {
 		_u.SetUpstreamID(*v)
 	}
+	return _u
+}
+
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (_u *RequestUsageUpdateOne) ClearUpstreamID() *RequestUsageUpdateOne {
+	_u.mutation.ClearUpstreamID()
+	return _u
+}
+
+// SetWorkspaceTargetJSON sets the "workspace_target_json" field.
+func (_u *RequestUsageUpdateOne) SetWorkspaceTargetJSON(v []byte) *RequestUsageUpdateOne {
+	_u.mutation.SetWorkspaceTargetJSON(v)
+	return _u
+}
+
+// ClearWorkspaceTargetJSON clears the value of the "workspace_target_json" field.
+func (_u *RequestUsageUpdateOne) ClearWorkspaceTargetJSON() *RequestUsageUpdateOne {
+	_u.mutation.ClearWorkspaceTargetJSON()
 	return _u
 }
 
@@ -1214,6 +1259,15 @@ func (_u *RequestUsageUpdateOne) sqlSave(ctx context.Context) (_node *RequestUsa
 	}
 	if value, ok := _u.mutation.UpstreamID(); ok {
 		_spec.SetField(requestusage.FieldUpstreamID, field.TypeString, value)
+	}
+	if _u.mutation.UpstreamIDCleared() {
+		_spec.ClearField(requestusage.FieldUpstreamID, field.TypeString)
+	}
+	if value, ok := _u.mutation.WorkspaceTargetJSON(); ok {
+		_spec.SetField(requestusage.FieldWorkspaceTargetJSON, field.TypeBytes, value)
+	}
+	if _u.mutation.WorkspaceTargetJSONCleared() {
+		_spec.ClearField(requestusage.FieldWorkspaceTargetJSON, field.TypeBytes)
 	}
 	if value, ok := _u.mutation.ManagedGeneration(); ok {
 		_spec.SetField(requestusage.FieldManagedGeneration, field.TypeInt64, value)

@@ -46,6 +46,7 @@ const NAV_I18N_KEYS: Record<string, string> = {
   BudgetTemplates: 'nav.budgetTemplates',
   Resources: 'nav.resources',
   Upstreams: 'nav.upstreams',
+  RemoteWorkspaces: 'nav.remoteWorkspaces',
   Releases: 'nav.releases',
   EnterpriseUpdates: 'nav.enterpriseUpdates',
   Settings: 'nav.settings',

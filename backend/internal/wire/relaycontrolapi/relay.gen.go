@@ -117,6 +117,42 @@ func (e BudgetLimitStatePeriod) Valid() bool {
 	}
 }
 
+// Defines values for ControlAckProtocolVersion.
+const (
+	ControlAckProtocolVersionN1 ControlAckProtocolVersion = 1
+	ControlAckProtocolVersionN2 ControlAckProtocolVersion = 2
+)
+
+// Valid indicates whether the value is a known member of the ControlAckProtocolVersion enum.
+func (e ControlAckProtocolVersion) Valid() bool {
+	switch e {
+	case ControlAckProtocolVersionN1:
+		return true
+	case ControlAckProtocolVersionN2:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ControlStatusProtocolVersion.
+const (
+	ControlStatusProtocolVersionN1 ControlStatusProtocolVersion = 1
+	ControlStatusProtocolVersionN2 ControlStatusProtocolVersion = 2
+)
+
+// Valid indicates whether the value is a known member of the ControlStatusProtocolVersion enum.
+func (e ControlStatusProtocolVersion) Valid() bool {
+	switch e {
+	case ControlStatusProtocolVersionN1:
+		return true
+	case ControlStatusProtocolVersionN2:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ControlStatusSpoolState.
 const (
 	METERINGDEGRADED ControlStatusSpoolState = "METERING_DEGRADED"
@@ -278,13 +314,13 @@ func (e ResourceRouteResourceKind) Valid() bool {
 
 // Defines values for RuntimeAudioProfileChannels.
 const (
-	N1 RuntimeAudioProfileChannels = 1
+	RuntimeAudioProfileChannelsN1 RuntimeAudioProfileChannels = 1
 )
 
 // Valid indicates whether the value is a known member of the RuntimeAudioProfileChannels enum.
 func (e RuntimeAudioProfileChannels) Valid() bool {
 	switch e {
-	case N1:
+	case RuntimeAudioProfileChannelsN1:
 		return true
 	default:
 		return false
@@ -324,6 +360,24 @@ func (e RuntimeAudioProfileSampleRates) Valid() bool {
 	case N24000:
 		return true
 	case N8000:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RuntimeControlStateProtocolVersion.
+const (
+	RuntimeControlStateProtocolVersionN1 RuntimeControlStateProtocolVersion = 1
+	RuntimeControlStateProtocolVersionN2 RuntimeControlStateProtocolVersion = 2
+)
+
+// Valid indicates whether the value is a known member of the RuntimeControlStateProtocolVersion enum.
+func (e RuntimeControlStateProtocolVersion) Valid() bool {
+	switch e {
+	case RuntimeControlStateProtocolVersionN1:
+		return true
+	case RuntimeControlStateProtocolVersionN2:
 		return true
 	default:
 		return false
@@ -402,6 +456,9 @@ func (e ValidationIssueSeverity) Valid() bool {
 // ActivationId defines model for ActivationId.
 type ActivationId = string
 
+// AgentSpaceId defines model for AgentSpaceId.
+type AgentSpaceId = string
+
 // AsrId defines model for AsrId.
 type AsrId = string
 
@@ -439,11 +496,15 @@ type BudgetLimitStatePeriod string
 
 // ControlAck defines model for ControlAck.
 type ControlAck struct {
-	ActiveManagedGeneration int        `json:"activeManagedGeneration"`
-	AppliedAt               time.Time  `json:"appliedAt"`
-	AppliedControlRevision  int        `json:"appliedControlRevision"`
-	BundleHash              Sha256Hash `json:"bundleHash"`
+	ActiveManagedGeneration int                        `json:"activeManagedGeneration"`
+	AppliedAt               time.Time                  `json:"appliedAt"`
+	AppliedControlRevision  int                        `json:"appliedControlRevision"`
+	BundleHash              Sha256Hash                 `json:"bundleHash"`
+	ProtocolVersion         *ControlAckProtocolVersion `json:"protocolVersion,omitempty"`
 }
+
+// ControlAckProtocolVersion defines model for ControlAck.ProtocolVersion.
+type ControlAckProtocolVersion int
 
 // ControlStatus defines model for ControlStatus.
 type ControlStatus struct {
@@ -451,15 +512,19 @@ type ControlStatus struct {
 	AppliedControlRevision  int `json:"appliedControlRevision"`
 
 	// BuildVersion Build identity of the running Relay process; dev for a development build.
-	BuildVersion            string                   `json:"buildVersion"`
-	BundleHash              string                   `json:"bundleHash"`
-	OldestPendingAgeSeconds *int                     `json:"oldestPendingAgeSeconds,omitempty"`
-	Ready                   bool                     `json:"ready"`
-	SpoolPendingCount       *int                     `json:"spoolPendingCount,omitempty"`
-	SpoolState              *ControlStatusSpoolState `json:"spoolState,omitempty"`
-	StartedAt               time.Time                `json:"startedAt"`
-	Telemetry               *ProcessTelemetry        `json:"telemetry,omitempty"`
+	BuildVersion            string                        `json:"buildVersion"`
+	BundleHash              string                        `json:"bundleHash"`
+	OldestPendingAgeSeconds *int                          `json:"oldestPendingAgeSeconds,omitempty"`
+	ProtocolVersion         *ControlStatusProtocolVersion `json:"protocolVersion,omitempty"`
+	Ready                   bool                          `json:"ready"`
+	SpoolPendingCount       *int                          `json:"spoolPendingCount,omitempty"`
+	SpoolState              *ControlStatusSpoolState      `json:"spoolState,omitempty"`
+	StartedAt               time.Time                     `json:"startedAt"`
+	Telemetry               *ProcessTelemetry             `json:"telemetry,omitempty"`
 }
+
+// ControlStatusProtocolVersion defines model for ControlStatus.ProtocolVersion.
+type ControlStatusProtocolVersion int
 
 // ControlStatusSpoolState defines model for ControlStatus.SpoolState.
 type ControlStatusSpoolState string
@@ -599,17 +664,22 @@ type RuntimeAudioProfileSampleRates int
 
 // RuntimeControlState defines model for RuntimeControlState.
 type RuntimeControlState struct {
-	ActiveManagedGeneration int                   `json:"activeManagedGeneration"`
-	AuthKeys                []PublicJwk           `json:"authKeys"`
-	BundleHash              Sha256Hash            `json:"bundleHash"`
-	ControlRevision         int                   `json:"controlRevision"`
-	DeploymentId            DeploymentId          `json:"deploymentId"`
-	OperationalLimits       OperationalLimits     `json:"operationalLimits"`
-	PrincipalState          PrincipalState        `json:"principalState"`
-	ResourceRoutes          []ResourceRoute       `json:"resourceRoutes"`
-	Routes                  []RuntimeRouteSpec    `json:"routes"`
-	Upstreams               []RuntimeUpstreamSpec `json:"upstreams"`
+	ActiveManagedGeneration int                                 `json:"activeManagedGeneration"`
+	AuthKeys                []PublicJwk                         `json:"authKeys"`
+	BundleHash              Sha256Hash                          `json:"bundleHash"`
+	ControlRevision         int                                 `json:"controlRevision"`
+	DeploymentId            DeploymentId                        `json:"deploymentId"`
+	OperationalLimits       OperationalLimits                   `json:"operationalLimits"`
+	PrincipalState          PrincipalState                      `json:"principalState"`
+	ProtocolVersion         *RuntimeControlStateProtocolVersion `json:"protocolVersion,omitempty"`
+	ResourceRoutes          []ResourceRoute                     `json:"resourceRoutes"`
+	Routes                  []RuntimeRouteSpec                  `json:"routes"`
+	Upstreams               []RuntimeUpstreamSpec               `json:"upstreams"`
+	UserBindings            *[]UserRuntimeBinding               `json:"userBindings,omitempty"`
 }
+
+// RuntimeControlStateProtocolVersion defines model for RuntimeControlState.ProtocolVersion.
+type RuntimeControlStateProtocolVersion int
 
 // RuntimeImageProfile defines model for RuntimeImageProfile.
 type RuntimeImageProfile struct {
@@ -641,7 +711,8 @@ type RuntimeRouteSpec struct {
 	RuntimeRouteId      RuntimeRouteId                  `json:"runtimeRouteId"`
 	TimeoutPolicy       TimeoutPolicy                   `json:"timeoutPolicy"`
 	TransportPolicy     RuntimeRouteSpecTransportPolicy `json:"transportPolicy"`
-	UpstreamId          UpstreamId                      `json:"upstreamId"`
+	UpstreamId          UpstreamId                      `json:"upstreamId,omitempty"`
+	WorkspaceServiceId  *WorkspaceServiceId             `json:"workspaceServiceId,omitempty"`
 }
 
 // RuntimeRouteSpecTransportPolicy defines model for RuntimeRouteSpec.TransportPolicy.
@@ -729,6 +800,16 @@ type UpstreamId = string
 // UserId defines model for UserId.
 type UserId = string
 
+// UserRuntimeBinding defines model for UserRuntimeBinding.
+type UserRuntimeBinding struct {
+	Endpoint    string          `json:"endpoint"`
+	McpServerId string          `json:"mcpServerId"`
+	SecretRef   SecretRef       `json:"secretRef"`
+	Target      WorkspaceTarget `json:"target"`
+	Token       string          `json:"token"`
+	UserId      UserId          `json:"userId"`
+}
+
 // ValidationIssue defines model for ValidationIssue.
 type ValidationIssue struct {
 	Code     string                  `json:"code"`
@@ -739,6 +820,20 @@ type ValidationIssue struct {
 
 // ValidationIssueSeverity defines model for ValidationIssue.Severity.
 type ValidationIssueSeverity string
+
+// WorkspaceOperationId defines model for WorkspaceOperationId.
+type WorkspaceOperationId = string
+
+// WorkspaceServiceId defines model for WorkspaceServiceId.
+type WorkspaceServiceId = string
+
+// WorkspaceTarget defines model for WorkspaceTarget.
+type WorkspaceTarget struct {
+	AgentSpaceId       AgentSpaceId       `json:"agentSpaceId"`
+	BindingRevision    int                `json:"bindingRevision"`
+	RemoteUsername     string             `json:"remoteUsername"`
+	WorkspaceServiceId WorkspaceServiceId `json:"workspaceServiceId"`
+}
 
 // ApplyControlStateJSONRequestBody defines body for ApplyControlState for application/json ContentType.
 type ApplyControlStateJSONRequestBody = RuntimeControlState

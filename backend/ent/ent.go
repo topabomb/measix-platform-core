@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"measix/platform/ent/activation"
+	"measix/platform/ent/agentspace"
 	"measix/platform/ent/budgetallocation"
 	"measix/platform/ent/budgetaudit"
 	"measix/platform/ent/budgetbucket"
@@ -41,6 +42,10 @@ import (
 	"measix/platform/ent/usageevent"
 	"measix/platform/ent/user"
 	"measix/platform/ent/userbudget"
+	"measix/platform/ent/workspaceaudit"
+	"measix/platform/ent/workspaceoperation"
+	"measix/platform/ent/workspaceservice"
+	"measix/platform/ent/workspaceserviceconfig"
 	"reflect"
 	"sync"
 
@@ -108,6 +113,7 @@ func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			activation.Table:               activation.ValidColumn,
+			agentspace.Table:               agentspace.ValidColumn,
 			budgetallocation.Table:         budgetallocation.ValidColumn,
 			budgetaudit.Table:              budgetaudit.ValidColumn,
 			budgetbucket.Table:             budgetbucket.ValidColumn,
@@ -142,6 +148,10 @@ func checkColumn(t, c string) error {
 			usageevent.Table:               usageevent.ValidColumn,
 			user.Table:                     user.ValidColumn,
 			userbudget.Table:               userbudget.ValidColumn,
+			workspaceaudit.Table:           workspaceaudit.ValidColumn,
+			workspaceoperation.Table:       workspaceoperation.ValidColumn,
+			workspaceservice.Table:         workspaceservice.ValidColumn,
+			workspaceserviceconfig.Table:   workspaceserviceconfig.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

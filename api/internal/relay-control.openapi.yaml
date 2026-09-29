@@ -47,6 +47,57 @@ paths:
           $ref: '#/components/responses/Problem'
 components:
   schemas:
+    WorkspaceServiceId:
+      type: string
+      pattern: ^wss_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AgentSpaceId:
+      type: string
+      pattern: ^spc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    WorkspaceOperationId:
+      type: string
+      pattern: ^wop_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    WorkspaceTarget:
+      type: object
+      additionalProperties: false
+      required:
+      - workspaceServiceId
+      - agentSpaceId
+      - remoteUsername
+      - bindingRevision
+      properties:
+        workspaceServiceId:
+          $ref: '#/components/schemas/WorkspaceServiceId'
+        agentSpaceId:
+          $ref: '#/components/schemas/AgentSpaceId'
+        remoteUsername:
+          type: string
+        bindingRevision:
+          type: integer
+          minimum: 1
+    UserRuntimeBinding:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - mcpServerId
+      - target
+      - endpoint
+      - secretRef
+      - token
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        mcpServerId:
+          type: string
+        target:
+          $ref: '#/components/schemas/WorkspaceTarget'
+        endpoint:
+          type: string
+          format: uri
+        secretRef:
+          $ref: '#/components/schemas/SecretRef'
+        token:
+          type: string
     DeploymentId:
       type: string
       pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -424,7 +475,6 @@ components:
       additionalProperties: false
       required:
       - runtimeRouteId
-      - upstreamId
       - allowedMethods
       - allowedPathPrefixes
       - transportPolicy
@@ -434,6 +484,7 @@ components:
           $ref: '#/components/schemas/RuntimeRouteId'
         upstreamId:
           $ref: '#/components/schemas/UpstreamId'
+          x-go-type-skip-optional-pointer: true
         allowedMethods:
           type: array
           minItems: 1
@@ -455,6 +506,22 @@ components:
           - WEBSOCKET
         timeoutPolicy:
           $ref: '#/components/schemas/TimeoutPolicy'
+        workspaceServiceId:
+          $ref: '#/components/schemas/WorkspaceServiceId'
+      not:
+        not:
+          oneOf:
+          - required:
+            - upstreamId
+            not:
+              anyOf:
+              - required:
+                - workspaceServiceId
+          - required:
+            - workspaceServiceId
+            not:
+              required:
+              - upstreamId
     SecretRef:
       type: object
       additionalProperties: false
@@ -559,6 +626,15 @@ components:
             $ref: '#/components/schemas/RuntimeUpstreamSpec'
         operationalLimits:
           $ref: '#/components/schemas/OperationalLimits'
+        protocolVersion:
+          type: integer
+          enum:
+          - 1
+          - 2
+        userBindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserRuntimeBinding'
     ControlAck:
       type: object
       additionalProperties: false
@@ -579,6 +655,11 @@ components:
         appliedAt:
           type: string
           format: date-time
+        protocolVersion:
+          type: integer
+          enum:
+          - 1
+          - 2
     ControlStatus:
       type: object
       additionalProperties: false
@@ -620,6 +701,11 @@ components:
           minimum: 0
         telemetry:
           $ref: '#/components/schemas/ProcessTelemetry'
+        protocolVersion:
+          type: integer
+          enum:
+          - 1
+          - 2
     TelemetryMetrics:
       type: object
       additionalProperties: false

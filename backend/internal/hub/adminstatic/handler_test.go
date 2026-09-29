@@ -48,3 +48,12 @@ func TestFingerprintAssetServedAndMissingAssetDoesNotFallback(t *testing.T) {
 		}
 	}
 }
+
+func TestModuleWorkerHasPortableJavaScriptMIME(t *testing.T) {
+	h := adminstatic.New(fstest.MapFS{"assets/pdf.worker.mjs": {Data: []byte("export const ready=true")}})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/admin/assets/pdf.worker.mjs", nil))
+	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "text/javascript; charset=utf-8" {
+		t.Fatalf("module worker: %d %v", w.Code, w.Header())
+	}
+}

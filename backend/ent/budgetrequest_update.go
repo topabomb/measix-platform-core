@@ -274,6 +274,12 @@ func (_u *BudgetRequestUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if _u.mutation.DeviceIDCleared() {
 		_spec.ClearField(budgetrequest.FieldDeviceID, field.TypeString)
 	}
+	if _u.mutation.UpstreamIDCleared() {
+		_spec.ClearField(budgetrequest.FieldUpstreamID, field.TypeString)
+	}
+	if _u.mutation.WorkspaceTargetJSONCleared() {
+		_spec.ClearField(budgetrequest.FieldWorkspaceTargetJSON, field.TypeBytes)
+	}
 	if _u.mutation.UserBudgetIDCleared() {
 		_spec.ClearField(budgetrequest.FieldUserBudgetID, field.TypeInt)
 	}
@@ -642,6 +648,12 @@ func (_u *BudgetRequestUpdateOne) sqlSave(ctx context.Context) (_node *BudgetReq
 	}
 	if _u.mutation.DeviceIDCleared() {
 		_spec.ClearField(budgetrequest.FieldDeviceID, field.TypeString)
+	}
+	if _u.mutation.UpstreamIDCleared() {
+		_spec.ClearField(budgetrequest.FieldUpstreamID, field.TypeString)
+	}
+	if _u.mutation.WorkspaceTargetJSONCleared() {
+		_spec.ClearField(budgetrequest.FieldWorkspaceTargetJSON, field.TypeBytes)
 	}
 	if _u.mutation.UserBudgetIDCleared() {
 		_spec.ClearField(budgetrequest.FieldUserBudgetID, field.TypeInt)

@@ -25,15 +25,25 @@ type upstreamDescriptor struct {
 }
 
 type descriptor struct {
-	ControlRevision         int                                `json:"controlRevision"`
-	ActiveManagedGeneration int                                `json:"activeManagedGeneration"`
-	DeploymentID            string                             `json:"deploymentId"`
-	AuthKeys                []relaycontrolapi.PublicJwk        `json:"authKeys"`
-	PrincipalState          relaycontrolapi.PrincipalState     `json:"principalState"`
-	ResourceRoutes          []relaycontrolapi.ResourceRoute    `json:"resourceRoutes"`
-	Routes                  []relaycontrolapi.RuntimeRouteSpec `json:"routes"`
-	Upstreams               []upstreamDescriptor               `json:"upstreams"`
-	OperationalLimits       relaycontrolapi.OperationalLimits  `json:"operationalLimits"`
+	ProtocolVersion         *relaycontrolapi.RuntimeControlStateProtocolVersion `json:"protocolVersion,omitempty"`
+	UserBindings            []bindingDescriptor                                 `json:"userBindings,omitempty"`
+	ControlRevision         int                                                 `json:"controlRevision"`
+	ActiveManagedGeneration int                                                 `json:"activeManagedGeneration"`
+	DeploymentID            string                                              `json:"deploymentId"`
+	AuthKeys                []relaycontrolapi.PublicJwk                         `json:"authKeys"`
+	PrincipalState          relaycontrolapi.PrincipalState                      `json:"principalState"`
+	ResourceRoutes          []relaycontrolapi.ResourceRoute                     `json:"resourceRoutes"`
+	Routes                  []relaycontrolapi.RuntimeRouteSpec                  `json:"routes"`
+	Upstreams               []upstreamDescriptor                                `json:"upstreams"`
+	OperationalLimits       relaycontrolapi.OperationalLimits                   `json:"operationalLimits"`
+}
+
+type bindingDescriptor struct {
+	UserId      string                          `json:"userId"`
+	McpServerId string                          `json:"mcpServerId"`
+	Target      relaycontrolapi.WorkspaceTarget `json:"target"`
+	Endpoint    string                          `json:"endpoint"`
+	SecretRef   relaycontrolapi.SecretRef       `json:"secretRef"`
 }
 
 func DescriptorJSON(input relaycontrolapi.RuntimeControlState) ([]byte, error) {
@@ -83,7 +93,20 @@ func DescriptorJSON(input relaycontrolapi.RuntimeControlState) ([]byte, error) {
 	}
 	sort.Slice(upstreams, func(i, j int) bool { return upstreams[i].UpstreamID < upstreams[j].UpstreamID })
 
+	bindings := []bindingDescriptor{}
+	if input.UserBindings != nil {
+		for _, b := range *input.UserBindings {
+			bindings = append(bindings, bindingDescriptor{b.UserId, b.McpServerId, b.Target, b.Endpoint, b.SecretRef})
+		}
+	}
+	sort.Slice(bindings, func(i, j int) bool {
+		if bindings[i].UserId == bindings[j].UserId {
+			return bindings[i].McpServerId < bindings[j].McpServerId
+		}
+		return bindings[i].UserId < bindings[j].UserId
+	})
 	return json.Marshal(descriptor{
+		ProtocolVersion: input.ProtocolVersion, UserBindings: bindings,
 		ControlRevision: input.ControlRevision, ActiveManagedGeneration: input.ActiveManagedGeneration,
 		DeploymentID: input.DeploymentId, AuthKeys: authKeys, PrincipalState: principal,
 		ResourceRoutes: resourceRoutes, Routes: routes, Upstreams: upstreams, OperationalLimits: input.OperationalLimits,

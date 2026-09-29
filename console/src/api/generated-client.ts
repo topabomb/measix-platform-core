@@ -325,10 +325,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/client/v1/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWorkspace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/client/v1/workspace/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listClientWorkspaceFiles"];
+        put?: never;
+        post: operations["mutateClientWorkspaceFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/client/v1/workspace/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadClientWorkspaceFile"];
+        put: operations["uploadClientWorkspaceFile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head: operations["headClientWorkspaceFile"];
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        WorkspaceServiceId: string;
+        AgentSpaceId: string;
+        WorkspaceOperationId: string;
+        WorkspaceFileEntry: {
+            path: string;
+            /** @enum {string} */
+            kind: "FILE" | "DIRECTORY";
+            /** Format: int64 */
+            size?: number;
+            /** Format: date-time */
+            modifiedAt?: string;
+            etag?: string;
+        };
+        WorkspaceFileList: {
+            entries: components["schemas"]["WorkspaceFileEntry"][];
+            /** Format: int64 */
+            usedBytes?: number;
+            /** Format: int64 */
+            availableBytes?: number;
+        };
+        WorkspaceFileMutation: {
+            /** @enum {string} */
+            action: "MKCOL" | "MOVE" | "COPY" | "DELETE";
+            path: string;
+            destination?: string;
+            sourceEtag?: string;
+            targetEtag?: string;
+            overwrite?: boolean;
+            recursiveConfirmed?: boolean;
+        };
+        WorkspaceFileFailure: {
+            path: string;
+            status: number;
+            code: string;
+        };
+        WorkspaceFileResult: {
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "PARTIAL" | "UNKNOWN";
+            failures: components["schemas"]["WorkspaceFileFailure"][];
+            truncated: boolean;
+        };
+        WorkspaceProjection: {
+            /** @enum {integer} */
+            schemaVersion: 1;
+            /** @enum {string} */
+            state: "UNPROVISIONED" | "CONNECTING" | "CONNECTED" | "DISCONNECTING" | "DISCONNECTED" | "RESTORING" | "DELETING" | "DELETED" | "NEEDS_ATTENTION";
+            bindingRevision: number;
+            agentSpaceId?: components["schemas"]["AgentSpaceId"];
+            mcpServerId?: components["schemas"]["McpServerId"];
+            mcpAvailable: boolean;
+            filesAvailable: boolean;
+            mcpReason: string;
+            filesReason: string;
+            /** Format: date-time */
+            observedAt?: string;
+            operationId?: components["schemas"]["WorkspaceOperationId"];
+        };
         ManagedAppliedReport: {
             managedGeneration: number;
             snapshotHash: string;
@@ -1450,6 +1555,157 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getWorkspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceProjection"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listClientWorkspaceFiles: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceFileList"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    mutateClientWorkspaceFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspaceFileMutation"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceFileResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    downloadClientWorkspaceFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: {
+                Range?: string;
+                "If-Match"?: string;
+                "If-None-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    uploadClientWorkspaceFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: {
+                "If-Match"?: string;
+                "If-None-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceFileResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    headClientWorkspaceFile: {
+        parameters: {
+            query?: {
+                path?: string;
+            };
+            header?: {
+                Range?: string;
+                "If-Match"?: string;
+                "If-None-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
         };
     };
 }

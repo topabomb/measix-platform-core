@@ -1,0 +1,22 @@
+{
+  "requestId": "req_550e8400-e29b-41d4-a716-446655440000",
+  "deploymentId": "dep_550e8400-e29b-41d4-a716-446655440000",
+  "userId": "usr_550e8400-e29b-41d4-a716-446655440000",
+  "resourceId": "mcp_550e8400-e29b-41d4-a716-446655440000",
+  "resourceKind": "MCP",
+  "clientProtocol": "MCP_STREAMABLE_HTTP",
+  "managedGeneration": 1,
+  "controlRevision": 2,
+  "admittedAt": "2026-09-29T00:00:00Z",
+  "requestHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "supportedMeters": [
+    "REQUESTS"
+  ],
+  "targetVersion": 2,
+  "workspaceTarget": {
+    "workspaceServiceId": "wss_550e8400-e29b-41d4-a716-446655440000",
+    "agentSpaceId": "spc_550e8400-e29b-41d4-a716-446655440000",
+    "remoteUsername": "measix_550e8400-e29b-41d4-a716-446655440000",
+    "bindingRevision": 3
+  }
+}

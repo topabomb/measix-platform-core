@@ -133,7 +133,7 @@ func TestApplyAdoptsMatchingLegacyDevelopmentRevision(t *testing.T) {
 	}
 	defer db.Close()
 	set := List()
-	if len(set) != 1 {
+	if len(set) < 1 {
 		t.Fatalf("initial Preview migration count=%d", len(set))
 	}
 	if _, err := db.Exec(set[0].SQL); err != nil {
@@ -149,7 +149,7 @@ func TestApplyAdoptsMatchingLegacyDevelopmentRevision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.AdoptedLegacy || result.ToVersion != 1 || len(result.Applied) != 0 {
+	if !result.AdoptedLegacy || result.ToVersion != set[len(set)-1].Version || len(result.Applied) != len(set)-1 {
 		t.Fatalf("unexpected adoption: %+v", result)
 	}
 	var legacy int

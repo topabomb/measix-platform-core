@@ -142,3 +142,10 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 - 当前 checkpoint 状态 → `docs/s0-execution-progress.md`。
 
 本文不声明 C1–C7 Green。完成状态必须来自当前 architecture baseline + exact implementation SHA 的 executable evidence。
+
+
+## 远程工作区页面
+
+远程工作区配置、用户空间、文件操作及四类安全预览的源码所有者和交互边界统一记录于远程工作区实现参考。新增 pdf.js worker 必须以 JavaScript MIME 提供；文件预览按需加载，查看工作区详情不触发 DAV/VM。
+
+详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。

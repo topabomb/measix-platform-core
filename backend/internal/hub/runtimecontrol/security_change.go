@@ -300,7 +300,7 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 		_ = s.markUnknown(ctx, activationID, "relay_apply_unknown")
 		return s.loadActivation(ctx, activationID)
 	}
-	if ack.AppliedControlRevision != revision || string(ack.BundleHash) != string(hash) || ack.ActiveManagedGeneration != generation {
+	if !ackProtocolMatches(state, ack) || ack.AppliedControlRevision != revision || string(ack.BundleHash) != string(hash) || ack.ActiveManagedGeneration != generation {
 		_ = s.markFailed(ctx, activationID, "relay_ack_mismatch")
 		return ActivationResult{}, ErrRelayAckMismatch
 	}

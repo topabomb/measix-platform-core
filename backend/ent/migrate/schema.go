@@ -32,6 +32,46 @@ var (
 		Columns:    ActivationsColumns,
 		PrimaryKey: []*schema.Column{ActivationsColumns[0]},
 	}
+	// AgentSpacesColumns holds the columns for the "agent_spaces" table.
+	AgentSpacesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "workspace_service_id", Type: field.TypeString},
+		{Name: "remote_username", Type: field.TypeString},
+		{Name: "agent_space_id", Type: field.TypeString, Nullable: true},
+		{Name: "binding_revision", Type: field.TypeInt64},
+		{Name: "intent", Type: field.TypeString},
+		{Name: "state", Type: field.TypeString},
+		{Name: "mcp_secret_id", Type: field.TypeString, Nullable: true},
+		{Name: "mcp_secret_version", Type: field.TypeInt64, Nullable: true},
+		{Name: "dav_secret_id", Type: field.TypeString, Nullable: true},
+		{Name: "dav_secret_version", Type: field.TypeInt64, Nullable: true},
+		{Name: "dav_confirmed", Type: field.TypeBool},
+		{Name: "remote_active", Type: field.TypeBool},
+		{Name: "stop_pending", Type: field.TypeBool},
+		{Name: "applied_control_revision", Type: field.TypeInt64, Nullable: true},
+		{Name: "diagnostic_code", Type: field.TypeString, Nullable: true},
+		{Name: "observed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// AgentSpacesTable holds the schema information for the "agent_spaces" table.
+	AgentSpacesTable = &schema.Table{
+		Name:       "agent_spaces",
+		Columns:    AgentSpacesColumns,
+		PrimaryKey: []*schema.Column{AgentSpacesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "agentspace_workspace_service_id_remote_username",
+				Unique:  true,
+				Columns: []*schema.Column{AgentSpacesColumns[1], AgentSpacesColumns[2]},
+			},
+			{
+				Name:    "agentspace_workspace_service_id_agent_space_id",
+				Unique:  true,
+				Columns: []*schema.Column{AgentSpacesColumns[1], AgentSpacesColumns[3]},
+			},
+		},
+	}
 	// BudgetAllocationsColumns holds the columns for the "budget_allocations" table.
 	BudgetAllocationsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -215,7 +255,8 @@ var (
 		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "IMAGE_GENERATION", "TTS", "ASR", "MCP"}},
 		{Name: "resource_id", Type: field.TypeString},
 		{Name: "client_protocol", Type: field.TypeString},
-		{Name: "upstream_id", Type: field.TypeString},
+		{Name: "upstream_id", Type: field.TypeString, Nullable: true},
+		{Name: "workspace_target_json", Type: field.TypeBytes, Nullable: true},
 		{Name: "managed_generation", Type: field.TypeInt64},
 		{Name: "control_revision", Type: field.TypeInt64},
 		{Name: "user_budget_id", Type: field.TypeInt, Nullable: true},
@@ -242,12 +283,12 @@ var (
 			{
 				Name:    "budgetrequest_user_id_capability_state",
 				Unique:  false,
-				Columns: []*schema.Column{BudgetRequestsColumns[3], BudgetRequestsColumns[6], BudgetRequestsColumns[17]},
+				Columns: []*schema.Column{BudgetRequestsColumns[3], BudgetRequestsColumns[6], BudgetRequestsColumns[18]},
 			},
 			{
 				Name:    "budgetrequest_state_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{BudgetRequestsColumns[17], BudgetRequestsColumns[25]},
+				Columns: []*schema.Column{BudgetRequestsColumns[18], BudgetRequestsColumns[26]},
 			},
 		},
 	}
@@ -643,7 +684,8 @@ var (
 		{Name: "resource_kind", Type: field.TypeString},
 		{Name: "client_protocol", Type: field.TypeString},
 		{Name: "runtime_route_id", Type: field.TypeString},
-		{Name: "upstream_id", Type: field.TypeString},
+		{Name: "upstream_id", Type: field.TypeString, Nullable: true},
+		{Name: "workspace_target_json", Type: field.TypeBytes, Nullable: true},
 		{Name: "managed_generation", Type: field.TypeInt64},
 		{Name: "control_revision", Type: field.TypeInt64},
 		{Name: "started_at", Type: field.TypeTime},
@@ -675,22 +717,22 @@ var (
 			{
 				Name:    "requestusage_completed_at_user_id",
 				Unique:  false,
-				Columns: []*schema.Column{RequestUsagesColumns[14], RequestUsagesColumns[4]},
+				Columns: []*schema.Column{RequestUsagesColumns[15], RequestUsagesColumns[4]},
 			},
 			{
 				Name:    "requestusage_completed_at_resource_id",
 				Unique:  false,
-				Columns: []*schema.Column{RequestUsagesColumns[14], RequestUsagesColumns[6]},
+				Columns: []*schema.Column{RequestUsagesColumns[15], RequestUsagesColumns[6]},
 			},
 			{
 				Name:    "requestusage_completed_at_client_protocol",
 				Unique:  false,
-				Columns: []*schema.Column{RequestUsagesColumns[14], RequestUsagesColumns[8]},
+				Columns: []*schema.Column{RequestUsagesColumns[15], RequestUsagesColumns[8]},
 			},
 			{
 				Name:    "requestusage_completed_at_resource_kind",
 				Unique:  false,
-				Columns: []*schema.Column{RequestUsagesColumns[14], RequestUsagesColumns[7]},
+				Columns: []*schema.Column{RequestUsagesColumns[15], RequestUsagesColumns[7]},
 			},
 		},
 	}
@@ -934,9 +976,113 @@ var (
 			},
 		},
 	}
+	// WorkspaceAuditsColumns holds the columns for the "workspace_audits" table.
+	WorkspaceAuditsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "request_id", Type: field.TypeString},
+		{Name: "actor_id", Type: field.TypeString},
+		{Name: "user_id", Type: field.TypeString},
+		{Name: "agent_space_id", Type: field.TypeString},
+		{Name: "action", Type: field.TypeString},
+		{Name: "path", Type: field.TypeString},
+		{Name: "outcome", Type: field.TypeString},
+		{Name: "bytes", Type: field.TypeInt64},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
+	}
+	// WorkspaceAuditsTable holds the schema information for the "workspace_audits" table.
+	WorkspaceAuditsTable = &schema.Table{
+		Name:       "workspace_audits",
+		Columns:    WorkspaceAuditsColumns,
+		PrimaryKey: []*schema.Column{WorkspaceAuditsColumns[0]},
+	}
+	// WorkspaceOperationsColumns holds the columns for the "workspace_operations" table.
+	WorkspaceOperationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "workspace_service_id", Type: field.TypeString},
+		{Name: "user_id", Type: field.TypeString, Nullable: true},
+		{Name: "action", Type: field.TypeString},
+		{Name: "idempotency_key", Type: field.TypeString},
+		{Name: "request_hash", Type: field.TypeString},
+		{Name: "config_revision", Type: field.TypeInt64},
+		{Name: "binding_revision", Type: field.TypeInt64},
+		{Name: "target_json", Type: field.TypeBytes},
+		{Name: "state", Type: field.TypeString},
+		{Name: "step", Type: field.TypeString},
+		{Name: "result_json", Type: field.TypeBytes, Nullable: true},
+		{Name: "candidate_secret_id", Type: field.TypeString, Nullable: true},
+		{Name: "candidate_secret_version", Type: field.TypeInt64, Nullable: true},
+		{Name: "activation_id", Type: field.TypeString, Nullable: true},
+		{Name: "diagnostic_code", Type: field.TypeString, Nullable: true},
+		{Name: "evidence", Type: field.TypeString, Nullable: true},
+		{Name: "created_by_user_id", Type: field.TypeString},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// WorkspaceOperationsTable holds the schema information for the "workspace_operations" table.
+	WorkspaceOperationsTable = &schema.Table{
+		Name:       "workspace_operations",
+		Columns:    WorkspaceOperationsColumns,
+		PrimaryKey: []*schema.Column{WorkspaceOperationsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workspaceoperation_created_by_user_id_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{WorkspaceOperationsColumns[17], WorkspaceOperationsColumns[4]},
+			},
+			{
+				Name:    "workspaceoperation_state_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{WorkspaceOperationsColumns[9], WorkspaceOperationsColumns[19]},
+			},
+		},
+	}
+	// WorkspaceServicesColumns holds the columns for the "workspace_services" table.
+	WorkspaceServicesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "config_revision", Type: field.TypeInt64},
+		{Name: "active_config_revision", Type: field.TypeInt64, Nullable: true},
+		{Name: "enabled", Type: field.TypeBool},
+		{Name: "state", Type: field.TypeString},
+		{Name: "mcp_server_id", Type: field.TypeString},
+		{Name: "runtime_route_id", Type: field.TypeString},
+		{Name: "diagnostic_code", Type: field.TypeString, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// WorkspaceServicesTable holds the schema information for the "workspace_services" table.
+	WorkspaceServicesTable = &schema.Table{
+		Name:       "workspace_services",
+		Columns:    WorkspaceServicesColumns,
+		PrimaryKey: []*schema.Column{WorkspaceServicesColumns[0]},
+	}
+	// WorkspaceServiceConfigsColumns holds the columns for the "workspace_service_configs" table.
+	WorkspaceServiceConfigsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "workspace_service_id", Type: field.TypeString},
+		{Name: "revision", Type: field.TypeInt64},
+		{Name: "config_json", Type: field.TypeBytes},
+		{Name: "created_by_user_id", Type: field.TypeString},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// WorkspaceServiceConfigsTable holds the schema information for the "workspace_service_configs" table.
+	WorkspaceServiceConfigsTable = &schema.Table{
+		Name:       "workspace_service_configs",
+		Columns:    WorkspaceServiceConfigsColumns,
+		PrimaryKey: []*schema.Column{WorkspaceServiceConfigsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workspaceserviceconfig_workspace_service_id_revision",
+				Unique:  true,
+				Columns: []*schema.Column{WorkspaceServiceConfigsColumns[1], WorkspaceServiceConfigsColumns[2]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		ActivationsTable,
+		AgentSpacesTable,
 		BudgetAllocationsTable,
 		BudgetAuditsTable,
 		BudgetBucketsTable,
@@ -971,6 +1117,10 @@ var (
 		UsageEventsTable,
 		UsersTable,
 		UserBudgetsTable,
+		WorkspaceAuditsTable,
+		WorkspaceOperationsTable,
+		WorkspaceServicesTable,
+		WorkspaceServiceConfigsTable,
 	}
 )
 

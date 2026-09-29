@@ -20,6 +20,18 @@ func (f ActivationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ActivationMutation", m)
 }
 
+// The AgentSpaceFunc type is an adapter to allow the use of ordinary
+// function as AgentSpace mutator.
+type AgentSpaceFunc func(context.Context, *ent.AgentSpaceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AgentSpaceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AgentSpaceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AgentSpaceMutation", m)
+}
+
 // The BudgetAllocationFunc type is an adapter to allow the use of ordinary
 // function as BudgetAllocation mutator.
 type BudgetAllocationFunc func(context.Context, *ent.BudgetAllocationMutation) (ent.Value, error)
@@ -426,6 +438,54 @@ func (f UserBudgetFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserBudgetMutation", m)
+}
+
+// The WorkspaceAuditFunc type is an adapter to allow the use of ordinary
+// function as WorkspaceAudit mutator.
+type WorkspaceAuditFunc func(context.Context, *ent.WorkspaceAuditMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkspaceAuditFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkspaceAuditMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkspaceAuditMutation", m)
+}
+
+// The WorkspaceOperationFunc type is an adapter to allow the use of ordinary
+// function as WorkspaceOperation mutator.
+type WorkspaceOperationFunc func(context.Context, *ent.WorkspaceOperationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkspaceOperationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkspaceOperationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkspaceOperationMutation", m)
+}
+
+// The WorkspaceServiceFunc type is an adapter to allow the use of ordinary
+// function as WorkspaceService mutator.
+type WorkspaceServiceFunc func(context.Context, *ent.WorkspaceServiceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkspaceServiceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkspaceServiceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkspaceServiceMutation", m)
+}
+
+// The WorkspaceServiceConfigFunc type is an adapter to allow the use of ordinary
+// function as WorkspaceServiceConfig mutator.
+type WorkspaceServiceConfigFunc func(context.Context, *ent.WorkspaceServiceConfigMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkspaceServiceConfigFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkspaceServiceConfigMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkspaceServiceConfigMutation", m)
 }
 
 // Condition is a hook condition function.

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"measix/platform/ent/activation"
+	"measix/platform/ent/agentspace"
 	"measix/platform/ent/budgetallocation"
 	"measix/platform/ent/budgetaudit"
 	"measix/platform/ent/budgetbucket"
@@ -42,6 +43,10 @@ import (
 	"measix/platform/ent/usageevent"
 	"measix/platform/ent/user"
 	"measix/platform/ent/userbudget"
+	"measix/platform/ent/workspaceaudit"
+	"measix/platform/ent/workspaceoperation"
+	"measix/platform/ent/workspaceservice"
+	"measix/platform/ent/workspaceserviceconfig"
 	"sync"
 	"time"
 
@@ -59,6 +64,7 @@ const (
 
 	// Node types.
 	TypeActivation               = "Activation"
+	TypeAgentSpace               = "AgentSpace"
 	TypeBudgetAllocation         = "BudgetAllocation"
 	TypeBudgetAudit              = "BudgetAudit"
 	TypeBudgetBucket             = "BudgetBucket"
@@ -93,6 +99,10 @@ const (
 	TypeUsageEvent               = "UsageEvent"
 	TypeUser                     = "User"
 	TypeUserBudget               = "UserBudget"
+	TypeWorkspaceAudit           = "WorkspaceAudit"
+	TypeWorkspaceOperation       = "WorkspaceOperation"
+	TypeWorkspaceService         = "WorkspaceService"
+	TypeWorkspaceServiceConfig   = "WorkspaceServiceConfig"
 )
 
 // ActivationMutation represents an operation that mutates the Activation nodes in the graph.
@@ -1295,6 +1305,1549 @@ func (m *ActivationMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ActivationMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Activation edge %s", name)
+}
+
+// AgentSpaceMutation represents an operation that mutates the AgentSpace nodes in the graph.
+type AgentSpaceMutation struct {
+	config
+	op                          Op
+	typ                         string
+	id                          *string
+	workspace_service_id        *string
+	remote_username             *string
+	agent_space_id              *string
+	binding_revision            *int64
+	addbinding_revision         *int64
+	intent                      *string
+	state                       *string
+	mcp_secret_id               *string
+	mcp_secret_version          *int64
+	addmcp_secret_version       *int64
+	dav_secret_id               *string
+	dav_secret_version          *int64
+	adddav_secret_version       *int64
+	dav_confirmed               *bool
+	remote_active               *bool
+	stop_pending                *bool
+	applied_control_revision    *int64
+	addapplied_control_revision *int64
+	diagnostic_code             *string
+	observed_at                 *time.Time
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*AgentSpace, error)
+	predicates                  []predicate.AgentSpace
+}
+
+var _ ent.Mutation = (*AgentSpaceMutation)(nil)
+
+// agentspaceOption allows management of the mutation configuration using functional options.
+type agentspaceOption func(*AgentSpaceMutation)
+
+// newAgentSpaceMutation creates new mutation for the AgentSpace entity.
+func newAgentSpaceMutation(c config, op Op, opts ...agentspaceOption) *AgentSpaceMutation {
+	m := &AgentSpaceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeAgentSpace,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withAgentSpaceID sets the ID field of the mutation.
+func withAgentSpaceID(id string) agentspaceOption {
+	return func(m *AgentSpaceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *AgentSpace
+		)
+		m.oldValue = func(ctx context.Context) (*AgentSpace, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().AgentSpace.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withAgentSpace sets the old AgentSpace of the mutation.
+func withAgentSpace(node *AgentSpace) agentspaceOption {
+	return func(m *AgentSpaceMutation) {
+		m.oldValue = func(context.Context) (*AgentSpace, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m AgentSpaceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m AgentSpaceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of AgentSpace entities.
+func (m *AgentSpaceMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *AgentSpaceMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *AgentSpaceMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().AgentSpace.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetWorkspaceServiceID sets the "workspace_service_id" field.
+func (m *AgentSpaceMutation) SetWorkspaceServiceID(s string) {
+	m.workspace_service_id = &s
+}
+
+// WorkspaceServiceID returns the value of the "workspace_service_id" field in the mutation.
+func (m *AgentSpaceMutation) WorkspaceServiceID() (r string, exists bool) {
+	v := m.workspace_service_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWorkspaceServiceID returns the old "workspace_service_id" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldWorkspaceServiceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWorkspaceServiceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWorkspaceServiceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWorkspaceServiceID: %w", err)
+	}
+	return oldValue.WorkspaceServiceID, nil
+}
+
+// ResetWorkspaceServiceID resets all changes to the "workspace_service_id" field.
+func (m *AgentSpaceMutation) ResetWorkspaceServiceID() {
+	m.workspace_service_id = nil
+}
+
+// SetRemoteUsername sets the "remote_username" field.
+func (m *AgentSpaceMutation) SetRemoteUsername(s string) {
+	m.remote_username = &s
+}
+
+// RemoteUsername returns the value of the "remote_username" field in the mutation.
+func (m *AgentSpaceMutation) RemoteUsername() (r string, exists bool) {
+	v := m.remote_username
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemoteUsername returns the old "remote_username" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldRemoteUsername(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemoteUsername is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemoteUsername requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemoteUsername: %w", err)
+	}
+	return oldValue.RemoteUsername, nil
+}
+
+// ResetRemoteUsername resets all changes to the "remote_username" field.
+func (m *AgentSpaceMutation) ResetRemoteUsername() {
+	m.remote_username = nil
+}
+
+// SetAgentSpaceID sets the "agent_space_id" field.
+func (m *AgentSpaceMutation) SetAgentSpaceID(s string) {
+	m.agent_space_id = &s
+}
+
+// AgentSpaceID returns the value of the "agent_space_id" field in the mutation.
+func (m *AgentSpaceMutation) AgentSpaceID() (r string, exists bool) {
+	v := m.agent_space_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAgentSpaceID returns the old "agent_space_id" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldAgentSpaceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAgentSpaceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAgentSpaceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAgentSpaceID: %w", err)
+	}
+	return oldValue.AgentSpaceID, nil
+}
+
+// ClearAgentSpaceID clears the value of the "agent_space_id" field.
+func (m *AgentSpaceMutation) ClearAgentSpaceID() {
+	m.agent_space_id = nil
+	m.clearedFields[agentspace.FieldAgentSpaceID] = struct{}{}
+}
+
+// AgentSpaceIDCleared returns if the "agent_space_id" field was cleared in this mutation.
+func (m *AgentSpaceMutation) AgentSpaceIDCleared() bool {
+	_, ok := m.clearedFields[agentspace.FieldAgentSpaceID]
+	return ok
+}
+
+// ResetAgentSpaceID resets all changes to the "agent_space_id" field.
+func (m *AgentSpaceMutation) ResetAgentSpaceID() {
+	m.agent_space_id = nil
+	delete(m.clearedFields, agentspace.FieldAgentSpaceID)
+}
+
+// SetBindingRevision sets the "binding_revision" field.
+func (m *AgentSpaceMutation) SetBindingRevision(i int64) {
+	m.binding_revision = &i
+	m.addbinding_revision = nil
+}
+
+// BindingRevision returns the value of the "binding_revision" field in the mutation.
+func (m *AgentSpaceMutation) BindingRevision() (r int64, exists bool) {
+	v := m.binding_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBindingRevision returns the old "binding_revision" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldBindingRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBindingRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBindingRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBindingRevision: %w", err)
+	}
+	return oldValue.BindingRevision, nil
+}
+
+// AddBindingRevision adds i to the "binding_revision" field.
+func (m *AgentSpaceMutation) AddBindingRevision(i int64) {
+	if m.addbinding_revision != nil {
+		*m.addbinding_revision += i
+	} else {
+		m.addbinding_revision = &i
+	}
+}
+
+// AddedBindingRevision returns the value that was added to the "binding_revision" field in this mutation.
+func (m *AgentSpaceMutation) AddedBindingRevision() (r int64, exists bool) {
+	v := m.addbinding_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBindingRevision resets all changes to the "binding_revision" field.
+func (m *AgentSpaceMutation) ResetBindingRevision() {
+	m.binding_revision = nil
+	m.addbinding_revision = nil
+}
+
+// SetIntent sets the "intent" field.
+func (m *AgentSpaceMutation) SetIntent(s string) {
+	m.intent = &s
+}
+
+// Intent returns the value of the "intent" field in the mutation.
+func (m *AgentSpaceMutation) Intent() (r string, exists bool) {
+	v := m.intent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntent returns the old "intent" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldIntent(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntent: %w", err)
+	}
+	return oldValue.Intent, nil
+}
+
+// ResetIntent resets all changes to the "intent" field.
+func (m *AgentSpaceMutation) ResetIntent() {
+	m.intent = nil
+}
+
+// SetState sets the "state" field.
+func (m *AgentSpaceMutation) SetState(s string) {
+	m.state = &s
+}
+
+// State returns the value of the "state" field in the mutation.
+func (m *AgentSpaceMutation) State() (r string, exists bool) {
+	v := m.state
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldState returns the old "state" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldState(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldState is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldState requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldState: %w", err)
+	}
+	return oldValue.State, nil
+}
+
+// ResetState resets all changes to the "state" field.
+func (m *AgentSpaceMutation) ResetState() {
+	m.state = nil
+}
+
+// SetMcpSecretID sets the "mcp_secret_id" field.
+func (m *AgentSpaceMutation) SetMcpSecretID(s string) {
+	m.mcp_secret_id = &s
+}
+
+// McpSecretID returns the value of the "mcp_secret_id" field in the mutation.
+func (m *AgentSpaceMutation) McpSecretID() (r string, exists bool) {
+	v := m.mcp_secret_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMcpSecretID returns the old "mcp_secret_id" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldMcpSecretID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMcpSecretID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMcpSecretID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMcpSecretID: %w", err)
+	}
+	return oldValue.McpSecretID, nil
+}
+
+// ClearMcpSecretID clears the value of the "mcp_secret_id" field.
+func (m *AgentSpaceMutation) ClearMcpSecretID() {
+	m.mcp_secret_id = nil
+	m.clearedFields[agentspace.FieldMcpSecretID] = struct{}{}
+}
+
+// McpSecretIDCleared returns if the "mcp_secret_id" field was cleared in this mutation.
+func (m *AgentSpaceMutation) McpSecretIDCleared() bool {
+	_, ok := m.clearedFields[agentspace.FieldMcpSecretID]
+	return ok
+}
+
+// ResetMcpSecretID resets all changes to the "mcp_secret_id" field.
+func (m *AgentSpaceMutation) ResetMcpSecretID() {
+	m.mcp_secret_id = nil
+	delete(m.clearedFields, agentspace.FieldMcpSecretID)
+}
+
+// SetMcpSecretVersion sets the "mcp_secret_version" field.
+func (m *AgentSpaceMutation) SetMcpSecretVersion(i int64) {
+	m.mcp_secret_version = &i
+	m.addmcp_secret_version = nil
+}
+
+// McpSecretVersion returns the value of the "mcp_secret_version" field in the mutation.
+func (m *AgentSpaceMutation) McpSecretVersion() (r int64, exists bool) {
+	v := m.mcp_secret_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMcpSecretVersion returns the old "mcp_secret_version" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldMcpSecretVersion(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMcpSecretVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMcpSecretVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMcpSecretVersion: %w", err)
+	}
+	return oldValue.McpSecretVersion, nil
+}
+
+// AddMcpSecretVersion adds i to the "mcp_secret_version" field.
+func (m *AgentSpaceMutation) AddMcpSecretVersion(i int64) {
+	if m.addmcp_secret_version != nil {
+		*m.addmcp_secret_version += i
+	} else {
+		m.addmcp_secret_version = &i
+	}
+}
+
+// AddedMcpSecretVersion returns the value that was added to the "mcp_secret_version" field in this mutation.
+func (m *AgentSpaceMutation) AddedMcpSecretVersion() (r int64, exists bool) {
+	v := m.addmcp_secret_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearMcpSecretVersion clears the value of the "mcp_secret_version" field.
+func (m *AgentSpaceMutation) ClearMcpSecretVersion() {
+	m.mcp_secret_version = nil
+	m.addmcp_secret_version = nil
+	m.clearedFields[agentspace.FieldMcpSecretVersion] = struct{}{}
+}
+
+// McpSecretVersionCleared returns if the "mcp_secret_version" field was cleared in this mutation.
+func (m *AgentSpaceMutation) McpSecretVersionCleared() bool {
+	_, ok := m.clearedFields[agentspace.FieldMcpSecretVersion]
+	return ok
+}
+
+// ResetMcpSecretVersion resets all changes to the "mcp_secret_version" field.
+func (m *AgentSpaceMutation) ResetMcpSecretVersion() {
+	m.mcp_secret_version = nil
+	m.addmcp_secret_version = nil
+	delete(m.clearedFields, agentspace.FieldMcpSecretVersion)
+}
+
+// SetDavSecretID sets the "dav_secret_id" field.
+func (m *AgentSpaceMutation) SetDavSecretID(s string) {
+	m.dav_secret_id = &s
+}
+
+// DavSecretID returns the value of the "dav_secret_id" field in the mutation.
+func (m *AgentSpaceMutation) DavSecretID() (r string, exists bool) {
+	v := m.dav_secret_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavSecretID returns the old "dav_secret_id" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldDavSecretID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavSecretID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavSecretID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavSecretID: %w", err)
+	}
+	return oldValue.DavSecretID, nil
+}
+
+// ClearDavSecretID clears the value of the "dav_secret_id" field.
+func (m *AgentSpaceMutation) ClearDavSecretID() {
+	m.dav_secret_id = nil
+	m.clearedFields[agentspace.FieldDavSecretID] = struct{}{}
+}
+
+// DavSecretIDCleared returns if the "dav_secret_id" field was cleared in this mutation.
+func (m *AgentSpaceMutation) DavSecretIDCleared() bool {
+	_, ok := m.clearedFields[agentspace.FieldDavSecretID]
+	return ok
+}
+
+// ResetDavSecretID resets all changes to the "dav_secret_id" field.
+func (m *AgentSpaceMutation) ResetDavSecretID() {
+	m.dav_secret_id = nil
+	delete(m.clearedFields, agentspace.FieldDavSecretID)
+}
+
+// SetDavSecretVersion sets the "dav_secret_version" field.
+func (m *AgentSpaceMutation) SetDavSecretVersion(i int64) {
+	m.dav_secret_version = &i
+	m.adddav_secret_version = nil
+}
+
+// DavSecretVersion returns the value of the "dav_secret_version" field in the mutation.
+func (m *AgentSpaceMutation) DavSecretVersion() (r int64, exists bool) {
+	v := m.dav_secret_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavSecretVersion returns the old "dav_secret_version" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldDavSecretVersion(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavSecretVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavSecretVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavSecretVersion: %w", err)
+	}
+	return oldValue.DavSecretVersion, nil
+}
+
+// AddDavSecretVersion adds i to the "dav_secret_version" field.
+func (m *AgentSpaceMutation) AddDavSecretVersion(i int64) {
+	if m.adddav_secret_version != nil {
+		*m.adddav_secret_version += i
+	} else {
+		m.adddav_secret_version = &i
+	}
+}
+
+// AddedDavSecretVersion returns the value that was added to the "dav_secret_version" field in this mutation.
+func (m *AgentSpaceMutation) AddedDavSecretVersion() (r int64, exists bool) {
+	v := m.adddav_secret_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDavSecretVersion clears the value of the "dav_secret_version" field.
+func (m *AgentSpaceMutation) ClearDavSecretVersion() {
+	m.dav_secret_version = nil
+	m.adddav_secret_version = nil
+	m.clearedFields[agentspace.FieldDavSecretVersion] = struct{}{}
+}
+
+// DavSecretVersionCleared returns if the "dav_secret_version" field was cleared in this mutation.
+func (m *AgentSpaceMutation) DavSecretVersionCleared() bool {
+	_, ok := m.clearedFields[agentspace.FieldDavSecretVersion]
+	return ok
+}
+
+// ResetDavSecretVersion resets all changes to the "dav_secret_version" field.
+func (m *AgentSpaceMutation) ResetDavSecretVersion() {
+	m.dav_secret_version = nil
+	m.adddav_secret_version = nil
+	delete(m.clearedFields, agentspace.FieldDavSecretVersion)
+}
+
+// SetDavConfirmed sets the "dav_confirmed" field.
+func (m *AgentSpaceMutation) SetDavConfirmed(b bool) {
+	m.dav_confirmed = &b
+}
+
+// DavConfirmed returns the value of the "dav_confirmed" field in the mutation.
+func (m *AgentSpaceMutation) DavConfirmed() (r bool, exists bool) {
+	v := m.dav_confirmed
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavConfirmed returns the old "dav_confirmed" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldDavConfirmed(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavConfirmed is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavConfirmed requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavConfirmed: %w", err)
+	}
+	return oldValue.DavConfirmed, nil
+}
+
+// ResetDavConfirmed resets all changes to the "dav_confirmed" field.
+func (m *AgentSpaceMutation) ResetDavConfirmed() {
+	m.dav_confirmed = nil
+}
+
+// SetRemoteActive sets the "remote_active" field.
+func (m *AgentSpaceMutation) SetRemoteActive(b bool) {
+	m.remote_active = &b
+}
+
+// RemoteActive returns the value of the "remote_active" field in the mutation.
+func (m *AgentSpaceMutation) RemoteActive() (r bool, exists bool) {
+	v := m.remote_active
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemoteActive returns the old "remote_active" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldRemoteActive(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemoteActive is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemoteActive requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemoteActive: %w", err)
+	}
+	return oldValue.RemoteActive, nil
+}
+
+// ResetRemoteActive resets all changes to the "remote_active" field.
+func (m *AgentSpaceMutation) ResetRemoteActive() {
+	m.remote_active = nil
+}
+
+// SetStopPending sets the "stop_pending" field.
+func (m *AgentSpaceMutation) SetStopPending(b bool) {
+	m.stop_pending = &b
+}
+
+// StopPending returns the value of the "stop_pending" field in the mutation.
+func (m *AgentSpaceMutation) StopPending() (r bool, exists bool) {
+	v := m.stop_pending
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStopPending returns the old "stop_pending" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldStopPending(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStopPending is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStopPending requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStopPending: %w", err)
+	}
+	return oldValue.StopPending, nil
+}
+
+// ResetStopPending resets all changes to the "stop_pending" field.
+func (m *AgentSpaceMutation) ResetStopPending() {
+	m.stop_pending = nil
+}
+
+// SetAppliedControlRevision sets the "applied_control_revision" field.
+func (m *AgentSpaceMutation) SetAppliedControlRevision(i int64) {
+	m.applied_control_revision = &i
+	m.addapplied_control_revision = nil
+}
+
+// AppliedControlRevision returns the value of the "applied_control_revision" field in the mutation.
+func (m *AgentSpaceMutation) AppliedControlRevision() (r int64, exists bool) {
+	v := m.applied_control_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAppliedControlRevision returns the old "applied_control_revision" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldAppliedControlRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAppliedControlRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAppliedControlRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAppliedControlRevision: %w", err)
+	}
+	return oldValue.AppliedControlRevision, nil
+}
+
+// AddAppliedControlRevision adds i to the "applied_control_revision" field.
+func (m *AgentSpaceMutation) AddAppliedControlRevision(i int64) {
+	if m.addapplied_control_revision != nil {
+		*m.addapplied_control_revision += i
+	} else {
+		m.addapplied_control_revision = &i
+	}
+}
+
+// AddedAppliedControlRevision returns the value that was added to the "applied_control_revision" field in this mutation.
+func (m *AgentSpaceMutation) AddedAppliedControlRevision() (r int64, exists bool) {
+	v := m.addapplied_control_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearAppliedControlRevision clears the value of the "applied_control_revision" field.
+func (m *AgentSpaceMutation) ClearAppliedControlRevision() {
+	m.applied_control_revision = nil
+	m.addapplied_control_revision = nil
+	m.clearedFields[agentspace.FieldAppliedControlRevision] = struct{}{}
+}
+
+// AppliedControlRevisionCleared returns if the "applied_control_revision" field was cleared in this mutation.
+func (m *AgentSpaceMutation) AppliedControlRevisionCleared() bool {
+	_, ok := m.clearedFields[agentspace.FieldAppliedControlRevision]
+	return ok
+}
+
+// ResetAppliedControlRevision resets all changes to the "applied_control_revision" field.
+func (m *AgentSpaceMutation) ResetAppliedControlRevision() {
+	m.applied_control_revision = nil
+	m.addapplied_control_revision = nil
+	delete(m.clearedFields, agentspace.FieldAppliedControlRevision)
+}
+
+// SetDiagnosticCode sets the "diagnostic_code" field.
+func (m *AgentSpaceMutation) SetDiagnosticCode(s string) {
+	m.diagnostic_code = &s
+}
+
+// DiagnosticCode returns the value of the "diagnostic_code" field in the mutation.
+func (m *AgentSpaceMutation) DiagnosticCode() (r string, exists bool) {
+	v := m.diagnostic_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiagnosticCode returns the old "diagnostic_code" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldDiagnosticCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiagnosticCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiagnosticCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiagnosticCode: %w", err)
+	}
+	return oldValue.DiagnosticCode, nil
+}
+
+// ClearDiagnosticCode clears the value of the "diagnostic_code" field.
+func (m *AgentSpaceMutation) ClearDiagnosticCode() {
+	m.diagnostic_code = nil
+	m.clearedFields[agentspace.FieldDiagnosticCode] = struct{}{}
+}
+
+// DiagnosticCodeCleared returns if the "diagnostic_code" field was cleared in this mutation.
+func (m *AgentSpaceMutation) DiagnosticCodeCleared() bool {
+	_, ok := m.clearedFields[agentspace.FieldDiagnosticCode]
+	return ok
+}
+
+// ResetDiagnosticCode resets all changes to the "diagnostic_code" field.
+func (m *AgentSpaceMutation) ResetDiagnosticCode() {
+	m.diagnostic_code = nil
+	delete(m.clearedFields, agentspace.FieldDiagnosticCode)
+}
+
+// SetObservedAt sets the "observed_at" field.
+func (m *AgentSpaceMutation) SetObservedAt(t time.Time) {
+	m.observed_at = &t
+}
+
+// ObservedAt returns the value of the "observed_at" field in the mutation.
+func (m *AgentSpaceMutation) ObservedAt() (r time.Time, exists bool) {
+	v := m.observed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldObservedAt returns the old "observed_at" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldObservedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldObservedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldObservedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldObservedAt: %w", err)
+	}
+	return oldValue.ObservedAt, nil
+}
+
+// ClearObservedAt clears the value of the "observed_at" field.
+func (m *AgentSpaceMutation) ClearObservedAt() {
+	m.observed_at = nil
+	m.clearedFields[agentspace.FieldObservedAt] = struct{}{}
+}
+
+// ObservedAtCleared returns if the "observed_at" field was cleared in this mutation.
+func (m *AgentSpaceMutation) ObservedAtCleared() bool {
+	_, ok := m.clearedFields[agentspace.FieldObservedAt]
+	return ok
+}
+
+// ResetObservedAt resets all changes to the "observed_at" field.
+func (m *AgentSpaceMutation) ResetObservedAt() {
+	m.observed_at = nil
+	delete(m.clearedFields, agentspace.FieldObservedAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *AgentSpaceMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *AgentSpaceMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *AgentSpaceMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *AgentSpaceMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *AgentSpaceMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *AgentSpaceMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the AgentSpaceMutation builder.
+func (m *AgentSpaceMutation) Where(ps ...predicate.AgentSpace) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the AgentSpaceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *AgentSpaceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.AgentSpace, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *AgentSpaceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *AgentSpaceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (AgentSpace).
+func (m *AgentSpaceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *AgentSpaceMutation) Fields() []string {
+	fields := make([]string, 0, 18)
+	if m.workspace_service_id != nil {
+		fields = append(fields, agentspace.FieldWorkspaceServiceID)
+	}
+	if m.remote_username != nil {
+		fields = append(fields, agentspace.FieldRemoteUsername)
+	}
+	if m.agent_space_id != nil {
+		fields = append(fields, agentspace.FieldAgentSpaceID)
+	}
+	if m.binding_revision != nil {
+		fields = append(fields, agentspace.FieldBindingRevision)
+	}
+	if m.intent != nil {
+		fields = append(fields, agentspace.FieldIntent)
+	}
+	if m.state != nil {
+		fields = append(fields, agentspace.FieldState)
+	}
+	if m.mcp_secret_id != nil {
+		fields = append(fields, agentspace.FieldMcpSecretID)
+	}
+	if m.mcp_secret_version != nil {
+		fields = append(fields, agentspace.FieldMcpSecretVersion)
+	}
+	if m.dav_secret_id != nil {
+		fields = append(fields, agentspace.FieldDavSecretID)
+	}
+	if m.dav_secret_version != nil {
+		fields = append(fields, agentspace.FieldDavSecretVersion)
+	}
+	if m.dav_confirmed != nil {
+		fields = append(fields, agentspace.FieldDavConfirmed)
+	}
+	if m.remote_active != nil {
+		fields = append(fields, agentspace.FieldRemoteActive)
+	}
+	if m.stop_pending != nil {
+		fields = append(fields, agentspace.FieldStopPending)
+	}
+	if m.applied_control_revision != nil {
+		fields = append(fields, agentspace.FieldAppliedControlRevision)
+	}
+	if m.diagnostic_code != nil {
+		fields = append(fields, agentspace.FieldDiagnosticCode)
+	}
+	if m.observed_at != nil {
+		fields = append(fields, agentspace.FieldObservedAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, agentspace.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, agentspace.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *AgentSpaceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case agentspace.FieldWorkspaceServiceID:
+		return m.WorkspaceServiceID()
+	case agentspace.FieldRemoteUsername:
+		return m.RemoteUsername()
+	case agentspace.FieldAgentSpaceID:
+		return m.AgentSpaceID()
+	case agentspace.FieldBindingRevision:
+		return m.BindingRevision()
+	case agentspace.FieldIntent:
+		return m.Intent()
+	case agentspace.FieldState:
+		return m.State()
+	case agentspace.FieldMcpSecretID:
+		return m.McpSecretID()
+	case agentspace.FieldMcpSecretVersion:
+		return m.McpSecretVersion()
+	case agentspace.FieldDavSecretID:
+		return m.DavSecretID()
+	case agentspace.FieldDavSecretVersion:
+		return m.DavSecretVersion()
+	case agentspace.FieldDavConfirmed:
+		return m.DavConfirmed()
+	case agentspace.FieldRemoteActive:
+		return m.RemoteActive()
+	case agentspace.FieldStopPending:
+		return m.StopPending()
+	case agentspace.FieldAppliedControlRevision:
+		return m.AppliedControlRevision()
+	case agentspace.FieldDiagnosticCode:
+		return m.DiagnosticCode()
+	case agentspace.FieldObservedAt:
+		return m.ObservedAt()
+	case agentspace.FieldCreatedAt:
+		return m.CreatedAt()
+	case agentspace.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *AgentSpaceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case agentspace.FieldWorkspaceServiceID:
+		return m.OldWorkspaceServiceID(ctx)
+	case agentspace.FieldRemoteUsername:
+		return m.OldRemoteUsername(ctx)
+	case agentspace.FieldAgentSpaceID:
+		return m.OldAgentSpaceID(ctx)
+	case agentspace.FieldBindingRevision:
+		return m.OldBindingRevision(ctx)
+	case agentspace.FieldIntent:
+		return m.OldIntent(ctx)
+	case agentspace.FieldState:
+		return m.OldState(ctx)
+	case agentspace.FieldMcpSecretID:
+		return m.OldMcpSecretID(ctx)
+	case agentspace.FieldMcpSecretVersion:
+		return m.OldMcpSecretVersion(ctx)
+	case agentspace.FieldDavSecretID:
+		return m.OldDavSecretID(ctx)
+	case agentspace.FieldDavSecretVersion:
+		return m.OldDavSecretVersion(ctx)
+	case agentspace.FieldDavConfirmed:
+		return m.OldDavConfirmed(ctx)
+	case agentspace.FieldRemoteActive:
+		return m.OldRemoteActive(ctx)
+	case agentspace.FieldStopPending:
+		return m.OldStopPending(ctx)
+	case agentspace.FieldAppliedControlRevision:
+		return m.OldAppliedControlRevision(ctx)
+	case agentspace.FieldDiagnosticCode:
+		return m.OldDiagnosticCode(ctx)
+	case agentspace.FieldObservedAt:
+		return m.OldObservedAt(ctx)
+	case agentspace.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case agentspace.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown AgentSpace field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AgentSpaceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case agentspace.FieldWorkspaceServiceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWorkspaceServiceID(v)
+		return nil
+	case agentspace.FieldRemoteUsername:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemoteUsername(v)
+		return nil
+	case agentspace.FieldAgentSpaceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAgentSpaceID(v)
+		return nil
+	case agentspace.FieldBindingRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBindingRevision(v)
+		return nil
+	case agentspace.FieldIntent:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntent(v)
+		return nil
+	case agentspace.FieldState:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetState(v)
+		return nil
+	case agentspace.FieldMcpSecretID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMcpSecretID(v)
+		return nil
+	case agentspace.FieldMcpSecretVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMcpSecretVersion(v)
+		return nil
+	case agentspace.FieldDavSecretID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavSecretID(v)
+		return nil
+	case agentspace.FieldDavSecretVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavSecretVersion(v)
+		return nil
+	case agentspace.FieldDavConfirmed:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavConfirmed(v)
+		return nil
+	case agentspace.FieldRemoteActive:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemoteActive(v)
+		return nil
+	case agentspace.FieldStopPending:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStopPending(v)
+		return nil
+	case agentspace.FieldAppliedControlRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAppliedControlRevision(v)
+		return nil
+	case agentspace.FieldDiagnosticCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiagnosticCode(v)
+		return nil
+	case agentspace.FieldObservedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetObservedAt(v)
+		return nil
+	case agentspace.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case agentspace.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AgentSpace field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *AgentSpaceMutation) AddedFields() []string {
+	var fields []string
+	if m.addbinding_revision != nil {
+		fields = append(fields, agentspace.FieldBindingRevision)
+	}
+	if m.addmcp_secret_version != nil {
+		fields = append(fields, agentspace.FieldMcpSecretVersion)
+	}
+	if m.adddav_secret_version != nil {
+		fields = append(fields, agentspace.FieldDavSecretVersion)
+	}
+	if m.addapplied_control_revision != nil {
+		fields = append(fields, agentspace.FieldAppliedControlRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *AgentSpaceMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case agentspace.FieldBindingRevision:
+		return m.AddedBindingRevision()
+	case agentspace.FieldMcpSecretVersion:
+		return m.AddedMcpSecretVersion()
+	case agentspace.FieldDavSecretVersion:
+		return m.AddedDavSecretVersion()
+	case agentspace.FieldAppliedControlRevision:
+		return m.AddedAppliedControlRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *AgentSpaceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case agentspace.FieldBindingRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBindingRevision(v)
+		return nil
+	case agentspace.FieldMcpSecretVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMcpSecretVersion(v)
+		return nil
+	case agentspace.FieldDavSecretVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDavSecretVersion(v)
+		return nil
+	case agentspace.FieldAppliedControlRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAppliedControlRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown AgentSpace numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *AgentSpaceMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(agentspace.FieldAgentSpaceID) {
+		fields = append(fields, agentspace.FieldAgentSpaceID)
+	}
+	if m.FieldCleared(agentspace.FieldMcpSecretID) {
+		fields = append(fields, agentspace.FieldMcpSecretID)
+	}
+	if m.FieldCleared(agentspace.FieldMcpSecretVersion) {
+		fields = append(fields, agentspace.FieldMcpSecretVersion)
+	}
+	if m.FieldCleared(agentspace.FieldDavSecretID) {
+		fields = append(fields, agentspace.FieldDavSecretID)
+	}
+	if m.FieldCleared(agentspace.FieldDavSecretVersion) {
+		fields = append(fields, agentspace.FieldDavSecretVersion)
+	}
+	if m.FieldCleared(agentspace.FieldAppliedControlRevision) {
+		fields = append(fields, agentspace.FieldAppliedControlRevision)
+	}
+	if m.FieldCleared(agentspace.FieldDiagnosticCode) {
+		fields = append(fields, agentspace.FieldDiagnosticCode)
+	}
+	if m.FieldCleared(agentspace.FieldObservedAt) {
+		fields = append(fields, agentspace.FieldObservedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *AgentSpaceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *AgentSpaceMutation) ClearField(name string) error {
+	switch name {
+	case agentspace.FieldAgentSpaceID:
+		m.ClearAgentSpaceID()
+		return nil
+	case agentspace.FieldMcpSecretID:
+		m.ClearMcpSecretID()
+		return nil
+	case agentspace.FieldMcpSecretVersion:
+		m.ClearMcpSecretVersion()
+		return nil
+	case agentspace.FieldDavSecretID:
+		m.ClearDavSecretID()
+		return nil
+	case agentspace.FieldDavSecretVersion:
+		m.ClearDavSecretVersion()
+		return nil
+	case agentspace.FieldAppliedControlRevision:
+		m.ClearAppliedControlRevision()
+		return nil
+	case agentspace.FieldDiagnosticCode:
+		m.ClearDiagnosticCode()
+		return nil
+	case agentspace.FieldObservedAt:
+		m.ClearObservedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown AgentSpace nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *AgentSpaceMutation) ResetField(name string) error {
+	switch name {
+	case agentspace.FieldWorkspaceServiceID:
+		m.ResetWorkspaceServiceID()
+		return nil
+	case agentspace.FieldRemoteUsername:
+		m.ResetRemoteUsername()
+		return nil
+	case agentspace.FieldAgentSpaceID:
+		m.ResetAgentSpaceID()
+		return nil
+	case agentspace.FieldBindingRevision:
+		m.ResetBindingRevision()
+		return nil
+	case agentspace.FieldIntent:
+		m.ResetIntent()
+		return nil
+	case agentspace.FieldState:
+		m.ResetState()
+		return nil
+	case agentspace.FieldMcpSecretID:
+		m.ResetMcpSecretID()
+		return nil
+	case agentspace.FieldMcpSecretVersion:
+		m.ResetMcpSecretVersion()
+		return nil
+	case agentspace.FieldDavSecretID:
+		m.ResetDavSecretID()
+		return nil
+	case agentspace.FieldDavSecretVersion:
+		m.ResetDavSecretVersion()
+		return nil
+	case agentspace.FieldDavConfirmed:
+		m.ResetDavConfirmed()
+		return nil
+	case agentspace.FieldRemoteActive:
+		m.ResetRemoteActive()
+		return nil
+	case agentspace.FieldStopPending:
+		m.ResetStopPending()
+		return nil
+	case agentspace.FieldAppliedControlRevision:
+		m.ResetAppliedControlRevision()
+		return nil
+	case agentspace.FieldDiagnosticCode:
+		m.ResetDiagnosticCode()
+		return nil
+	case agentspace.FieldObservedAt:
+		m.ResetObservedAt()
+		return nil
+	case agentspace.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case agentspace.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown AgentSpace field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *AgentSpaceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *AgentSpaceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *AgentSpaceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *AgentSpaceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *AgentSpaceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *AgentSpaceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *AgentSpaceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown AgentSpace unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *AgentSpaceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown AgentSpace edge %s", name)
 }
 
 // BudgetAllocationMutation represents an operation that mutates the BudgetAllocation nodes in the graph.
@@ -5928,6 +7481,7 @@ type BudgetRequestMutation struct {
 	resource_id                 *string
 	client_protocol             *string
 	upstream_id                 *string
+	workspace_target_json       *[]byte
 	managed_generation          *int64
 	addmanaged_generation       *int64
 	control_revision            *int64
@@ -6407,9 +7961,71 @@ func (m *BudgetRequestMutation) OldUpstreamID(ctx context.Context) (v string, er
 	return oldValue.UpstreamID, nil
 }
 
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (m *BudgetRequestMutation) ClearUpstreamID() {
+	m.upstream_id = nil
+	m.clearedFields[budgetrequest.FieldUpstreamID] = struct{}{}
+}
+
+// UpstreamIDCleared returns if the "upstream_id" field was cleared in this mutation.
+func (m *BudgetRequestMutation) UpstreamIDCleared() bool {
+	_, ok := m.clearedFields[budgetrequest.FieldUpstreamID]
+	return ok
+}
+
 // ResetUpstreamID resets all changes to the "upstream_id" field.
 func (m *BudgetRequestMutation) ResetUpstreamID() {
 	m.upstream_id = nil
+	delete(m.clearedFields, budgetrequest.FieldUpstreamID)
+}
+
+// SetWorkspaceTargetJSON sets the "workspace_target_json" field.
+func (m *BudgetRequestMutation) SetWorkspaceTargetJSON(b []byte) {
+	m.workspace_target_json = &b
+}
+
+// WorkspaceTargetJSON returns the value of the "workspace_target_json" field in the mutation.
+func (m *BudgetRequestMutation) WorkspaceTargetJSON() (r []byte, exists bool) {
+	v := m.workspace_target_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWorkspaceTargetJSON returns the old "workspace_target_json" field's value of the BudgetRequest entity.
+// If the BudgetRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetRequestMutation) OldWorkspaceTargetJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWorkspaceTargetJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWorkspaceTargetJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWorkspaceTargetJSON: %w", err)
+	}
+	return oldValue.WorkspaceTargetJSON, nil
+}
+
+// ClearWorkspaceTargetJSON clears the value of the "workspace_target_json" field.
+func (m *BudgetRequestMutation) ClearWorkspaceTargetJSON() {
+	m.workspace_target_json = nil
+	m.clearedFields[budgetrequest.FieldWorkspaceTargetJSON] = struct{}{}
+}
+
+// WorkspaceTargetJSONCleared returns if the "workspace_target_json" field was cleared in this mutation.
+func (m *BudgetRequestMutation) WorkspaceTargetJSONCleared() bool {
+	_, ok := m.clearedFields[budgetrequest.FieldWorkspaceTargetJSON]
+	return ok
+}
+
+// ResetWorkspaceTargetJSON resets all changes to the "workspace_target_json" field.
+func (m *BudgetRequestMutation) ResetWorkspaceTargetJSON() {
+	m.workspace_target_json = nil
+	delete(m.clearedFields, budgetrequest.FieldWorkspaceTargetJSON)
 }
 
 // SetManagedGeneration sets the "managed_generation" field.
@@ -7247,7 +8863,7 @@ func (m *BudgetRequestMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BudgetRequestMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.request_hash != nil {
 		fields = append(fields, budgetrequest.FieldRequestHash)
 	}
@@ -7274,6 +8890,9 @@ func (m *BudgetRequestMutation) Fields() []string {
 	}
 	if m.upstream_id != nil {
 		fields = append(fields, budgetrequest.FieldUpstreamID)
+	}
+	if m.workspace_target_json != nil {
+		fields = append(fields, budgetrequest.FieldWorkspaceTargetJSON)
 	}
 	if m.managed_generation != nil {
 		fields = append(fields, budgetrequest.FieldManagedGeneration)
@@ -7349,6 +8968,8 @@ func (m *BudgetRequestMutation) Field(name string) (ent.Value, bool) {
 		return m.ClientProtocol()
 	case budgetrequest.FieldUpstreamID:
 		return m.UpstreamID()
+	case budgetrequest.FieldWorkspaceTargetJSON:
+		return m.WorkspaceTargetJSON()
 	case budgetrequest.FieldManagedGeneration:
 		return m.ManagedGeneration()
 	case budgetrequest.FieldControlRevision:
@@ -7408,6 +9029,8 @@ func (m *BudgetRequestMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldClientProtocol(ctx)
 	case budgetrequest.FieldUpstreamID:
 		return m.OldUpstreamID(ctx)
+	case budgetrequest.FieldWorkspaceTargetJSON:
+		return m.OldWorkspaceTargetJSON(ctx)
 	case budgetrequest.FieldManagedGeneration:
 		return m.OldManagedGeneration(ctx)
 	case budgetrequest.FieldControlRevision:
@@ -7511,6 +9134,13 @@ func (m *BudgetRequestMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpstreamID(v)
+		return nil
+	case budgetrequest.FieldWorkspaceTargetJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWorkspaceTargetJSON(v)
 		return nil
 	case budgetrequest.FieldManagedGeneration:
 		v, ok := value.(int64)
@@ -7735,6 +9365,12 @@ func (m *BudgetRequestMutation) ClearedFields() []string {
 	if m.FieldCleared(budgetrequest.FieldDeviceID) {
 		fields = append(fields, budgetrequest.FieldDeviceID)
 	}
+	if m.FieldCleared(budgetrequest.FieldUpstreamID) {
+		fields = append(fields, budgetrequest.FieldUpstreamID)
+	}
+	if m.FieldCleared(budgetrequest.FieldWorkspaceTargetJSON) {
+		fields = append(fields, budgetrequest.FieldWorkspaceTargetJSON)
+	}
 	if m.FieldCleared(budgetrequest.FieldUserBudgetID) {
 		fields = append(fields, budgetrequest.FieldUserBudgetID)
 	}
@@ -7769,6 +9405,12 @@ func (m *BudgetRequestMutation) ClearField(name string) error {
 		return nil
 	case budgetrequest.FieldDeviceID:
 		m.ClearDeviceID()
+		return nil
+	case budgetrequest.FieldUpstreamID:
+		m.ClearUpstreamID()
+		return nil
+	case budgetrequest.FieldWorkspaceTargetJSON:
+		m.ClearWorkspaceTargetJSON()
 		return nil
 	case budgetrequest.FieldUserBudgetID:
 		m.ClearUserBudgetID()
@@ -7819,6 +9461,9 @@ func (m *BudgetRequestMutation) ResetField(name string) error {
 		return nil
 	case budgetrequest.FieldUpstreamID:
 		m.ResetUpstreamID()
+		return nil
+	case budgetrequest.FieldWorkspaceTargetJSON:
+		m.ResetWorkspaceTargetJSON()
 		return nil
 	case budgetrequest.FieldManagedGeneration:
 		m.ResetManagedGeneration()
@@ -19986,6 +21631,7 @@ type RequestUsageMutation struct {
 	client_protocol         *string
 	runtime_route_id        *string
 	upstream_id             *string
+	workspace_target_json   *[]byte
 	managed_generation      *int64
 	addmanaged_generation   *int64
 	control_revision        *int64
@@ -20502,9 +22148,71 @@ func (m *RequestUsageMutation) OldUpstreamID(ctx context.Context) (v string, err
 	return oldValue.UpstreamID, nil
 }
 
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (m *RequestUsageMutation) ClearUpstreamID() {
+	m.upstream_id = nil
+	m.clearedFields[requestusage.FieldUpstreamID] = struct{}{}
+}
+
+// UpstreamIDCleared returns if the "upstream_id" field was cleared in this mutation.
+func (m *RequestUsageMutation) UpstreamIDCleared() bool {
+	_, ok := m.clearedFields[requestusage.FieldUpstreamID]
+	return ok
+}
+
 // ResetUpstreamID resets all changes to the "upstream_id" field.
 func (m *RequestUsageMutation) ResetUpstreamID() {
 	m.upstream_id = nil
+	delete(m.clearedFields, requestusage.FieldUpstreamID)
+}
+
+// SetWorkspaceTargetJSON sets the "workspace_target_json" field.
+func (m *RequestUsageMutation) SetWorkspaceTargetJSON(b []byte) {
+	m.workspace_target_json = &b
+}
+
+// WorkspaceTargetJSON returns the value of the "workspace_target_json" field in the mutation.
+func (m *RequestUsageMutation) WorkspaceTargetJSON() (r []byte, exists bool) {
+	v := m.workspace_target_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWorkspaceTargetJSON returns the old "workspace_target_json" field's value of the RequestUsage entity.
+// If the RequestUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestUsageMutation) OldWorkspaceTargetJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWorkspaceTargetJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWorkspaceTargetJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWorkspaceTargetJSON: %w", err)
+	}
+	return oldValue.WorkspaceTargetJSON, nil
+}
+
+// ClearWorkspaceTargetJSON clears the value of the "workspace_target_json" field.
+func (m *RequestUsageMutation) ClearWorkspaceTargetJSON() {
+	m.workspace_target_json = nil
+	m.clearedFields[requestusage.FieldWorkspaceTargetJSON] = struct{}{}
+}
+
+// WorkspaceTargetJSONCleared returns if the "workspace_target_json" field was cleared in this mutation.
+func (m *RequestUsageMutation) WorkspaceTargetJSONCleared() bool {
+	_, ok := m.clearedFields[requestusage.FieldWorkspaceTargetJSON]
+	return ok
+}
+
+// ResetWorkspaceTargetJSON resets all changes to the "workspace_target_json" field.
+func (m *RequestUsageMutation) ResetWorkspaceTargetJSON() {
+	m.workspace_target_json = nil
+	delete(m.clearedFields, requestusage.FieldWorkspaceTargetJSON)
 }
 
 // SetManagedGeneration sets the "managed_generation" field.
@@ -21324,7 +23032,7 @@ func (m *RequestUsageMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RequestUsageMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 27)
 	if m.request_id != nil {
 		fields = append(fields, requestusage.FieldRequestID)
 	}
@@ -21354,6 +23062,9 @@ func (m *RequestUsageMutation) Fields() []string {
 	}
 	if m.upstream_id != nil {
 		fields = append(fields, requestusage.FieldUpstreamID)
+	}
+	if m.workspace_target_json != nil {
+		fields = append(fields, requestusage.FieldWorkspaceTargetJSON)
 	}
 	if m.managed_generation != nil {
 		fields = append(fields, requestusage.FieldManagedGeneration)
@@ -21431,6 +23142,8 @@ func (m *RequestUsageMutation) Field(name string) (ent.Value, bool) {
 		return m.RuntimeRouteID()
 	case requestusage.FieldUpstreamID:
 		return m.UpstreamID()
+	case requestusage.FieldWorkspaceTargetJSON:
+		return m.WorkspaceTargetJSON()
 	case requestusage.FieldManagedGeneration:
 		return m.ManagedGeneration()
 	case requestusage.FieldControlRevision:
@@ -21492,6 +23205,8 @@ func (m *RequestUsageMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldRuntimeRouteID(ctx)
 	case requestusage.FieldUpstreamID:
 		return m.OldUpstreamID(ctx)
+	case requestusage.FieldWorkspaceTargetJSON:
+		return m.OldWorkspaceTargetJSON(ctx)
 	case requestusage.FieldManagedGeneration:
 		return m.OldManagedGeneration(ctx)
 	case requestusage.FieldControlRevision:
@@ -21602,6 +23317,13 @@ func (m *RequestUsageMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpstreamID(v)
+		return nil
+	case requestusage.FieldWorkspaceTargetJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWorkspaceTargetJSON(v)
 		return nil
 	case requestusage.FieldManagedGeneration:
 		v, ok := value.(int64)
@@ -21862,6 +23584,12 @@ func (m *RequestUsageMutation) ClearedFields() []string {
 	if m.FieldCleared(requestusage.FieldDeviceID) {
 		fields = append(fields, requestusage.FieldDeviceID)
 	}
+	if m.FieldCleared(requestusage.FieldUpstreamID) {
+		fields = append(fields, requestusage.FieldUpstreamID)
+	}
+	if m.FieldCleared(requestusage.FieldWorkspaceTargetJSON) {
+		fields = append(fields, requestusage.FieldWorkspaceTargetJSON)
+	}
 	if m.FieldCleared(requestusage.FieldUpstreamHTTPStatus) {
 		fields = append(fields, requestusage.FieldUpstreamHTTPStatus)
 	}
@@ -21887,6 +23615,12 @@ func (m *RequestUsageMutation) ClearField(name string) error {
 		return nil
 	case requestusage.FieldDeviceID:
 		m.ClearDeviceID()
+		return nil
+	case requestusage.FieldUpstreamID:
+		m.ClearUpstreamID()
+		return nil
+	case requestusage.FieldWorkspaceTargetJSON:
+		m.ClearWorkspaceTargetJSON()
 		return nil
 	case requestusage.FieldUpstreamHTTPStatus:
 		m.ClearUpstreamHTTPStatus()
@@ -21931,6 +23665,9 @@ func (m *RequestUsageMutation) ResetField(name string) error {
 		return nil
 	case requestusage.FieldUpstreamID:
 		m.ResetUpstreamID()
+		return nil
+	case requestusage.FieldWorkspaceTargetJSON:
+		m.ResetWorkspaceTargetJSON()
 		return nil
 	case requestusage.FieldManagedGeneration:
 		m.ResetManagedGeneration()
@@ -29669,4 +31406,3936 @@ func (m *UserBudgetMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *UserBudgetMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown UserBudget edge %s", name)
+}
+
+// WorkspaceAuditMutation represents an operation that mutates the WorkspaceAudit nodes in the graph.
+type WorkspaceAuditMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *int
+	request_id     *string
+	actor_id       *string
+	user_id        *string
+	agent_space_id *string
+	action         *string
+	_path          *string
+	outcome        *string
+	bytes          *int64
+	addbytes       *int64
+	created_at     *time.Time
+	completed_at   *time.Time
+	clearedFields  map[string]struct{}
+	done           bool
+	oldValue       func(context.Context) (*WorkspaceAudit, error)
+	predicates     []predicate.WorkspaceAudit
+}
+
+var _ ent.Mutation = (*WorkspaceAuditMutation)(nil)
+
+// workspaceauditOption allows management of the mutation configuration using functional options.
+type workspaceauditOption func(*WorkspaceAuditMutation)
+
+// newWorkspaceAuditMutation creates new mutation for the WorkspaceAudit entity.
+func newWorkspaceAuditMutation(c config, op Op, opts ...workspaceauditOption) *WorkspaceAuditMutation {
+	m := &WorkspaceAuditMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeWorkspaceAudit,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withWorkspaceAuditID sets the ID field of the mutation.
+func withWorkspaceAuditID(id int) workspaceauditOption {
+	return func(m *WorkspaceAuditMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *WorkspaceAudit
+		)
+		m.oldValue = func(ctx context.Context) (*WorkspaceAudit, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().WorkspaceAudit.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withWorkspaceAudit sets the old WorkspaceAudit of the mutation.
+func withWorkspaceAudit(node *WorkspaceAudit) workspaceauditOption {
+	return func(m *WorkspaceAuditMutation) {
+		m.oldValue = func(context.Context) (*WorkspaceAudit, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m WorkspaceAuditMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m WorkspaceAuditMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of WorkspaceAudit entities.
+func (m *WorkspaceAuditMutation) SetID(id int) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *WorkspaceAuditMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *WorkspaceAuditMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().WorkspaceAudit.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetRequestID sets the "request_id" field.
+func (m *WorkspaceAuditMutation) SetRequestID(s string) {
+	m.request_id = &s
+}
+
+// RequestID returns the value of the "request_id" field in the mutation.
+func (m *WorkspaceAuditMutation) RequestID() (r string, exists bool) {
+	v := m.request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestID returns the old "request_id" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldRequestID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestID: %w", err)
+	}
+	return oldValue.RequestID, nil
+}
+
+// ResetRequestID resets all changes to the "request_id" field.
+func (m *WorkspaceAuditMutation) ResetRequestID() {
+	m.request_id = nil
+}
+
+// SetActorID sets the "actor_id" field.
+func (m *WorkspaceAuditMutation) SetActorID(s string) {
+	m.actor_id = &s
+}
+
+// ActorID returns the value of the "actor_id" field in the mutation.
+func (m *WorkspaceAuditMutation) ActorID() (r string, exists bool) {
+	v := m.actor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorID returns the old "actor_id" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldActorID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorID: %w", err)
+	}
+	return oldValue.ActorID, nil
+}
+
+// ResetActorID resets all changes to the "actor_id" field.
+func (m *WorkspaceAuditMutation) ResetActorID() {
+	m.actor_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *WorkspaceAuditMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *WorkspaceAuditMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *WorkspaceAuditMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetAgentSpaceID sets the "agent_space_id" field.
+func (m *WorkspaceAuditMutation) SetAgentSpaceID(s string) {
+	m.agent_space_id = &s
+}
+
+// AgentSpaceID returns the value of the "agent_space_id" field in the mutation.
+func (m *WorkspaceAuditMutation) AgentSpaceID() (r string, exists bool) {
+	v := m.agent_space_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAgentSpaceID returns the old "agent_space_id" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldAgentSpaceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAgentSpaceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAgentSpaceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAgentSpaceID: %w", err)
+	}
+	return oldValue.AgentSpaceID, nil
+}
+
+// ResetAgentSpaceID resets all changes to the "agent_space_id" field.
+func (m *WorkspaceAuditMutation) ResetAgentSpaceID() {
+	m.agent_space_id = nil
+}
+
+// SetAction sets the "action" field.
+func (m *WorkspaceAuditMutation) SetAction(s string) {
+	m.action = &s
+}
+
+// Action returns the value of the "action" field in the mutation.
+func (m *WorkspaceAuditMutation) Action() (r string, exists bool) {
+	v := m.action
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAction returns the old "action" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldAction(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAction is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAction requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAction: %w", err)
+	}
+	return oldValue.Action, nil
+}
+
+// ResetAction resets all changes to the "action" field.
+func (m *WorkspaceAuditMutation) ResetAction() {
+	m.action = nil
+}
+
+// SetPath sets the "path" field.
+func (m *WorkspaceAuditMutation) SetPath(s string) {
+	m._path = &s
+}
+
+// Path returns the value of the "path" field in the mutation.
+func (m *WorkspaceAuditMutation) Path() (r string, exists bool) {
+	v := m._path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPath returns the old "path" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPath: %w", err)
+	}
+	return oldValue.Path, nil
+}
+
+// ResetPath resets all changes to the "path" field.
+func (m *WorkspaceAuditMutation) ResetPath() {
+	m._path = nil
+}
+
+// SetOutcome sets the "outcome" field.
+func (m *WorkspaceAuditMutation) SetOutcome(s string) {
+	m.outcome = &s
+}
+
+// Outcome returns the value of the "outcome" field in the mutation.
+func (m *WorkspaceAuditMutation) Outcome() (r string, exists bool) {
+	v := m.outcome
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutcome returns the old "outcome" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldOutcome(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutcome is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutcome requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutcome: %w", err)
+	}
+	return oldValue.Outcome, nil
+}
+
+// ResetOutcome resets all changes to the "outcome" field.
+func (m *WorkspaceAuditMutation) ResetOutcome() {
+	m.outcome = nil
+}
+
+// SetBytes sets the "bytes" field.
+func (m *WorkspaceAuditMutation) SetBytes(i int64) {
+	m.bytes = &i
+	m.addbytes = nil
+}
+
+// Bytes returns the value of the "bytes" field in the mutation.
+func (m *WorkspaceAuditMutation) Bytes() (r int64, exists bool) {
+	v := m.bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBytes returns the old "bytes" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldBytes(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBytes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBytes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBytes: %w", err)
+	}
+	return oldValue.Bytes, nil
+}
+
+// AddBytes adds i to the "bytes" field.
+func (m *WorkspaceAuditMutation) AddBytes(i int64) {
+	if m.addbytes != nil {
+		*m.addbytes += i
+	} else {
+		m.addbytes = &i
+	}
+}
+
+// AddedBytes returns the value that was added to the "bytes" field in this mutation.
+func (m *WorkspaceAuditMutation) AddedBytes() (r int64, exists bool) {
+	v := m.addbytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBytes resets all changes to the "bytes" field.
+func (m *WorkspaceAuditMutation) ResetBytes() {
+	m.bytes = nil
+	m.addbytes = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *WorkspaceAuditMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *WorkspaceAuditMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *WorkspaceAuditMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetCompletedAt sets the "completed_at" field.
+func (m *WorkspaceAuditMutation) SetCompletedAt(t time.Time) {
+	m.completed_at = &t
+}
+
+// CompletedAt returns the value of the "completed_at" field in the mutation.
+func (m *WorkspaceAuditMutation) CompletedAt() (r time.Time, exists bool) {
+	v := m.completed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCompletedAt returns the old "completed_at" field's value of the WorkspaceAudit entity.
+// If the WorkspaceAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceAuditMutation) OldCompletedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCompletedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCompletedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCompletedAt: %w", err)
+	}
+	return oldValue.CompletedAt, nil
+}
+
+// ClearCompletedAt clears the value of the "completed_at" field.
+func (m *WorkspaceAuditMutation) ClearCompletedAt() {
+	m.completed_at = nil
+	m.clearedFields[workspaceaudit.FieldCompletedAt] = struct{}{}
+}
+
+// CompletedAtCleared returns if the "completed_at" field was cleared in this mutation.
+func (m *WorkspaceAuditMutation) CompletedAtCleared() bool {
+	_, ok := m.clearedFields[workspaceaudit.FieldCompletedAt]
+	return ok
+}
+
+// ResetCompletedAt resets all changes to the "completed_at" field.
+func (m *WorkspaceAuditMutation) ResetCompletedAt() {
+	m.completed_at = nil
+	delete(m.clearedFields, workspaceaudit.FieldCompletedAt)
+}
+
+// Where appends a list predicates to the WorkspaceAuditMutation builder.
+func (m *WorkspaceAuditMutation) Where(ps ...predicate.WorkspaceAudit) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the WorkspaceAuditMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *WorkspaceAuditMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.WorkspaceAudit, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *WorkspaceAuditMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *WorkspaceAuditMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (WorkspaceAudit).
+func (m *WorkspaceAuditMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *WorkspaceAuditMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.request_id != nil {
+		fields = append(fields, workspaceaudit.FieldRequestID)
+	}
+	if m.actor_id != nil {
+		fields = append(fields, workspaceaudit.FieldActorID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, workspaceaudit.FieldUserID)
+	}
+	if m.agent_space_id != nil {
+		fields = append(fields, workspaceaudit.FieldAgentSpaceID)
+	}
+	if m.action != nil {
+		fields = append(fields, workspaceaudit.FieldAction)
+	}
+	if m._path != nil {
+		fields = append(fields, workspaceaudit.FieldPath)
+	}
+	if m.outcome != nil {
+		fields = append(fields, workspaceaudit.FieldOutcome)
+	}
+	if m.bytes != nil {
+		fields = append(fields, workspaceaudit.FieldBytes)
+	}
+	if m.created_at != nil {
+		fields = append(fields, workspaceaudit.FieldCreatedAt)
+	}
+	if m.completed_at != nil {
+		fields = append(fields, workspaceaudit.FieldCompletedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *WorkspaceAuditMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceaudit.FieldRequestID:
+		return m.RequestID()
+	case workspaceaudit.FieldActorID:
+		return m.ActorID()
+	case workspaceaudit.FieldUserID:
+		return m.UserID()
+	case workspaceaudit.FieldAgentSpaceID:
+		return m.AgentSpaceID()
+	case workspaceaudit.FieldAction:
+		return m.Action()
+	case workspaceaudit.FieldPath:
+		return m.Path()
+	case workspaceaudit.FieldOutcome:
+		return m.Outcome()
+	case workspaceaudit.FieldBytes:
+		return m.Bytes()
+	case workspaceaudit.FieldCreatedAt:
+		return m.CreatedAt()
+	case workspaceaudit.FieldCompletedAt:
+		return m.CompletedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *WorkspaceAuditMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case workspaceaudit.FieldRequestID:
+		return m.OldRequestID(ctx)
+	case workspaceaudit.FieldActorID:
+		return m.OldActorID(ctx)
+	case workspaceaudit.FieldUserID:
+		return m.OldUserID(ctx)
+	case workspaceaudit.FieldAgentSpaceID:
+		return m.OldAgentSpaceID(ctx)
+	case workspaceaudit.FieldAction:
+		return m.OldAction(ctx)
+	case workspaceaudit.FieldPath:
+		return m.OldPath(ctx)
+	case workspaceaudit.FieldOutcome:
+		return m.OldOutcome(ctx)
+	case workspaceaudit.FieldBytes:
+		return m.OldBytes(ctx)
+	case workspaceaudit.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case workspaceaudit.FieldCompletedAt:
+		return m.OldCompletedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown WorkspaceAudit field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceAuditMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case workspaceaudit.FieldRequestID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestID(v)
+		return nil
+	case workspaceaudit.FieldActorID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorID(v)
+		return nil
+	case workspaceaudit.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case workspaceaudit.FieldAgentSpaceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAgentSpaceID(v)
+		return nil
+	case workspaceaudit.FieldAction:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAction(v)
+		return nil
+	case workspaceaudit.FieldPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPath(v)
+		return nil
+	case workspaceaudit.FieldOutcome:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutcome(v)
+		return nil
+	case workspaceaudit.FieldBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBytes(v)
+		return nil
+	case workspaceaudit.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case workspaceaudit.FieldCompletedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCompletedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceAudit field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *WorkspaceAuditMutation) AddedFields() []string {
+	var fields []string
+	if m.addbytes != nil {
+		fields = append(fields, workspaceaudit.FieldBytes)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *WorkspaceAuditMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceaudit.FieldBytes:
+		return m.AddedBytes()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceAuditMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case workspaceaudit.FieldBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBytes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceAudit numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *WorkspaceAuditMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(workspaceaudit.FieldCompletedAt) {
+		fields = append(fields, workspaceaudit.FieldCompletedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *WorkspaceAuditMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *WorkspaceAuditMutation) ClearField(name string) error {
+	switch name {
+	case workspaceaudit.FieldCompletedAt:
+		m.ClearCompletedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceAudit nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *WorkspaceAuditMutation) ResetField(name string) error {
+	switch name {
+	case workspaceaudit.FieldRequestID:
+		m.ResetRequestID()
+		return nil
+	case workspaceaudit.FieldActorID:
+		m.ResetActorID()
+		return nil
+	case workspaceaudit.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case workspaceaudit.FieldAgentSpaceID:
+		m.ResetAgentSpaceID()
+		return nil
+	case workspaceaudit.FieldAction:
+		m.ResetAction()
+		return nil
+	case workspaceaudit.FieldPath:
+		m.ResetPath()
+		return nil
+	case workspaceaudit.FieldOutcome:
+		m.ResetOutcome()
+		return nil
+	case workspaceaudit.FieldBytes:
+		m.ResetBytes()
+		return nil
+	case workspaceaudit.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case workspaceaudit.FieldCompletedAt:
+		m.ResetCompletedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceAudit field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *WorkspaceAuditMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *WorkspaceAuditMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *WorkspaceAuditMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *WorkspaceAuditMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *WorkspaceAuditMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *WorkspaceAuditMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *WorkspaceAuditMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown WorkspaceAudit unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *WorkspaceAuditMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown WorkspaceAudit edge %s", name)
+}
+
+// WorkspaceOperationMutation represents an operation that mutates the WorkspaceOperation nodes in the graph.
+type WorkspaceOperationMutation struct {
+	config
+	op                          Op
+	typ                         string
+	id                          *string
+	workspace_service_id        *string
+	user_id                     *string
+	action                      *string
+	idempotency_key             *string
+	request_hash                *string
+	config_revision             *int64
+	addconfig_revision          *int64
+	binding_revision            *int64
+	addbinding_revision         *int64
+	target_json                 *[]byte
+	state                       *string
+	step                        *string
+	result_json                 *[]byte
+	candidate_secret_id         *string
+	candidate_secret_version    *int64
+	addcandidate_secret_version *int64
+	activation_id               *string
+	diagnostic_code             *string
+	evidence                    *string
+	created_by_user_id          *string
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*WorkspaceOperation, error)
+	predicates                  []predicate.WorkspaceOperation
+}
+
+var _ ent.Mutation = (*WorkspaceOperationMutation)(nil)
+
+// workspaceoperationOption allows management of the mutation configuration using functional options.
+type workspaceoperationOption func(*WorkspaceOperationMutation)
+
+// newWorkspaceOperationMutation creates new mutation for the WorkspaceOperation entity.
+func newWorkspaceOperationMutation(c config, op Op, opts ...workspaceoperationOption) *WorkspaceOperationMutation {
+	m := &WorkspaceOperationMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeWorkspaceOperation,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withWorkspaceOperationID sets the ID field of the mutation.
+func withWorkspaceOperationID(id string) workspaceoperationOption {
+	return func(m *WorkspaceOperationMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *WorkspaceOperation
+		)
+		m.oldValue = func(ctx context.Context) (*WorkspaceOperation, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().WorkspaceOperation.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withWorkspaceOperation sets the old WorkspaceOperation of the mutation.
+func withWorkspaceOperation(node *WorkspaceOperation) workspaceoperationOption {
+	return func(m *WorkspaceOperationMutation) {
+		m.oldValue = func(context.Context) (*WorkspaceOperation, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m WorkspaceOperationMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m WorkspaceOperationMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of WorkspaceOperation entities.
+func (m *WorkspaceOperationMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *WorkspaceOperationMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *WorkspaceOperationMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().WorkspaceOperation.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetWorkspaceServiceID sets the "workspace_service_id" field.
+func (m *WorkspaceOperationMutation) SetWorkspaceServiceID(s string) {
+	m.workspace_service_id = &s
+}
+
+// WorkspaceServiceID returns the value of the "workspace_service_id" field in the mutation.
+func (m *WorkspaceOperationMutation) WorkspaceServiceID() (r string, exists bool) {
+	v := m.workspace_service_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWorkspaceServiceID returns the old "workspace_service_id" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldWorkspaceServiceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWorkspaceServiceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWorkspaceServiceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWorkspaceServiceID: %w", err)
+	}
+	return oldValue.WorkspaceServiceID, nil
+}
+
+// ResetWorkspaceServiceID resets all changes to the "workspace_service_id" field.
+func (m *WorkspaceOperationMutation) ResetWorkspaceServiceID() {
+	m.workspace_service_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *WorkspaceOperationMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *WorkspaceOperationMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (m *WorkspaceOperationMutation) ClearUserID() {
+	m.user_id = nil
+	m.clearedFields[workspaceoperation.FieldUserID] = struct{}{}
+}
+
+// UserIDCleared returns if the "user_id" field was cleared in this mutation.
+func (m *WorkspaceOperationMutation) UserIDCleared() bool {
+	_, ok := m.clearedFields[workspaceoperation.FieldUserID]
+	return ok
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *WorkspaceOperationMutation) ResetUserID() {
+	m.user_id = nil
+	delete(m.clearedFields, workspaceoperation.FieldUserID)
+}
+
+// SetAction sets the "action" field.
+func (m *WorkspaceOperationMutation) SetAction(s string) {
+	m.action = &s
+}
+
+// Action returns the value of the "action" field in the mutation.
+func (m *WorkspaceOperationMutation) Action() (r string, exists bool) {
+	v := m.action
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAction returns the old "action" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldAction(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAction is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAction requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAction: %w", err)
+	}
+	return oldValue.Action, nil
+}
+
+// ResetAction resets all changes to the "action" field.
+func (m *WorkspaceOperationMutation) ResetAction() {
+	m.action = nil
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (m *WorkspaceOperationMutation) SetIdempotencyKey(s string) {
+	m.idempotency_key = &s
+}
+
+// IdempotencyKey returns the value of the "idempotency_key" field in the mutation.
+func (m *WorkspaceOperationMutation) IdempotencyKey() (r string, exists bool) {
+	v := m.idempotency_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyKey returns the old "idempotency_key" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldIdempotencyKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyKey: %w", err)
+	}
+	return oldValue.IdempotencyKey, nil
+}
+
+// ResetIdempotencyKey resets all changes to the "idempotency_key" field.
+func (m *WorkspaceOperationMutation) ResetIdempotencyKey() {
+	m.idempotency_key = nil
+}
+
+// SetRequestHash sets the "request_hash" field.
+func (m *WorkspaceOperationMutation) SetRequestHash(s string) {
+	m.request_hash = &s
+}
+
+// RequestHash returns the value of the "request_hash" field in the mutation.
+func (m *WorkspaceOperationMutation) RequestHash() (r string, exists bool) {
+	v := m.request_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestHash returns the old "request_hash" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldRequestHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestHash: %w", err)
+	}
+	return oldValue.RequestHash, nil
+}
+
+// ResetRequestHash resets all changes to the "request_hash" field.
+func (m *WorkspaceOperationMutation) ResetRequestHash() {
+	m.request_hash = nil
+}
+
+// SetConfigRevision sets the "config_revision" field.
+func (m *WorkspaceOperationMutation) SetConfigRevision(i int64) {
+	m.config_revision = &i
+	m.addconfig_revision = nil
+}
+
+// ConfigRevision returns the value of the "config_revision" field in the mutation.
+func (m *WorkspaceOperationMutation) ConfigRevision() (r int64, exists bool) {
+	v := m.config_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigRevision returns the old "config_revision" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldConfigRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigRevision: %w", err)
+	}
+	return oldValue.ConfigRevision, nil
+}
+
+// AddConfigRevision adds i to the "config_revision" field.
+func (m *WorkspaceOperationMutation) AddConfigRevision(i int64) {
+	if m.addconfig_revision != nil {
+		*m.addconfig_revision += i
+	} else {
+		m.addconfig_revision = &i
+	}
+}
+
+// AddedConfigRevision returns the value that was added to the "config_revision" field in this mutation.
+func (m *WorkspaceOperationMutation) AddedConfigRevision() (r int64, exists bool) {
+	v := m.addconfig_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConfigRevision resets all changes to the "config_revision" field.
+func (m *WorkspaceOperationMutation) ResetConfigRevision() {
+	m.config_revision = nil
+	m.addconfig_revision = nil
+}
+
+// SetBindingRevision sets the "binding_revision" field.
+func (m *WorkspaceOperationMutation) SetBindingRevision(i int64) {
+	m.binding_revision = &i
+	m.addbinding_revision = nil
+}
+
+// BindingRevision returns the value of the "binding_revision" field in the mutation.
+func (m *WorkspaceOperationMutation) BindingRevision() (r int64, exists bool) {
+	v := m.binding_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBindingRevision returns the old "binding_revision" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldBindingRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBindingRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBindingRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBindingRevision: %w", err)
+	}
+	return oldValue.BindingRevision, nil
+}
+
+// AddBindingRevision adds i to the "binding_revision" field.
+func (m *WorkspaceOperationMutation) AddBindingRevision(i int64) {
+	if m.addbinding_revision != nil {
+		*m.addbinding_revision += i
+	} else {
+		m.addbinding_revision = &i
+	}
+}
+
+// AddedBindingRevision returns the value that was added to the "binding_revision" field in this mutation.
+func (m *WorkspaceOperationMutation) AddedBindingRevision() (r int64, exists bool) {
+	v := m.addbinding_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBindingRevision resets all changes to the "binding_revision" field.
+func (m *WorkspaceOperationMutation) ResetBindingRevision() {
+	m.binding_revision = nil
+	m.addbinding_revision = nil
+}
+
+// SetTargetJSON sets the "target_json" field.
+func (m *WorkspaceOperationMutation) SetTargetJSON(b []byte) {
+	m.target_json = &b
+}
+
+// TargetJSON returns the value of the "target_json" field in the mutation.
+func (m *WorkspaceOperationMutation) TargetJSON() (r []byte, exists bool) {
+	v := m.target_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTargetJSON returns the old "target_json" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldTargetJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTargetJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTargetJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTargetJSON: %w", err)
+	}
+	return oldValue.TargetJSON, nil
+}
+
+// ResetTargetJSON resets all changes to the "target_json" field.
+func (m *WorkspaceOperationMutation) ResetTargetJSON() {
+	m.target_json = nil
+}
+
+// SetState sets the "state" field.
+func (m *WorkspaceOperationMutation) SetState(s string) {
+	m.state = &s
+}
+
+// State returns the value of the "state" field in the mutation.
+func (m *WorkspaceOperationMutation) State() (r string, exists bool) {
+	v := m.state
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldState returns the old "state" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldState(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldState is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldState requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldState: %w", err)
+	}
+	return oldValue.State, nil
+}
+
+// ResetState resets all changes to the "state" field.
+func (m *WorkspaceOperationMutation) ResetState() {
+	m.state = nil
+}
+
+// SetStep sets the "step" field.
+func (m *WorkspaceOperationMutation) SetStep(s string) {
+	m.step = &s
+}
+
+// Step returns the value of the "step" field in the mutation.
+func (m *WorkspaceOperationMutation) Step() (r string, exists bool) {
+	v := m.step
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStep returns the old "step" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldStep(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStep is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStep requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStep: %w", err)
+	}
+	return oldValue.Step, nil
+}
+
+// ResetStep resets all changes to the "step" field.
+func (m *WorkspaceOperationMutation) ResetStep() {
+	m.step = nil
+}
+
+// SetResultJSON sets the "result_json" field.
+func (m *WorkspaceOperationMutation) SetResultJSON(b []byte) {
+	m.result_json = &b
+}
+
+// ResultJSON returns the value of the "result_json" field in the mutation.
+func (m *WorkspaceOperationMutation) ResultJSON() (r []byte, exists bool) {
+	v := m.result_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResultJSON returns the old "result_json" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldResultJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResultJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResultJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResultJSON: %w", err)
+	}
+	return oldValue.ResultJSON, nil
+}
+
+// ClearResultJSON clears the value of the "result_json" field.
+func (m *WorkspaceOperationMutation) ClearResultJSON() {
+	m.result_json = nil
+	m.clearedFields[workspaceoperation.FieldResultJSON] = struct{}{}
+}
+
+// ResultJSONCleared returns if the "result_json" field was cleared in this mutation.
+func (m *WorkspaceOperationMutation) ResultJSONCleared() bool {
+	_, ok := m.clearedFields[workspaceoperation.FieldResultJSON]
+	return ok
+}
+
+// ResetResultJSON resets all changes to the "result_json" field.
+func (m *WorkspaceOperationMutation) ResetResultJSON() {
+	m.result_json = nil
+	delete(m.clearedFields, workspaceoperation.FieldResultJSON)
+}
+
+// SetCandidateSecretID sets the "candidate_secret_id" field.
+func (m *WorkspaceOperationMutation) SetCandidateSecretID(s string) {
+	m.candidate_secret_id = &s
+}
+
+// CandidateSecretID returns the value of the "candidate_secret_id" field in the mutation.
+func (m *WorkspaceOperationMutation) CandidateSecretID() (r string, exists bool) {
+	v := m.candidate_secret_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCandidateSecretID returns the old "candidate_secret_id" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldCandidateSecretID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCandidateSecretID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCandidateSecretID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCandidateSecretID: %w", err)
+	}
+	return oldValue.CandidateSecretID, nil
+}
+
+// ClearCandidateSecretID clears the value of the "candidate_secret_id" field.
+func (m *WorkspaceOperationMutation) ClearCandidateSecretID() {
+	m.candidate_secret_id = nil
+	m.clearedFields[workspaceoperation.FieldCandidateSecretID] = struct{}{}
+}
+
+// CandidateSecretIDCleared returns if the "candidate_secret_id" field was cleared in this mutation.
+func (m *WorkspaceOperationMutation) CandidateSecretIDCleared() bool {
+	_, ok := m.clearedFields[workspaceoperation.FieldCandidateSecretID]
+	return ok
+}
+
+// ResetCandidateSecretID resets all changes to the "candidate_secret_id" field.
+func (m *WorkspaceOperationMutation) ResetCandidateSecretID() {
+	m.candidate_secret_id = nil
+	delete(m.clearedFields, workspaceoperation.FieldCandidateSecretID)
+}
+
+// SetCandidateSecretVersion sets the "candidate_secret_version" field.
+func (m *WorkspaceOperationMutation) SetCandidateSecretVersion(i int64) {
+	m.candidate_secret_version = &i
+	m.addcandidate_secret_version = nil
+}
+
+// CandidateSecretVersion returns the value of the "candidate_secret_version" field in the mutation.
+func (m *WorkspaceOperationMutation) CandidateSecretVersion() (r int64, exists bool) {
+	v := m.candidate_secret_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCandidateSecretVersion returns the old "candidate_secret_version" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldCandidateSecretVersion(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCandidateSecretVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCandidateSecretVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCandidateSecretVersion: %w", err)
+	}
+	return oldValue.CandidateSecretVersion, nil
+}
+
+// AddCandidateSecretVersion adds i to the "candidate_secret_version" field.
+func (m *WorkspaceOperationMutation) AddCandidateSecretVersion(i int64) {
+	if m.addcandidate_secret_version != nil {
+		*m.addcandidate_secret_version += i
+	} else {
+		m.addcandidate_secret_version = &i
+	}
+}
+
+// AddedCandidateSecretVersion returns the value that was added to the "candidate_secret_version" field in this mutation.
+func (m *WorkspaceOperationMutation) AddedCandidateSecretVersion() (r int64, exists bool) {
+	v := m.addcandidate_secret_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCandidateSecretVersion clears the value of the "candidate_secret_version" field.
+func (m *WorkspaceOperationMutation) ClearCandidateSecretVersion() {
+	m.candidate_secret_version = nil
+	m.addcandidate_secret_version = nil
+	m.clearedFields[workspaceoperation.FieldCandidateSecretVersion] = struct{}{}
+}
+
+// CandidateSecretVersionCleared returns if the "candidate_secret_version" field was cleared in this mutation.
+func (m *WorkspaceOperationMutation) CandidateSecretVersionCleared() bool {
+	_, ok := m.clearedFields[workspaceoperation.FieldCandidateSecretVersion]
+	return ok
+}
+
+// ResetCandidateSecretVersion resets all changes to the "candidate_secret_version" field.
+func (m *WorkspaceOperationMutation) ResetCandidateSecretVersion() {
+	m.candidate_secret_version = nil
+	m.addcandidate_secret_version = nil
+	delete(m.clearedFields, workspaceoperation.FieldCandidateSecretVersion)
+}
+
+// SetActivationID sets the "activation_id" field.
+func (m *WorkspaceOperationMutation) SetActivationID(s string) {
+	m.activation_id = &s
+}
+
+// ActivationID returns the value of the "activation_id" field in the mutation.
+func (m *WorkspaceOperationMutation) ActivationID() (r string, exists bool) {
+	v := m.activation_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActivationID returns the old "activation_id" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldActivationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActivationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActivationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActivationID: %w", err)
+	}
+	return oldValue.ActivationID, nil
+}
+
+// ClearActivationID clears the value of the "activation_id" field.
+func (m *WorkspaceOperationMutation) ClearActivationID() {
+	m.activation_id = nil
+	m.clearedFields[workspaceoperation.FieldActivationID] = struct{}{}
+}
+
+// ActivationIDCleared returns if the "activation_id" field was cleared in this mutation.
+func (m *WorkspaceOperationMutation) ActivationIDCleared() bool {
+	_, ok := m.clearedFields[workspaceoperation.FieldActivationID]
+	return ok
+}
+
+// ResetActivationID resets all changes to the "activation_id" field.
+func (m *WorkspaceOperationMutation) ResetActivationID() {
+	m.activation_id = nil
+	delete(m.clearedFields, workspaceoperation.FieldActivationID)
+}
+
+// SetDiagnosticCode sets the "diagnostic_code" field.
+func (m *WorkspaceOperationMutation) SetDiagnosticCode(s string) {
+	m.diagnostic_code = &s
+}
+
+// DiagnosticCode returns the value of the "diagnostic_code" field in the mutation.
+func (m *WorkspaceOperationMutation) DiagnosticCode() (r string, exists bool) {
+	v := m.diagnostic_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiagnosticCode returns the old "diagnostic_code" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldDiagnosticCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiagnosticCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiagnosticCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiagnosticCode: %w", err)
+	}
+	return oldValue.DiagnosticCode, nil
+}
+
+// ClearDiagnosticCode clears the value of the "diagnostic_code" field.
+func (m *WorkspaceOperationMutation) ClearDiagnosticCode() {
+	m.diagnostic_code = nil
+	m.clearedFields[workspaceoperation.FieldDiagnosticCode] = struct{}{}
+}
+
+// DiagnosticCodeCleared returns if the "diagnostic_code" field was cleared in this mutation.
+func (m *WorkspaceOperationMutation) DiagnosticCodeCleared() bool {
+	_, ok := m.clearedFields[workspaceoperation.FieldDiagnosticCode]
+	return ok
+}
+
+// ResetDiagnosticCode resets all changes to the "diagnostic_code" field.
+func (m *WorkspaceOperationMutation) ResetDiagnosticCode() {
+	m.diagnostic_code = nil
+	delete(m.clearedFields, workspaceoperation.FieldDiagnosticCode)
+}
+
+// SetEvidence sets the "evidence" field.
+func (m *WorkspaceOperationMutation) SetEvidence(s string) {
+	m.evidence = &s
+}
+
+// Evidence returns the value of the "evidence" field in the mutation.
+func (m *WorkspaceOperationMutation) Evidence() (r string, exists bool) {
+	v := m.evidence
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEvidence returns the old "evidence" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldEvidence(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEvidence is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEvidence requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEvidence: %w", err)
+	}
+	return oldValue.Evidence, nil
+}
+
+// ClearEvidence clears the value of the "evidence" field.
+func (m *WorkspaceOperationMutation) ClearEvidence() {
+	m.evidence = nil
+	m.clearedFields[workspaceoperation.FieldEvidence] = struct{}{}
+}
+
+// EvidenceCleared returns if the "evidence" field was cleared in this mutation.
+func (m *WorkspaceOperationMutation) EvidenceCleared() bool {
+	_, ok := m.clearedFields[workspaceoperation.FieldEvidence]
+	return ok
+}
+
+// ResetEvidence resets all changes to the "evidence" field.
+func (m *WorkspaceOperationMutation) ResetEvidence() {
+	m.evidence = nil
+	delete(m.clearedFields, workspaceoperation.FieldEvidence)
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *WorkspaceOperationMutation) SetCreatedByUserID(s string) {
+	m.created_by_user_id = &s
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *WorkspaceOperationMutation) CreatedByUserID() (r string, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldCreatedByUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *WorkspaceOperationMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *WorkspaceOperationMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *WorkspaceOperationMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *WorkspaceOperationMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *WorkspaceOperationMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *WorkspaceOperationMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *WorkspaceOperationMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the WorkspaceOperationMutation builder.
+func (m *WorkspaceOperationMutation) Where(ps ...predicate.WorkspaceOperation) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the WorkspaceOperationMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *WorkspaceOperationMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.WorkspaceOperation, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *WorkspaceOperationMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *WorkspaceOperationMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (WorkspaceOperation).
+func (m *WorkspaceOperationMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *WorkspaceOperationMutation) Fields() []string {
+	fields := make([]string, 0, 19)
+	if m.workspace_service_id != nil {
+		fields = append(fields, workspaceoperation.FieldWorkspaceServiceID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, workspaceoperation.FieldUserID)
+	}
+	if m.action != nil {
+		fields = append(fields, workspaceoperation.FieldAction)
+	}
+	if m.idempotency_key != nil {
+		fields = append(fields, workspaceoperation.FieldIdempotencyKey)
+	}
+	if m.request_hash != nil {
+		fields = append(fields, workspaceoperation.FieldRequestHash)
+	}
+	if m.config_revision != nil {
+		fields = append(fields, workspaceoperation.FieldConfigRevision)
+	}
+	if m.binding_revision != nil {
+		fields = append(fields, workspaceoperation.FieldBindingRevision)
+	}
+	if m.target_json != nil {
+		fields = append(fields, workspaceoperation.FieldTargetJSON)
+	}
+	if m.state != nil {
+		fields = append(fields, workspaceoperation.FieldState)
+	}
+	if m.step != nil {
+		fields = append(fields, workspaceoperation.FieldStep)
+	}
+	if m.result_json != nil {
+		fields = append(fields, workspaceoperation.FieldResultJSON)
+	}
+	if m.candidate_secret_id != nil {
+		fields = append(fields, workspaceoperation.FieldCandidateSecretID)
+	}
+	if m.candidate_secret_version != nil {
+		fields = append(fields, workspaceoperation.FieldCandidateSecretVersion)
+	}
+	if m.activation_id != nil {
+		fields = append(fields, workspaceoperation.FieldActivationID)
+	}
+	if m.diagnostic_code != nil {
+		fields = append(fields, workspaceoperation.FieldDiagnosticCode)
+	}
+	if m.evidence != nil {
+		fields = append(fields, workspaceoperation.FieldEvidence)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, workspaceoperation.FieldCreatedByUserID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, workspaceoperation.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, workspaceoperation.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *WorkspaceOperationMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceoperation.FieldWorkspaceServiceID:
+		return m.WorkspaceServiceID()
+	case workspaceoperation.FieldUserID:
+		return m.UserID()
+	case workspaceoperation.FieldAction:
+		return m.Action()
+	case workspaceoperation.FieldIdempotencyKey:
+		return m.IdempotencyKey()
+	case workspaceoperation.FieldRequestHash:
+		return m.RequestHash()
+	case workspaceoperation.FieldConfigRevision:
+		return m.ConfigRevision()
+	case workspaceoperation.FieldBindingRevision:
+		return m.BindingRevision()
+	case workspaceoperation.FieldTargetJSON:
+		return m.TargetJSON()
+	case workspaceoperation.FieldState:
+		return m.State()
+	case workspaceoperation.FieldStep:
+		return m.Step()
+	case workspaceoperation.FieldResultJSON:
+		return m.ResultJSON()
+	case workspaceoperation.FieldCandidateSecretID:
+		return m.CandidateSecretID()
+	case workspaceoperation.FieldCandidateSecretVersion:
+		return m.CandidateSecretVersion()
+	case workspaceoperation.FieldActivationID:
+		return m.ActivationID()
+	case workspaceoperation.FieldDiagnosticCode:
+		return m.DiagnosticCode()
+	case workspaceoperation.FieldEvidence:
+		return m.Evidence()
+	case workspaceoperation.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case workspaceoperation.FieldCreatedAt:
+		return m.CreatedAt()
+	case workspaceoperation.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *WorkspaceOperationMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case workspaceoperation.FieldWorkspaceServiceID:
+		return m.OldWorkspaceServiceID(ctx)
+	case workspaceoperation.FieldUserID:
+		return m.OldUserID(ctx)
+	case workspaceoperation.FieldAction:
+		return m.OldAction(ctx)
+	case workspaceoperation.FieldIdempotencyKey:
+		return m.OldIdempotencyKey(ctx)
+	case workspaceoperation.FieldRequestHash:
+		return m.OldRequestHash(ctx)
+	case workspaceoperation.FieldConfigRevision:
+		return m.OldConfigRevision(ctx)
+	case workspaceoperation.FieldBindingRevision:
+		return m.OldBindingRevision(ctx)
+	case workspaceoperation.FieldTargetJSON:
+		return m.OldTargetJSON(ctx)
+	case workspaceoperation.FieldState:
+		return m.OldState(ctx)
+	case workspaceoperation.FieldStep:
+		return m.OldStep(ctx)
+	case workspaceoperation.FieldResultJSON:
+		return m.OldResultJSON(ctx)
+	case workspaceoperation.FieldCandidateSecretID:
+		return m.OldCandidateSecretID(ctx)
+	case workspaceoperation.FieldCandidateSecretVersion:
+		return m.OldCandidateSecretVersion(ctx)
+	case workspaceoperation.FieldActivationID:
+		return m.OldActivationID(ctx)
+	case workspaceoperation.FieldDiagnosticCode:
+		return m.OldDiagnosticCode(ctx)
+	case workspaceoperation.FieldEvidence:
+		return m.OldEvidence(ctx)
+	case workspaceoperation.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case workspaceoperation.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case workspaceoperation.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown WorkspaceOperation field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceOperationMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case workspaceoperation.FieldWorkspaceServiceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWorkspaceServiceID(v)
+		return nil
+	case workspaceoperation.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case workspaceoperation.FieldAction:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAction(v)
+		return nil
+	case workspaceoperation.FieldIdempotencyKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyKey(v)
+		return nil
+	case workspaceoperation.FieldRequestHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestHash(v)
+		return nil
+	case workspaceoperation.FieldConfigRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigRevision(v)
+		return nil
+	case workspaceoperation.FieldBindingRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBindingRevision(v)
+		return nil
+	case workspaceoperation.FieldTargetJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTargetJSON(v)
+		return nil
+	case workspaceoperation.FieldState:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetState(v)
+		return nil
+	case workspaceoperation.FieldStep:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStep(v)
+		return nil
+	case workspaceoperation.FieldResultJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResultJSON(v)
+		return nil
+	case workspaceoperation.FieldCandidateSecretID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCandidateSecretID(v)
+		return nil
+	case workspaceoperation.FieldCandidateSecretVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCandidateSecretVersion(v)
+		return nil
+	case workspaceoperation.FieldActivationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActivationID(v)
+		return nil
+	case workspaceoperation.FieldDiagnosticCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiagnosticCode(v)
+		return nil
+	case workspaceoperation.FieldEvidence:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEvidence(v)
+		return nil
+	case workspaceoperation.FieldCreatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case workspaceoperation.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case workspaceoperation.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceOperation field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *WorkspaceOperationMutation) AddedFields() []string {
+	var fields []string
+	if m.addconfig_revision != nil {
+		fields = append(fields, workspaceoperation.FieldConfigRevision)
+	}
+	if m.addbinding_revision != nil {
+		fields = append(fields, workspaceoperation.FieldBindingRevision)
+	}
+	if m.addcandidate_secret_version != nil {
+		fields = append(fields, workspaceoperation.FieldCandidateSecretVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *WorkspaceOperationMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceoperation.FieldConfigRevision:
+		return m.AddedConfigRevision()
+	case workspaceoperation.FieldBindingRevision:
+		return m.AddedBindingRevision()
+	case workspaceoperation.FieldCandidateSecretVersion:
+		return m.AddedCandidateSecretVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceOperationMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case workspaceoperation.FieldConfigRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConfigRevision(v)
+		return nil
+	case workspaceoperation.FieldBindingRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBindingRevision(v)
+		return nil
+	case workspaceoperation.FieldCandidateSecretVersion:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCandidateSecretVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceOperation numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *WorkspaceOperationMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(workspaceoperation.FieldUserID) {
+		fields = append(fields, workspaceoperation.FieldUserID)
+	}
+	if m.FieldCleared(workspaceoperation.FieldResultJSON) {
+		fields = append(fields, workspaceoperation.FieldResultJSON)
+	}
+	if m.FieldCleared(workspaceoperation.FieldCandidateSecretID) {
+		fields = append(fields, workspaceoperation.FieldCandidateSecretID)
+	}
+	if m.FieldCleared(workspaceoperation.FieldCandidateSecretVersion) {
+		fields = append(fields, workspaceoperation.FieldCandidateSecretVersion)
+	}
+	if m.FieldCleared(workspaceoperation.FieldActivationID) {
+		fields = append(fields, workspaceoperation.FieldActivationID)
+	}
+	if m.FieldCleared(workspaceoperation.FieldDiagnosticCode) {
+		fields = append(fields, workspaceoperation.FieldDiagnosticCode)
+	}
+	if m.FieldCleared(workspaceoperation.FieldEvidence) {
+		fields = append(fields, workspaceoperation.FieldEvidence)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *WorkspaceOperationMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *WorkspaceOperationMutation) ClearField(name string) error {
+	switch name {
+	case workspaceoperation.FieldUserID:
+		m.ClearUserID()
+		return nil
+	case workspaceoperation.FieldResultJSON:
+		m.ClearResultJSON()
+		return nil
+	case workspaceoperation.FieldCandidateSecretID:
+		m.ClearCandidateSecretID()
+		return nil
+	case workspaceoperation.FieldCandidateSecretVersion:
+		m.ClearCandidateSecretVersion()
+		return nil
+	case workspaceoperation.FieldActivationID:
+		m.ClearActivationID()
+		return nil
+	case workspaceoperation.FieldDiagnosticCode:
+		m.ClearDiagnosticCode()
+		return nil
+	case workspaceoperation.FieldEvidence:
+		m.ClearEvidence()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceOperation nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *WorkspaceOperationMutation) ResetField(name string) error {
+	switch name {
+	case workspaceoperation.FieldWorkspaceServiceID:
+		m.ResetWorkspaceServiceID()
+		return nil
+	case workspaceoperation.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case workspaceoperation.FieldAction:
+		m.ResetAction()
+		return nil
+	case workspaceoperation.FieldIdempotencyKey:
+		m.ResetIdempotencyKey()
+		return nil
+	case workspaceoperation.FieldRequestHash:
+		m.ResetRequestHash()
+		return nil
+	case workspaceoperation.FieldConfigRevision:
+		m.ResetConfigRevision()
+		return nil
+	case workspaceoperation.FieldBindingRevision:
+		m.ResetBindingRevision()
+		return nil
+	case workspaceoperation.FieldTargetJSON:
+		m.ResetTargetJSON()
+		return nil
+	case workspaceoperation.FieldState:
+		m.ResetState()
+		return nil
+	case workspaceoperation.FieldStep:
+		m.ResetStep()
+		return nil
+	case workspaceoperation.FieldResultJSON:
+		m.ResetResultJSON()
+		return nil
+	case workspaceoperation.FieldCandidateSecretID:
+		m.ResetCandidateSecretID()
+		return nil
+	case workspaceoperation.FieldCandidateSecretVersion:
+		m.ResetCandidateSecretVersion()
+		return nil
+	case workspaceoperation.FieldActivationID:
+		m.ResetActivationID()
+		return nil
+	case workspaceoperation.FieldDiagnosticCode:
+		m.ResetDiagnosticCode()
+		return nil
+	case workspaceoperation.FieldEvidence:
+		m.ResetEvidence()
+		return nil
+	case workspaceoperation.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case workspaceoperation.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case workspaceoperation.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceOperation field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *WorkspaceOperationMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *WorkspaceOperationMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *WorkspaceOperationMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *WorkspaceOperationMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *WorkspaceOperationMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *WorkspaceOperationMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *WorkspaceOperationMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown WorkspaceOperation unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *WorkspaceOperationMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown WorkspaceOperation edge %s", name)
+}
+
+// WorkspaceServiceMutation represents an operation that mutates the WorkspaceService nodes in the graph.
+type WorkspaceServiceMutation struct {
+	config
+	op                        Op
+	typ                       string
+	id                        *string
+	name                      *string
+	config_revision           *int64
+	addconfig_revision        *int64
+	active_config_revision    *int64
+	addactive_config_revision *int64
+	enabled                   *bool
+	state                     *string
+	mcp_server_id             *string
+	runtime_route_id          *string
+	diagnostic_code           *string
+	created_at                *time.Time
+	updated_at                *time.Time
+	clearedFields             map[string]struct{}
+	done                      bool
+	oldValue                  func(context.Context) (*WorkspaceService, error)
+	predicates                []predicate.WorkspaceService
+}
+
+var _ ent.Mutation = (*WorkspaceServiceMutation)(nil)
+
+// workspaceserviceOption allows management of the mutation configuration using functional options.
+type workspaceserviceOption func(*WorkspaceServiceMutation)
+
+// newWorkspaceServiceMutation creates new mutation for the WorkspaceService entity.
+func newWorkspaceServiceMutation(c config, op Op, opts ...workspaceserviceOption) *WorkspaceServiceMutation {
+	m := &WorkspaceServiceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeWorkspaceService,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withWorkspaceServiceID sets the ID field of the mutation.
+func withWorkspaceServiceID(id string) workspaceserviceOption {
+	return func(m *WorkspaceServiceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *WorkspaceService
+		)
+		m.oldValue = func(ctx context.Context) (*WorkspaceService, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().WorkspaceService.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withWorkspaceService sets the old WorkspaceService of the mutation.
+func withWorkspaceService(node *WorkspaceService) workspaceserviceOption {
+	return func(m *WorkspaceServiceMutation) {
+		m.oldValue = func(context.Context) (*WorkspaceService, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m WorkspaceServiceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m WorkspaceServiceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of WorkspaceService entities.
+func (m *WorkspaceServiceMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *WorkspaceServiceMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *WorkspaceServiceMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().WorkspaceService.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetName sets the "name" field.
+func (m *WorkspaceServiceMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *WorkspaceServiceMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *WorkspaceServiceMutation) ResetName() {
+	m.name = nil
+}
+
+// SetConfigRevision sets the "config_revision" field.
+func (m *WorkspaceServiceMutation) SetConfigRevision(i int64) {
+	m.config_revision = &i
+	m.addconfig_revision = nil
+}
+
+// ConfigRevision returns the value of the "config_revision" field in the mutation.
+func (m *WorkspaceServiceMutation) ConfigRevision() (r int64, exists bool) {
+	v := m.config_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigRevision returns the old "config_revision" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldConfigRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigRevision: %w", err)
+	}
+	return oldValue.ConfigRevision, nil
+}
+
+// AddConfigRevision adds i to the "config_revision" field.
+func (m *WorkspaceServiceMutation) AddConfigRevision(i int64) {
+	if m.addconfig_revision != nil {
+		*m.addconfig_revision += i
+	} else {
+		m.addconfig_revision = &i
+	}
+}
+
+// AddedConfigRevision returns the value that was added to the "config_revision" field in this mutation.
+func (m *WorkspaceServiceMutation) AddedConfigRevision() (r int64, exists bool) {
+	v := m.addconfig_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConfigRevision resets all changes to the "config_revision" field.
+func (m *WorkspaceServiceMutation) ResetConfigRevision() {
+	m.config_revision = nil
+	m.addconfig_revision = nil
+}
+
+// SetActiveConfigRevision sets the "active_config_revision" field.
+func (m *WorkspaceServiceMutation) SetActiveConfigRevision(i int64) {
+	m.active_config_revision = &i
+	m.addactive_config_revision = nil
+}
+
+// ActiveConfigRevision returns the value of the "active_config_revision" field in the mutation.
+func (m *WorkspaceServiceMutation) ActiveConfigRevision() (r int64, exists bool) {
+	v := m.active_config_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActiveConfigRevision returns the old "active_config_revision" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldActiveConfigRevision(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActiveConfigRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActiveConfigRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActiveConfigRevision: %w", err)
+	}
+	return oldValue.ActiveConfigRevision, nil
+}
+
+// AddActiveConfigRevision adds i to the "active_config_revision" field.
+func (m *WorkspaceServiceMutation) AddActiveConfigRevision(i int64) {
+	if m.addactive_config_revision != nil {
+		*m.addactive_config_revision += i
+	} else {
+		m.addactive_config_revision = &i
+	}
+}
+
+// AddedActiveConfigRevision returns the value that was added to the "active_config_revision" field in this mutation.
+func (m *WorkspaceServiceMutation) AddedActiveConfigRevision() (r int64, exists bool) {
+	v := m.addactive_config_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearActiveConfigRevision clears the value of the "active_config_revision" field.
+func (m *WorkspaceServiceMutation) ClearActiveConfigRevision() {
+	m.active_config_revision = nil
+	m.addactive_config_revision = nil
+	m.clearedFields[workspaceservice.FieldActiveConfigRevision] = struct{}{}
+}
+
+// ActiveConfigRevisionCleared returns if the "active_config_revision" field was cleared in this mutation.
+func (m *WorkspaceServiceMutation) ActiveConfigRevisionCleared() bool {
+	_, ok := m.clearedFields[workspaceservice.FieldActiveConfigRevision]
+	return ok
+}
+
+// ResetActiveConfigRevision resets all changes to the "active_config_revision" field.
+func (m *WorkspaceServiceMutation) ResetActiveConfigRevision() {
+	m.active_config_revision = nil
+	m.addactive_config_revision = nil
+	delete(m.clearedFields, workspaceservice.FieldActiveConfigRevision)
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *WorkspaceServiceMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *WorkspaceServiceMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *WorkspaceServiceMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetState sets the "state" field.
+func (m *WorkspaceServiceMutation) SetState(s string) {
+	m.state = &s
+}
+
+// State returns the value of the "state" field in the mutation.
+func (m *WorkspaceServiceMutation) State() (r string, exists bool) {
+	v := m.state
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldState returns the old "state" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldState(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldState is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldState requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldState: %w", err)
+	}
+	return oldValue.State, nil
+}
+
+// ResetState resets all changes to the "state" field.
+func (m *WorkspaceServiceMutation) ResetState() {
+	m.state = nil
+}
+
+// SetMcpServerID sets the "mcp_server_id" field.
+func (m *WorkspaceServiceMutation) SetMcpServerID(s string) {
+	m.mcp_server_id = &s
+}
+
+// McpServerID returns the value of the "mcp_server_id" field in the mutation.
+func (m *WorkspaceServiceMutation) McpServerID() (r string, exists bool) {
+	v := m.mcp_server_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMcpServerID returns the old "mcp_server_id" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldMcpServerID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMcpServerID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMcpServerID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMcpServerID: %w", err)
+	}
+	return oldValue.McpServerID, nil
+}
+
+// ResetMcpServerID resets all changes to the "mcp_server_id" field.
+func (m *WorkspaceServiceMutation) ResetMcpServerID() {
+	m.mcp_server_id = nil
+}
+
+// SetRuntimeRouteID sets the "runtime_route_id" field.
+func (m *WorkspaceServiceMutation) SetRuntimeRouteID(s string) {
+	m.runtime_route_id = &s
+}
+
+// RuntimeRouteID returns the value of the "runtime_route_id" field in the mutation.
+func (m *WorkspaceServiceMutation) RuntimeRouteID() (r string, exists bool) {
+	v := m.runtime_route_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRuntimeRouteID returns the old "runtime_route_id" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldRuntimeRouteID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRuntimeRouteID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRuntimeRouteID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRuntimeRouteID: %w", err)
+	}
+	return oldValue.RuntimeRouteID, nil
+}
+
+// ResetRuntimeRouteID resets all changes to the "runtime_route_id" field.
+func (m *WorkspaceServiceMutation) ResetRuntimeRouteID() {
+	m.runtime_route_id = nil
+}
+
+// SetDiagnosticCode sets the "diagnostic_code" field.
+func (m *WorkspaceServiceMutation) SetDiagnosticCode(s string) {
+	m.diagnostic_code = &s
+}
+
+// DiagnosticCode returns the value of the "diagnostic_code" field in the mutation.
+func (m *WorkspaceServiceMutation) DiagnosticCode() (r string, exists bool) {
+	v := m.diagnostic_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiagnosticCode returns the old "diagnostic_code" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldDiagnosticCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiagnosticCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiagnosticCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiagnosticCode: %w", err)
+	}
+	return oldValue.DiagnosticCode, nil
+}
+
+// ClearDiagnosticCode clears the value of the "diagnostic_code" field.
+func (m *WorkspaceServiceMutation) ClearDiagnosticCode() {
+	m.diagnostic_code = nil
+	m.clearedFields[workspaceservice.FieldDiagnosticCode] = struct{}{}
+}
+
+// DiagnosticCodeCleared returns if the "diagnostic_code" field was cleared in this mutation.
+func (m *WorkspaceServiceMutation) DiagnosticCodeCleared() bool {
+	_, ok := m.clearedFields[workspaceservice.FieldDiagnosticCode]
+	return ok
+}
+
+// ResetDiagnosticCode resets all changes to the "diagnostic_code" field.
+func (m *WorkspaceServiceMutation) ResetDiagnosticCode() {
+	m.diagnostic_code = nil
+	delete(m.clearedFields, workspaceservice.FieldDiagnosticCode)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *WorkspaceServiceMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *WorkspaceServiceMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *WorkspaceServiceMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *WorkspaceServiceMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *WorkspaceServiceMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *WorkspaceServiceMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the WorkspaceServiceMutation builder.
+func (m *WorkspaceServiceMutation) Where(ps ...predicate.WorkspaceService) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the WorkspaceServiceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *WorkspaceServiceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.WorkspaceService, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *WorkspaceServiceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *WorkspaceServiceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (WorkspaceService).
+func (m *WorkspaceServiceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *WorkspaceServiceMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.name != nil {
+		fields = append(fields, workspaceservice.FieldName)
+	}
+	if m.config_revision != nil {
+		fields = append(fields, workspaceservice.FieldConfigRevision)
+	}
+	if m.active_config_revision != nil {
+		fields = append(fields, workspaceservice.FieldActiveConfigRevision)
+	}
+	if m.enabled != nil {
+		fields = append(fields, workspaceservice.FieldEnabled)
+	}
+	if m.state != nil {
+		fields = append(fields, workspaceservice.FieldState)
+	}
+	if m.mcp_server_id != nil {
+		fields = append(fields, workspaceservice.FieldMcpServerID)
+	}
+	if m.runtime_route_id != nil {
+		fields = append(fields, workspaceservice.FieldRuntimeRouteID)
+	}
+	if m.diagnostic_code != nil {
+		fields = append(fields, workspaceservice.FieldDiagnosticCode)
+	}
+	if m.created_at != nil {
+		fields = append(fields, workspaceservice.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, workspaceservice.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *WorkspaceServiceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceservice.FieldName:
+		return m.Name()
+	case workspaceservice.FieldConfigRevision:
+		return m.ConfigRevision()
+	case workspaceservice.FieldActiveConfigRevision:
+		return m.ActiveConfigRevision()
+	case workspaceservice.FieldEnabled:
+		return m.Enabled()
+	case workspaceservice.FieldState:
+		return m.State()
+	case workspaceservice.FieldMcpServerID:
+		return m.McpServerID()
+	case workspaceservice.FieldRuntimeRouteID:
+		return m.RuntimeRouteID()
+	case workspaceservice.FieldDiagnosticCode:
+		return m.DiagnosticCode()
+	case workspaceservice.FieldCreatedAt:
+		return m.CreatedAt()
+	case workspaceservice.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *WorkspaceServiceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case workspaceservice.FieldName:
+		return m.OldName(ctx)
+	case workspaceservice.FieldConfigRevision:
+		return m.OldConfigRevision(ctx)
+	case workspaceservice.FieldActiveConfigRevision:
+		return m.OldActiveConfigRevision(ctx)
+	case workspaceservice.FieldEnabled:
+		return m.OldEnabled(ctx)
+	case workspaceservice.FieldState:
+		return m.OldState(ctx)
+	case workspaceservice.FieldMcpServerID:
+		return m.OldMcpServerID(ctx)
+	case workspaceservice.FieldRuntimeRouteID:
+		return m.OldRuntimeRouteID(ctx)
+	case workspaceservice.FieldDiagnosticCode:
+		return m.OldDiagnosticCode(ctx)
+	case workspaceservice.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case workspaceservice.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown WorkspaceService field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceServiceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case workspaceservice.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case workspaceservice.FieldConfigRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigRevision(v)
+		return nil
+	case workspaceservice.FieldActiveConfigRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActiveConfigRevision(v)
+		return nil
+	case workspaceservice.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case workspaceservice.FieldState:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetState(v)
+		return nil
+	case workspaceservice.FieldMcpServerID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMcpServerID(v)
+		return nil
+	case workspaceservice.FieldRuntimeRouteID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRuntimeRouteID(v)
+		return nil
+	case workspaceservice.FieldDiagnosticCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiagnosticCode(v)
+		return nil
+	case workspaceservice.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case workspaceservice.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceService field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *WorkspaceServiceMutation) AddedFields() []string {
+	var fields []string
+	if m.addconfig_revision != nil {
+		fields = append(fields, workspaceservice.FieldConfigRevision)
+	}
+	if m.addactive_config_revision != nil {
+		fields = append(fields, workspaceservice.FieldActiveConfigRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *WorkspaceServiceMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceservice.FieldConfigRevision:
+		return m.AddedConfigRevision()
+	case workspaceservice.FieldActiveConfigRevision:
+		return m.AddedActiveConfigRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceServiceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case workspaceservice.FieldConfigRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConfigRevision(v)
+		return nil
+	case workspaceservice.FieldActiveConfigRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddActiveConfigRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceService numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *WorkspaceServiceMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(workspaceservice.FieldActiveConfigRevision) {
+		fields = append(fields, workspaceservice.FieldActiveConfigRevision)
+	}
+	if m.FieldCleared(workspaceservice.FieldDiagnosticCode) {
+		fields = append(fields, workspaceservice.FieldDiagnosticCode)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *WorkspaceServiceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *WorkspaceServiceMutation) ClearField(name string) error {
+	switch name {
+	case workspaceservice.FieldActiveConfigRevision:
+		m.ClearActiveConfigRevision()
+		return nil
+	case workspaceservice.FieldDiagnosticCode:
+		m.ClearDiagnosticCode()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceService nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *WorkspaceServiceMutation) ResetField(name string) error {
+	switch name {
+	case workspaceservice.FieldName:
+		m.ResetName()
+		return nil
+	case workspaceservice.FieldConfigRevision:
+		m.ResetConfigRevision()
+		return nil
+	case workspaceservice.FieldActiveConfigRevision:
+		m.ResetActiveConfigRevision()
+		return nil
+	case workspaceservice.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case workspaceservice.FieldState:
+		m.ResetState()
+		return nil
+	case workspaceservice.FieldMcpServerID:
+		m.ResetMcpServerID()
+		return nil
+	case workspaceservice.FieldRuntimeRouteID:
+		m.ResetRuntimeRouteID()
+		return nil
+	case workspaceservice.FieldDiagnosticCode:
+		m.ResetDiagnosticCode()
+		return nil
+	case workspaceservice.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case workspaceservice.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceService field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *WorkspaceServiceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *WorkspaceServiceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *WorkspaceServiceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *WorkspaceServiceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *WorkspaceServiceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *WorkspaceServiceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *WorkspaceServiceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown WorkspaceService unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *WorkspaceServiceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown WorkspaceService edge %s", name)
+}
+
+// WorkspaceServiceConfigMutation represents an operation that mutates the WorkspaceServiceConfig nodes in the graph.
+type WorkspaceServiceConfigMutation struct {
+	config
+	op                   Op
+	typ                  string
+	id                   *int
+	workspace_service_id *string
+	revision             *int64
+	addrevision          *int64
+	config_json          *[]byte
+	created_by_user_id   *string
+	created_at           *time.Time
+	clearedFields        map[string]struct{}
+	done                 bool
+	oldValue             func(context.Context) (*WorkspaceServiceConfig, error)
+	predicates           []predicate.WorkspaceServiceConfig
+}
+
+var _ ent.Mutation = (*WorkspaceServiceConfigMutation)(nil)
+
+// workspaceserviceconfigOption allows management of the mutation configuration using functional options.
+type workspaceserviceconfigOption func(*WorkspaceServiceConfigMutation)
+
+// newWorkspaceServiceConfigMutation creates new mutation for the WorkspaceServiceConfig entity.
+func newWorkspaceServiceConfigMutation(c config, op Op, opts ...workspaceserviceconfigOption) *WorkspaceServiceConfigMutation {
+	m := &WorkspaceServiceConfigMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeWorkspaceServiceConfig,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withWorkspaceServiceConfigID sets the ID field of the mutation.
+func withWorkspaceServiceConfigID(id int) workspaceserviceconfigOption {
+	return func(m *WorkspaceServiceConfigMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *WorkspaceServiceConfig
+		)
+		m.oldValue = func(ctx context.Context) (*WorkspaceServiceConfig, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().WorkspaceServiceConfig.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withWorkspaceServiceConfig sets the old WorkspaceServiceConfig of the mutation.
+func withWorkspaceServiceConfig(node *WorkspaceServiceConfig) workspaceserviceconfigOption {
+	return func(m *WorkspaceServiceConfigMutation) {
+		m.oldValue = func(context.Context) (*WorkspaceServiceConfig, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m WorkspaceServiceConfigMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m WorkspaceServiceConfigMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of WorkspaceServiceConfig entities.
+func (m *WorkspaceServiceConfigMutation) SetID(id int) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *WorkspaceServiceConfigMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *WorkspaceServiceConfigMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().WorkspaceServiceConfig.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetWorkspaceServiceID sets the "workspace_service_id" field.
+func (m *WorkspaceServiceConfigMutation) SetWorkspaceServiceID(s string) {
+	m.workspace_service_id = &s
+}
+
+// WorkspaceServiceID returns the value of the "workspace_service_id" field in the mutation.
+func (m *WorkspaceServiceConfigMutation) WorkspaceServiceID() (r string, exists bool) {
+	v := m.workspace_service_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWorkspaceServiceID returns the old "workspace_service_id" field's value of the WorkspaceServiceConfig entity.
+// If the WorkspaceServiceConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceConfigMutation) OldWorkspaceServiceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWorkspaceServiceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWorkspaceServiceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWorkspaceServiceID: %w", err)
+	}
+	return oldValue.WorkspaceServiceID, nil
+}
+
+// ResetWorkspaceServiceID resets all changes to the "workspace_service_id" field.
+func (m *WorkspaceServiceConfigMutation) ResetWorkspaceServiceID() {
+	m.workspace_service_id = nil
+}
+
+// SetRevision sets the "revision" field.
+func (m *WorkspaceServiceConfigMutation) SetRevision(i int64) {
+	m.revision = &i
+	m.addrevision = nil
+}
+
+// Revision returns the value of the "revision" field in the mutation.
+func (m *WorkspaceServiceConfigMutation) Revision() (r int64, exists bool) {
+	v := m.revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevision returns the old "revision" field's value of the WorkspaceServiceConfig entity.
+// If the WorkspaceServiceConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceConfigMutation) OldRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevision: %w", err)
+	}
+	return oldValue.Revision, nil
+}
+
+// AddRevision adds i to the "revision" field.
+func (m *WorkspaceServiceConfigMutation) AddRevision(i int64) {
+	if m.addrevision != nil {
+		*m.addrevision += i
+	} else {
+		m.addrevision = &i
+	}
+}
+
+// AddedRevision returns the value that was added to the "revision" field in this mutation.
+func (m *WorkspaceServiceConfigMutation) AddedRevision() (r int64, exists bool) {
+	v := m.addrevision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRevision resets all changes to the "revision" field.
+func (m *WorkspaceServiceConfigMutation) ResetRevision() {
+	m.revision = nil
+	m.addrevision = nil
+}
+
+// SetConfigJSON sets the "config_json" field.
+func (m *WorkspaceServiceConfigMutation) SetConfigJSON(b []byte) {
+	m.config_json = &b
+}
+
+// ConfigJSON returns the value of the "config_json" field in the mutation.
+func (m *WorkspaceServiceConfigMutation) ConfigJSON() (r []byte, exists bool) {
+	v := m.config_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigJSON returns the old "config_json" field's value of the WorkspaceServiceConfig entity.
+// If the WorkspaceServiceConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceConfigMutation) OldConfigJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigJSON: %w", err)
+	}
+	return oldValue.ConfigJSON, nil
+}
+
+// ResetConfigJSON resets all changes to the "config_json" field.
+func (m *WorkspaceServiceConfigMutation) ResetConfigJSON() {
+	m.config_json = nil
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *WorkspaceServiceConfigMutation) SetCreatedByUserID(s string) {
+	m.created_by_user_id = &s
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *WorkspaceServiceConfigMutation) CreatedByUserID() (r string, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the WorkspaceServiceConfig entity.
+// If the WorkspaceServiceConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceConfigMutation) OldCreatedByUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *WorkspaceServiceConfigMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *WorkspaceServiceConfigMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *WorkspaceServiceConfigMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the WorkspaceServiceConfig entity.
+// If the WorkspaceServiceConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceConfigMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *WorkspaceServiceConfigMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the WorkspaceServiceConfigMutation builder.
+func (m *WorkspaceServiceConfigMutation) Where(ps ...predicate.WorkspaceServiceConfig) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the WorkspaceServiceConfigMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *WorkspaceServiceConfigMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.WorkspaceServiceConfig, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *WorkspaceServiceConfigMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *WorkspaceServiceConfigMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (WorkspaceServiceConfig).
+func (m *WorkspaceServiceConfigMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *WorkspaceServiceConfigMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.workspace_service_id != nil {
+		fields = append(fields, workspaceserviceconfig.FieldWorkspaceServiceID)
+	}
+	if m.revision != nil {
+		fields = append(fields, workspaceserviceconfig.FieldRevision)
+	}
+	if m.config_json != nil {
+		fields = append(fields, workspaceserviceconfig.FieldConfigJSON)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, workspaceserviceconfig.FieldCreatedByUserID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, workspaceserviceconfig.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *WorkspaceServiceConfigMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceserviceconfig.FieldWorkspaceServiceID:
+		return m.WorkspaceServiceID()
+	case workspaceserviceconfig.FieldRevision:
+		return m.Revision()
+	case workspaceserviceconfig.FieldConfigJSON:
+		return m.ConfigJSON()
+	case workspaceserviceconfig.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case workspaceserviceconfig.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *WorkspaceServiceConfigMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case workspaceserviceconfig.FieldWorkspaceServiceID:
+		return m.OldWorkspaceServiceID(ctx)
+	case workspaceserviceconfig.FieldRevision:
+		return m.OldRevision(ctx)
+	case workspaceserviceconfig.FieldConfigJSON:
+		return m.OldConfigJSON(ctx)
+	case workspaceserviceconfig.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case workspaceserviceconfig.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown WorkspaceServiceConfig field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceServiceConfigMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case workspaceserviceconfig.FieldWorkspaceServiceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWorkspaceServiceID(v)
+		return nil
+	case workspaceserviceconfig.FieldRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevision(v)
+		return nil
+	case workspaceserviceconfig.FieldConfigJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigJSON(v)
+		return nil
+	case workspaceserviceconfig.FieldCreatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case workspaceserviceconfig.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceServiceConfig field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *WorkspaceServiceConfigMutation) AddedFields() []string {
+	var fields []string
+	if m.addrevision != nil {
+		fields = append(fields, workspaceserviceconfig.FieldRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *WorkspaceServiceConfigMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceserviceconfig.FieldRevision:
+		return m.AddedRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceServiceConfigMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case workspaceserviceconfig.FieldRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceServiceConfig numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *WorkspaceServiceConfigMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *WorkspaceServiceConfigMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *WorkspaceServiceConfigMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown WorkspaceServiceConfig nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *WorkspaceServiceConfigMutation) ResetField(name string) error {
+	switch name {
+	case workspaceserviceconfig.FieldWorkspaceServiceID:
+		m.ResetWorkspaceServiceID()
+		return nil
+	case workspaceserviceconfig.FieldRevision:
+		m.ResetRevision()
+		return nil
+	case workspaceserviceconfig.FieldConfigJSON:
+		m.ResetConfigJSON()
+		return nil
+	case workspaceserviceconfig.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case workspaceserviceconfig.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceServiceConfig field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *WorkspaceServiceConfigMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *WorkspaceServiceConfigMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *WorkspaceServiceConfigMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *WorkspaceServiceConfigMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *WorkspaceServiceConfigMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *WorkspaceServiceConfigMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *WorkspaceServiceConfigMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown WorkspaceServiceConfig unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *WorkspaceServiceConfigMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown WorkspaceServiceConfig edge %s", name)
 }

@@ -12,6 +12,7 @@ import (
 	"measix/platform/ent/migrate"
 
 	"measix/platform/ent/activation"
+	"measix/platform/ent/agentspace"
 	"measix/platform/ent/budgetallocation"
 	"measix/platform/ent/budgetaudit"
 	"measix/platform/ent/budgetbucket"
@@ -46,6 +47,10 @@ import (
 	"measix/platform/ent/usageevent"
 	"measix/platform/ent/user"
 	"measix/platform/ent/userbudget"
+	"measix/platform/ent/workspaceaudit"
+	"measix/platform/ent/workspaceoperation"
+	"measix/platform/ent/workspaceservice"
+	"measix/platform/ent/workspaceserviceconfig"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -60,6 +65,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// Activation is the client for interacting with the Activation builders.
 	Activation *ActivationClient
+	// AgentSpace is the client for interacting with the AgentSpace builders.
+	AgentSpace *AgentSpaceClient
 	// BudgetAllocation is the client for interacting with the BudgetAllocation builders.
 	BudgetAllocation *BudgetAllocationClient
 	// BudgetAudit is the client for interacting with the BudgetAudit builders.
@@ -128,6 +135,14 @@ type Client struct {
 	User *UserClient
 	// UserBudget is the client for interacting with the UserBudget builders.
 	UserBudget *UserBudgetClient
+	// WorkspaceAudit is the client for interacting with the WorkspaceAudit builders.
+	WorkspaceAudit *WorkspaceAuditClient
+	// WorkspaceOperation is the client for interacting with the WorkspaceOperation builders.
+	WorkspaceOperation *WorkspaceOperationClient
+	// WorkspaceService is the client for interacting with the WorkspaceService builders.
+	WorkspaceService *WorkspaceServiceClient
+	// WorkspaceServiceConfig is the client for interacting with the WorkspaceServiceConfig builders.
+	WorkspaceServiceConfig *WorkspaceServiceConfigClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -140,6 +155,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.Activation = NewActivationClient(c.config)
+	c.AgentSpace = NewAgentSpaceClient(c.config)
 	c.BudgetAllocation = NewBudgetAllocationClient(c.config)
 	c.BudgetAudit = NewBudgetAuditClient(c.config)
 	c.BudgetBucket = NewBudgetBucketClient(c.config)
@@ -174,6 +190,10 @@ func (c *Client) init() {
 	c.UsageEvent = NewUsageEventClient(c.config)
 	c.User = NewUserClient(c.config)
 	c.UserBudget = NewUserBudgetClient(c.config)
+	c.WorkspaceAudit = NewWorkspaceAuditClient(c.config)
+	c.WorkspaceOperation = NewWorkspaceOperationClient(c.config)
+	c.WorkspaceService = NewWorkspaceServiceClient(c.config)
+	c.WorkspaceServiceConfig = NewWorkspaceServiceConfigClient(c.config)
 }
 
 type (
@@ -267,6 +287,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:                      ctx,
 		config:                   cfg,
 		Activation:               NewActivationClient(cfg),
+		AgentSpace:               NewAgentSpaceClient(cfg),
 		BudgetAllocation:         NewBudgetAllocationClient(cfg),
 		BudgetAudit:              NewBudgetAuditClient(cfg),
 		BudgetBucket:             NewBudgetBucketClient(cfg),
@@ -301,6 +322,10 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		UsageEvent:               NewUsageEventClient(cfg),
 		User:                     NewUserClient(cfg),
 		UserBudget:               NewUserBudgetClient(cfg),
+		WorkspaceAudit:           NewWorkspaceAuditClient(cfg),
+		WorkspaceOperation:       NewWorkspaceOperationClient(cfg),
+		WorkspaceService:         NewWorkspaceServiceClient(cfg),
+		WorkspaceServiceConfig:   NewWorkspaceServiceConfigClient(cfg),
 	}, nil
 }
 
@@ -321,6 +346,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:                      ctx,
 		config:                   cfg,
 		Activation:               NewActivationClient(cfg),
+		AgentSpace:               NewAgentSpaceClient(cfg),
 		BudgetAllocation:         NewBudgetAllocationClient(cfg),
 		BudgetAudit:              NewBudgetAuditClient(cfg),
 		BudgetBucket:             NewBudgetBucketClient(cfg),
@@ -355,6 +381,10 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		UsageEvent:               NewUsageEventClient(cfg),
 		User:                     NewUserClient(cfg),
 		UserBudget:               NewUserBudgetClient(cfg),
+		WorkspaceAudit:           NewWorkspaceAuditClient(cfg),
+		WorkspaceOperation:       NewWorkspaceOperationClient(cfg),
+		WorkspaceService:         NewWorkspaceServiceClient(cfg),
+		WorkspaceServiceConfig:   NewWorkspaceServiceConfigClient(cfg),
 	}, nil
 }
 
@@ -384,15 +414,16 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Activation, c.BudgetAllocation, c.BudgetAudit, c.BudgetBucket, c.BudgetLimit,
-		c.BudgetReconciliation, c.BudgetRequest, c.BudgetSettlement, c.BudgetTemplate,
-		c.BudgetTemplateAssignment, c.BudgetTemplateAudit, c.DeletedCredential,
-		c.DeletedPrincipal, c.Deployment, c.DeploymentSettingAudit, c.Device,
-		c.Enrollment, c.EnterpriseUpdate, c.IdempotencyRecord, c.ManagedDraft,
-		c.ManagedRelease, c.ManagedState, c.PortalSession, c.PricingRule,
-		c.RequestUsage, c.Secret, c.SecretVersion, c.SemanticUsage, c.Session,
-		c.Upstream, c.UpstreamConfigRevision, c.UsageDetail, c.UsageEvent, c.User,
-		c.UserBudget,
+		c.Activation, c.AgentSpace, c.BudgetAllocation, c.BudgetAudit, c.BudgetBucket,
+		c.BudgetLimit, c.BudgetReconciliation, c.BudgetRequest, c.BudgetSettlement,
+		c.BudgetTemplate, c.BudgetTemplateAssignment, c.BudgetTemplateAudit,
+		c.DeletedCredential, c.DeletedPrincipal, c.Deployment,
+		c.DeploymentSettingAudit, c.Device, c.Enrollment, c.EnterpriseUpdate,
+		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
+		c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion,
+		c.SemanticUsage, c.Session, c.Upstream, c.UpstreamConfigRevision,
+		c.UsageDetail, c.UsageEvent, c.User, c.UserBudget, c.WorkspaceAudit,
+		c.WorkspaceOperation, c.WorkspaceService, c.WorkspaceServiceConfig,
 	} {
 		n.Use(hooks...)
 	}
@@ -402,15 +433,16 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Activation, c.BudgetAllocation, c.BudgetAudit, c.BudgetBucket, c.BudgetLimit,
-		c.BudgetReconciliation, c.BudgetRequest, c.BudgetSettlement, c.BudgetTemplate,
-		c.BudgetTemplateAssignment, c.BudgetTemplateAudit, c.DeletedCredential,
-		c.DeletedPrincipal, c.Deployment, c.DeploymentSettingAudit, c.Device,
-		c.Enrollment, c.EnterpriseUpdate, c.IdempotencyRecord, c.ManagedDraft,
-		c.ManagedRelease, c.ManagedState, c.PortalSession, c.PricingRule,
-		c.RequestUsage, c.Secret, c.SecretVersion, c.SemanticUsage, c.Session,
-		c.Upstream, c.UpstreamConfigRevision, c.UsageDetail, c.UsageEvent, c.User,
-		c.UserBudget,
+		c.Activation, c.AgentSpace, c.BudgetAllocation, c.BudgetAudit, c.BudgetBucket,
+		c.BudgetLimit, c.BudgetReconciliation, c.BudgetRequest, c.BudgetSettlement,
+		c.BudgetTemplate, c.BudgetTemplateAssignment, c.BudgetTemplateAudit,
+		c.DeletedCredential, c.DeletedPrincipal, c.Deployment,
+		c.DeploymentSettingAudit, c.Device, c.Enrollment, c.EnterpriseUpdate,
+		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
+		c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion,
+		c.SemanticUsage, c.Session, c.Upstream, c.UpstreamConfigRevision,
+		c.UsageDetail, c.UsageEvent, c.User, c.UserBudget, c.WorkspaceAudit,
+		c.WorkspaceOperation, c.WorkspaceService, c.WorkspaceServiceConfig,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -421,6 +453,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *ActivationMutation:
 		return c.Activation.mutate(ctx, m)
+	case *AgentSpaceMutation:
+		return c.AgentSpace.mutate(ctx, m)
 	case *BudgetAllocationMutation:
 		return c.BudgetAllocation.mutate(ctx, m)
 	case *BudgetAuditMutation:
@@ -489,6 +523,14 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.User.mutate(ctx, m)
 	case *UserBudgetMutation:
 		return c.UserBudget.mutate(ctx, m)
+	case *WorkspaceAuditMutation:
+		return c.WorkspaceAudit.mutate(ctx, m)
+	case *WorkspaceOperationMutation:
+		return c.WorkspaceOperation.mutate(ctx, m)
+	case *WorkspaceServiceMutation:
+		return c.WorkspaceService.mutate(ctx, m)
+	case *WorkspaceServiceConfigMutation:
+		return c.WorkspaceServiceConfig.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -624,6 +666,139 @@ func (c *ActivationClient) mutate(ctx context.Context, m *ActivationMutation) (V
 		return (&ActivationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Activation mutation op: %q", m.Op())
+	}
+}
+
+// AgentSpaceClient is a client for the AgentSpace schema.
+type AgentSpaceClient struct {
+	config
+}
+
+// NewAgentSpaceClient returns a client for the AgentSpace from the given config.
+func NewAgentSpaceClient(c config) *AgentSpaceClient {
+	return &AgentSpaceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `agentspace.Hooks(f(g(h())))`.
+func (c *AgentSpaceClient) Use(hooks ...Hook) {
+	c.hooks.AgentSpace = append(c.hooks.AgentSpace, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `agentspace.Intercept(f(g(h())))`.
+func (c *AgentSpaceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AgentSpace = append(c.inters.AgentSpace, interceptors...)
+}
+
+// Create returns a builder for creating a AgentSpace entity.
+func (c *AgentSpaceClient) Create() *AgentSpaceCreate {
+	mutation := newAgentSpaceMutation(c.config, OpCreate)
+	return &AgentSpaceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AgentSpace entities.
+func (c *AgentSpaceClient) CreateBulk(builders ...*AgentSpaceCreate) *AgentSpaceCreateBulk {
+	return &AgentSpaceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AgentSpaceClient) MapCreateBulk(slice any, setFunc func(*AgentSpaceCreate, int)) *AgentSpaceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AgentSpaceCreateBulk{err: fmt.Errorf("calling to AgentSpaceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AgentSpaceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AgentSpaceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AgentSpace.
+func (c *AgentSpaceClient) Update() *AgentSpaceUpdate {
+	mutation := newAgentSpaceMutation(c.config, OpUpdate)
+	return &AgentSpaceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AgentSpaceClient) UpdateOne(_m *AgentSpace) *AgentSpaceUpdateOne {
+	mutation := newAgentSpaceMutation(c.config, OpUpdateOne, withAgentSpace(_m))
+	return &AgentSpaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AgentSpaceClient) UpdateOneID(id string) *AgentSpaceUpdateOne {
+	mutation := newAgentSpaceMutation(c.config, OpUpdateOne, withAgentSpaceID(id))
+	return &AgentSpaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AgentSpace.
+func (c *AgentSpaceClient) Delete() *AgentSpaceDelete {
+	mutation := newAgentSpaceMutation(c.config, OpDelete)
+	return &AgentSpaceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AgentSpaceClient) DeleteOne(_m *AgentSpace) *AgentSpaceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AgentSpaceClient) DeleteOneID(id string) *AgentSpaceDeleteOne {
+	builder := c.Delete().Where(agentspace.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AgentSpaceDeleteOne{builder}
+}
+
+// Query returns a query builder for AgentSpace.
+func (c *AgentSpaceClient) Query() *AgentSpaceQuery {
+	return &AgentSpaceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAgentSpace},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AgentSpace entity by its id.
+func (c *AgentSpaceClient) Get(ctx context.Context, id string) (*AgentSpace, error) {
+	return c.Query().Where(agentspace.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AgentSpaceClient) GetX(ctx context.Context, id string) *AgentSpace {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AgentSpaceClient) Hooks() []Hook {
+	return c.hooks.AgentSpace
+}
+
+// Interceptors returns the client interceptors.
+func (c *AgentSpaceClient) Interceptors() []Interceptor {
+	return c.inters.AgentSpace
+}
+
+func (c *AgentSpaceClient) mutate(ctx context.Context, m *AgentSpaceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AgentSpaceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AgentSpaceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AgentSpaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AgentSpaceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AgentSpace mutation op: %q", m.Op())
 	}
 }
 
@@ -5181,26 +5356,560 @@ func (c *UserBudgetClient) mutate(ctx context.Context, m *UserBudgetMutation) (V
 	}
 }
 
+// WorkspaceAuditClient is a client for the WorkspaceAudit schema.
+type WorkspaceAuditClient struct {
+	config
+}
+
+// NewWorkspaceAuditClient returns a client for the WorkspaceAudit from the given config.
+func NewWorkspaceAuditClient(c config) *WorkspaceAuditClient {
+	return &WorkspaceAuditClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workspaceaudit.Hooks(f(g(h())))`.
+func (c *WorkspaceAuditClient) Use(hooks ...Hook) {
+	c.hooks.WorkspaceAudit = append(c.hooks.WorkspaceAudit, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workspaceaudit.Intercept(f(g(h())))`.
+func (c *WorkspaceAuditClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkspaceAudit = append(c.inters.WorkspaceAudit, interceptors...)
+}
+
+// Create returns a builder for creating a WorkspaceAudit entity.
+func (c *WorkspaceAuditClient) Create() *WorkspaceAuditCreate {
+	mutation := newWorkspaceAuditMutation(c.config, OpCreate)
+	return &WorkspaceAuditCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkspaceAudit entities.
+func (c *WorkspaceAuditClient) CreateBulk(builders ...*WorkspaceAuditCreate) *WorkspaceAuditCreateBulk {
+	return &WorkspaceAuditCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkspaceAuditClient) MapCreateBulk(slice any, setFunc func(*WorkspaceAuditCreate, int)) *WorkspaceAuditCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkspaceAuditCreateBulk{err: fmt.Errorf("calling to WorkspaceAuditClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkspaceAuditCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkspaceAuditCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkspaceAudit.
+func (c *WorkspaceAuditClient) Update() *WorkspaceAuditUpdate {
+	mutation := newWorkspaceAuditMutation(c.config, OpUpdate)
+	return &WorkspaceAuditUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkspaceAuditClient) UpdateOne(_m *WorkspaceAudit) *WorkspaceAuditUpdateOne {
+	mutation := newWorkspaceAuditMutation(c.config, OpUpdateOne, withWorkspaceAudit(_m))
+	return &WorkspaceAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkspaceAuditClient) UpdateOneID(id int) *WorkspaceAuditUpdateOne {
+	mutation := newWorkspaceAuditMutation(c.config, OpUpdateOne, withWorkspaceAuditID(id))
+	return &WorkspaceAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkspaceAudit.
+func (c *WorkspaceAuditClient) Delete() *WorkspaceAuditDelete {
+	mutation := newWorkspaceAuditMutation(c.config, OpDelete)
+	return &WorkspaceAuditDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkspaceAuditClient) DeleteOne(_m *WorkspaceAudit) *WorkspaceAuditDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkspaceAuditClient) DeleteOneID(id int) *WorkspaceAuditDeleteOne {
+	builder := c.Delete().Where(workspaceaudit.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkspaceAuditDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkspaceAudit.
+func (c *WorkspaceAuditClient) Query() *WorkspaceAuditQuery {
+	return &WorkspaceAuditQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkspaceAudit},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkspaceAudit entity by its id.
+func (c *WorkspaceAuditClient) Get(ctx context.Context, id int) (*WorkspaceAudit, error) {
+	return c.Query().Where(workspaceaudit.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkspaceAuditClient) GetX(ctx context.Context, id int) *WorkspaceAudit {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkspaceAuditClient) Hooks() []Hook {
+	return c.hooks.WorkspaceAudit
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkspaceAuditClient) Interceptors() []Interceptor {
+	return c.inters.WorkspaceAudit
+}
+
+func (c *WorkspaceAuditClient) mutate(ctx context.Context, m *WorkspaceAuditMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkspaceAuditCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkspaceAuditUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkspaceAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkspaceAuditDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkspaceAudit mutation op: %q", m.Op())
+	}
+}
+
+// WorkspaceOperationClient is a client for the WorkspaceOperation schema.
+type WorkspaceOperationClient struct {
+	config
+}
+
+// NewWorkspaceOperationClient returns a client for the WorkspaceOperation from the given config.
+func NewWorkspaceOperationClient(c config) *WorkspaceOperationClient {
+	return &WorkspaceOperationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workspaceoperation.Hooks(f(g(h())))`.
+func (c *WorkspaceOperationClient) Use(hooks ...Hook) {
+	c.hooks.WorkspaceOperation = append(c.hooks.WorkspaceOperation, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workspaceoperation.Intercept(f(g(h())))`.
+func (c *WorkspaceOperationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkspaceOperation = append(c.inters.WorkspaceOperation, interceptors...)
+}
+
+// Create returns a builder for creating a WorkspaceOperation entity.
+func (c *WorkspaceOperationClient) Create() *WorkspaceOperationCreate {
+	mutation := newWorkspaceOperationMutation(c.config, OpCreate)
+	return &WorkspaceOperationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkspaceOperation entities.
+func (c *WorkspaceOperationClient) CreateBulk(builders ...*WorkspaceOperationCreate) *WorkspaceOperationCreateBulk {
+	return &WorkspaceOperationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkspaceOperationClient) MapCreateBulk(slice any, setFunc func(*WorkspaceOperationCreate, int)) *WorkspaceOperationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkspaceOperationCreateBulk{err: fmt.Errorf("calling to WorkspaceOperationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkspaceOperationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkspaceOperationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkspaceOperation.
+func (c *WorkspaceOperationClient) Update() *WorkspaceOperationUpdate {
+	mutation := newWorkspaceOperationMutation(c.config, OpUpdate)
+	return &WorkspaceOperationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkspaceOperationClient) UpdateOne(_m *WorkspaceOperation) *WorkspaceOperationUpdateOne {
+	mutation := newWorkspaceOperationMutation(c.config, OpUpdateOne, withWorkspaceOperation(_m))
+	return &WorkspaceOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkspaceOperationClient) UpdateOneID(id string) *WorkspaceOperationUpdateOne {
+	mutation := newWorkspaceOperationMutation(c.config, OpUpdateOne, withWorkspaceOperationID(id))
+	return &WorkspaceOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkspaceOperation.
+func (c *WorkspaceOperationClient) Delete() *WorkspaceOperationDelete {
+	mutation := newWorkspaceOperationMutation(c.config, OpDelete)
+	return &WorkspaceOperationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkspaceOperationClient) DeleteOne(_m *WorkspaceOperation) *WorkspaceOperationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkspaceOperationClient) DeleteOneID(id string) *WorkspaceOperationDeleteOne {
+	builder := c.Delete().Where(workspaceoperation.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkspaceOperationDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkspaceOperation.
+func (c *WorkspaceOperationClient) Query() *WorkspaceOperationQuery {
+	return &WorkspaceOperationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkspaceOperation},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkspaceOperation entity by its id.
+func (c *WorkspaceOperationClient) Get(ctx context.Context, id string) (*WorkspaceOperation, error) {
+	return c.Query().Where(workspaceoperation.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkspaceOperationClient) GetX(ctx context.Context, id string) *WorkspaceOperation {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkspaceOperationClient) Hooks() []Hook {
+	return c.hooks.WorkspaceOperation
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkspaceOperationClient) Interceptors() []Interceptor {
+	return c.inters.WorkspaceOperation
+}
+
+func (c *WorkspaceOperationClient) mutate(ctx context.Context, m *WorkspaceOperationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkspaceOperationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkspaceOperationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkspaceOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkspaceOperationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkspaceOperation mutation op: %q", m.Op())
+	}
+}
+
+// WorkspaceServiceClient is a client for the WorkspaceService schema.
+type WorkspaceServiceClient struct {
+	config
+}
+
+// NewWorkspaceServiceClient returns a client for the WorkspaceService from the given config.
+func NewWorkspaceServiceClient(c config) *WorkspaceServiceClient {
+	return &WorkspaceServiceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workspaceservice.Hooks(f(g(h())))`.
+func (c *WorkspaceServiceClient) Use(hooks ...Hook) {
+	c.hooks.WorkspaceService = append(c.hooks.WorkspaceService, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workspaceservice.Intercept(f(g(h())))`.
+func (c *WorkspaceServiceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkspaceService = append(c.inters.WorkspaceService, interceptors...)
+}
+
+// Create returns a builder for creating a WorkspaceService entity.
+func (c *WorkspaceServiceClient) Create() *WorkspaceServiceCreate {
+	mutation := newWorkspaceServiceMutation(c.config, OpCreate)
+	return &WorkspaceServiceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkspaceService entities.
+func (c *WorkspaceServiceClient) CreateBulk(builders ...*WorkspaceServiceCreate) *WorkspaceServiceCreateBulk {
+	return &WorkspaceServiceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkspaceServiceClient) MapCreateBulk(slice any, setFunc func(*WorkspaceServiceCreate, int)) *WorkspaceServiceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkspaceServiceCreateBulk{err: fmt.Errorf("calling to WorkspaceServiceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkspaceServiceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkspaceServiceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkspaceService.
+func (c *WorkspaceServiceClient) Update() *WorkspaceServiceUpdate {
+	mutation := newWorkspaceServiceMutation(c.config, OpUpdate)
+	return &WorkspaceServiceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkspaceServiceClient) UpdateOne(_m *WorkspaceService) *WorkspaceServiceUpdateOne {
+	mutation := newWorkspaceServiceMutation(c.config, OpUpdateOne, withWorkspaceService(_m))
+	return &WorkspaceServiceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkspaceServiceClient) UpdateOneID(id string) *WorkspaceServiceUpdateOne {
+	mutation := newWorkspaceServiceMutation(c.config, OpUpdateOne, withWorkspaceServiceID(id))
+	return &WorkspaceServiceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkspaceService.
+func (c *WorkspaceServiceClient) Delete() *WorkspaceServiceDelete {
+	mutation := newWorkspaceServiceMutation(c.config, OpDelete)
+	return &WorkspaceServiceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkspaceServiceClient) DeleteOne(_m *WorkspaceService) *WorkspaceServiceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkspaceServiceClient) DeleteOneID(id string) *WorkspaceServiceDeleteOne {
+	builder := c.Delete().Where(workspaceservice.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkspaceServiceDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkspaceService.
+func (c *WorkspaceServiceClient) Query() *WorkspaceServiceQuery {
+	return &WorkspaceServiceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkspaceService},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkspaceService entity by its id.
+func (c *WorkspaceServiceClient) Get(ctx context.Context, id string) (*WorkspaceService, error) {
+	return c.Query().Where(workspaceservice.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkspaceServiceClient) GetX(ctx context.Context, id string) *WorkspaceService {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkspaceServiceClient) Hooks() []Hook {
+	return c.hooks.WorkspaceService
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkspaceServiceClient) Interceptors() []Interceptor {
+	return c.inters.WorkspaceService
+}
+
+func (c *WorkspaceServiceClient) mutate(ctx context.Context, m *WorkspaceServiceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkspaceServiceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkspaceServiceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkspaceServiceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkspaceServiceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkspaceService mutation op: %q", m.Op())
+	}
+}
+
+// WorkspaceServiceConfigClient is a client for the WorkspaceServiceConfig schema.
+type WorkspaceServiceConfigClient struct {
+	config
+}
+
+// NewWorkspaceServiceConfigClient returns a client for the WorkspaceServiceConfig from the given config.
+func NewWorkspaceServiceConfigClient(c config) *WorkspaceServiceConfigClient {
+	return &WorkspaceServiceConfigClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workspaceserviceconfig.Hooks(f(g(h())))`.
+func (c *WorkspaceServiceConfigClient) Use(hooks ...Hook) {
+	c.hooks.WorkspaceServiceConfig = append(c.hooks.WorkspaceServiceConfig, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workspaceserviceconfig.Intercept(f(g(h())))`.
+func (c *WorkspaceServiceConfigClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkspaceServiceConfig = append(c.inters.WorkspaceServiceConfig, interceptors...)
+}
+
+// Create returns a builder for creating a WorkspaceServiceConfig entity.
+func (c *WorkspaceServiceConfigClient) Create() *WorkspaceServiceConfigCreate {
+	mutation := newWorkspaceServiceConfigMutation(c.config, OpCreate)
+	return &WorkspaceServiceConfigCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkspaceServiceConfig entities.
+func (c *WorkspaceServiceConfigClient) CreateBulk(builders ...*WorkspaceServiceConfigCreate) *WorkspaceServiceConfigCreateBulk {
+	return &WorkspaceServiceConfigCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkspaceServiceConfigClient) MapCreateBulk(slice any, setFunc func(*WorkspaceServiceConfigCreate, int)) *WorkspaceServiceConfigCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkspaceServiceConfigCreateBulk{err: fmt.Errorf("calling to WorkspaceServiceConfigClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkspaceServiceConfigCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkspaceServiceConfigCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkspaceServiceConfig.
+func (c *WorkspaceServiceConfigClient) Update() *WorkspaceServiceConfigUpdate {
+	mutation := newWorkspaceServiceConfigMutation(c.config, OpUpdate)
+	return &WorkspaceServiceConfigUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkspaceServiceConfigClient) UpdateOne(_m *WorkspaceServiceConfig) *WorkspaceServiceConfigUpdateOne {
+	mutation := newWorkspaceServiceConfigMutation(c.config, OpUpdateOne, withWorkspaceServiceConfig(_m))
+	return &WorkspaceServiceConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkspaceServiceConfigClient) UpdateOneID(id int) *WorkspaceServiceConfigUpdateOne {
+	mutation := newWorkspaceServiceConfigMutation(c.config, OpUpdateOne, withWorkspaceServiceConfigID(id))
+	return &WorkspaceServiceConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkspaceServiceConfig.
+func (c *WorkspaceServiceConfigClient) Delete() *WorkspaceServiceConfigDelete {
+	mutation := newWorkspaceServiceConfigMutation(c.config, OpDelete)
+	return &WorkspaceServiceConfigDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkspaceServiceConfigClient) DeleteOne(_m *WorkspaceServiceConfig) *WorkspaceServiceConfigDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkspaceServiceConfigClient) DeleteOneID(id int) *WorkspaceServiceConfigDeleteOne {
+	builder := c.Delete().Where(workspaceserviceconfig.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkspaceServiceConfigDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkspaceServiceConfig.
+func (c *WorkspaceServiceConfigClient) Query() *WorkspaceServiceConfigQuery {
+	return &WorkspaceServiceConfigQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkspaceServiceConfig},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkspaceServiceConfig entity by its id.
+func (c *WorkspaceServiceConfigClient) Get(ctx context.Context, id int) (*WorkspaceServiceConfig, error) {
+	return c.Query().Where(workspaceserviceconfig.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkspaceServiceConfigClient) GetX(ctx context.Context, id int) *WorkspaceServiceConfig {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkspaceServiceConfigClient) Hooks() []Hook {
+	return c.hooks.WorkspaceServiceConfig
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkspaceServiceConfigClient) Interceptors() []Interceptor {
+	return c.inters.WorkspaceServiceConfig
+}
+
+func (c *WorkspaceServiceConfigClient) mutate(ctx context.Context, m *WorkspaceServiceConfigMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkspaceServiceConfigCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkspaceServiceConfigUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkspaceServiceConfigUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkspaceServiceConfigDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkspaceServiceConfig mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Activation, BudgetAllocation, BudgetAudit, BudgetBucket, BudgetLimit,
-		BudgetReconciliation, BudgetRequest, BudgetSettlement, BudgetTemplate,
-		BudgetTemplateAssignment, BudgetTemplateAudit, DeletedCredential,
-		DeletedPrincipal, Deployment, DeploymentSettingAudit, Device, Enrollment,
-		EnterpriseUpdate, IdempotencyRecord, ManagedDraft, ManagedRelease,
-		ManagedState, PortalSession, PricingRule, RequestUsage, Secret, SecretVersion,
-		SemanticUsage, Session, Upstream, UpstreamConfigRevision, UsageDetail,
-		UsageEvent, User, UserBudget []ent.Hook
+		Activation, AgentSpace, BudgetAllocation, BudgetAudit, BudgetBucket,
+		BudgetLimit, BudgetReconciliation, BudgetRequest, BudgetSettlement,
+		BudgetTemplate, BudgetTemplateAssignment, BudgetTemplateAudit,
+		DeletedCredential, DeletedPrincipal, Deployment, DeploymentSettingAudit,
+		Device, Enrollment, EnterpriseUpdate, IdempotencyRecord, ManagedDraft,
+		ManagedRelease, ManagedState, PortalSession, PricingRule, RequestUsage, Secret,
+		SecretVersion, SemanticUsage, Session, Upstream, UpstreamConfigRevision,
+		UsageDetail, UsageEvent, User, UserBudget, WorkspaceAudit, WorkspaceOperation,
+		WorkspaceService, WorkspaceServiceConfig []ent.Hook
 	}
 	inters struct {
-		Activation, BudgetAllocation, BudgetAudit, BudgetBucket, BudgetLimit,
-		BudgetReconciliation, BudgetRequest, BudgetSettlement, BudgetTemplate,
-		BudgetTemplateAssignment, BudgetTemplateAudit, DeletedCredential,
-		DeletedPrincipal, Deployment, DeploymentSettingAudit, Device, Enrollment,
-		EnterpriseUpdate, IdempotencyRecord, ManagedDraft, ManagedRelease,
-		ManagedState, PortalSession, PricingRule, RequestUsage, Secret, SecretVersion,
-		SemanticUsage, Session, Upstream, UpstreamConfigRevision, UsageDetail,
-		UsageEvent, User, UserBudget []ent.Interceptor
+		Activation, AgentSpace, BudgetAllocation, BudgetAudit, BudgetBucket,
+		BudgetLimit, BudgetReconciliation, BudgetRequest, BudgetSettlement,
+		BudgetTemplate, BudgetTemplateAssignment, BudgetTemplateAudit,
+		DeletedCredential, DeletedPrincipal, Deployment, DeploymentSettingAudit,
+		Device, Enrollment, EnterpriseUpdate, IdempotencyRecord, ManagedDraft,
+		ManagedRelease, ManagedState, PortalSession, PricingRule, RequestUsage, Secret,
+		SecretVersion, SemanticUsage, Session, Upstream, UpstreamConfigRevision,
+		UsageDetail, UsageEvent, User, UserBudget, WorkspaceAudit, WorkspaceOperation,
+		WorkspaceService, WorkspaceServiceConfig []ent.Interceptor
 	}
 )

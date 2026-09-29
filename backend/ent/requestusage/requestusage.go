@@ -31,6 +31,8 @@ const (
 	FieldRuntimeRouteID = "runtime_route_id"
 	// FieldUpstreamID holds the string denoting the upstream_id field in the database.
 	FieldUpstreamID = "upstream_id"
+	// FieldWorkspaceTargetJSON holds the string denoting the workspace_target_json field in the database.
+	FieldWorkspaceTargetJSON = "workspace_target_json"
 	// FieldManagedGeneration holds the string denoting the managed_generation field in the database.
 	FieldManagedGeneration = "managed_generation"
 	// FieldControlRevision holds the string denoting the control_revision field in the database.
@@ -80,6 +82,7 @@ var Columns = []string{
 	FieldClientProtocol,
 	FieldRuntimeRouteID,
 	FieldUpstreamID,
+	FieldWorkspaceTargetJSON,
 	FieldManagedGeneration,
 	FieldControlRevision,
 	FieldStartedAt,

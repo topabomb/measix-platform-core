@@ -275,7 +275,7 @@ export const useDraftStore = defineStore('draft', () => {
     content.tts[index] = { ttsId: id, displayName: previous.displayName, enabled: previous.enabled, clientProtocol: protocol, ...settings }
     const binding = bindingFor(id)
     if (protocol === 'SYSTEM_TTS') removeBinding(id)
-    else if (binding) setBinding(id, binding.upstreamId, ttsTransport(protocol))
+    else if (binding?.upstreamId) setBinding(id, binding.upstreamId, ttsTransport(protocol))
     markDirty()
   }
 

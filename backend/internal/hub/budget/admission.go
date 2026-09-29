@@ -16,6 +16,8 @@ import (
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/userbudget"
+	"measix/platform/internal/wire/usageingestapi"
+	"measix/platform/internal/wire/usagetarget"
 	"measix/platform/pkg/platformid"
 )
 
@@ -180,7 +182,8 @@ func (s *Service) Admit(ctx context.Context, input AdmitInput) (AdmissionDecisio
 		SetCapability(budgetrequest.Capability(normalized.Capability)).
 		SetResourceID(normalized.ResourceID).
 		SetClientProtocol(string(normalized.ClientProtocol)).
-		SetUpstreamID(normalized.UpstreamID).
+		SetNillableUpstreamID(usagetarget.Upstream(normalized.UpstreamID)).
+		SetWorkspaceTargetJSON(usagetarget.JSON(normalized.WorkspaceTarget)).
 		SetManagedGeneration(normalized.ManagedGeneration).
 		SetControlRevision(normalized.ControlRevision).
 		SetNillableUserBudgetID(budgetID).
@@ -329,7 +332,7 @@ func normalizeAdmit(input AdmitInput) (AdmitInput, map[Meter]int64, map[Meter]bo
 		return AdmitInput{}, nil, nil, "", ErrInvalidConfiguration
 	}
 	kind, err := platformid.KindOf(input.ResourceID)
-	if err != nil || !resourceMatchesCapability(kind, input.Capability) || platformid.Validate(platformid.Upstream, input.UpstreamID) != nil || !protocolMatchesCapability(input.ClientProtocol, input.Capability) {
+	if err != nil || !resourceMatchesCapability(kind, input.Capability) || !usagetarget.Valid(input.UpstreamID, string(input.Capability), input.TargetVersion, input.WorkspaceTarget) || !protocolMatchesCapability(input.ClientProtocol, input.Capability) {
 		return AdmitInput{}, nil, nil, "", ErrInvalidConfiguration
 	}
 	input.AdmittedAt = input.AdmittedAt.UTC()
@@ -362,24 +365,26 @@ func normalizeAdmit(input AdmitInput) (AdmitInput, map[Meter]int64, map[Meter]bo
 
 func admissionHash(input AdmitInput, known map[Meter]int64, supported map[Meter]bool) (string, error) {
 	type canonical struct {
-		RequestID         string          `json:"requestId"`
-		RequestHash       string          `json:"requestHash"`
-		DeploymentID      string          `json:"deploymentId"`
-		UserID            string          `json:"userId"`
-		InteractionID     *string         `json:"interactionId,omitempty"`
-		DeviceID          *string         `json:"deviceId,omitempty"`
-		Capability        Capability      `json:"capability"`
-		ResourceID        string          `json:"resourceId"`
-		ClientProtocol    ClientProtocol  `json:"clientProtocol"`
-		UpstreamID        string          `json:"upstreamId"`
-		ManagedGeneration int64           `json:"managedGeneration"`
-		ControlRevision   int64           `json:"controlRevision"`
-		AdmittedAt        string          `json:"admittedAt"`
-		Known             []MeterQuantity `json:"known"`
-		Supported         []Meter         `json:"supported"`
+		WorkspaceTarget   *usageingestapi.WorkspaceTarget `json:"workspaceTarget,omitempty"`
+		RequestID         string                          `json:"requestId"`
+		RequestHash       string                          `json:"requestHash"`
+		DeploymentID      string                          `json:"deploymentId"`
+		UserID            string                          `json:"userId"`
+		InteractionID     *string                         `json:"interactionId,omitempty"`
+		DeviceID          *string                         `json:"deviceId,omitempty"`
+		Capability        Capability                      `json:"capability"`
+		ResourceID        string                          `json:"resourceId"`
+		ClientProtocol    ClientProtocol                  `json:"clientProtocol"`
+		UpstreamID        string                          `json:"upstreamId"`
+		ManagedGeneration int64                           `json:"managedGeneration"`
+		ControlRevision   int64                           `json:"controlRevision"`
+		AdmittedAt        string                          `json:"admittedAt"`
+		Known             []MeterQuantity                 `json:"known"`
+		Supported         []Meter                         `json:"supported"`
 	}
 	payload := canonical{
-		RequestID: input.RequestID, RequestHash: input.RequestHash, DeploymentID: input.DeploymentID,
+		WorkspaceTarget: input.WorkspaceTarget,
+		RequestID:       input.RequestID, RequestHash: input.RequestHash, DeploymentID: input.DeploymentID,
 		UserID: input.UserID, InteractionID: input.InteractionID, DeviceID: input.DeviceID, Capability: input.Capability,
 		ResourceID: input.ResourceID, ClientProtocol: input.ClientProtocol, UpstreamID: input.UpstreamID,
 		ManagedGeneration: input.ManagedGeneration, ControlRevision: input.ControlRevision,

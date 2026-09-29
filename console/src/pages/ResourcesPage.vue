@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
-import { apiFetch, createCandidateId } from '../api/client'
+import { apiFetch, createCandidateId, createIdempotencyKey } from '../api/client'
 import { useDraftStore, ttsTransport, asrTransport, isRealtimeAsr, type AsrProtocol, type ImageGenerationProtocol, type TtsProtocol, type ManagedResourceKind } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
+import { useRemoteWorkspaceStore } from '../stores/remoteWorkspace'
 import { useActivationStore } from '../stores/activation'
 import ManagedExperienceEditor from '../components/ManagedExperienceEditor.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -41,6 +42,10 @@ type ValidationIssue = components['schemas']['ValidationIssue']
 const { t: $t, te: $te } = useI18n()
 const draft = useDraftStore()
 const session = useSessionStore()
+const remoteWorkspace = useRemoteWorkspaceStore()
+const route = useRoute()
+const addingWorkspaceMcp = ref(false)
+const hasWorkspaceMcp = computed(() => draft.localContent?.mcp.some(mcp => mcp.mcpServerId === remoteWorkspace.current?.mcpServerId) ?? false)
 const activation = useActivationStore()
 const { reviewWarnings, hasBlockingErrors, validationIssuesFor } = useResourceDiff(draft)
 const error = ref<unknown>()
@@ -51,7 +56,7 @@ const previewOpen = ref(false)
 const reviewOpen = ref(false)
 const reviewing = ref(false)
 const validating = ref(false)
-const workspaceBusy = computed(() => draft.loading || draft.saving || validating.value || previewing.value || reviewing.value || publishing.value)
+const workspaceBusy = computed(() => draft.loading || draft.saving || validating.value || previewing.value || reviewing.value || publishing.value || addingWorkspaceMcp.value)
 const workspaceVisible = computed(() => !reviewOpen.value && !previewOpen.value)
 const upstreams = ref<Upstream[]>([])
 const upstreamsLoading = ref(false)
@@ -255,11 +260,11 @@ const relationshipRows = computed(() => {
     const b = draft.bindingFor(m.modelId)
     rows.push({
       resourceId: m.modelId, kind: 'Model', displayName: m.displayName,
-      upstreamId: b?.upstreamId, upstreamName: upstreamLabel(b?.upstreamId),
+      upstreamId: b?.upstreamId, upstreamName: b?.workspaceServiceId ? '远程工作区 · 每用户独立空间' : upstreamLabel(b?.upstreamId),
       upstreamStatus: upstreamStatus(b?.upstreamId),
       enabled: m.enabled, runtimePath: m.runtimePath,
       transport: b?.transportPolicy,
-      bindingState: !b ? 'missing' : !b.upstreamId ? 'missing' : 'bound',
+      bindingState: !b ? 'missing' : !(b.upstreamId || b.workspaceServiceId) ? 'missing' : 'bound',
     })
   }
   for (const image of c.imageGenerators ?? []) {
@@ -288,22 +293,22 @@ const relationshipRows = computed(() => {
     const b = draft.bindingFor(a.asrId)
     rows.push({
       resourceId: a.asrId, kind: 'ASR', displayName: a.displayName,
-      upstreamId: b?.upstreamId, upstreamName: upstreamLabel(b?.upstreamId),
+      upstreamId: b?.upstreamId, upstreamName: b?.workspaceServiceId ? '远程工作区 · 每用户独立空间' : upstreamLabel(b?.upstreamId),
       upstreamStatus: upstreamStatus(b?.upstreamId),
       enabled: a.enabled, runtimePath: a.runtimePath,
       transport: b?.transportPolicy,
-      bindingState: !b ? 'missing' : !b.upstreamId ? 'missing' : 'bound',
+      bindingState: !b ? 'missing' : !(b.upstreamId || b.workspaceServiceId) ? 'missing' : 'bound',
     })
   }
   for (const m of c.mcp) {
     const b = draft.bindingFor(m.mcpServerId)
     rows.push({
       resourceId: m.mcpServerId, kind: 'MCP', displayName: m.displayName,
-      upstreamId: b?.upstreamId, upstreamName: upstreamLabel(b?.upstreamId),
+      upstreamId: b?.upstreamId, upstreamName: b?.workspaceServiceId ? '远程工作区 · 每用户独立空间' : upstreamLabel(b?.upstreamId),
       upstreamStatus: upstreamStatus(b?.upstreamId),
       enabled: m.enabled, runtimePath: m.runtimePath,
       transport: b?.transportPolicy,
-      bindingState: !b ? 'missing' : !b.upstreamId ? 'missing' : 'bound',
+      bindingState: !b ? 'missing' : !(b.upstreamId || b.workspaceServiceId) ? 'missing' : 'bound',
     })
   }
   return rows
@@ -368,7 +373,7 @@ async function refresh(force = false) {
   if (!force && !confirmDiscard()) return
   error.value = undefined
   try {
-    await draft.load()
+    await Promise.all([draft.load(), remoteWorkspace.load()])
     await loadUpstreams()
   } catch (cause) {
     error.value = cause
@@ -381,7 +386,7 @@ async function loadUpstreams() {
   try {
     const page = await apiFetch<UpstreamPage>('/api/admin/v1/upstreams?limit=50')
     const known = new Map(page.items.map(item => [item.upstreamId, item]))
-    const referenced = new Set(draft.localContent?.bindings.map(binding => binding.upstreamId).filter(Boolean) ?? [])
+    const referenced = new Set(draft.localContent?.bindings.map(binding => binding.upstreamId).filter((id): id is string => !!id) ?? [])
     await Promise.all([...referenced].filter(id => !known.has(id)).map(async id => {
       known.set(id, await apiFetch<Upstream>(`/api/admin/v1/upstreams/${encodeURIComponent(id)}`))
     }))
@@ -656,8 +661,22 @@ async function goToValidationIssue(issue: ValidationIssue) {
   }
 }
 
+async function addWorkspaceMcp() {
+  const service = remoteWorkspace.current
+  if (!service || !remoteWorkspace.enabled || draft.dirty || !session.csrfToken || draft.baselineRevision === undefined) return
+  addingWorkspaceMcp.value = true; error.value = undefined
+  try {
+    await apiFetch(`/api/admin/v1/remote-workspace/services/${service.workspaceServiceId}/mcp-draft`, {
+      method: 'POST', headers: { 'Idempotency-Key': createIdempotencyKey() }, body: JSON.stringify({ expectedDraftRevision: draft.baselineRevision }),
+    }, session.csrfToken)
+    await draft.load()
+    selectedResourceId.value = service.mcpServerId
+  } catch (cause) { error.value = cause }
+  finally { addingWorkspaceMcp.value = false }
+}
 onBeforeRouteLeave(() => confirmDiscard())
 onMounted(() => {
+  if (route.query.section === 'mcp') activeTab.value = 'mcp'
   window.addEventListener('beforeunload', beforeUnload)
   void refresh(true)
 })
@@ -1235,6 +1254,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
       <!-- ===== MCP: Collection → Editor ===== -->
       <template v-if="activeTab === 'mcp'">
+        <ProblemBanner :error="remoteWorkspace.error" />
+        <q-banner v-if="remoteWorkspace.enabled && !hasWorkspaceMcp" class="bg-blue-1 q-mb-sm" data-cy="workspace-mcp-offer">
+          远程工作区服务已启用。需要助手操作用户空间时，可添加独立的工具入口；文件管理不依赖 MCP。
+          <div v-if="draft.dirty" class="text-caption">请先保存或放弃当前草稿修改，再添加工具入口。</div>
+          <q-btn flat color="primary" label="添加远程工作区 MCP" :loading="addingWorkspaceMcp" :disable="draft.dirty || workspaceBusy || addingWorkspaceMcp" @click="addWorkspaceMcp" />
+        </q-banner>
         <div class="row q-col-gutter-xs resource-split" :class="{ 'resource-split--selected': Boolean(selectedMcp) }">
           <div class="col-12 col-md-4 resource-split__collection">
             <q-card flat bordered>
@@ -1252,7 +1277,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   </q-item-section>
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
-                      <q-badge v-if="!draft.bindingFor(mcp.mcpServerId)?.upstreamId" color="red" :label="$t('resources.overview.noBinding')" />
+                      <q-badge v-if="!draft.bindingFor(mcp.mcpServerId)?.upstreamId && !draft.bindingFor(mcp.mcpServerId)?.workspaceServiceId" color="red" :label="$t('resources.overview.noBinding')" />
                       <q-btn flat dense color="negative" icon="delete" size="sm" :aria-label="$t('resources.removeNamed', { name: mcp.displayName })" @click.stop="removeResource('MCP', mcp.mcpServerId, mcp.displayName)" />
                     </div>
                   </q-item-section>
@@ -1270,7 +1295,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <div class="text-h6">{{ selectedMcp.displayName }}</div>
                   <details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ selectedMcp.mcpServerId }} · {{ $t('resources.mcp.protocolBadge') }}</details>
                 </div>
-                <q-toggle v-model="selectedMcp.enabled" :label="$t('common.enabled')" @update:model-value="draft.markDirty()" />
+                <q-toggle v-model="selectedMcp.enabled" :label="draft.bindingFor(selectedMcp.mcpServerId)?.workspaceServiceId ? '启用工具定义（发布后生效）' : $t('common.enabled')" @update:model-value="draft.markDirty()" />
               </q-card-section>
               <q-separator />
 
@@ -1285,7 +1310,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <div class="row q-gutter-xs items-center q-mb-xs">
                   <div class="col">
                     <div class="text-caption text-grey-7 q-mb-xs">{{ $t('resources.mcp.authOwnership') }}</div>
-                    <q-select v-model="selectedMcp.authOwnership" dense outlined :label="$t('resources.mcp.authOwnership')" :options="AUTH_OWNERSHIPS.map(value => ({ label: $t(`authOwnership.${value}`), value }))" data-field="authOwnership" emit-value map-options @update:model-value="draft.markDirty()" />
+                    <q-select :disable="!!draft.bindingFor(selectedMcp.mcpServerId)?.workspaceServiceId" v-model="selectedMcp.authOwnership" dense outlined :label="$t('resources.mcp.authOwnership')" :options="AUTH_OWNERSHIPS.map(value => ({ label: $t(`authOwnership.${value}`), value }))" data-field="authOwnership" emit-value map-options @update:model-value="draft.markDirty()" />
                   </div>
                 </div>
                 <q-banner v-if="selectedMcp.authOwnership === 'ENTERPRISE_MANAGED'" class="bg-blue-1 q-mt-xs rounded-borders">
@@ -1300,8 +1325,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <q-card-section>
                 <div class="text-subtitle2 q-mb-xs">{{ $t('resources.mcp.execution') }}</div>
                 <div class="row q-gutter-xs">
-                  <PagedEntityPicker :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="mcp-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
-                  <q-input :model-value="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="mcp-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedMcp!.mcpServerId, String(v ?? ''))" />
+                  <div v-if="draft.bindingFor(selectedMcp.mcpServerId)?.workspaceServiceId" class="col self-center"><q-banner v-if="!remoteWorkspace.enabled" dense class="bg-orange-1 q-mb-sm">远程工作区服务未启用，此工具暂不可用。可以保留此定义，或移除后发布。</q-banner>远程工作区 · 每用户独立空间<router-link class="q-ml-sm" to="/remote-workspaces">管理远程工作区</router-link></div>
+                  <PagedEntityPicker v-else :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="mcp-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
+                  <q-input :readonly="!!draft.bindingFor(selectedMcp.mcpServerId)?.workspaceServiceId" :model-value="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="draft.bindingFor(selectedMcp.mcpServerId)?.workspaceServiceId ? '公开工具入口；服务端按已登录用户选择独立空间。' : $t('resources.model.runtimePathHint')" class="col" data-cy="mcp-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedMcp!.mcpServerId, String(v ?? ''))" />
                 </div>
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.mcp.transportSummary') }}</div>
               </q-card-section>

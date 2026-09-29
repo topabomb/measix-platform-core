@@ -147,3 +147,11 @@ Never emit tokens, cookies, credentials, enrollment/session/signing material, pr
 | Repeated process crash | Preserve diagnostics/persistent data; no production restart-rate-limit package exists yet |
 
 Deployment must pin artifacts, verify checksums, back up, apply the packaged forward migrations, validate readiness/control/static routing and run smoke/recovery checks. Downgrade means restoring both the pre-upgrade release and its backup; migration files/history are never reversed in place. RC also needs isolated restore, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).
+
+## 9. Optional remote workspace service
+
+Agent Space remains independently deployed. Core startup, login, migrations and unrelated resources do not require it. See [implementation and recovery](remote-workspace-implementation.md) and [verified candidate evidence](remote-workspace-verification.md).
+
+Back up and check the database, deploy a Relay that explicitly supports control protocol v2, apply/check migrations 002 and 003, then start the matching Hub/Admin. Enable the service through the remote workspace switch and **Save configuration**. Provision a test user and verify files before optionally adding/publishing the MCP definition. Do not bypass the version check or manufacture an Upstream to carry per-user credentials.
+
+Disabling retains configuration, original spaces/files and cleanup records; completing remote revocation requires the original Agent Space to respond. Restoring a connection retains its original space and does not silently reissue DAV access. Unknown management writes require the documented explicit reconciliation. A downgrade restores the old binaries and complete pre-upgrade database backup with its keys; never edit migration checksums or reverse these migrations in place. Agent Space backup/rollback remains its own release procedure.

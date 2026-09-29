@@ -105,6 +105,11 @@ func UpstreamID(v string) predicate.BudgetRequest {
 	return predicate.BudgetRequest(sql.FieldEQ(FieldUpstreamID, v))
 }
 
+// WorkspaceTargetJSON applies equality check predicate on the "workspace_target_json" field. It's identical to WorkspaceTargetJSONEQ.
+func WorkspaceTargetJSON(v []byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldEQ(FieldWorkspaceTargetJSON, v))
+}
+
 // ManagedGeneration applies equality check predicate on the "managed_generation" field. It's identical to ManagedGenerationEQ.
 func ManagedGeneration(v int64) predicate.BudgetRequest {
 	return predicate.BudgetRequest(sql.FieldEQ(FieldManagedGeneration, v))
@@ -720,6 +725,16 @@ func UpstreamIDHasSuffix(v string) predicate.BudgetRequest {
 	return predicate.BudgetRequest(sql.FieldHasSuffix(FieldUpstreamID, v))
 }
 
+// UpstreamIDIsNil applies the IsNil predicate on the "upstream_id" field.
+func UpstreamIDIsNil() predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldIsNull(FieldUpstreamID))
+}
+
+// UpstreamIDNotNil applies the NotNil predicate on the "upstream_id" field.
+func UpstreamIDNotNil() predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldNotNull(FieldUpstreamID))
+}
+
 // UpstreamIDEqualFold applies the EqualFold predicate on the "upstream_id" field.
 func UpstreamIDEqualFold(v string) predicate.BudgetRequest {
 	return predicate.BudgetRequest(sql.FieldEqualFold(FieldUpstreamID, v))
@@ -728,6 +743,56 @@ func UpstreamIDEqualFold(v string) predicate.BudgetRequest {
 // UpstreamIDContainsFold applies the ContainsFold predicate on the "upstream_id" field.
 func UpstreamIDContainsFold(v string) predicate.BudgetRequest {
 	return predicate.BudgetRequest(sql.FieldContainsFold(FieldUpstreamID, v))
+}
+
+// WorkspaceTargetJSONEQ applies the EQ predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONEQ(v []byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldEQ(FieldWorkspaceTargetJSON, v))
+}
+
+// WorkspaceTargetJSONNEQ applies the NEQ predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONNEQ(v []byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldNEQ(FieldWorkspaceTargetJSON, v))
+}
+
+// WorkspaceTargetJSONIn applies the In predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONIn(vs ...[]byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldIn(FieldWorkspaceTargetJSON, vs...))
+}
+
+// WorkspaceTargetJSONNotIn applies the NotIn predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONNotIn(vs ...[]byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldNotIn(FieldWorkspaceTargetJSON, vs...))
+}
+
+// WorkspaceTargetJSONGT applies the GT predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONGT(v []byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldGT(FieldWorkspaceTargetJSON, v))
+}
+
+// WorkspaceTargetJSONGTE applies the GTE predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONGTE(v []byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldGTE(FieldWorkspaceTargetJSON, v))
+}
+
+// WorkspaceTargetJSONLT applies the LT predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONLT(v []byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldLT(FieldWorkspaceTargetJSON, v))
+}
+
+// WorkspaceTargetJSONLTE applies the LTE predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONLTE(v []byte) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldLTE(FieldWorkspaceTargetJSON, v))
+}
+
+// WorkspaceTargetJSONIsNil applies the IsNil predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONIsNil() predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldIsNull(FieldWorkspaceTargetJSON))
+}
+
+// WorkspaceTargetJSONNotNil applies the NotNil predicate on the "workspace_target_json" field.
+func WorkspaceTargetJSONNotNil() predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldNotNull(FieldWorkspaceTargetJSON))
 }
 
 // ManagedGenerationEQ applies the EQ predicate on the "managed_generation" field.

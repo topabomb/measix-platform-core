@@ -45,7 +45,13 @@ func (h *Handler) writeFile(w http.ResponseWriter, name string, data []byte) {
 	} else if strings.HasPrefix(name, "assets/") {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	}
-	if ct := mime.TypeByExtension(path.Ext(name)); ct != "" {
+	// JavaScript MIME mappings from the Windows registry may map .mjs to
+	// text/plain. Module workers require a JavaScript MIME type on every host.
+	ct := mime.TypeByExtension(path.Ext(name))
+	if path.Ext(name) == ".mjs" || path.Ext(name) == ".js" {
+		ct = "text/javascript; charset=utf-8"
+	}
+	if ct != "" {
 		w.Header().Set("Content-Type", ct)
 	}
 	w.WriteHeader(http.StatusOK)

@@ -6,3 +6,6 @@ declare module '*.vue' {
   const component: DefineComponent<Record<string, never>, Record<string, never>, unknown>
   export default component
 }
+
+declare module "*?url" { const url: string; export default url }
+declare module "*?worker&url" { const url: string; export default url }

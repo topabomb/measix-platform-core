@@ -37,6 +37,8 @@ type RequestUsage struct {
 	RuntimeRouteID string `json:"runtime_route_id,omitempty"`
 	// UpstreamID holds the value of the "upstream_id" field.
 	UpstreamID string `json:"upstream_id,omitempty"`
+	// WorkspaceTargetJSON holds the value of the "workspace_target_json" field.
+	WorkspaceTargetJSON []byte `json:"workspace_target_json,omitempty"`
 	// ManagedGeneration holds the value of the "managed_generation" field.
 	ManagedGeneration int64 `json:"managed_generation,omitempty"`
 	// ControlRevision holds the value of the "control_revision" field.
@@ -77,6 +79,8 @@ func (*RequestUsage) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case requestusage.FieldWorkspaceTargetJSON:
+			values[i] = new([]byte)
 		case requestusage.FieldForwarded:
 			values[i] = new(sql.NullBool)
 		case requestusage.FieldID, requestusage.FieldManagedGeneration, requestusage.FieldControlRevision, requestusage.FieldHTTPStatus, requestusage.FieldUpstreamHTTPStatus, requestusage.FieldRequestBytes, requestusage.FieldResponseBytes, requestusage.FieldDurationMs, requestusage.FieldSettlementRevision, requestusage.FieldBudgetRevision:
@@ -167,6 +171,12 @@ func (_m *RequestUsage) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field upstream_id", values[i])
 			} else if value.Valid {
 				_m.UpstreamID = value.String
+			}
+		case requestusage.FieldWorkspaceTargetJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field workspace_target_json", values[i])
+			} else if value != nil {
+				_m.WorkspaceTargetJSON = *value
 			}
 		case requestusage.FieldManagedGeneration:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -335,6 +345,9 @@ func (_m *RequestUsage) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("upstream_id=")
 	builder.WriteString(_m.UpstreamID)
+	builder.WriteString(", ")
+	builder.WriteString("workspace_target_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.WorkspaceTargetJSON))
 	builder.WriteString(", ")
 	builder.WriteString("managed_generation=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ManagedGeneration))

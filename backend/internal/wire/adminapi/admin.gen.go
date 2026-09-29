@@ -259,28 +259,28 @@ func (e BudgetStatus) Valid() bool {
 
 // Defines values for BudgetTemplateAuditItemAction.
 const (
-	ASSIGN   BudgetTemplateAuditItemAction = "ASSIGN"
-	CREATE   BudgetTemplateAuditItemAction = "CREATE"
-	DELETE   BudgetTemplateAuditItemAction = "DELETE"
-	REASSIGN BudgetTemplateAuditItemAction = "REASSIGN"
-	UNASSIGN BudgetTemplateAuditItemAction = "UNASSIGN"
-	UPDATE   BudgetTemplateAuditItemAction = "UPDATE"
+	BudgetTemplateAuditItemActionASSIGN   BudgetTemplateAuditItemAction = "ASSIGN"
+	BudgetTemplateAuditItemActionCREATE   BudgetTemplateAuditItemAction = "CREATE"
+	BudgetTemplateAuditItemActionDELETE   BudgetTemplateAuditItemAction = "DELETE"
+	BudgetTemplateAuditItemActionREASSIGN BudgetTemplateAuditItemAction = "REASSIGN"
+	BudgetTemplateAuditItemActionUNASSIGN BudgetTemplateAuditItemAction = "UNASSIGN"
+	BudgetTemplateAuditItemActionUPDATE   BudgetTemplateAuditItemAction = "UPDATE"
 )
 
 // Valid indicates whether the value is a known member of the BudgetTemplateAuditItemAction enum.
 func (e BudgetTemplateAuditItemAction) Valid() bool {
 	switch e {
-	case ASSIGN:
+	case BudgetTemplateAuditItemActionASSIGN:
 		return true
-	case CREATE:
+	case BudgetTemplateAuditItemActionCREATE:
 		return true
-	case DELETE:
+	case BudgetTemplateAuditItemActionDELETE:
 		return true
-	case REASSIGN:
+	case BudgetTemplateAuditItemActionREASSIGN:
 		return true
-	case UNASSIGN:
+	case BudgetTemplateAuditItemActionUNASSIGN:
 		return true
-	case UPDATE:
+	case BudgetTemplateAuditItemActionUPDATE:
 		return true
 	default:
 		return false
@@ -761,6 +761,21 @@ func (e RequestUsageViewSettlementState) Valid() bool {
 	}
 }
 
+// Defines values for RequestUsageViewTargetVersion.
+const (
+	N2 RequestUsageViewTargetVersion = 2
+)
+
+// Valid indicates whether the value is a known member of the RequestUsageViewTargetVersion enum.
+func (e RequestUsageViewTargetVersion) Valid() bool {
+	switch e {
+	case N2:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResolveReconciliationRequestAction.
 const (
 	RELEASEUNCERTAIN ResolveReconciliationRequestAction = "RELEASE_UNCERTAIN"
@@ -818,6 +833,24 @@ func (e ResourceKind) Valid() bool {
 	}
 }
 
+// Defines values for RuntimeBindingDefinitionTargetKind.
+const (
+	REMOTEWORKSPACE RuntimeBindingDefinitionTargetKind = "REMOTE_WORKSPACE"
+	UPSTREAM        RuntimeBindingDefinitionTargetKind = "UPSTREAM"
+)
+
+// Valid indicates whether the value is a known member of the RuntimeBindingDefinitionTargetKind enum.
+func (e RuntimeBindingDefinitionTargetKind) Valid() bool {
+	switch e {
+	case REMOTEWORKSPACE:
+		return true
+	case UPSTREAM:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RuntimeBindingDefinitionTransportPolicy.
 const (
 	RuntimeBindingDefinitionTransportPolicyHTTPBINARYSTREAM    RuntimeBindingDefinitionTransportPolicy = "HTTP_BINARY_STREAM"
@@ -847,13 +880,13 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 
 // Defines values for StarterOpeningSnapshotFormat.
 const (
-	N1 StarterOpeningSnapshotFormat = 1
+	StarterOpeningSnapshotFormatN1 StarterOpeningSnapshotFormat = 1
 )
 
 // Valid indicates whether the value is a known member of the StarterOpeningSnapshotFormat enum.
 func (e StarterOpeningSnapshotFormat) Valid() bool {
 	switch e {
-	case N1:
+	case StarterOpeningSnapshotFormatN1:
 		return true
 	default:
 		return false
@@ -1292,6 +1325,258 @@ func (e ValidationIssueSeverity) Valid() bool {
 	case ValidationIssueSeverityERROR:
 		return true
 	case ValidationIssueSeverityWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceCommandAction.
+const (
+	WorkspaceCommandActionCONTINUE   WorkspaceCommandAction = "CONTINUE"
+	WorkspaceCommandActionCREATE     WorkspaceCommandAction = "CREATE"
+	WorkspaceCommandActionDELETE     WorkspaceCommandAction = "DELETE"
+	WorkspaceCommandActionDISCONNECT WorkspaceCommandAction = "DISCONNECT"
+	WorkspaceCommandActionREQUERY    WorkspaceCommandAction = "REQUERY"
+	WorkspaceCommandActionRESETMCP   WorkspaceCommandAction = "RESET_MCP"
+	WorkspaceCommandActionRESTORE    WorkspaceCommandAction = "RESTORE"
+	WorkspaceCommandActionREVOKEDAV  WorkspaceCommandAction = "REVOKE_DAV"
+	WorkspaceCommandActionSETDAV     WorkspaceCommandAction = "SET_DAV"
+	WorkspaceCommandActionTAKEOVER   WorkspaceCommandAction = "TAKEOVER"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceCommandAction enum.
+func (e WorkspaceCommandAction) Valid() bool {
+	switch e {
+	case WorkspaceCommandActionCONTINUE:
+		return true
+	case WorkspaceCommandActionCREATE:
+		return true
+	case WorkspaceCommandActionDELETE:
+		return true
+	case WorkspaceCommandActionDISCONNECT:
+		return true
+	case WorkspaceCommandActionREQUERY:
+		return true
+	case WorkspaceCommandActionRESETMCP:
+		return true
+	case WorkspaceCommandActionRESTORE:
+		return true
+	case WorkspaceCommandActionREVOKEDAV:
+		return true
+	case WorkspaceCommandActionSETDAV:
+		return true
+	case WorkspaceCommandActionTAKEOVER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceFileEntryKind.
+const (
+	DIRECTORY WorkspaceFileEntryKind = "DIRECTORY"
+	FILE      WorkspaceFileEntryKind = "FILE"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceFileEntryKind enum.
+func (e WorkspaceFileEntryKind) Valid() bool {
+	switch e {
+	case DIRECTORY:
+		return true
+	case FILE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceFileMutationAction.
+const (
+	WorkspaceFileMutationActionCOPY   WorkspaceFileMutationAction = "COPY"
+	WorkspaceFileMutationActionDELETE WorkspaceFileMutationAction = "DELETE"
+	WorkspaceFileMutationActionMKCOL  WorkspaceFileMutationAction = "MKCOL"
+	WorkspaceFileMutationActionMOVE   WorkspaceFileMutationAction = "MOVE"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceFileMutationAction enum.
+func (e WorkspaceFileMutationAction) Valid() bool {
+	switch e {
+	case WorkspaceFileMutationActionCOPY:
+		return true
+	case WorkspaceFileMutationActionDELETE:
+		return true
+	case WorkspaceFileMutationActionMKCOL:
+		return true
+	case WorkspaceFileMutationActionMOVE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceFileResultOutcome.
+const (
+	WorkspaceFileResultOutcomePARTIAL   WorkspaceFileResultOutcome = "PARTIAL"
+	WorkspaceFileResultOutcomeSUCCEEDED WorkspaceFileResultOutcome = "SUCCEEDED"
+	WorkspaceFileResultOutcomeUNKNOWN   WorkspaceFileResultOutcome = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceFileResultOutcome enum.
+func (e WorkspaceFileResultOutcome) Valid() bool {
+	switch e {
+	case WorkspaceFileResultOutcomePARTIAL:
+		return true
+	case WorkspaceFileResultOutcomeSUCCEEDED:
+		return true
+	case WorkspaceFileResultOutcomeUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceOperationState.
+const (
+	WorkspaceOperationStateCOMPLETED      WorkspaceOperationState = "COMPLETED"
+	WorkspaceOperationStateNEEDSATTENTION WorkspaceOperationState = "NEEDS_ATTENTION"
+	WorkspaceOperationStatePENDING        WorkspaceOperationState = "PENDING"
+	WorkspaceOperationStateRUNNING        WorkspaceOperationState = "RUNNING"
+	WorkspaceOperationStateUNKNOWN        WorkspaceOperationState = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceOperationState enum.
+func (e WorkspaceOperationState) Valid() bool {
+	switch e {
+	case WorkspaceOperationStateCOMPLETED:
+		return true
+	case WorkspaceOperationStateNEEDSATTENTION:
+		return true
+	case WorkspaceOperationStatePENDING:
+		return true
+	case WorkspaceOperationStateRUNNING:
+		return true
+	case WorkspaceOperationStateUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceProjectionSchemaVersion.
+const (
+	WorkspaceProjectionSchemaVersionN1 WorkspaceProjectionSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceProjectionSchemaVersion enum.
+func (e WorkspaceProjectionSchemaVersion) Valid() bool {
+	switch e {
+	case WorkspaceProjectionSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceProjectionState.
+const (
+	WorkspaceProjectionStateCONNECTED      WorkspaceProjectionState = "CONNECTED"
+	WorkspaceProjectionStateCONNECTING     WorkspaceProjectionState = "CONNECTING"
+	WorkspaceProjectionStateDELETED        WorkspaceProjectionState = "DELETED"
+	WorkspaceProjectionStateDELETING       WorkspaceProjectionState = "DELETING"
+	WorkspaceProjectionStateDISCONNECTED   WorkspaceProjectionState = "DISCONNECTED"
+	WorkspaceProjectionStateDISCONNECTING  WorkspaceProjectionState = "DISCONNECTING"
+	WorkspaceProjectionStateNEEDSATTENTION WorkspaceProjectionState = "NEEDS_ATTENTION"
+	WorkspaceProjectionStateRESTORING      WorkspaceProjectionState = "RESTORING"
+	WorkspaceProjectionStateUNPROVISIONED  WorkspaceProjectionState = "UNPROVISIONED"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceProjectionState enum.
+func (e WorkspaceProjectionState) Valid() bool {
+	switch e {
+	case WorkspaceProjectionStateCONNECTED:
+		return true
+	case WorkspaceProjectionStateCONNECTING:
+		return true
+	case WorkspaceProjectionStateDELETED:
+		return true
+	case WorkspaceProjectionStateDELETING:
+		return true
+	case WorkspaceProjectionStateDISCONNECTED:
+		return true
+	case WorkspaceProjectionStateDISCONNECTING:
+		return true
+	case WorkspaceProjectionStateNEEDSATTENTION:
+		return true
+	case WorkspaceProjectionStateRESTORING:
+		return true
+	case WorkspaceProjectionStateUNPROVISIONED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceServiceState.
+const (
+	WorkspaceServiceStateACTIVE         WorkspaceServiceState = "ACTIVE"
+	WorkspaceServiceStateAPPLYING       WorkspaceServiceState = "APPLYING"
+	WorkspaceServiceStateDISABLED       WorkspaceServiceState = "DISABLED"
+	WorkspaceServiceStateDISABLING      WorkspaceServiceState = "DISABLING"
+	WorkspaceServiceStateNEEDSATTENTION WorkspaceServiceState = "NEEDS_ATTENTION"
+	WorkspaceServiceStateSAVED          WorkspaceServiceState = "SAVED"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceServiceState enum.
+func (e WorkspaceServiceState) Valid() bool {
+	switch e {
+	case WorkspaceServiceStateACTIVE:
+		return true
+	case WorkspaceServiceStateAPPLYING:
+		return true
+	case WorkspaceServiceStateDISABLED:
+		return true
+	case WorkspaceServiceStateDISABLING:
+		return true
+	case WorkspaceServiceStateNEEDSATTENTION:
+		return true
+	case WorkspaceServiceStateSAVED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceServiceType.
+const (
+	AGENTSPACE WorkspaceServiceType = "AGENT_SPACE"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceServiceType enum.
+func (e WorkspaceServiceType) Valid() bool {
+	switch e {
+	case AGENTSPACE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceServiceCheckFilesStatus.
+const (
+	NOTCONFIGURED WorkspaceServiceCheckFilesStatus = "NOT_CONFIGURED"
+	UNVERIFIED    WorkspaceServiceCheckFilesStatus = "UNVERIFIED"
+	VERIFIED      WorkspaceServiceCheckFilesStatus = "VERIFIED"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceServiceCheckFilesStatus enum.
+func (e WorkspaceServiceCheckFilesStatus) Valid() bool {
+	switch e {
+	case NOTCONFIGURED:
+		return true
+	case UNVERIFIED:
+		return true
+	case VERIFIED:
 		return true
 	default:
 		return false
@@ -1767,6 +2052,20 @@ type AdminUserSummary struct {
 
 // AdminUserSummaryRole defines model for AdminUserSummary.Role.
 type AdminUserSummaryRole string
+
+// AgentSpaceConfig defines model for AgentSpaceConfig.
+type AgentSpaceConfig struct {
+	AdminOrigin      string    `json:"adminOrigin"`
+	ConnectTimeoutMs int       `json:"connectTimeoutMs"`
+	DavOrigin        *string   `json:"davOrigin,omitempty"`
+	IdleTimeoutMs    int       `json:"idleTimeoutMs"`
+	ManagementSecret SecretRef `json:"managementSecret"`
+	McpOrigin        string    `json:"mcpOrigin"`
+	ReleaseIdentity  string    `json:"releaseIdentity"`
+}
+
+// AgentSpaceId defines model for AgentSpaceId.
+type AgentSpaceId = string
 
 // AsrDefinition defines model for AsrDefinition.
 type AsrDefinition struct {
@@ -2624,12 +2923,14 @@ type RequestUsageView struct {
 	SemanticMeters      []MeterQuantity                 `json:"semanticMeters"`
 	SettlementState     RequestUsageViewSettlementState `json:"settlementState"`
 	StartedAt           time.Time                       `json:"startedAt"`
+	TargetVersion       *RequestUsageViewTargetVersion  `json:"targetVersion,omitempty"`
 	UpstreamHttpStatus  *int                            `json:"upstreamHttpStatus,omitempty"`
 	UpstreamId          UpstreamId                      `json:"upstreamId,omitempty"`
 
 	// UserDisplayName Display name resolved from the users table. Always present, because a usage row cannot exist without its user. Display metadata, not authorization identity.
-	UserDisplayName string `json:"userDisplayName"`
-	UserId          UserId `json:"userId"`
+	UserDisplayName string           `json:"userDisplayName"`
+	UserId          UserId           `json:"userId"`
+	WorkspaceTarget *WorkspaceTarget `json:"workspaceTarget,omitempty"`
 }
 
 // RequestUsageViewRequestCompleteness defines model for RequestUsageView.RequestCompleteness.
@@ -2637,6 +2938,9 @@ type RequestUsageViewRequestCompleteness string
 
 // RequestUsageViewSettlementState defines model for RequestUsageView.SettlementState.
 type RequestUsageViewSettlementState string
+
+// RequestUsageViewTargetVersion defines model for RequestUsageView.TargetVersion.
+type RequestUsageViewTargetVersion int
 
 // ResolveReconciliationRequest defines model for ResolveReconciliationRequest.
 type ResolveReconciliationRequest struct {
@@ -2662,22 +2966,35 @@ type ResourceDiff struct {
 // ResourceKind defines model for ResourceKind.
 type ResourceKind string
 
-// RuntimeBindingDefinition defines model for RuntimeBindingDefinition.
+// RuntimeBindingDefinition Exactly one target: legacy upstreamId (targetKind omitted or UPSTREAM), or targetKind REMOTE_WORKSPACE plus workspaceServiceId. WorkspaceService targets are MCP-only.
 type RuntimeBindingDefinition struct {
 	AllowedMethods      []string                                `json:"allowedMethods"`
 	AllowedPathPrefixes []string                                `json:"allowedPathPrefixes"`
 	ResourceId          string                                  `json:"resourceId"`
 	RuntimeRouteId      RuntimeRouteId                          `json:"runtimeRouteId"`
+	TargetKind          *RuntimeBindingDefinitionTargetKind     `json:"targetKind,omitempty"`
 	TimeoutPolicy       *TimeoutPolicy                          `json:"timeoutPolicy,omitempty"`
 	TransportPolicy     RuntimeBindingDefinitionTransportPolicy `json:"transportPolicy"`
-	UpstreamId          UpstreamId                              `json:"upstreamId"`
+	UpstreamId          UpstreamId                              `json:"upstreamId,omitempty"`
+	WorkspaceServiceId  *WorkspaceServiceId                     `json:"workspaceServiceId,omitempty"`
 }
+
+// RuntimeBindingDefinitionTargetKind defines model for RuntimeBindingDefinition.TargetKind.
+type RuntimeBindingDefinitionTargetKind string
 
 // RuntimeBindingDefinitionTransportPolicy defines model for RuntimeBindingDefinition.TransportPolicy.
 type RuntimeBindingDefinitionTransportPolicy string
 
 // RuntimeRouteId defines model for RuntimeRouteId.
 type RuntimeRouteId = string
+
+// SaveWorkspaceServiceRequest defines model for SaveWorkspaceServiceRequest.
+type SaveWorkspaceServiceRequest struct {
+	Config                AgentSpaceConfig `json:"config"`
+	ConfirmSameDeployment *bool            `json:"confirmSameDeployment,omitempty"`
+	ExpectedRevision      int              `json:"expectedRevision"`
+	Name                  string           `json:"name"`
+}
 
 // Secret defines model for Secret.
 type Secret struct {
@@ -2711,6 +3028,11 @@ type SetPasswordRequest struct {
 
 // Sha256Hash defines model for Sha256Hash.
 type Sha256Hash = string
+
+// StageWorkspaceMCPRequest defines model for StageWorkspaceMCPRequest.
+type StageWorkspaceMCPRequest struct {
+	ExpectedDraftRevision int `json:"expectedDraftRevision"`
+}
 
 // StarterId defines model for StarterId.
 type StarterId = string
@@ -3147,6 +3469,179 @@ type ValidationIssueResourceKind string
 // ValidationIssueSeverity defines model for ValidationIssue.Severity.
 type ValidationIssueSeverity string
 
+// WorkspaceCommand defines model for WorkspaceCommand.
+type WorkspaceCommand struct {
+	Action           WorkspaceCommandAction `json:"action"`
+	AgentSpaceId     *AgentSpaceId          `json:"agentSpaceId,omitempty"`
+	Confirmation     *string                `json:"confirmation,omitempty"`
+	Evidence         *string                `json:"evidence,omitempty"`
+	ExpectedRevision int                    `json:"expectedRevision"`
+	ManagementSecret *SecretRef             `json:"managementSecret,omitempty"`
+	RemoteUsername   *string                `json:"remoteUsername,omitempty"`
+}
+
+// WorkspaceCommandAction defines model for WorkspaceCommand.Action.
+type WorkspaceCommandAction string
+
+// WorkspaceDAVConnection defines model for WorkspaceDAVConnection.
+type WorkspaceDAVConnection struct {
+	DavUrl   string `json:"davUrl"`
+	Token    string `json:"token"`
+	Username string `json:"username"`
+}
+
+// WorkspaceFileEntry defines model for WorkspaceFileEntry.
+type WorkspaceFileEntry struct {
+	Etag       *string                `json:"etag,omitempty"`
+	Kind       WorkspaceFileEntryKind `json:"kind"`
+	ModifiedAt *time.Time             `json:"modifiedAt,omitempty"`
+	Path       string                 `json:"path"`
+	Size       *int64                 `json:"size,omitempty"`
+}
+
+// WorkspaceFileEntryKind defines model for WorkspaceFileEntry.Kind.
+type WorkspaceFileEntryKind string
+
+// WorkspaceFileFailure defines model for WorkspaceFileFailure.
+type WorkspaceFileFailure struct {
+	Code   string `json:"code"`
+	Path   string `json:"path"`
+	Status int    `json:"status"`
+}
+
+// WorkspaceFileList defines model for WorkspaceFileList.
+type WorkspaceFileList struct {
+	AvailableBytes *int64               `json:"availableBytes,omitempty"`
+	Entries        []WorkspaceFileEntry `json:"entries"`
+	UsedBytes      *int64               `json:"usedBytes,omitempty"`
+}
+
+// WorkspaceFileMutation defines model for WorkspaceFileMutation.
+type WorkspaceFileMutation struct {
+	Action             WorkspaceFileMutationAction `json:"action"`
+	Destination        *string                     `json:"destination,omitempty"`
+	Overwrite          *bool                       `json:"overwrite,omitempty"`
+	Path               string                      `json:"path"`
+	RecursiveConfirmed *bool                       `json:"recursiveConfirmed,omitempty"`
+	SourceEtag         *string                     `json:"sourceEtag,omitempty"`
+	TargetEtag         *string                     `json:"targetEtag,omitempty"`
+}
+
+// WorkspaceFileMutationAction defines model for WorkspaceFileMutation.Action.
+type WorkspaceFileMutationAction string
+
+// WorkspaceFileResult defines model for WorkspaceFileResult.
+type WorkspaceFileResult struct {
+	Failures  []WorkspaceFileFailure     `json:"failures"`
+	Outcome   WorkspaceFileResultOutcome `json:"outcome"`
+	Truncated bool                       `json:"truncated"`
+}
+
+// WorkspaceFileResultOutcome defines model for WorkspaceFileResult.Outcome.
+type WorkspaceFileResultOutcome string
+
+// WorkspaceList defines model for WorkspaceList.
+type WorkspaceList struct {
+	Items      []WorkspaceListItem `json:"items"`
+	NextCursor *string             `json:"nextCursor,omitempty"`
+}
+
+// WorkspaceListItem defines model for WorkspaceListItem.
+type WorkspaceListItem struct {
+	DisplayName    string              `json:"displayName"`
+	RemoteUsername string              `json:"remoteUsername"`
+	UserId         UserId              `json:"userId"`
+	Workspace      WorkspaceProjection `json:"workspace"`
+}
+
+// WorkspaceOperation defines model for WorkspaceOperation.
+type WorkspaceOperation struct {
+	Action             string                  `json:"action"`
+	CreatedAt          time.Time               `json:"createdAt"`
+	DiagnosticCode     *string                 `json:"diagnosticCode,omitempty"`
+	OperationId        WorkspaceOperationId    `json:"operationId"`
+	State              WorkspaceOperationState `json:"state"`
+	Step               string                  `json:"step"`
+	UpdatedAt          time.Time               `json:"updatedAt"`
+	UserId             *UserId                 `json:"userId,omitempty"`
+	WorkspaceServiceId WorkspaceServiceId      `json:"workspaceServiceId"`
+}
+
+// WorkspaceOperationState defines model for WorkspaceOperation.State.
+type WorkspaceOperationState string
+
+// WorkspaceOperationId defines model for WorkspaceOperationId.
+type WorkspaceOperationId = string
+
+// WorkspaceProjection defines model for WorkspaceProjection.
+type WorkspaceProjection struct {
+	AgentSpaceId    *AgentSpaceId                    `json:"agentSpaceId,omitempty"`
+	BindingRevision int                              `json:"bindingRevision"`
+	FilesAvailable  bool                             `json:"filesAvailable"`
+	FilesReason     string                           `json:"filesReason"`
+	McpAvailable    bool                             `json:"mcpAvailable"`
+	McpReason       string                           `json:"mcpReason"`
+	McpServerId     *McpServerId                     `json:"mcpServerId,omitempty"`
+	ObservedAt      *time.Time                       `json:"observedAt,omitempty"`
+	OperationId     *WorkspaceOperationId            `json:"operationId,omitempty"`
+	SchemaVersion   WorkspaceProjectionSchemaVersion `json:"schemaVersion"`
+	State           WorkspaceProjectionState         `json:"state"`
+}
+
+// WorkspaceProjectionSchemaVersion defines model for WorkspaceProjection.SchemaVersion.
+type WorkspaceProjectionSchemaVersion int
+
+// WorkspaceProjectionState defines model for WorkspaceProjection.State.
+type WorkspaceProjectionState string
+
+// WorkspaceService defines model for WorkspaceService.
+type WorkspaceService struct {
+	ActiveConfigRevision *int                  `json:"activeConfigRevision,omitempty"`
+	Config               AgentSpaceConfig      `json:"config"`
+	ConfigRevision       int                   `json:"configRevision"`
+	DiagnosticCode       *string               `json:"diagnosticCode,omitempty"`
+	Enabled              bool                  `json:"enabled"`
+	McpPublished         bool                  `json:"mcpPublished"`
+	McpServerId          McpServerId           `json:"mcpServerId"`
+	Name                 string                `json:"name"`
+	OperationId          *WorkspaceOperationId `json:"operationId,omitempty"`
+	State                WorkspaceServiceState `json:"state"`
+	Type                 WorkspaceServiceType  `json:"type"`
+	WorkspaceServiceId   WorkspaceServiceId    `json:"workspaceServiceId"`
+}
+
+// WorkspaceServiceState defines model for WorkspaceService.State.
+type WorkspaceServiceState string
+
+// WorkspaceServiceType defines model for WorkspaceService.Type.
+type WorkspaceServiceType string
+
+// WorkspaceServiceCheck defines model for WorkspaceServiceCheck.
+type WorkspaceServiceCheck struct {
+	DiagnosticCode  *string                          `json:"diagnosticCode,omitempty"`
+	FilesStatus     WorkspaceServiceCheckFilesStatus `json:"filesStatus"`
+	ManagementReady bool                             `json:"managementReady"`
+}
+
+// WorkspaceServiceCheckFilesStatus defines model for WorkspaceServiceCheck.FilesStatus.
+type WorkspaceServiceCheckFilesStatus string
+
+// WorkspaceServiceId defines model for WorkspaceServiceId.
+type WorkspaceServiceId = string
+
+// WorkspaceServiceList defines model for WorkspaceServiceList.
+type WorkspaceServiceList struct {
+	Items []WorkspaceService `json:"items"`
+}
+
+// WorkspaceTarget defines model for WorkspaceTarget.
+type WorkspaceTarget struct {
+	AgentSpaceId       AgentSpaceId       `json:"agentSpaceId"`
+	BindingRevision    int                `json:"bindingRevision"`
+	RemoteUsername     string             `json:"remoteUsername"`
+	WorkspaceServiceId WorkspaceServiceId `json:"workspaceServiceId"`
+}
+
 // ListBudgetTemplatesParams defines parameters for ListBudgetTemplates.
 type ListBudgetTemplatesParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
@@ -3266,6 +3761,47 @@ type ListReleasesParams struct {
 type RepublishReleaseParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateWorkspaceServiceParams defines parameters for CreateWorkspaceService.
+type CreateWorkspaceServiceParams struct {
+	XCSRFToken     string         `json:"X-CSRF-Token"`
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateWorkspaceServiceParams defines parameters for UpdateWorkspaceService.
+type UpdateWorkspaceServiceParams struct {
+	XCSRFToken     string         `json:"X-CSRF-Token"`
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ApplyWorkspaceServiceParams defines parameters for ApplyWorkspaceService.
+type ApplyWorkspaceServiceParams struct {
+	XCSRFToken     string         `json:"X-CSRF-Token"`
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CheckWorkspaceServiceParams defines parameters for CheckWorkspaceService.
+type CheckWorkspaceServiceParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// DisableWorkspaceServiceParams defines parameters for DisableWorkspaceService.
+type DisableWorkspaceServiceParams struct {
+	XCSRFToken     string         `json:"X-CSRF-Token"`
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// StageWorkspaceMCPParams defines parameters for StageWorkspaceMCP.
+type StageWorkspaceMCPParams struct {
+	XCSRFToken     string         `json:"X-CSRF-Token"`
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListWorkspacesParams defines parameters for ListWorkspaces.
+type ListWorkspacesParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
 
 // ListSecretsParams defines parameters for ListSecrets.
@@ -3544,6 +4080,51 @@ type CreateEnrollmentParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// CommandWorkspaceParams defines parameters for CommandWorkspace.
+type CommandWorkspaceParams struct {
+	XCSRFToken     string         `json:"X-CSRF-Token"`
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DownloadAdminWorkspaceFileParams defines parameters for DownloadAdminWorkspaceFile.
+type DownloadAdminWorkspaceFileParams struct {
+	Path        *string `form:"path,omitempty" json:"path,omitempty"`
+	Range       *string `json:"Range,omitempty"`
+	IfMatch     *string `json:"If-Match,omitempty"`
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
+// HeadAdminWorkspaceFileParams defines parameters for HeadAdminWorkspaceFile.
+type HeadAdminWorkspaceFileParams struct {
+	Path        *string `form:"path,omitempty" json:"path,omitempty"`
+	Range       *string `json:"Range,omitempty"`
+	IfMatch     *string `json:"If-Match,omitempty"`
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
+// UploadAdminWorkspaceFileParams defines parameters for UploadAdminWorkspaceFile.
+type UploadAdminWorkspaceFileParams struct {
+	Path        *string `form:"path,omitempty" json:"path,omitempty"`
+	XCSRFToken  string  `json:"X-CSRF-Token"`
+	IfMatch     *string `json:"If-Match,omitempty"`
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
+// RevealWorkspaceDAVParams defines parameters for RevealWorkspaceDAV.
+type RevealWorkspaceDAVParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// ListAdminWorkspaceFilesParams defines parameters for ListAdminWorkspaceFiles.
+type ListAdminWorkspaceFilesParams struct {
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// MutateAdminWorkspaceFileParams defines parameters for MutateAdminWorkspaceFile.
+type MutateAdminWorkspaceFileParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // DisableUserParams defines parameters for DisableUser.
 type DisableUserParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
@@ -3591,6 +4172,15 @@ type UpdateEnterpriseUpdateJSONRequestBody = UpdateEnterpriseUpdateRequest
 // PutPricingJSONRequestBody defines body for PutPricing for application/json ContentType.
 type PutPricingJSONRequestBody = PutPricingRequest
 
+// CreateWorkspaceServiceJSONRequestBody defines body for CreateWorkspaceService for application/json ContentType.
+type CreateWorkspaceServiceJSONRequestBody = SaveWorkspaceServiceRequest
+
+// UpdateWorkspaceServiceJSONRequestBody defines body for UpdateWorkspaceService for application/json ContentType.
+type UpdateWorkspaceServiceJSONRequestBody = SaveWorkspaceServiceRequest
+
+// StageWorkspaceMCPJSONRequestBody defines body for StageWorkspaceMCP for application/json ContentType.
+type StageWorkspaceMCPJSONRequestBody = StageWorkspaceMCPRequest
+
 // CreateSecretJSONRequestBody defines body for CreateSecret for application/json ContentType.
 type CreateSecretJSONRequestBody = CreateSecretRequest
 
@@ -3629,6 +4219,12 @@ type PutUserBudgetJSONRequestBody = PutBudgetRequest
 
 // CreateEnrollmentJSONRequestBody defines body for CreateEnrollment for application/json ContentType.
 type CreateEnrollmentJSONRequestBody = CreateEnrollmentRequest
+
+// CommandWorkspaceJSONRequestBody defines body for CommandWorkspace for application/json ContentType.
+type CommandWorkspaceJSONRequestBody = WorkspaceCommand
+
+// MutateAdminWorkspaceFileJSONRequestBody defines body for MutateAdminWorkspaceFile for application/json ContentType.
+type MutateAdminWorkspaceFileJSONRequestBody = WorkspaceFileMutation
 
 // SetPasswordJSONRequestBody defines body for SetPassword for application/json ContentType.
 type SetPasswordJSONRequestBody = SetPasswordRequest
@@ -3719,6 +4315,33 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/releases/{releaseId}:republish)
 	RepublishRelease(w http.ResponseWriter, r *http.Request, releaseId ReleaseId, params RepublishReleaseParams)
+
+	// (GET /api/admin/v1/remote-workspace/services)
+	ListWorkspaceServices(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/admin/v1/remote-workspace/services)
+	CreateWorkspaceService(w http.ResponseWriter, r *http.Request, params CreateWorkspaceServiceParams)
+
+	// (GET /api/admin/v1/remote-workspace/services/{workspaceServiceId})
+	GetWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId)
+
+	// (PUT /api/admin/v1/remote-workspace/services/{workspaceServiceId})
+	UpdateWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params UpdateWorkspaceServiceParams)
+
+	// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply)
+	ApplyWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params ApplyWorkspaceServiceParams)
+
+	// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/check)
+	CheckWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params CheckWorkspaceServiceParams)
+
+	// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/disable)
+	DisableWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params DisableWorkspaceServiceParams)
+
+	// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/mcp-draft)
+	StageWorkspaceMCP(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params StageWorkspaceMCPParams)
+
+	// (GET /api/admin/v1/remote-workspace/services/{workspaceServiceId}/workspaces)
+	ListWorkspaces(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params ListWorkspacesParams)
 
 	// (GET /api/admin/v1/secrets)
 	ListSecrets(w http.ResponseWriter, r *http.Request, params ListSecretsParams)
@@ -3837,6 +4460,30 @@ type ServerInterface interface {
 	// (POST /api/admin/v1/users/{userId}/enrollments)
 	CreateEnrollment(w http.ResponseWriter, r *http.Request, userId UserId, params CreateEnrollmentParams)
 
+	// (GET /api/admin/v1/users/{userId}/workspace)
+	GetUserWorkspace(w http.ResponseWriter, r *http.Request, userId UserId)
+
+	// (POST /api/admin/v1/users/{userId}/workspace)
+	CommandWorkspace(w http.ResponseWriter, r *http.Request, userId UserId, params CommandWorkspaceParams)
+
+	// (GET /api/admin/v1/users/{userId}/workspace/content)
+	DownloadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params DownloadAdminWorkspaceFileParams)
+
+	// (HEAD /api/admin/v1/users/{userId}/workspace/content)
+	HeadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params HeadAdminWorkspaceFileParams)
+
+	// (PUT /api/admin/v1/users/{userId}/workspace/content)
+	UploadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params UploadAdminWorkspaceFileParams)
+
+	// (POST /api/admin/v1/users/{userId}/workspace/dav-connection)
+	RevealWorkspaceDAV(w http.ResponseWriter, r *http.Request, userId UserId, params RevealWorkspaceDAVParams)
+
+	// (GET /api/admin/v1/users/{userId}/workspace/files)
+	ListAdminWorkspaceFiles(w http.ResponseWriter, r *http.Request, userId UserId, params ListAdminWorkspaceFilesParams)
+
+	// (POST /api/admin/v1/users/{userId}/workspace/files)
+	MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params MutateAdminWorkspaceFileParams)
+
 	// (POST /api/admin/v1/users/{userId}:disable)
 	DisableUser(w http.ResponseWriter, r *http.Request, userId UserId, params DisableUserParams)
 
@@ -3845,6 +4492,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/users/{userId}:set-password)
 	SetPassword(w http.ResponseWriter, r *http.Request, userId UserId, params SetPasswordParams)
+
+	// (GET /api/admin/v1/workspace-operations/{operationId})
+	GetWorkspaceOperation(w http.ResponseWriter, r *http.Request, operationId WorkspaceOperationId)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -3988,6 +4638,51 @@ func (_ Unimplemented) GetRelease(w http.ResponseWriter, r *http.Request, releas
 
 // (POST /api/admin/v1/releases/{releaseId}:republish)
 func (_ Unimplemented) RepublishRelease(w http.ResponseWriter, r *http.Request, releaseId ReleaseId, params RepublishReleaseParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/remote-workspace/services)
+func (_ Unimplemented) ListWorkspaceServices(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/remote-workspace/services)
+func (_ Unimplemented) CreateWorkspaceService(w http.ResponseWriter, r *http.Request, params CreateWorkspaceServiceParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/remote-workspace/services/{workspaceServiceId})
+func (_ Unimplemented) GetWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/admin/v1/remote-workspace/services/{workspaceServiceId})
+func (_ Unimplemented) UpdateWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params UpdateWorkspaceServiceParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply)
+func (_ Unimplemented) ApplyWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params ApplyWorkspaceServiceParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/check)
+func (_ Unimplemented) CheckWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params CheckWorkspaceServiceParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/disable)
+func (_ Unimplemented) DisableWorkspaceService(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params DisableWorkspaceServiceParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/mcp-draft)
+func (_ Unimplemented) StageWorkspaceMCP(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params StageWorkspaceMCPParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/remote-workspace/services/{workspaceServiceId}/workspaces)
+func (_ Unimplemented) ListWorkspaces(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params ListWorkspacesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4186,6 +4881,46 @@ func (_ Unimplemented) CreateEnrollment(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (GET /api/admin/v1/users/{userId}/workspace)
+func (_ Unimplemented) GetUserWorkspace(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/users/{userId}/workspace)
+func (_ Unimplemented) CommandWorkspace(w http.ResponseWriter, r *http.Request, userId UserId, params CommandWorkspaceParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/users/{userId}/workspace/content)
+func (_ Unimplemented) DownloadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params DownloadAdminWorkspaceFileParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (HEAD /api/admin/v1/users/{userId}/workspace/content)
+func (_ Unimplemented) HeadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params HeadAdminWorkspaceFileParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/admin/v1/users/{userId}/workspace/content)
+func (_ Unimplemented) UploadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params UploadAdminWorkspaceFileParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/users/{userId}/workspace/dav-connection)
+func (_ Unimplemented) RevealWorkspaceDAV(w http.ResponseWriter, r *http.Request, userId UserId, params RevealWorkspaceDAVParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/users/{userId}/workspace/files)
+func (_ Unimplemented) ListAdminWorkspaceFiles(w http.ResponseWriter, r *http.Request, userId UserId, params ListAdminWorkspaceFilesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/users/{userId}/workspace/files)
+func (_ Unimplemented) MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params MutateAdminWorkspaceFileParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (POST /api/admin/v1/users/{userId}:disable)
 func (_ Unimplemented) DisableUser(w http.ResponseWriter, r *http.Request, userId UserId, params DisableUserParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -4198,6 +4933,11 @@ func (_ Unimplemented) EnableUser(w http.ResponseWriter, r *http.Request, userId
 
 // (POST /api/admin/v1/users/{userId}:set-password)
 func (_ Unimplemented) SetPassword(w http.ResponseWriter, r *http.Request, userId UserId, params SetPasswordParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/workspace-operations/{operationId})
+func (_ Unimplemented) GetWorkspaceOperation(w http.ResponseWriter, r *http.Request, operationId WorkspaceOperationId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5534,6 +6274,531 @@ func (siw *ServerInterfaceWrapper) RepublishRelease(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RepublishRelease(w, r, releaseId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWorkspaceServices operation middleware
+func (siw *ServerInterfaceWrapper) ListWorkspaceServices(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWorkspaceServices(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateWorkspaceService operation middleware
+func (siw *ServerInterfaceWrapper) CreateWorkspaceService(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateWorkspaceServiceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateWorkspaceService(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetWorkspaceService operation middleware
+func (siw *ServerInterfaceWrapper) GetWorkspaceService(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceServiceId" -------------
+	var workspaceServiceId WorkspaceServiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceServiceId", chi.URLParam(r, "workspaceServiceId"), &workspaceServiceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceServiceId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWorkspaceService(w, r, workspaceServiceId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateWorkspaceService operation middleware
+func (siw *ServerInterfaceWrapper) UpdateWorkspaceService(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceServiceId" -------------
+	var workspaceServiceId WorkspaceServiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceServiceId", chi.URLParam(r, "workspaceServiceId"), &workspaceServiceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceServiceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateWorkspaceServiceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateWorkspaceService(w, r, workspaceServiceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApplyWorkspaceService operation middleware
+func (siw *ServerInterfaceWrapper) ApplyWorkspaceService(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceServiceId" -------------
+	var workspaceServiceId WorkspaceServiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceServiceId", chi.URLParam(r, "workspaceServiceId"), &workspaceServiceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceServiceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApplyWorkspaceServiceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApplyWorkspaceService(w, r, workspaceServiceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CheckWorkspaceService operation middleware
+func (siw *ServerInterfaceWrapper) CheckWorkspaceService(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceServiceId" -------------
+	var workspaceServiceId WorkspaceServiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceServiceId", chi.URLParam(r, "workspaceServiceId"), &workspaceServiceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceServiceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CheckWorkspaceServiceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CheckWorkspaceService(w, r, workspaceServiceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableWorkspaceService operation middleware
+func (siw *ServerInterfaceWrapper) DisableWorkspaceService(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceServiceId" -------------
+	var workspaceServiceId WorkspaceServiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceServiceId", chi.URLParam(r, "workspaceServiceId"), &workspaceServiceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceServiceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DisableWorkspaceServiceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableWorkspaceService(w, r, workspaceServiceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StageWorkspaceMCP operation middleware
+func (siw *ServerInterfaceWrapper) StageWorkspaceMCP(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceServiceId" -------------
+	var workspaceServiceId WorkspaceServiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceServiceId", chi.URLParam(r, "workspaceServiceId"), &workspaceServiceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceServiceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StageWorkspaceMCPParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StageWorkspaceMCP(w, r, workspaceServiceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWorkspaces operation middleware
+func (siw *ServerInterfaceWrapper) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceServiceId" -------------
+	var workspaceServiceId WorkspaceServiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceServiceId", chi.URLParam(r, "workspaceServiceId"), &workspaceServiceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceServiceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWorkspacesParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "search" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "search"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWorkspaces(w, r, workspaceServiceId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7928,6 +9193,566 @@ func (siw *ServerInterfaceWrapper) CreateEnrollment(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetUserWorkspace operation middleware
+func (siw *ServerInterfaceWrapper) GetUserWorkspace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUserWorkspace(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CommandWorkspace operation middleware
+func (siw *ServerInterfaceWrapper) CommandWorkspace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CommandWorkspaceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CommandWorkspace(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadAdminWorkspaceFile operation middleware
+func (siw *ServerInterfaceWrapper) DownloadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DownloadAdminWorkspaceFileParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Range" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Range")]; found {
+		var Range string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Range", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Range", valueList[0], &Range, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Range", Err: err})
+			return
+		}
+
+		params.Range = &Range
+
+	}
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadAdminWorkspaceFile(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// HeadAdminWorkspaceFile operation middleware
+func (siw *ServerInterfaceWrapper) HeadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params HeadAdminWorkspaceFileParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Range" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Range")]; found {
+		var Range string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Range", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Range", valueList[0], &Range, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Range", Err: err})
+			return
+		}
+
+		params.Range = &Range
+
+	}
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.HeadAdminWorkspaceFile(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadAdminWorkspaceFile operation middleware
+func (siw *ServerInterfaceWrapper) UploadAdminWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UploadAdminWorkspaceFileParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadAdminWorkspaceFile(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevealWorkspaceDAV operation middleware
+func (siw *ServerInterfaceWrapper) RevealWorkspaceDAV(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevealWorkspaceDAVParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevealWorkspaceDAV(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminWorkspaceFiles operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminWorkspaceFiles(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminWorkspaceFilesParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminWorkspaceFiles(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MutateAdminWorkspaceFile operation middleware
+func (siw *ServerInterfaceWrapper) MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MutateAdminWorkspaceFileParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MutateAdminWorkspaceFile(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DisableUser operation middleware
 func (siw *ServerInterfaceWrapper) DisableUser(w http.ResponseWriter, r *http.Request) {
 
@@ -8127,6 +9952,32 @@ func (siw *ServerInterfaceWrapper) SetPassword(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetPassword(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetWorkspaceOperation operation middleware
+func (siw *ServerInterfaceWrapper) GetWorkspaceOperation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId WorkspaceOperationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", chi.URLParam(r, "operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "operationId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWorkspaceOperation(w, r, operationId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8458,6 +10309,60 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/enterprise-updates/{enterpriseUpdateId}:withdraw", wrapper.WithdrawEnterpriseUpdate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/remote-workspace/services", wrapper.ListWorkspaceServices)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/remote-workspace/services", wrapper.CreateWorkspaceService)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}", wrapper.GetWorkspaceService)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}", wrapper.UpdateWorkspaceService)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}/check", wrapper.CheckWorkspaceService)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply", wrapper.ApplyWorkspaceService)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}/disable", wrapper.DisableWorkspaceService)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}/mcp-draft", wrapper.StageWorkspaceMCP)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}/workspaces", wrapper.ListWorkspaces)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/workspace", wrapper.GetUserWorkspace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace", wrapper.CommandWorkspace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/workspace-operations/{operationId}", wrapper.GetWorkspaceOperation)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/dav-connection", wrapper.RevealWorkspaceDAV)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/files", wrapper.ListAdminWorkspaceFiles)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/files", wrapper.MutateAdminWorkspaceFile)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/content", wrapper.DownloadAdminWorkspaceFile)
+	})
+	r.Group(func(r chi.Router) {
+		r.Head(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/content", wrapper.HeadAdminWorkspaceFile)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/content", wrapper.UploadAdminWorkspaceFile)
 	})
 
 	return r

@@ -11,6 +11,7 @@ import (
 type Route struct {
 	ID                  string
 	UpstreamID          string
+	WorkspaceServiceID  string
 	AllowedMethods      map[string]struct{}
 	AllowedPathPrefixes []string
 	TransportPolicy     relaycontrolapi.RuntimeRouteSpecTransportPolicy
@@ -47,6 +48,7 @@ type Upstream struct {
 }
 
 type State struct {
+	ProtocolVersion         int
 	ControlRevision         int
 	BundleHash              string
 	ActiveManagedGeneration int
@@ -59,6 +61,7 @@ type State struct {
 	Resources               map[string]Resource
 	Routes                  map[string]Route
 	Upstreams               map[string]Upstream
+	UserBindings            map[string]relaycontrolapi.UserRuntimeBinding
 	OperationalLimits       relaycontrolapi.OperationalLimits
 	AppliedAt               time.Time
 }

@@ -116,6 +116,33 @@ components:
       schema:
         $ref: '#/components/schemas/RequestId'
   schemas:
+    WorkspaceServiceId:
+      type: string
+      pattern: ^wss_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AgentSpaceId:
+      type: string
+      pattern: ^spc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    WorkspaceOperationId:
+      type: string
+      pattern: ^wop_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    WorkspaceTarget:
+      type: object
+      additionalProperties: false
+      required:
+      - workspaceServiceId
+      - agentSpaceId
+      - remoteUsername
+      - bindingRevision
+      properties:
+        workspaceServiceId:
+          $ref: '#/components/schemas/WorkspaceServiceId'
+        agentSpaceId:
+          $ref: '#/components/schemas/AgentSpaceId'
+        remoteUsername:
+          type: string
+        bindingRevision:
+          type: integer
+          minimum: 1
     DeploymentId:
       type: string
       pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -215,7 +242,6 @@ components:
       - resourceId
       - resourceKind
       - clientProtocol
-      - upstreamId
       - managedGeneration
       - controlRevision
       - admittedAt
@@ -241,6 +267,7 @@ components:
           $ref: '#/components/schemas/ClientProtocol'
         upstreamId:
           $ref: '#/components/schemas/UpstreamId'
+          x-go-type-skip-optional-pointer: true
         managedGeneration:
           type: integer
           minimum: 0
@@ -264,6 +291,34 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/UsageMeter'
+        targetVersion:
+          type: integer
+          enum:
+          - 2
+        workspaceTarget:
+          $ref: '#/components/schemas/WorkspaceTarget'
+      not:
+        not:
+          oneOf:
+          - required:
+            - upstreamId
+            not:
+              anyOf:
+              - required:
+                - workspaceTarget
+              - required:
+                - targetVersion
+          - required:
+            - workspaceTarget
+            - targetVersion
+            properties:
+              resourceKind:
+                enum: [MCP]
+              clientProtocol:
+                enum: [MCP_STREAMABLE_HTTP]
+            not:
+              required:
+              - upstreamId
     BudgetLimitState:
       type: object
       additionalProperties: false
@@ -358,14 +413,15 @@ components:
           maxLength: 256
     RequestUsageFact:
       type: object
-      description: Immutable, fully attributed request fact. Proven-unforwarded admission denials carry the same deployment, resource, route and upstream attribution as forwarded requests; only their semantic meters are empty and forwarded is false.
+      description: Immutable, fully attributed request fact. Proven-unforwarded admission denials carry the same deployment,
+        resource, route and upstream attribution as forwarded requests; only their semantic meters are empty and forwarded
+        is false.
       additionalProperties: false
       required:
       - deploymentId
       - userId
       - resourceId
       - runtimeRouteId
-      - upstreamId
       - resourceKind
       - clientProtocol
       - managedGeneration
@@ -392,6 +448,7 @@ components:
           $ref: '#/components/schemas/RuntimeRouteId'
         upstreamId:
           $ref: '#/components/schemas/UpstreamId'
+          x-go-type-skip-optional-pointer: true
         resourceKind:
           $ref: '#/components/schemas/ResourceKind'
         clientProtocol:
@@ -410,7 +467,8 @@ components:
           format: date-time
         forwarded:
           type: boolean
-          description: False only for a proven-unforwarded durable denial. Such a fact still requires complete resource, runtime route and upstream attribution.
+          description: False only for a proven-unforwarded durable denial. Such a fact still requires complete resource,
+            runtime route and upstream attribution.
         httpStatus:
           type: integer
           minimum: 100
@@ -433,6 +491,34 @@ components:
           minimum: 0
         errorClass:
           type: string
+        targetVersion:
+          type: integer
+          enum:
+          - 2
+        workspaceTarget:
+          $ref: '#/components/schemas/WorkspaceTarget'
+      not:
+        not:
+          oneOf:
+          - required:
+            - upstreamId
+            not:
+              anyOf:
+              - required:
+                - workspaceTarget
+              - required:
+                - targetVersion
+          - required:
+            - workspaceTarget
+            - targetVersion
+            properties:
+              resourceKind:
+                enum: [MCP]
+              clientProtocol:
+                enum: [MCP_STREAMABLE_HTTP]
+            not:
+              required:
+              - upstreamId
     UsageSettlement:
       type: object
       description: Durable settlement or correction. A proven-unforwarded denial is SETTLED with EXACT completeness, no meters, and a fully attributed request fact.

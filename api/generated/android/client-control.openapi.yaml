@@ -522,8 +522,312 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+  /api/client/v1/workspace:
+    get:
+      operationId: getWorkspace
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceProjection'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/client/v1/workspace/files:
+    get:
+      operationId: listClientWorkspaceFiles
+      parameters:
+      - &workspace_id001
+        name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileList'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: mutateClientWorkspaceFile
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResult'
+        default:
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceFileMutation'
+  /api/client/v1/workspace/content:
+    get:
+      operationId: downloadClientWorkspaceFile
+      parameters:
+      - name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: Range
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: uploadClientWorkspaceFile
+      parameters:
+      - name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceFileResult'
+        default:
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+    head:
+      operationId: headClientWorkspaceFile
+      parameters:
+      - name: path
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: Range
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+        default:
+          $ref: '#/components/responses/Problem'
 components:
   schemas:
+    WorkspaceServiceId:
+      type: string
+      pattern: ^wss_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    AgentSpaceId:
+      type: string
+      pattern: ^spc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    WorkspaceOperationId:
+      type: string
+      pattern: ^wop_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    WorkspaceFileEntry:
+      type: object
+      additionalProperties: false
+      required:
+      - path
+      - kind
+      properties:
+        path:
+          type: string
+        kind:
+          type: string
+          enum:
+          - FILE
+          - DIRECTORY
+        size:
+          type: integer
+          format: int64
+          minimum: 0
+        modifiedAt:
+          type: string
+          format: date-time
+        etag:
+          type: string
+    WorkspaceFileList:
+      type: object
+      additionalProperties: false
+      required:
+      - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceFileEntry'
+        usedBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        availableBytes:
+          type: integer
+          format: int64
+          minimum: 0
+    WorkspaceFileMutation:
+      type: object
+      additionalProperties: false
+      required:
+      - action
+      - path
+      properties:
+        action:
+          type: string
+          enum:
+          - MKCOL
+          - MOVE
+          - COPY
+          - DELETE
+        path:
+          type: string
+        destination:
+          type: string
+        sourceEtag:
+          type: string
+        targetEtag:
+          type: string
+        overwrite:
+          type: boolean
+        recursiveConfirmed:
+          type: boolean
+    WorkspaceFileFailure:
+      type: object
+      additionalProperties: false
+      required:
+      - path
+      - status
+      - code
+      properties:
+        path:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+    WorkspaceFileResult:
+      type: object
+      additionalProperties: false
+      required:
+      - outcome
+      - failures
+      - truncated
+      properties:
+        outcome:
+          type: string
+          enum:
+          - SUCCEEDED
+          - PARTIAL
+          - UNKNOWN
+        failures:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceFileFailure'
+        truncated:
+          type: boolean
+    WorkspaceProjection:
+      type: object
+      additionalProperties: false
+      required:
+      - schemaVersion
+      - state
+      - bindingRevision
+      - mcpAvailable
+      - filesAvailable
+      - mcpReason
+      - filesReason
+      properties:
+        schemaVersion:
+          type: integer
+          enum:
+          - 1
+        state:
+          type: string
+          enum:
+          - UNPROVISIONED
+          - CONNECTING
+          - CONNECTED
+          - DISCONNECTING
+          - DISCONNECTED
+          - RESTORING
+          - DELETING
+          - DELETED
+          - NEEDS_ATTENTION
+        bindingRevision:
+          type: integer
+          minimum: 0
+        agentSpaceId:
+          $ref: '#/components/schemas/AgentSpaceId'
+        mcpServerId:
+          $ref: '#/components/schemas/McpServerId'
+        mcpAvailable:
+          type: boolean
+        filesAvailable:
+          type: boolean
+        mcpReason:
+          type: string
+        filesReason:
+          type: string
+        observedAt:
+          type: string
+          format: date-time
+        operationId:
+          $ref: '#/components/schemas/WorkspaceOperationId'
     ManagedAppliedReport:
       type: object
       additionalProperties: false

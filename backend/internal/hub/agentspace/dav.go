@@ -71,8 +71,11 @@ func readMulti(body io.Reader) (multistatus, error) {
 		}
 	}
 	var out multistatus
-	if xml.Unmarshal(data, &out) != nil || len(out.Responses) > maxEntries {
+	if xml.Unmarshal(data, &out) != nil {
 		return out, &Error{Code: "invalid_dav_xml"}
+	}
+	if len(out.Responses) > maxEntries {
+		return out, &Error{Code: "file_listing_limit"}
 	}
 	return out, nil
 }
@@ -267,7 +270,13 @@ func (c *Client) Content(ctx context.Context, name, token, p, method string, bod
 	if headers.Get("If-Match") != "" && !validETag(headers.Get("If-Match")) {
 		return nil, &Error{Code: "invalid_file_condition"}
 	}
+	if len(headers.Values("If-Match")) > 1 || len(headers.Values("If-None-Match")) > 1 {
+		return nil, &Error{Code: "invalid_file_condition"}
+	}
 	if method == "PUT" {
+		if headers.Get("If-Match") != "" && headers.Get("If-None-Match") != "" {
+			return nil, &Error{Code: "invalid_file_condition"}
+		}
 		create := headers.Get("If-None-Match") == "*"
 		replace := validETag(headers.Get("If-Match"))
 		if create == replace {

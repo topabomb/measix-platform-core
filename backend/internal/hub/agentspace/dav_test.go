@@ -106,6 +106,29 @@ func TestDAVUploadStreamsAndRequiresCondition(t *testing.T) {
 	}
 }
 
+func TestDAVUploadRejectsAmbiguousConditionsBeforeForwarding(t *testing.T) {
+	writes := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { writes++; w.WriteHeader(201) }))
+	defer server.Close()
+	c, _ := New(server.URL, server.URL, server.URL, "admin")
+	for _, headers := range []http.Header{
+		{"If-Match": {`"v1"`}, "If-None-Match": {`"other"`}},
+		{"If-Match": {`"v1"`, `"v2"`}},
+		{"If-None-Match": {"*", `"other"`}},
+	} {
+		response, err := c.Content(context.Background(), "alice", "token", "a", "PUT", strings.NewReader("test"), headers)
+		if response != nil {
+			response.Body.Close()
+		}
+		if err == nil {
+			t.Error("accepted ambiguous conditions")
+		}
+	}
+	if writes != 0 {
+		t.Fatalf("forwarded %d ambiguous writes", writes)
+	}
+}
+
 func TestDAVCopyRequiresObservedSourceVersion(t *testing.T) {
 	writes := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

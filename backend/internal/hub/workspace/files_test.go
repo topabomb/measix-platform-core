@@ -18,7 +18,7 @@ func TestFileLeaseRevokesAndLateDAVFailureCannotRevokeNewVersion(t *testing.T) {
 		}
 		return nil
 	}
-	access, e := s.OpenFiles(ctx, actor, user, "GET", "a.txt", authorize)
+	access, e := s.OpenFiles(ctx, actor, user, s.Client.AgentSpace.GetX(ctx, user).AgentSpaceID, "GET", "a.txt", authorize)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -35,7 +35,7 @@ func TestFileLeaseRevokesAndLateDAVFailureCannotRevokeNewVersion(t *testing.T) {
 	default:
 		t.Fatal("old credential lease not cancelled")
 	}
-	fresh, e := s.OpenFiles(ctx, actor, user, "GET", "a.txt", authorize)
+	fresh, e := s.OpenFiles(ctx, actor, user, s.Client.AgentSpace.GetX(ctx, user).AgentSpaceID, "GET", "a.txt", authorize)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -47,7 +47,7 @@ func TestFileLeaseRevokesAndLateDAVFailureCannotRevokeNewVersion(t *testing.T) {
 	default:
 		t.Fatal("logout did not cancel file lease")
 	}
-	if _, e = s.OpenFiles(ctx, actor, user, "GET", "a.txt", authorize); e == nil {
+	if _, e = s.OpenFiles(ctx, actor, user, s.Client.AgentSpace.GetX(ctx, user).AgentSpaceID, "GET", "a.txt", authorize); e == nil {
 		t.Fatal("revoked session registered a file lease")
 	}
 }
@@ -56,7 +56,7 @@ func TestCurrentDAVFailureOnlyInvalidatesFiles(t *testing.T) {
 	s, _, actor, user := lifecycleFixture(t)
 	ctx := context.Background()
 	runCommand(t, s, actor, user, "CREATE")
-	a, e := s.OpenFiles(ctx, actor, user, "LIST", "", func(context.Context) error { return nil })
+	a, e := s.OpenFiles(ctx, actor, user, s.Client.AgentSpace.GetX(ctx, user).AgentSpaceID, "LIST", "", func(context.Context) error { return nil })
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -28,7 +28,10 @@ const proof=(name)=>{checks.push(name);console.log('PASS '+name)}
 async function start(){processes=startHubAndRelay(env);for(const [name,p]of Object.entries(processes)){const log=createWriteStream(join(out,name+'.log'),{flags:'a'});for(const stream of[p.stdout,p.stderr]){stream.removeAllListeners('data');stream.pipe(log)}}await waitFor(env.hubBaseURL+'/live','hub');await waitFor(env.relayIntBaseURL+'/live','relay')}
 async function stop(){await Promise.all(Object.values(processes??{}).map(async p=>{if(p.exitCode!==null)return;const exited=once(p,'exit');p.kill();await exited}))}
 async function login(){const r=await fetch(env.hubBaseURL+'/api/admin/v1/session/login',{method:'POST',headers:{'Content-Type':'application/json',Origin:env.hubBaseURL},body:JSON.stringify({username:'admin',password:env.adminPassword})});assert.equal(r.status,200);session=await r.json();cookie=r.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ')}
-async function raw(path,init={}){return fetch(env.hubBaseURL+path,{...init,headers:{cookie,Origin:env.hubBaseURL,'X-CSRF-Token':session.csrfToken,...init.headers}})}
+async function raw(path,init={}){
+ const match=path.match(/^(\/api\/admin\/v1\/users\/[^/]+\/workspace)\/(?:files|content)(?:\?|$)/)
+ if(match&&!new URL(path,env.hubBaseURL).searchParams.has('agentSpaceId')){const view=await api(match[1]);path+=(path.includes('?')?'&':'?')+'agentSpaceId='+encodeURIComponent(view.agentSpaceId)}
+ return fetch(env.hubBaseURL+path,{...init,headers:{cookie,Origin:env.hubBaseURL,'X-CSRF-Token':session.csrfToken,...init.headers}})}
 async function api(path,method='GET',body,headers={}){const r=await raw(path,{method,headers:{...(body===undefined?{}:{'Content-Type':'application/json'}),...headers},body:body===undefined?undefined:JSON.stringify(body)});assert.ok(r.ok,path+' HTTP '+r.status);const text=await r.text();return text?JSON.parse(text):undefined}
 async function complete(op){for(let i=0;i<180;i++){const v=await api('/api/admin/v1/workspace-operations/'+op.operationId);if(v.state==='COMPLETED'){assert.notEqual(v.step,'CHECK_FAILED');return v}assert.ok(!['UNKNOWN','NEEDS_ATTENTION'].includes(v.state),v.diagnosticCode);await pause()}throw Error('Operation did not complete')}
 const base=u=>'/api/admin/v1/users/'+u.userId+'/workspace'
@@ -48,9 +51,12 @@ try{
   await new Promise(resolve=>{process.once('SIGINT',resolve);process.once('SIGTERM',resolve)})
   process.exitCode=0
  }else{
+ const noService=await api(base(session.user));assert.equal(noService.serviceState,'NOT_CONFIGURED');assert.equal(noService.state,'UNPROVISIONED')
  const secret=await api('/api/admin/v1/secrets','POST',{name:'Isolated Agent Space management',value:managementToken})
  const workspaceService=await api('/api/admin/v1/remote-workspace/services','POST',{name:'Agent Space acceptance',expectedRevision:0,config:{adminOrigin:config.adminOrigin,mcpOrigin:config.mcpOrigin,davOrigin:config.davOrigin,managementSecret:{secretId:secret.secretId,secretVersion:secret.secretVersion},releaseIdentity:config.releaseIdentity,connectTimeoutMs:90000,idleTimeoutMs:120000}},{'Idempotency-Key':key()});mcpId=workspaceService.mcpServerId
+ assert.equal((await api(base(session.user))).serviceState,'DISABLED')
  await api('/api/admin/v1/remote-workspace/services/'+workspaceService.workspaceServiceId+'/check','POST');await complete(await api('/api/admin/v1/remote-workspace/services/'+workspaceService.workspaceServiceId+'/apply','POST',undefined,{'Idempotency-Key':key()}))
+ assert.equal((await api(base(session.user))).serviceState,'ENABLED');proof('unprovisioned user distinguishes unconfigured, disabled and enabled service')
  for(const n of['a','b']){const u=await api('/api/admin/v1/users','POST',{username:'acceptance_'+n,displayName:'Acceptance '+n,role:'MEMBER'});users.push(u);await command(u,'CREATE')}
  const beforeMcp=await api(base(users[0]));assert.equal(beforeMcp.filesAvailable,true);assert.equal(beforeMcp.mcpAvailable,false)
  let pre=await raw(base(users[0])+'/content?path=before-mcp.txt',{method:'PUT',headers:{'If-None-Match':'*'},body:'Files work before optional MCP publication'});assert.equal(pre.status,200);await pre.body.cancel()
@@ -66,6 +72,20 @@ try{
  const a=await enroll(users[0]),b=await enroll(users[1]);await initMCP(a);await initMCP(b)
  await tool(a,'write',{path:'/workspace/跨入口.txt',content:'MCP and DAV share this original space\n'})
  let r=await raw(base(a)+'/content?path='+encodeURIComponent('跨入口.txt'));assert.equal(await r.text(),'MCP and DAV share this original space\n')
+ const clientView=await fetch(env.hubBaseURL+'/api/client/v1/workspace',{headers:{Authorization:'Bearer '+a.accessToken}}).then(r=>r.json())
+ assert.equal(clientView.serviceState,'ENABLED')
+ const clientURL=env.hubBaseURL+'/api/client/v1/workspace/content?'+new URLSearchParams({path:'client-edit.txt',agentSpaceId:clientView.agentSpaceId})
+ const clientHeaders={Authorization:'Bearer '+a.accessToken}
+ const initialText=Buffer.from('\uFEFFfirst\r\n')
+ let cr=await fetch(clientURL,{method:'PUT',headers:{...clientHeaders,'If-None-Match':'*'},body:initialText});assert.equal(cr.status,200);await cr.body.cancel()
+ cr=await fetch(clientURL,{headers:clientHeaders});assert.equal(cr.status,200);const editETag=cr.headers.get('etag');assert.deepEqual(Buffer.from(await cr.arrayBuffer()),initialText)
+ cr=await fetch(clientURL,{method:'PUT',headers:{...clientHeaders,'If-Match':editETag},body:Buffer.from('\uFEFFedited text\r\n')});assert.equal(cr.status,200);await cr.body.cancel()
+ cr=await fetch(clientURL,{method:'PUT',headers:{...clientHeaders,'If-Match':editETag},body:'stale overwrite'});assert.equal(cr.status,409);assert.equal((await cr.json()).code,'file_version_conflict')
+ const wrong=new URL(clientURL);wrong.searchParams.set('agentSpaceId','spc_'+randomUUID())
+ cr=await fetch(wrong,{method:'PUT',headers:{...clientHeaders,'If-None-Match':'*'},body:'wrong space'});assert.equal(cr.status,409);assert.equal((await cr.json()).code,'workspace_space_mismatch')
+ const missing=new URL(clientURL);missing.searchParams.delete('agentSpaceId');cr=await fetch(missing,{headers:clientHeaders});assert.equal(cr.status,400);await cr.body.cancel()
+ cr=await fetch(clientURL,{headers:clientHeaders});assert.deepEqual(Buffer.from(await cr.arrayBuffer()),Buffer.from('\uFEFFedited text\r\n'))
+ proof('native client file authentication, exact UTF-8 bytes, conditional editing and required original space')
  const other=await mcp(b,'tools/call',{name:'read',arguments:{path:'/workspace/跨入口.txt'}});assert.ok(other.body?.result?.isError)
  const cross=await mcp(b,'tools/list',{},3,{'Mcp-Session-Id':a.mcpSession,'X-Measix-User-Id':a.userId});assert.ok([401,404].includes(cross.status))
  const snapshots=[];for(const u of[a,b]){const q=await fetch(env.hubBaseURL+'/api/client/v1/managed/snapshots/1',{headers:{Authorization:'Bearer '+u.accessToken}});assert.equal(q.status,200);snapshots.push(await q.text())}assert.equal(snapshots[0],snapshots[1]);proof('two-user real MCP isolation, DAV interoperability and byte-identical Snapshot')

@@ -57,7 +57,7 @@ onBeforeUnmount(()=>{alive=false;controller.abort();if(timer)clearTimeout(timer)
  <q-card flat bordered data-cy="workspace-panel">
   <q-card-section><div class="row items-center justify-between"><div><div class="text-h6">远程工作区<span v-if="displayName"> · {{displayName}}</span></div><div class="text-caption text-grey-7">{{view?labels[view.state]:'正在加载'}}</div></div><q-btn flat round icon="refresh" aria-label="刷新工作区" :disable="busy" @click="refresh"/></div></q-card-section>
   <q-card-section class="q-pt-none"><ProblemBanner :error="error"/>
-   <template v-if="view"><q-banner v-if="!serviceEnabled" dense class="bg-grey-2 q-mb-sm">远程工作区服务未启用，不能开通或恢复连接。已有空间仍可核查和删除。</q-banner>
+   <template v-if="view"><q-banner v-if="view.serviceState==='NOT_CONFIGURED'" dense class="bg-grey-2 q-mb-sm">企业尚未配置远程工作区服务。</q-banner><q-banner v-else-if="view.serviceState==='DISABLED'" dense class="bg-grey-2 q-mb-sm">远程工作区服务未启用，不能开通或恢复连接。已有空间仍可核查和删除。</q-banner>
     <div class="row q-gutter-sm q-my-sm"><q-chip dense :color="view.mcpAvailable?'green-1':'grey-2'">{{view.mcpAvailable?'MCP 可用':view.mcpReason==='mcp_not_published'?'MCP 未发布（可选）':'MCP 不可用'}}</q-chip><q-chip dense :color="view.filesAvailable?'green-1':'grey-2'">文件 {{view.filesAvailable?'可用':'不可用'}}</q-chip></div>
     <div v-if="!view.mcpAvailable||!view.filesAvailable" class="text-caption text-grey-7 q-mb-sm">MCP：{{workspaceLabel(view.mcpReason)}} · 文件：{{workspaceLabel(view.filesReason)}}</div>
     <q-banner v-if="serviceEnabled && view.state==='CONNECTED' && view.filesReason==='dav_not_configured'" dense class="bg-grey-2 q-mb-sm">请先在远程工作区服务配置中填写文件服务地址，再签发 WebDAV Token。</q-banner>
@@ -75,7 +75,7 @@ onBeforeUnmount(()=>{alive=false;controller.abort();if(timer)clearTimeout(timer)
     <details v-if="view.agentSpaceId" class="text-caption text-grey-7 q-mt-sm"><summary>空间标识与最近观测</summary><div class="text-break">{{view.agentSpaceId}}</div><div>{{view.observedAt?new Date(view.observedAt).toLocaleString():'未观测'}} · 绑定版本 {{view.bindingRevision}}</div></details>
    </template>
   </q-card-section>
-  <WorkspaceFiles v-if="serviceEnabled&&showFiles&&view?.filesAvailable&&view.agentSpaceId" :key="view.agentSpaceId+'/'+view.bindingRevision" :base-url="url" :space-id="view.agentSpaceId"/>
+  <WorkspaceFiles v-if="showFiles&&view?.agentSpaceId" :key="view.agentSpaceId" :base-url="url" :space-id="view.agentSpaceId" :available="serviceEnabled&&view.filesAvailable"/>
   <q-dialog :model-value="!!confirm" :persistent="busy" @update:model-value="v=>{if(!v){confirm=undefined;recoveryBearer='';recoverySecret=undefined}}"><q-card style="width:520px;max-width:95vw"><q-card-section class="text-h6">{{actionLabels[confirm??'']}}</q-card-section><q-card-section class="q-gutter-sm"><ProblemBanner :error="error"/>
    <div v-if="confirm==='CREATE'">为此用户创建独立空间。首次工具或文件访问时启动运行环境。</div>
    <div v-if="confirm==='DISCONNECT'">停止工作区并撤销 MCP 和 WebDAV 访问。账号和文件保留。</div>

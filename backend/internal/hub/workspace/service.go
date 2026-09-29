@@ -307,9 +307,22 @@ func diagnostic(err error) string {
 	return "workspace_unavailable"
 }
 func (s *Service) Projection(ctx context.Context, userID string) (adminapi.WorkspaceProjection, error) {
-	out := adminapi.WorkspaceProjection{SchemaVersion: 1, State: "UNPROVISIONED", McpReason: "not_provisioned", FilesReason: "not_provisioned"}
+	out := adminapi.WorkspaceProjection{SchemaVersion: 1, ServiceState: "NOT_CONFIGURED", State: "UNPROVISIONED", McpReason: "not_provisioned", FilesReason: "not_provisioned"}
 	row, err := s.Client.AgentSpace.Get(ctx, userID)
 	if ent.IsNotFound(err) {
+		services, e := s.Client.WorkspaceService.Query().All(ctx)
+		if e != nil {
+			return out, e
+		}
+		if len(services) > 0 {
+			out.ServiceState = "DISABLED"
+		}
+		for _, service := range services {
+			if service.Enabled {
+				out.ServiceState = "ENABLED"
+				break
+			}
+		}
 		user, e := s.Client.User.Get(ctx, userID)
 		if e != nil || user.Status != "ACTIVE" {
 			out.McpReason = "user_unavailable"
@@ -331,6 +344,10 @@ func (s *Service) Projection(ctx context.Context, userID string) (adminapi.Works
 		return out, err
 	}
 	out.McpServerId = ptr(workspaceService.McpServerID)
+	out.ServiceState = "DISABLED"
+	if workspaceService.Enabled {
+		out.ServiceState = "ENABLED"
+	}
 	reason := "workspace_not_connected"
 	user, e := s.Client.User.Get(ctx, userID)
 	eligible := e == nil && user.Status == "ACTIVE" && workspaceService.Enabled && workspaceService.State == "ACTIVE" && workspaceService.ActiveConfigRevision != nil && row.Intent == "CONNECTED" && row.State == "CONNECTED" && row.RemoteActive && !row.StopPending

@@ -348,8 +348,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Paths are relative to the workspace root, encoded once as query values. Writes are never automatically retried. */
         get: operations["listClientWorkspaceFiles"];
         put?: never;
+        /** @description Paths are relative to the workspace root, encoded once as query values. Writes are never automatically retried. */
         post: operations["mutateClientWorkspaceFile"];
         delete?: never;
         options?: never;
@@ -364,11 +366,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Paths are relative to the workspace root, encoded once as query values. Writes are never automatically retried. Range supports byte downloads. Resume only with the same ETag in If-Match; do not append a full 200 response to partial bytes. */
         get: operations["downloadClientWorkspaceFile"];
+        /** @description Paths are relative to the workspace root, encoded once as query values. Writes are never automatically retried. PUT requires exactly one of If-None-Match: * (create) or a strong If-Match ETag from the content GET (replace). A lost response may mean the write committed; re-read before deciding. */
         put: operations["uploadClientWorkspaceFile"];
         post?: never;
         delete?: never;
         options?: never;
+        /** @description Paths are relative to the workspace root, encoded once as query values. Writes are never automatically retried. Range supports byte downloads. Resume only with the same ETag in If-Match; do not append a full 200 response to partial bytes. */
         head: operations["headClientWorkspaceFile"];
         patch?: never;
         trace?: never;
@@ -433,6 +438,11 @@ export interface components {
             /** Format: date-time */
             observedAt?: string;
             operationId?: components["schemas"]["WorkspaceOperationId"];
+            /**
+             * @description Configured enable intent, independent of this user lifecycle and remote health. ENABLED does not imply filesAvailable.
+             * @enum {string}
+             */
+            serviceState: "NOT_CONFIGURED" | "DISABLED" | "ENABLED";
         };
         ManagedAppliedReport: {
             managedGeneration: number;
@@ -1580,8 +1590,10 @@ export interface operations {
     };
     listClientWorkspaceFiles: {
         parameters: {
-            query?: {
+            query: {
                 path?: string;
+                /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
             };
             header?: never;
             path?: never;
@@ -1598,12 +1610,96 @@ export interface operations {
                     "application/json": components["schemas"]["WorkspaceFileList"];
                 };
             };
+            /** @description invalid_file_path, invalid_file_condition, file_condition_required, invalid_file_destination or invalid_workspace_request; correct the request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core authentication invalid. Refresh/sign in through the existing session lifecycle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core permission denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_not_found; refresh parent. Missing deployment routes are not an empty directory. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_transfer_limit; bounded concurrent transfers exceeded. Queue reads; do not replay writes automatically. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_unavailable, dav_credential_unavailable, file_service_unavailable, file_transport_unavailable or workspace_result_unknown. DAV failures do not invalidate Core login. Unknown writes require re-reading; do not retry automatically. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_storage_full; free space before a new explicit attempt. */
+            507: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             default: components["responses"]["Problem"];
         };
     };
     mutateClientWorkspaceFile: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1614,7 +1710,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
+            /** @description Inspect outcome: SUCCEEDED, PARTIAL or UNKNOWN. HTTP 200 alone does not mean every mutation succeeded. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1623,13 +1719,96 @@ export interface operations {
                     "application/json": components["schemas"]["WorkspaceFileResult"];
                 };
             };
+            /** @description invalid_file_path, invalid_file_condition, file_condition_required, invalid_file_destination or invalid_workspace_request; correct the request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core authentication invalid. Refresh/sign in through the existing session lifecycle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core permission denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_not_found; refresh parent. Missing deployment routes are not an empty directory. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_transfer_limit; bounded concurrent transfers exceeded. Queue reads; do not replay writes automatically. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_unavailable, dav_credential_unavailable, file_service_unavailable, file_transport_unavailable or workspace_result_unknown. DAV failures do not invalidate Core login. Unknown writes require re-reading; do not retry automatically. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_storage_full; free space before a new explicit attempt. */
+            507: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             default: components["responses"]["Problem"];
         };
     };
     downloadClientWorkspaceFile: {
         parameters: {
-            query?: {
+            query: {
                 path?: string;
+                /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
             };
             header?: {
                 Range?: string;
@@ -1641,13 +1820,155 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Full content or HEAD metadata. */
             200: {
                 headers: {
+                    /** @description Opaque version of these bytes; preserve quotes. Use with If-Match for editing and resumed downloads. */
+                    ETag?: string;
+                    /** @description Remote HTTP modification date when available. */
+                    "Last-Modified"?: string;
+                    /** @description Response byte length when known. */
+                    "Content-Length"?: string;
+                    /** @description Selected range for 206. */
+                    "Content-Range"?: string;
+                    /** @description Remote byte range support. */
+                    "Accept-Ranges"?: string;
+                    /** @description Attachment filename; never execute as same-origin HTML. */
+                    "Content-Disposition"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/octet-stream": string;
+                };
+            };
+            /** @description Partial byte range. */
+            206: {
+                headers: {
+                    /** @description Opaque version of these bytes; preserve quotes. Use with If-Match for editing and resumed downloads. */
+                    ETag?: string;
+                    /** @description Remote HTTP modification date when available. */
+                    "Last-Modified"?: string;
+                    /** @description Response byte length when known. */
+                    "Content-Length"?: string;
+                    /** @description Selected range for 206. */
+                    "Content-Range"?: string;
+                    /** @description Remote byte range support. */
+                    "Accept-Ranges"?: string;
+                    /** @description Attachment filename; never execute as same-origin HTML. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Not modified; no body. */
+            304: {
+                headers: {
+                    /** @description Opaque version of these bytes; preserve quotes. Use with If-Match for editing and resumed downloads. */
+                    ETag?: string;
+                    /** @description Remote HTTP modification date when available. */
+                    "Last-Modified"?: string;
+                    /** @description Response byte length when known. */
+                    "Content-Length"?: string;
+                    /** @description Selected range for 206. */
+                    "Content-Range"?: string;
+                    /** @description Remote byte range support. */
+                    "Accept-Ranges"?: string;
+                    /** @description Attachment filename; never execute as same-origin HTML. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invalid_file_path, invalid_file_condition, file_condition_required, invalid_file_destination or invalid_workspace_request; correct the request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core authentication invalid. Refresh/sign in through the existing session lifecycle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core permission denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_not_found; refresh parent. Missing deployment routes are not an empty directory. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_range_invalid; requested range cannot be served. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_transfer_limit; bounded concurrent transfers exceeded. Queue reads; do not replay writes automatically. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_unavailable, dav_credential_unavailable, file_service_unavailable, file_transport_unavailable or workspace_result_unknown. DAV failures do not invalidate Core login. Unknown writes require re-reading; do not retry automatically. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_storage_full; free space before a new explicit attempt. */
+            507: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             default: components["responses"]["Problem"];
@@ -1655,8 +1976,10 @@ export interface operations {
     };
     uploadClientWorkspaceFile: {
         parameters: {
-            query?: {
+            query: {
                 path?: string;
+                /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
             };
             header?: {
                 "If-Match"?: string;
@@ -1671,7 +1994,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
+            /** @description Inspect outcome: SUCCEEDED, PARTIAL or UNKNOWN. HTTP 200 alone does not mean every mutation succeeded. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1680,13 +2003,96 @@ export interface operations {
                     "application/json": components["schemas"]["WorkspaceFileResult"];
                 };
             };
+            /** @description invalid_file_path, invalid_file_condition, file_condition_required, invalid_file_destination or invalid_workspace_request; correct the request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core authentication invalid. Refresh/sign in through the existing session lifecycle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core permission denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_not_found; refresh parent. Missing deployment routes are not an empty directory. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_transfer_limit; bounded concurrent transfers exceeded. Queue reads; do not replay writes automatically. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_unavailable, dav_credential_unavailable, file_service_unavailable, file_transport_unavailable or workspace_result_unknown. DAV failures do not invalidate Core login. Unknown writes require re-reading; do not retry automatically. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_storage_full; free space before a new explicit attempt. */
+            507: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             default: components["responses"]["Problem"];
         };
     };
     headClientWorkspaceFile: {
         parameters: {
-            query?: {
+            query: {
                 path?: string;
+                /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
             };
             header?: {
                 Range?: string;
@@ -1698,12 +2104,152 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Full content or HEAD metadata. */
             200: {
                 headers: {
+                    /** @description Opaque version of these bytes; preserve quotes. Use with If-Match for editing and resumed downloads. */
+                    ETag?: string;
+                    /** @description Remote HTTP modification date when available. */
+                    "Last-Modified"?: string;
+                    /** @description Response byte length when known. */
+                    "Content-Length"?: string;
+                    /** @description Selected range for 206. */
+                    "Content-Range"?: string;
+                    /** @description Remote byte range support. */
+                    "Accept-Ranges"?: string;
+                    /** @description Attachment filename; never execute as same-origin HTML. */
+                    "Content-Disposition"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Partial byte range. */
+            206: {
+                headers: {
+                    /** @description Opaque version of these bytes; preserve quotes. Use with If-Match for editing and resumed downloads. */
+                    ETag?: string;
+                    /** @description Remote HTTP modification date when available. */
+                    "Last-Modified"?: string;
+                    /** @description Response byte length when known. */
+                    "Content-Length"?: string;
+                    /** @description Selected range for 206. */
+                    "Content-Range"?: string;
+                    /** @description Remote byte range support. */
+                    "Accept-Ranges"?: string;
+                    /** @description Attachment filename; never execute as same-origin HTML. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not modified; no body. */
+            304: {
+                headers: {
+                    /** @description Opaque version of these bytes; preserve quotes. Use with If-Match for editing and resumed downloads. */
+                    ETag?: string;
+                    /** @description Remote HTTP modification date when available. */
+                    "Last-Modified"?: string;
+                    /** @description Response byte length when known. */
+                    "Content-Length"?: string;
+                    /** @description Selected range for 206. */
+                    "Content-Range"?: string;
+                    /** @description Remote byte range support. */
+                    "Accept-Ranges"?: string;
+                    /** @description Attachment filename; never execute as same-origin HTML. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invalid_file_path, invalid_file_condition, file_condition_required, invalid_file_destination or invalid_workspace_request; correct the request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core authentication invalid. Refresh/sign in through the existing session lifecycle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core permission denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_not_found; refresh parent. Missing deployment routes are not an empty directory. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_range_invalid; requested range cannot be served. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_transfer_limit; bounded concurrent transfers exceeded. Queue reads; do not replay writes automatically. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_unavailable, dav_credential_unavailable, file_service_unavailable, file_transport_unavailable or workspace_result_unknown. DAV failures do not invalidate Core login. Unknown writes require re-reading; do not retry automatically. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_storage_full; free space before a new explicit attempt. */
+            507: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             default: components["responses"]["Problem"];
         };

@@ -7,6 +7,40 @@ import (
 	"testing"
 )
 
+func TestWorkspaceClientProjectionFixtures(t *testing.T) {
+	for _, contract := range []string{"api/client/client-control.openapi.yaml", "api/admin/admin.openapi.yaml"} {
+		doc := loadContractDoc(t, contract)
+		schema := doc.Components.Schemas["WorkspaceProjection"].Value
+		for _, name := range []string{"projection-unprovisioned.json", "projection-files-only.json"} {
+			raw, err := os.ReadFile(filepath.Join("../../../api/fixtures/workspace", name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var value map[string]any
+			if err = json.Unmarshal(raw, &value); err != nil {
+				t.Fatal(err)
+			}
+			if err = schema.VisitJSON(value); err != nil {
+				t.Fatalf("%s/%s: %v", contract, name, err)
+			}
+			for _, state := range []string{"NOT_CONFIGURED", "DISABLED", "ENABLED"} {
+				value["serviceState"] = state
+				if err = schema.VisitJSON(value); err != nil {
+					t.Fatal(err)
+				}
+			}
+			value["serviceState"] = "UNKNOWN"
+			if schema.VisitJSON(value) == nil {
+				t.Fatal("accepted unknown service state")
+			}
+			delete(value, "serviceState")
+			if schema.VisitJSON(value) == nil {
+				t.Fatal("accepted missing service state")
+			}
+		}
+	}
+}
+
 func TestWorkspaceTargetFixturesAreExclusiveAndMCPOnly(t *testing.T) {
 	doc := loadContractDoc(t, "api/internal/usage-ingest.openapi.yaml")
 	for schema, file := range map[string]string{"BudgetAdmissionRequest": "admission-v2.json", "RequestUsageFact": "usage-target-v2.json"} {

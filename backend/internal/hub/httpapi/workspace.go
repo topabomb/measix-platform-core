@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"path"
+	"sync/atomic"
 
 	"measix/platform/ent"
 	remoteapi "measix/platform/internal/hub/agentspace"
@@ -33,15 +35,17 @@ func writeWorkspaceError(w http.ResponseWriter, err error) {
 		switch code {
 		case "file_not_found":
 			status = 404
-		case "file_version_conflict", "file_conflict", "file_locked":
+		case "file_version_conflict", "file_conflict", "file_locked", "workspace_space_mismatch":
 			status = 409
+		case "file_listing_limit":
+			status = 422
 		case "file_storage_full":
 			status = 507
 		case "file_range_invalid":
 			status = 416
 		case "file_transfer_limit":
 			status = 429
-		case "invalid_file_path", "invalid_file_request", "invalid_file_condition", "file_condition_required", "recursive_confirmation_required", "directory_overwrite_forbidden":
+		case "invalid_file_path", "invalid_file_request", "invalid_file_condition", "invalid_file_destination", "file_condition_required", "recursive_confirmation_required", "directory_overwrite_forbidden":
 			status = 400
 		}
 		if remote.Unknown {
@@ -288,7 +292,7 @@ func (h *fullClientHandler) clientWorkspaceFiles(w http.ResponseWriter, r *http.
 func (h *fullClientHandler) ListClientWorkspaceFiles(w http.ResponseWriter, r *http.Request, p clientapi.ListClientWorkspaceFilesParams) {
 	h.clientWorkspaceFiles(w, r, "LIST", optionalString(p.Path))
 }
-func (h *fullClientHandler) MutateClientWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+func (h *fullClientHandler) MutateClientWorkspaceFile(w http.ResponseWriter, r *http.Request, p clientapi.MutateClientWorkspaceFileParams) {
 	h.clientWorkspaceFiles(w, r, "MUTATE", "")
 }
 func (h *fullClientHandler) DownloadClientWorkspaceFile(w http.ResponseWriter, r *http.Request, p clientapi.DownloadClientWorkspaceFileParams) {
@@ -320,14 +324,14 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 	if action == "MUTATE" {
 		auditAction = string(mutation.Action)
 	}
-	access, err := service.OpenFiles(r.Context(), actor, userID, auditAction, filePath, authorize)
+	access, err := service.OpenFiles(r.Context(), actor, userID, r.URL.Query().Get("agentSpaceId"), auditAction, filePath, authorize)
 	if err != nil {
 		writeWorkspaceError(w, err)
 		return
 	}
 	outcome := "REJECTED"
-	var bytes int64
-	defer func() { service.CloseFiles(access, outcome, bytes) }()
+	var bytes atomic.Int64
+	defer func() { service.CloseFiles(access, outcome, bytes.Load()) }()
 	switch action {
 	case "LIST":
 		out, err := access.Remote.List(access.Context, access.Username, access.Token, filePath)
@@ -344,6 +348,7 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 			var re *remoteapi.Error
 			if errors.As(err, &re) && re.Unknown {
 				outcome = "UNKNOWN"
+				logUnknownFileWrite(access, r, auditAction, re, bytes.Load())
 			}
 			service.ObserveFileError(context.WithoutCancel(r.Context()), access, err)
 			writeWorkspaceError(w, err)
@@ -363,6 +368,7 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 			var re *remoteapi.Error
 			if errors.As(err, &re) && re.Unknown {
 				outcome = "UNKNOWN"
+				logUnknownFileWrite(access, r, auditAction, re, bytes.Load())
 			}
 			service.ObserveFileError(context.WithoutCancel(r.Context()), access, err)
 			writeWorkspaceError(w, err)
@@ -384,7 +390,8 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 		w.WriteHeader(response.StatusCode)
 		stream := remoteapi.IdleBody(response.Body, access.Idle)
 		defer stream.Close()
-		bytes, err = io.Copy(w, stream)
+		transferred, err := io.Copy(w, stream)
+		bytes.Store(transferred)
 		if err != nil {
 			outcome = "UNKNOWN"
 			panic(http.ErrAbortHandler)
@@ -393,14 +400,24 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 	}
 }
 
+// Keep transport diagnostics separate from the public unknown-result contract.
+// Never log file paths, remote URLs, credentials, response bodies or raw errors.
+func logUnknownFileWrite(access *workspace.FileAccess, r *http.Request, action string, remote *remoteapi.Error, bytes int64) {
+	slog.Warn("workspace file write result unknown", "event", "workspace.file_write_unknown", "action", action,
+		"remoteCode", remote.Code, "remoteStatus", remote.Status, "bytes", bytes,
+		"requestCanceled", r.Context().Err() != nil, "leaseCanceled", access.Context.Err() != nil)
+}
+
 type workspaceCountingReader struct {
 	reader io.Reader
-	count  *int64
+	// The transport may still be reading an upload when an early response
+	// reaches the handler, so audit/diagnostic snapshots must be atomic.
+	count *atomic.Int64
 }
 
 func (r *workspaceCountingReader) Read(p []byte) (int, error) {
 	n, err := r.reader.Read(p)
-	*r.count += int64(n)
+	r.count.Add(int64(n))
 	return n, err
 }
 

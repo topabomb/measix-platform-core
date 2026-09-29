@@ -23,7 +23,10 @@ type FileAccess struct {
 	bindingRevision, davSecretVersion int64
 }
 
-func (s *Service) OpenFiles(ctx context.Context, actor, userID, action, path string, authorize func(context.Context) error) (*FileAccess, error) {
+func (s *Service) OpenFiles(ctx context.Context, actor, userID, expectedSpaceID, action, path string, authorize func(context.Context) error) (*FileAccess, error) {
+	if platformid.Validate(platformid.AgentSpace, expectedSpaceID) != nil {
+		return nil, ErrInvalid
+	}
 	if _, err := remoteapi.RelativePath(path, false); err != nil {
 		return nil, err
 	}
@@ -39,12 +42,18 @@ func (s *Service) OpenFiles(ctx context.Context, actor, userID, action, path str
 	if err != nil {
 		return nil, err
 	}
+	if str(projection.AgentSpaceId) != expectedSpaceID {
+		return nil, &remoteapi.Error{Code: "workspace_space_mismatch", Status: 409}
+	}
 	if !projection.FilesAvailable {
 		return nil, ErrUnavailable
 	}
 	row, err := s.Client.AgentSpace.Get(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+	if row.AgentSpaceID != expectedSpaceID {
+		return nil, &remoteapi.Error{Code: "workspace_space_mismatch", Status: 409}
 	}
 	workspaceService, err := s.Client.WorkspaceService.Get(ctx, row.WorkspaceServiceID)
 	if err != nil {
@@ -128,7 +137,11 @@ func (s *Service) CancelInvalidFiles(ctx context.Context) {
 	}
 }
 func (s *Service) RevealDAV(ctx context.Context, actor, userID string, authorize func(context.Context) error) (adminapi.WorkspaceDAVConnection, error) {
-	access, err := s.OpenFiles(ctx, actor, userID, "REVEAL_DAV", "", authorize)
+	view, err := s.Projection(ctx, userID)
+	if err != nil {
+		return adminapi.WorkspaceDAVConnection{}, err
+	}
+	access, err := s.OpenFiles(ctx, actor, userID, str(view.AgentSpaceId), "REVEAL_DAV", "", authorize)
 	if err != nil {
 		return adminapi.WorkspaceDAVConnection{}, err
 	}

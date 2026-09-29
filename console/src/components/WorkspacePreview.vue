@@ -2,12 +2,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type PDFDocumentLoadingTask, type RenderTask } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
-import { apiResponse } from '../api/client'
+import { downloadWorkspaceFile, readWorkspaceContent, workspaceFileUrl } from '../composables/workspaceFiles'
 import { decodeWorkspaceText, previewKind, renderWorkspaceMarkdown, rasterMetadata } from '../composables/workspacePreview'
 import ProblemBanner from './ProblemBanner.vue'
 
 GlobalWorkerOptions.workerSrc=workerUrl
-const props=defineProps<{baseUrl:string;path:string;etag?:string}>()
+const props=defineProps<{baseUrl:string;spaceId:string;path:string;etag?:string}>()
 const emit=defineEmits<{close:[]}>()
 const kind=computed(()=>previewKind(props.path))
 const error=ref<unknown>(),loading=ref(true),text=ref(''),html=ref(''),imageUrl=ref('')
@@ -17,12 +17,7 @@ const controller=new AbortController(),urls:string[]=[]
 let task:PDFDocumentLoadingTask|undefined,pdf:PDFDocumentProxy|undefined,render:RenderTask|undefined,closed=false
 const limit=24*1024*1024
 async function bytes(path:string,etag?:string,max=limit){
- const response=await apiResponse(props.baseUrl+'/content?path='+encodeURIComponent(path),{signal:controller.signal,headers:etag?{'If-Match':etag}:{}})
- if(Number(response.headers.get('Content-Length'))>max){await response.body?.cancel();throw new Error('文件超过预览大小限制，请下载后打开。')}
- const reader=response.body?.getReader();if(!reader)throw new Error('文件响应为空')
- const chunks:Uint8Array[]=[];let size=0
- try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>max)throw new Error('文件超过预览大小限制，请下载后打开。');chunks.push(value)}}finally{await reader.cancel()}
- const out=new Uint8Array(size);let offset=0;for(const chunk of chunks){out.set(chunk,offset);offset+=chunk.length}return out
+ return (await readWorkspaceContent(workspaceFileUrl(props.baseUrl,props.spaceId,'content',path),controller.signal,max,etag)).data
 }
 async function raster(data:Uint8Array){
  const {type}=rasterMetadata(data)
@@ -68,7 +63,7 @@ onMounted(async()=>{
 onBeforeUnmount(()=>{closed=true;controller.abort();render?.cancel();void task?.destroy();for(const url of urls)URL.revokeObjectURL(url)})
 </script>
 <template>
- <q-card class="workspace-preview"><q-card-section class="row items-center no-wrap q-gutter-sm"><div class="text-subtitle1 ellipsis col">{{path}}</div><q-btn flat round icon="close" aria-label="关闭预览" @click="emit('close')"/></q-card-section><q-separator/>
+ <q-card class="workspace-preview"><q-card-section class="row items-center no-wrap q-gutter-sm"><div class="text-subtitle1 ellipsis col">{{path}}</div><q-btn flat label="下载" @click="downloadWorkspaceFile(baseUrl,spaceId,path)"/><q-btn flat round icon="close" aria-label="关闭预览" @click="emit('close')"/></q-card-section><q-separator/>
   <q-card-section><ProblemBanner :error="error"/><q-spinner v-if="loading" size="32px"/>
    <p v-if="kind==='download'">此类型不在网页中执行或预览，请下载后使用合适的软件打开。</p>
    <template v-if="kind==='pdf'&&pages"><div class="row items-center q-gutter-sm q-mb-sm"><q-btn flat icon="chevron_left" aria-label="上一页" :disable="page===1" @click="changePage(-1)"/><span>{{page}} / {{pages}}</span><q-btn flat icon="chevron_right" aria-label="下一页" :disable="page===pages" @click="changePage(1)"/><q-select v-model="zoom" dense outlined label="缩放" style="width:120px" :options="[0.5,1,1.5,2]" @update:model-value="draw"/></div><div class="pdf-scroll"><canvas ref="canvas"/></div></template>

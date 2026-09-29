@@ -149,3 +149,5 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 远程工作区配置、用户空间、文件操作及四类安全预览的源码所有者和交互边界统一记录于远程工作区实现参考。新增 pdf.js worker 必须以 JavaScript MIME 提供；文件预览按需加载，查看工作区详情不触发 DAV/VM。
 
 详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。
+
+文件列表增加“新建文本”，普通 UTF-8 文本与 Markdown 操作菜单提供“编辑文本”；预览内直接下载。编辑器按同次 GET 的 ETag 条件保存，支持另存新文件，保留 BOM/换行；冲突或未知结果保留草稿并阻止原写入重放。关闭/路由离开有未保存确认。文件可用性变化取消 IO，但同一空间的编辑器保留文字供复制；重新恢复访问后覆盖原文件仍须重新读取核实。服务未配置、企业关闭、用户未开通和文件暂不可用分别呈现，不把服务开关或 MCP 状态当作文件授权。

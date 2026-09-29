@@ -11,7 +11,7 @@
 | Runtime Control | `backend/internal/hub/runtimecontrol/workspace.go`：复用原全局 Activation、revision/hash/ACK；工作区不另建运行状态写入者 |
 | Relay | `internal/relay/control/`、`runtime/`：按已验证用户及 MCP ID 选择 immutable binding，取消失效在途请求 |
 | Secret | `internal/hub/upstream/secret_transaction.go`：在业务事务中复用 SecretBox/SecretVersion；不建立派生密钥或第二份凭据表 |
-| Admin | `RemoteWorkspacesPage.vue`、`WorkspacePanel.vue`、`WorkspaceFiles.vue`、`WorkspacePreview.vue`：全部通过同源 Admin API |
+| Admin | `RemoteWorkspacesPage.vue`、`WorkspacePanel.vue`、`WorkspaceFiles.vue`、`WorkspacePreview.vue`、`WorkspaceTextEditor.vue`：全部通过同源 Admin API |
 | 第三方服务 | Agent Space 拥有账号、空间、VM、磁盘和文件；本轮未修改其源码 |
 
 使用固定 Agent Space `3ea01c167fb263f8ef2467b5fe3103353f9a5ddc` 的管理 v1/MCP/WebDAV 能力。Core 当前版本门禁接受这一完整 release identity；升级远端版本需先核对指定 DAV token、禁用清理和条件文件语义，再更新适配与验收。管理凭据保存为版本化 Secret 引用。
@@ -48,6 +48,8 @@
 
 Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/workspace` 下的 `files`、`content` 进入同一个应用服务。Client 用户来自已验证令牌，不接受请求提供的 userId；Admin 每次验证会话、角色及写请求 CSRF。
 
+全部文件请求必须带 `agentSpaceId` query，取自当前 WorkspaceProjection。它固定本次操作目标，不提供选择其他用户的权限；参数缺失/无效返回 400，当前空间与目标不一致返回 409 `workspace_space_mismatch`，即使当前文件服务不可用也先区分空间不匹配。不能把旧页面、草稿或排队写入提交到重新开通的新空间。
+
 - `GET files?path=` 列目录、元信息和卷容量；`POST files` 仅接受 MKCOL/MOVE/COPY/DELETE 的类型化 JSON。
 - `GET/HEAD content?path=` 返回流、ETag、Range 元信息；`PUT content` 直接流式传输，创建要求 `If-None-Match: *`，覆盖要求单个源 `If-Match`。
 - COPY/MOVE 分别校验源 ETag、目标 tagged If；普通文件覆盖需目标 ETag，目录覆盖禁止。目录删除需显式递归确认。不把 DAV Destination/If 或浏览器 Cookie/Origin 任意转发。
@@ -55,17 +57,22 @@ Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/worksp
 - PROPFIND 裸 opaque ETag 规范化为 HTTP 引号形式，随后仍由远端条件请求验证。404 必须通过已认证根目录探测区分文件不存在和文件服务失效。
 - 并发文件请求最多 8；连接/响应头与传输无进展超时受服务配置控制，目录及多状态 XML 响应正文同样受空闲超时约束。请求取消、会话撤销、用户/服务停用、绑定或凭据修订变化均取消原租约。旧请求失败不能撤销新 Token。
 - 审计保存 actor、用户、原空间、路径、实际操作、字节数和结束结果；外部 DAV 直连不冒充 Core 审计。连接信息领取是显式 POST/no-store；列表不返回明文，查看不轮换。
+- 未知文件写入产生 `workspace.file_write_unknown` 结构化诊断，仅记录动作、远端错误分类/状态、字节数及请求/租约是否取消；不记录路径、URL、正文、原始错误或凭据。结合审计区分取消和远端失败，不据日志自动重放。
 - 网页下载通过原生浏览器下载，不把整个大文件读入 JavaScript。上传显示进度并可取消；断流提示刷新核实，不自动重试写入。
 - 文件服务地址未配置时不提供 Token 签发入口，后端在持久化操作前拒绝该请求。上传更换文件、目录或刷新发现目标版本变化时，必须重新确认覆盖。
 
 预览纯文本/Markdown 上限 2 MiB，PDF/图片上限 24 MiB；图片头在解码前限制 1600 万像素，PDF 每次渲染画布同样有像素上限。Markdown 禁用原始 HTML 执行、外部图片和危险链接，原文可切换，相对图片通过当前授权文件 API 加载（每张 4 MiB，最多 20 张）。PDF 使用 pdf.js 模块 worker 和 canvas，支持翻页/缩放；不执行文件作为网页。HTML/SVG 等只下载。关闭预览会取消读取、渲染并释放对象 URL。
+
+文本编辑复用 GET/PUT，不新增服务端编辑会话。正文与强 ETag 必须来自同一次 GET；新建/另存使用 `If-None-Match: *`，原文件保存使用该 GET 的 `If-Match`。Admin 编辑严格 UTF-8、最多 2 MiB，保留 BOM 和统一换行风格；二进制、非 UTF-8 或混合换行不自动转码覆盖。成功后关闭编辑器，下一次编辑重新 GET，避免把保存之后其他写入的版本错误地绑定到旧缓冲区。冲突/未知结果保留文字、禁止直接重放原写入；同名另存失败也需先核实或换新目标。关闭、重新读取和路由离开对未保存文字要求确认，页面刷新/关闭有浏览器原生保护。
+
+文件访问失效会取消 IO；同一空间编辑文字暂留页面供复制，恢复访问后覆盖仍需重新读取。预览直接下载，原生客户端分享复用下载文件副本，不新增公开链接或分享服务。完整 Client 传输状态、错误码和缓存边界见 [Android 对接说明](android-platform-integration.md#远程工作区与文件客户端)。
 
 ## 数据与合同
 
 - `000002_remote_workspace.sql` 增加 WorkspaceService、WorkspaceServiceConfig、AgentSpace、WorkspaceOperation、WorkspaceAudit；`000003_workspace_usage_target.sql` 保留旧归属，增加互斥 workspaceTarget。既有 `000001` 不变。
 - 旧 upstream 归属保持原字段和序列化；新分支使用 `targetVersion: 2` 与 workspaceServiceId、agentSpaceId、remoteUsername、bindingRevision，仅用于 MCP。预算准入、spool、结算和 Admin 历史详情携带同一固定归属，不引用可变空间表补写历史。
 - migration 003 重建表时保留所有原列、索引和引用；结束前完整 foreign_key_check。测试覆盖已有请求、结算引用、原始字节/哈希的升级及重复执行。
-- `WorkspaceProjection` 的 `schemaVersion: 1` 是独立 Client 控制接口。Android generated 导出已同步，不代表 Android 消费端 UI 或真实设备传输完成。
+- `WorkspaceProjection` 的 `schemaVersion: 1` 是独立 Client 控制接口，必填 `serviceState: NOT_CONFIGURED | DISABLED | ENABLED` 区分企业配置意图；`state` 表示用户生命周期，`filesAvailable`/`mcpAvailable` 各自表示实际准入。ENABLED 不等于远端健康。Android generated 导出和 Client 投影样例已同步，不代表 Android 消费端 UI 或真实设备传输完成。未发布的工作区合同直接更新，不新增兼容探测/回退分支；Snapshot 保持 v5。
 - 共享历史 Snapshot v4/v5 的发布字节、hash、republish 保持原协议；不在旧实体中填造假的 Upstream。
 
 ## 验证和边界

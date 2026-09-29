@@ -186,3 +186,5 @@ Freeze identity generation is a candidate/C7 concern and must not be confused wi
 运行控制显式 v2 和 MCP workspaceTarget、独立 WorkspaceProjection v1，以及 Admin/Client 文件接口已加入相应 OpenAPI。新目标不填造假 upstreamId；旧字段缺省序列化和历史 Snapshot 保持原语义。共享正反例在 `api/fixtures/workspace/`，执行测试为 `workspace_contract_test.go`。
 
 详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。
+
+未发布的工作区合同直接同步修订：WorkspaceProjection v1 必填 `serviceState`，全部文件请求必填 `agentSpaceId`，文件响应明确条件、Range 与 Problem 错误语义。Snapshot 仍为 v5，不增加工作区兼容探测或回退。两份 Client 投影样例随 Android 对接包导出，并由 Admin/Client 合同共同校验。

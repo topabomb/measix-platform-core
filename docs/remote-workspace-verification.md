@@ -2,7 +2,11 @@
 
 验证日期：2026-09-29。范围为当前 Core / Relay / Admin 候选、隔离 Agent Space 实际管理/MCP/VM/WebDAV 链路和浏览器管理操作；不是生产部署或完整 S1 验收。当前操作说明见 [实现参考](remote-workspace-implementation.md)。
 
-## 候选与环境
+## 首次集成验收（历史记录）
+
+下列候选、构建和 11 组结果属于此前已提交的首次集成，不能代替下文最新修订的验证。
+
+### 候选与环境
 
 | 项目 | 固定身份 |
 |---|---|
@@ -23,7 +27,7 @@
 
 源输入清单保存在 `.artifacts/workspace-git-review-final/source-inputs.json`：按路径排序，对 UTF-8/LF 规范化内容计算 SHA-256，再对 `path NUL digest NUL` 串计算总摘要；不包含凭据、测试数据库、日志或本文。精确构建及合同摘要另由联调脚本写入同目录的 `evidence.json`。这些忽略目录只作本机诊断，长期结论和执行命令记录于本文。
 
-## 执行结果
+### 执行结果
 
 | 检查 | 结果 |
 |---|---|
@@ -57,7 +61,7 @@ node scripts/workspace-integration.mjs --config .artifacts/workspace-integration
 10. 实际准入和结算记录保留不可变 workspaceTarget，未冒用 upstreamId。
 11. 远端删除完成后本地绑定回到 UNPROVISIONED；202 不当作已删除。
 
-## 实际 Admin 审查
+### 实际 Admin 审查
 
 使用 `--ui-only --output .artifacts/workspace-admin-review` 启动全新未配置环境，实际登录、输入测试连接配置并逐项操作；不是只检查 DOM 模板或以自动化 API 脚本代替网页操作。首轮完整审查地址为 `http://127.0.0.1:56990/admin/remote-workspaces`，临时登录资料仅保存在该目录的私有 `ui-env.json`。
 
@@ -70,7 +74,7 @@ node scripts/workspace-integration.mjs --config .artifacts/workspace-integration
 - 修复换选上传文件后沿用旧覆盖确认的问题；回归测试能拒绝旧行为，最终网页实际核对勾选状态从 true 变为 false。文件覆盖读取目标版本期间锁住重复提交。
 - 桌面与窄屏检查：窄屏内容宽和可视宽均为 375 px，无横向溢出；测试后恢复默认 viewport。最终截图保存在 `.artifacts/workspace-admin-review/remote-workspaces-desktop.png`、`remote-workspaces-narrow.png` 和 `remote-workspaces-overview.png`。
 
-## 提交前复审与修复
+### 提交前复审与修复
 
 对 Core 全部既有变更、生成输入和架构文档逐项复核，并新增以下回归验证：
 
@@ -85,10 +89,45 @@ node scripts/workspace-integration.mjs --config .artifacts/workspace-integration
 
 真实联调首次复审运行在 64 MiB 上传时返回一次 503，前四组已通过；当时未记录错误响应正文，根因未确认。为后续诊断，脚本增加失败响应与私有测试环境记录；随后一次完整重跑通过，补上 DAV 元数据超时及地址确认修复后的最终构建再次通过全部 11 组。通过重跑不作为首次 503 根因已修复的证据。
 
+## 文件客户端合同与编辑能力修订（当前）
+
+Core 基线 `d7f310a`、架构基线 `016e6fc` 加本次提交中的修订。执行范围为服务状态、固定空间请求、完整传输/错误合同、Admin 文本编辑/预览下载及 Android 对接资料；Snapshot v5 不变，没有新增工作区旧版兼容分支。Android、Portal 与 Agent Space 源码未修改。
+
+| 固定输入 | 当前验证身份 |
+|---|---|
+| Core 源输入 | `sha256:549635bcd3ad37469a99073032018f8397fecbc93eba9480e5d6222cff41555c`（910 个输入；清单位于 `.artifacts/workspace-review-clean/source-inputs.json`） |
+| Hub | `sha256:4e5f1b926bb11850224faa9e429cb87dfd9bfb58004c9a30c4f50bd7b54e0e31` |
+| Relay | `sha256:20c08a7dbf7fd9e337295b2eef47545580aa5d448e52703ae403f3456ba484f7` |
+| Admin 生产构建 | `sha256:8c1074dfb20b0f08f93352d0f2d1490ab22af1e943eede52ec8d83bad0e22b8d` |
+| Admin OpenAPI | `sha256:879977e10a41f295e9c75803b8c61a8e4eecbda93fdaba43acc290bc19661ea5` |
+| Client OpenAPI | `sha256:55930f4ddc6aa790537f37797f3f4f8f180d431569c8daf9022295d4b9bf90d7` |
+| Agent Space | 与首次集成相同的固定 release/镜像；最终使用新容器 `measix-workspace-review-20260929` 和独立卷 `measix-workspace-review-initialized-20260929`，未改其源码 |
+
+- `go test ./... -count=1`、`go vet ./...`、`npm run fmt:check` 全部通过。
+- 前端 39 个测试文件、240 项通过；typecheck 和生产构建通过。新增回归覆盖服务状态、固定空间 ID、错误分类、UTF-8/BOM/换行、拒绝混用/重复条件头、条件保存、冲突/未知结果保留草稿与阻止重放、另存/退出确认、访问恢复后的请求生命周期。
+- tooling 41 项通过；重复 `npm run generate` 后 417 个生成相关文件规范化摘要无漂移；Admin/Client 投影样例校验通过。`git diff --check` 通过。
+- 最终真实服务联调 13 组全部通过，完成时间 `2026-09-29T15:36:43.064Z`。在首次 11 组基础上，增加未开通用户三种服务状态，以及原生 Client Bearer 文件 API 的 UTF-8/BOM/CRLF 字节一致、条件编辑、旧 ETag 拒绝、缺失/错误空间 ID 拒绝。其余管理、MCP、双用户隔离、64 MiB、取消、撤销/恢复、重启、用量和删除链路全部重新执行。
+
+复现最终联调：
+
+```powershell
+node scripts/workspace-integration.mjs --config .artifacts/workspace-review-service.json --output .artifacts/workspace-review-clean
+```
+
+本轮条件头修复前的构建首跑在大文件 PUT 约 50,855,936 字节时返回 `503 workspace_result_unknown`（前六组通过），证据保存在 `.artifacts/workspace-files-final/`。审计 outcome 为 UNKNOWN，未自动重放写入。未发现可确认的根因；以全新库/新空间完整重跑通过不代表该间歇传输问题已修复。前一轮相似 503 的历史说明仍保留。生产验收前应继续定位这一传输稳定性风险。
+
+提交复审修复了两项可复现问题：UTF-8 BOM 后的正文 U+FEFF 被重复剥离，以及不可用空间的旧目标请求未按合同返回 409；均先观察失败测试再修复。上传计数改用原子读写，避免远端提前响应时传输 goroutine 与诊断/审计读取竞争；不改变流式传输或字节归属。未知写入增加不含路径、URL、原始错误及秘密的结构化诊断。
+
+复审在旧测试容器连续遇到文件首次访问 503，新增日志确认 `remoteCode=file_service_unavailable`、`remoteStatus=503`、`requestCanceled=false`、`leaseCanceled=false`；同一时刻 Agent Space 日志记录 VM 启动 `insert run` 的 SQLite 外键失败。两次失败证据保留在 `.artifacts/workspace-review-push-final/` 和 `.artifacts/workspace-review-approved/`。未修改远端源码或数据库，未重放未知写入；按独立服务初始化流程另建同镜像、相同配置（仅端口变化）的全新数据卷和容器后，最终 13 组联调全部通过。此证据定位了本轮失败边界，不能证明此前大文件中断同源，也不能宣称旧远端环境问题已修复。
+
+此前功能实现阶段的实际网页使用 `http://127.0.0.1:51297/admin/remote-workspaces` 的隔离生产 SPA，完成中文 Markdown 新建、预览、原生下载、编辑、关闭时继续编辑、双页面竞争保存和冲突后另存。旧页面保存返回 409，原草稿保留；另存副本与另一页面保存的原文件分别核实，未发生覆盖。实际下载正文与创建文本一致。该轮构建重载后再次核实原文件版本和另存副本；浏览器未记录控制台错误。
+
+该轮 390×844 窄屏编辑器宽度/scrollWidth 均 327px，文档宽 375px，无横向溢出；桌面和窄屏截图分别为 `.artifacts/workspace-file-edit-review/preview-final.png`、`editor-narrow-final.png`，并发冲突截图为 `editor-conflict.png`。测试后恢复默认 viewport。本次提交复审没有改变布局，BOM 修复由新增逐字节往返测试覆盖。访问失效/恢复及未知写入由确定性组件测试验证，未冒充实际网页故障注入。
+
 ## 发布边界与未执行项
 
 `npm run verify:preview-contract` **未通过跨仓库检查**：Core 自身基线已同步，但 Portal generated.ts/client-feed 的 source hash，以及 Android client fixture、manifest、PlatformWire 与 Portal 副本尚未同步。没有因此修改 Portal/Android 消费端，或把生成导出当作原生客户端已完成。部署整套 Preview 前必须在各消费仓库完成同步及其对应验证。
 
 本轮没有生产部署、真实 Android 工作区文件 UI/旧 APK MCP 验收、任意第三方 DAV 桌面客户端资格认证、生产规模负载/内存测量，也不覆盖完整 S1 compute/storage 计量。外部 DAV 通过真实 Basic/Bearer HTTP 客户端验证；磁盘不足等远端故障边界由确定性测试/远端发布合同分层覆盖，不能声称对所有真实 VM 故障做了注入。迁移/备份验证在隔离数据上完成，不对唯一生产副本做恢复实验。
 
-未知管理写入仍需管理员核实旧请求结束后明确继续；这是现有远端合同边界，不通过自动重放或修改 Agent Space 绕过。代码与文档作为本次审查提交；没有推送或部署。
+未知管理写入仍需管理员核实旧请求结束后明确继续；这是现有远端合同边界，不通过自动重放或修改 Agent Space 绕过。首次集成代码已提交；本轮文件客户端修订及复审修复随代码提交并推送；没有部署生产。

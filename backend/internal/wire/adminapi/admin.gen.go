@@ -1478,6 +1478,27 @@ func (e WorkspaceProjectionSchemaVersion) Valid() bool {
 	}
 }
 
+// Defines values for WorkspaceProjectionServiceState.
+const (
+	WorkspaceProjectionServiceStateDISABLED      WorkspaceProjectionServiceState = "DISABLED"
+	WorkspaceProjectionServiceStateENABLED       WorkspaceProjectionServiceState = "ENABLED"
+	WorkspaceProjectionServiceStateNOTCONFIGURED WorkspaceProjectionServiceState = "NOT_CONFIGURED"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceProjectionServiceState enum.
+func (e WorkspaceProjectionServiceState) Valid() bool {
+	switch e {
+	case WorkspaceProjectionServiceStateDISABLED:
+		return true
+	case WorkspaceProjectionServiceStateENABLED:
+		return true
+	case WorkspaceProjectionServiceStateNOTCONFIGURED:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WorkspaceProjectionState.
 const (
 	WorkspaceProjectionStateCONNECTED      WorkspaceProjectionState = "CONNECTED"
@@ -1564,19 +1585,19 @@ func (e WorkspaceServiceType) Valid() bool {
 
 // Defines values for WorkspaceServiceCheckFilesStatus.
 const (
-	NOTCONFIGURED WorkspaceServiceCheckFilesStatus = "NOT_CONFIGURED"
-	UNVERIFIED    WorkspaceServiceCheckFilesStatus = "UNVERIFIED"
-	VERIFIED      WorkspaceServiceCheckFilesStatus = "VERIFIED"
+	WorkspaceServiceCheckFilesStatusNOTCONFIGURED WorkspaceServiceCheckFilesStatus = "NOT_CONFIGURED"
+	WorkspaceServiceCheckFilesStatusUNVERIFIED    WorkspaceServiceCheckFilesStatus = "UNVERIFIED"
+	WorkspaceServiceCheckFilesStatusVERIFIED      WorkspaceServiceCheckFilesStatus = "VERIFIED"
 )
 
 // Valid indicates whether the value is a known member of the WorkspaceServiceCheckFilesStatus enum.
 func (e WorkspaceServiceCheckFilesStatus) Valid() bool {
 	switch e {
-	case NOTCONFIGURED:
+	case WorkspaceServiceCheckFilesStatusNOTCONFIGURED:
 		return true
-	case UNVERIFIED:
+	case WorkspaceServiceCheckFilesStatusUNVERIFIED:
 		return true
-	case VERIFIED:
+	case WorkspaceServiceCheckFilesStatusVERIFIED:
 		return true
 	default:
 		return false
@@ -3585,11 +3606,17 @@ type WorkspaceProjection struct {
 	ObservedAt      *time.Time                       `json:"observedAt,omitempty"`
 	OperationId     *WorkspaceOperationId            `json:"operationId,omitempty"`
 	SchemaVersion   WorkspaceProjectionSchemaVersion `json:"schemaVersion"`
-	State           WorkspaceProjectionState         `json:"state"`
+
+	// ServiceState Configured enable intent, independent of this user lifecycle and remote health. ENABLED does not imply filesAvailable.
+	ServiceState WorkspaceProjectionServiceState `json:"serviceState"`
+	State        WorkspaceProjectionState        `json:"state"`
 }
 
 // WorkspaceProjectionSchemaVersion defines model for WorkspaceProjection.SchemaVersion.
 type WorkspaceProjectionSchemaVersion int
+
+// WorkspaceProjectionServiceState Configured enable intent, independent of this user lifecycle and remote health. ENABLED does not imply filesAvailable.
+type WorkspaceProjectionServiceState string
 
 // WorkspaceProjectionState defines model for WorkspaceProjection.State.
 type WorkspaceProjectionState string
@@ -4088,26 +4115,35 @@ type CommandWorkspaceParams struct {
 
 // DownloadAdminWorkspaceFileParams defines parameters for DownloadAdminWorkspaceFile.
 type DownloadAdminWorkspaceFileParams struct {
-	Path        *string `form:"path,omitempty" json:"path,omitempty"`
-	Range       *string `json:"Range,omitempty"`
-	IfMatch     *string `json:"If-Match,omitempty"`
-	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	Range        *string      `json:"Range,omitempty"`
+	IfMatch      *string      `json:"If-Match,omitempty"`
+	IfNoneMatch  *string      `json:"If-None-Match,omitempty"`
 }
 
 // HeadAdminWorkspaceFileParams defines parameters for HeadAdminWorkspaceFile.
 type HeadAdminWorkspaceFileParams struct {
-	Path        *string `form:"path,omitempty" json:"path,omitempty"`
-	Range       *string `json:"Range,omitempty"`
-	IfMatch     *string `json:"If-Match,omitempty"`
-	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	Range        *string      `json:"Range,omitempty"`
+	IfMatch      *string      `json:"If-Match,omitempty"`
+	IfNoneMatch  *string      `json:"If-None-Match,omitempty"`
 }
 
 // UploadAdminWorkspaceFileParams defines parameters for UploadAdminWorkspaceFile.
 type UploadAdminWorkspaceFileParams struct {
-	Path        *string `form:"path,omitempty" json:"path,omitempty"`
-	XCSRFToken  string  `json:"X-CSRF-Token"`
-	IfMatch     *string `json:"If-Match,omitempty"`
-	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	XCSRFToken   string       `json:"X-CSRF-Token"`
+	IfMatch      *string      `json:"If-Match,omitempty"`
+	IfNoneMatch  *string      `json:"If-None-Match,omitempty"`
 }
 
 // RevealWorkspaceDAVParams defines parameters for RevealWorkspaceDAV.
@@ -4118,11 +4154,16 @@ type RevealWorkspaceDAVParams struct {
 // ListAdminWorkspaceFilesParams defines parameters for ListAdminWorkspaceFiles.
 type ListAdminWorkspaceFilesParams struct {
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
 }
 
 // MutateAdminWorkspaceFileParams defines parameters for MutateAdminWorkspaceFile.
 type MutateAdminWorkspaceFileParams struct {
-	XCSRFToken string `json:"X-CSRF-Token"`
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	XCSRFToken   string       `json:"X-CSRF-Token"`
 }
 
 // DisableUserParams defines parameters for DisableUser.
@@ -9327,6 +9368,19 @@ func (siw *ServerInterfaceWrapper) DownloadAdminWorkspaceFile(w http.ResponseWri
 		return
 	}
 
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
 	headers := r.Header
 
 	// ------------- Optional header parameter "Range" -------------
@@ -9428,6 +9482,19 @@ func (siw *ServerInterfaceWrapper) HeadAdminWorkspaceFile(w http.ResponseWriter,
 		return
 	}
 
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
 	headers := r.Header
 
 	// ------------- Optional header parameter "Range" -------------
@@ -9525,6 +9592,19 @@ func (siw *ServerInterfaceWrapper) UploadAdminWorkspaceFile(w http.ResponseWrite
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
 		}
 		return
 	}
@@ -9688,6 +9768,19 @@ func (siw *ServerInterfaceWrapper) ListAdminWorkspaceFiles(w http.ResponseWriter
 		return
 	}
 
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminWorkspaceFiles(w, r, userId, params)
 	}))
@@ -9716,6 +9809,19 @@ func (siw *ServerInterfaceWrapper) MutateAdminWorkspaceFile(w http.ResponseWrite
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params MutateAdminWorkspaceFileParams
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
 
 	headers := r.Header
 

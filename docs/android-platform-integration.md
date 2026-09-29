@@ -111,6 +111,48 @@ Direct MCP 的平台路由允许 `POST`、`GET`、`DELETE` 到 Snapshot 给出�
 
 完整 428 body 使用 [现行 Problem 样例](../api/fixtures/problem/managed-snapshot-required.json)。这些是请求构造示例，不声称合成 profile 已取得真实供应商资格认证。
 
+## 远程工作区与文件客户端
+
+共享配置仍为 Snapshot v5；远程工作区状态不塞入企业共享 Snapshot，也不能根据托管 MCP 的名称推断。使用当前企业身份的 Bearer 调用 `GET /api/client/v1/workspace`，消费独立 `WorkspaceProjection`（schemaVersion 1）。本协议尚未生产发布，Core 和消费者直接同步现行合同，不增加旧工作区协议探测、字段缺省或回退分支。
+
+| 字段 | 客户端含义 |
+|---|---|
+| `serviceState` | `NOT_CONFIGURED` 企业尚未配置；`DISABLED` 企业已关闭；`ENABLED` 企业配置为启用，不表示远端健康或用户可访问 |
+| `state` | 当前用户空间生命周期；企业启用且 `UNPROVISIONED` 表示尚未给当前用户开通 |
+| `filesAvailable` / `filesReason` | 是否允许进入文件操作及不可用原因；不依赖 MCP 发布、预算或工具可用性 |
+| `mcpAvailable` / `mcpReason` | 助手工具独立状态；不能作为文件入口开关 |
+| `agentSpaceId` | 本次操作的固定空间身份；不是由客户端指定任意用户的授权参数 |
+
+登录、企业切换、前台恢复、进入文件页面以及访问失效时重新查询；请求失败应显示未知/重试读取，不能伪装为企业关闭。未启用时隐藏文件操作，已启用未开通时说明需管理员开通；已有空间不可用时保留原因和刷新入口。状态查询不启动 VM。文件读取和工具执行可能启动 VM，应允许取消并呈现加载状态。
+
+文件 API 基址为 `/api/client/v1/workspace`。所有 `files`/`content` 请求必须带当前投影取得的 `agentSpaceId` query，路径为相对工作区根目录的路径，URL 编码一次。Client 用户完全来自 Bearer。列表、预览、下载缓存与草稿按企业身份、空间 ID、路径及文件 ETag 隔离；重新开通的新空间不能继承旧操作目标。空间身份或登录身份变化时取消旧请求，重新查询后由用户发起新操作。
+
+| 操作 | 合同与客户端要求 |
+|---|---|
+| 浏览与容量 | `GET files?agentSpaceId=…&path=…`，返回条目、文件版本、可用时的容量；不支持任意分页伪装，目录超限须明确报告 |
+| 新建目录、重命名、移动、复制、删除 | `POST files?agentSpaceId=…`，使用 `WorkspaceFileMutation`；源 ETag、目标覆盖条件、递归确认按 OpenAPI；禁止根目录修改 |
+| 下载与预览 | `GET/HEAD content?agentSpaceId=…&path=…`；正文流式落盘，保留 ETag、长度、类型等元信息。预览按实际类型和大小限制，不执行 HTML/SVG，不自动访问文档外部资源 |
+| 续传与缓存 | 续传使用 Range 加同一强 ETag 的 If-Match，版本变化返回 409；条件缓存读取使用 If-None-Match。206 核对 Content-Range 后续传，200 必须重建完整文件，不能追加；304 仅使用同身份、同空间、同版本的完整缓存；416 重新核对长度与版本 |
+| 上传或新建文本 | `PUT content?agentSpaceId=…&path=…`，原始字节正文；新文件必须 `If-None-Match: *`，覆盖必须单个强 `If-Match`，两者不能并用；流式上传、进度、取消由客户端负责 |
+| 编辑文本 | 从同一次 GET 取得正文和 ETag；UTF-8 严格解码，保留 BOM 与换行格式。Admin 首轮限制 2 MiB，非 UTF-8/二进制/混合换行只预览或下载。保存携带该 GET 的 ETag；没有强 ETag 时只允许另存新文件。未保存退出需确认 |
+| 分享 | 下载到应用私有临时文件后由 Android 原生文件分享授权给用户选择的应用；分享的是文件副本，不是 WebDAV 凭据、Core Bearer 或公开 URL。Core 不新增分享链接/分享会话接口 |
+
+HTTP 成功不代表所有写操作成功，必须检查 `WorkspaceFileResult.outcome`（`SUCCEEDED` / `PARTIAL` / `UNKNOWN`）和失败条目。错误 body 使用现有 Problem 的 `code`，不能靠中文消息分派：
+
+| HTTP / code | 处理 |
+|---|---|
+| 400 | 无效路径、空间参数或条件；修正请求，不重试原写入 |
+| 401 / 403 | Core 身份失效/权限不足，走原认证或权限流程；DAV 失效不会映射为 Core 登出 |
+| 404 `file_not_found` | 文件已不存在，刷新目录 |
+| 409 `workspace_space_mismatch` | 固定空间不匹配，刷新工作区，保留旧目标信息，禁止把旧写入转发到新空间 |
+| 409 `file_version_conflict` / `file_conflict` / `file_locked` | 保留编辑，重新读取核实或另存新文件；不得自动强制覆盖 |
+| 416 `file_range_invalid` | 核对远端版本和长度后重新下载 |
+| 422 `file_listing_limit` / 429 `file_transfer_limit` | 目录超限/并发已满；提示缩小目录或等待已有传输结束 |
+| 503 | 工作区、DAV 凭据、传输失败或结果未知；刷新状态并核实目标，不自动重放写入 |
+| 507 `file_storage_full` | 空间不足，保留本地内容，释放空间后由用户决定后续动作 |
+
+取消、网络断开或未知结果都不能证明写入未发生。重新读取可安全重试；覆盖、创建和删除不得自动重放。读取失败不能丢失尚未保存的编辑，成功保存后再关闭或以一次新 GET 开始下一轮编辑。Android 的后台传输、文件分享授权和本地缓存清理属于客户端 owner，本轮 Core/Admin 验证不等于这些设备能力已交付。
+
 ## 合同回归入口
 
 `api/fixtures/client-integration/` 提供基础、四模型协议、两种文生图、四种 TTS、四种 ASR、策略拒绝、HTTP 时序及 Runtime 请求样例。接入资料、Portal Native Bridge 与 Feed 的正反例分别在 `api/fixtures/enrollment/` 和 `api/fixtures/portal/`。Android 应消费同一份 Core 导出并对当前资料进行严格解析、引用校验及执行分派；导出包本身不包含真机运行结果。

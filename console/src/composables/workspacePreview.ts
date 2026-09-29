@@ -13,6 +13,19 @@ export function decodeWorkspaceText(bytes: Uint8Array): string {
  if (text.includes('\0')) throw new Error('文件不是可预览的 UTF-8 文本，请下载后打开。')
  return text
 }
+export function decodeEditableText(bytes: Uint8Array) {
+ const bom = bytes[0]===239 && bytes[1]===187 && bytes[2]===191
+ // TextDecoder already consumes one BOM. Stripping it here too loses a
+ // leading U+FEFF that belongs to the text after the encoding marker.
+ const value = decodeWorkspaceText(bytes)
+ const endings = new Set(value.match(/\r\n|\r|\n/g) ?? [])
+ if (endings.size > 1) throw new Error('文件混用了不同换行格式，请下载后编辑，避免自动改变原格式。')
+ const newline = [...endings][0] ?? '\n'
+ return { text: value.replace(/\r\n|\r/g,'\n'), bom, newline }
+}
+export function encodeEditableText(text: string, format: {bom:boolean;newline:string}) {
+ return new TextEncoder().encode((format.bom?'\uFEFF':'')+text.replace(/\r\n|\r|\n/g,format.newline))
+}
 const escape = (s: string) => s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')
 export function renderWorkspaceMarkdown(text: string, documentPath: string) {
  const images: { id: string; path: string }[] = []

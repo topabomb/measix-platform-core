@@ -19,6 +19,8 @@ const INPUTS = [
   'measix-platform-core/api/fixtures/client-integration',
   'measix-platform-core/api/fixtures/enrollment',
   'measix-platform-core/api/fixtures/portal',
+  'measix-platform-core/api/fixtures/workspace/projection-unprovisioned.json',
+  'measix-platform-core/api/fixtures/workspace/projection-files-only.json',
   'measix-platform-core/api/fixtures/problem/managed-snapshot-required.json',
   'measix-platform-core/docs/android-platform-integration.md',
 ]

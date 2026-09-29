@@ -822,6 +822,27 @@ func (e WorkspaceProjectionSchemaVersion) Valid() bool {
 	}
 }
 
+// Defines values for WorkspaceProjectionServiceState.
+const (
+	DISABLED      WorkspaceProjectionServiceState = "DISABLED"
+	ENABLED       WorkspaceProjectionServiceState = "ENABLED"
+	NOTCONFIGURED WorkspaceProjectionServiceState = "NOT_CONFIGURED"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceProjectionServiceState enum.
+func (e WorkspaceProjectionServiceState) Valid() bool {
+	switch e {
+	case DISABLED:
+		return true
+	case ENABLED:
+		return true
+	case NOTCONFIGURED:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WorkspaceProjectionState.
 const (
 	CONNECTED      WorkspaceProjectionState = "CONNECTED"
@@ -1655,11 +1676,17 @@ type WorkspaceProjection struct {
 	ObservedAt      *time.Time                       `json:"observedAt,omitempty"`
 	OperationId     *WorkspaceOperationId            `json:"operationId,omitempty"`
 	SchemaVersion   WorkspaceProjectionSchemaVersion `json:"schemaVersion"`
-	State           WorkspaceProjectionState         `json:"state"`
+
+	// ServiceState Configured enable intent, independent of this user lifecycle and remote health. ENABLED does not imply filesAvailable.
+	ServiceState WorkspaceProjectionServiceState `json:"serviceState"`
+	State        WorkspaceProjectionState        `json:"state"`
 }
 
 // WorkspaceProjectionSchemaVersion defines model for WorkspaceProjection.SchemaVersion.
 type WorkspaceProjectionSchemaVersion int
+
+// WorkspaceProjectionServiceState Configured enable intent, independent of this user lifecycle and remote health. ENABLED does not imply filesAvailable.
+type WorkspaceProjectionServiceState string
 
 // WorkspaceProjectionState defines model for WorkspaceProjection.State.
 type WorkspaceProjectionState string
@@ -1697,30 +1724,48 @@ type RefreshSessionParams struct {
 
 // DownloadClientWorkspaceFileParams defines parameters for DownloadClientWorkspaceFile.
 type DownloadClientWorkspaceFileParams struct {
-	Path        *string `form:"path,omitempty" json:"path,omitempty"`
-	Range       *string `json:"Range,omitempty"`
-	IfMatch     *string `json:"If-Match,omitempty"`
-	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	Range        *string      `json:"Range,omitempty"`
+	IfMatch      *string      `json:"If-Match,omitempty"`
+	IfNoneMatch  *string      `json:"If-None-Match,omitempty"`
 }
 
 // HeadClientWorkspaceFileParams defines parameters for HeadClientWorkspaceFile.
 type HeadClientWorkspaceFileParams struct {
-	Path        *string `form:"path,omitempty" json:"path,omitempty"`
-	Range       *string `json:"Range,omitempty"`
-	IfMatch     *string `json:"If-Match,omitempty"`
-	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	Range        *string      `json:"Range,omitempty"`
+	IfMatch      *string      `json:"If-Match,omitempty"`
+	IfNoneMatch  *string      `json:"If-None-Match,omitempty"`
 }
 
 // UploadClientWorkspaceFileParams defines parameters for UploadClientWorkspaceFile.
 type UploadClientWorkspaceFileParams struct {
-	Path        *string `form:"path,omitempty" json:"path,omitempty"`
-	IfMatch     *string `json:"If-Match,omitempty"`
-	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	IfMatch      *string      `json:"If-Match,omitempty"`
+	IfNoneMatch  *string      `json:"If-None-Match,omitempty"`
 }
 
 // ListClientWorkspaceFilesParams defines parameters for ListClientWorkspaceFiles.
 type ListClientWorkspaceFilesParams struct {
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+}
+
+// MutateClientWorkspaceFileParams defines parameters for MutateClientWorkspaceFile.
+type MutateClientWorkspaceFileParams struct {
+	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
 }
 
 // ClosePortalSessionParams defines parameters for ClosePortalSession.
@@ -1903,7 +1948,7 @@ type ServerInterface interface {
 	ListClientWorkspaceFiles(w http.ResponseWriter, r *http.Request, params ListClientWorkspaceFilesParams)
 
 	// (POST /api/client/v1/workspace/files)
-	MutateClientWorkspaceFile(w http.ResponseWriter, r *http.Request)
+	MutateClientWorkspaceFile(w http.ResponseWriter, r *http.Request, params MutateClientWorkspaceFileParams)
 
 	// (GET /api/portal/v1/budgets)
 	GetPortalBudgets(w http.ResponseWriter, r *http.Request)
@@ -2023,7 +2068,7 @@ func (_ Unimplemented) ListClientWorkspaceFiles(w http.ResponseWriter, r *http.R
 }
 
 // (POST /api/client/v1/workspace/files)
-func (_ Unimplemented) MutateClientWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) MutateClientWorkspaceFile(w http.ResponseWriter, r *http.Request, params MutateClientWorkspaceFileParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2457,6 +2502,19 @@ func (siw *ServerInterfaceWrapper) DownloadClientWorkspaceFile(w http.ResponseWr
 		return
 	}
 
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
 	headers := r.Header
 
 	// ------------- Optional header parameter "Range" -------------
@@ -2545,6 +2603,19 @@ func (siw *ServerInterfaceWrapper) HeadClientWorkspaceFile(w http.ResponseWriter
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
 		}
 		return
 	}
@@ -2641,6 +2712,19 @@ func (siw *ServerInterfaceWrapper) UploadClientWorkspaceFile(w http.ResponseWrit
 		return
 	}
 
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
 	headers := r.Header
 
 	// ------------- Optional header parameter "If-Match" -------------
@@ -2714,6 +2798,19 @@ func (siw *ServerInterfaceWrapper) ListClientWorkspaceFiles(w http.ResponseWrite
 		return
 	}
 
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListClientWorkspaceFiles(w, r, params)
 	}))
@@ -2728,8 +2825,27 @@ func (siw *ServerInterfaceWrapper) ListClientWorkspaceFiles(w http.ResponseWrite
 // MutateClientWorkspaceFile operation middleware
 func (siw *ServerInterfaceWrapper) MutateClientWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MutateClientWorkspaceFileParams
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.MutateClientWorkspaceFile(w, r)
+		siw.Handler.MutateClientWorkspaceFile(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

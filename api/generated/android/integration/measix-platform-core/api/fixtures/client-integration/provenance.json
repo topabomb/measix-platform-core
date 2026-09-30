@@ -1,0 +1,9 @@
+{
+  "compiler": "capability.CompileSnapshot",
+  "credentials": "synthetic-not-usable",
+  "fixtureTime": "2026-09-12T00:00:00Z",
+  "generated": true,
+  "httpEvidence": "See docs/testing.md; examples do not prove a live exchange",
+  "input": "api/fixtures/draft/s02-client-profile.json",
+  "snapshotSchemaVersion": 4
+}

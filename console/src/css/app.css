@@ -1,0 +1,67 @@
+:root {
+  --q-primary: #7558be;
+  --orchelm-primary-dark: #5e429f;
+}
+
+body { background: #f5f4f8; color: #241d2e; }
+.orchelm-header { background: rgba(255, 255, 255, .97); box-shadow: 0 1px 0 rgba(74, 52, 105, .08); }
+.orchelm-toolbar { min-height: 48px; }
+.admin-shell .q-drawer { background: #fbfaff; }
+.admin-shell .q-item.q-router-link--active { border-right: 3px solid var(--q-primary); background: #f1ecfa !important; }
+.admin-shell .q-card { border-color: #e1ddea; }
+.admin-shell .q-btn.bg-primary { background: linear-gradient(135deg, var(--q-primary), var(--orchelm-primary-dark)) !important; }
+
+/* Shared spacing and responsive sizing for management pages. */
+/* Compact card/banner internals. 12px horizontal is the inset that
+   .card-inset aligns to for elements rendered directly inside a card. */
+.q-card > .q-card__section { padding: 8px 12px; }
+.q-card > .q-card__actions { padding: 4px 12px; }
+.q-banner { padding: 8px 12px; }
+
+.card-inset { margin-left: 12px; margin-right: 12px; }
+
+/* Dialogs — one sizing and scrolling pattern for the whole console.
+   Widths: --sm 480 / default 640 / --lg 760, always leaving 4px of viewport.
+   Height is capped at 90vh; the block marked .app-dialog__body scrolls so the
+   header and the actions of a long dialog stay reachable. */
+.app-dialog {
+  width: min(640px, calc(100vw - 8px));
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.q-dialog__inner > .app-dialog { max-width: 100%; }
+
+.app-dialog--sm { width: min(480px, calc(100vw - 8px)); }
+.app-dialog--lg { width: min(760px, calc(100vw - 8px)); }
+
+.app-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.admin-page { padding: 12px; min-width: 0; }
+.admin-page .q-card, .admin-page .q-field { min-width: 0; }
+.admin-page details, .admin-page .text-break { overflow-wrap: anywhere; }
+.admin-page .q-item__section--main { min-width: 0; overflow-wrap: anywhere; }
+.admin-page .q-markup-table { max-width: 100%; }
+.admin-page .q-table td { white-space: normal; overflow-wrap: anywhere; }
+.admin-page .q-tabs { max-width: 100%; }
+.admin-page .q-tab { min-height: 44px; }
+.app-dialog .q-card__actions { flex-wrap: wrap; gap: 4px; }
+@media (max-width: 599px) {
+  .admin-page { padding: 8px; }
+  .admin-page .q-btn--dense { min-height: 36px; }
+  .admin-page .q-chip { max-width: 100%; }
+  .admin-page .q-chip__content { white-space: normal; overflow-wrap: anywhere; }
+  .admin-page .q-chip { height: auto; min-height: 24px; }
+  .admin-page .q-tab { padding: 0 10px; }
+  .admin-page .q-tab__label { font-size: 13px; }
+  .admin-page .q-table td { padding: 8px; }
+}
+
+/* Multi-line field help must reserve its actual height. */
+.admin-page .q-field--with-bottom { padding-bottom: 0; }
+.admin-page .q-field__bottom { position: relative; top: auto; bottom: auto; transform: none; min-height: 20px; }

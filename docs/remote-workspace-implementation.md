@@ -14,7 +14,7 @@
 | Admin | `RemoteWorkspacesPage.vue`、`WorkspacePanel.vue`、`WorkspaceFiles.vue`、`WorkspacePreview.vue`、`WorkspaceTextEditor.vue`：全部通过同源 Admin API |
 | 第三方服务 | Agent Space 拥有账号、空间、VM、磁盘和文件；本轮未修改其源码 |
 
-使用固定 Agent Space `661d20d8bfe1fb7630a879383257e61602fb6df6` 的管理 v1/资源摘要/MCP/WebDAV 能力。Core 当前版本门禁接受这一完整 release identity；升级远端版本需先核对资源观测、指定 DAV token、禁用清理和条件文件语义，再更新适配与验收。已有配置版本不匹配时，Admin 不沿用旧确认，管理员核实远端版本后保存新配置修订再应用；不增加旧版回退。管理凭据保存为版本化 Secret 引用。
+当前适配 Agent Space 的管理 v1、资源摘要、MCP 和 WebDAV 合同。Admin 填写地址和管理凭据后即可保存并启用，不要求人工声明版本或能力；配置不包含第三方提交号，也不按固定提交号设置运行门禁。连接检查和实际请求校验响应、空间身份与凭据，失败按对应合同处理。确切测试源码和镜像身份记录在 [联调记录](remote-workspace-verification.md)，用于复现验收。管理凭据保存为版本化 Secret 引用。
 
 ## 管理员资源摘要
 
@@ -96,7 +96,7 @@ pnpm -C console build
 node scripts/workspace-integration.mjs --config .artifacts/workspace-test.json
 ```
 
-配置文件包含 `adminOrigin`、`mcpOrigin`、`davOrigin`、`managementTokenFile`（只含 token 的文件）、`releaseIdentity`、`imageIdentity`。脚本只允许 loopback 服务，创建独立临时 Core 库和 带独立 UUID 的用户，最后删除本次新建的远端空间并停止测试进程；数据库、日志与脱敏 evidence 保留用于诊断。失败的远端写入不得自动重放，失败时保留数据库、日志及未完成的远端目标供核查，停止本次 Core 进程。凭据输入文件及测试数据库不得提交。
+联调私有配置文件包含 `adminOrigin`、`mcpOrigin`、`davOrigin`、`managementTokenFile`（只含 token 的文件）、`releaseIdentity`、`imageIdentity`；后两项仅记录测试源码和镜像身份，不发送给服务配置 API。脚本只允许 loopback 服务，创建独立临时 Core 库和带独立 UUID 的用户，最后删除本次新建的远端空间并停止测试进程；数据库、日志与脱敏 evidence 保留用于诊断。失败的远端写入不得自动重放，失败时保留数据库、日志及未完成的远端目标供核查，停止本次 Core 进程。凭据输入文件及测试数据库不得提交。
 
 该脚本不部署第三方服务、不核验真实生产版本、不替代浏览器/Android 验收，也不宣称整个 S1 已完成。部署及回滚仍遵循现有 Core 数据库备份和 Agent Space 独立发布流程。
 

@@ -2,6 +2,14 @@
 
 最近验证日期：2026-09-30。范围为当前 Core / Relay / Admin 候选、隔离 Agent Space 实际管理/MCP/VM/WebDAV 链路和浏览器管理操作；不是生产部署或完整 S1 验收。当前操作说明见 [实现参考](remote-workspace-implementation.md)。
 
+## 配置流程简化验收（2026-09-30）
+
+基于 Core `9c985d2` 和架构 `550a00d`，删除 Admin 的版本能力确认、配置 `releaseIdentity` 字段及固定第三方提交号门禁；工具地址折叠区只呈现可选 MCP 地址。连接检查、地址迁移时的空间核对和指定 DAV token 响应校验仍由原流程执行。测试脚本中的源码/镜像身份仅用于验收记录。
+
+先验证无提交号配置保存和无确认项界面测试失败，再修订实现及生成类型。全量 Go 测试、Admin 40 文件 / 244 项测试、类型检查、生产构建、格式检查通过。以同一隔离 Agent Space 镜像完整重跑 19 组联调通过；实际浏览器修改连接名称、保存配置并等待启用完成，确认不再出现版本声明。
+
+证据在 `.artifacts/workspace-config-simplify/` 的 `evidence.json`、`source-inputs.json`、`browser-evidence.json` 和 `admin-config.png`：917 个源码输入摘要为 `sha256:6381319fa9c5897fe9168417a5b7964bcf424fff71dd486c8793b26d28ecdda7`，Admin 构建为 `sha256:ae7bc8c45d6448a43f44ffad8022b88f482f49dfe96b9bc27de1aba9e9a8bd8c`，Admin 合同为 `sha256:37deabd51670919906c18c0c56807ba25c864ad4b49466f9ac38ff4c70d84658`。本次没有 Client/Snapshot/Relay 合同或数据库迁移变更。
+
 ## 资源摘要集成验收（2026-09-30）
 
 执行计划见 [资源摘要计划](remote-workspace-integration-plan.md#2026-09-30-资源摘要执行计划)，六项已完成。基于 Core `35e3ac9`、架构 `e6ea18a` 的工作树实现；Agent Space 固定为已提交 `661d20d8bfe1fb7630a879383257e61602fb6df6`，本轮未修改其源码。其既有 `docker/build.sh` 模式差异原样保留。

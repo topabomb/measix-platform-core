@@ -12,7 +12,7 @@ import type { components } from '../api/generated'
 type Service = components['schemas']['WorkspaceService']
 let service: Service | undefined
 let operationAction = ''
-const configured = (): Service => ({ workspaceServiceId: 'wss_test', type: 'AGENT_SPACE', name: 'Remote workspace', configRevision: 1, activeConfigRevision: 1, enabled: true, state: 'ACTIVE', mcpServerId: 'mcp_test', mcpPublished: false, config: { adminOrigin: 'http://space.test', mcpOrigin: 'http://space.test', managementSecret: { secretId: 'sec_test', secretVersion: 1 }, releaseIdentity: '661d20d8bfe1fb7630a879383257e61602fb6df6', connectTimeoutMs: 90000, idleTimeoutMs: 120000 } })
+const configured = (): Service => ({ workspaceServiceId: 'wss_test', type: 'AGENT_SPACE', name: 'Remote workspace', configRevision: 1, activeConfigRevision: 1, enabled: true, state: 'ACTIVE', mcpServerId: 'mcp_test', mcpPublished: false, config: { adminOrigin: 'http://space.test', mcpOrigin: 'http://space.test', managementSecret: { secretId: 'sec_test', secretVersion: 1 }, connectTimeoutMs: 90000, idleTimeoutMs: 120000 } })
 function mountPage() {
   const pinia = createPinia(); setActivePinia(pinia)
   useSessionStore(pinia).session = { user: { userId: 'usr_admin', displayName: 'Admin', role: 'ADMIN' }, csrfToken: 'csrf', expiresAt: '2026-12-31T00:00:00Z' }
@@ -45,20 +45,6 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('remote workspace administrator flow', () => {
-  it('requires fresh confirmation and saves the supported release when stored identity differs', async () => {
-    service = configured(); service.config.releaseIdentity = 'previous-unreleased-candidate'
-    const wrapper = mountPage(); await flushPromises()
-    const confirmation = wrapper.findAllComponents(QCheckbox).find(input => input.props('label') === '已确认工作区服务版本支持资源摘要及指定 WebDAV 凭据')!
-    expect(confirmation.props('modelValue')).toBe(false)
-    expect(button(wrapper, '保存配置').props('disable')).toBe(true)
-    await confirmation.setValue(true)
-    expect(button(wrapper, '保存配置').props('disable')).toBe(false)
-    await button(wrapper, '保存配置').trigger('click'); await flushPromises()
-    const write = vi.mocked(client.apiFetch).mock.calls.find(([, init]) => init?.method === 'PUT')
-    expect(JSON.parse(write![1]!.body as string).config.releaseIdentity).toBe(configured().config.releaseIdentity)
-    expect(operationAction).toBe('apply')
-    wrapper.unmount()
-  })
   it('requires confirmation before saving a changed service origin', async () => {
     service = configured(); const wrapper = mountPage(); await flushPromises()
     await wrapper.findAllComponents(QInput).find(input => input.props('label') === '文件服务地址（可选）')!.setValue('http://dav.test')
@@ -73,10 +59,13 @@ describe('remote workspace administrator flow', () => {
     await wrapper.findComponent(QToggle).setValue(true)
     await wrapper.findAllComponents(QInput).find(input => input.props('label') === '管理服务地址')!.setValue('http://space.test')
     await wrapper.findAllComponents(QInput).find(input => input.props('label') === '管理凭据')!.setValue('management')
-    await wrapper.findComponent(QCheckbox).setValue(true)
+    expect(wrapper.text()).not.toContain('已确认工作区服务版本')
+    expect(button(wrapper, '保存配置').props('disable')).toBe(false)
     expect(vi.mocked(client.apiFetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
     await button(wrapper, '保存配置').trigger('click'); await flushPromises()
     expect(operationAction).toBe('apply')
+    const write = vi.mocked(client.apiFetch).mock.calls.find(([path, init]) => path === '/api/admin/v1/remote-workspace/services' && init?.method === 'POST')
+    expect(JSON.parse(write![1]!.body as string).config).not.toHaveProperty('releaseIdentity')
     expect(wrapper.text()).toContain('正在启用')
     await vi.advanceTimersByTimeAsync(1000); await flushPromises()
     expect(wrapper.text()).toContain('现在可以开通用户工作区')

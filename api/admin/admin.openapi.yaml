@@ -2842,7 +2842,6 @@ components:
       required:
       - adminOrigin
       - mcpOrigin
-      - releaseIdentity
       - managementSecret
       - connectTimeoutMs
       - idleTimeoutMs
@@ -2856,9 +2855,6 @@ components:
         davOrigin:
           type: string
           format: uri
-        releaseIdentity:
-          type: string
-          minLength: 1
         managementSecret:
           $ref: '#/components/schemas/SecretRef'
         connectTimeoutMs:

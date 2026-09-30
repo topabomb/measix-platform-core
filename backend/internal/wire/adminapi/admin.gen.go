@@ -2130,7 +2130,6 @@ type AgentSpaceConfig struct {
 	IdleTimeoutMs    int       `json:"idleTimeoutMs"`
 	ManagementSecret SecretRef `json:"managementSecret"`
 	McpOrigin        string    `json:"mcpOrigin"`
-	ReleaseIdentity  string    `json:"releaseIdentity"`
 }
 
 // AgentSpaceId defines model for AgentSpaceId.

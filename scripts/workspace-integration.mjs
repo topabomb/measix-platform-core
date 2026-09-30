@@ -14,7 +14,7 @@ const args=process.argv.slice(2), configPath=args[args.indexOf('--config')+1]
 if(!args.includes('--config')||!configPath)throw Error('Pass --config with an isolated local Agent Space configuration')
 const config=JSON.parse(readFileSync(resolve(configPath),'utf8'))
 for(const field of ['adminOrigin','mcpOrigin','davOrigin'])assert.ok(['127.0.0.1','localhost','[::1]'].includes(new URL(config[field]).hostname),'Only isolated loopback services are accepted')
-assert.equal(config.releaseIdentity,'661d20d8bfe1fb7630a879383257e61602fb6df6')
+assert.ok(typeof config.releaseIdentity === 'string' && config.releaseIdentity.trim(), 'Record the tested Agent Space source identity')
 const managementToken=readFileSync(resolve(config.managementTokenFile),'utf8').trim()
 const root=resolve('.'),out=resolve(args.includes('--output')?args[args.indexOf('--output')+1]:'.artifacts/workspace-acceptance')
 mkdirSync(out,{recursive:true})
@@ -53,7 +53,7 @@ try{
  }else{
  const noService=await api(base(session.user));assert.equal(noService.serviceState,'NOT_CONFIGURED');assert.equal(noService.state,'UNPROVISIONED')
  const secret=await api('/api/admin/v1/secrets','POST',{name:'Isolated Agent Space management',value:managementToken})
- const workspaceService=await api('/api/admin/v1/remote-workspace/services','POST',{name:'Agent Space acceptance',expectedRevision:0,config:{adminOrigin:config.adminOrigin,mcpOrigin:config.mcpOrigin,davOrigin:config.davOrigin,managementSecret:{secretId:secret.secretId,secretVersion:secret.secretVersion},releaseIdentity:config.releaseIdentity,connectTimeoutMs:90000,idleTimeoutMs:120000}},{'Idempotency-Key':key()});mcpId=workspaceService.mcpServerId
+ const workspaceService=await api('/api/admin/v1/remote-workspace/services','POST',{name:'Agent Space acceptance',expectedRevision:0,config:{adminOrigin:config.adminOrigin,mcpOrigin:config.mcpOrigin,davOrigin:config.davOrigin,managementSecret:{secretId:secret.secretId,secretVersion:secret.secretVersion},connectTimeoutMs:90000,idleTimeoutMs:120000}},{'Idempotency-Key':key()});mcpId=workspaceService.mcpServerId
  assert.equal((await api(base(session.user))).serviceState,'DISABLED')
  await api('/api/admin/v1/remote-workspace/services/'+workspaceService.workspaceServiceId+'/check','POST');await complete(await api('/api/admin/v1/remote-workspace/services/'+workspaceService.workspaceServiceId+'/apply','POST',undefined,{'Idempotency-Key':key()}))
  assert.equal((await api(base(session.user))).serviceState,'ENABLED');proof('unprovisioned user distinguishes unconfigured, disabled and enabled service')

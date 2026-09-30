@@ -147,7 +147,7 @@ func lifecycleFixture(t *testing.T) (*Service, *lifecycleRemote, string, string)
 	if e != nil {
 		t.Fatal(e)
 	}
-	cfg := adminapi.AgentSpaceConfig{AdminOrigin: server.URL, McpOrigin: server.URL, DavOrigin: &server.URL, ManagementSecret: adminapi.SecretRef{SecretId: secret.SecretID, SecretVersion: secret.SecretVersion}, ReleaseIdentity: "661d20d8bfe1fb7630a879383257e61602fb6df6", ConnectTimeoutMs: 1000, IdleTimeoutMs: 1000}
+	cfg := adminapi.AgentSpaceConfig{AdminOrigin: server.URL, McpOrigin: server.URL, DavOrigin: &server.URL, ManagementSecret: adminapi.SecretRef{SecretId: secret.SecretID, SecretVersion: secret.SecretVersion}, ConnectTimeoutMs: 1000, IdleTimeoutMs: 1000}
 	workspaceService, e := svc.Save(ctx, actor, platformid.New(platformid.Idempotency), "", adminapi.SaveWorkspaceServiceRequest{Name: "test", Config: cfg})
 	if e != nil {
 		t.Fatal(e)

@@ -12,12 +12,11 @@ import WorkspacePanel from '../components/WorkspacePanel.vue'
 import { workspaceLabel } from '../composables/workspaceLabels'
 
 type Operation = components['schemas']['WorkspaceOperation']
-const supportedRelease = '661d20d8bfe1fb7630a879383257e61602fb6df6'
 const session = useSessionStore(), remoteWorkspace = useRemoteWorkspaceStore(), router = useRouter()
 const current = computed(() => remoteWorkspace.current)
 const desiredEnabled = ref(false), saving = ref(false), error = ref<unknown>(), notice = ref('')
 const name = ref('远程工作区'), adminOrigin = ref(''), mcpOrigin = ref(''), davOrigin = ref(''), bearer = ref('')
-const confirmedRelease = ref(false), sameDeployment = ref(false), confirmDisable = ref(false)
+const sameDeployment = ref(false), confirmDisable = ref(false)
 const selectedUser = ref<string>(), userLabel = ref('')
 const workspaces = ref<components['schemas']['WorkspaceList']>({ items: [] })
 const savedSecret = ref<components['schemas']['SecretRef']>()
@@ -28,9 +27,9 @@ const running = computed(() => !!operation.value && ['PENDING', 'RUNNING'].inclu
 const blocked = computed(() => !!operation.value && ['UNKNOWN', 'NEEDS_ATTENTION'].includes(operation.value.state))
 const busy = computed(() => saving.value || running.value || remoteWorkspace.loading)
 const originChanged = computed(() => !!current.value && (adminOrigin.value.trim() !== current.value.config.adminOrigin || (mcpOrigin.value.trim() || adminOrigin.value.trim()) !== current.value.config.mcpOrigin || davOrigin.value.trim() !== (current.value.config.davOrigin ?? '')))
-const hasChanges = computed(() => desiredEnabled.value !== !!current.value?.enabled || name.value.trim() !== current.value?.name || originChanged.value || !!bearer.value || !!savedSecret.value || current.value?.config.releaseIdentity !== supportedRelease || current.value?.activeConfigRevision !== current.value?.configRevision)
+const hasChanges = computed(() => desiredEnabled.value !== !!current.value?.enabled || name.value.trim() !== current.value?.name || originChanged.value || !!bearer.value || !!savedSecret.value || current.value?.activeConfigRevision !== current.value?.configRevision)
 const canSave = computed(() => !busy.value && !blocked.value && (desiredEnabled.value
-  ? !!adminOrigin.value.trim() && confirmedRelease.value && (!originChanged.value || sameDeployment.value) && (!!current.value || !!bearer.value || !!savedSecret.value) && (hasChanges.value || !remoteWorkspace.enabled)
+  ? !!adminOrigin.value.trim() && (!originChanged.value || sameDeployment.value) && (!!current.value || !!bearer.value || !!savedSecret.value) && (hasChanges.value || !remoteWorkspace.enabled)
   : !!current.value?.enabled))
 const status = computed(() => !current.value ? '尚未配置' : current.value.state === 'ACTIVE' ? '已启用' : current.value.state === 'SAVED' ? '配置已保存，未启用' : workspaceLabel(current.value.state))
 
@@ -44,7 +43,7 @@ function fillForm() {
   if (!value) return
   name.value = value.name; adminOrigin.value = value.config.adminOrigin
   mcpOrigin.value = value.config.mcpOrigin; davOrigin.value = value.config.davOrigin ?? ''
-  confirmedRelease.value = value.config.releaseIdentity === supportedRelease; sameDeployment.value = false
+  sameDeployment.value = false
 }
 async function loadSpaces(cursor?: string) {
   if (!current.value) return
@@ -84,10 +83,10 @@ async function save() {
         adminOrigin: adminOrigin.value.trim().replace(/\/$/, ''),
         mcpOrigin: (mcpOrigin.value.trim() || adminOrigin.value.trim()).replace(/\/$/, ''),
         ...(davOrigin.value.trim() ? { davOrigin: davOrigin.value.trim().replace(/\/$/, '') } : {}),
-        managementSecret: secret, releaseIdentity: supportedRelease,
+        managementSecret: secret,
         connectTimeoutMs: value?.config.connectTimeoutMs ?? 90000, idleTimeoutMs: value?.config.idleTimeoutMs ?? 120000,
       }
-      if (!value || name.value.trim() !== value.name || originChanged.value || value.config.releaseIdentity !== supportedRelease || secret.secretId !== value.config.managementSecret.secretId || secret.secretVersion !== value.config.managementSecret.secretVersion) {
+      if (!value || name.value.trim() !== value.name || originChanged.value || secret.secretId !== value.config.managementSecret.secretId || secret.secretVersion !== value.config.managementSecret.secretVersion) {
         const body = { expectedRevision: value?.configRevision ?? 0, name: name.value.trim() || '远程工作区', confirmSameDeployment: sameDeployment.value, config }
         const payload = JSON.stringify(body)
         value = await apiFetch<WorkspaceService>('/api/admin/v1/remote-workspace/services' + (value ? '/' + value.workspaceServiceId : ''), {
@@ -161,11 +160,9 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
             <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="填写独立 WebDAV 地址；留空只使用工具能力。" :disable="busy || !desiredEnabled" />
             <q-input v-model="bearer" outlined dense type="password" autocomplete="new-password" :label="current ? '管理凭据（留空保留原值）' : '管理凭据'" :disable="busy || !desiredEnabled" />
             <details>
-              <summary class="cursor-pointer text-primary">工具地址与兼容性</summary>
+              <summary class="cursor-pointer text-primary">工具服务地址（可选）</summary>
               <q-input v-model="mcpOrigin" outlined dense label="MCP 服务地址" hint="留空使用管理服务地址。填写地址不等于发布 MCP 工具。" class="q-mt-sm" :disable="busy || !desiredEnabled" />
-              <p class="text-caption q-mt-sm">当前适配 Agent Space 的管理 API、资源摘要与指定 WebDAV 凭据能力（661d20d）。</p>
             </details>
-            <q-checkbox v-model="confirmedRelease" dense label="已确认工作区服务版本支持资源摘要及指定 WebDAV 凭据" :disable="busy || !desiredEnabled" />
             <q-checkbox v-if="originChanged" v-model="sameDeployment" dense label="新地址仍指向原服务和原有空间" :disable="busy || !desiredEnabled" />
           </q-card-section>
         </template>

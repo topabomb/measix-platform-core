@@ -1112,7 +1112,6 @@ export interface components {
             mcpOrigin: string;
             /** Format: uri */
             davOrigin?: string;
-            releaseIdentity: string;
             managementSecret: components["schemas"]["SecretRef"];
             connectTimeoutMs: number;
             idleTimeoutMs: number;

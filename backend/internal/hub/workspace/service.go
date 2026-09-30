@@ -88,9 +88,7 @@ func (s *Service) adapter(ctx context.Context, cfg adminapi.AgentSpaceConfig) (*
 	return client, nil
 }
 func (s *Service) validateConfig(ctx context.Context, cfg adminapi.AgentSpaceConfig) error {
-	// status does not advertise this capability. The operator records the
-	// independently verified release identity instead of probing a real user.
-	if cfg.ReleaseIdentity != "661d20d8bfe1fb7630a879383257e61602fb6df6" || cfg.ConnectTimeoutMs < 1000 || cfg.ConnectTimeoutMs > 120000 || cfg.IdleTimeoutMs < 1000 || cfg.IdleTimeoutMs > 600000 {
+	if cfg.ConnectTimeoutMs < 1000 || cfg.ConnectTimeoutMs > 120000 || cfg.IdleTimeoutMs < 1000 || cfg.IdleTimeoutMs > 600000 {
 		return ErrInvalid
 	}
 	_, err := s.adapter(ctx, cfg)

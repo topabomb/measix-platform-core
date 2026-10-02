@@ -145,22 +145,31 @@ test('Admin drawer returns to desktop layout after an open narrow overlay is res
 })
 
 /**
- * Helper: select an option from a q-select identified by data-cy.
+ * Select through the control's interactive trigger, including paged entity pickers.
  */
 async function selectOption(page: Page, selectCy: string, optionMatcher: string | RegExp): Promise<void> {
   const select = page.locator(`[data-cy="${selectCy}"]`).first()
   await expect(select).toBeVisible({ timeout: 5_000 })
-  await select.click()
-  await page.waitForTimeout(300)
-  const entityPicker = page.locator('[data-cy="entity-picker-dialog"]')
-  if (await entityPicker.isVisible()) {
+  const trigger = select.locator('[data-cy="entity-picker-trigger"]')
+  if (await trigger.count()) {
+    await trigger.click()
+    const entityPicker = page.locator('[data-cy="entity-picker-dialog"]')
+    await expect(entityPicker).toBeVisible()
     await entityPicker.locator('[data-cy="entity-picker-option"]').filter({ hasText: optionMatcher }).first().click()
+    await expect(entityPicker).not.toBeVisible()
   } else {
-    const popup = page.locator('.q-menu').first()
+    const combobox = select.getByRole('combobox')
+    await combobox.click()
+    await expect(combobox).toHaveAttribute('aria-expanded', 'true')
+    const listboxId = await combobox.getAttribute('aria-controls')
+    expect(listboxId).toBeTruthy()
+    const popup = page.locator(`[id="${listboxId}"]`)
     await expect(popup).toBeVisible({ timeout: 5_000 })
     await popup.getByText(optionMatcher, { exact: typeof optionMatcher === 'string' }).first().click()
+    // Multi-selects stay open; close the actual control before opening the next one.
+    await combobox.press('Escape')
+    await expect(popup).not.toBeVisible()
   }
-  await page.waitForTimeout(200)
 }
 
 test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page }: { page: Page }) => {
@@ -515,8 +524,8 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await selectOption(page, 'policy-default-asr', 'E2E Test ASR')
     await selectOption(page, 'policy-default-image-generation', 'E2E Image Generation')
     const imageDefault = page.locator('[data-cy="policy-default-image-generation"]')
-    await imageDefault.click()
-    await page.keyboard.press('Backspace')
+    await page.locator('.q-field').filter({ has: imageDefault })
+      .getByRole('button', { name: 'Clear', exact: true }).click()
     await expect(imageDefault).not.toContainText('E2E Image Generation')
 
     // S0.2 typed experience authoring shares this same Draft and Publish.

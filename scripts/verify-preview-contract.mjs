@@ -48,6 +48,8 @@ function main() {
   }
 
   const androidPlatform = join(android, 'app/src/test/resources/contracts/platform/client-control.openapi.yaml')
+  checkFileEquals(join(android, 'app/src/test/resources/contracts/platform/snapshot-reception-cases.json'),
+    join(root, 'api/fixtures/client-integration/snapshot-reception-cases.json'), 'Android snapshot reception cases')
   const platformWire = readFileSync(join(android, 'app/src/main/java/net/weero/measix/pilot/data/enterprise/PlatformWire.kt'), 'utf8')
   failures.push(...androidContractFailures(readFileSync(join(root, 'api/client/client-control.openapi.yaml')), coreAndroidManifest, readFileSync(androidPlatform), readJSON(join(android, 'app/src/test/resources/contracts/platform/manifest.json')), platformWire))
 

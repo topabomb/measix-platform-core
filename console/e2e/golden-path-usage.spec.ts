@@ -114,6 +114,7 @@ test('CAP-C6-001-Usage Usage/System verification after five-capability traffic',
     try {
       await page.goto('/admin/system')
       await expect(page.locator('[data-cy="system-page"]')).toBeVisible()
+      await page.locator('.system-deployment > summary').click()
       await expect(page.locator('[data-cy="system-runtime-status"]')).toBeVisible()
 
       const statusText = await page.locator('[data-cy="system-runtime-status"]').textContent()

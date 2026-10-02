@@ -57,6 +57,19 @@ export function snapshotVersions(root) {
   return { current, supported }
 }
 
+export function androidSnapshotVersions(root) {
+  const source = readFileSync(join(root, 'app/src/main/java/net/weero/measix/pilot/data/enterprise/PlatformSnapshotCompatibility.kt'), 'utf8')
+  const list = source.match(/val supportedSchemas: Set<Long> = setOf\(([^)]*)\)/)?.[1]
+  if (!list || !/^\s*\d+L(?:\s*,\s*\d+L)*\s*,?\s*$/.test(list)) {
+    throw new Error('Cannot determine Android Snapshot support identity')
+  }
+  const supported = list.split(',').map(value => value.trim()).filter(Boolean).map(value => Number(value.slice(0, -1)))
+  if (supported.some(value => !Number.isSafeInteger(value) || value < 1) || new Set(supported).size !== supported.length) {
+    throw new Error('Invalid Android Snapshot support identity')
+  }
+  return supported
+}
+
 // --- Git utilities ---
 
 export function gitCommit(cwd) {

@@ -182,6 +182,33 @@ func TestOldClientReleaseVersionAndAppliedBoundary(t *testing.T) {
 			if err != nil || len(devices) != 1 || devices[0].ApplicationState != "PENDING" || devices[0].TargetManagedGeneration != 2 {
 				t.Fatal("Admin did not retain the pending device state")
 			}
+			// A client that cannot apply the active format still owns a valid identity.
+			response = doJSON(t, h, http.MethodPost, "/api/client/v1/sessions/refresh",
+				map[string]string{"Idempotency-Key": platformid.New(platformid.Idempotency)},
+				map[string]string{"refreshToken": session.RefreshToken})
+			if response.Code != http.StatusOK {
+				t.Fatalf("pending configuration blocked refresh: %d", response.Code)
+			}
+			var renewed clientapi.RefreshResponse
+			decodeJSON(t, response, &renewed)
+			headers["Authorization"] = "Bearer " + renewed.AccessToken
+			response = doJSON(t, h, http.MethodGet, "/api/client/v1/bootstrap", headers, nil)
+			if response.Code != http.StatusOK {
+				t.Fatalf("pending configuration blocked restored identity: %d", response.Code)
+			}
+			decodeJSON(t, response, &boot)
+			if boot.Session.SessionId != session.SessionId || !boot.ManagedState.RuntimeBlocked {
+				t.Fatal("refresh changed session identity or bypassed the execution barrier")
+			}
+			response = doJSON(t, h, http.MethodPost, "/api/client/v1/sessions/logout", nil,
+				map[string]string{"refreshToken": renewed.RefreshToken})
+			if response.Code != http.StatusNoContent {
+				t.Fatalf("pending configuration blocked logout: %d", response.Code)
+			}
+			response = doJSON(t, h, http.MethodGet, "/api/client/v1/bootstrap", headers, nil)
+			if response.Code != http.StatusForbidden {
+				t.Fatalf("logged out identity retained access: %d", response.Code)
+			}
 		})
 	}
 }

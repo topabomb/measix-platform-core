@@ -3,6 +3,7 @@ package contract_test
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -81,23 +82,48 @@ func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
 	}
 	var cases []struct {
 		Name    string
-		Valid   bool
+		Outcome string
 		Context struct {
 			DeploymentID string
 			Generation   int
 			Etag         string
 		}
-		Snapshot clientapi.ManagedSnapshot
+		Snapshot map[string]any
 	}
 	read("snapshot-reception-cases.json", &cases)
+	doc, err := openapi3.NewLoader().LoadFromFile(filepath.Join(fixtureRoot(t), "..", "client", "client-control.openapi.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			hash := c.Snapshot.SnapshotHash
-			valid := c.Context.DeploymentID == c.Snapshot.DeploymentId && c.Context.Generation == c.Snapshot.ManagedGeneration && c.Context.Etag == "\""+hash+"\""
-			if valid != c.Valid {
-				t.Fatal("reception outcome mismatch")
+			seen[c.Name] = true
+			outcome := "invalid_configuration"
+			version, numeric := c.Snapshot["schemaVersion"].(float64)
+			if numeric && version > 0 && math.Trunc(version) == version && version != 4 && version != 5 {
+				outcome = "unsupported_version"
+			} else if version == 4 || version == 5 {
+				schema := "ManagedSnapshot"
+				if version == 4 {
+					schema = "ManagedSnapshotV4"
+				}
+				if doc.Components.Schemas[schema].Value.VisitJSON(c.Snapshot) == nil &&
+					c.Snapshot["deploymentId"] == c.Context.DeploymentID &&
+					c.Snapshot["managedGeneration"] == float64(c.Context.Generation) &&
+					c.Context.Etag == fmt.Sprintf("\"%v\"", c.Snapshot["snapshotHash"]) {
+					outcome = "accepted"
+				}
+			}
+			if outcome != c.Outcome {
+				t.Fatalf("reception outcome=%s want %s", outcome, c.Outcome)
 			}
 		})
+	}
+	for _, name := range []string{"accept", "accept-v5", "future-v6", "future-v7", "missing-version", "null-version", "string-version", "fractional-version", "zero-version", "known-version-unknown-field"} {
+		if !seen[name] {
+			t.Errorf("missing receiver case %s", name)
+		}
 	}
 	var snapshot clientapi.ManagedSnapshot
 	read("snapshot-v4.json", &snapshot)
@@ -157,7 +183,7 @@ func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
 	}
 	// Load the copied schema directly: all refs must resolve in the export.
 	path := filepath.Join(fixtureRoot(t), "../generated/android/integration/measix-platform-core/api/generated/android/client-control.openapi.yaml")
-	doc, err := openapi3.NewLoader().LoadFromFile(path)
+	doc, err = openapi3.NewLoader().LoadFromFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

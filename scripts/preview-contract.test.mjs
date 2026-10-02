@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { snapshotVersions } from './lib/harness.mjs'
+import { snapshotVersions, androidSnapshotVersions } from './lib/harness.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -43,6 +43,22 @@ test('release Snapshot versions come from the compiler and reject incomplete sou
     for (const invalid of ['', source.replace('5, 7', '5'), source.replace('5, 7', '7, 7'), source.replace('5, 7', '5, unknown')]) {
       writeFileSync(file, invalid)
       assert.throws(() => snapshotVersions(root), /Snapshot/)
+    }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test('release records the finite Android support set independently of Core', () => {
+  const root = mkdtempSync(join(tmpdir(), 'measix-android-support-'))
+  try {
+    const directory = join(root, 'app/src/main/java/net/weero/measix/pilot/data/enterprise')
+    mkdirSync(directory, { recursive: true })
+    const file = join(directory, 'PlatformSnapshotCompatibility.kt')
+    const source = 'val supportedSchemas: Set<Long> = setOf(5L, 7L)'
+    writeFileSync(file, source)
+    assert.deepEqual(androidSnapshotVersions(root), [5, 7])
+    for (const invalid of ['', source.replace('5L, 7L', '5L, 5L'), source.replace('5L, 7L', '0L'), source.replace('5L, 7L', 'nextVersion')]) {
+      writeFileSync(file, invalid)
+      assert.throws(() => androidSnapshotVersions(root), /Android Snapshot/)
     }
   } finally { rmSync(root, { recursive: true, force: true }) }
 })

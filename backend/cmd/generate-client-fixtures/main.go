@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -293,8 +294,33 @@ func main() {
 		case "wrong-body-hash":
 			value["snapshotHash"] = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 		}
-		receptions = append(receptions, object{"name": name, "valid": name == "accept", "context": context, "snapshot": value})
+		outcome := "invalid_configuration"
+		if name == "accept" {
+			outcome = "accepted"
+		}
+		receptions = append(receptions, object{"name": name, "outcome": outcome, "context": context, "snapshot": value})
 	}
+	context := object{"deploymentId": deployment, "generation": 44, "etag": "\"" + v5Snapshot.SnapshotHash + "\""}
+	receptions = append(receptions, object{"name": "accept-v5", "outcome": "accepted", "context": context, "snapshot": v5Snapshot})
+	// Future bodies are receiver fault inputs, never compiler-supported releases.
+	for _, version := range []int{6, 7} {
+		receptions = append(receptions, object{"name": fmt.Sprintf("future-v%d", version), "outcome": "unsupported_version", "context": context,
+			"snapshot": object{"schemaVersion": version, "futurePolicy": object{"mode": "UNRECOGNIZED", "nested": []any{object{"next": true}}}}})
+	}
+	for _, invalid := range []struct {
+		name    string
+		version any
+	}{{"null-version", nil}, {"string-version", "6"}, {"fractional-version", 6.5}, {"zero-version", 0}} {
+		value := clone(v5Snapshot)
+		value["schemaVersion"] = invalid.version
+		receptions = append(receptions, object{"name": invalid.name, "outcome": "invalid_configuration", "context": context, "snapshot": value})
+	}
+	missingVersion := clone(v5Snapshot)
+	delete(missingVersion, "schemaVersion")
+	receptions = append(receptions, object{"name": "missing-version", "outcome": "invalid_configuration", "context": context, "snapshot": missingVersion})
+	unknownField := clone(v5Snapshot)
+	unknownField["futurePolicy"] = object{"mode": "UNRECOGNIZED"}
+	receptions = append(receptions, object{"name": "known-version-unknown-field", "outcome": "invalid_configuration", "context": context, "snapshot": unknownField})
 	write("snapshot-reception-cases.json", receptions)
 	base := "https://platform.example.invalid/runtime/v1/resources/"
 	headers := object{"Authorization": "Bearer synthetic.access.token", "X-Measix-Managed-Generation": "42", "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000"}

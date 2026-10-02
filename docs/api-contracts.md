@@ -412,13 +412,14 @@ P5 通过需同时具备：固定候选的合同/生成检查、Core 定向及�
 | 派生产物 | 原生成链、Android wire `--check`、跨仓库 `verify-preview-contract.mjs` 通过 |
 | Android | 历史修复后的 `test assembleDebug lintDebug assembleRelease --no-parallel --max-workers=1` 通过；app Debug JVM 报告 2523 项、零失败；历史 VM/作用域查询 8 项定向测试及企业页 27 项设备测试通过 |
 | 安装升级探针 | 历史和当前 APK 使用同一覆盖安装探针；两次实际执行与新增测试源的 lint 通过 |
-| 设备组件 | app 389 项、17 项显式跳过、零失败；speech 首次系统 TTS 合成超时，原代码复验 18 项零失败、2 项跳过；workspace 12 项零失败、1 项跳过。完整设备门禁再次确认中，首次失败记录保留 |
+| 设备组件 | 同一候选分模块完成：app 389 项、17 项显式跳过、零失败；speech 18 项、2 项跳过、零失败；workspace 12 项、1 项跳过、零失败。联网完整命令两次在系统 TTS 首次合成超时；离线完整命令在 ADB 短暂断连时中止。后续离线 speech/workspace 完整运行通过，冷启动 TTS 单测 3.5 秒通过。保留全部失败，不宣称一次完整命令全绿 |
 
 **真实服务与界面证据**
 
 | 场景 | 已观察结果与范围 |
 | --- | --- |
 | v5 闭环 | `npm run device:real` 的 Admin 实际保存、审查并发布工作区 MCP 与助手绑定；active 为 v5 generation 11。Android 接入、无预同步重开、三条 Starter 预填、两节点历史及真实模型流式/辅助调用通过，release/hash 与 Core 一致 |
+| v5 Starter 首发 | 当前已提交 Core/Android 运行带 Android lane 的隔离 E2E：真实 Admin 发布 v5 generation 2，设备点击预填、首次发送、开场/Room 回读及重开通过；确定性供应商实际请求核验通过。该独立数据库及发布身份与 `device:real` generation 11 分开记录 |
 | 未来格式 | 隔离代理注入 v6/v7 Snapshot 和 Bootstrap 仅声明 `{6,7}`；身份、Applied、非空历史保全，执行准备阶段拒绝，企业页显示升级提示。属于故障注入，不是正式 v6/v7 发布 |
 | 个人使用 | 不兼容期间实际切个人、修改设置、个人聊天及 MCP `tools/call` 成功。请求无企业执行头，个人 MCP 无 Authorization，未触发企业 Snapshot 下载 |
 | 退出 | 不兼容时真实 Core logout 返回 204，本地 SIGNED_OUT；另对 logout 注入 503，本地仍终结。两者均清除 Session、Applied 与 pending exit；离线退出后个人模型/MCP 保留且实际聊天和工具调用成功 |
@@ -436,9 +437,11 @@ v4 验证使用专用模拟器、独立数据库副本和重建 Debug APK，不�
 
 §11.13 的取消、迟到 Session、撤权/过期、已知坏内容及网络错误由现有 owner 的 JVM/设备行为测试覆盖；实际界面和 HTTP 注入覆盖上表组合，不声称每一种组合均已人工操作。完整个人功能的隔离由统一 Realm/配置/执行路径及行为回归共同约束，个人聊天、MCP、设置与本地文件另有实操。真实麦克风、未准备的 PRoot 镜像和 OEM/生产签名安装不属于本次已执行证据，显式跳过不计通过。
 
-证据入口：Core `.artifacts/v5-protocol/` 的 `fresh-v7-*.json`、`reachable-v7-exit.json`、`rolling-v4-rollback.json`、`rolling-release-preserved.json`、`personal-local-file.json`、`remote-live-evidence.json`；Android 同目录的覆盖安装报告、构建及设备日志。测试身份和目录仅用于隔离验证，证据文件不含接入凭据。
+验收材料已归档到本机工作区外 `%USERPROFILE%\Documents\MeasixValidation\2026-10-02-v5`：`core/v5-protocol/` 保存未来版本、退出、回退、个人文件和真实工作区证据；`core/starter-e2e/` 保存当前候选的真实 Core Starter 首发及供应商请求证据；`android/v5-protocol/` 保存覆盖安装、构建、设备运行和失败日志。`binaries/` 保留实际测试的 v4/v5 Debug 与测试 APK，并逐个核对原 SHA-256。264 个归档文件与原件哈希一致；公开结果 JSON 不包含接入凭据。
 
-剩余收尾：完整设备门禁再次确认、干净候选静态门禁及本地提交身份记录；不提前宣布里程碑全部验收。
+实现候选已本地提交：Architecture `07fdf4e`、Core `34decd0`、Portal `6b96d10`、Android `3d47418de`；本节后续提交只补验收记录。Core 干净候选的 gofmt、go vet、生成漂移门禁通过，跨仓库合同检查与 Android wire 检查通过；修改文档的 34 个本地链接有效。上述实现与协议专项验证完成，设备整条命令的环境失败和未覆盖场景保留为明确边界，不声称生产发布或所有环境均通过。
+
+收尾采用可恢复归档：自动审批拒绝永久删除，未绕过该限制。项目内本次测试材料移出到上述归档，运行副本、旧源码构建和已停止的专用 AVD 归集到 `%TEMP%\measix-v5-retained-temporary-20261002`，保留原件而非永久删除；运行副本不作为公开验收材料。临时代理、个人测试服务和隔离 v4 Core 已停止；仅删除明确属于本次验证的两个远程目录，其他根目录条目保全。现有 `device:real`、Agent Space 及其原数据保留，活动服务日志仍留在原路径。
 
 ## 远程工作区合同扩展
 

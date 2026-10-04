@@ -461,6 +461,44 @@ func TestVerifiedLostCreateCanBeCleanedAfterUserRevocation(t *testing.T) {
 	}
 }
 
+func TestVerifiedDisconnectRetiresUnknownDAVWithoutReplay(t *testing.T) {
+	s, remote, actor, user := lifecycleFixture(t)
+	ctx := context.Background()
+	remote.failDAV = true
+	old := runCommand(t, s, actor, user, "CREATE")
+	view, _ := s.Projection(ctx, user)
+	spaceID := str(view.AgentSpaceId)
+	input := adminapi.WorkspaceCommand{Action: "DISCONNECT", ExpectedRevision: view.BindingRevision}
+	if _, err := s.Command(ctx, actor, platformid.New(platformid.Idempotency), user, input); err != ErrPending {
+		t.Fatalf("unverified disconnect must remain blocked: %v", err)
+	}
+	evidence := "Verified original account and space; the old DAV request has ended."
+	input.Evidence = &evidence
+	s.Client.WorkspaceOperation.UpdateOneID(old.OperationId).SetStep("CREATE_SENT").ExecX(ctx)
+	if _, err := s.Command(ctx, actor, platformid.New(platformid.Idempotency), user, input); err != ErrPending {
+		t.Fatalf("unknown create must not be superseded by disconnect: %v", err)
+	}
+	s.Client.WorkspaceOperation.UpdateOneID(old.OperationId).SetStep("DAV_SENT").ExecX(ctx)
+	op, err := s.Command(ctx, actor, platformid.New(platformid.Idempotency), user, input)
+	if err != nil {
+		t.Fatalf("verified disconnect must provide a recovery exit: %v", err)
+	}
+	for i := 0; i < 5; i++ {
+		if err := s.Reconcile(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	retired, _ := s.Operation(ctx, old.OperationId)
+	finished, _ := s.Operation(ctx, op.OperationId)
+	view, _ = s.Projection(ctx, user)
+	if retired.State != "COMPLETED" || retired.Step != "SUPERSEDED_BY_VERIFIED_DISCONNECT" || finished.State != "COMPLETED" || view.State != "DISCONNECTED" {
+		t.Fatalf("recovery did not settle: %+v %+v %+v", retired, finished, view)
+	}
+	if !remote.exists || remote.enabled || remote.dav != "" || remote.davWrites != 1 || str(view.AgentSpaceId) != spaceID {
+		t.Fatalf("exists=%v enabled=%v DAV present=%v writes=%d space=%s expected=%s", remote.exists, remote.enabled, remote.dav != "", remote.davWrites, str(view.AgentSpaceId), spaceID)
+	}
+}
+
 func TestVerifiedContinueCanReplaceExpiredManagementCredential(t *testing.T) {
 	s, remote, actor, user := lifecycleFixture(t)
 	ctx := context.Background()

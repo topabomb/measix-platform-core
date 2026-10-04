@@ -196,10 +196,27 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 		// A lost create response cannot be replayed. Explicit takeover of the
 		// observed original account is the only permitted replacement operation.
 		prior, e := pending.Only(ctx)
-		if e != nil || action != "TAKEOVER" || prior.Action != "CREATE" || prior.State != "UNKNOWN" || prior.Step != "CREATE_SENT" {
+		if e != nil {
 			return adminapi.WorkspaceOperation{}, ErrPending
 		}
-		if _, e = tx.WorkspaceOperation.UpdateOneID(prior.ID).SetState("COMPLETED").SetStep("SUPERSEDED_BY_VERIFIED_TAKEOVER").SetEvidence(actor + ": " + str(input.Evidence)).Save(ctx); e != nil {
+		retiredStep := "SUPERSEDED_BY_VERIFIED_TAKEOVER"
+		if action == "DISCONNECT" && input != nil && strings.TrimSpace(str(input.Evidence)) != "" &&
+			(prior.State == "UNKNOWN" || prior.State == "NEEDS_ATTENTION") &&
+			(prior.Step == "DAV_SENT" || prior.Step == "DAV_REVOKE_SENT") {
+			var pinned operationTarget
+			if json.Unmarshal(prior.TargetJSON, &pinned) != nil || prior.UserID != userID ||
+				prior.BindingRevision != bindingRevision || target.SpaceID == "" ||
+				pinned.Username != target.Username || (pinned.SpaceID != "" && pinned.SpaceID != target.SpaceID) ||
+				hash(pinned.Config) != hash(target.Config) {
+				return adminapi.WorkspaceOperation{}, ErrConflict
+			}
+			// Evidence establishes that the old DAV write ended. Retire it without
+			// replay, then use the normal disconnect flow to revoke both credentials.
+			retiredStep = "SUPERSEDED_BY_VERIFIED_DISCONNECT"
+		} else if action != "TAKEOVER" || prior.Action != "CREATE" || prior.State != "UNKNOWN" || prior.Step != "CREATE_SENT" {
+			return adminapi.WorkspaceOperation{}, ErrPending
+		}
+		if _, e = tx.WorkspaceOperation.UpdateOneID(prior.ID).SetState("COMPLETED").SetStep(retiredStep).SetEvidence(actor + ": " + str(input.Evidence)).Save(ctx); e != nil {
 			return adminapi.WorkspaceOperation{}, e
 		}
 	}

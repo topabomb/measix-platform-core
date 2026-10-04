@@ -8,6 +8,26 @@ import * as client from '../api/client'
 afterEach(() => vi.restoreAllMocks())
 
 describe('workspace file prerequisites', () => {
+  it('allows verified disconnect from an unknown DAV write and requires evidence', async () => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async path => (path.includes('workspace-operations') ? {
+      operationId: 'wop_test', action: 'CREATE', state: 'UNKNOWN', step: 'DAV_SENT',
+    } : {
+      schemaVersion: 1, state: 'CONNECTED', bindingRevision: 1, operationId: 'wop_test',
+      agentSpaceId: 'spc_test', mcpAvailable: true, filesAvailable: false,
+    }) as never)
+    const wrapper = mount(WorkspacePanel, {
+      props: { userId: 'usr_test', serviceEnabled: true },
+      global: { plugins: [createPinia(), [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, WorkspaceFiles: true, ProblemBanner: true } },
+    })
+    try {
+      await flushPromises()
+      const disconnect = wrapper.findAllComponents(QBtn).find(button => button.props('label') === '断开')!
+      expect(disconnect.props('disable')).toBe(false)
+      await disconnect.trigger('click'); await flushPromises()
+      expect(wrapper.findAllComponents(QInput).some(input => input.props('label') === '核实依据（必填）')).toBe(true)
+      expect(wrapper.findAllComponents(QBtn).find(button => button.props('label') === '确认')!.props('disable')).toBe(true)
+    } finally { wrapper.unmount() }
+  })
   it('keeps verified cleanup reachable after a lost create and user revocation', async () => {
     vi.spyOn(client, 'apiFetch').mockImplementation(async path => (path.includes('workspace-operations') ? {
       operationId: 'wop_test', action: 'CREATE', state: 'UNKNOWN', step: 'CREATE_SENT',

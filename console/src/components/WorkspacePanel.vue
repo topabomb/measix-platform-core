@@ -23,6 +23,8 @@ const url=`/api/admin/v1/users/${encodeURIComponent(props.userId)}/workspace`
 const labels:Record<string,string>={UNPROVISIONED:'未开通',CONNECTING:'开通中',CONNECTED:'已连接',DISCONNECTING:'断开中',DISCONNECTED:'已断开',RESTORING:'恢复中',DELETING:'删除中',DELETED:'已删除',NEEDS_ATTENTION:'需要处理'}
 const actionLabels:Record<string,string>={CREATE:'开通远程工作区',DISCONNECT:'断开工作区',RESTORE:'恢复连接',DELETE:'删除远程工作区',TAKEOVER:'显式接管',RESET_MCP:'重新签发 MCP 凭据',SET_DAV:'签发 / 重设 WebDAV Token',REVOKE_DAV:'撤销 WebDAV Token',CONTINUE:'核实后继续'}
 const pendingOperation=computed(()=>operation.value&&operation.value.state!=='COMPLETED')
+const canVerifyDisconnect=computed(()=>!!operation.value&&['UNKNOWN','NEEDS_ATTENTION'].includes(operation.value.state)&&['DAV_SENT','DAV_REVOKE_SENT'].includes(operation.value.step))
+const needsEvidence=computed(()=>['TAKEOVER','CONTINUE'].includes(confirm.value??'')||confirm.value==='DISCONNECT'&&canVerifyDisconnect.value)
 let alive=true,timer:ReturnType<typeof setTimeout>|undefined,controller=new AbortController()
 let pending:{payload:string;key:string}|undefined
 async function refresh(){
@@ -66,7 +68,7 @@ onBeforeUnmount(()=>{alive=false;controller.abort();if(timer)clearTimeout(timer)
      <q-btn v-if="serviceEnabled && view.state==='UNPROVISIONED' && view.mcpReason!=='user_unavailable'" color="primary" label="开通工作区" :disable="busy" @click="ask('CREATE')"/>
      <q-btn v-if="serviceEnabled && (view.state==='UNPROVISIONED'||operation?.step==='CREATE_SENT'&&operation.state==='UNKNOWN') && view.mcpReason!=='user_unavailable'" outline label="接管已有空间" :disable="busy" @click="ask('TAKEOVER')"/>
      <q-btn v-if="serviceEnabled && view.filesAvailable" color="primary" :label="showFiles?'收起文件':'浏览文件'" @click="showFiles=!showFiles"/>
-     <q-btn v-if="view.state==='CONNECTED'" outline label="断开" :disable="busy||!!pendingOperation" @click="ask('DISCONNECT')"/>
+     <q-btn v-if="view.state==='CONNECTED'" outline label="断开" :disable="busy||!!pendingOperation&&!canVerifyDisconnect" @click="ask('DISCONNECT')"/>
      <q-btn v-if="serviceEnabled && view.state==='DISCONNECTED' && view.mcpReason!=='user_unavailable'" color="primary" label="恢复连接" :disable="busy||!!pendingOperation" @click="ask('RESTORE')"/>
      <q-btn v-if="serviceEnabled && view.state==='CONNECTED' && view.filesReason!=='dav_not_configured'" outline label="WebDAV 连接信息" :disable="busy" @click="connectionOpen=true"/>
      <q-btn v-if="view.agentSpaceId&&['CONNECTED','DISCONNECTED'].includes(view.state)" flat color="negative" label="删除空间" :disable="busy||!!pendingOperation" @click="ask('DELETE')"/>
@@ -88,8 +90,9 @@ onBeforeUnmount(()=>{alive=false;controller.abort();if(timer)clearTimeout(timer)
    <div v-if="confirm==='REVOKE_DAV'">撤销文件访问及外部 WebDAV 客户端凭据；MCP 保持原状态。</div>
    <template v-if="confirm==='TAKEOVER'||confirm==='CONTINUE'&&operation?.step==='CREATE_SENT'"><q-input v-model="remoteUsername" outlined label="现有远端账号"/><q-input v-model="spaceId" outlined label="原 agentSpaceId"/><div>{{confirm==='TAKEOVER'?'确认原控制方停止编排且旧管理请求已结束。接管会撤销原凭据，保留原空间和文件。':'确认原创建请求已结束，并核对原账号与空间。仅继续当前停用或删除清理，不会恢复访问。'}}</div></template>
    <q-input v-if="confirm==='CONTINUE'" v-model="recoveryBearer" type="password" autocomplete="new-password" outlined label="新的管理凭据（仅原凭据失效时填写）" hint="只用于原目标的当前操作。完成后请同步服务连接配置。"/>
-   <q-input v-if="confirm==='TAKEOVER'||confirm==='CONTINUE'" v-model="evidence" type="textarea" outlined label="核实依据（必填）"/>
-  </q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup :disable="busy"/><q-btn :color="confirm==='DELETE'?'negative':'primary'" label="确认" :loading="busy" :disable="confirm==='DELETE'&&confirmation!==view?.agentSpaceId||['TAKEOVER','CONTINUE'].includes(confirm??'')&&!evidence.trim()" @click="confirm&&command(confirm)"/></q-card-actions></q-card></q-dialog>
+   <p v-if="confirm==='DISCONNECT'&&canVerifyDisconnect">请先核实原 DAV 请求已经结束及原账号、空间身份。断开将结束该待处理操作并撤销访问，保留空间和文件；之后可以修正连接配置再恢复。</p>
+   <q-input v-if="needsEvidence" v-model="evidence" type="textarea" outlined label="核实依据（必填）"/>
+  </q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup :disable="busy"/><q-btn :color="confirm==='DELETE'?'negative':'primary'" label="确认" :loading="busy" :disable="confirm==='DELETE'&&confirmation!==view?.agentSpaceId||needsEvidence&&!evidence.trim()" @click="confirm&&command(confirm)"/></q-card-actions></q-card></q-dialog>
   <q-dialog v-model="connectionOpen" @hide="connection=undefined;showToken=false"><q-card style="width:600px;max-width:95vw"><q-card-section class="text-h6">WebDAV 连接信息</q-card-section><q-card-section>
    <ProblemBanner :error="error"/><p>管理员可将连接信息交付给用户。外部客户端使用用户名和完整 Token，不使用企业登录密码。</p>
    <q-btn v-if="!connection" outline label="查看当前连接信息" :loading="revealing" :disable="!view?.filesAvailable" @click="reveal"/>

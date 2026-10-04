@@ -164,6 +164,8 @@ node scripts/workspace-integration.mjs --config .artifacts/workspace-review-serv
 
 ## 发布边界与未执行项
 
+2026-10-04 本机 Device Demo 恢复验证：补齐未知 DAV 写入的“核实后断开”出口，后端与页面测试分别先复现阻断再通过；workspace、agentspace、httpapi、runtimecontrol 测试、Console 245 项测试、typecheck/build 通过。保留 SQLite 在线备份后更新本机运行二进制，通过正式 API 断开、修正同机 DAV origin、应用配置、恢复原空间并显式签发 DAV；原空间 ID 不变，文件列表实际返回 200。内置 Chromium 登录管理台确认 MCP/文件均可用、资源摘要正常、文件浏览成功且无待处理操作。未直接修改业务数据库。备份与结果位于忽略目录 `.data/device-real/recovery-dav-20261004/`；这是本机开发实例恢复，不代表生产或手机直连 DAV 验收。
+
 `npm run verify:preview-contract` **未通过跨仓库检查**：Core 自身基线已同步，但 Portal generated.ts/client-feed 的 source hash，以及 Android client fixture、manifest、PlatformWire 与 Portal 副本尚未同步。没有因此修改 Portal/Android 消费端，或把生成导出当作原生客户端已完成。部署整套 Preview 前必须在各消费仓库完成同步及其对应验证。
 
 本轮没有生产部署、真实 Android 工作区文件 UI/旧 APK MCP 验收、任意第三方 DAV 桌面客户端资格认证、生产规模负载/内存测量，也不覆盖完整 S1 compute/storage 计量。外部 DAV 通过真实 Basic/Bearer HTTP 客户端验证；磁盘不足等远端故障边界由确定性测试/远端发布合同分层覆盖，不能声称对所有真实 VM 故障做了注入。迁移/备份验证在隔离数据上完成，不对唯一生产副本做恢复实验。

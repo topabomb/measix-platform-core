@@ -63,12 +63,14 @@ func TestHistoricalRepublishPreservesSchemaAndSourceBytes(t *testing.T) {
 			content.Assistants = []adminapi.ManagedAssistantDefinition{{AssistantDefinitionId: assistantID, DisplayName: "Original", SystemPrompt: "Original assistant", ModelId: content.Models[0].ModelId, MemorySeed: []string{}, McpServerIds: []adminapi.McpServerId{}, Enabled: true}}
 			starter := adminapi.AssistantStarterDefinition{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: assistantID, Title: "Entry", Prompt: "Original prompt", Enabled: true}
 			if version == 5 {
-				starter.OpeningSnapshot = &adminapi.StarterOpeningSnapshot{Format: 1, SystemPrompt: tc.system, InitialContexts: []adminapi.StarterInitialContext{{Id: "b", Title: "Block", Content: "Literal {{body}}"}}}
+				starter.OpeningSnapshot = &adminapi.StarterOpeningSnapshot{Format: 1, SystemPrompt: tc.system, InitialContexts: []adminapi.StarterInitialContext{{Id: "b", Content: "Literal {{body}}"}}}
 			}
 			content.Starters = []adminapi.AssistantStarterDefinition{starter}
 			var original clientapi.ManagedSnapshot
 			json.Unmarshal(source.SnapshotJSON, &original)
-			snapshot, hash, err := svc.Capability.CompileSnapshot(capability.SnapshotInput{SchemaVersion: version, DeploymentID: string(original.DeploymentId), ReleaseID: source.ID, ManagedGeneration: int(source.ManagedGeneration), Content: content, PublishedAt: source.CreatedAt, PublishedByUserID: adminID})
+			description := "Retained v4 description"
+			historical := []clientapi.AssistantStarterDefinitionV4{{StarterId: starter.StarterId, Description: &description}}
+			snapshot, hash, err := svc.Capability.CompileSnapshot(capability.SnapshotInput{SchemaVersion: version, V4Starters: historical, DeploymentID: string(original.DeploymentId), ReleaseID: source.ID, ManagedGeneration: int(source.ManagedGeneration), Content: content, PublishedAt: source.CreatedAt, PublishedByUserID: adminID})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -112,7 +114,7 @@ func TestHistoricalRepublishPreservesSchemaAndSourceBytes(t *testing.T) {
 			if newRow.ID == old.ID || newRow.ManagedGeneration <= old.ManagedGeneration || newRow.SnapshotHash == old.SnapshotHash {
 				t.Fatal("republish did not create fresh release identity")
 			}
-			var published clientapi.ManagedSnapshot
+			var published capability.Snapshot
 			json.Unmarshal(newRow.SnapshotJSON, &published)
 			if int(published.SchemaVersion) != version || published.Assistants[0].SystemPrompt != "Original assistant" {
 				t.Fatalf("republish changed historical semantics: %+v", published)
@@ -122,6 +124,9 @@ func TestHistoricalRepublishPreservesSchemaAndSourceBytes(t *testing.T) {
 			}
 			if version == 5 && published.Starters[0].OpeningSnapshot.SystemPrompt != tc.system {
 				t.Fatal("republish rederived opening")
+			}
+			if version == 4 && (published.Starters[0].Description == nil || *published.Starters[0].Description != description) {
+				t.Fatal("v4 description lost during republish")
 			}
 			got, err := capability.HashSnapshot(published)
 			if err != nil || got != newRow.SnapshotHash {

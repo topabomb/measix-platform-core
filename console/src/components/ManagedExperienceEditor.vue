@@ -130,7 +130,7 @@ function useAssistantSystem(starter: Starter) {
 function addContext(starter: Starter) {
   if (props.disabled || !starter.openingSnapshot) return
   const contexts = starter.openingSnapshot.initialContexts
-  contexts.push({ id: uid(), title: t('experience.contextNew', { index: contexts.length + 1 }), content: '' })
+  contexts.push({ id: uid(), content: '' })
   draft.markDirty()
 }
 function moveContext(starter: Starter, index: number, offset: number) {
@@ -170,10 +170,9 @@ async function focusIssue(kind: 'ASSISTANT' | 'STARTER', resourceId?: string, fi
       const details = root?.querySelector<HTMLDetailsElement>('[data-cy="starter-opening"]')
       if (details) details.open = true
       const contextIndex = /initialContexts\[(\d+)\]/.exec(path)?.[1]
-      const contextField = /\.(id|title|content)$/.exec(path)?.[1]
       element = contextIndex === undefined
         ? root?.querySelector<HTMLElement>('[data-cy="starter-opening-system"], [data-cy="starter-opening-create"]') ?? null
-        : root?.querySelector<HTMLElement>(`[data-context-index="${contextIndex}"] [data-field="${contextField === 'content' ? 'content' : 'title'}"]`) ?? null
+        : root?.querySelector<HTMLElement>(`[data-context-index="${contextIndex}"] [data-field="content"]`) ?? null
     } else {
       element = root?.querySelector<HTMLElement>(`[data-field="${field ?? ''}"]`) ?? null
     }
@@ -193,12 +192,9 @@ defineExpose({ focusIssue })
 
 <template>
   <section ref="editorRoot" class="assistant-editor" data-cy="experience-editor">
-    <q-banner class="bg-blue-1 q-mb-xs rounded-borders">
-      <div class="text-weight-medium">{{ t('experience.managedSource') }}</div>
-      <div class="text-body2">{{ t('experience.hint') }}</div>
-    </q-banner>
-    <div class="row q-col-gutter-xs">
-      <div class="col-12 col-md-4">
+
+    <div class="assistant-master-detail" :class="{ 'has-selection': selected }">
+      <div class="assistant-collection">
         <q-card flat bordered>
           <q-card-section class="row items-center justify-between">
             <div>
@@ -229,10 +225,11 @@ defineExpose({ focusIssue })
         </q-card>
       </div>
 
-      <div v-if="selected" class="col-12 col-md-8">
+      <div v-if="selected" class="assistant-detail">
         <q-card flat bordered>
           <q-card-section class="row items-start justify-between no-wrap q-gutter-xs">
             <div class="assistant-heading">
+              <q-btn flat dense icon="arrow_back" class="assistant-back" :label="t('experience.backToAssistants')" @click="selectedId = undefined" />
               <div class="text-h6">{{ selected.displayName }}</div>
               <details class="text-caption text-grey-7" data-cy="assistant-identity"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ selected.assistantDefinitionId }}</details>
             </div>
@@ -334,9 +331,7 @@ defineExpose({ focusIssue })
         <q-separator />
         <q-card-section class="app-dialog__body">
           <div ref="starterEditorRoot" class="q-gutter-xs">
-                    <details class="text-caption text-grey-7"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ editedStarter.starterId }}</details>
                     <q-input data-cy="starter-title" v-model="editedStarter.title" outlined :label="t('experience.title')" :disable="disabled" data-field="title" @update:model-value="draft.markDirty" />
-                    <q-input v-model="editedStarter.description" outlined :label="t('experience.description')" :disable="disabled" @update:model-value="draft.markDirty" />
                     <q-input data-cy="starter-prompt" v-model="editedStarter.prompt" outlined autogrow type="textarea" :label="t('experience.starterPrompt')" :disable="disabled" data-field="prompt" @update:model-value="draft.markDirty" />
                     <details data-cy="starter-opening" class="starter-opening">
                       <summary class="cursor-pointer text-body2">{{ editedStarter.openingSnapshot ? t('experience.opening', { count: editedStarter.openingSnapshot.initialContexts.length }) : t('experience.openingMissing') }}</summary>
@@ -360,12 +355,11 @@ defineExpose({ focusIssue })
                             <div class="row items-center justify-between no-wrap">
                               <span class="text-caption text-grey-7">{{ t('experience.contextNew', { index: index + 1 }) }}</span>
                               <div class="row no-wrap">
-                                <q-btn flat round dense icon="arrow_upward" :aria-label="`${t('experience.moveUp')} ${context.title}`" :disable="disabled || index === 0" data-cy="starter-context-up" @click="moveContext(editedStarter, index, -1)" />
-                                <q-btn flat round dense icon="arrow_downward" :aria-label="`${t('experience.moveDown')} ${context.title}`" :disable="disabled || index === editedStarter.openingSnapshot.initialContexts.length - 1" data-cy="starter-context-down" @click="moveContext(editedStarter, index, 1)" />
-                                <q-btn flat round dense color="negative" icon="delete" :aria-label="`${t('common.remove')} ${context.title}`" :disable="disabled" data-cy="starter-context-remove" @click="removeContext(editedStarter, index)" />
+                                <q-btn flat round dense icon="arrow_upward" :aria-label="`${t('experience.moveUp')} ${t('experience.contextNew', { index: index + 1 })}`" :disable="disabled || index === 0" data-cy="starter-context-up" @click="moveContext(editedStarter, index, -1)" />
+                                <q-btn flat round dense icon="arrow_downward" :aria-label="`${t('experience.moveDown')} ${t('experience.contextNew', { index: index + 1 })}`" :disable="disabled || index === editedStarter.openingSnapshot.initialContexts.length - 1" data-cy="starter-context-down" @click="moveContext(editedStarter, index, 1)" />
+                                <q-btn flat round dense color="negative" icon="delete" :aria-label="`${t('common.remove')} ${t('experience.contextNew', { index: index + 1 })}`" :disable="disabled" data-cy="starter-context-remove" @click="removeContext(editedStarter, index)" />
                               </div>
                             </div>
-                            <q-input v-model="context.title" dense outlined :label="t('experience.contextTitle')" :disable="disabled" data-cy="starter-context-title" data-field="title" @update:model-value="draft.markDirty" />
                             <q-input v-model="context.content" outlined type="textarea" :rows="3" :label="t('experience.contextContent')" :disable="disabled" data-cy="starter-context-content" data-field="content" @update:model-value="draft.markDirty" />
                             <details class="text-caption text-grey-7"><summary>{{ t('resources.review.technicalDetails') }}</summary>{{ context.id }}</details>
                           </div>
@@ -386,6 +380,17 @@ defineExpose({ focusIssue })
 </template>
 
 <style scoped>
+.assistant-master-detail { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 8px; align-items: start; }
+.assistant-collection, .assistant-detail { min-width: 0; }
+.assistant-back { display: none; }
+.starter-opening > summary { padding: 12px 8px; background: var(--q-primary-tint, #f3f0fa); border-radius: 4px; font-weight: 500; }
+.starter-opening > summary::before { content: '▸'; display: inline-block; margin-right: 8px; }
+.starter-opening[open] > summary::before { content: '▾'; }
+@media (max-width: 1100px) {
+  .assistant-master-detail { grid-template-columns: minmax(0, 1fr); }
+  .assistant-master-detail.has-selection .assistant-collection { display: none; }
+  .assistant-back { display: inline-flex; }
+}
 .assistant-editor, .starter-editor { min-width: 0; overflow-wrap: anywhere; }
 .assistant-heading { flex: 1; min-width: 0; }
 .assistant-heading + .q-toggle { flex-shrink: 0; }

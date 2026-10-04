@@ -49,10 +49,10 @@ export function verifyStarterRequest(requests, starter, assistantSystemPrompt) {
   if (assistantSystemPrompt && remainingSystem.includes(assistantSystemPrompt)) throw new Error('Original Assistant System was appended to the Starter opening')
   const packets = request.messages.filter(message => message.role === 'user').flatMap(messageTexts).map(openingPacket).filter(Boolean)
   if (packets.length !== 1) throw new Error(`Expected one Starter context packet, received ${packets.length}`)
-  assert.equal(packets[0].format, 1, 'Starter packet format mismatch')
+  assert.deepEqual(Object.keys(packets[0]).sort(), ['blocks', 'type'], 'Starter packet must not expose internal metadata')
   // The equality assertion is intentionally redacted: only synthetic evidence files contain prompt content.
-  if (!isDeepStrictEqual(packets[0].blocks, starter.openingSnapshot.initialContexts)) {
-    throw new Error('Published Starter background identity/order/content differs from the adapter request')
+  if (!isDeepStrictEqual(packets[0].blocks, starter.openingSnapshot.initialContexts.map(block => block.content))) {
+    throw new Error('Published Starter background order/content differs from the adapter request')
   }
-  return { starterId: starter.starterId, contextIds: packets[0].blocks.map(block => block.id), request }
+  return { starterId: starter.starterId, contextIds: starter.openingSnapshot.initialContexts.map(block => block.id), request }
 }

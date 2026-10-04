@@ -6,8 +6,8 @@ import { freePort } from './lib/harness.mjs'
 import { assertInstrumentationPassed, verifyStarterRequest, validateAndroidSerial } from './lib/android-starter.mjs'
 
 const assistantSystem = 'Original assistant instructions'
-const starter = { starterId: 'str_synthetic', prompt: 'Question', openingSnapshot: { format: 1, systemPrompt: 'Domain system', initialContexts: [{ id: 'b2', title: 'Second', content: 'second content' }, { id: 'b1', title: 'First', content: 'first content' }] } }
-const request = { model: 'model', messages: [{ role: 'system', content: 'Rules\nDomain system' }, { role: 'user', content: JSON.stringify({ type: 'starter_context', format: 1, blocks: starter.openingSnapshot.initialContexts }) }, { role: 'user', content: 'Question' }] }
+const starter = { starterId: 'str_synthetic', prompt: 'Question', openingSnapshot: { format: 1, systemPrompt: 'Domain system', initialContexts: [{ id: 'b2', content: 'second content' }, { id: 'b1', content: 'first content' }] } }
+const request = { model: 'model', messages: [{ role: 'system', content: 'Rules\nDomain system' }, { role: 'user', content: JSON.stringify({ type: 'starter_context', blocks: starter.openingSnapshot.initialContexts.map(block => block.content) }) }, { role: 'user', content: 'Question' }] }
 
 test('instrumentation requires one completed test and rejects failure, ignored, zero-test and adb-only success', () => {
   assertInstrumentationPassed('INSTRUMENTATION_STATUS_CODE: 1\nINSTRUMENTATION_STATUS_CODE: 0\nOK (1 test)\nINSTRUMENTATION_CODE: -1')
@@ -17,7 +17,7 @@ test('instrumentation requires one completed test and rejects failure, ignored, 
 })
 test('wire verification checks system, source order, exact prompt, and preserves literal text', () => {
   assert.deepEqual(verifyStarterRequest([request], starter, assistantSystem).contextIds, ['b2', 'b1'])
-  const canonical = { ...starter, openingSnapshot: { ...starter.openingSnapshot, initialContexts: starter.openingSnapshot.initialContexts.map(({ id, title, content }) => ({ content, id, title })) } }
+  const canonical = { ...starter, openingSnapshot: { ...starter.openingSnapshot, initialContexts: starter.openingSnapshot.initialContexts.map(({ id, content }) => ({ content, id })) } }
   assert.deepEqual(verifyStarterRequest([request], canonical, assistantSystem).contextIds, ['b2', 'b1'])
   const merged = { model: 'model', messages: [request.messages[0], { role: 'user', content: request.messages[1].content + '\n\nQuestion' }] }
   assert.deepEqual(verifyStarterRequest([merged], starter, assistantSystem).contextIds, ['b2', 'b1'])
@@ -30,6 +30,16 @@ test('wire verification checks system, source order, exact prompt, and preserves
 test('Android lane requires the dedicated fixture emulator and cannot target the production demo', () => {
   assert.equal(validateAndroidSerial('emulator-5562'), 'emulator-5562')
   for (const serial of ['', 'emulator-5560', 'device', 'emulator-5562; rm']) assert.throws(() => validateAndroidSerial(serial))
+})
+
+test('wire verification rejects internal version metadata and object-shaped background blocks', () => {
+  for (const packet of [
+    { type: 'starter_context', format: 1, blocks: ['second content', 'first content'] },
+    { type: 'starter_context', blocks: starter.openingSnapshot.initialContexts },
+  ]) {
+    const invalid = { ...request, messages: [request.messages[0], { role: 'user', content: JSON.stringify(packet) }, request.messages[2]] }
+    assert.throws(() => verifyStarterRequest([invalid], starter, assistantSystem))
+  }
 })
 
 test('opt-in worker captures only selected synthetic model bodies through actual HTTP', async () => {

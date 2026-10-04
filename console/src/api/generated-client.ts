@@ -946,7 +946,6 @@ export interface components {
             assistantDefinitionId: components["schemas"]["AssistantDefinitionId"];
             title: string;
             prompt: string;
-            description?: string;
             sortOrder: number;
             enabled: boolean;
             openingSnapshot: components["schemas"]["StarterOpeningSnapshot"];
@@ -970,7 +969,6 @@ export interface components {
         };
         StarterInitialContext: {
             id: string;
-            title: string;
             content: string;
         };
         /** @enum {string} */

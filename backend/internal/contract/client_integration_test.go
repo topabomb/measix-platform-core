@@ -53,7 +53,7 @@ func TestClientIntegrationSharedWireCases(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var s clientapi.ManagedSnapshot
+		var s capability.Snapshot
 		if err := json.Unmarshal(raw, &s); err != nil {
 			t.Fatal(err)
 		}

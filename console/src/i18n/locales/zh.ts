@@ -39,6 +39,7 @@ export default {
     changedSignInAgain: '密码已修改，请使用新密码重新登录。',
   },
  experience: {
+  "backToAssistants": "返回助手列表",
   "tab": "企业助手",
   "newAssistant": "新助手",
   "addAssistant": "添加助手",
@@ -77,7 +78,6 @@ export default {
   "starterOrderHint": "按此顺序显示在 Android 中，可上下移动调整。",
   "starterPromptEmpty": "尚未填写起始提示词",
   "contextAdd": "添加背景",
-  "contextTitle": "背景标题",
   "contextContent": "背景内容",
   "contextNew": "背景 {index}",
   "emptySystem": "系统提示词为空",
@@ -726,6 +726,16 @@ export default {
       },
     },
     draft: {
+      publishCOMPLETED: '企业配置已发布',
+      publishCOMPLETEDHint: 'Android 设备现在可以同步这份配置；设备实际接收情况请在用户的设备列表中查看。',
+      publishAPPLYING: '正在发布企业配置',
+      publishAPPLYINGHint: '正在应用运行配置。完成后才会开放新配置同步，请勿重复发布。',
+      publishUNKNOWN: '发布结果待确认',
+      publishUNKNOWNHint: '尚未确认这次发布的最终结果。请查询原操作，确认前不要再次提交。',
+      publishFAILED: '企业配置发布失败',
+      publishFAILEDHint: '本次发布未完成。请查看操作详情和运行状态，处理问题后重新审查。',
+      checkPublish: '查询发布结果',
+      viewReleases: '查看发布记录',
       latestOperation: '最近配置操作',
       revision: '已保存草稿修订',
       dirty: '未保存',
@@ -1192,6 +1202,10 @@ export default {
   session: {
   },
   problem: {
+    workspace_unavailable: '暂时无法完成工作区操作。请刷新状态，并检查远程服务连接；有待核实操作时先处理原操作。',
+    workspace_operation_pending: '已有工作区操作尚未结束，请先查看并处理该操作。',
+    workspace_revision_conflict: '工作区状态已变化，请刷新后重新核对。',
+
     default: '发生错误，请重试。',
     activation_in_progress: '另一个配置操作仍在进行，请等待其结束后重试。',
     activation_not_found: '该配置操作已经不存在。',

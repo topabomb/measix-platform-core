@@ -100,6 +100,20 @@ async function switchTab(wrapper: ReturnType<typeof mount>, name: string) {
 }
 
 describe('ResourcesPage', () => {
+  it('does not ask administrators to maintain a Starter description', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    await switchTab(wrapper, 'assistants')
+    await wrapper.get('[data-cy="assistant-add"]').trigger('click')
+    await wrapper.get('[data-cy="assistant-section-starters"]').trigger('click')
+    await wrapper.get('[data-cy="starter-add"]').trigger('click')
+    await flushPromises()
+    const dialog = wrapper.get('[data-cy="starter-editor-dialog"]')
+    expect(dialog.findAllComponents(QInput).map((input: { props(name: string): unknown }) => input.props('label'))).not.toContain('Description (optional)')
+    expect(dialog.find('[data-cy="starter-title"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
   it.each(['preview', 'review'] as const)('returns from %s to the editable Starter field when a validation issue is activated', async surface => {
     const { wrapper, pinia } = mountResourcesPage()
     setupSession(pinia)
@@ -107,7 +121,7 @@ describe('ResourcesPage', () => {
     const draft = useDraftStore(pinia)
     const assistantId = draft.addAssistant('Assistant')
     const starterId = draft.addStarter(assistantId, 'Starter')
-    draft.localContent!.starters[0]!.openingSnapshot!.initialContexts = [{ id: 'background', title: 'Background', content: 'Original' }]
+    draft.localContent!.starters[0]!.openingSnapshot!.initialContexts = [{ id: 'background', content: 'Original' }]
     draft.dirty = false
     vi.mocked(client.apiFetch).mockImplementation(async path => {
       if (path === '/api/admin/v1/draft:validate') return { valid: true, errors: [], warnings: [] }
@@ -119,7 +133,7 @@ describe('ResourcesPage', () => {
     })
     await wrapper.get(`[data-cy="draft-${surface}-btn"]`).trigger('click')
     await flushPromises()
-    draft.validationResult = { valid: false, warnings: [], errors: [{ severity: 'ERROR', code: 'invalid_starter_opening', path: 'starters[0].openingSnapshot.initialContexts[0].title', resourceKind: 'STARTER', resourceId: starterId, field: 'openingSnapshot', message: 'title required' }] }
+    draft.validationResult = { valid: false, warnings: [], errors: [{ severity: 'ERROR', code: 'invalid_starter_opening', path: 'starters[0].openingSnapshot.initialContexts[0].content', resourceKind: 'STARTER', resourceId: starterId, field: 'openingSnapshot', message: 'content required' }] }
     await flushPromises()
     const issue = wrapper.findAll('[data-validation-code="invalid_starter_opening"]').find(item => item.classes().includes('q-item--clickable'))!
     await issue.trigger('click')
@@ -129,7 +143,7 @@ describe('ResourcesPage', () => {
     expect(wrapper.get('.configuration-workbench').isVisible()).toBe(true)
     expect(wrapper.get('.configuration-workbench').attributes('inert')).toBeUndefined()
     expect(wrapper.get('[data-cy="starter-opening"]').attributes('open')).toBeDefined()
-    expect(wrapper.get('[data-cy="starter-context-title"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-cy="starter-context-content"]').attributes('disabled')).toBeUndefined()
     expect(draft.dirty).toBe(false)
     wrapper.unmount()
   })
@@ -226,9 +240,7 @@ describe('ResourcesPage', () => {
     await wrapper.get('[data-cy="starter-opening-system"]').setValue('Custom literal {{raw}}')
     await wrapper.get('[data-cy="starter-context-add"]').trigger('click')
     await wrapper.get('[data-cy="starter-context-add"]').trigger('click')
-    await wrapper.findAll('[data-cy="starter-context-title"]')[0]!.setValue('First')
     await wrapper.findAll('[data-cy="starter-context-content"]')[0]!.setValue('{{literal}} <context>')
-    await wrapper.findAll('[data-cy="starter-context-title"]')[1]!.setValue('Second')
     const ids = starter.openingSnapshot!.initialContexts.map(item => item.id)
     await wrapper.findAll('[data-cy="starter-context-up"]')[1]!.trigger('click')
     expect(starter.openingSnapshot!.initialContexts.map(item => item.id)).toEqual(ids.toReversed())
@@ -266,13 +278,13 @@ describe('ResourcesPage', () => {
     expect(starter.openingSnapshot).toEqual({ format: 1, systemPrompt: '', initialContexts: [] })
     expect(starter.enabled).toBe(false)
     await wrapper.get('[data-cy="starter-context-add"]').trigger('click')
-    draft.validationResult = { valid: false, warnings: [], errors: [{ severity: 'ERROR', code: 'invalid_starter_opening', path: 'starters[0].openingSnapshot.initialContexts[0].title', resourceKind: 'STARTER', resourceId: 'str_old', field: 'openingSnapshot', message: 'title required' }] }
+    draft.validationResult = { valid: false, warnings: [], errors: [{ severity: 'ERROR', code: 'invalid_starter_opening', path: 'starters[0].openingSnapshot.initialContexts[0].content', resourceKind: 'STARTER', resourceId: 'str_old', field: 'openingSnapshot', message: 'content required' }] }
     await flushPromises()
     const issue = wrapper.findAll('[data-validation-code="invalid_starter_opening"]').find(item => item.classes().includes('q-item--clickable'))!
     await issue.trigger('click')
     await flushPromises()
     expect(wrapper.get('[data-cy="starter-opening"]').attributes('open')).toBeDefined()
-    expect(wrapper.find('[data-cy="starter-context-title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-cy="starter-context-content"]').exists()).toBe(true)
     wrapper.unmount()
   })
 
@@ -630,6 +642,11 @@ describe('ResourcesPage', () => {
     activation.accept({ ...base, state: 'COMPLETED' })
     await flushPromises()
     expect(wrapper.text()).not.toContain('Recovery: refresh the page')
+    expect(wrapper.get('[data-cy="publish-outcome"]').text()).toContain('Configuration published')
+    expect(wrapper.get('[data-cy="publish-outcome"]').text()).toContain('Android devices can sync')
+    activation.accept({ ...base, kind: 'RUNTIME_CONFIG', state: 'COMPLETED' })
+    await flushPromises()
+    expect(wrapper.find('[data-cy="publish-outcome"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
@@ -1025,7 +1042,7 @@ describe('ResourcesPage', () => {
           mcp: [{ mcpServerId: 'mcp_1', displayName: 'Tools', authOwnership: 'ENTERPRISE_MANAGED', enabled: true }],
           policy: { policyId: 'pol_draft', allowLocalProviders: true, allowLocalTts: false, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true, defaultModelId: 'mdl_missing', defaultTtsId: 'tts_1' },
           assistants: [{ assistantDefinitionId: 'asd_1', displayName: 'Field Helper', description: 'Helps field engineers', enabled: true, modelId: 'mdl_1', mcpServerIds: ['mcp_1'], systemPrompt: 'Help safely', memorySeed: ['Check safety'] }],
-          starters: [{ starterId: 'str_1', assistantDefinitionId: 'asd_1', title: 'Inspect device', description: 'Start a safety inspection', prompt: 'Please inspect', sortOrder: 0, enabled: true, openingSnapshot: { format: 1, systemPrompt: '', initialContexts: [{ id: 'b2', title: 'Second', content: '{{literal}} <tag>' }, { id: 'b1', title: 'First', content: '' }] } }],
+          starters: [{ starterId: 'str_1', assistantDefinitionId: 'asd_1', title: 'Inspect device', prompt: 'Please inspect', sortOrder: 0, enabled: true, openingSnapshot: { format: 1, systemPrompt: '', initialContexts: [{ id: 'b2', content: '{{literal}} <tag>' }, { id: 'b1', content: '' }] } }],
           diffSummary: { added: 0, changed: 0, removed: 0 },
         }
       }
@@ -1080,10 +1097,9 @@ describe('ResourcesPage', () => {
     expect(model.text()).toContain('Disabled')
     await sections.find(item => String(item.props('label')).startsWith('Starters ('))!.trigger('click')
     await flushPromises()
-    expect(wrapper.get('[data-cy="preview-starter-description"]').text()).toContain('Start a safety inspection')
     expect(wrapper.get('[data-cy="preview-starter-opening"]').attributes('open')).toBeUndefined()
     expect(wrapper.get('[data-cy="preview-starter-system"]').text()).toBe('Empty system prompt')
-    expect(wrapper.findAll('[data-cy="preview-starter-context"]').map(item => item.text())).toEqual(['Second{{literal}} <tag>', 'First'])
+    expect(wrapper.findAll('[data-cy="preview-starter-context"]').map(item => item.text())).toEqual(['Background 1{{literal}} <tag>', 'Background 2'])
     wrapper.unmount()
   })
 })

@@ -919,7 +919,6 @@ type AssistantDefinitionId = string
 // AssistantStarterDefinition defines model for AssistantStarterDefinition.
 type AssistantStarterDefinition struct {
 	AssistantDefinitionId AssistantDefinitionId   `json:"assistantDefinitionId"`
-	Description           *string                 `json:"description,omitempty"`
 	Enabled               bool                    `json:"enabled"`
 	OpeningSnapshot       *StarterOpeningSnapshot `json:"openingSnapshot,omitempty"`
 	Prompt                string                  `json:"prompt"`
@@ -1489,7 +1488,6 @@ type StarterId = string
 type StarterInitialContext struct {
 	Content string `json:"content"`
 	Id      string `json:"id"`
-	Title   string `json:"title"`
 }
 
 // StarterOpeningSnapshot defines model for StarterOpeningSnapshot.

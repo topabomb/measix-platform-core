@@ -59,7 +59,7 @@ Admin 草稿允许“尚未完成”的定义，因此 opening 在 Admin DTO 中
 
 ## 4. 精确数据语义
 
-Client v5 与 Admin 使用相同 opening 内容结构，字段的可缺失范围由外层契约决定：
+v5 尚未正式发布，只维护一个确定合同：Starter 无 `description`，背景块为 `id/content`，无标题字段。当前编制、预览、发布和 Android 领域/UI 均不携带 Starter 说明，不为 v5 中间候选保留兼容分支。v4 说明仅留在其网络及历史发布边界。Client v5 与 Admin 使用相同 opening 内容结构，字段的可缺失范围由外层契约决定：
 
 ```json
 {
@@ -67,7 +67,7 @@ Client v5 与 Admin 使用相同 opening 内容结构，字段的可缺失范围
     "format": 1,
     "systemPrompt": "用于此任务的领域指令",
     "initialContexts": [
-      { "id": "context-1", "title": "处理约定", "content": "已确认的背景原文" }
+      { "id": "context-1", "content": "已确认的背景原文" }
     ]
   }
 }
@@ -80,7 +80,6 @@ Client v5 与 Admin 使用相同 opening 内容结构，字段的可缺失范围
 | systemPrompt | 必填字符串。Admin Draft 空串/全空白表示继承同一草稿的助手指令；非空白覆盖原样保留。Client Snapshot 是编译后的固化值，空值不再解析继承 |
 | initialContexts | 必填数组，可为空；顺序是作者意图，不能排序或去重 |
 | id | 必填字符串，至少一个非空白字符，同一 opening 内唯一；不要求平台 ID 前缀 |
-| title | 必填字符串；Client v5 至少一个非空白字符。Admin 允许保存未完成的空白标题，Validate 精确定位并阻止发布 |
 | content | 必填字符串，可为空；不执行模板、不解释 HTML、不改换行或修剪正文 |
 
 保留中文、占位符、反引号和重复正文。字段对象保持严格结构；不通过忽略未知字段或补零值掩盖输入错误。
@@ -122,7 +121,7 @@ Starter 与背景当前只随完整草稿或发布一起查询、校验和提交
 1. `draft.addStarter` 创建空 System 覆盖与空背景数组；空串及全空白在新草稿编译时继承所选助手当前指令，不复制为隐式覆盖。
 2. 旧 Starter 缺 opening 时显示未编制状态，由显式动作初始化为空覆盖与空背景，不在读取时补造。
 3. 展开后编辑可选 System 覆盖与有序背景；空白显示继承及只读助手预览，非空覆盖保留完整原文。助手修改不覆盖独立文本或背景。
-4. 背景提供标题、正文、新增、上移、下移、删除；ID 自动生成，重排不重建 ID。删除只改本地草稿，不额外弹确认。Starter 列表上移/下移调用 `draft.moveStarter` 调整本助手顺序，不影响其他助手；sortOrder 保留在存储与排序中，不作为数字编辑字段。
+4. 背景仅编辑正文，使用不入库的显示序号，提供新增、上移、下移、删除；ID 自动生成，重排不重建 ID。删除只改本地草稿，不额外弹确认。Starter 列表上移/下移调用 `draft.moveStarter` 调整本助手顺序，不影响其他助手；sortOrder 保留在存储与排序中，不作为数字编辑字段。
 5. `useAssistantSystem` 在丢弃非空覆盖时确认，然后清空覆盖恢复继承，保留全部背景；不是将助手当前正文复制为新的固定覆盖。
 6. 所有修改进入现有 localContent/dirty 状态；Save 使用原 revision CAS。409 保留未保存内容；即使服务端未返回可选当前 revision，也显示重新加载入口，不虚构版本号，取消重新加载仍保留编辑。
 
@@ -165,7 +164,7 @@ Core lane 可连接本地确定性 adapter，也可连接 `device:real` 的实�
 
 | 编号 | 必须证明的结果 | 证据层 |
 | --- | --- | --- |
-| V01 | v5完整定义、缺失/null/错误类型/unknown/format/id/title约束；空值合法 | OpenAPI、HTTP、领域测试 |
+| V01 | v5完整定义、缺失/null/错误类型/unknown/format/id约束；空值合法 | OpenAPI、HTTP、领域测试 |
 | V02 | 新草稿空白继承、非空覆盖逐字保留，不回写编制值；固化正文/顺序/ID与hash/diff一致 | compiler golden |
 | V03 | 旧draft读取不写库；显式初始化保存；stale CAS不丢新内容 | SQLite + Admin测试 |
 | V04 | 旧release bytes/hash/ETag/304不变；PublishedContent恢复固化opening，v4/v5重新发布保持版本，历史空/空白System不重新继承 | HTTP + RuntimeControl |
@@ -240,7 +239,7 @@ Core lane 可连接本地确定性 adapter，也可连接 `device:real` 的实�
 
 ### 10.5 默认继承与对话框的最终复核
 
-本节记录默认继承语义与独立对话框落地后的验证，覆盖本节之前记录的界面状态。实际重新运行 `device:real` 加载新后端与生产 SPA，保留数据库和旧发布；启动脚本按其既定行为重建本地验证草稿。通过实际网页新建“默认指令与背景验证”，确认独立指令初始为空、助手指令可展开查看、背景原文不进入起始输入。操作添加背景、列表上移、关闭重开、保存与服务器 Preview；Preview 中的有效 System 等于助手原文，`{{unchanged}}` 未替换。缺失背景标题的真实校验错误能打开对话框并聚焦正确字段。
+本节记录默认继承语义与独立对话框落地后的验证，覆盖本节之前记录的界面状态。实际重新运行 `device:real` 加载新后端与生产 SPA，保留数据库和旧发布；启动脚本按其既定行为重建本地验证草稿。通过实际网页新建“默认指令与背景验证”，确认独立指令初始为空、助手指令可展开查看、背景原文不进入起始输入。操作添加背景、列表上移、关闭重开、保存与服务器 Preview；Preview 中的有效 System 等于助手原文，`{{unchanged}}` 未替换。当时的标题校验路径已随未发布 v5 的无标题修订移除；当前背景正文错误仍沿原路径定位。
 
 网页实操与回归共同修复两个问题：Preview/Review 不再卸载工作区，返回后保留选中助手与内部标签，隐藏时使用 inert/disabled/active 隔离；共享对话框尺寸规则不再被 Quasar 的 560px 默认上限覆盖。实测桌面宽度 760px，320px 窄屏无横向溢出，正文独立滚动且完成按钮可达。证据为 `admin-dialog-desktop.png`、`admin-dialog-320.png`、`admin-starter-list.png`。原生确认框在一次浏览器控制中阻塞了工具标签，改用新标签继续实操；取消/确认恢复助手指令并保留背景两条路径由真实 Playwright 浏览器覆盖。
 

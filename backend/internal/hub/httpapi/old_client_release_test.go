@@ -62,7 +62,7 @@ func TestOldClientReleaseVersionAndAppliedBoundary(t *testing.T) {
 			if err := json.Unmarshal(raw, &content); err != nil {
 				t.Fatal(err)
 			}
-			storeRelease := func(generation, version int, content adminapi.ManagedDraftContent) (clientapi.ManagedSnapshot, []byte) {
+			storeRelease := func(generation, version int, content adminapi.ManagedDraftContent) (capability.Snapshot, []byte) {
 				t.Helper()
 				releaseID := platformid.New(platformid.Release)
 				snapshot, hash, err := cap.CompileSnapshot(capability.SnapshotInput{
@@ -113,7 +113,7 @@ func TestOldClientReleaseVersionAndAppliedBoundary(t *testing.T) {
 			next, nextBytes := storeRelease(2, tc.version, content)
 			cookie, csrf := loginAdmin(t, h)
 			adminHeaders := map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf}
-			for _, expected := range []clientapi.ManagedSnapshot{original, next} {
+			for _, expected := range []capability.Snapshot{original, next} {
 				var detail map[string]any
 				decodeJSON(t, doJSON(t, h, http.MethodGet, "/api/admin/v1/releases/"+string(expected.ReleaseId), adminHeaders, nil), &detail)
 				if detail["snapshotSchemaVersion"] != float64(expected.SchemaVersion) {

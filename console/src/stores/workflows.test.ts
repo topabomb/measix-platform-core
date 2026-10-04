@@ -98,11 +98,11 @@ describe('DraftStore', () => {
     const id = store.addStarter('asd_1', 'New')
     const starter = store.localContent!.starters.find(item => item.starterId === id)!
     starter.openingSnapshot!.systemPrompt = ''
-    starter.openingSnapshot!.initialContexts = [{ id: 'b2', title: 'Two', content: '' }, { id: 'b1', title: 'One', content: '{{value}} <raw>' }]
+    starter.openingSnapshot!.initialContexts = [{ id: 'b2', content: '' }, { id: 'b1', content: '{{value}} <raw>' }]
     await store.save('csrf')
     await store.load()
     expect(store.localContent!.starters[0]!.openingSnapshot).toBeUndefined()
-    expect(store.localContent!.starters[1]!.openingSnapshot).toEqual({ format: 1, systemPrompt: '', initialContexts: [{ id: 'b2', title: 'Two', content: '' }, { id: 'b1', title: 'One', content: '{{value}} <raw>' }] })
+    expect(store.localContent!.starters[1]!.openingSnapshot).toEqual({ format: 1, systemPrompt: '', initialContexts: [{ id: 'b2', content: '' }, { id: 'b1', content: '{{value}} <raw>' }] })
     expect(store.dirty).toBe(false)
     store.localContent!.starters[1]!.openingSnapshot!.systemPrompt = 'Unsaved'
     store.markDirty()

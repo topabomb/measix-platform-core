@@ -1,9 +1,9 @@
 {
   "baseline": "S0.2/v5-workspace-v2-preview",
-  "policy": "New publication uses Snapshot v5 Starter openings. Historical v4 releases retain their original bytes, hash and republish semantics. API v1 and Bridge v3 remain unchanged; incompatible schema meanings require a new version and explicit preservation plan. Remote workspace runtime descriptors require Relay protocol v2; remote workspace usage targets use targetVersion 2. Snapshot v5 and legacy admission/fact byte semantics remain unchanged.",
+  "policy": "New publication uses Snapshot v5 Starter openings. Historical v4 releases retain their original bytes, hash and republish semantics. API v1 and Bridge v3 remain unchanged; incompatible schema meanings require a new version and explicit preservation plan. Remote workspace runtime descriptors require Relay protocol v2; remote workspace usage targets use targetVersion 2. Snapshot v5 and legacy admission/fact byte semantics remain unchanged. Unpublished v5 has one current schema: Starter has no description; background blocks contain only id/content, no title. Retained v4 remains independent.",
   "documents": {
-    "api/admin/admin.openapi.yaml": "sha256:37deabd51670919906c18c0c56807ba25c864ad4b49466f9ac38ff4c70d84658",
-    "api/client/client-control.openapi.yaml": "sha256:7f33db24784f179c6027028f5218056f851cd9eba1de41e85a8270a58596a8f9",
+    "api/admin/admin.openapi.yaml": "sha256:81b7a03f39353ca44acb4762a69fd8481d92d2e38d878021c5c9adc0a753b9d9",
+    "api/client/client-control.openapi.yaml": "sha256:f4b925784bc1e18e47e01da1691577fab6ca08e264849c47e5dd5ffa28315467",
     "api/internal/relay-control.openapi.yaml": "sha256:4d53542a652e89c99e2a340b7d4e2d4e86821c3782c418cb7041ac2ed4aec1fd",
     "api/internal/usage-ingest.openapi.yaml": "sha256:0e73594260ad086b13f3e785bc65135616eec7cab142387419223ddc6724423f"
   }

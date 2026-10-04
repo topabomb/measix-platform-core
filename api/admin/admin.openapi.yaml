@@ -3936,8 +3936,6 @@ components:
         prompt:
           type: string
           minLength: 1
-        description:
-          type: string
         sortOrder:
           type: integer
           minimum: 0
@@ -3970,16 +3968,12 @@ components:
       additionalProperties: false
       required:
       - id
-      - title
       - content
       properties:
         id:
           type: string
           minLength: 1
           pattern: '\S'
-        title:
-          type: string
-          description: May remain blank in a draft; validation requires a nonblank title before publication.
         content:
           type: string
     AdminUserSummary:

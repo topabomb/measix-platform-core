@@ -100,7 +100,7 @@ func ValidateDraftOpeningJSON(raw []byte) error {
 			return fmt.Errorf("starters[%d].openingSnapshot.initialContexts must be an array", i)
 		}
 		for j, block := range blocks {
-			if _, err := requiredObject(block, []string{"id", "title", "content"}); err != nil {
+			if _, err := requiredObject(block, []string{"id", "content"}); err != nil {
 				return fmt.Errorf("starters[%d].openingSnapshot.initialContexts[%d]: %w", i, j, err)
 			}
 		}
@@ -176,7 +176,7 @@ func validateStarterVersion(starters []adminapi.AssistantStarterDefinition, vers
 		if version == 5 && starter.OpeningSnapshot == nil {
 			return fmt.Errorf("%w: missing_starter_opening", ErrInvalidDraft)
 		}
-		if err := validateOpening(starter.OpeningSnapshot); err != nil {
+		if err := validateDraftOpening(starter.OpeningSnapshot); err != nil {
 			return err
 		}
 	}
@@ -189,7 +189,7 @@ func toClientOpening(src *adminapi.StarterOpeningSnapshot) *clientapi.StarterOpe
 	}
 	blocks := make([]clientapi.StarterInitialContext, len(src.InitialContexts))
 	for i, b := range src.InitialContexts {
-		blocks[i] = clientapi.StarterInitialContext{Id: b.Id, Title: b.Title, Content: b.Content}
+		blocks[i] = clientapi.StarterInitialContext{Id: b.Id, Content: b.Content}
 	}
 	return &clientapi.StarterOpeningSnapshot{Format: clientapi.StarterOpeningSnapshotFormat(src.Format), SystemPrompt: src.SystemPrompt, InitialContexts: blocks}
 }
@@ -203,22 +203,7 @@ func toAdminOpening(src *clientapi.StarterOpeningSnapshot) *adminapi.StarterOpen
 		blocks = make([]adminapi.StarterInitialContext, len(src.InitialContexts))
 	}
 	for i, b := range src.InitialContexts {
-		blocks[i] = adminapi.StarterInitialContext{Id: b.Id, Title: b.Title, Content: b.Content}
+		blocks[i] = adminapi.StarterInitialContext{Id: b.Id, Content: b.Content}
 	}
 	return &adminapi.StarterOpeningSnapshot{Format: adminapi.StarterOpeningSnapshotFormat(src.Format), SystemPrompt: src.SystemPrompt, InitialContexts: blocks}
-}
-
-func validateOpening(opening *adminapi.StarterOpeningSnapshot) error {
-	if err := validateDraftOpening(opening); err != nil {
-		return err
-	}
-	if opening == nil {
-		return nil
-	}
-	for i, block := range opening.InitialContexts {
-		if strings.TrimSpace(block.Title) == "" {
-			return &openingValidationError{Path: fmt.Sprintf("initialContexts[%d].title", i), Detail: "Title must contain non-whitespace text"}
-		}
-	}
-	return nil
 }

@@ -253,7 +253,6 @@ func TestPreviewPreservesStarterContentAndCanonicalOrder(t *testing.T) {
 	// Add two starters with different sort orders
 	starter1ID := platformid.New(platformid.Starter)
 	starter2ID := platformid.New(platformid.Starter)
-	description := "Start the first task"
 	content.Starters = []adminapi.AssistantStarterDefinition{
 		{
 			StarterId:             adminapi.StarterId(starter2ID),
@@ -268,7 +267,6 @@ func TestPreviewPreservesStarterContentAndCanonicalOrder(t *testing.T) {
 			AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 			Title:                 "First Starter",
 			Prompt:                "First prompt",
-			Description:           &description,
 			SortOrder:             0,
 			Enabled:               true,
 		},

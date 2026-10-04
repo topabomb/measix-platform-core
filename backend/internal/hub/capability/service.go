@@ -935,7 +935,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		path := fmt.Sprintf("starters[%d]", i)
 		if s.OpeningSnapshot == nil {
 			addError("missing_starter_opening", path+".openingSnapshot", "Create the starter opening before publishing", &kindStarter, ptrStr(string(s.StarterId)), ptrStr("openingSnapshot"))
-		} else if err := validateOpening(s.OpeningSnapshot); err != nil {
+		} else if err := validateDraftOpening(s.OpeningSnapshot); err != nil {
 			issuePath := path + ".openingSnapshot"
 			var detail *openingValidationError
 			if errors.As(err, &detail) {

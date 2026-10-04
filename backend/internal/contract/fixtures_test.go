@@ -59,7 +59,7 @@ func TestSYSI0001CanonicalFixturesDecodeWithGeneratedWire(t *testing.T) {
 	_ = decodeFixture[adminapi.UserUsagePage](t, "usage/user-analytics.json", true)
 
 	// C0 canonical full-profile snapshot fixtures must decode with strict wire types.
-	_ = decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
+	_ = decodeFixture[clientapi.ManagedSnapshotV4](t, "client-integration/snapshot-v4.json", true)
 
 	// S0.2 Enterprise Update fixtures must decode with strict wire types.
 	_ = decodeFixture[clientapi.EnterpriseUpdateFeed](t, "enterprise-update/feed.json", true)
@@ -122,7 +122,7 @@ func TestNegativeSnapshotFixturesRejectedByEnumValidation(t *testing.T) {
 }
 
 func TestSnapshotAndRuntimeControlGoldenHashes(t *testing.T) {
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
+	snapshot := decodeFixture[clientapi.ManagedSnapshotV4](t, "client-integration/snapshot-v4.json", true)
 	hash, err := capability.HashSnapshot(snapshot)
 	if err != nil {
 		t.Fatal(err)
@@ -177,7 +177,7 @@ func TestSnapshotV4PolicyGoldenHash(t *testing.T) {
 
 func TestERXC0002CurrentSnapshotContainsResourceAndExperienceProfile(t *testing.T) {
 	// Current profile contains both runtime resources and enterprise experience.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
+	snapshot := decodeFixture[clientapi.ManagedSnapshotV4](t, "client-integration/snapshot-v4.json", true)
 	if snapshot.SchemaVersion != 4 {
 		t.Fatalf("expected schemaVersion=4, got %d", snapshot.SchemaVersion)
 	}
@@ -218,7 +218,7 @@ func TestERXC0002CurrentSnapshotContainsResourceAndExperienceProfile(t *testing.
 
 func TestERXC0003AssistantRefsAreTypedAndComplete(t *testing.T) {
 	// ERX-C0-003: assistant/model/MCP/starter refs are typed and complete.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
+	snapshot := decodeFixture[clientapi.ManagedSnapshotV4](t, "client-integration/snapshot-v4.json", true)
 	modelIds := map[string]bool{}
 	for _, m := range snapshot.Models {
 		if m.Enabled {
@@ -267,7 +267,7 @@ func TestERXC0003AssistantRefsAreTypedAndComplete(t *testing.T) {
 
 func TestERXC0005SeedStarterNormalizationAndOrder(t *testing.T) {
 	// ERX-C0-005: seed/starter normalization and deterministic hash/order.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
+	snapshot := decodeFixture[clientapi.ManagedSnapshotV4](t, "client-integration/snapshot-v4.json", true)
 	// Canonical order is stable ID, independently of display order.
 	for i := 1; i < len(snapshot.Starters); i++ {
 		if snapshot.Starters[i-1].StarterId > snapshot.Starters[i].StarterId {
@@ -290,7 +290,7 @@ func TestERXC0005SeedStarterNormalizationAndOrder(t *testing.T) {
 
 func TestERXC0006SnapshotContainsNoEnterpriseUpdateBody(t *testing.T) {
 	// ERX-C0-006: Snapshot contains no Enterprise Update body, Secret, Upstream or runtime route.
-	snapshot := decodeFixture[clientapi.ManagedSnapshot](t, "client-integration/snapshot-v4.json", true)
+	snapshot := decodeFixture[clientapi.ManagedSnapshotV4](t, "client-integration/snapshot-v4.json", true)
 	// Verify that no assistant or starter fields contain enterprise update content
 	for _, a := range snapshot.Assistants {
 		if a.SystemPrompt == "" {

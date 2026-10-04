@@ -12,6 +12,17 @@ import (
 	"measix/platform/pkg/platformid"
 )
 
+func TestStarterV5BackgroundHasOnlyIdentityAndContent(t *testing.T) {
+	valid := []byte(`{"starters":[{"openingSnapshot":{"format":1,"systemPrompt":"","initialContexts":[{"id":"background","content":"literal {{text}}"}]}}]}`)
+	if err := capability.ValidateDraftOpeningJSON(valid); err != nil {
+		t.Fatalf("title-free background rejected: %v", err)
+	}
+	withTitle := strings.Replace(string(valid), `"content":`, `"title":"obsolete","content":`, 1)
+	if err := capability.ValidateDraftOpeningJSON([]byte(withTitle)); err == nil {
+		t.Fatal("unpublished obsolete background title accepted")
+	}
+}
+
 func TestStarterV5CompilerRequiresAuthoredOpening(t *testing.T) {
 	st, boot, now := bootstrapI2(t)
 	svc := capability.NewService(st.Client)
@@ -200,7 +211,7 @@ func TestStarterOpeningCanonicalOrderAndLiteralText(t *testing.T) {
 	draft, _ := svc.GetDraft(context.Background())
 	opening := testOpening()
 	opening.SystemPrompt = "  中文 {{user}}\n```system```  "
-	opening.InitialContexts = []adminapi.StarterInitialContext{{Id: "z", Title: " First ", Content: "{{ untouched }}\n````"}, {Id: "a", Title: "Second", Content: ""}}
+	opening.InitialContexts = []adminapi.StarterInitialContext{{Id: "z", Content: "{{ untouched }}\n````"}, {Id: "a", Content: ""}}
 	draft.Content.Starters = []adminapi.AssistantStarterDefinition{{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: platformid.New(platformid.Assistant), Title: "Entry", Prompt: "Start", OpeningSnapshot: opening}}
 	input := capability.SnapshotInput{DeploymentID: boot.DeploymentID, ReleaseID: platformid.New(platformid.Release), ManagedGeneration: 1, Content: draft.Content, PublishedAt: now}
 	snapshot, hash, err := svc.CompileSnapshot(input)
@@ -208,7 +219,7 @@ func TestStarterOpeningCanonicalOrderAndLiteralText(t *testing.T) {
 		t.Fatal(err)
 	}
 	actual := snapshot.Starters[0].OpeningSnapshot
-	if actual.SystemPrompt != opening.SystemPrompt || actual.InitialContexts[0].Id != "z" || actual.InitialContexts[0].Content != opening.InitialContexts[0].Content || actual.InitialContexts[0].Title != " First " {
+	if actual.SystemPrompt != opening.SystemPrompt || actual.InitialContexts[0].Id != "z" || actual.InitialContexts[0].Content != opening.InitialContexts[0].Content {
 		t.Fatalf("authored content changed: %+v", actual)
 	}
 	if got, err := capability.HashSnapshot(snapshot); err != nil || got != hash {
@@ -254,7 +265,7 @@ func TestStarterSnapshotSizeBoundary(t *testing.T) {
 }
 
 func TestOpeningRawContractRejectsNullUnknownAndCorruption(t *testing.T) {
-	valid := `{"format":1,"systemPrompt":"","initialContexts":[{"id":"x","title":"标题","content":""}]}`
+	valid := `{"format":1,"systemPrompt":"","initialContexts":[{"id":"x","content":""}]}`
 	cases := []string{
 		`null`, `{}`, `{"format":null,"systemPrompt":"","initialContexts":[]}`,
 		`{"format":2,"systemPrompt":"","initialContexts":[]}`, `{"format":1,"systemPrompt":null,"initialContexts":[]}`,
@@ -263,7 +274,7 @@ func TestOpeningRawContractRejectsNullUnknownAndCorruption(t *testing.T) {
 		strings.Replace(valid, `"content":""`, `"content":null`, 1),
 		strings.Replace(valid, `"id":"x"`, `"id":"  "`, 1),
 
-		`{"format":1,"systemPrompt":"","initialContexts":[{"id":"same","title":"A","content":""},{"id":"same","title":"B","content":""}]}`,
+		`{"format":1,"systemPrompt":"","initialContexts":[{"id":"same","content":""},{"id":"same","content":""}]}`,
 	}
 	for _, opening := range cases {
 		t.Run(opening, func(t *testing.T) {
@@ -280,39 +291,19 @@ func TestOpeningRawContractRejectsNullUnknownAndCorruption(t *testing.T) {
 	}
 }
 
-func TestDraftCanSaveUnfinishedTitleButCannotPreviewOrPublish(t *testing.T) {
+func TestDraftBackgroundWithoutTitleRoundTrips(t *testing.T) {
 	st, boot, _ := bootstrapI2(t)
 	ctx := context.Background()
 	svc := capability.NewService(st.Client)
 	draft, _ := svc.GetDraft(ctx)
 	opening := testOpening()
-	opening.InitialContexts = []adminapi.StarterInitialContext{{Id: "draft-note", Title: "  ", Content: "Draft body"}}
+	opening.InitialContexts = []adminapi.StarterInitialContext{{Id: "draft-note", Content: "  {{literal}}\nBody  "}}
 	draft.Content.Starters = []adminapi.AssistantStarterDefinition{{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: platformid.New(platformid.Assistant), Title: "Entry", Prompt: "Start", OpeningSnapshot: opening}}
-	saved, err := svc.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, draft.Content)
-	if err != nil {
+	if _, err := svc.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, draft.Content); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err := svc.GetDraft(ctx)
-	if err != nil || loaded.Content.Starters[0].OpeningSnapshot.InitialContexts[0].Title != "  " {
-		t.Fatalf("draft title lost: %v", err)
-	}
-	validation, err := svc.ValidateDraft(ctx, saved.DraftRevision)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, issue := range validation.Errors {
-		if issue.Code == "invalid_starter_opening" && issue.Path == "starters[0].openingSnapshot.initialContexts[0].title" && issue.Field != nil && *issue.Field == "openingSnapshot" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("precise title issue missing: %+v", validation.Errors)
-	}
-	if _, err := svc.PreviewDraft(ctx, saved.DraftRevision); err == nil {
-		t.Fatal("unfinished title previewed")
-	}
-	if _, err := svc.StageRelease(ctx, boot.AdminUserID, saved.DraftRevision); err == nil {
-		t.Fatal("unfinished title published")
+	if err != nil || loaded.Content.Starters[0].OpeningSnapshot.InitialContexts[0] != opening.InitialContexts[0] {
+		t.Fatalf("background changed: %v", err)
 	}
 }

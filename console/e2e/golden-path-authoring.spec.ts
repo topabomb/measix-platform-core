@@ -569,23 +569,21 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await opening.locator('summary').first().click()
     await page.locator('[data-cy="starter-opening-system"]').fill('Starter-specific system {{literal}}')
     await page.click('[data-cy="starter-context-add"]')
-    await page.locator('[data-cy="starter-context-title"]').nth(0).fill('First background')
     await page.locator('[data-cy="starter-context-content"]').nth(0).fill('{{literal}} <context> authored first')
     await page.click('[data-cy="starter-context-add"]')
-    await page.locator('[data-cy="starter-context-title"]').nth(1).fill('Second background')
     await page.locator('[data-cy="starter-context-content"]').nth(1).fill('authored second')
     await page.locator('[data-cy="starter-context-up"]').nth(1).click()
-    await expect(page.locator('[data-cy="starter-context-title"]').nth(0)).toHaveValue('Second background')
+    await expect(page.locator('[data-cy="starter-context-content"]').nth(0)).toHaveValue('authored second')
     await page.click('[data-cy="starter-context-add"]')
     await page.locator('[data-cy="starter-context-remove"]').nth(2).click()
-    await expect(page.locator('[data-cy="starter-context-title"]')).toHaveCount(2)
+    await expect(page.locator('[data-cy="starter-context-content"]')).toHaveCount(2)
     page.once('dialog', dialog => dialog.dismiss())
     await page.click('[data-cy="starter-opening-reset"]')
     await expect(page.locator('[data-cy="starter-opening-system"]')).toHaveValue('Starter-specific system {{literal}}')
     page.once('dialog', dialog => dialog.accept())
     await page.click('[data-cy="starter-opening-reset"]')
     await expect(page.locator('[data-cy="starter-opening-system"]')).toHaveValue('')
-    await expect(page.locator('[data-cy="starter-context-title"]').nth(0)).toHaveValue('Second background')
+    await expect(page.locator('[data-cy="starter-context-content"]').nth(0)).toHaveValue('authored second')
     await expect(page.locator('[data-cy="starter-context-content"]').nth(1)).toHaveValue('{{literal}} <context> authored first')
     await page.locator('[data-cy="starter-opening-system"]').fill('Starter-specific system {{literal}}')
     await page.setViewportSize({ width: 320, height: 800 })
@@ -640,7 +638,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.click('[data-cy="starter-edit"]')
     await page.locator('[data-cy="starter-opening"] > summary').click()
     await expect(page.locator('[data-cy="starter-opening-system"]')).toHaveValue('Starter-specific system {{literal}}')
-    await expect(page.locator('[data-cy="starter-context-title"]').nth(0)).toHaveValue('Second background')
+    await expect(page.locator('[data-cy="starter-context-content"]').nth(0)).toHaveValue('authored second')
     const other = await page.context().newPage()
     try {
       await other.goto('/admin/resources')
@@ -660,7 +658,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
       await page.click('[data-cy="starter-edit"]')
       await page.locator('[data-cy="starter-opening"] > summary').click()
       await expect(page.locator('[data-cy="starter-opening-system"]')).toHaveValue('Unsaved local opening')
-      await expect(page.locator('[data-cy="starter-context-title"]').nth(0)).toHaveValue('Second background')
+      await expect(page.locator('[data-cy="starter-context-content"]').nth(0)).toHaveValue('authored second')
       await page.click('[data-cy="starter-editor-done"]')
       page.once('dialog', dialog => dialog.accept())
       await page.getByRole('button', { name: 'Reload', exact: true }).click()
@@ -753,8 +751,8 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     expect(projection.starters[0].openingSnapshot).toMatchObject({
       format: 1, systemPrompt: 'Starter-specific system {{literal}}',
       initialContexts: [
-        { title: 'Second background', content: 'authored second' },
-        { title: 'First background', content: '{{literal}} <context> authored first' },
+        { content: 'authored second' },
+        { content: '{{literal}} <context> authored first' },
       ],
     })
     const contextIds = projection.starters[0].openingSnapshot.initialContexts.map((item: { id: string }) => item.id)
@@ -768,7 +766,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await expect(previewOpening).not.toHaveAttribute('open', '')
     await previewOpening.locator('summary').click()
     await expect(previewSurface.locator('[data-cy="preview-starter-system"]')).toHaveText('Starter-specific system {{literal}}')
-    await expect(previewSurface.locator('[data-cy="preview-starter-context"]').nth(0)).toContainText('Second background')
+    await expect(previewSurface.locator('[data-cy="preview-starter-context"]').nth(0)).toContainText('authored second')
 
     await expect(previewSurface.getByText(/Hash:/i)).toBeVisible({ timeout: 10_000 })
     await expect(previewSurface.getByText(/Providers \(1\)/)).toBeVisible()
@@ -840,7 +838,8 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     }
 
     // Wait for activation to complete
-    await expect(page.locator('text=/COMPLETED|completed/i')).toBeVisible({ timeout: 60_000 })
+    await expect(page.locator('[data-cy="publish-outcome"]')).toContainText('Configuration published', { timeout: 60_000 })
+    await expect(page.locator('[data-cy="publish-outcome"]')).toContainText('Android devices can sync')
 
     // Verify generation increment
     if (prePublishGeneration > 0) {
@@ -897,7 +896,8 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await expect(page.locator('[data-cy="publish-review-surface"]')).toBeVisible({ timeout: 10_000 })
     page.once('dialog', dialog => dialog.accept())
     await page.click('[data-cy="draft-publish-btn"]')
-    await expect(page.locator('text=/COMPLETED|completed/i')).toBeVisible({ timeout: 60_000 })
+    await expect(page.locator('[data-cy="publish-outcome"]')).toContainText('Configuration published', { timeout: 60_000 })
+    await expect(page.locator('[data-cy="publish-outcome"]')).toContainText('Android devices can sync')
     await page.keyboard.press('Escape')
   })
 

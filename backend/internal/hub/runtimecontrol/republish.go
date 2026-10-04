@@ -9,6 +9,7 @@ import (
 	"measix/platform/ent/activation"
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/wire/adminapi"
+	"measix/platform/internal/wire/clientapi"
 	"measix/platform/internal/wire/relaystate"
 	"measix/platform/pkg/platformid"
 )
@@ -47,10 +48,16 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	controlRevision := int(managed.DesiredControlRevision) + 1
 	newReleaseID := platformid.New(platformid.Release)
 	activationID := platformid.New(platformid.Activation)
+	var historical clientapi.ManagedSnapshotV4
+	if sourceVersion == 4 {
+		if err := json.Unmarshal(source.SnapshotJSON, &historical); err != nil {
+			return ActivationResult{}, err
+		}
+	}
 	now := s.Now().UTC()
 	snapshot, snapshotHash, err := s.Capability.CompileSnapshot(capability.SnapshotInput{
 		DeploymentID: s.Signer.DeploymentID, ReleaseID: newReleaseID, ManagedGeneration: generation, SchemaVersion: sourceVersion,
-		Content: content, PublishedAt: now, PublishedByUserID: adminUserID,
+		Content: content, V4Starters: historical.Starters, PublishedAt: now, PublishedByUserID: adminUserID,
 	})
 	if err != nil {
 		return ActivationResult{}, err

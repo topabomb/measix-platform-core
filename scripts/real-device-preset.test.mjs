@@ -88,7 +88,8 @@ test('real-device preset publishes complete authored v5 openings with existing u
     assert.ok(Array.isArray(opening.initialContexts))
     assert.equal(new Set(opening.initialContexts.map(item => item.id)).size, opening.initialContexts.length)
     for (const block of opening.initialContexts) {
-      assert.ok(block.id.trim() && block.title.trim())
+      assert.ok(block.id.trim())
+      assert.equal(Object.hasOwn(block, 'title'), false)
       assert.equal(typeof block.content, 'string')
     }
   }
@@ -108,10 +109,10 @@ test('unchanged preset does not publish another release', async t => {
 
 test('validation failure reports authoritative field path and prevents preview/publish', async t => {
   const result = await runPreset(t, { validationErrors: [
-    { code: 'invalid_starter_opening', path: 'starters[1].openingSnapshot.initialContexts[0].title' },
+    { code: 'invalid_starter_opening', path: 'starters[1].openingSnapshot.initialContexts[0].content' },
   ] })
   assert.notEqual(result.code, 0)
-  assert.match(result.output, /invalid_starter_opening:starters\[1\]\.openingSnapshot\.initialContexts\[0\]\.title/)
+  assert.match(result.output, /invalid_starter_opening:starters\[1\]\.openingSnapshot\.initialContexts\[0\]\.content/)
   assert.ok(!result.requests.some(item => ['/draft:preview', '/draft:publish'].includes(item.path)))
 })
 

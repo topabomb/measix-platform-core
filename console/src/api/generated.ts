@@ -1458,7 +1458,6 @@ export interface components {
             assistantDefinitionId: components["schemas"]["AssistantDefinitionId"];
             title: string;
             prompt: string;
-            description?: string;
             sortOrder: number;
             enabled: boolean;
             openingSnapshot?: components["schemas"]["StarterOpeningSnapshot"];
@@ -1473,8 +1472,6 @@ export interface components {
         };
         StarterInitialContext: {
             id: string;
-            /** @description May remain blank in a draft; validation requires a nonblank title before publication. */
-            title: string;
             content: string;
         };
         AdminUserSummary: {

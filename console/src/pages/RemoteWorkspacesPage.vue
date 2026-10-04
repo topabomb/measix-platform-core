@@ -157,7 +157,7 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
           <q-card-section class="workspace-connection-fields">
             <q-input v-model="name" outlined dense label="连接名称" :disable="busy || !desiredEnabled" />
             <q-input v-model="adminOrigin" outlined dense label="管理服务地址" placeholder="https://space.example.com" :disable="busy || !desiredEnabled" />
-            <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="填写独立 WebDAV 地址；留空只使用工具能力。" :disable="busy || !desiredEnabled" />
+            <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="须与 Agent Space 的 WebDAV 对外地址一致；非回环地址须使用 HTTPS。留空只使用工具能力。" :disable="busy || !desiredEnabled" />
             <q-input v-model="bearer" outlined dense type="password" autocomplete="new-password" :label="current ? '管理凭据（留空保留原值）' : '管理凭据'" :disable="busy || !desiredEnabled" />
             <details>
               <summary class="cursor-pointer text-primary">工具服务地址（可选）</summary>

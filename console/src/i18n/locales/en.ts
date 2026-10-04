@@ -39,6 +39,7 @@ export default {
     changedSignInAgain: 'Password changed. Sign in again with the new password.',
   },
  experience: {
+  "backToAssistants": "Back to assistants",
   "tab": "Assistants",
   "newAssistant": "New assistant",
   "addAssistant": "Add assistant",
@@ -77,7 +78,6 @@ export default {
   "starterOrderHint": "Shown in this order on Android. Move entries up or down to reorder.",
   "starterPromptEmpty": "No starting prompt yet",
   "contextAdd": "Add background",
-  "contextTitle": "Background title",
   "contextContent": "Background content",
   "contextNew": "Background {index}",
   "emptySystem": "Empty system prompt",
@@ -726,6 +726,16 @@ export default {
       },
     },
     draft: {
+      publishCOMPLETED: 'Configuration published',
+      publishCOMPLETEDHint: 'Android devices can sync this configuration now. Check each user’s device list for actual receipt.',
+      publishAPPLYING: 'Publishing configuration',
+      publishAPPLYINGHint: 'Applying runtime configuration before enabling sync. Do not publish again while this is in progress.',
+      publishUNKNOWN: 'Publication result needs confirmation',
+      publishUNKNOWNHint: 'The final result is not confirmed. Check the original operation before submitting again.',
+      publishFAILED: 'Configuration publication failed',
+      publishFAILEDHint: 'Publication did not complete. Check operation details and runtime status, then review again after resolving the issue.',
+      checkPublish: 'Check publication result',
+      viewReleases: 'View releases',
       latestOperation: 'Latest configuration operation',
       revision: 'Saved draft revision',
       dirty: 'Unsaved',
@@ -1192,6 +1202,10 @@ export default {
   session: {
   },
   problem: {
+    workspace_unavailable: 'The workspace operation could not complete. Refresh status and check the remote service connection. Resolve any pending operation first.',
+    workspace_operation_pending: 'A workspace operation is still pending. Check and resolve that operation first.',
+    workspace_revision_conflict: 'The workspace state changed. Refresh and review it again.',
+
     default: 'Something went wrong. Please try again.',
     activation_in_progress: 'Another configuration operation is still running. Wait for it to finish and try again.',
     activation_not_found: 'The configuration operation no longer exists.',

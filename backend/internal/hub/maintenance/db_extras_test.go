@@ -713,7 +713,7 @@ func TestBackupRestoresV4BytesAndV5OpeningsWithoutSchemaRewrite(t *testing.T) {
 		if err := rows.Scan(&raw, &storedHash); err != nil {
 			t.Fatal(err)
 		}
-		var value clientapi.ManagedSnapshot
+		var value capability.Snapshot
 		if err := json.Unmarshal(raw, &value); err != nil {
 			t.Fatal(err)
 		}

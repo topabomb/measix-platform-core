@@ -475,6 +475,14 @@ async function publish() {
   }
 }
 
+async function checkPublication() {
+  error.value = undefined
+  try {
+    await activation.poll()
+    if (!activation.pending) await refresh(true)
+  } catch (cause) { error.value = cause }
+}
+
 async function previewSnapshot() {
   if (!session.csrfToken || workspaceBusy.value || draft.dirty) return
   if (draft.baselineRevision === undefined) return
@@ -706,14 +714,18 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <div class="text-body2">{{ draft.conflictRevision === null ? $t('resources.staleRevisionUnknown') : $t('resources.staleHint', { rev: draft.conflictRevision }) }}</div>
       <template #action><q-btn flat :label="$t('resources.reload')" @click="refresh()" /></template>
     </q-banner>
-    <q-banner v-if="activation.activation" :class="activation.succeeded ? 'bg-green-1' : 'bg-orange-1'" class="q-mb-xs rounded-borders">
-      <div class="row items-center justify-between">
-        <span>{{ $t('resources.draft.latestOperation') }}</span>
-        <StatusChip :value="activation.activation.state" />
+    <q-banner v-if="activation.activation?.kind === 'PUBLISH'" :class="activation.succeeded ? 'bg-green-1' : activation.failed ? 'bg-red-1' : 'bg-orange-1'" class="q-mb-xs rounded-borders" data-cy="publish-outcome" role="status">
+      <div class="row items-center justify-between q-gutter-xs">
+        <div class="text-weight-medium">{{ $t(`resources.draft.publish${activation.activation.state}`) }}</div>
+        <span class="text-caption text-grey-7">{{ new Date(activation.activation.updatedAt).toLocaleString() }}</span>
       </div>
-      <details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ activation.activation.activationId }} · {{ activation.activation.kind }}</details>
-      <div v-if="activation.activation.errorCode" class="text-caption text-negative">{{ activation.activation.errorCode }}</div>
+      <div class="text-body2 q-mt-xs">{{ $t(`resources.draft.publish${activation.activation.state}Hint`) }}</div>
       <div v-if="activation.pending" class="text-caption text-grey-7 q-mt-xs">{{ $t('upstreams.activationRecoveryHint') }}</div>
+      <details class="text-caption text-grey-7 q-mt-xs"><summary class="cursor-pointer">{{ $t('resources.review.technicalDetails') }}</summary>{{ activation.activation.activationId }}<div v-if="activation.activation.errorCode">{{ activation.activation.errorCode }}</div></details>
+      <template #action>
+        <q-btn v-if="activation.pending" flat :label="$t('resources.draft.checkPublish')" :loading="activation.polling" @click="checkPublication" />
+        <q-btn flat :label="$t('resources.draft.viewReleases')" to="/releases" />
+      </template>
     </q-banner>
 
     <LoadingState v-if="draft.loading" />
@@ -1665,15 +1677,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <q-item v-for="s in preview.starters.toSorted((a, b) => a.sortOrder - b.sortOrder || a.starterId.localeCompare(b.starterId))" :key="s.starterId">
                   <q-item-section>
                     <q-item-label>{{ s.title }} <q-badge class="q-ml-xs" :color="s.enabled ? 'positive' : 'grey'" :label="s.enabled ? $t('common.enabled') : $t('common.disabled')" /></q-item-label>
-                    <div v-if="s.description" data-cy="preview-starter-description" class="text-body2 q-mt-xs">{{ s.description }}</div>
                     <q-item-label caption>{{ $t('resources.preview.forAssistant') }}: {{ previewAssistantName(s.assistantDefinitionId) }}</q-item-label>
                     <p class="q-my-xs" style="white-space: pre-wrap">{{ s.prompt }}</p>
                     <details v-if="s.openingSnapshot" data-cy="preview-starter-opening" class="q-my-xs" style="overflow-wrap: anywhere">
                       <summary class="cursor-pointer text-body2">{{ $t('experience.opening', { count: s.openingSnapshot.initialContexts.length }) }}</summary>
                       <div class="text-caption text-grey-7 q-mt-xs">{{ $t('experience.systemPrompt') }}</div>
                       <div data-cy="preview-starter-system" style="white-space: pre-wrap">{{ s.openingSnapshot.systemPrompt || $t('experience.emptySystem') }}</div>
-                      <div v-for="context in s.openingSnapshot.initialContexts" :key="context.id" data-cy="preview-starter-context" class="q-mt-xs">
-                        <div class="text-weight-medium">{{ context.title }}</div>
+                      <div v-for="(context, index) in s.openingSnapshot.initialContexts" :key="context.id" data-cy="preview-starter-context" class="q-mt-xs">
+                        <div class="text-weight-medium">{{ $t('experience.contextNew', { index: index + 1 }) }}</div>
                         <div style="white-space: pre-wrap">{{ context.content }}</div>
                       </div>
                     </details>

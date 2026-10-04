@@ -70,7 +70,7 @@ function diffText(diff: Release['diffSummary']): string {
   if (diff.added) parts.push($t('releases.addedCount', { count: diff.added }))
   if (diff.changed) parts.push($t('releases.changedCount', { count: diff.changed }))
   if (diff.removed) parts.push($t('releases.removedCount', { count: diff.removed }))
-  return parts.length ? parts.join(' · ') : $t('common.noData')
+  return parts.length ? parts.join(' · ') : $t('resources.review.noChanges')
 }
 
 function localTime(value: string): string {

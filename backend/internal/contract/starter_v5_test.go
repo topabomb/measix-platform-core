@@ -29,21 +29,23 @@ func TestStarterV5StrictWireAndV4Isolation(t *testing.T) {
 		return value["starters"].([]any)[0].(map[string]any)["openingSnapshot"].(map[string]any)
 	}
 	cases := map[string]func(map[string]any){
-		"missing opening": func(v map[string]any) { delete(v["starters"].([]any)[0].(map[string]any), "openingSnapshot") },
-		"null opening":    func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["openingSnapshot"] = nil },
-		"unknown opening": func(v map[string]any) { opening(v)["hidden"] = true },
-		"future format":   func(v map[string]any) { opening(v)["format"] = 2 },
-		"v4 opening":      func(v map[string]any) { v["schemaVersion"] = 4 },
-		"blank title":     func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["title"] = "  " },
-		"blank id":        func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["id"] = "\n " },
-		"unknown block":   func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["role"] = "system" },
+		"obsolete description": func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["description"] = "obsolete" },
+		"null description":     func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["description"] = nil },
+		"missing opening":      func(v map[string]any) { delete(v["starters"].([]any)[0].(map[string]any), "openingSnapshot") },
+		"null opening":         func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["openingSnapshot"] = nil },
+		"unknown opening":      func(v map[string]any) { opening(v)["hidden"] = true },
+		"future format":        func(v map[string]any) { opening(v)["format"] = 2 },
+		"v4 opening":           func(v map[string]any) { v["schemaVersion"] = 4 },
+		"obsolete title":       func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["title"] = "  " },
+		"blank id":             func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["id"] = "\n " },
+		"unknown block":        func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["role"] = "system" },
 	}
 	for _, field := range []string{"format", "systemPrompt", "initialContexts"} {
 		field := field
 		cases["missing "+field] = func(v map[string]any) { delete(opening(v), field) }
 		cases["null "+field] = func(v map[string]any) { opening(v)[field] = nil }
 	}
-	for _, field := range []string{"id", "title", "content"} {
+	for _, field := range []string{"id", "content"} {
 		field := field
 		cases["block missing "+field] = func(v map[string]any) { delete(opening(v)["initialContexts"].([]any)[0].(map[string]any), field) }
 		cases["block null "+field] = func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)[field] = nil }
@@ -82,13 +84,24 @@ func TestStarterV5StrictWireAndV4Isolation(t *testing.T) {
 			t.Fatalf("%s: %v", version, err)
 		}
 	}
-	// Unfinished titles are allowed only in Admin draft authoring.
+	// Admin and Client both use title-free background blocks.
 	admin, err := openapi3.NewLoader().LoadFromFile(filepath.Join(fixtureRoot(t), "..", "admin", "admin.openapi.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	block := map[string]any{"id": "pending", "title": "  ", "content": ""}
+	block := map[string]any{"id": "pending", "content": ""}
 	if err := admin.Components.Schemas["StarterInitialContext"].Value.VisitJSON(block); err != nil {
 		t.Fatal(err)
+	}
+	starter := fresh()["starters"].([]any)[0].(map[string]any)
+	adminStarter := admin.Components.Schemas["AssistantStarterDefinition"].Value
+	if err := adminStarter.VisitJSON(starter); err != nil {
+		t.Fatal(err)
+	}
+	for _, obsolete := range []any{"obsolete", nil} {
+		starter["description"] = obsolete
+		if err := adminStarter.VisitJSON(starter); err == nil {
+			t.Fatal("Admin must reject obsolete Starter description")
+		}
 	}
 }

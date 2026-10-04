@@ -135,6 +135,8 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 
 ## 7. 文档与完成声明
 
+企业配置的发布反馈由 `ResourcesPage` 按 PUBLISH activation 状态呈现，明确区分已发布和设备实际接收；未知结果查询原操作，不重复提交。企业助手采用紧凑列表与详情布局，窄屏可返回列表。当前 v5 Starter 无说明字段，编辑、预览和发布使用同一合同。`WorkspacePanel` 分开管理刷新错误和操作错误，文件凭据签发待核实时保留原操作核实流程；文件可用性仅取当前投影。
+
 - 产品/UX 变化 → architecture Admin Product Requirements；
 - required scenario 变化 → architecture Testing Spec；
 - wire/state/security semantic 变化 → architecture Control Protocol，再同步 OpenAPI；

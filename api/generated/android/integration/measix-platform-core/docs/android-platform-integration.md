@@ -132,7 +132,7 @@ Direct MCP 的平台路由允许 `POST`、`GET`、`DELETE` 到 Snapshot 给出�
 | 浏览与容量 | `GET files?agentSpaceId=…&path=…`，返回条目、文件版本、可用时的容量；不支持任意分页伪装，目录超限须明确报告 |
 | 新建目录、重命名、移动、复制、删除 | `POST files?agentSpaceId=…`，使用 `WorkspaceFileMutation`；源 ETag、目标覆盖条件、递归确认按 OpenAPI；禁止根目录修改 |
 | 下载与预览 | `GET/HEAD content?agentSpaceId=…&path=…`；正文流式落盘，保留 ETag、长度、类型等元信息。预览按实际类型和大小限制，不执行 HTML/SVG，不自动访问文档外部资源 |
-| 续传与缓存 | 续传使用 Range 加同一强 ETag 的 If-Match，版本变化返回 409；条件缓存读取使用 If-None-Match。206 核对 Content-Range 后续传，200 必须重建完整文件，不能追加；304 仅使用同身份、同空间、同版本的完整缓存；416 重新核对长度与版本 |
+| 续传与缓存 | 续传使用 Range 加同一强 ETag 的 If-Match，版本条件失败返回 412；条件缓存读取使用 If-None-Match。206 核对 Content-Range 后续传，200 必须重建完整文件，不能追加；304 仅使用同身份、同空间、同版本的完整缓存；416 重新核对长度与版本 |
 | 上传或新建文本 | `PUT content?agentSpaceId=…&path=…`，原始字节正文；新文件必须 `If-None-Match: *`，覆盖必须单个强 `If-Match`，两者不能并用；流式上传、进度、取消由客户端负责 |
 | 编辑文本 | 从同一次 GET 取得正文和 ETag；UTF-8 严格解码，保留 BOM 与换行格式。Admin 首轮限制 2 MiB，非 UTF-8/二进制/混合换行只预览或下载。保存携带该 GET 的 ETag；没有强 ETag 时只允许另存新文件。未保存退出需确认 |
 | 分享 | 下载到应用私有临时文件后由 Android 原生文件分享授权给用户选择的应用；分享的是文件副本，不是 WebDAV 凭据、Core Bearer 或公开 URL。Core 不新增分享链接/分享会话接口 |
@@ -145,8 +145,8 @@ HTTP 成功不代表所有写操作成功，必须检查 `WorkspaceFileResult.ou
 | 401 / 403 | Core 身份失效/权限不足，走原认证或权限流程；DAV 失效不会映射为 Core 登出 |
 | 404 `file_not_found` | 文件已不存在，刷新目录 |
 | 409 `workspace_space_mismatch` | 固定空间不匹配，刷新工作区，保留旧目标信息，禁止把旧写入转发到新空间 |
-| 409 `file_version_conflict` / `file_conflict` / `file_locked` | 保留编辑，重新读取核实或另存新文件；不得自动强制覆盖 |
-| 416 `file_range_invalid` | 核对远端版本和长度后重新下载 |
+| 412 `file_version_conflict` / 409 `file_conflict` / 423 `file_locked` | 保留编辑，重新读取核实或另存新文件；不得自动强制覆盖 |
+| 416 `file_range_invalid` | 合法上游长度保留为 `Content-Range: bytes */N`；核对远端版本和长度后重新下载 |
 | 422 `file_listing_limit` / 429 `file_transfer_limit` | 目录超限/并发已满；提示缩小目录或等待已有传输结束 |
 | 503 | 工作区、DAV 凭据、传输失败或结果未知；刷新状态并核实目标，不自动重放写入 |
 | 507 `file_storage_full` | 空间不足，保留本地内容，释放空间后由用户决定后续动作 |

@@ -115,7 +115,25 @@ func (c *Client) davRequest(ctx context.Context, name, token, p, method string, 
 	if err != nil {
 		return nil, &Error{Code: "file_transport_unavailable", Unknown: method != "GET" && method != "HEAD" && method != "PROPFIND"}
 	}
-	if res.StatusCode >= 200 && res.StatusCode < 300 || res.StatusCode == 304 {
+	readOnly := method == "GET" || method == "HEAD" || method == "PROPFIND"
+	validSuccess := false
+	switch method {
+	case "GET":
+		validSuccess = res.StatusCode == 200 || res.StatusCode == 206 || res.StatusCode == 304 && headers.Get("If-None-Match") != ""
+	case "HEAD":
+		validSuccess = res.StatusCode == 200 || res.StatusCode == 304 && headers.Get("If-None-Match") != ""
+	case "PROPFIND":
+		validSuccess = res.StatusCode == 207
+	case "PUT":
+		validSuccess = res.StatusCode == 200 || res.StatusCode == 201 || res.StatusCode == 204
+	case "MKCOL":
+		validSuccess = res.StatusCode == 201
+	case "DELETE":
+		validSuccess = res.StatusCode == 200 || res.StatusCode == 204 || res.StatusCode == 207
+	case "COPY", "MOVE":
+		validSuccess = res.StatusCode == 201 || res.StatusCode == 204 || res.StatusCode == 207
+	}
+	if validSuccess {
 		// Metadata and multi-status results consume a transfer slot too. A
 		// response-header timeout alone cannot bound a stalled XML body.
 		if method == "PROPFIND" || res.StatusCode == http.StatusMultiStatus {
@@ -128,6 +146,9 @@ func (c *Client) davRequest(ctx context.Context, name, token, p, method string, 
 		return res, nil
 	}
 	defer res.Body.Close()
+	if res.StatusCode >= 200 && res.StatusCode < 400 {
+		return nil, &Error{Code: "invalid_dav_response", Status: res.StatusCode, Unknown: !readOnly}
+	}
 	code := "file_service_unavailable"
 	switch res.StatusCode {
 	case 401, 403:
@@ -155,7 +176,15 @@ func (c *Client) davRequest(ctx context.Context, name, token, p, method string, 
 			}
 		}
 	}
-	return nil, &Error{Code: code, Status: res.StatusCode, Unknown: res.StatusCode >= 500 && method != "GET" && method != "HEAD" && method != "PROPFIND"}
+	contentRange := ""
+	if res.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+		if size, ok := strings.CutPrefix(res.Header.Get("Content-Range"), "bytes */"); ok {
+			if n, err := strconv.ParseInt(size, 10, 64); err == nil && n >= 0 && strconv.FormatInt(n, 10) == size {
+				contentRange = "bytes */" + size
+			}
+		}
+	}
+	return nil, &Error{Code: code, Status: res.StatusCode, ContentRange: contentRange, Unknown: res.StatusCode >= 500 && !readOnly}
 }
 func (c *Client) list(ctx context.Context, name, token, p, depth string) (adminapi.WorkspaceFileList, error) {
 	out := adminapi.WorkspaceFileList{Entries: []adminapi.WorkspaceFileEntry{}}

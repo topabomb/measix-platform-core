@@ -26,6 +26,8 @@ type Error struct {
 	Code    string
 	Status  int
 	Unknown bool
+	// ContentRange contains only a validated unsatisfied byte range from DAV.
+	ContentRange string
 }
 
 func (e *Error) Error() string  { return "agent space: " + e.Code }

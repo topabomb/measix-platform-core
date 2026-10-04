@@ -35,14 +35,21 @@ func writeWorkspaceError(w http.ResponseWriter, err error) {
 		switch code {
 		case "file_not_found":
 			status = 404
-		case "file_version_conflict", "file_conflict", "file_locked", "workspace_space_mismatch":
+		case "file_conflict", "workspace_space_mismatch":
 			status = 409
+		case "file_version_conflict":
+			status = http.StatusPreconditionFailed
+		case "file_locked":
+			status = http.StatusLocked
 		case "file_listing_limit":
 			status = 422
 		case "file_storage_full":
 			status = 507
 		case "file_range_invalid":
 			status = 416
+			if remote.ContentRange != "" {
+				w.Header().Set("Content-Range", remote.ContentRange)
+			}
 		case "file_transfer_limit":
 			status = 429
 		case "invalid_file_path", "invalid_file_request", "invalid_file_condition", "invalid_file_destination", "file_condition_required", "recursive_confirmation_required", "directory_overwrite_forbidden":

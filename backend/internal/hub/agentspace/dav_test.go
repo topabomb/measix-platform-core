@@ -2,6 +2,7 @@ package agentspace
 
 import (
 	"context"
+	"errors"
 	"io"
 	"measix/platform/internal/wire/adminapi"
 	"net/http"
@@ -10,6 +11,51 @@ import (
 	"testing"
 	"time"
 )
+
+func TestDAVRejectsNonFinalOrWrongMethodSuccess(t *testing.T) {
+	for _, method := range []string{"PUT", "MKCOL", "DELETE", "COPY", "MOVE"} {
+		for _, status := range []int{202, 206, 304} {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) }))
+			c, _ := New(server.URL, server.URL, server.URL, "admin")
+			response, err := c.davRequest(context.Background(), "alice", "dav", "a", method, nil, http.Header{})
+			if response != nil {
+				response.Body.Close()
+			}
+			var remote *Error
+			if !errors.As(err, &remote) || !remote.Unknown || remote.Code != "invalid_dav_response" {
+				t.Errorf("%s %d must not claim write completed: %v", method, status, err)
+			}
+			server.Close()
+		}
+	}
+}
+
+func TestDAVDeleteAcceptsCompletedRepresentation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
+	defer server.Close()
+	c, _ := New(server.URL, server.URL, server.URL, "admin")
+	response, err := c.davRequest(context.Background(), "alice", "dav", "a", "DELETE", nil, http.Header{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+}
+
+func TestDAVRangeFailurePreservesValidatedLength(t *testing.T) {
+	for raw, want := range map[string]string{"bytes */4294967296": "bytes */4294967296", "bytes */0": "bytes */0", "": "", "bytes */-1": "", "bytes */9223372036854775808": "", "bytes 1-2/3": "", "bytes */+1": ""} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Range", raw)
+			w.WriteHeader(416)
+		}))
+		c, _ := New(server.URL, server.URL, server.URL, "admin")
+		_, err := c.Content(context.Background(), "alice", "dav", "a", "GET", nil, http.Header{"Range": {"bytes=4294967296-"}})
+		var remote *Error
+		if !errors.As(err, &remote) || remote.Code != "file_range_invalid" || remote.ContentRange != want {
+			t.Errorf("%q: got %+v, want range %q", raw, remote, want)
+		}
+		server.Close()
+	}
+}
 
 func TestDAVMetadataBodyIdleTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -105,3 +105,9 @@ node scripts/workspace-integration.mjs --config .artifacts/workspace-test.json
 该脚本不部署第三方服务、不核验真实生产版本、不替代浏览器/Android 验收，也不宣称整个 S1 已完成。部署及回滚仍遵循现有 Core 数据库备份和 Agent Space 独立发布流程。
 
 `--ui-only --output <目录>` 启动全新、未配置的隔离 Admin 环境供实际网页操作；`--keep-ui` 在脚本通过后保留一个已开通的审查用户。两种模式把测试登录资料写入输出目录的私有 `ui-env.json`，不把凭据打印到终端。
+
+### 文件 HTTP 状态与 DAV 完成语义
+
+Core 文件接口保留标准条件/锁定状态：`file_version_conflict` 为 412，`file_locked` 为 423，普通文件冲突及空间不匹配仍为 409。业务 Problem code 与保留草稿、禁止自动重放的恢复语义不变；旧部署曾将前两项统一为 409，消费者按稳定 code 识别期间仍可保留编辑。416 仅输出经过校验的 `Content-Range: bytes */N`，缺失或非法的上游长度不猜测。DAV 401/403 仍映射工作区凭据不可用，不能冒充 Core 登录失效。
+
+DAV adapter 按请求方法检查完成状态；202、非 GET 的 206 或写入的 304 等不能证明文件写入完成，沿已有 `workspace_result_unknown` 返回并要求核实。PUT 的 200/201/204、MKCOL 的 201、DELETE 的 200/204/207、COPY/MOVE 的 201/204/207 分别处理；207 继续解析逐项失败，不伪装为整个目录操作成功。

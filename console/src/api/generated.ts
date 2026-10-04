@@ -4785,8 +4785,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            /** @description workspace_space_mismatch or file_conflict; refresh the target and preserve edits. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_version_conflict; HTTP or DAV precondition failed. Preserve edits and never overwrite automatically. */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4796,6 +4805,15 @@ export interface operations {
             };
             /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_locked; verify the lock before retrying. Preserve edits. */
+            423: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4898,8 +4916,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            /** @description workspace_space_mismatch or file_conflict; refresh the target and preserve edits. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_version_conflict; HTTP or DAV precondition failed. Preserve edits and never overwrite automatically. */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4909,6 +4936,15 @@ export interface operations {
             };
             /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_locked; verify the lock before retrying. Preserve edits. */
+            423: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5062,8 +5098,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            /** @description workspace_space_mismatch or file_conflict; refresh the target and preserve edits. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_version_conflict; HTTP or DAV precondition failed. Preserve edits and never overwrite automatically. */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5074,6 +5119,8 @@ export interface operations {
             /** @description file_range_invalid; requested range cannot be served. */
             416: {
                 headers: {
+                    /** @description Valid upstream unsatisfied byte range, including the current representation length. Omitted if upstream does not provide a valid value. */
+                    "Content-Range"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5082,6 +5129,15 @@ export interface operations {
             };
             /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_locked; verify the lock before retrying. Preserve edits. */
+            423: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5187,8 +5243,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            /** @description workspace_space_mismatch or file_conflict; refresh the target and preserve edits. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_version_conflict; HTTP or DAV precondition failed. Preserve edits and never overwrite automatically. */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5198,6 +5263,15 @@ export interface operations {
             };
             /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_locked; verify the lock before retrying. Preserve edits. */
+            423: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5273,25 +5347,6 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Partial byte range. */
-            206: {
-                headers: {
-                    /** @description Opaque version of these bytes; preserve quotes. Use with If-Match for editing and resumed downloads. */
-                    ETag?: string;
-                    /** @description Remote HTTP modification date when available. */
-                    "Last-Modified"?: string;
-                    /** @description Response byte length when known. */
-                    "Content-Length"?: string;
-                    /** @description Selected range for 206. */
-                    "Content-Range"?: string;
-                    /** @description Remote byte range support. */
-                    "Accept-Ranges"?: string;
-                    /** @description Attachment filename; never execute as same-origin HTML. */
-                    "Content-Disposition"?: string;
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
             /** @description Not modified; no body. */
             304: {
                 headers: {
@@ -5347,8 +5402,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description workspace_space_mismatch, file_version_conflict, file_conflict or file_locked; refresh the target, preserve edits and never overwrite automatically. */
+            /** @description workspace_space_mismatch or file_conflict; refresh the target and preserve edits. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_version_conflict; HTTP or DAV precondition failed. Preserve edits and never overwrite automatically. */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5359,6 +5423,8 @@ export interface operations {
             /** @description file_range_invalid; requested range cannot be served. */
             416: {
                 headers: {
+                    /** @description Valid upstream unsatisfied byte range, including the current representation length. Omitted if upstream does not provide a valid value. */
+                    "Content-Range"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5367,6 +5433,15 @@ export interface operations {
             };
             /** @description file_listing_limit; directory response exceeds the supported bound, never interpret as empty. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_locked; verify the lock before retrying. Preserve edits. */
+            423: {
                 headers: {
                     [name: string]: unknown;
                 };

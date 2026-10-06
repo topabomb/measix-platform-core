@@ -15,9 +15,69 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func emptyMcpBindings() *[]adminapi.AssistantMcpBinding { return &[]adminapi.AssistantMcpBinding{} }
+
+func TestDirectMcpDiscoveryAnswersServerRequestsDuringSSE(t *testing.T) {
+	for _, method := range []string{"ping", "sampling/createMessage"} {
+		t.Run(method, func(t *testing.T) {
+			replies := make(chan map[string]json.RawMessage, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var msg map[string]json.RawMessage
+				if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
+					t.Error(err)
+					return
+				}
+				if len(msg["method"]) == 0 {
+					replies <- msg
+					w.WriteHeader(http.StatusAccepted)
+					return
+				}
+				var requested string
+				json.Unmarshal(msg["method"], &requested)
+				switch requested {
+				case "initialize":
+					w.Header().Set("Content-Type", "application/json")
+					fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%s,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}}}}`, msg["id"])
+				case "notifications/initialized":
+					w.WriteHeader(http.StatusAccepted)
+				case "tools/list":
+					w.Header().Set("Content-Type", "text/event-stream")
+					fmt.Fprintf(w, "data: {\"jsonrpc\":\"2.0\",\"id\":\"server-request\",\"method\":%q}\n\n", method)
+					w.(http.Flusher).Flush()
+					select {
+					case reply := <-replies:
+						if string(reply["id"]) != `"server-request"` || string(reply["jsonrpc"]) != `"2.0"` {
+							t.Errorf("incorrect response identity: %s", reply)
+						}
+						if method == "ping" {
+							if string(reply["result"]) != `{}` || len(reply["error"]) != 0 {
+								t.Errorf("ping was not answered: %s", reply)
+							}
+						} else {
+							var problem struct{ Code int }
+							if json.Unmarshal(reply["error"], &problem) != nil || problem.Code != -32601 || len(reply["result"]) != 0 {
+								t.Errorf("undeclared capability was not rejected: %s", reply)
+							}
+						}
+					case <-time.After(time.Second):
+						t.Error("server request was not answered")
+					}
+					fmt.Fprintf(w, "data: {\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{\"tools\":[]}}\n\n", msg["id"])
+				default:
+					t.Errorf("unexpected discovery action: %s", requested)
+				}
+			}))
+			defer server.Close()
+			tools, err := capability.DiscoverMcpCatalog(context.Background(), server.URL, http.Header{})
+			if err != nil || tools == nil || len(tools) != 0 {
+				t.Fatalf("complete catalog rejected after server request: %v %v", tools, err)
+			}
+		})
+	}
+}
 
 func TestDirectMcpDiscoveryRejectsIncompleteAndUnboundedCatalogs(t *testing.T) {
 	for _, kind := range []string{"duplicate", "cursor_loop", "missing_tools", "invalid_schema", "wrong_id", "oversize", "no_capability"} {

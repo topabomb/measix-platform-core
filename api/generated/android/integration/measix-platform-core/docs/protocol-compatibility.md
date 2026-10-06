@@ -1,25 +1,13 @@
 # 协议响应扩展与消费者稳定性
 
-语义由架构 Control Protocol §2.1、§10.10.3 和 §11 拥有；本文件记录 Core/Portal 的落点与交付边界。本轮不修改 Android 源码，不改变 API v1、Snapshot 支持集合 v4/v5、Bridge v3 或已发布数据。
+语义由架构 Control Protocol §2.1、§10.10.3 和 §11 拥有；本文件记录 Core/Portal 的落点与交付边界。Core 支持 API v1、Snapshot v4/v5 和 Bridge v3；Android 源码与设备验证由其仓库拥有。
 
-## 问题与处理
+## Core 实现
 
-Android 截图只提供 `unknown_platform_field`，没有字段路径，无法据此确认具体新增字段。审查发现旧架构和 Client OpenAPI 明确封闭 Snapshot 子对象，Portal 额度与 Bridge 也拒绝未知字段。因此普通新增说明字段就可能使整份配置或查询不可用。仅修一个 DTO 或删除 Core 的某个字段无法建立稳定演进规则。
-
-当前合同改为按通信方向处理：受支持版本内的响应对象递归忽略未知字段；写入命令继续拒绝未声明参数。忽略字段不等于理解新功能，也不改变权限与默认值。已知字段、必填、类型、null、范围、互斥、ID/引用、来源、身份、generation 和准入规则保留校验。
-
-| 边界 | 当前处理 | 实现/验证 owner |
-|---|---|---|
-| Discovery、Enrollment/Refresh 响应、Bootstrap/ManagedState、Snapshot v4/v5 | 递归允许响应扩展；未知合法版本先分类不兼容；已知权限与执行枚举不猜测 | Client OpenAPI、共享 fixture、Go 合同测试；实际 APK 消费由 Android 验证 |
-| Client/Portal 查询：Session、动态、工作区、用量、额度 | 新增字段不使已有投影失败；已知值仍验证 | Client OpenAPI；Portal 的生成 Feed 校验器和 usage 校验 |
-| Bridge v3 响应 | 信封可扩展；result/error 互斥；按捕获方法校验结果，绑定原文档/请求 | Core Portal schema；Portal Bridge owner 与测试 |
-| Bridge 能力声明与错误码 | 未知方法声明可忽略，不增加本端可调用方法；未知 code 保留为操作失败，中性提示 | HostStatus/BridgeError schema；Portal Bridge 测试 |
-| Admin/Client 命令、Bridge 请求/params、Enrollment 资料、内部控制指令 | 未声明字段拒绝，避免意图被静默丢弃 | 各命令 schema 与现有 HTTP/来源/鉴权测试 |
-| 未知权限模式、额度模式、内容格式或执行协议枚举 | 保持拒绝；新增含义先审查版本或定义明确兜底 | 不默认全部工具、不显示不限额、不按 HTML 执行未知格式 |
+响应扩展、已知字段和命令的接收规则直接遵循 Control Protocol §10.10.3，不在本仓库维护第二份兼容规则表。
 
 Admin 写入与 Client 下载的 ManagedPolicy 已知字段必须一致，但对象扩展规则按方向不同，合同测试不再要求二者 `additionalProperties` 完全相同。Client schema 省略 `additionalProperties: false`，采用 JSON Schema 默认可扩展语义；不添加生成 DTO 的业务字段副本或保留未知值的执行入口。Go 的类型化投影继续只解释已知字段。Admin 与前端同构建交付；它的共享写入 schema 保持封闭，响应读取不能借此建立未知字段拒绝规则。
 
-Client 合同移除没有任何 Client operation 引用的 ManagedDraftContent、RuntimeBindingDefinition、TimeoutPolicy、ValidationIssue 旧 authoring/internal schema；这些对象仍由 Admin/内部合同拥有，不是受支持的历史 Client 响应。没有移除 v4 decoder、历史发布恢复或当前权限校验。
 
 Core 的 Snapshot 读取先选择生成的 v4/v5 DTO，再进入历史 adapter，避免用 v5 字段类型检查 v4 扩展。PublishedContent 的下载开场校验与 Admin 草稿校验分开：前者容忍扩展，后者保持封闭；两者共享已知必填/null/格式/顺序规则。
 
@@ -52,12 +40,6 @@ Core-owned OpenAPI、Bridge schema、共享向量和集成导出已同步，本�
 3. 验证历史 v4 fixture bytes/hash、当前版本已知约束、生产非泄漏、生成一致性、Core 全量和 Portal 的真实 Hub STANDARD/CUSTOM 路径。
 4. 记录当前源码、合同、构建及测试证据；Android 未验收时明确标记，不能宣称完整端到端兼容或新的 S0 Freeze。
 
-## 2026-10-06 验证记录
+## 验证入口
 
-Red 已观察：普通新增字段使 Snapshot v4/v5、Discovery、Bootstrap、Refresh、Portal 额度/计量、Feed 和 Bridge 失败；Core 历史 adapter 对 v4 中的 v5 字段提前类型校验，PublishedContent 将下载扩展套用命令校验；Client 合同仍导出四项无 operation 引用的旧 authoring/internal schema。
-
-Green 覆盖响应扩展与已知错误的双向用例、命令未知参数拒绝、v4/v5 版本投影、原开场字面值与历史 hash、真实 Hub 的私有模板投影隔离、完整 MCP Tool JCS 摘要。共享材料增加基础控制与 v4/v5 嵌套扩展接收样例；生产非泄漏反例从消费者拒绝规则移回生产输出 guard。
-
-执行了 Core 全量 Go 测试及 vet、合同检查、Admin 265 项测试/typecheck/build、62 项工具脚本测试与 1 项 public-origin 测试；真实 Admin 浏览器 8 项通过，0 skip/flaky/unexpected，包含编制/发布、MCP、用量与桌面/320px 页面操作。Portal 101 项测试、typecheck/build 与 STANDARD/CUSTOM 各 2 项真实 Hub 浏览器测试通过；原生 Bridge 使用浏览器替身，未运行 Android 设备。受影响生成链另行重跑并比较，历史 v4 fixture 无差异。
-
-具体源码/合同/构建摘要与提交身份记录在本地 `.artifacts/protocol-compatibility-verification.json`。这不是阶段 Freeze 或 Android consumer 验收。旧的 Preview/Starter 设备记录保留其原构建边界，不能据此宣称本轮新消费者已可用。
+在 `backend` 执行 `go test ./internal/contract ./internal/hub/capability ./internal/hub/httpapi -count=1`；重点为 response_extensions_test、v4 bytes/hash、已知错型/null、命令封闭和生产非泄漏。重新生成消费者材料后比对权威源；Portal 在其仓库运行 STANDARD/CUSTOM 实际 Hub 浏览器路径，Android 按支持的真实构建独立验证。历史测试计数和候选提交不作为当前 Green，证据边界见 [testing](testing.md) 与 [release](release.md)。

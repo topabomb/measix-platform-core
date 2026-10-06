@@ -34,6 +34,7 @@ export const useDraftStore = defineStore('draft', () => {
   const discovering = ref(false)
   const validationResult = ref<ValidateDraftResponse>()
   const conflictRevision = ref<number | null>()
+  let loadEpoch = 0
 
   function accept(draft: Draft) {
     const content = structuredClone(draft.content)
@@ -47,13 +48,39 @@ export const useDraftStore = defineStore('draft', () => {
   }
 
   async function load() {
+    const epoch = ++loadEpoch
+    const startingContent = JSON.stringify(localContent.value)
     loading.value = true
     try {
       const draft = await apiFetch<Draft>('/api/admin/v1/draft')
-      accept(draft)
+      if (epoch === loadEpoch) {
+        if (JSON.stringify(localContent.value) !== startingContent) {
+          // A load can include another administrator's changes. Keep the old
+          // baseline so a later save cannot silently overwrite that revision.
+          conflictRevision.value = draft.draftRevision
+        } else accept(draft)
+      }
       return draft
     } finally {
-      loading.value = false
+      if (epoch === loadEpoch) loading.value = false
+    }
+  }
+
+  function acceptWrite(draft: Draft, sentContent: string, epoch: number) {
+    if (epoch !== loadEpoch || draft.draftRevision < (baselineRevision.value ?? 0)) return
+    const pending = localContent.value
+    const edited = JSON.stringify(pending) !== sentContent
+    accept(draft)
+    if (edited && pending) {
+      // Keep authoring changes, but echo the server's latest read-only evidence
+      // on the next save. Discovery never approves or rewrites local grants.
+      for (const mcp of pending.mcp) {
+        const discovery = draft.content.mcp.find(server => server.mcpServerId === mcp.mcpServerId)?.toolDiscovery
+        if (discovery) mcp.toolDiscovery = structuredClone(discovery)
+        else delete mcp.toolDiscovery
+      }
+      localContent.value = pending
+      dirty.value = true
     }
   }
 
@@ -389,16 +416,18 @@ export const useDraftStore = defineStore('draft', () => {
 
   async function save(csrfToken: string) {
     if (baselineRevision.value === undefined) throw new Error('draft is not loaded')
+    const epoch = loadEpoch
+    const sentContent = JSON.stringify(requireContent())
     saving.value = true
     try {
       const draft = await apiFetch<Draft>('/api/admin/v1/draft', {
         method: 'PUT',
         body: JSON.stringify({ expectedDraftRevision: baselineRevision.value, content: requireContent() }),
       }, csrfToken)
-      accept(draft)
+      acceptWrite(draft, sentContent, epoch)
       return draft
     } catch (error) {
-      if (error instanceof ApiProblem && error.status === 409) conflictRevision.value = error.currentDraftRevision ?? null
+      if (epoch === loadEpoch && error instanceof ApiProblem && error.status === 409) conflictRevision.value = error.currentDraftRevision ?? null
       throw error
     } finally {
       saving.value = false
@@ -417,16 +446,20 @@ export const useDraftStore = defineStore('draft', () => {
   async function discoverMcpTools(mcpServerId: string, csrfToken: string, userId?: string) {
     if (discovering.value) return
     if (baselineRevision.value === undefined) throw new Error('draft is not loaded')
+    const epoch = loadEpoch
     discovering.value = true
     try {
       if (dirty.value) await save(csrfToken)
+      if (epoch !== loadEpoch) return
+      if (dirty.value) throw new ApiProblem(422, 'draft_changed_during_save', 'Draft changed while saving; save again before discovering tools')
+      const sentContent = JSON.stringify(requireContent())
       const result = await apiFetch<Draft>(`/api/admin/v1/draft/mcp/${encodeURIComponent(mcpServerId)}:discover`, {
         method: 'POST', body: JSON.stringify({ expectedDraftRevision: baselineRevision.value, ...(userId ? { userId } : {}) }),
       }, csrfToken)
-      accept(result)
+      acceptWrite(result, sentContent, epoch)
       return result
     } catch (error) {
-      if (error instanceof ApiProblem && error.status === 409) conflictRevision.value = error.currentDraftRevision ?? null
+      if (epoch === loadEpoch && error instanceof ApiProblem && error.status === 409) conflictRevision.value = error.currentDraftRevision ?? null
       throw error
     } finally { discovering.value = false }
   }

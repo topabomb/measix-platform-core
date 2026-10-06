@@ -370,7 +370,7 @@ No production token, Secret, enrollment code, refresh credential, real conversat
 
 ## 20. Starter v5 cross-consumer verification
 
-Direct MCP v5 与 Admin 2026-10-06 增量的完整验证见 [工具治理实施](direct-mcp-tool-governance.md#7-验证计划与证据)及 [Admin 全页审查](admin-console-review-2026-10-06.md)。`node scripts/e2e-harness.mjs` 顺序运行 authoring、MCP 治理、五类 Runtime、usage、topology 和 Admin 全路由 review。后两类 UI 验证均用生产 SPA 与真实 API；review 在 1280/320px 检查 11 个页面与公告必填保护，MCP 验证另覆盖 64 工具搜索和有界分页。Android lane 仍仅在显式指定设备时执行。
+Direct MCP 的定向与浏览器验证入口见 [工具治理实施](direct-mcp-tool-governance.md#验证入口与边界)。`node scripts/e2e-harness.mjs` 顺序运行 authoring、MCP、五类 Runtime、usage、topology 和 Admin 全路由 review，使用生产 SPA 与真实 API，并固定本次服务的构建副本和摘要。Android lane 仅在显式指定设备时执行。
 
 `MEASIX_E2E_ANDROID_SERIAL=emulator-5562 node scripts/e2e-harness.mjs` adds an opt-in native lane after the real Admin authoring/publish flow. Install the matching debug and androidTest APKs on a dedicated, fresh unbound emulator first; the harness never installs or clears app data and rejects the retained production-demo emulator. `ADB` may select the executable. The public Admin API issues temporary enrollment, adb reverse preserves canonical origin, and Android performs the actual HTTP sync, UI prefill/send, Room readback and context-detail reopen. The deterministic adapter verifies the exact published opening and absence of an additional Assistant System. Only synthetic request bodies are captured; transient enrollment files and reverse mapping are removed in finally. This is local Core/Android evidence, not a production-model or physical-device gate.
 
@@ -380,7 +380,6 @@ Use `npm run test:tooling` for instrumentation-result and wire-verifier negative
 
 `scripts/real-device-preset.test.mjs` also covers a restart after Admin discovery: full-draft replacement preserves the matching server-owned catalog, including raw Tool extension fields, and keeps the preset's explicit ALL scope without a discovery prerequisite. Failure diagnostics retain endpoint/status/code, exclude response bodies, and never reuse a previous attempt's result. Successful output reports the completed activation's generation; an unchanged preset does not publish another release. Build-identity cases refuse mutations against an older Hub or Relay and wait for a starting Relay to report its identity.
 
-2026-10-06 real-environment regression: first reproduced `PUT /draft` HTTP 422 `mcp_tool_evidence_required` on the retained real-device database; the corrected command completed activation at generation 3. A complete rebuild/restart then kept generation 3 and all 27 discovered tools. Read-only verification compared all three immutable releases' bytes/hashes and retained users, deployment, four upstreams, four Secret identities/versions and five protected files. Admin System Status reported matching current Hub/Relay build identities, READY, matching desired/applied control revision and bundle hash; `/ready`, Discovery and the served current Admin index passed. The 70-case tooling gate and affected Hub capability/device-demo Go packages passed. Safe local results/logs live under `.artifacts/device-real-*`; this is startup/configuration evidence, not a new supplier-invocation or Android acceptance claim.
 
 
 ## 远程工作区专项验证

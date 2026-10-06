@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"mime"
 	"net/http"
 	"sort"
@@ -247,8 +248,14 @@ func (d *mcpDiscoveryClient) rpc(method string, params any, notification bool) (
 		if json.Unmarshal(raw, &msg) != nil || msg.JSONRPC != "2.0" {
 			return nil, false, ErrMcpDiscoveryProtocol
 		}
-		if len(msg.ID) == 0 && msg.Method != "" {
-			return nil, false, nil
+		if msg.Method != "" {
+			if len(msg.Result) != 0 || len(msg.Error) != 0 {
+				return nil, false, ErrMcpDiscoveryProtocol
+			}
+			if len(msg.ID) == 0 {
+				return nil, false, nil
+			}
+			return nil, false, d.answer(msg.ID, msg.Method)
 		}
 		if string(msg.ID) != string(mustJSON(d.id)) || len(msg.Error) > 0 || len(msg.Result) == 0 {
 			return nil, false, ErrMcpDiscoveryProtocol
@@ -319,6 +326,43 @@ func (d *mcpDiscoveryClient) rpc(method string, params any, notification bool) (
 	return result, nil
 }
 func mustJSON(v any) []byte { raw, _ := json.Marshal(v); return raw }
+
+// A discovery stream may contain server requests before its catalog response.
+// Ping is the only supported action; no execution capability is advertised.
+func (d *mcpDiscoveryClient) answer(id json.RawMessage, method string) error {
+	var value any
+	if json.Unmarshal(id, &value) != nil {
+		return ErrMcpDiscoveryProtocol
+	}
+	switch v := value.(type) {
+	case string:
+	case float64:
+		if math.Trunc(v) != v {
+			return ErrMcpDiscoveryProtocol
+		}
+	default:
+		return ErrMcpDiscoveryProtocol
+	}
+	msg := map[string]any{"jsonrpc": "2.0", "id": id}
+	if method == "ping" {
+		msg["result"] = map[string]any{}
+	} else {
+		msg["error"] = map[string]any{"code": -32601, "message": "Method not found"}
+	}
+	response, err := d.request(d.ctx, "POST", mustJSON(msg))
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return ErrMcpDiscoveryUnavailable
+	}
+	if response.StatusCode != http.StatusAccepted {
+		return ErrMcpDiscoveryProtocol
+	}
+	return nil
+}
+
 func (d *mcpDiscoveryClient) close() {
 	if d.session == "" {
 		return

@@ -16,11 +16,7 @@ Core 导出只更新消费者合同，不能修复已安装 Android 的严格 de
 
 当前未稳定 v5 已升级 Direct MCP 工具许可。Android 源码接入和消费者验证由 Android 仓库承担；下文历史 Preview/Starter 验证不证明新版许可已消费。消费者更新及原生验证完成前不能宣称当前 v5 可端到端发布部署。
 
-具体对接要求见 [Direct MCP 工具治理方案 §5](direct-mcp-tool-governance.md)。v5 必填服务器 toolAccessMode/allowedTools 与助手 mcpBindings（toolSelection/toolNames）；ALL 明确表示对已绑定服务器不限制工具，数组必须为空；ALLOWLIST 至少一项，不能把空白名单补成全部。未绑定服务器不提供该服务器工具。拒绝已知必填缺失/null/未知权限枚举；v5 不解释旧 mcpServerIds，也不能用它替代必填 mcpBindings；v4 独立保留。服务器 ALL 动态发现新增工具，不增加调用确认；服务器 ALLOWLIST 要求已批准 name/完整 JCS 合同匹配，助手 ALLOWLIST 再按名称过滤，助手 ALL 不额外过滤。全部入口复验服务器权限；用户不能编辑企业许可。
-
-`contractHash` 使用 RFC 8785 JCS 对完整原始 Tool JSON 求 SHA-256，包含 description、input/outputSchema、annotations、_meta 和扩展字段，输出 `sha256:` 加小写十六进制。保持完整 Tool 数据而非只比较 name/inputSchema；使用共享摘要向量验证 Unicode、数字与属性序列的跨语言一致性。模型工具装配与每次调用准入都执行同一许可规则；ALL 不追加企业确认，ALLOWLIST 的 AUTO 不追加企业确认，只有显式 REQUIRE_CONFIRMATION 才复用现有 ToolBatchRunner 逐次暂停/继续机制；助手 ALL/ALLOWLIST 不改变确认策略。AUTO 不自动发起调用或绕过既有运行准入及系统权限。Direct 名单不用于 Gateway 原子工具对，不创建 fallback。
-
-Core 交付的是 OpenAPI、生成材料与参考用例；Android 必须另行完成解码、领域模型、目录刷新、turn snapshot、所有调用入口防绕过、审批及设备 UI 的消费者验证。详见方案 §5 的文件 owner、建议顺序和验收清单。本轮禁止通过删除旧数据或改写历史 v4 release 适配协议。
+工具许可、目录 JCS、调用门控和确认策略的具体 owner 与验收材料统一见 [Direct MCP Android 接线](direct-mcp-tool-governance.md#android-接线)。不删除旧数据或改写历史 v4 Release；Android 消费者必须独立验证。
 
 语义权威在 `topabomb/measix-architecture`，本包不复制其正文，只按文档名与章节引用：
 

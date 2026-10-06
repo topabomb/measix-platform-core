@@ -25,7 +25,6 @@ const INPUTS = [
   'measix-platform-core/docs/android-platform-integration.md',
   'measix-platform-core/docs/protocol-compatibility.md',
   'measix-platform-core/docs/direct-mcp-tool-governance.md',
-  'measix-platform-core/docs/admin-console-review-2026-10-06.md',
 ]
 
 function files(path) {

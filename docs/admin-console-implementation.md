@@ -22,7 +22,7 @@ pnpm
 ```
 
 - `console/package.json` 与 `console/pnpm-lock.yaml` 是前端依赖/版本权威；
-- `console/pnpm-workspace.yaml` 固定 `nodeLinker: hoisted`：2026-10-06 用户终端直接访问 Quasar virtual-store 文件成功，但经 dependency junction 访问返回 UNKNOWN，CLI 因此报 MODULE_NOT_FOUND；重建单个 junction 仍失败。改用普通目录并按 frozen lockfile 重装，避免该链接访问路径；仅在安装命令临时指定 hoisted 会在后续运行时恢复默认布局，因此必须保存项目配置。配置后 npm→Windows PowerShell→pnpm 构建、typecheck 与 260 项前端测试通过，Quasar 目录确认不是链接；未改变依赖版本、wire 或架构语义。
+- `console/pnpm-workspace.yaml` 固定 `nodeLinker: hoisted`，使用普通包目录避免 Windows dependency junction 访问失败；按 frozen lockfile 安装。
 - production 输出为 `dist/spa`；same-origin 静态托管是发布要求，Hub main 通过 `--admin-assets-dir` 配置既有 static handler，部署/同源路由见 `docs/operations.md`；
 - 浏览器只调用 Control Hub Admin API，不直连 Relay internal API；
 - API DTO/type 来自 generated Admin OpenAPI；不维护平行手写 wire model；
@@ -38,13 +38,7 @@ Root repository 的 npm orchestration、实际开发命令与 system harness 生
 
 ## 2. 当前源码组织
 
-### Direct MCP 工具治理
-
-[完整实施方案及安卓对接要求](direct-mcp-tool-governance.md)落实 Control Protocol §10.7.1 与 Admin Product Requirements。`McpToolsEditor` 从当前保存的实际 binding 发现工具；有未保存编辑时先保存，再发现。发现仅更新候选目录，支持名称/说明搜索、完整合同只读详情、明确指定工具模式下的逐项选择/按目录或搜索结果批量选择/清空、每项 `AUTO`（无需额外确认）或 `REQUIRE_CONFIRMATION`（每次调用前确认），新批准默认 AUTO。工具范围与确认独立，ALL 不追加确认；合同重审保留原策略，批量选择仅给新增项写 AUTO。既有策略由管理员明确修改，不在读取或解码时补默认。同名合同变更单独复核；“批量选择”不复核已有变更许可。删除工具保留失效提示供显式移除。远端失败保全目录并展示可恢复错误。
-
-`AssistantMcpToolsEditor` 先通过“使用此 MCP”绑定服务器，默认 ALL；需要编排时选择 ALLOWLIST 并至少选择一项。服务器为 ALLOWLIST 时选项来自已批准名单，为 ALL 时来自发现目录；全选只复制当前名称，恢复动态全部需要主动切换模式。服务器非空限制导致的越界引用保留供修复。旧草稿通过明确动作把原服务器转换为 ALL，不在读取时自动赋权。Snapshot Preview 显示服务器权限、确认策略及助手全部/指定工具模式。发现期间阻止再次提交；成功以 CAS 草稿为基线，失败保留作者编辑。
-
-工具名/说明可换行，合同详情独立滚动，320px 屏宽使用现有配置分区选择器。切换配置分区复位滚动位置，避免长目录把下一分区表单置于固定 header 下。搜索清除按钮的 null 值按空搜索处理。中英文文案及 validation/problem code 均统一落在 i18n。
+Direct MCP 的组件、草稿并发处理、目录交互及 Android 接线统一见 [工具治理实施](direct-mcp-tool-governance.md)。
 
 `ResourcesPage` 使用统一配置工作台组织 Overview、Models、Image Generation、TTS、ASR、MCP、Assistants 和 Policy。Model 可选填写 `publishedModelKey` 作为设备侧下发模型标识；留空时使用 `upstreamModelKey`。界面同时显示“设备使用 → Core 转发”的有效映射，真实上游标识不进入 Client Snapshot。OpenAI Chat Completions、OpenAI Responses 与 Anthropic Messages 由 Relay 只改写 JSON 顶层 `model`；Google Gemini 同时把客户端模型路径映射为上游模型路径。Image Generation 是独立受管资源，只表达同步 text-to-image、允许尺寸、单次数量上限和固定 Runtime binding，不借用 Model 或引入资源级额度。协议选择只包含 `OPENAI_IMAGES_GENERATIONS` 与 `DASHSCOPE_MULTIMODAL_GENERATION`；切换协议会原子改写其固定 Runtime path、默认 canonical 尺寸和 binding protocol，避免产生跨协议半配置。桌面显示固定分区导航，窄屏使用同一 section state 的选择器；Policy 直接编辑当前五项必填用户配置准入开关和各类默认资源。新草稿五项默认 false；不存在缺字段补齐逻辑；已有草稿保留原数据，校验不完整项由管理员显式修正，不能通过清理数据库处理升级。服务端在 HTTP 边界独立校验五项必填 Boolean 与所有资源、Assistants/Starters 数组。
 
@@ -144,8 +138,6 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 
 ## 7. 文档与完成声明
 
-助手通过“选择工具”打开 `AssistantMcpToolPicker` 独立窗口，显示服务器名、搜索、已选/可用数量；复选框和“已选/未选”文字同时表达状态，可仅看已选。搜索同时匹配名称和用途，批量动作明确针对完整目录或搜索结果，保留范围外选择；每页最多 50 项。当前不可用的旧选择可取消，不能作为新增选择。“完成”、关闭和 Escape 保留当前草稿修改，实际生效仍由统一 Save/Publish 路径负责。
-
 企业配置的发布反馈由 `ResourcesPage` 按 PUBLISH activation 状态呈现，明确区分已发布和设备实际接收；未知结果查询原操作，不重复提交。企业助手采用紧凑列表与详情布局，窄屏可返回列表。当前 v5 Starter 无说明字段，编辑、预览和发布使用同一合同。`WorkspacePanel` 分开管理刷新错误和操作错误，文件凭据签发待核实时保留原操作核实流程；文件可用性仅取当前投影。
 
 - 产品/UX 变化 → architecture Admin Product Requirements；
@@ -156,7 +148,6 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 
 本文不声明 C1–C7 Green。完成状态必须来自当前 architecture baseline + exact implementation SHA 的 executable evidence。
 
-
 ## 远程工作区页面
 
 远程工作区配置、用户空间、文件操作及四类安全预览的源码所有者和交互边界统一记录于远程工作区实现参考。新增 pdf.js worker 必须以 JavaScript MIME 提供；文件预览按需加载，查看工作区详情不触发 DAV/VM。
@@ -165,8 +156,4 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 
 文件列表增加“新建文本”，普通 UTF-8 文本与 Markdown 操作菜单提供“编辑文本”；预览内直接下载。编辑器按同次 GET 的 ETag 条件保存，支持另存新文件，保留 BOM/换行；冲突或未知结果保留草稿并阻止原写入重放。关闭/路由离开有未保存确认。文件可用性变化取消 IO，但同一空间的编辑器保留文字供复制；重新恢复访问后覆盖原文件仍须重新读取核实。服务未配置、企业关闭、用户未开通和文件暂不可用分别呈现，不把服务开关或 MCP 状态当作文件授权。
 
-助手 MCP 编辑器按“使用此 MCP → 全部工具 / 指定工具”呈现。新绑定默认 ALL，取消使用移除绑定；指定工具清空保留 ALLOWLIST 并阻止发布，恢复全部必须主动切换。服务器工具区名为“企业工具权限”，区分共同权限上限与助手编排。Preview 明确显示 ALL 的动态含义，不能把空名单渲染成零工具或静态全选。Portal 同步传递 Client 类型/schema/来源摘要，保持当前同源 Session/Feed/Usage/Bridge UI。
-
-`McpToolSummary` 在服务器目录和助手独立选择窗口中共用名称、用途描述各一行的截断布局；`McpToolDetailDialog` 保留完整原始定义和摘要，查看不修改选择。服务器 ALL 默认收起目录，查看、搜索、显式发现不切换模式或编制白名单；发现成功展开结果。只有指定工具显示选择和调用确认。目录滚动区桌面最多 440px、窄屏 380px，普通 27 项目录无需分页；已选项跨页保留。两端的批量动作按当前搜索结果明确标注，无查询时针对完整可用目录，保留范围外选择和既有策略，不能偷偷重审变更合同。助手选中值最多显示两个紧凑标签及剩余数量，完整名单仍保持原值。保存并发现的提示明确保存整个配置草稿且不发布。
-
-工具目录与失效批准项合并搜索，每页最多 50 项，目录有界滚动，选项跨页保留；翻页定位到目录摘要，搜索/刷新复位页码。尚未发现目录的保留批准项显示未核实及原定义，完整发现缺失才报删除。服务器 ALL 不要求先发现；助手在 ALL 来源上保留暂时缺失的名称并提示不可用，服务器白名单越界则报错。公告创建/编辑要求 trim 后标题和正文非空，提交中禁用重复命令；新建清除旧错误。全局设置的 Portal 模式使用本地化标签，低频部署标识折叠。2026-10-06 的全页真实审查及 Git 复核详见 [审查记录](admin-console-review-2026-10-06.md)。
+公告创建/编辑要求 trim 后标题和正文非空，提交中禁用重复命令；新建清除旧错误。全局设置的 Portal 模式使用本地化标签，低频部署标识折叠。

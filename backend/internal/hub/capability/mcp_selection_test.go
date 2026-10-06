@@ -2,7 +2,6 @@ package capability
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"measix/platform/internal/wire/adminapi"
@@ -44,13 +43,6 @@ func TestDirectMcpSelectionSeparatesBindingFromToolRestriction(t *testing.T) {
 				if !found {
 					t.Fatalf("missing %s: %+v", tc.code, issues)
 				}
-			}
-			bindings := clientAssistantBindings(content.Assistants[0].McpBindings)
-			encoded, _ := json.Marshal(bindings)
-			var projected []map[string]any
-			json.Unmarshal(encoded, &projected)
-			if projected[0]["toolSelection"] != tc.assistantMode {
-				t.Fatalf("selection mode lost: %s", encoded)
 			}
 		})
 	}

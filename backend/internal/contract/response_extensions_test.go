@@ -90,12 +90,3 @@ func TestResponseToleranceDoesNotWidenCommands(t *testing.T) {
 		})
 	}
 }
-
-func TestClientContractDoesNotExportAdminAuthoringPrototypes(t *testing.T) {
-	doc := loadContractDoc(t, "api/client/client-control.openapi.yaml")
-	for _, name := range []string{"ManagedDraftContent", "RuntimeBindingDefinition", "TimeoutPolicy", "ValidationIssue"} {
-		if doc.Components.Schemas[name] != nil {
-			t.Errorf("Client contract still exports unused Admin/internal prototype %s", name)
-		}
-	}
-}

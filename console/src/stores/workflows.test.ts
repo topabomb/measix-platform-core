@@ -76,6 +76,148 @@ describe('SessionStore', () => {
 })
 
 describe('DraftStore', () => {
+  it('keeps edits made during save and saves them against the acknowledged revision', async () => {
+    const initial = emptyDraft()
+    let completeSave!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeSave = resolve }))
+      .mockImplementationOnce(async (_path, init) => {
+        const body = JSON.parse(init.body)
+        expect(body.expectedDraftRevision).toBe(2)
+        expect(body.content.policy.allowLocalMcp).toBe(false)
+        return new Response(JSON.stringify({ ...initial, draftRevision: 3, content: body.content }))
+      })
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDraftStore()
+    await store.load()
+    store.markDirty()
+    const saving = store.save('csrf')
+    store.localContent!.policy.allowLocalMcp = false
+    store.markDirty()
+    completeSave(new Response(JSON.stringify({ ...initial, draftRevision: 2 })))
+    await saving
+    expect(store.localContent!.policy.allowLocalMcp).toBe(false)
+    expect(store.baselineContent!.policy.allowLocalMcp).toBe(true)
+    expect(store.dirty).toBe(true)
+    await store.save('csrf')
+    expect(store.dirty).toBe(false)
+  })
+
+  it('merges server-owned discovery while retaining edits made during discovery', async () => {
+    const initial = emptyDraft()
+    initial.content.mcp = [{ mcpServerId: 'mcp_1', displayName: 'Original', clientProtocol: 'MCP_STREAMABLE_HTTP', runtimePath: '/mcp', authOwnership: 'NONE', toolAccessMode: 'ALL', allowedTools: [], enabled: true }]
+    const discovered = structuredClone(initial)
+    discovered.draftRevision = 2
+    discovered.content.mcp[0]!.toolDiscovery = { sourceHash: `sha256:${'1'.repeat(64)}`, discoveredAt: '2026-10-06T00:00:00Z', tools: [] }
+    let completeDiscovery!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeDiscovery = resolve }))
+      .mockImplementationOnce(async (_path, init) => {
+        const body = JSON.parse(init.body)
+        expect(body.expectedDraftRevision).toBe(2)
+        expect(body.content.mcp[0].displayName).toBe('Edited during discovery')
+        expect(body.content.mcp[0].toolDiscovery).toEqual(discovered.content.mcp[0]!.toolDiscovery)
+        return new Response(JSON.stringify({ ...discovered, draftRevision: 3, content: body.content }))
+      })
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDraftStore()
+    await store.load()
+    const discovering = store.discoverMcpTools('mcp_1', 'csrf')
+    store.localContent!.mcp[0]!.displayName = 'Edited during discovery'
+    store.markDirty()
+    completeDiscovery(new Response(JSON.stringify(discovered)))
+    await discovering
+    expect(store.localContent!.mcp[0]!.displayName).toBe('Edited during discovery')
+    expect(store.dirty).toBe(true)
+    await store.save('csrf')
+  })
+
+  it('does not overwrite a reloaded draft with a late discovery response', async () => {
+    const initial = emptyDraft()
+    const reloaded = structuredClone(initial)
+    reloaded.draftRevision = 2
+    reloaded.content.policy.allowLocalMcp = false
+    let completeDiscovery!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeDiscovery = resolve }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(reloaded))))
+    const store = useDraftStore()
+    await store.load()
+    const discovering = store.discoverMcpTools('mcp_1', 'csrf')
+    await store.load()
+    completeDiscovery(new Response(JSON.stringify({ ...initial, draftRevision: 3 })))
+    await discovering
+    expect(store.baselineRevision).toBe(2)
+    expect(store.localContent!.policy.allowLocalMcp).toBe(false)
+  })
+
+  it.each(['save', 'discover'] as const)('ignores a late %s conflict after a reload', async operation => {
+    const initial = emptyDraft()
+    let completeRequest!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeRequest = resolve }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...initial, draftRevision: 3 }))))
+    const store = useDraftStore()
+    await store.load()
+    const request = operation === 'save' ? store.save('csrf') : store.discoverMcpTools('mcp_1', 'csrf')
+    const rejected = expect(request).rejects.toMatchObject({ code: 'stale_draft_revision' })
+    await store.load()
+    completeRequest(new Response(JSON.stringify({ code: 'stale_draft_revision', currentDraftRevision: 2 }), { status: 409 }))
+    await rejected
+    expect(store.baselineRevision).toBe(3)
+    expect(store.conflictRevision).toBeUndefined()
+  })
+
+  it('stops save-and-discover when new edits arrive during its save', async () => {
+    const initial = emptyDraft()
+    let completeSave!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeSave = resolve }))
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDraftStore()
+    await store.load()
+    store.markDirty()
+    const discovering = store.discoverMcpTools('mcp_1', 'csrf')
+    const rejected = expect(discovering).rejects.toMatchObject({ code: 'draft_changed_during_save' })
+    store.localContent!.policy.allowLocalMcp = false
+    store.markDirty()
+    completeSave(new Response(JSON.stringify({ ...initial, draftRevision: 2 })))
+    await rejected
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(store.localContent!.policy.allowLocalMcp).toBe(false)
+    expect(store.dirty).toBe(true)
+    expect(store.discovering).toBe(false)
+  })
+
+  it('keeps edits made while reloading and ignores older load responses', async () => {
+    const initial = emptyDraft()
+    let completeOlder!: (response: Response) => void
+    let completeNewer!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeOlder = resolve }))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeNewer = resolve })))
+    const store = useDraftStore()
+    await store.load()
+    const older = store.load()
+    const newer = store.load()
+    store.localContent!.policy.allowLocalMcp = false
+    store.markDirty()
+    completeNewer(new Response(JSON.stringify({ ...initial, draftRevision: 3 })))
+    await newer
+    completeOlder(new Response(JSON.stringify({ ...initial, draftRevision: 2 })))
+    await older
+    expect(store.baselineRevision).toBe(1)
+    expect(store.conflictRevision).toBe(3)
+    expect(store.localContent!.policy.allowLocalMcp).toBe(false)
+    expect(store.dirty).toBe(true)
+  })
+
   it('preserves missing and authored Starter openings across save, reload and revision conflict', async () => {
     const initial = emptyDraft()
     initial.content.assistants.push({ assistantDefinitionId: 'asd_1', displayName: 'A', systemPrompt: 'Base', modelId: 'mdl_1', mcpBindings: [], memorySeed: [], enabled: true })

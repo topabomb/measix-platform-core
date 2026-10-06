@@ -81,6 +81,7 @@ export const mcpValidationEn = {
   mcp_tool_review_required: 'The source or tool contract changed. Discover again and review changed or removed tools.',
 }
 export const mcpProblemsZh = {
+  draft_changed_during_save: '保存期间草稿又有修改，编辑已保留；请再次保存后发现工具。',
   mcp_tool_evidence_required: '新增批准项必须来自已发现目录；请重新加载草稿并发现工具。',
   mcp_source_unavailable: '发现需要已应用的上游配置；工作区需选择已连接用户。',
   mcp_source_changed: '发现期间连接已变化，请保存并重新发现。',
@@ -90,6 +91,7 @@ export const mcpProblemsZh = {
   mcp_discovery_timeout: '工具发现超时，请检查服务器后重试；旧目录已保留。',
 }
 export const mcpProblemsEn = {
+  draft_changed_during_save: 'The draft changed while saving. Your edits were retained; save again before discovering tools.',
   mcp_tool_evidence_required: 'New approvals must come from the discovered catalog. Reload the draft and discover again.',
   mcp_source_unavailable: 'Apply the upstream configuration first. Workspace discovery also requires a connected user.',
   mcp_source_changed: 'The connection changed during discovery. Save and discover again.',

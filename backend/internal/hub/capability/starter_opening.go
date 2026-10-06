@@ -40,11 +40,22 @@ func PublishedContent(content adminapi.ManagedDraftContent, snapshotJSON []byte)
 	if len(source.Starters) == 0 || bytes.Equal(bytes.TrimSpace(source.Starters), []byte("null")) {
 		return content, 0, ErrInvalidDraft
 	}
-	if err := ValidateDraftOpeningJSON(snapshotJSON); err != nil {
+	var starters []clientapi.AssistantStarterDefinition
+	starterJSON := source.Starters
+	if source.SchemaVersion == 4 {
+		var historical []clientapi.AssistantStarterDefinitionV4
+		if err := json.Unmarshal(starterJSON, &historical); err != nil {
+			return content, 0, err
+		}
+		var err error
+		starterJSON, err = json.Marshal(historical)
+		if err != nil {
+			return content, 0, err
+		}
+	} else if err := validateOpeningJSON(snapshotJSON, false); err != nil {
 		return content, 0, err
 	}
-	var starters []clientapi.AssistantStarterDefinition
-	if err := json.Unmarshal(source.Starters, &starters); err != nil {
+	if err := json.Unmarshal(starterJSON, &starters); err != nil {
 		return content, 0, err
 	}
 	if len(starters) != len(content.Starters) {
@@ -79,6 +90,12 @@ func PublishedContent(content adminapi.ManagedDraftContent, snapshotJSON []byte)
 // ValidateDraftOpeningJSON distinguishes absent (unfinished) from null/broken.
 // Generated Go value fields alone cannot distinguish null from valid empty text.
 func ValidateDraftOpeningJSON(raw []byte) error {
+	return validateOpeningJSON(raw, true)
+}
+
+// Published responses and authored commands share known opening constraints,
+// but only commands reject undeclared fields.
+func validateOpeningJSON(raw []byte, closed bool) error {
 	var content struct {
 		Starters []json.RawMessage `json:"starters"`
 	}
@@ -94,7 +111,7 @@ func ValidateDraftOpeningJSON(raw []byte) error {
 		if !exists {
 			continue
 		}
-		fields, err := requiredObject(opening, []string{"format", "systemPrompt", "initialContexts"})
+		fields, err := requiredObject(opening, []string{"format", "systemPrompt", "initialContexts"}, closed)
 		if err != nil {
 			return fmt.Errorf("starters[%d].openingSnapshot: %w", i, err)
 		}
@@ -103,13 +120,15 @@ func ValidateDraftOpeningJSON(raw []byte) error {
 			return fmt.Errorf("starters[%d].openingSnapshot.initialContexts must be an array", i)
 		}
 		for j, block := range blocks {
-			if _, err := requiredObject(block, []string{"id", "content"}); err != nil {
+			if _, err := requiredObject(block, []string{"id", "content"}, closed); err != nil {
 				return fmt.Errorf("starters[%d].openingSnapshot.initialContexts[%d]: %w", i, j, err)
 			}
 		}
 		var value adminapi.StarterOpeningSnapshot
 		decoder := json.NewDecoder(bytes.NewReader(opening))
-		decoder.DisallowUnknownFields()
+		if closed {
+			decoder.DisallowUnknownFields()
+		}
 		if err := decoder.Decode(&value); err != nil {
 			return err
 		}
@@ -120,7 +139,7 @@ func ValidateDraftOpeningJSON(raw []byte) error {
 	return nil
 }
 
-func requiredObject(raw json.RawMessage, names []string) (map[string]json.RawMessage, error) {
+func requiredObject(raw json.RawMessage, names []string, closed bool) (map[string]json.RawMessage, error) {
 	var value map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil, err
@@ -134,7 +153,7 @@ func requiredObject(raw json.RawMessage, names []string) (map[string]json.RawMes
 			return nil, fmt.Errorf("%s is required and must not be null", name)
 		}
 	}
-	if len(value) != len(names) {
+	if closed && len(value) != len(names) {
 		return nil, fmt.Errorf("unknown object field")
 	}
 	return value, nil

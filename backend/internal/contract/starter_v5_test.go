@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"measix/platform/internal/hub/capability"
 )
 
 func TestStarterV5StrictWireAndV4Isolation(t *testing.T) {
@@ -29,16 +30,11 @@ func TestStarterV5StrictWireAndV4Isolation(t *testing.T) {
 		return value["starters"].([]any)[0].(map[string]any)["openingSnapshot"].(map[string]any)
 	}
 	cases := map[string]func(map[string]any){
-		"obsolete description": func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["description"] = "obsolete" },
-		"null description":     func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["description"] = nil },
-		"missing opening":      func(v map[string]any) { delete(v["starters"].([]any)[0].(map[string]any), "openingSnapshot") },
-		"null opening":         func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["openingSnapshot"] = nil },
-		"unknown opening":      func(v map[string]any) { opening(v)["hidden"] = true },
-		"future format":        func(v map[string]any) { opening(v)["format"] = 2 },
-		"v4 opening":           func(v map[string]any) { v["schemaVersion"] = 4 },
-		"obsolete title":       func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["title"] = "  " },
-		"blank id":             func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["id"] = "\n " },
-		"unknown block":        func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["role"] = "system" },
+		"missing opening": func(v map[string]any) { delete(v["starters"].([]any)[0].(map[string]any), "openingSnapshot") },
+		"null opening":    func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["openingSnapshot"] = nil },
+		"future format":   func(v map[string]any) { opening(v)["format"] = 2 },
+		"v4 opening":      func(v map[string]any) { v["schemaVersion"] = 4 },
+		"blank id":        func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["id"] = "\n " },
 	}
 	for _, field := range []string{"format", "systemPrompt", "initialContexts"} {
 		field := field
@@ -54,6 +50,27 @@ func TestStarterV5StrictWireAndV4Isolation(t *testing.T) {
 		t.Fatal("Android generation requires unique-property contract")
 	}
 	schema := doc.Components.Schemas["ManagedSnapshot"].Value
+	for name, change := range map[string]func(map[string]any){
+		"ignored obsolete description": func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["description"] = "obsolete" },
+		"ignored null description":     func(v map[string]any) { v["starters"].([]any)[0].(map[string]any)["description"] = nil },
+		"ignored opening extension":    func(v map[string]any) { opening(v)["futureDisplayHint"] = true },
+		"ignored obsolete title":       func(v map[string]any) { opening(v)["initialContexts"].([]any)[0].(map[string]any)["title"] = "  " },
+		"ignored block extension": func(v map[string]any) {
+			opening(v)["initialContexts"].([]any)[0].(map[string]any)["futureDisplayHint"] = "advisory"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			value := fresh()
+			change(value)
+			if err := schema.VisitJSON(value); err != nil {
+				t.Fatal(err)
+			}
+			hash, err := capability.HashSnapshot(value)
+			if err != nil || hash != value["snapshotHash"] {
+				t.Fatalf("ignored field changed projection: %s %v", hash, err)
+			}
+		})
+	}
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {
 			value := fresh()

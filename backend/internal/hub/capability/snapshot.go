@@ -51,8 +51,8 @@ type snapshotDescriptor struct {
 	Starters          []SnapshotStarter                     `json:"starters"`
 }
 
-// Snapshot is the compiler's versioned result. Current wire DTOs remain strict;
-// the retained v4 description exists only in this historical adapter.
+// Snapshot is the compiler's versioned known-field projection. Downloaded wire
+// extensions are ignored; v4 descriptions remain in this historical adapter.
 type Snapshot struct {
 	clientapi.ManagedSnapshot
 	Starters     []SnapshotStarter                        `json:"starters"`

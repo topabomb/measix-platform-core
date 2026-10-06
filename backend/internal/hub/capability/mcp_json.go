@@ -45,7 +45,7 @@ func ValidateDraftMcpJSON(raw []byte) error {
 				return ErrInvalidDraft
 			}
 			for _, item := range items {
-				if _, err := requiredObject(item, collection.required); err != nil {
+				if _, err := requiredObject(item, collection.required, true); err != nil {
 					return fmt.Errorf("%s[%d].%s: %w", collection.name, i, collection.field, err)
 				}
 			}

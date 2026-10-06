@@ -57,18 +57,38 @@ func mcpPublishedHash(m adminapi.McpDefinition) string {
 	return defHash(m)
 }
 func (s *Snapshot) UnmarshalJSON(raw []byte) error {
+	var header struct {
+		SchemaVersion int `json:"schemaVersion"`
+	}
+	if err := json.Unmarshal(raw, &header); err != nil {
+		return err
+	}
+	// Project through the selected generated wire DTO before the historical
+	// adapter. A v5 field must not acquire meaning (or a type check) in v4.
+	var wire any
+	switch header.SchemaVersion {
+	case 4:
+		wire = &clientapi.ManagedSnapshotV4{}
+	case 5:
+		wire = &clientapi.ManagedSnapshot{}
+	default:
+		return ErrInvalidDraft
+	}
+	if err := json.Unmarshal(raw, wire); err != nil {
+		return err
+	}
+	known, err := json.Marshal(wire)
+	if err != nil {
+		return err
+	}
 	type plain Snapshot
 	var value plain
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if err := json.Unmarshal(known, &value); err != nil {
 		return err
 	}
 	*s = Snapshot(value)
 	if s.SchemaVersion == 4 {
-		var historical clientapi.ManagedSnapshotV4
-		if err := json.Unmarshal(raw, &historical); err != nil {
-			return err
-		}
-		s.V4Assistants = historical.Assistants
+		s.V4Assistants = wire.(*clientapi.ManagedSnapshotV4).Assistants
 	}
 	return nil
 }

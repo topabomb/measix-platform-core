@@ -92,7 +92,7 @@ Release 内容保存审核定义便于审查和追溯，Client Snapshot 不含�
 
 | 接线位置 | 必须调整的行为 |
 | --- | --- |
-| `data/enterprise/PlatformWire.kt`、`PlatformWireCodec.kt` | 从新 Core OpenAPI 重新生成，保留 v4 独立 DTO；v5 必填许可模式/绑定模式、closed shape、非法枚举/hash/null 拒绝，禁止沿用 server-only 引用 |
+| `data/enterprise/PlatformWire.kt`、`PlatformWireCodec.kt` | 从新 Core OpenAPI 重新生成，保留 v4 独立 DTO；v5 必填许可模式/绑定模式、已知非法枚举/hash/null 拒绝；响应忽略未知字段，不解释 server-only 引用 |
 | `data/enterprise/PlatformSnapshotMapper.kt`、企业领域资源与 Assistant 映射 | 当前仍检查 assistant.mcpServerIds；升级为显式 ALL/ALLOWLIST 和工具子集闭合校验，并保存只读 name/hash/approvalPolicy |
 | `data/configuration/ResolvedConfiguration.kt` 的 ConfigurationResolver | 企业许可来源保持领域隔离；全部受管服务器入口施加资源上限，企业助手再施加子集，不让本地工具 policy 覆盖企业要求 |
 | `data/ai/mcp/McpProtocol.kt`、`McpCatalogWire.kt`、`McpCatalogStore.kt` | 保留原始完整 Tool；当前目录 digest 不是逐工具 JCS 许可摘要，需要新增独立摘要校验。刷新、新增、失配、持久缓存恢复均不得改写发布许可 |
@@ -126,7 +126,7 @@ Direct 适合少量稳定工具，模型直接看到当前可用 schema；有服
 
 ## 7. 验证计划与证据
 
-按 Red→Green：先添加 v5 closed schema/v4 保全、目录摘要/分页/失败/来源竞态、授权闭合与 canonical projection 测试；记录失败后实现。生成所有消费者材料，并执行合同、Hub/Relay、Admin typecheck/unit/build、工具脚本回归、真实 production Admin E2E 与手工浏览器交互。新增 wire 更新 protocol-baseline，记录源码/合同/产物摘要，不称为新的阶段 Freeze。
+按 Red→Green：先添加 v5 已知字段/引用约束与响应扩展、v4 保全、目录摘要/分页/失败/来源竞态、授权闭合与 canonical projection 测试；记录失败后实现。生成所有消费者材料，并执行合同、Hub/Relay、Admin typecheck/unit/build、工具脚本回归、真实 production Admin E2E 与手工浏览器交互。新增 wire 更新 protocol-baseline，记录源码/合同/产物摘要，不称为新的阶段 Freeze。
 
 2026-10-06 完成 Core/Admin/Portal 实施、全页 Admin 审查与 Git 变更复核。本次验证基线为 Core `59b2f4157e2fc8032e91a18bed0c1ae71afdcf9c` / Architecture `719267f65dca487913983b09075e32367c8eb554` / Portal `1ec94b1a7d5a45eb588d2085b91567dded3c4ed0` 上的候选内容，提交记录见各仓库 Git 历史；不是基线干净 commit 的发布验收，不构成新 S0 Freeze。实际产物、源码/合同/构建摘要和验证日志见 `.artifacts/mcp-tool-governance-verification.json`；全页审查范围、修复和复核方式见 [Admin 审查记录](admin-console-review-2026-10-06.md)。
 

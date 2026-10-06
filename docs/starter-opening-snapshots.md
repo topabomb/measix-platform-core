@@ -164,7 +164,7 @@ Core lane 可连接本地确定性 adapter，也可连接 `device:real` 的实�
 
 | 编号 | 必须证明的结果 | 证据层 |
 | --- | --- | --- |
-| V01 | v5完整定义、缺失/null/错误类型/unknown/format/id约束；空值合法 | OpenAPI、HTTP、领域测试 |
+| V01 | v5完整定义、已知缺失/null/错型/format/id约束；下载扩展忽略、Admin 未声明参数拒绝；空值合法 | OpenAPI、HTTP、领域测试；当前扩展规则见 protocol-compatibility.md |
 | V02 | 新草稿空白继承、非空覆盖逐字保留，不回写编制值；固化正文/顺序/ID与hash/diff一致 | compiler golden |
 | V03 | 旧draft读取不写库；显式初始化保存；stale CAS不丢新内容 | SQLite + Admin测试 |
 | V04 | 旧release bytes/hash/ETag/304不变；PublishedContent恢复固化opening，v4/v5重新发布保持版本，历史空/空白System不重新继承 | HTTP + RuntimeControl |

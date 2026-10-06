@@ -33,11 +33,19 @@ func TestManagedPolicySchemaMatchesAcrossAdminAndClient(t *testing.T) {
 	admin := loadOpenAPIDocument(t, filepath.Join(root, "api/admin/admin.openapi.yaml"))
 	client := loadOpenAPIDocument(t, filepath.Join(root, "api/client/client-control.openapi.yaml"))
 
-	adminSchema, err := json.Marshal(admin.Components.Schemas["ManagedPolicy"])
+	adminPolicy := *admin.Components.Schemas["ManagedPolicy"].Value
+	clientPolicy := *client.Components.Schemas["ManagedPolicy"].Value
+	if adminPolicy.AdditionalProperties.Has == nil || *adminPolicy.AdditionalProperties.Has || clientPolicy.AdditionalProperties.Has != nil {
+		t.Fatal("Admin policy command must stay closed; Client policy response must be extensible")
+	}
+	// Known policy meaning stays identical. Object extension handling differs by
+	// direction: authored command vs downloaded response.
+	adminPolicy.AdditionalProperties = clientPolicy.AdditionalProperties
+	adminSchema, err := json.Marshal(adminPolicy)
 	if err != nil {
 		t.Fatalf("marshal Admin ManagedPolicy: %v", err)
 	}
-	clientSchema, err := json.Marshal(client.Components.Schemas["ManagedPolicy"])
+	clientSchema, err := json.Marshal(clientPolicy)
 	if err != nil {
 		t.Fatalf("marshal Client ManagedPolicy: %v", err)
 	}

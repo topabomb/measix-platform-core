@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,6 +92,22 @@ func TestPortalUsageIsSelfScopedAndNeverCacheable(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// Consumer extension tolerance must not be used as the non-disclosure gate.
+	// Prove the real writer strips private template state from Portal projections.
+	templateID := platformid.New(platformid.BudgetTemplate)
+	if _, err := budgetService.CreateTemplate(ctx, budget.CreateTemplateInput{
+		TemplateID: templateID, Name: "Private template", Description: "Admin-only",
+		Rules:       []budget.TemplateRule{{Capability: budget.CapabilityTTS, Mode: budget.ModeUnlimited}},
+		ActorUserID: adminID, Reason: "verify private projection",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := budgetService.AssignTemplate(ctx, budget.AssignTemplateInput{
+		UserID: principal.UserID, TemplateID: templateID, ExpectedRevision: 0,
+		ActorUserID: adminID, Reason: "verify assigned projection",
+	}); err != nil {
+		t.Fatal(err)
+	}
 	other, err := identityService.CreateUser(ctx, "other-usage", "Other Usage", "MEMBER")
 	if err != nil {
 		t.Fatal(err)
@@ -102,6 +119,9 @@ func TestPortalUsageIsSelfScopedAndNeverCacheable(t *testing.T) {
 	adminResponse := doJSON(t, h, http.MethodGet, "/api/admin/v1/users/"+principal.UserID+"/budgets", map[string]string{"Cookie": adminCookie}, nil)
 	if adminResponse.Code != http.StatusOK {
 		t.Fatalf("admin budgets: %d %s", adminResponse.Code, adminResponse.Body)
+	}
+	if !strings.Contains(adminResponse.Body.String(), templateID) {
+		t.Fatal("Admin fixture did not exercise private template state")
 	}
 	var adminBudgets adminapi.UserBudgetView
 	decodeJSON(t, adminResponse, &adminBudgets)
@@ -132,6 +152,11 @@ func TestPortalUsageIsSelfScopedAndNeverCacheable(t *testing.T) {
 		"/api/portal/v1/usage/requests/" + requestID,
 	} {
 		response := doJSON(t, h, http.MethodGet, path, headers, nil)
+		for _, private := range []string{templateID, `"templateAssignment"`, `"budgetTemplateId"`, `"templateRevision"`} {
+			if strings.Contains(response.Body.String(), private) {
+				t.Fatalf("Portal %s leaked Admin template metadata", path)
+			}
+		}
 		if response.Code != http.StatusOK || response.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("portal endpoint %s: status=%d cache=%q body=%s", path, response.Code, response.Header().Get("Cache-Control"), response.Body)
 		}

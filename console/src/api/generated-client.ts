@@ -679,13 +679,6 @@ export interface components {
             forwarded?: boolean;
             budget?: components["schemas"]["RuntimeBudgetContext"];
         };
-        ValidationIssue: {
-            code: string;
-            /** @enum {string} */
-            severity: "ERROR" | "WARNING";
-            path: string;
-            message: string;
-        };
         ProviderDefinition: {
             providerId: components["schemas"]["ProviderId"];
             displayName: string;
@@ -763,22 +756,6 @@ export interface components {
             toolAccessMode: "ALL" | "ALLOWLIST";
             allowedTools: components["schemas"]["McpToolGrant"][];
         };
-        TimeoutPolicy: {
-            connectMs: number;
-            responseHeaderMs: number;
-            idleMs: number;
-            overallMs?: number;
-        };
-        RuntimeBindingDefinition: {
-            runtimeRouteId: components["schemas"]["RuntimeRouteId"];
-            resourceId: string;
-            upstreamId: components["schemas"]["UpstreamId"];
-            allowedMethods: string[];
-            allowedPathPrefixes: string[];
-            /** @enum {string} */
-            transportPolicy: "HTTP_REQUEST_RESPONSE" | "HTTP_STREAMING_SSE" | "HTTP_BINARY_STREAM" | "HTTP_MULTIPART" | "WEBSOCKET";
-            timeoutPolicy?: components["schemas"]["TimeoutPolicy"];
-        };
         /** @description Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted. */
         ManagedPolicy: {
             policyId: components["schemas"]["PolicyId"];
@@ -798,19 +775,6 @@ export interface components {
             defaultTtsId?: components["schemas"]["TtsId"];
             defaultAsrId?: components["schemas"]["AsrId"];
             defaultAssistantId?: components["schemas"]["AssistantDefinitionId"];
-        };
-        ManagedDraftContent: {
-            providers: components["schemas"]["ProviderDefinition"][];
-            models: components["schemas"]["ModelDefinition"][];
-            /** @description Additive Snapshot v4 field; omission means an empty list. */
-            imageGenerators?: components["schemas"]["ImageGenerationDefinition"][];
-            tts: components["schemas"]["TtsDefinition"][];
-            asr: components["schemas"]["AsrDefinition"][];
-            mcp: components["schemas"]["McpDefinition"][];
-            bindings: components["schemas"]["RuntimeBindingDefinition"][];
-            policy: components["schemas"]["ManagedPolicy"];
-            assistants: components["schemas"]["ManagedAssistantDefinition"][];
-            starters: components["schemas"]["AssistantStarterDefinition"][];
         };
         Discovery: {
             /** @enum {string} */

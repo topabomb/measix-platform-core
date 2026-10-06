@@ -290,19 +290,19 @@ func (e EnterpriseUpdateContentFormat) Valid() bool {
 
 // Defines values for EnterpriseUpdateSeverity.
 const (
-	EnterpriseUpdateSeverityCRITICAL EnterpriseUpdateSeverity = "CRITICAL"
-	EnterpriseUpdateSeverityINFO     EnterpriseUpdateSeverity = "INFO"
-	EnterpriseUpdateSeverityWARNING  EnterpriseUpdateSeverity = "WARNING"
+	CRITICAL EnterpriseUpdateSeverity = "CRITICAL"
+	INFO     EnterpriseUpdateSeverity = "INFO"
+	WARNING  EnterpriseUpdateSeverity = "WARNING"
 )
 
 // Valid indicates whether the value is a known member of the EnterpriseUpdateSeverity enum.
 func (e EnterpriseUpdateSeverity) Valid() bool {
 	switch e {
-	case EnterpriseUpdateSeverityCRITICAL:
+	case CRITICAL:
 		return true
-	case EnterpriseUpdateSeverityINFO:
+	case INFO:
 		return true
-	case EnterpriseUpdateSeverityWARNING:
+	case WARNING:
 		return true
 	default:
 		return false
@@ -636,33 +636,6 @@ func (e ResourceKind) Valid() bool {
 	}
 }
 
-// Defines values for RuntimeBindingDefinitionTransportPolicy.
-const (
-	HTTPBINARYSTREAM    RuntimeBindingDefinitionTransportPolicy = "HTTP_BINARY_STREAM"
-	HTTPMULTIPART       RuntimeBindingDefinitionTransportPolicy = "HTTP_MULTIPART"
-	HTTPREQUESTRESPONSE RuntimeBindingDefinitionTransportPolicy = "HTTP_REQUEST_RESPONSE"
-	HTTPSTREAMINGSSE    RuntimeBindingDefinitionTransportPolicy = "HTTP_STREAMING_SSE"
-	WEBSOCKET           RuntimeBindingDefinitionTransportPolicy = "WEBSOCKET"
-)
-
-// Valid indicates whether the value is a known member of the RuntimeBindingDefinitionTransportPolicy enum.
-func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
-	switch e {
-	case HTTPBINARYSTREAM:
-		return true
-	case HTTPMULTIPART:
-		return true
-	case HTTPREQUESTRESPONSE:
-		return true
-	case HTTPSTREAMINGSSE:
-		return true
-	case WEBSOCKET:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for StarterOpeningSnapshotFormat.
 const (
 	StarterOpeningSnapshotFormatN1 StarterOpeningSnapshotFormat = 1
@@ -807,24 +780,6 @@ func (e UsageMeter) Valid() bool {
 	case REQUESTS:
 		return true
 	case TOTALTOKENS:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ValidationIssueSeverity.
-const (
-	ValidationIssueSeverityERROR   ValidationIssueSeverity = "ERROR"
-	ValidationIssueSeverityWARNING ValidationIssueSeverity = "WARNING"
-)
-
-// Valid indicates whether the value is a known member of the ValidationIssueSeverity enum.
-func (e ValidationIssueSeverity) Valid() bool {
-	switch e {
-	case ValidationIssueSeverityERROR:
-		return true
-	case ValidationIssueSeverityWARNING:
 		return true
 	default:
 		return false
@@ -1258,24 +1213,6 @@ type ManagedAssistantDefinitionV4 struct {
 	SystemPrompt          string                `json:"systemPrompt"`
 }
 
-// ManagedDraftContent defines model for ManagedDraftContent.
-type ManagedDraftContent struct {
-	Asr        []AsrDefinition              `json:"asr"`
-	Assistants []ManagedAssistantDefinition `json:"assistants"`
-	Bindings   []RuntimeBindingDefinition   `json:"bindings"`
-
-	// ImageGenerators Additive Snapshot v4 field; omission means an empty list.
-	ImageGenerators *[]ImageGenerationDefinition `json:"imageGenerators,omitempty"`
-	Mcp             []McpDefinition              `json:"mcp"`
-	Models          []ModelDefinition            `json:"models"`
-
-	// Policy Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted.
-	Policy    ManagedPolicy                `json:"policy"`
-	Providers []ProviderDefinition         `json:"providers"`
-	Starters  []AssistantStarterDefinition `json:"starters"`
-	Tts       []TtsDefinition              `json:"tts"`
-}
-
 // ManagedPolicy Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted.
 type ManagedPolicy struct {
 	AllowLocalAsr bool `json:"allowLocalAsr"`
@@ -1580,20 +1517,6 @@ type RequestUsageViewSettlementState string
 // ResourceKind defines model for ResourceKind.
 type ResourceKind string
 
-// RuntimeBindingDefinition defines model for RuntimeBindingDefinition.
-type RuntimeBindingDefinition struct {
-	AllowedMethods      []string                                `json:"allowedMethods"`
-	AllowedPathPrefixes []string                                `json:"allowedPathPrefixes"`
-	ResourceId          string                                  `json:"resourceId"`
-	RuntimeRouteId      RuntimeRouteId                          `json:"runtimeRouteId"`
-	TimeoutPolicy       *TimeoutPolicy                          `json:"timeoutPolicy,omitempty"`
-	TransportPolicy     RuntimeBindingDefinitionTransportPolicy `json:"transportPolicy"`
-	UpstreamId          UpstreamId                              `json:"upstreamId"`
-}
-
-// RuntimeBindingDefinitionTransportPolicy defines model for RuntimeBindingDefinition.TransportPolicy.
-type RuntimeBindingDefinitionTransportPolicy string
-
 // RuntimeBudgetContext defines model for RuntimeBudgetContext.
 type RuntimeBudgetContext struct {
 	AsOf           time.Time                 `json:"asOf"`
@@ -1648,14 +1571,6 @@ type StarterOpeningSnapshot struct {
 
 // StarterOpeningSnapshotFormat defines model for StarterOpeningSnapshot.Format.
 type StarterOpeningSnapshotFormat int
-
-// TimeoutPolicy defines model for TimeoutPolicy.
-type TimeoutPolicy struct {
-	ConnectMs        int  `json:"connectMs"`
-	IdleMs           int  `json:"idleMs"`
-	OverallMs        *int `json:"overallMs,omitempty"`
-	ResponseHeaderMs int  `json:"responseHeaderMs"`
-}
 
 // TtsDefinition defines model for TtsDefinition.
 type TtsDefinition struct {
@@ -1742,17 +1657,6 @@ type UserBudgetView struct {
 
 // UserId defines model for UserId.
 type UserId = string
-
-// ValidationIssue defines model for ValidationIssue.
-type ValidationIssue struct {
-	Code     string                  `json:"code"`
-	Message  string                  `json:"message"`
-	Path     string                  `json:"path"`
-	Severity ValidationIssueSeverity `json:"severity"`
-}
-
-// ValidationIssueSeverity defines model for ValidationIssue.Severity.
-type ValidationIssueSeverity string
 
 // WorkspaceFileEntry defines model for WorkspaceFileEntry.
 type WorkspaceFileEntry struct {

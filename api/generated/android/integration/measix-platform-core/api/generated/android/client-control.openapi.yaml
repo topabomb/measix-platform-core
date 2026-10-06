@@ -7,7 +7,7 @@ info:
     form a stable control profile independent of Snapshot schema versions. Publishing a newer Snapshot
     must not require a client to understand that configuration before restoring identity, refreshing
     credentials or logging out. Changes to this profile require verification with supported client builds;
-    even optional additions can break strict consumers. Breaking control changes require an independently
+    response objects recursively ignore unknown fields while known fields and command inputs remain validated. Breaking control changes require an independently
     versioned API and retention of the supported control path, not automatic Snapshot downgrade.
 paths:
   /api/client/v1/managed/applied:
@@ -1233,7 +1233,6 @@ components:
       pattern: ^wop_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
     WorkspaceFileEntry:
       type: object
-      additionalProperties: false
       required:
       - path
       - kind
@@ -1256,7 +1255,6 @@ components:
           type: string
     WorkspaceFileList:
       type: object
-      additionalProperties: false
       required:
       - entries
       properties:
@@ -1300,7 +1298,6 @@ components:
           type: boolean
     WorkspaceFileFailure:
       type: object
-      additionalProperties: false
       required:
       - path
       - status
@@ -1314,7 +1311,6 @@ components:
           type: string
     WorkspaceFileResult:
       type: object
-      additionalProperties: false
       required:
       - outcome
       - failures
@@ -1334,7 +1330,6 @@ components:
           type: boolean
     WorkspaceProjection:
       type: object
-      additionalProperties: false
       required:
       - schemaVersion
       - serviceState
@@ -1427,7 +1422,6 @@ components:
 
     PortalGrant:
       type: object
-      additionalProperties: false
       required: [exchangeUrl, ticket, expiresAt]
       properties:
         exchangeUrl:
@@ -1440,7 +1434,6 @@ components:
           format: date-time
     PortalSession:
       type: object
-      additionalProperties: false
       required: [deploymentId, userId, deviceId, sessionId, enterpriseName, userDisplayName, expiresAt, sessionIdleExpiresAt, csrfToken]
       properties:
         deploymentId:
@@ -1587,7 +1580,6 @@ components:
       enum: [AVAILABLE, EXHAUSTED, PENDING_RECONCILIATION]
     MeterQuantity:
       type: object
-      additionalProperties: false
       required: [meter, quantity, completeness]
       properties:
         meter:
@@ -1599,7 +1591,6 @@ components:
           $ref: '#/components/schemas/UsageCompleteness'
     BudgetLimitState:
       type: object
-      additionalProperties: false
       required: [period, meter, limit, used, reserved, remaining, overage, scopeStart]
       properties:
         period:
@@ -1629,7 +1620,6 @@ components:
           format: date-time
     BudgetCapabilityView:
       type: object
-      additionalProperties: false
       required: [capability, mode, source, revision, effectiveFrom, asOf, inFlightRequests, limits, usageMeters, status]
       properties:
         capability:
@@ -1663,7 +1653,6 @@ components:
           $ref: '#/components/schemas/BudgetStatus'
     UserBudgetView:
       type: object
-      additionalProperties: false
       required: [userId, timezone, items, asOf]
       properties:
         userId:
@@ -1681,7 +1670,6 @@ components:
           format: date-time
     BudgetContext:
       type: object
-      additionalProperties: false
       required: [capability, mode, revision, blockers, asOf]
       properties:
         capability:
@@ -1703,7 +1691,6 @@ components:
           format: date-time
     RuntimeBudgetContext:
       type: object
-      additionalProperties: false
       required: [capability, mode, blockingLimits, asOf]
       properties:
         capability:
@@ -1725,7 +1712,6 @@ components:
           format: date-time
     RuntimeBudgetLimitState:
       type: object
-      additionalProperties: false
       required: [meter, period, limit, used, reserved]
       properties:
         meter:
@@ -1750,7 +1736,6 @@ components:
           nullable: true
     UsageSummary:
       type: object
-      additionalProperties: false
       required: [from, to, requestCount, forwardedRequestCount, requestBytes, responseBytes, semanticMeters]
       properties:
         from:
@@ -1777,7 +1762,6 @@ components:
             $ref: '#/components/schemas/MeterQuantity'
     UsageTrendPoint:
       type: object
-      additionalProperties: false
       required: [date, requestCount, semanticMeters]
       properties:
         date:
@@ -1792,7 +1776,6 @@ components:
             $ref: '#/components/schemas/MeterQuantity'
     UsageTrend:
       type: object
-      additionalProperties: false
       required: [from, to, timezone, points]
       properties:
         from:
@@ -1809,7 +1792,6 @@ components:
             $ref: '#/components/schemas/UsageTrendPoint'
     UsageDistributionItem:
       type: object
-      additionalProperties: false
       required: [resourceKind, clientProtocol, requestCount, semanticMeters]
       properties:
         resourceKind:
@@ -1829,7 +1811,6 @@ components:
             $ref: '#/components/schemas/MeterQuantity'
     UsageDistribution:
       type: object
-      additionalProperties: false
       required: [from, to, items]
       properties:
         from:
@@ -1844,7 +1825,6 @@ components:
             $ref: '#/components/schemas/UsageDistributionItem'
     RequestUsageView:
       type: object
-      additionalProperties: false
       required: [requestId, resourceKind, clientProtocol, startedAt, completedAt, forwarded, requestBytes, responseBytes, durationMs, requestCompleteness, settlementState, semanticMeters]
       properties:
         requestId:
@@ -1893,7 +1873,6 @@ components:
           $ref: '#/components/schemas/BudgetContext'
     RequestUsagePage:
       type: object
-      additionalProperties: false
       required: [items]
       properties:
         items:
@@ -1904,7 +1883,6 @@ components:
           type: string
     Problem:
       type: object
-      additionalProperties: false
       required:
       - type
       - title
@@ -1943,29 +1921,8 @@ components:
           type: boolean
         budget:
           $ref: '#/components/schemas/RuntimeBudgetContext'
-    ValidationIssue:
-      type: object
-      additionalProperties: false
-      required:
-      - code
-      - severity
-      - path
-      - message
-      properties:
-        code:
-          type: string
-        severity:
-          type: string
-          enum:
-          - ERROR
-          - WARNING
-        path:
-          type: string
-        message:
-          type: string
     ProviderDefinition:
       type: object
-      additionalProperties: false
       required:
       - providerId
       - displayName
@@ -1988,7 +1945,6 @@ components:
           type: boolean
     ModelDefinition:
       type: object
-      additionalProperties: false
       required:
       - modelId
       - providerId
@@ -2039,7 +1995,6 @@ components:
           type: boolean
     ImageGenerationDefinition:
       type: object
-      additionalProperties: false
       required:
       - imageId
       - displayName
@@ -2079,7 +2034,6 @@ components:
           type: boolean
     TtsDefinition:
       type: object
-      additionalProperties: false
       required:
       - ttsId
       - displayName
@@ -2128,7 +2082,6 @@ components:
           type: boolean
     AsrDefinition:
       type: object
-      additionalProperties: false
       required:
       - asrId
       - displayName
@@ -2179,7 +2132,6 @@ components:
           type: boolean
     McpDefinition:
       type: object
-      additionalProperties: false
       required:
       - mcpServerId
       - displayName
@@ -2218,67 +2170,8 @@ components:
           x-uniqueProperty: name
           items:
             $ref: '#/components/schemas/McpToolGrant'
-    TimeoutPolicy:
-      type: object
-      additionalProperties: false
-      required:
-      - connectMs
-      - responseHeaderMs
-      - idleMs
-      properties:
-        connectMs:
-          type: integer
-          minimum: 1
-        responseHeaderMs:
-          type: integer
-          minimum: 1
-        idleMs:
-          type: integer
-          minimum: 1
-        overallMs:
-          type: integer
-          minimum: 1
-    RuntimeBindingDefinition:
-      type: object
-      additionalProperties: false
-      required:
-      - runtimeRouteId
-      - resourceId
-      - upstreamId
-      - allowedMethods
-      - allowedPathPrefixes
-      - transportPolicy
-      properties:
-        runtimeRouteId:
-          $ref: '#/components/schemas/RuntimeRouteId'
-        resourceId:
-          type: string
-        upstreamId:
-          $ref: '#/components/schemas/UpstreamId'
-        allowedMethods:
-          type: array
-          minItems: 1
-          items:
-            type: string
-        allowedPathPrefixes:
-          type: array
-          minItems: 1
-          items:
-            type: string
-            pattern: ^/
-        transportPolicy:
-          type: string
-          enum:
-          - HTTP_REQUEST_RESPONSE
-          - HTTP_STREAMING_SSE
-          - HTTP_BINARY_STREAM
-          - HTTP_MULTIPART
-          - WEBSOCKET
-        timeoutPolicy:
-          $ref: '#/components/schemas/TimeoutPolicy'
     ManagedPolicy:
       type: object
-      additionalProperties: false
       description: Current policy. All five admission flags are required; all ten defaults are optional and remain unset when omitted.
       required:
       - policyId
@@ -2321,62 +2214,8 @@ components:
           $ref: '#/components/schemas/AsrId'
         defaultAssistantId:
           $ref: '#/components/schemas/AssistantDefinitionId'
-    ManagedDraftContent:
-      type: object
-      additionalProperties: false
-      required:
-      - providers
-      - models
-      - tts
-      - asr
-      - mcp
-      - bindings
-      - policy
-      - assistants
-      - starters
-      properties:
-        providers:
-          type: array
-          items:
-            $ref: '#/components/schemas/ProviderDefinition'
-        models:
-          type: array
-          items:
-            $ref: '#/components/schemas/ModelDefinition'
-        imageGenerators:
-          type: array
-          description: Additive Snapshot v4 field; omission means an empty list.
-          items:
-            $ref: '#/components/schemas/ImageGenerationDefinition'
-        tts:
-          type: array
-          items:
-            $ref: '#/components/schemas/TtsDefinition'
-        asr:
-          type: array
-          items:
-            $ref: '#/components/schemas/AsrDefinition'
-        mcp:
-          type: array
-          items:
-            $ref: '#/components/schemas/McpDefinition'
-        bindings:
-          type: array
-          items:
-            $ref: '#/components/schemas/RuntimeBindingDefinition'
-        policy:
-          $ref: '#/components/schemas/ManagedPolicy'
-        assistants:
-          type: array
-          items:
-            $ref: '#/components/schemas/ManagedAssistantDefinition'
-        starters:
-          type: array
-          items:
-            $ref: '#/components/schemas/AssistantStarterDefinition'
     Discovery:
       type: object
-      additionalProperties: false
       required:
       - product
       - protocolVersion
@@ -2432,7 +2271,6 @@ components:
           - ANDROID
     EnrollmentExchangeResponse:
       type: object
-      additionalProperties: false
       required:
       - deploymentId
       - userId
@@ -2475,7 +2313,6 @@ components:
           type: string
     RefreshResponse:
       type: object
-      additionalProperties: false
       required:
       - accessToken
       - accessTokenExpiresAt
@@ -2498,7 +2335,6 @@ components:
           format: date-time
     ManagedState:
       type: object
-      additionalProperties: false
       required:
       - runtimeStatus
       - activeManagedGeneration
@@ -2527,7 +2363,6 @@ components:
           type: boolean
     Bootstrap:
       type: object
-      additionalProperties: false
       required:
       - deployment
       - user
@@ -2538,7 +2373,6 @@ components:
       properties:
         deployment:
           type: object
-          additionalProperties: false
           required:
           - deploymentId
           - name
@@ -2549,7 +2383,6 @@ components:
               type: string
         user:
           type: object
-          additionalProperties: false
           required:
           - userId
           - displayName
@@ -2560,7 +2393,6 @@ components:
               type: string
         device:
           type: object
-          additionalProperties: false
           required:
           - deviceId
           - status
@@ -2574,7 +2406,6 @@ components:
               - REVOKED
         session:
           type: object
-          additionalProperties: false
           required:
           - sessionId
           - expiresAt
@@ -2596,7 +2427,6 @@ components:
           $ref: '#/components/schemas/ManagedState'
     ManagedSnapshot:
       type: object
-      additionalProperties: false
       required:
       - deploymentId
       - schemaVersion
@@ -2655,7 +2485,6 @@ components:
           $ref: '#/components/schemas/ManagedPolicy'
         metadata:
           type: object
-          additionalProperties: false
           required:
           - publishedAt
           properties:
@@ -2674,7 +2503,6 @@ components:
             $ref: '#/components/schemas/AssistantStarterDefinition'
     ManagedSnapshotV4:
       type: object
-      additionalProperties: false
       required:
       - deploymentId
       - schemaVersion
@@ -2733,7 +2561,6 @@ components:
           $ref: '#/components/schemas/ManagedPolicy'
         metadata:
           type: object
-          additionalProperties: false
           required:
           - publishedAt
           properties:
@@ -2752,7 +2579,6 @@ components:
             $ref: '#/components/schemas/AssistantStarterDefinitionV4'
     ManagedAssistantDefinition:
       type: object
-      additionalProperties: false
       required:
       - assistantDefinitionId
       - displayName
@@ -2788,7 +2614,6 @@ components:
           type: boolean
     AssistantStarterDefinition:
       type: object
-      additionalProperties: false
       required:
       - starterId
       - assistantDefinitionId
@@ -2819,7 +2644,6 @@ components:
           x-omitempty: true
     AssistantStarterDefinitionV4:
       type: object
-      additionalProperties: false
       required:
       - starterId
       - assistantDefinitionId
@@ -2847,7 +2671,6 @@ components:
           type: boolean
     StarterOpeningSnapshot:
       type: object
-      additionalProperties: false
       required:
       - format
       - systemPrompt
@@ -2867,7 +2690,6 @@ components:
             $ref: '#/components/schemas/StarterInitialContext'
     StarterInitialContext:
       type: object
-      additionalProperties: false
       required:
       - id
       - content
@@ -2897,7 +2719,6 @@ components:
       - PLAIN
     EnterpriseUpdateItem:
       type: object
-      additionalProperties: false
       required:
       - enterpriseUpdateId
       - title
@@ -2926,7 +2747,6 @@ components:
           format: date-time
     EnterpriseUpdateFeed:
       type: object
-      additionalProperties: false
       required:
       - enterpriseTimezone
       - items
@@ -2942,7 +2762,6 @@ components:
           type: boolean
     McpDefinitionV4:
       type: object
-      additionalProperties: false
       required:
       - mcpServerId
       - displayName
@@ -2972,7 +2791,6 @@ components:
           type: boolean
     ManagedAssistantDefinitionV4:
       type: object
-      additionalProperties: false
       required:
       - assistantDefinitionId
       - displayName
@@ -3007,7 +2825,6 @@ components:
           type: boolean
     McpToolGrant:
       type: object
-      additionalProperties: false
       required: [name, contractHash, approvalPolicy]
       properties:
         name:
@@ -3022,7 +2839,6 @@ components:
           enum: [AUTO, REQUIRE_CONFIRMATION]
     AssistantMcpBinding:
       type: object
-      additionalProperties: false
       required: [mcpServerId, toolSelection, toolNames]
       properties:
         mcpServerId:

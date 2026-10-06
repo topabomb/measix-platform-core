@@ -370,9 +370,9 @@ func TestERXUPDC0AdminEnterpriseUpdateFixturesValidEnums(t *testing.T) {
 	}
 }
 
-func TestCAPC0007TypedSnapshotUnknownFieldRejected(t *testing.T) {
-	// CAP-C0-007: extensible HTTP responses may ignore unknown optional fields, but
-	// the typed Snapshot remains closed and fail-closed.
+func TestCAPC0007TypedSnapshotUnknownFieldIgnored(t *testing.T) {
+	// CAP-C0-007: downloaded responses ignore unknown fields recursively. Strict
+	// known-field and version checks are covered by the executable schema cases.
 	file, err := os.Open(filepath.Join(fixtureRoot(t), "snapshot/unknown-optional-field.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -380,16 +380,31 @@ func TestCAPC0007TypedSnapshotUnknownFieldRejected(t *testing.T) {
 	defer file.Close()
 	var snapshot clientapi.ManagedSnapshot
 	decoder := json.NewDecoder(io.LimitReader(file, 2<<20))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&snapshot); err == nil {
-		t.Fatal("typed Snapshot unknown field unexpectedly accepted")
+	if err := decoder.Decode(&snapshot); err != nil {
+		t.Fatal("ordinary Snapshot extension rejected", err)
+	}
+	if len(snapshot.Models) == 0 || snapshot.Models[0].DisplayName == "" || snapshot.SchemaVersion != 4 {
+		t.Fatal("known projection changed")
+	}
+	raw, err := os.ReadFile(filepath.Join(fixtureRoot(t), "snapshot/unknown-optional-field.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		t.Fatal(err)
+	}
+	doc := loadContractDoc(t, "api/client/client-control.openapi.yaml")
+	if err := doc.Components.Schemas["ManagedSnapshotV4"].Value.VisitJSON(value); err != nil {
+		t.Fatal("positive extension fixture must be valid supported wire", err)
 	}
 }
 
-func TestCAPC0003SnapshotSecretLeakRejectedByStrictWire(t *testing.T) {
+func TestCAPC0003ProducerProjectionGuardDetectsSecretLeak(t *testing.T) {
 	// CAP-C0-003 / HUB-CAP-007: Snapshot must never contain Secret, Upstream URL,
 	// runtimeRouteId or resolved credential. The negative fixture includes these
-	// fields; strict decoding with the generated wire type must reject them.
+	// fields. This strict decoder is a producer output guard, NOT a consumer
+	// reception rule. Actual compiler non-disclosure is checked in Hub tests.
 	file, err := os.Open(filepath.Join(fixtureRoot(t), "snapshot/invalid-secret-leak.json"))
 	if err != nil {
 		t.Fatal(err)

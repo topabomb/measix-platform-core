@@ -57,7 +57,7 @@ If an exact schema choice can change client interpretation, resolve architecture
 
 The internal Preview pins the four executable HTTP documents in `api/protocol-baseline.json` under the candidate identity recorded in that file. `node scripts/verify-preview-contract.mjs` fails when a document changes without deliberate baseline review, and the ARM64 release manifest records every document hash. Within this baseline, additive optional response fields are allowed only after consumer review; removal, rename, type/meaning changes, enum narrowing, or a new required input require an architecture-approved protocol version and migration plan. Human error text is never a compatibility key; HTTP status plus stable Problem `code` is.
 
-New Draft Preview/Publish uses Snapshot v5; published v4 remains readable and republishable at v4. Starter opening details and executed verification are in [starter-opening-snapshots.md](starter-opening-snapshots.md). All five policy flags are required booleans. Policy exposes ten independent optional defaults: assistant, chat, fast, title, attachment inspection, suggestion, context compaction, Image Generation, TTS and ASR. Omission means unset; no default is inferred from another slot or from resource order. All six model defaults must reference enabled models, and attachment inspection additionally requires IMAGE input. `ManagedPolicy` is intentionally exposed on both Admin and Client surfaces; a contract test requires those two schema definitions to remain byte-equivalent after parsing. Standalone Image Generation remains part of the same v4 profile: `imageGenerators` and `policy.defaultImageGenerationId` may be absent only to represent an empty collection and an unset default; new writers emit the collection explicitly. Known values remain strict, and typed Snapshot consumers reject unknown fields. Shared Android materials, mappings and HTTP/runtime examples are maintained in [android-platform-integration.md](android-platform-integration.md).
+New Draft Preview/Publish uses Snapshot v5; published v4 remains readable and republishable at v4. Starter opening details and executed verification are in [starter-opening-snapshots.md](starter-opening-snapshots.md). All five policy flags are required booleans. Policy exposes ten independent optional defaults: assistant, chat, fast, title, attachment inspection, suggestion, context compaction, Image Generation, TTS and ASR. Omission means unset; no default is inferred from another slot or from resource order. All six model defaults must reference enabled models, and attachment inspection additionally requires IMAGE input. `ManagedPolicy` is intentionally exposed on both Admin and Client surfaces; a contract test requires identical known-field meaning; Admin command objects remain closed while Client response objects are extensible. Standalone Image Generation remains part of the same v4 profile: `imageGenerators` and `policy.defaultImageGenerationId` may be absent only to represent an empty collection and an unset default; new writers emit the collection explicitly. Known values remain validated; supported typed Snapshot responses recursively ignore unknown fields. Shared Android materials, mappings and HTTP/runtime examples are maintained in [android-platform-integration.md](android-platform-integration.md).
 
 Admin `ModelDefinition.publishedModelKey` is an optional enterprise selector; missing/blank means `upstreamModelKey`. Snapshot v4/v5 keeps its existing `upstreamModelKey` wire field but its value is the effective published selector, so Android needs no new field and never receives the real provider key. The internal Relay control carries both selectors and both runtime paths. Current Hub output always emits that mapping; Relay accepts a missing mapping only to keep an already-applied pre-change control state pass-through during an incremental restart. The four model profiles translate only their selector location: top-level JSON `model` for OpenAI Chat/Responses and Anthropic, and the exact `/models/{key}:method` path segment for Google. Unknown fields, query strings and provider payload shape otherwise remain unchanged.
 
@@ -152,9 +152,11 @@ Current Starter output is Snapshot v5; supported immutable v4 releases retain th
 
 ## 8. Current contract strictness and extensibility
 
+Current implementation, receiver rules and remaining Android verification are recorded in [protocol-compatibility.md](protocol-compatibility.md). Architecture Control Protocol §10.10.3 owns the meaning.
+
 S0 contract tests must prove architecture rules including (not a claim that all current tests already do):
 
-- clients tolerate unknown optional fields only where the response contract permits extension; closed Snapshot objects reject undeclared fields and require coordinated producer/consumer contract changes;
+- Client/Portal consumers recursively ignore unknown response fields within a supported version, including Snapshot v4/v5; known fields, permissions, references, version selection and atomic application remain validated;
 - undeclared request fields are rejected where strict request decoding is required;
 - programs branch on HTTP status + stable Problem `code`, not human `detail` text;
 - stable identifier format/ownership is not redefined by generated DTOs;
@@ -230,7 +232,7 @@ Core 的新发布格式、可读取的历史发布格式、Android 可执行的�
 | Admin/发布工具 | 沿现有发布审查展示目标格式，记录准确构建支持集合、基础控制兼容证据和回退目标 | 不以 App 名称或双方支持集合交集冒充目标发布兼容 |
 | 派生消费者 | 有关联 OpenAPI 变化时同步 Portal、导出、fixtures 与生成摘要 | 干净工作树上漂移校验通过；不因相同 Snapshot 版本跳过接口影响检查 |
 
-基础控制 profile 至少覆盖 Discovery、Enrollment、Bootstrap、Refresh、Logout、Managed State 和既有身份 Problem 语义。Snapshot 升版不能顺带使旧客户端无法解析 Bootstrap 或续期；嵌套 Managed State 的必需字段和枚举同样属于边界。当前严格 DTO 不能将任意新增 optional 字段视为安全扩展。
+基础控制 profile 至少覆盖 Discovery、Enrollment、Bootstrap、Refresh、Logout、Managed State 和既有身份 Problem 语义。Snapshot 升版不能顺带使旧客户端无法解析 Bootstrap 或续期；嵌套 Managed State 的必需字段和枚举同样属于边界。接收端递归忽略普通新增响应字段；新增权限或执行语义、无兜底枚举仍须单独审查版本。旧 APK 的严格解析不能由 Core 更新追溯修复。
 
 默认保持已发布基础响应的结构与解释稳定。新增业务数据优先放独立接口；已有明确可扩展对象才允许经过消费验证的 optional 扩展。确需破坏性改变基础控制时，另行版本化并保留受支持旧客户端所需的控制路径。它有独立生命周期，不要求保留旧 Snapshot 执行能力，也不要求机械跟随 Snapshot 编号升级。
 
@@ -240,7 +242,7 @@ Snapshot 继续使用现有外层 `schemaVersion`，不为本轮新增包装协�
 
 沿现有 owner 修订，不另建 Session、配置存储或恢复协调器：
 
-1. `PlatformSnapshotCompatibility`、`PlatformWireCodec`、`PlatformControlClient` 保持单一版本预检入口，保留 v4/v5 的精确语义。未知格式不产生候选、Applied 回执或部分配置；不能用全局忽略未知字段替代版本分流。
+1. `PlatformSnapshotCompatibility`、`PlatformWireCodec`、`PlatformControlClient` 保持单一版本预检入口，保留 v4/v5 的精确语义。未知格式不产生候选、Applied 回执或部分配置；支持版本内递归忽略未知响应字段，但不能以此替代版本分流或已知字段验证。
 2. `EnterpriseAppliedStore`、`EnterpriseSessionController` 将身份/manifest 的恢复与配置正文读取结果分开。修订前，`load()` 和 `commit()` 在 manifest 有 Applied 时读取 candidate，`recover()` 可将读取失败发布为整个 `EnterpriseState.Failed`。修订后有效身份可独立恢复，配置不可读只关闭配置依赖能力；保留原 Applied 的身份提交与发布新配置的严格提交分别处理。未知网络版本不应造成文件损坏状态；真正的身份或凭据损坏仍单独处理。
 3. 本地 Applied 是本地数据合同，不等于网络 wire。移除旧 wire decoder 时，已有 canonical 配置要么通过现有有序迁移保持可读，要么明确标为不可用于执行并保全原应用事实；两者都不能阻断身份、历史或退出。不能通过删除 Applied 事实、清库或伪造同步成功来消除不兼容。
 4. `EnterpriseSynchronizationService` 负责有限、可行动的同步结果，UI 只消费该结果。进入页面、恢复和切域不引入循环下载或隐式重放；同步检查与实际下载/应用的触发规则需和当前手动同步策略统一。不兼容状态不构成全局错误弹窗，不在切到个人域后继续打断用户。

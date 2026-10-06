@@ -2,11 +2,21 @@
 
 本说明面向 Android 维护方，描述当前源码的协议消费边界。Discovery protocolVersion="1"、Snapshot v4/v5、Portal Bridge v3 与 Enrollment formatVersion=1 是当前支持组合；新草稿发布 v5，保全已发布 v4。历史封版身份见 `docs/s0-execution-progress.md`，当前 Starter 实施及验证见 Core 源仓库的 `docs/starter-opening-snapshots.md`，两者不能混作同一部署证据。
 
+## 响应扩展与适配规则
+
+以 Control Protocol §2.1、§10.10.3 为唯一语义。Client/Portal HTTP 响应及 Bridge v3 响应，在支持版本内递归忽略未知字段；包含 Snapshot v4/v5 的所有子对象。不维护未知字段白名单，不因字段新增使整份企业配置失败。解析模式应按边界设置：响应允许扩展；Admin/Client 写入、Enrollment 资料、Bridge 请求/params 和内部控制指令保持封闭。已知字段错型、必填/null、权限模式、工具策略、引用、重复键、大小限制、来源/身份/generation、ETag/body hash 仍须验证，不补默认值或降级。合法未知 schemaVersion 在 DTO 前分类为不兼容；配置错误不撤销有效企业身份，也不破坏个人空间、历史或退出。
+
+本轮不改 v4/v5 descriptor、历史 bytes/hash；忽略未知字段不等于重算原始 JSON hash。Snapshot 按既有 ETag/body hash 合同验证；MCP Tool contractHash 仍覆盖完整原始 Tool JCS，不能删扩展字段。Bridge 返回按捕获的请求方法验证已知结果，result/error 必须互斥；未知能力声明只忽略，未知错误码保留为失败并中性提示，不能推断授权变化。
+
+内容失败的技术信息提供稳定 code、非敏感 JSON 路径和原因，例如 /mcp/0/toolAccessMode：不支持的值；不记录原值、正文、凭据或内部地址。未知普通字段不产生错误。共享 snapshot-reception-cases 与 cases.json 包含正向扩展、已知错误、未知版本及历史版本测试；基础控制也须覆盖嵌套新增字段。
+
+Core 导出只更新消费者合同，不能修复已安装 Android 的严格 decoder。Android 仓库本轮未改、未验证；后续以实际支持 APK 验证响应/命令分离、原子应用和失败隔离后再宣称设备端完成。只改 Kotlin Json.ignoreUnknownKeys 而不检查其他 mapper/领域校验并不充分。
+
 ## 权威与资料入口
 
 当前未稳定 v5 已升级 Direct MCP 工具许可。Android 源码接入和消费者验证由 Android 仓库承担；下文历史 Preview/Starter 验证不证明新版许可已消费。消费者更新及原生验证完成前不能宣称当前 v5 可端到端发布部署。
 
-具体对接要求见 [Direct MCP 工具治理方案 §5](direct-mcp-tool-governance.md)。v5 必填服务器 toolAccessMode/allowedTools 与助手 mcpBindings（toolSelection/toolNames）；ALL 明确表示对已绑定服务器不限制工具，数组必须为空；ALLOWLIST 至少一项，不能把空白名单补成全部。未绑定服务器不提供该服务器工具。拒绝缺失/null/未知枚举与 v5 旧 mcpServerIds；v4 独立保留。服务器 ALL 动态发现新增工具，不增加调用确认；服务器 ALLOWLIST 要求已批准 name/完整 JCS 合同匹配，助手 ALLOWLIST 再按名称过滤，助手 ALL 不额外过滤。全部入口复验服务器权限；用户不能编辑企业许可。
+具体对接要求见 [Direct MCP 工具治理方案 §5](direct-mcp-tool-governance.md)。v5 必填服务器 toolAccessMode/allowedTools 与助手 mcpBindings（toolSelection/toolNames）；ALL 明确表示对已绑定服务器不限制工具，数组必须为空；ALLOWLIST 至少一项，不能把空白名单补成全部。未绑定服务器不提供该服务器工具。拒绝已知必填缺失/null/未知权限枚举；v5 不解释旧 mcpServerIds，也不能用它替代必填 mcpBindings；v4 独立保留。服务器 ALL 动态发现新增工具，不增加调用确认；服务器 ALLOWLIST 要求已批准 name/完整 JCS 合同匹配，助手 ALLOWLIST 再按名称过滤，助手 ALL 不额外过滤。全部入口复验服务器权限；用户不能编辑企业许可。
 
 `contractHash` 使用 RFC 8785 JCS 对完整原始 Tool JSON 求 SHA-256，包含 description、input/outputSchema、annotations、_meta 和扩展字段，输出 `sha256:` 加小写十六进制。保持完整 Tool 数据而非只比较 name/inputSchema；使用共享摘要向量验证 Unicode、数字与属性序列的跨语言一致性。模型工具装配与每次调用准入都执行同一许可规则；ALL 不追加企业确认，ALLOWLIST 的 AUTO 不追加企业确认，只有显式 REQUIRE_CONFIRMATION 才复用现有 ToolBatchRunner 逐次暂停/继续机制；助手 ALL/ALLOWLIST 不改变确认策略。AUTO 不自动发起调用或绕过既有运行准入及系统权限。Direct 名单不用于 Gateway 原子工具对，不创建 fallback。
 

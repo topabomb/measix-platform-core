@@ -187,8 +187,6 @@ func TestPublishedContentRejectsMissingOrMismatchedOpeningAuthority(t *testing.T
 		"null opening":         `{"schemaVersion":5,"starters":[{"starterId":"str_original","assistantDefinitionId":"asd_original","openingSnapshot":null}]}`,
 		"missing System":       strings.Replace(valid, `"systemPrompt":"",`, "", 1),
 		"null System":          strings.Replace(valid, `"systemPrompt":""`, `"systemPrompt":null`, 1),
-		"unknown field":        strings.Replace(valid, `"format":1`, `"format":1,"unexpected":true`, 1),
-		"v4 with opening":      strings.Replace(valid, `"schemaVersion":5`, `"schemaVersion":4`, 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, _, err := capability.PublishedContent(content, []byte(raw)); err == nil {
@@ -202,6 +200,23 @@ func TestPublishedContentRejectsMissingOrMismatchedOpeningAuthority(t *testing.T
 	}
 	if content.Starters[0].OpeningSnapshot.SystemPrompt != "Fixed system" {
 		t.Fatal("source mutated")
+	}
+	for name, raw := range map[string]string{
+		"opening extension":              strings.Replace(valid, `"format":1`, `"format":1,"futureDisplayHint":true`, 1),
+		"v4 ignores later opening field": strings.Replace(valid, `"schemaVersion":5`, `"schemaVersion":4`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			resolved, version, err := capability.PublishedContent(content, []byte(raw))
+			if err != nil {
+				t.Fatal("published response extension rejected", err)
+			}
+			if version == 4 && resolved.Starters[0].OpeningSnapshot != nil {
+				t.Fatal("v4 interpreted a later-version extension")
+			}
+			if version == 5 && resolved.Starters[0].OpeningSnapshot.SystemPrompt != "" {
+				t.Fatal("literal System changed")
+			}
+		})
 	}
 }
 

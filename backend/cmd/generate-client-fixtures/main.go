@@ -36,6 +36,20 @@ func clone(value any) object {
 	return result
 }
 
+func addDisplayHints(value any) {
+	switch v := value.(type) {
+	case map[string]any:
+		for _, child := range v {
+			addDisplayHints(child)
+		}
+		v["futureDisplayHint"] = object{"label": "advisory"}
+	case []any:
+		for _, child := range v {
+			addDisplayHints(child)
+		}
+	}
+}
+
 func main() {
 	root := filepath.Join("..", "api", "fixtures")
 	out := filepath.Join(root, "client-integration")
@@ -234,7 +248,7 @@ func main() {
 	}
 	legacyBindings := clone(v5Snapshot)
 	legacyBindings["assistants"].([]any)[0].(map[string]any)["mcpServerIds"] = []any{}
-	add("v5-obsolete-server-only-permission", "ManagedSnapshot", false, legacyBindings)
+	add("v5-ignored-obsolete-server-reference", "ManagedSnapshot", true, legacyBindings)
 	emptyTools := clone(v5Snapshot)
 	for _, m := range emptyTools["mcp"].([]any) {
 		m.(map[string]any)["toolAccessMode"] = "ALL"
@@ -249,7 +263,7 @@ func main() {
 	add("v5-dynamic-all-tools", "ManagedSnapshot", true, allTools)
 	obsoleteDescription := clone(v5Snapshot)
 	obsoleteDescription["starters"].([]any)[0].(map[string]any)["description"] = "retired display metadata"
-	add("v5-obsolete-starter-description", "ManagedSnapshot", false, obsoleteDescription)
+	add("v5-ignored-obsolete-starter-description", "ManagedSnapshot", true, obsoleteDescription)
 	add("v4-full", "ManagedSnapshotV4", true, snapshot)
 	add("v4-dashscope-image", "ManagedSnapshotV4", true, dashScopeImageSnapshot)
 	var responsesContent adminapi.ManagedDraftContent
@@ -334,14 +348,8 @@ func main() {
 	value := clone(snapshot)
 	value["schemaVersion"] = 6
 	add("unknown-snapshot-version", "ManagedSnapshotV4", false, value)
-	value = clone(snapshot)
-	value["models"].([]any)[0].(map[string]any)["credential"] = "forbidden-synthetic-secret"
-	add("v4-secret-leak", "ManagedSnapshotV4", false, value)
-	for _, field := range []string{"upstreamUrl", "runtimeRouteId", "resolvedCredential"} {
-		value := clone(snapshot)
-		value["models"].([]any)[0].(map[string]any)[field] = "forbidden-synthetic-internal-value"
-		add("v4-internal-"+field, "ManagedSnapshotV4", false, value)
-	}
+	// Non-disclosure is a producer projection gate, not a closed-response rule.
+	// See the output guard fixture and TestHUBCAP006SnapshotDeterministicAndClientSafe.
 	discovery := object{"product": "MEASIX_AGENT_PLATFORM", "protocolVersion": "1", "deploymentId": deployment, "deploymentName": "S0.2 Integration", "clientApiBase": "/api/client/v1", "runtimeApiBase": "/runtime/v1", "supportedSnapshotSchemaVersions": capability.SupportedSnapshotSchemaVersions()}
 	enrollmentRequest := object{"code": "synthetic-single-use-code", "installationId": "ins_550e8400-e29b-41d4-a716-446655440000", "deviceName": "Android contract fixture", "appVersion": "0.0.20", "platform": "ANDROID"}
 	enrollment := object{"deploymentId": deployment, "userId": user, "deviceId": device, "sessionId": session, "accessToken": "synthetic.access.token", "accessTokenExpiresAt": at.Add(15 * time.Minute).Format(time.RFC3339), "refreshToken": "synthetic-refresh-token", "refreshExpiresAt": at.Add(7 * 24 * time.Hour).Format(time.RFC3339), "sessionIdleExpiresAt": at.Add(7 * 24 * time.Hour).Format(time.RFC3339)}
@@ -358,6 +366,11 @@ func main() {
 	}{{"discovery", "Discovery", discovery}, {"enrollment-request", "EnrollmentExchangeRequest", enrollmentRequest}, {"enrollment-response", "EnrollmentExchangeResponse", enrollment}, {"bootstrap", "Bootstrap", bootstrap}, {"managed-ready", "ManagedState", ready}, {"managed-pending", "ManagedState", pending}, {"managed-sync-required", "ManagedState", syncRequired}, {"refresh-response", "RefreshResponse", refresh}} {
 		write(entry.name+".json", entry.value)
 		add(entry.name, entry.schema, true, entry.value)
+		if entry.schema != "EnrollmentExchangeRequest" {
+			extended := clone(entry.value)
+			addDisplayHints(extended)
+			add(entry.name+"-response-extensions", entry.schema, true, extended)
+		}
 	}
 	applied := object{"managedGeneration": 42, "snapshotHash": snapshot.SnapshotHash}
 	add("managed-applied-report", "ManagedAppliedReport", true, applied)
@@ -365,7 +378,6 @@ func main() {
 	add("managed-applied-missing-hash", "ManagedAppliedReport", false, object{"managedGeneration": 42})
 	add("managed-applied-empty-hash", "ManagedAppliedReport", false, object{"managedGeneration": 42, "snapshotHash": ""})
 	add("managed-applied-spoof-device", "ManagedAppliedReport", false, object{"managedGeneration": 42, "snapshotHash": snapshot.SnapshotHash, "deviceId": device})
-	write("cases.json", cases)
 	response := func(status int, body any) object { return object{"status": status, "body": body} }
 	httpExamples := []object{
 		{"name": "discovery", "method": "GET", "path": "/.well-known/measix", "response": response(200, discovery)},
@@ -400,6 +412,11 @@ func main() {
 	}
 	context := object{"deploymentId": deployment, "generation": 44, "etag": "\"" + v5Snapshot.SnapshotHash + "\""}
 	receptions = append(receptions, object{"name": "accept-v5", "outcome": "accepted", "context": context, "snapshot": v5Snapshot})
+	extendedV4 := clone(snapshot)
+	addDisplayHints(extendedV4)
+	writeTo(filepath.Join(root, "snapshot"), "unknown-optional-field.json", extendedV4)
+	add("v4-response-extensions", "ManagedSnapshotV4", true, extendedV4)
+	receptions = append(receptions, object{"name": "known-v4-response-extensions", "outcome": "accepted", "context": object{"deploymentId": deployment, "generation": 42, "etag": "\"" + snapshot.SnapshotHash + "\""}, "snapshot": extendedV4})
 	// Future bodies are receiver fault inputs, never compiler-supported releases.
 	for _, version := range []int{6, 7} {
 		receptions = append(receptions, object{"name": fmt.Sprintf("future-v%d", version), "outcome": "unsupported_version", "context": context,
@@ -417,8 +434,13 @@ func main() {
 	delete(missingVersion, "schemaVersion")
 	receptions = append(receptions, object{"name": "missing-version", "outcome": "invalid_configuration", "context": context, "snapshot": missingVersion})
 	unknownField := clone(v5Snapshot)
-	unknownField["futurePolicy"] = object{"mode": "UNRECOGNIZED"}
-	receptions = append(receptions, object{"name": "known-version-unknown-field", "outcome": "invalid_configuration", "context": context, "snapshot": unknownField})
+	unknownField["futureDisplayHint"] = object{"label": "advisory"}
+	unknownField["models"].([]any)[0].(map[string]any)["futureDisplayHint"] = object{"label": "model advisory"}
+	unknownField["policy"].(map[string]any)["futureDisplayHint"] = true
+	unknownField["starters"].([]any)[0].(map[string]any)["openingSnapshot"].(map[string]any)["futureDisplayHint"] = nil
+	receptions = append(receptions, object{"name": "known-version-unknown-field", "outcome": "accepted", "context": context, "snapshot": unknownField})
+	add("v5-response-extensions", "ManagedSnapshot", true, unknownField)
+	write("cases.json", cases)
 	write("snapshot-reception-cases.json", receptions)
 	base := "https://platform.example.invalid/runtime/v1/resources/"
 	headers := object{"Authorization": "Bearer synthetic.access.token", "X-Measix-Managed-Generation": "42", "X-Measix-Interaction-Id": "int_550e8400-e29b-41d4-a716-446655440000"}

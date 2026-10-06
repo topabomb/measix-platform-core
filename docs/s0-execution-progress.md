@@ -35,3 +35,9 @@ S0.3 的 Enterprise Tool Gateway、Snapshot v6、Gateway Control API、Catalog �
 ## 当前 Starter 源码增量
 
 本地源码在上述固定发布之后增加 Snapshot v5 Starter 开场编制，保全已发布 v4。方案、兼容和本次实际验证统一见 [Starter 开场快照](starter-opening-snapshots.md)。此增量未部署生产，不改变 preview.22 的固定身份与历史记录；Gateway 为后续 v6。
+
+## 当前 Direct MCP 工具治理源码增量
+
+本轮追加全部 11 个 Admin 管理页面的真实人工审查、1280/320px 浏览器回归与三个仓库全部 Git 变更复核。修复目录有界呈现、未核实/暂不可用/权限错误区分、空白公告提交和状态本地化；Admin 259 用例与完整 8 浏览器用例通过。范围、Red/Green 和验证限制见 [Admin 审查记录](admin-console-review-2026-10-06.md)，提交身份见各仓库 Git 历史及本地审查证据。
+
+2026-10-06 未稳定 v5 升级为显式 ALL/ALLOWLIST：助手先绑定服务器，默认动态全部工具，需要编排时选非空工具白名单；服务器企业权限是共同上限。完整实施、UI 要求、Android 接线及实际验证见 [Direct MCP 工具治理](direct-mcp-tool-governance.md)。Core/Admin 已实现发现、审阅、许可、校验、Preview/Publish，并通过全量与真实生产 Admin 浏览器回归。Portal 传递类型/schema/摘要已同步，类型检查、95 用例、构建及 STANDARD/CUSTOM 实际浏览器通过。Android 本轮未改，新 consumer/device 验证待下阶段；跨仓库 gate 的 Android 差异仍保留。本次工作树候选不改变 preview.22 固定发布身份，不构成新的 S0.2/S0.3 或 final S0 Exit。

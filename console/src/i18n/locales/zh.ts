@@ -1,3 +1,4 @@
+import { mcpToolsZh, mcpValidationZh, mcpProblemsZh } from './mcpTools'
 /**
  * 简体中文 (zh) translations for MEASIX Admin Console.
  *
@@ -22,6 +23,7 @@
  *   - experience:   托管助手/入口编辑器（ManagedExperienceEditor.vue）
  */
 export default {
+  mcpTools: mcpToolsZh,
   brand: {
     description: '企业智能体治理与协同平台',
   },
@@ -641,7 +643,7 @@ export default {
         voice: '音色', voiceDesignPrompt: '音色设计描述', language: '语言', sampleRate: '采样率',
         vadThreshold: '语音检测阈值', silenceDurationMs: '静音时长', prefixPaddingMs: '前置缓冲', prompt: '提示词',
         authOwnership: '凭据归属', modelId: '模型', mcpServerIds: '工具（MCP）', memorySeed: '记忆种子',
-        systemPrompt: '系统提示词', title: '标题', assistantDefinitionId: '企业助手', upstreamId: '上游连接',
+        systemPrompt: '系统提示词', title: '标题', assistantDefinitionId: '企业助手', upstreamId: '上游连接', allowedTools: '允许的 MCP 工具', mcpBindings: '助手工具选择',
         resourceId: '资源', transportPolicy: '传输方式', allowedMethods: '允许的 HTTP 方法', allowedPathPrefixes: '允许的路径',
         defaultModelId: '默认对话模型', defaultFastModelId: '快速模型', defaultTitleModelId: '标题生成模型',
         defaultAttachmentInspectionModelId: '附件检查模型', defaultSuggestionModelId: '建议生成模型',
@@ -649,6 +651,7 @@ export default {
         defaultTtsId: '默认语音朗读', defaultAsrId: '默认语音识别', defaultAssistantId: '首次进入使用的助手',
       },
       issues: {
+        ...mcpValidationZh,
         missing_starter_opening: '请先创建此入口的开场上下文，再发布。',
         invalid_starter_opening: '请检查开场格式和背景标题。背景标识不能为空或重复；标识异常时请删除该项后重新添加。',
         invalid_candidate_id: '内部资源标识无效或重复，请删除并重新创建受影响的草稿项。',
@@ -1202,6 +1205,7 @@ export default {
   session: {
   },
   problem: {
+    ...mcpProblemsZh,
     workspace_unavailable: '暂时无法完成工作区操作。请刷新状态，并检查远程服务连接；有待核实操作时先处理原操作。',
     workspace_operation_pending: '已有工作区操作尚未结束，请先查看并处理该操作。',
     workspace_revision_conflict: '工作区状态已变化，请刷新后重新核对。',

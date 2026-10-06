@@ -1,9 +1,9 @@
 {
-  "baseline": "S0.2/v5-workspace-v2-preview",
-  "policy": "New publication uses Snapshot v5 Starter openings. Historical v4 releases retain their original bytes, hash and republish semantics. API v1 and Bridge v3 remain unchanged; incompatible schema meanings require a new version and explicit preservation plan. Remote workspace runtime descriptors require Relay protocol v2; remote workspace usage targets use targetVersion 2. Snapshot v5 and legacy admission/fact byte semantics remain unchanged. Unpublished v5 has one current schema: Starter has no description; background blocks contain only id/content, no title. Retained v4 remains independent.",
+  "baseline": "S0.2/v5-direct-mcp-tool-governance-preview",
+  "policy": "Unpublished Snapshot v5 uses Starter openings and explicit Direct MCP server toolAccessMode ALL/ALLOWLIST and assistant mcpBindings with toolSelection ALL/ALLOWLIST; ALL follows dynamic discovery and ALLOWLIST must be nonempty, allowedTools and toolNames are required, full Tool JCS contractHash and AUTO/REQUIRE_CONFIRMATION policy. v5 server-only assistant references are retired; missing tool fields require explicit draft authoring. Retained published v4 uses independent DTOs, original bytes/hash and republish recovery. API v1, Bridge v3, Relay workspace protocol v2 and usage targetVersion 2 remain unchanged. Current v5 Android consumer verification is pending; Core-generated exports alone do not prove deployment compatibility. Gateway remains a separate later stage.",
   "documents": {
-    "api/admin/admin.openapi.yaml": "sha256:8b506c7e334b1369c58a1a4b015d1920c5feba1330aacb31bb33475a2b2c1d73",
-    "api/client/client-control.openapi.yaml": "sha256:9d11570c74966ecd8bfec65dceb4cb93ee7f188576b2e46a55b0dc8e3f573082",
+    "api/admin/admin.openapi.yaml": "sha256:7fec8df1304fa78915cbc17faa7b8932ec3f8ddbc68318f20548ecb336c014e2",
+    "api/client/client-control.openapi.yaml": "sha256:3d78a1314983abdcf5af83034fc4adb9ff97e7c2aa4e796c1761353dbe2cb230",
     "api/internal/relay-control.openapi.yaml": "sha256:4d53542a652e89c99e2a340b7d4e2d4e86821c3782c418cb7041ac2ed4aec1fd",
     "api/internal/usage-ingest.openapi.yaml": "sha256:0e73594260ad086b13f3e785bc65135616eec7cab142387419223ddc6724423f"
   }

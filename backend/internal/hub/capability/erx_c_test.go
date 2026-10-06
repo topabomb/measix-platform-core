@@ -32,7 +32,7 @@ func TestAssistantUnknownModelReferenceRejected(t *testing.T) {
 	content := validDraft("ups_nonexistent")
 	assistantID := platformid.New(platformid.Assistant)
 	modelID := platformid.New(platformid.Model) // this model is NOT in the draft
-	assistantContent := adminapi.ManagedAssistantDefinition{
+	assistantContent := adminapi.ManagedAssistantDefinition{McpBindings: emptyMcpBindings(),
 		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 		DisplayName:           "Test Assistant",
 		SystemPrompt:          "You are a test assistant.",
@@ -100,7 +100,7 @@ func TestStagedReleaseContainsManagedAssistantAndStarter(t *testing.T) {
 	mcpID := platformid.New(platformid.MCP)
 	// Add MCP server
 	content.Mcp = []adminapi.McpDefinition{{
-		McpServerId: mcpID, DisplayName: "Enterprise MCP", ClientProtocol: adminapi.McpDefinitionClientProtocol("MCP_STREAMABLE_HTTP"),
+		ToolAccessMode: new(adminapi.McpDefinitionToolAccessMode("ALL")), AllowedTools: &[]adminapi.McpToolGrant{}, McpServerId: mcpID, DisplayName: "Enterprise MCP", ClientProtocol: adminapi.McpDefinitionClientProtocol("MCP_STREAMABLE_HTTP"),
 		RuntimePath: "/mcp", AuthOwnership: adminapi.McpDefinitionAuthOwnership("ENTERPRISE_MANAGED"), Enabled: true,
 	}}
 	content.Bindings = append(content.Bindings, adminapi.RuntimeBindingDefinition{
@@ -113,7 +113,7 @@ func TestStagedReleaseContainsManagedAssistantAndStarter(t *testing.T) {
 		SystemPrompt:          "You are a helpful enterprise assistant.",
 		ModelId:               adminapi.ModelId(modelID),
 		MemorySeed:            []string{"Company policy: be excellent", "Check updates daily"},
-		McpServerIds:          []adminapi.McpServerId{adminapi.McpServerId(mcpID)},
+		McpBindings:           &[]adminapi.AssistantMcpBinding{{McpServerId: mcpID, ToolSelection: "ALL", ToolNames: []string{}}},
 		Enabled:               true,
 	}
 	content.Assistants = []adminapi.ManagedAssistantDefinition{assistantDef}
@@ -242,7 +242,7 @@ func TestPreviewPreservesStarterContentAndCanonicalOrder(t *testing.T) {
 	content := validDraft(up.UpstreamID)
 	assistantID := platformid.New(platformid.Assistant)
 	modelID := string(content.Models[0].ModelId)
-	content.Assistants = []adminapi.ManagedAssistantDefinition{{
+	content.Assistants = []adminapi.ManagedAssistantDefinition{{McpBindings: emptyMcpBindings(),
 		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 		DisplayName:           "Test Assistant",
 		SystemPrompt:          "You are helpful.",
@@ -321,7 +321,7 @@ func TestAssistantDisabledModelReferenceRejected(t *testing.T) {
 	})
 	// Assistant referencing the disabled model
 	assistantID := platformid.New(platformid.Assistant)
-	content.Assistants = []adminapi.ManagedAssistantDefinition{{
+	content.Assistants = []adminapi.ManagedAssistantDefinition{{McpBindings: emptyMcpBindings(),
 		AssistantDefinitionId: adminapi.AssistantDefinitionId(assistantID),
 		DisplayName:           "Test Assistant",
 		SystemPrompt:          "You are helpful.",

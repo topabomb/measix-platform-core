@@ -146,6 +146,24 @@ func (e AsrDefinitionSampleRate) Valid() bool {
 	}
 }
 
+// Defines values for AssistantMcpBindingToolSelection.
+const (
+	AssistantMcpBindingToolSelectionALL       AssistantMcpBindingToolSelection = "ALL"
+	AssistantMcpBindingToolSelectionALLOWLIST AssistantMcpBindingToolSelection = "ALLOWLIST"
+)
+
+// Valid indicates whether the value is a known member of the AssistantMcpBindingToolSelection enum.
+func (e AssistantMcpBindingToolSelection) Valid() bool {
+	switch e {
+	case AssistantMcpBindingToolSelectionALL:
+		return true
+	case AssistantMcpBindingToolSelectionALLOWLIST:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BudgetCapability.
 const (
 	BudgetCapabilityASR             BudgetCapability = "ASR"
@@ -494,6 +512,42 @@ const (
 func (e McpDefinitionClientProtocol) Valid() bool {
 	switch e {
 	case McpDefinitionClientProtocolMCPSTREAMABLEHTTP:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for McpDefinitionToolAccessMode.
+const (
+	McpDefinitionToolAccessModeALL       McpDefinitionToolAccessMode = "ALL"
+	McpDefinitionToolAccessModeALLOWLIST McpDefinitionToolAccessMode = "ALLOWLIST"
+)
+
+// Valid indicates whether the value is a known member of the McpDefinitionToolAccessMode enum.
+func (e McpDefinitionToolAccessMode) Valid() bool {
+	switch e {
+	case McpDefinitionToolAccessModeALL:
+		return true
+	case McpDefinitionToolAccessModeALLOWLIST:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for McpToolGrantApprovalPolicy.
+const (
+	AUTO                McpToolGrantApprovalPolicy = "AUTO"
+	REQUIRECONFIRMATION McpToolGrantApprovalPolicy = "REQUIRE_CONFIRMATION"
+)
+
+// Valid indicates whether the value is a known member of the McpToolGrantApprovalPolicy enum.
+func (e McpToolGrantApprovalPolicy) Valid() bool {
+	switch e {
+	case AUTO:
+		return true
+	case REQUIRECONFIRMATION:
 		return true
 	default:
 		return false
@@ -2170,6 +2224,18 @@ type AssignBudgetTemplateRequest struct {
 // AssistantDefinitionId defines model for AssistantDefinitionId.
 type AssistantDefinitionId = string
 
+// AssistantMcpBinding defines model for AssistantMcpBinding.
+type AssistantMcpBinding struct {
+	McpServerId McpServerId `json:"mcpServerId"`
+	ToolNames   []string    `json:"toolNames"`
+
+	// ToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+	ToolSelection AssistantMcpBindingToolSelection `json:"toolSelection"`
+}
+
+// AssistantMcpBindingToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+type AssistantMcpBindingToolSelection string
+
 // AssistantStarterDefinition defines model for AssistantStarterDefinition.
 type AssistantStarterDefinition struct {
 	AssistantDefinitionId AssistantDefinitionId   `json:"assistantDefinitionId"`
@@ -2518,6 +2584,12 @@ type DiffSummary struct {
 	Removed int             `json:"removed"`
 }
 
+// DiscoverMcpToolsRequest defines model for DiscoverMcpToolsRequest.
+type DiscoverMcpToolsRequest struct {
+	ExpectedDraftRevision int     `json:"expectedDraftRevision"`
+	UserId                *UserId `json:"userId,omitempty"`
+}
+
 // Draft defines model for Draft.
 type Draft struct {
 	Content       ManagedDraftContent `json:"content"`
@@ -2638,14 +2710,17 @@ type LoginRequest struct {
 
 // ManagedAssistantDefinition defines model for ManagedAssistantDefinition.
 type ManagedAssistantDefinition struct {
-	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
-	Description           *string               `json:"description,omitempty"`
-	DisplayName           string                `json:"displayName"`
-	Enabled               bool                  `json:"enabled"`
-	McpServerIds          []McpServerId         `json:"mcpServerIds"`
-	MemorySeed            []string              `json:"memorySeed"`
-	ModelId               ModelId               `json:"modelId"`
-	SystemPrompt          string                `json:"systemPrompt"`
+	AssistantDefinitionId AssistantDefinitionId  `json:"assistantDefinitionId"`
+	Description           *string                `json:"description,omitempty"`
+	DisplayName           string                 `json:"displayName"`
+	Enabled               bool                   `json:"enabled"`
+	McpBindings           *[]AssistantMcpBinding `json:"mcpBindings,omitempty"`
+
+	// McpServerIds Retained legacy draft references; explicit tool selection required before v5 publication.
+	McpServerIds []McpServerId `json:"mcpServerIds,omitempty"`
+	MemorySeed   []string      `json:"memorySeed"`
+	ModelId      ModelId       `json:"modelId"`
+	SystemPrompt string        `json:"systemPrompt"`
 }
 
 // ManagedDraftContent defines model for ManagedDraftContent.
@@ -2690,12 +2765,17 @@ type ManagedPolicy struct {
 
 // McpDefinition defines model for McpDefinition.
 type McpDefinition struct {
+	AllowedTools   *[]McpToolGrant             `json:"allowedTools,omitempty"`
 	AuthOwnership  McpDefinitionAuthOwnership  `json:"authOwnership"`
 	ClientProtocol McpDefinitionClientProtocol `json:"clientProtocol"`
 	DisplayName    string                      `json:"displayName"`
 	Enabled        bool                        `json:"enabled"`
 	McpServerId    McpServerId                 `json:"mcpServerId"`
 	RuntimePath    string                      `json:"runtimePath"`
+
+	// ToolAccessMode ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+	ToolAccessMode *McpDefinitionToolAccessMode `json:"toolAccessMode,omitempty"`
+	ToolDiscovery  *McpToolDiscovery            `json:"toolDiscovery,omitempty"`
 }
 
 // McpDefinitionAuthOwnership defines model for McpDefinition.AuthOwnership.
@@ -2704,8 +2784,44 @@ type McpDefinitionAuthOwnership string
 // McpDefinitionClientProtocol defines model for McpDefinition.ClientProtocol.
 type McpDefinitionClientProtocol string
 
+// McpDefinitionToolAccessMode ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+type McpDefinitionToolAccessMode string
+
+// McpDiscoveredTool defines model for McpDiscoveredTool.
+type McpDiscoveredTool struct {
+	ContractHash Sha256Hash `json:"contractHash"`
+
+	// Definition Complete raw MCP Tool object including extension fields; checked by discovery and RFC 8785 hashing.
+	Definition McpToolDefinition `json:"definition"`
+	Name       string            `json:"name"`
+}
+
 // McpServerId defines model for McpServerId.
 type McpServerId = string
+
+// McpToolDefinition Complete raw MCP Tool object including extension fields; checked by discovery and RFC 8785 hashing.
+type McpToolDefinition map[string]interface{}
+
+// McpToolDiscovery defines model for McpToolDiscovery.
+type McpToolDiscovery struct {
+	DiscoveredAt time.Time           `json:"discoveredAt"`
+	SourceHash   Sha256Hash          `json:"sourceHash"`
+	Tools        []McpDiscoveredTool `json:"tools"`
+	UserId       *UserId             `json:"userId,omitempty"`
+}
+
+// McpToolGrant defines model for McpToolGrant.
+type McpToolGrant struct {
+	ApprovalPolicy McpToolGrantApprovalPolicy `json:"approvalPolicy"`
+	ContractHash   Sha256Hash                 `json:"contractHash"`
+
+	// Definition Complete raw MCP Tool object including extension fields; checked by discovery and RFC 8785 hashing.
+	Definition McpToolDefinition `json:"definition"`
+	Name       string            `json:"name"`
+}
+
+// McpToolGrantApprovalPolicy defines model for McpToolGrant.ApprovalPolicy.
+type McpToolGrantApprovalPolicy string
 
 // MeterQuantity defines model for MeterQuantity.
 type MeterQuantity struct {
@@ -3826,6 +3942,11 @@ type PutDraftParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// DiscoverMcpToolsParams defines parameters for DiscoverMcpTools.
+type DiscoverMcpToolsParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // PreviewDraftParams defines parameters for PreviewDraft.
 type PreviewDraftParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
@@ -4304,6 +4425,9 @@ type UpdateDeploymentSettingsJSONRequestBody = UpdateDeploymentSettingsRequest
 // PutDraftJSONRequestBody defines body for PutDraft for application/json ContentType.
 type PutDraftJSONRequestBody = PutDraftRequest
 
+// DiscoverMcpToolsJSONRequestBody defines body for DiscoverMcpTools for application/json ContentType.
+type DiscoverMcpToolsJSONRequestBody = DiscoverMcpToolsRequest
+
 // PreviewDraftJSONRequestBody defines body for PreviewDraft for application/json ContentType.
 type PreviewDraftJSONRequestBody = PreviewDraftRequest
 
@@ -4420,6 +4544,9 @@ type ServerInterface interface {
 
 	// (PUT /api/admin/v1/draft)
 	PutDraft(w http.ResponseWriter, r *http.Request, params PutDraftParams)
+
+	// (POST /api/admin/v1/draft/mcp/{mcpServerId}:discover)
+	DiscoverMcpTools(w http.ResponseWriter, r *http.Request, mcpServerId McpServerId, params DiscoverMcpToolsParams)
 
 	// (POST /api/admin/v1/draft:preview)
 	PreviewDraft(w http.ResponseWriter, r *http.Request, params PreviewDraftParams)
@@ -4716,6 +4843,11 @@ func (_ Unimplemented) GetDraft(w http.ResponseWriter, r *http.Request) {
 
 // (PUT /api/admin/v1/draft)
 func (_ Unimplemented) PutDraft(w http.ResponseWriter, r *http.Request, params PutDraftParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/draft/mcp/{mcpServerId}:discover)
+func (_ Unimplemented) DiscoverMcpTools(w http.ResponseWriter, r *http.Request, mcpServerId McpServerId, params DiscoverMcpToolsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5707,6 +5839,60 @@ func (siw *ServerInterfaceWrapper) PutDraft(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutDraft(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DiscoverMcpTools operation middleware
+func (siw *ServerInterfaceWrapper) DiscoverMcpTools(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "mcpServerId" -------------
+	var mcpServerId McpServerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "mcpServerId", chi.URLParam(r, "mcpServerId"), &mcpServerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "mcpServerId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DiscoverMcpToolsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscoverMcpTools(w, r, mcpServerId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10454,6 +10640,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/admin/v1/draft", wrapper.PutDraft)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/draft/mcp/{mcpServerId}:discover", wrapper.DiscoverMcpTools)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/draft:validate", wrapper.ValidateDraft)

@@ -60,7 +60,7 @@ func TestHistoricalRepublishPreservesSchemaAndSourceBytes(t *testing.T) {
 				t.Fatal(err)
 			}
 			assistantID := platformid.New(platformid.Assistant)
-			content.Assistants = []adminapi.ManagedAssistantDefinition{{AssistantDefinitionId: assistantID, DisplayName: "Original", SystemPrompt: "Original assistant", ModelId: content.Models[0].ModelId, MemorySeed: []string{}, McpServerIds: []adminapi.McpServerId{}, Enabled: true}}
+			content.Assistants = []adminapi.ManagedAssistantDefinition{{McpBindings: &[]adminapi.AssistantMcpBinding{}, AssistantDefinitionId: assistantID, DisplayName: "Original", SystemPrompt: "Original assistant", ModelId: content.Models[0].ModelId, MemorySeed: []string{}, McpServerIds: []adminapi.McpServerId{}, Enabled: true}}
 			starter := adminapi.AssistantStarterDefinition{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: assistantID, Title: "Entry", Prompt: "Original prompt", Enabled: true}
 			if version == 5 {
 				starter.OpeningSnapshot = &adminapi.StarterOpeningSnapshot{Format: 1, SystemPrompt: tc.system, InitialContexts: []adminapi.StarterInitialContext{{Id: "b", Content: "Literal {{body}}"}}}
@@ -92,7 +92,7 @@ func TestHistoricalRepublishPreservesSchemaAndSourceBytes(t *testing.T) {
 				}
 			}
 			current, _ := svc.Capability.GetDraft(ctx)
-			current.Content.Assistants = []adminapi.ManagedAssistantDefinition{{AssistantDefinitionId: assistantID, DisplayName: "Changed", SystemPrompt: "Current draft must not leak", ModelId: content.Models[0].ModelId, MemorySeed: []string{}, McpServerIds: []adminapi.McpServerId{}, Enabled: true}}
+			current.Content.Assistants = []adminapi.ManagedAssistantDefinition{{McpBindings: &[]adminapi.AssistantMcpBinding{}, AssistantDefinitionId: assistantID, DisplayName: "Changed", SystemPrompt: "Current draft must not leak", ModelId: content.Models[0].ModelId, MemorySeed: []string{}, McpServerIds: []adminapi.McpServerId{}, Enabled: true}}
 			if _, err := svc.Capability.PutDraft(ctx, adminID, current.DraftRevision, current.Content); err != nil {
 				t.Fatal(err)
 			}
@@ -146,7 +146,7 @@ func TestInheritedStarterPublicationAndRepeatedRepublishUseFrozenSystem(t *testi
 	defer relayServer.Close()
 	draft, _ := svc.Capability.GetDraft(ctx)
 	assistantID := platformid.New(platformid.Assistant)
-	draft.Content.Assistants = []adminapi.ManagedAssistantDefinition{{AssistantDefinitionId: assistantID, DisplayName: "Assistant", SystemPrompt: "  Frozen assistant\n", ModelId: draft.Content.Models[0].ModelId, MemorySeed: []string{}, McpServerIds: []adminapi.McpServerId{}, Enabled: true}}
+	draft.Content.Assistants = []adminapi.ManagedAssistantDefinition{{McpBindings: &[]adminapi.AssistantMcpBinding{}, AssistantDefinitionId: assistantID, DisplayName: "Assistant", SystemPrompt: "  Frozen assistant\n", ModelId: draft.Content.Models[0].ModelId, MemorySeed: []string{}, McpServerIds: []adminapi.McpServerId{}, Enabled: true}}
 	draft.Content.Starters = []adminapi.AssistantStarterDefinition{{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: assistantID, Title: "Entry", Prompt: "Start", Enabled: true, OpeningSnapshot: &adminapi.StarterOpeningSnapshot{Format: 1, SystemPrompt: " \t", InitialContexts: []adminapi.StarterInitialContext{}}}}
 	saved, err := svc.Capability.PutDraft(ctx, adminID, draft.DraftRevision, draft.Content)
 	if err != nil {

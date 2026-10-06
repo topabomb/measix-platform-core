@@ -763,6 +763,44 @@ paths:
               $ref: '#/components/schemas/PutDraftRequest'
       parameters:
       - *id001
+  /api/admin/v1/draft/mcp/{mcpServerId}:discover:
+    post:
+      operationId: discoverMcpTools
+      description: Discover the saved draft source without calling tools; replace candidates only after complete success and revision/source recheck.
+      parameters:
+      - *id001
+      - in: path
+        name: mcpServerId
+        required: true
+        schema:
+          $ref: '#/components/schemas/McpServerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscoverMcpToolsRequest'
+      responses:
+        '200':
+          description: Updated draft with discovery candidates and a new revision.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draft'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '502':
+          $ref: '#/components/responses/Problem'
+        '504':
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/draft:validate:
     post:
       operationId: validateDraft
@@ -3733,6 +3771,17 @@ components:
           - NONE
         enabled:
           type: boolean
+        toolDiscovery:
+          $ref: '#/components/schemas/McpToolDiscovery'
+        toolAccessMode:
+          description: ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+          type: string
+          enum: [ALL, ALLOWLIST]
+        allowedTools:
+          type: array
+          x-uniqueProperty: name
+          items:
+            $ref: '#/components/schemas/McpToolGrant'
     TimeoutPolicy:
       type: object
       additionalProperties: false
@@ -3929,7 +3978,6 @@ components:
       - systemPrompt
       - modelId
       - memorySeed
-      - mcpServerIds
       - enabled
       properties:
         assistantDefinitionId:
@@ -3950,11 +3998,18 @@ components:
             type: string
             minLength: 1
         mcpServerIds:
+          description: Retained legacy draft references; explicit tool selection required before v5 publication.
+          x-go-type-skip-optional-pointer: true
           type: array
           items:
             $ref: '#/components/schemas/McpServerId'
         enabled:
           type: boolean
+        mcpBindings:
+          type: array
+          x-uniqueProperty: mcpServerId
+          items:
+            $ref: '#/components/schemas/AssistantMcpBinding'
     AssistantStarterDefinition:
       type: object
       additionalProperties: false
@@ -6118,6 +6173,83 @@ components:
           $ref: '#/components/schemas/EnterpriseUpdateCategory'
         severity:
           $ref: '#/components/schemas/EnterpriseUpdateSeverity'
+    McpToolDefinition:
+      description: Complete raw MCP Tool object including extension fields; checked by discovery and RFC 8785 hashing.
+      type: object
+      additionalProperties: true
+    McpDiscoveredTool:
+      type: object
+      additionalProperties: false
+      required: [name, contractHash, definition]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        contractHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        definition:
+          $ref: '#/components/schemas/McpToolDefinition'
+    McpToolDiscovery:
+      type: object
+      additionalProperties: false
+      required: [sourceHash, discoveredAt, tools]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        sourceHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        discoveredAt:
+          type: string
+          format: date-time
+        tools:
+          type: array
+          x-uniqueProperty: name
+          items:
+            $ref: '#/components/schemas/McpDiscoveredTool'
+    DiscoverMcpToolsRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedDraftRevision]
+      properties:
+        expectedDraftRevision:
+          type: integer
+          minimum: 1
+        userId:
+          $ref: '#/components/schemas/UserId'
+    McpToolGrant:
+      type: object
+      additionalProperties: false
+      required: [name, contractHash, approvalPolicy, definition]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          pattern: '^[^*]+$'
+        contractHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        approvalPolicy:
+          type: string
+          enum: [AUTO, REQUIRE_CONFIRMATION]
+        definition:
+          $ref: '#/components/schemas/McpToolDefinition'
+    AssistantMcpBinding:
+      type: object
+      additionalProperties: false
+      required: [mcpServerId, toolSelection, toolNames]
+      properties:
+        mcpServerId:
+          $ref: '#/components/schemas/McpServerId'
+        toolSelection:
+          description: ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+          type: string
+          enum: [ALL, ALLOWLIST]
+        toolNames:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            pattern: '^[^*]+$'
   responses:
     Problem:
       description: Problem response

@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { useDraftStore } from '../stores/draft'
 import ValidationIssueItem from './ValidationIssueItem.vue'
+import AssistantMcpToolsEditor from './AssistantMcpToolsEditor.vue'
 
 type Starter = components['schemas']['AssistantStarterDefinition']
 
@@ -31,7 +32,6 @@ const filteredAssistants = computed(() => {
 })
 const selected = computed(() => assistants.value.find(a => a.assistantDefinitionId === selectedId.value))
 const models = computed(() => draft.localContent?.models.filter(m => m.enabled).map(m => ({ label: m.displayName, value: m.modelId })) ?? [])
-const mcps = computed(() => draft.localContent?.mcp.filter(m => m.enabled).map(m => ({ label: m.displayName, value: m.mcpServerId })) ?? [])
 const starters = computed(() => (draft.localContent?.starters ?? [])
   .filter(s => s.assistantDefinitionId === selectedId.value)
   .toSorted((a, b) => a.sortOrder - b.sortOrder || a.starterId.localeCompare(b.starterId)))
@@ -43,7 +43,6 @@ const sections = computed(() => [
   { id: 'starters' as const, label: t('experience.sections.starters') },
 ])
 const modelUnavailable = computed(() => Boolean(selected.value?.modelId && !models.value.some(model => model.value === selected.value?.modelId)))
-const unavailableMcps = computed(() => selected.value?.mcpServerIds.filter(id => !mcps.value.some(mcp => mcp.value === id)) ?? [])
 function issuesForAssistant(assistantId: string): ValidationIssue[] {
   const starterIds = new Set((draft.localContent?.starters ?? []).filter(item => item.assistantDefinitionId === assistantId).map(item => item.starterId))
   const result = draft.validationResult
@@ -159,7 +158,7 @@ async function focusIssue(kind: 'ASSISTANT' | 'STARTER', resourceId?: string, fi
     selectedId.value = resourceId
     selectedSection.value = field === 'systemPrompt' ? 'prompt'
       : field === 'memorySeed' ? 'memory'
-        : field === 'modelId' || field === 'mcpServerIds' ? 'connections'
+        : field === 'modelId' || field === 'mcpServerIds' || field === 'mcpBindings' ? 'connections'
           : 'basic'
   }
   await nextTick()
@@ -275,8 +274,7 @@ defineExpose({ focusIssue })
                 <div class="text-body2 text-grey-7">{{ t('experience.connectionsHint') }}</div>
                 <q-select data-cy="assistant-model" v-model="selected.modelId" outlined :options="models" emit-value map-options :label="t('experience.model')" :disable="disabled" data-field="modelId" @update:model-value="draft.markDirty" />
                 <q-banner v-if="modelUnavailable" class="bg-red-1 rounded-borders text-negative">{{ t('experience.unavailableModel', { id: selected.modelId }) }}</q-banner>
-                <q-select v-model="selected.mcpServerIds" outlined :options="mcps" multiple use-chips emit-value map-options :label="t('experience.mcps')" :disable="disabled" data-field="mcpServerIds" @update:model-value="draft.markDirty" />
-                <q-banner v-if="unavailableMcps.length" class="bg-red-1 rounded-borders text-negative">{{ t('experience.unavailableMcps', { ids: unavailableMcps.join(', ') }) }}</q-banner>
+                <AssistantMcpToolsEditor :assistant="selected" :disabled="disabled" />
               </template>
 
               <template v-else>

@@ -11,6 +11,46 @@ import (
 	"measix/platform/internal/wire/adminapi"
 )
 
+func (h *fullAdminHandler) DiscoverMcpTools(w http.ResponseWriter, r *http.Request, id adminapi.McpServerId, params adminapi.DiscoverMcpToolsParams) {
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	var request adminapi.DiscoverMcpToolsRequest
+	if decodeStrictJSON(r, &request) != nil {
+		writeProblem(w, 400, "invalid_request", "Invalid discovery request")
+		return
+	}
+	if request.ExpectedDraftRevision < 1 {
+		writeProblem(w, 400, "invalid_request", "Draft revision is required")
+		return
+	}
+	view, err := h.services.Capability.DiscoverMcpTools(r.Context(), admin.UserID, id, request)
+	if err != nil {
+		status, code, title := 500, "internal_error", "Discovery could not be completed"
+		switch {
+		case errors.Is(err, capability.ErrRevisionConflict):
+			status, code, title = 409, "stale_draft_revision", "Draft changed; reload before discovering tools"
+		case errors.Is(err, capability.ErrMcpSourceChanged):
+			status, code, title = 409, "mcp_source_changed", err.Error()
+		case errors.Is(err, capability.ErrMcpSourceUnavailable):
+			status, code, title = 422, "mcp_source_unavailable", err.Error()
+		case errors.Is(err, capability.ErrMcpDiscoveryUnavailable):
+			status, code, title = 502, "mcp_discovery_unavailable", err.Error()
+		case errors.Is(err, capability.ErrMcpDiscoveryProtocol):
+			status, code, title = 502, "mcp_discovery_protocol", err.Error()
+		case errors.Is(err, capability.ErrMcpDiscoveryLimit):
+			status, code, title = 422, "mcp_discovery_limit", err.Error()
+		case errors.Is(err, capability.ErrMcpDiscoveryTimeout):
+			status, code, title = 504, "mcp_discovery_timeout", err.Error()
+		}
+		writeProblem(w, status, code, title)
+		return
+	}
+	writeJSON(w, 200, adminapi.Draft{DraftId: view.DraftID, DraftRevision: view.DraftRevision, Content: view.Content})
+}
+
 func (h *fullAdminHandler) GetDraft(w http.ResponseWriter, r *http.Request) {
 	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)
@@ -38,6 +78,10 @@ func (h *fullAdminHandler) PutDraft(w http.ResponseWriter, r *http.Request, para
 	view, err := h.services.Capability.PutDraft(r.Context(), admin.UserID, request.ExpectedDraftRevision, request.Content)
 	if errors.Is(err, capability.ErrRevisionConflict) {
 		writeProblem(w, http.StatusConflict, "stale_draft_revision", "Draft revision conflict")
+		return
+	}
+	if errors.Is(err, capability.ErrMcpToolEvidence) {
+		writeProblem(w, 422, "mcp_tool_evidence_required", err.Error())
 		return
 	}
 	if err != nil {

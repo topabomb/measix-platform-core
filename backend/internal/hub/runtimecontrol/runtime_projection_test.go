@@ -31,7 +31,7 @@ func TestDisabledResourcesStayUnroutableAcrossActivations(t *testing.T) {
 				ttsID, asrID, mcpID := platformid.New(platformid.TTS), platformid.New(platformid.ASR), platformid.New(platformid.MCP)
 				content.Tts = []adminapi.TtsDefinition{{TtsId: ttsID, DisplayName: "TTS", UpstreamModelKey: "tts", ClientProtocol: "OPENAI_AUDIO_SPEECH", RuntimePath: "/v1/audio/speech"}}
 				content.Asr = []adminapi.AsrDefinition{{AsrId: asrID, DisplayName: "ASR", UpstreamModelKey: "asr", ClientProtocol: "OPENAI_AUDIO_TRANSCRIPTIONS", RuntimePath: "/v1/audio/transcriptions"}}
-				content.Mcp = []adminapi.McpDefinition{{McpServerId: mcpID, DisplayName: "MCP", ClientProtocol: "MCP_STREAMABLE_HTTP", AuthOwnership: "ENTERPRISE_MANAGED", RuntimePath: "/mcp"}}
+				content.Mcp = []adminapi.McpDefinition{{ToolAccessMode: new(adminapi.McpDefinitionToolAccessMode("ALL")), AllowedTools: &[]adminapi.McpToolGrant{}, McpServerId: mcpID, DisplayName: "MCP", ClientProtocol: "MCP_STREAMABLE_HTTP", AuthOwnership: "ENTERPRISE_MANAGED", RuntimePath: "/mcp"}}
 				for _, id := range []string{ttsID, asrID, mcpID} {
 					binding := content.Bindings[0]
 					binding.ResourceId, binding.RuntimeRouteId = id, platformid.New(platformid.Route)

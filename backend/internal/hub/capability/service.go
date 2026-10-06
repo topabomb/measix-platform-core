@@ -104,7 +104,7 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 			prevKinds[a.AsrId] = adminapi.ReleaseDiffKindASR
 		}
 		for _, m := range previous.Mcp {
-			prev[m.McpServerId] = defHash(m)
+			prev[m.McpServerId] = mcpPublishedHash(m)
 			prevKinds[m.McpServerId] = adminapi.ReleaseDiffKindMCP
 		}
 		for _, a := range previous.Assistants {
@@ -242,7 +242,7 @@ func currentHash(content *adminapi.ManagedDraftContent, id string) string {
 	}
 	for _, m := range content.Mcp {
 		if m.McpServerId == id {
-			return defHash(m)
+			return mcpPublishedHash(m)
 		}
 	}
 	for _, a := range content.Assistants {
@@ -436,8 +436,9 @@ func (s *Service) GetSnapshot(ctx context.Context, generation int) (SnapshotView
 }
 
 type Service struct {
-	Client *ent.Client
-	Now    func() time.Time
+	Client  *ent.Client
+	Now     func() time.Time
+	Secrets *upstream.Service
 }
 
 func NewService(client *ent.Client) *Service {
@@ -487,6 +488,16 @@ func (s *Service) PutDraft(ctx context.Context, updatedBy string, expectedRevisi
 	}
 	row, err := s.Client.ManagedDraft.Query().Only(ctx)
 	if err != nil {
+		return DraftView{}, err
+	}
+	if int(row.DraftRevision) != expectedRevision {
+		return DraftView{}, ErrRevisionConflict
+	}
+	var previous adminapi.ManagedDraftContent
+	if err := DecodeManagedDraftContent(row.ContentJSON, &previous); err != nil {
+		return DraftView{}, err
+	}
+	if err := s.validateMcpSave(ctx, previous, content); err != nil {
 		return DraftView{}, err
 	}
 	contentJSON, err := json.Marshal(content)
@@ -554,6 +565,9 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 	}
 	if draft.DraftRevision != expectedRevision {
 		return DraftPreview{}, ErrRevisionConflict
+	}
+	if !s.validateContent(ctx, draft.Content).Valid {
+		return DraftPreview{}, ErrInvalidDraft
 	}
 	deployment, err := s.Client.Deployment.Query().Only(ctx)
 	if err != nil {
@@ -1121,6 +1135,8 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 		return result.Warnings[i].Path < result.Warnings[j].Path
 	})
+	result.Errors = append(result.Errors, mcpGovernanceIssues(content)...)
+	result.Errors = append(result.Errors, s.mcpSourceIssues(ctx, content)...)
 	result.Valid = len(result.Errors) == 0
 	return result
 }

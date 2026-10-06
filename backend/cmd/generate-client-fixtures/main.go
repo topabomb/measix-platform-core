@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"measix/platform/internal/hub/capability"
@@ -104,6 +105,17 @@ func main() {
 	must(err)
 	write("snapshot-v5.json", v5Snapshot)
 	references := []object{{"name": "complete-references", "expectedCode": "", "content": v5Content}}
+	for _, selection := range []string{"ALL", "ALLOWLIST"} {
+		value := clone(v5Content)
+		server := value["mcp"].([]any)[0].(map[string]any)
+		server["toolAccessMode"], server["allowedTools"] = "ALL", []any{}
+		binding := value["assistants"].([]any)[0].(map[string]any)["mcpBindings"].([]any)[0].(map[string]any)
+		binding["toolSelection"], binding["toolNames"] = selection, []any{}
+		if selection == "ALLOWLIST" {
+			binding["toolNames"] = []any{"future_dynamic_tool"}
+		}
+		references = append(references, object{"name": "open-server-assistant-" + strings.ToLower(selection), "expectedCode": "", "content": value})
+	}
 	mutations := []struct {
 		name, code string
 		change     func(object)
@@ -113,6 +125,26 @@ func main() {
 		}},
 		{"assistant-disabled-model", "invalid_model_ref", func(v object) { v["models"].([]any)[0].(map[string]any)["enabled"] = false }},
 		{"assistant-disabled-mcp", "invalid_mcp_ref", func(v object) { v["mcp"].([]any)[0].(map[string]any)["enabled"] = false }},
+		{"assistant-unapproved-tool", "invalid_mcp_tool_ref", func(v object) {
+			v["assistants"].([]any)[0].(map[string]any)["mcpBindings"].([]any)[0].(map[string]any)["toolNames"] = []any{"unapproved_tool"}
+		}},
+		{"assistant-duplicate-tool", "invalid_mcp_tool_ref", func(v object) {
+			binding := v["assistants"].([]any)[0].(map[string]any)["mcpBindings"].([]any)[0].(map[string]any)
+			binding["toolNames"] = []any{"search_records", "search_records"}
+		}},
+		{"assistant-missing-tool-bindings", "missing_mcp_tool_bindings", func(v object) { delete(v["assistants"].([]any)[0].(map[string]any), "mcpBindings") }},
+		{"server-missing-tool-grants", "missing_mcp_tool_grants", func(v object) { delete(v["mcp"].([]any)[0].(map[string]any), "allowedTools") }},
+		{"server-missing-tool-mode", "missing_mcp_tool_grants", func(v object) { delete(v["mcp"].([]any)[0].(map[string]any), "toolAccessMode") }},
+		{"server-empty-allowlist", "invalid_mcp_tool_grant", func(v object) { v["mcp"].([]any)[0].(map[string]any)["allowedTools"] = []any{} }},
+		{"assistant-empty-allowlist", "invalid_mcp_tool_ref", func(v object) {
+			v["assistants"].([]any)[0].(map[string]any)["mcpBindings"].([]any)[0].(map[string]any)["toolNames"] = []any{}
+		}},
+		{"assistant-all-with-hidden-list", "invalid_mcp_tool_ref", func(v object) {
+			v["assistants"].([]any)[0].(map[string]any)["mcpBindings"].([]any)[0].(map[string]any)["toolSelection"] = "ALL"
+		}},
+		{"server-invalid-tool-hash", "invalid_mcp_tool_grant", func(v object) {
+			v["mcp"].([]any)[0].(map[string]any)["allowedTools"].([]any)[0].(map[string]any)["contractHash"] = "sha256:" + strings.Repeat("0", 64)
+		}},
 		{"starter-disabled-assistant", "invalid_assistant_ref", func(v object) { v["assistants"].([]any)[0].(map[string]any)["enabled"] = false }},
 		{"default-missing-model", "invalid_default_model", func(v object) {
 			v["policy"].(map[string]any)["defaultModelId"] = "mdl_99999999-9999-4999-8999-999999999999"
@@ -157,6 +189,64 @@ func main() {
 		cases = append(cases, wireCase{name, schema, valid, value})
 	}
 	add("v5-full", "ManagedSnapshot", true, v5Snapshot)
+	for _, field := range []string{"allowedTools", "toolAccessMode", "mcpBindings"} {
+		resource := "mcp"
+		if field == "mcpBindings" {
+			resource = "assistants"
+		}
+		for _, null := range []bool{false, true} {
+			value := clone(v5Snapshot)
+			item := value[resource].([]any)[0].(map[string]any)
+			delete(item, field)
+			kind := "missing"
+			if null {
+				item[field] = nil
+				kind = "null"
+			}
+			add("v5-"+kind+"-"+field, "ManagedSnapshot", false, value)
+		}
+	}
+	for _, field := range []string{"toolSelection", "toolNames"} {
+		for _, invalid := range []string{"missing", "null"} {
+			value := clone(v5Snapshot)
+			binding := value["assistants"].([]any)[0].(map[string]any)["mcpBindings"].([]any)[0].(map[string]any)
+			delete(binding, field)
+			if invalid == "null" {
+				binding[field] = nil
+			}
+			add("v5-"+invalid+"-"+field, "ManagedSnapshot", false, value)
+		}
+	}
+	for _, field := range []string{"toolAccessMode", "toolSelection"} {
+		value := clone(v5Snapshot)
+		if field == "toolAccessMode" {
+			value["mcp"].([]any)[0].(map[string]any)[field] = "BLACKLIST"
+		} else {
+			value["assistants"].([]any)[0].(map[string]any)["mcpBindings"].([]any)[0].(map[string]any)[field] = "UNKNOWN"
+		}
+		add("v5-unknown-"+field, "ManagedSnapshot", false, value)
+	}
+	for _, field := range []string{"contractHash", "approvalPolicy", "name"} {
+		value := clone(v5Snapshot)
+		grant := value["mcp"].([]any)[0].(map[string]any)["allowedTools"].([]any)[0].(map[string]any)
+		grant[field] = "*"
+		add("v5-invalid-tool-"+field, "ManagedSnapshot", false, value)
+	}
+	legacyBindings := clone(v5Snapshot)
+	legacyBindings["assistants"].([]any)[0].(map[string]any)["mcpServerIds"] = []any{}
+	add("v5-obsolete-server-only-permission", "ManagedSnapshot", false, legacyBindings)
+	emptyTools := clone(v5Snapshot)
+	for _, m := range emptyTools["mcp"].([]any) {
+		m.(map[string]any)["toolAccessMode"] = "ALL"
+		m.(map[string]any)["allowedTools"] = []any{}
+	}
+	for _, a := range emptyTools["assistants"].([]any) {
+		a.(map[string]any)["mcpBindings"] = []any{}
+	}
+	add("v5-open-servers-with-no-assistant-bindings", "ManagedSnapshot", true, emptyTools)
+	allTools := clone(emptyTools)
+	allTools["assistants"].([]any)[0].(map[string]any)["mcpBindings"] = []any{object{"mcpServerId": allTools["mcp"].([]any)[0].(map[string]any)["mcpServerId"], "toolSelection": "ALL", "toolNames": []any{}}}
+	add("v5-dynamic-all-tools", "ManagedSnapshot", true, allTools)
 	obsoleteDescription := clone(v5Snapshot)
 	obsoleteDescription["starters"].([]any)[0].(map[string]any)["description"] = "retired display metadata"
 	add("v5-obsolete-starter-description", "ManagedSnapshot", false, obsoleteDescription)

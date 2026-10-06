@@ -36,6 +36,9 @@ type fullAdminHandler struct {
 }
 
 func RegisterFull(router chi.Router, services Services) {
+	if services.Capability != nil {
+		services.Capability.Secrets = services.Upstream
+	}
 	admin := &fullAdminHandler{
 		adminHandler: &adminHandler{identity: services.Identity},
 		services:     services,

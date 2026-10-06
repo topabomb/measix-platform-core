@@ -549,6 +549,20 @@ try {
   if (phaseA !== 0) throw new Error(`Phase A failed (exit ${phaseA})`)
   log('Phase A PASSED')
 
+  if (process.argv.includes('--manual')) {
+    writeFileSync(join(env.envRoot, 'manual-browser.json'), JSON.stringify({ spaBaseURL, adapterBaseURL, adminPassword }, null, 2))
+    log(`Manual browser verification is ready. Local test credentials: ${join(env.envRoot, 'manual-browser.json')}`)
+    log('Press Enter in this harness to continue runtime verification and cleanup.')
+    process.stdin.resume()
+    await new Promise(resolve => process.stdin.once('data', resolve))
+    process.stdin.pause()
+  }
+
+  log('Phase A MCP: explicit tool grants, assistant bindings and drift recovery...')
+  const phaseMcp = await runPlaywrightSpec('e2e/mcp-tool-governance.spec.ts', 'mcp')
+  if (phaseMcp !== 0) throw new Error(`MCP browser verification failed (exit ${phaseMcp})`)
+  log('Phase A MCP PASSED')
+
   // Phase B: Five-capability runtime traffic. A failure here is a gate
   // failure, not a warning: the complete capability path is the point of the run.
   log('Phase B: Five-capability runtime traffic...')
@@ -581,6 +595,11 @@ try {
   if (phaseE !== 0) throw new Error(`Phase E failed (exit ${phaseE})`)
   log('Phase E PASSED')
 
+  log('Phase F: all Admin routes, responsive layout and input guards...')
+  const phaseF = await runPlaywrightSpec('e2e/admin-console-review.spec.ts', 'admin-review')
+  if (phaseF !== 0) throw new Error(`Admin review failed (exit ${phaseF})`)
+  log('Phase F PASSED')
+
   exitCode = 0
 } catch (e) {
   log(`E2E test FAILED: ${e.message}`)
@@ -594,8 +613,10 @@ try {
   // Merge per-phase Playwright JSON results into the final artifact
   const tempFiles = [
     join(artifactsDir, '_e2e-authoring.json'),
+    join(artifactsDir, '_e2e-mcp.json'),
     join(artifactsDir, '_e2e-usage.json'),
     join(artifactsDir, '_e2e-topology.json'),
+    join(artifactsDir, '_e2e-admin-review.json'),
   ].filter(f => existsSync(f))
   if (tempFiles.length === 0) {
     // Writing meta without a refreshed artifact would let a stale

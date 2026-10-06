@@ -78,7 +78,7 @@ describe('SessionStore', () => {
 describe('DraftStore', () => {
   it('preserves missing and authored Starter openings across save, reload and revision conflict', async () => {
     const initial = emptyDraft()
-    initial.content.assistants.push({ assistantDefinitionId: 'asd_1', displayName: 'A', systemPrompt: 'Base', modelId: 'mdl_1', mcpServerIds: [], memorySeed: [], enabled: true })
+    initial.content.assistants.push({ assistantDefinitionId: 'asd_1', displayName: 'A', systemPrompt: 'Base', modelId: 'mdl_1', mcpBindings: [], memorySeed: [], enabled: true })
     initial.content.starters.push({ starterId: 'str_old', assistantDefinitionId: 'asd_1', title: 'Old', prompt: 'Q', enabled: false, sortOrder: 0 })
     let savedDraft: Draft
     const fetchMock = vi.fn()

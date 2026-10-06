@@ -35,27 +35,28 @@ type SnapshotInput struct {
 }
 
 type snapshotDescriptor struct {
-	DeploymentID      string                                 `json:"deploymentId"`
-	SchemaVersion     int                                    `json:"schemaVersion"`
-	ManagedGeneration int                                    `json:"managedGeneration"`
-	ReleaseID         string                                 `json:"releaseId"`
-	Providers         []clientapi.ProviderDefinition         `json:"providers"`
-	Models            []clientapi.ModelDefinition            `json:"models"`
-	ImageGenerators   []clientapi.ImageGenerationDefinition  `json:"imageGenerators"`
-	TTS               []clientapi.TtsDefinition              `json:"tts"`
-	ASR               []clientapi.AsrDefinition              `json:"asr"`
-	MCP               []clientapi.McpDefinition              `json:"mcp"`
-	Policy            clientapi.ManagedPolicy                `json:"policy"`
-	Metadata          snapshotMetadata                       `json:"metadata"`
-	Assistants        []clientapi.ManagedAssistantDefinition `json:"assistants"`
-	Starters          []SnapshotStarter                      `json:"starters"`
+	DeploymentID      string                                `json:"deploymentId"`
+	SchemaVersion     int                                   `json:"schemaVersion"`
+	ManagedGeneration int                                   `json:"managedGeneration"`
+	ReleaseID         string                                `json:"releaseId"`
+	Providers         []clientapi.ProviderDefinition        `json:"providers"`
+	Models            []clientapi.ModelDefinition           `json:"models"`
+	ImageGenerators   []clientapi.ImageGenerationDefinition `json:"imageGenerators"`
+	TTS               []clientapi.TtsDefinition             `json:"tts"`
+	ASR               []clientapi.AsrDefinition             `json:"asr"`
+	MCP               any                                   `json:"mcp"`
+	Policy            clientapi.ManagedPolicy               `json:"policy"`
+	Metadata          snapshotMetadata                      `json:"metadata"`
+	Assistants        any                                   `json:"assistants"`
+	Starters          []SnapshotStarter                     `json:"starters"`
 }
 
 // Snapshot is the compiler's versioned result. Current wire DTOs remain strict;
 // the retained v4 description exists only in this historical adapter.
 type Snapshot struct {
 	clientapi.ManagedSnapshot
-	Starters []SnapshotStarter `json:"starters"`
+	Starters     []SnapshotStarter                        `json:"starters"`
+	V4Assistants []clientapi.ManagedAssistantDefinitionV4 `json:"-"`
 }
 
 type SnapshotStarter struct {
@@ -72,6 +73,16 @@ func (s Snapshot) MarshalJSON() ([]byte, error) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		return nil, err
+	}
+	if s.SchemaVersion == 4 {
+		fields["mcp"], err = json.Marshal(v4Mcp(s.Mcp))
+		if err != nil {
+			return nil, err
+		}
+		fields["assistants"], err = json.Marshal(s.V4Assistants)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return json.Marshal(fields)
 }
@@ -109,6 +120,9 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error)
 	}
 	if err := validateCandidateIDs(input.Content); err != nil {
 		return Snapshot{}, "", err
+	}
+	if version == 5 && len(mcpGovernanceIssues(input.Content)) > 0 {
+		return Snapshot{}, "", ErrInvalidDraft
 	}
 	providers := make([]clientapi.ProviderDefinition, 0, len(input.Content.Providers))
 	for _, value := range input.Content.Providers {
@@ -172,7 +186,12 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error)
 	}
 	mcp := make([]clientapi.McpDefinition, 0, len(input.Content.Mcp))
 	for _, value := range input.Content.Mcp {
-		mcp = append(mcp, clientapi.McpDefinition{McpServerId: value.McpServerId, DisplayName: value.DisplayName, ClientProtocol: clientapi.McpDefinitionClientProtocol(value.ClientProtocol), AuthOwnership: clientapi.McpDefinitionAuthOwnership(value.AuthOwnership), RuntimePath: value.RuntimePath, Enabled: value.Enabled})
+		grants := clientMcpGrants(value.AllowedTools)
+		mode := clientapi.McpDefinitionToolAccessMode("")
+		if value.ToolAccessMode != nil {
+			mode = clientapi.McpDefinitionToolAccessMode(*value.ToolAccessMode)
+		}
+		mcp = append(mcp, clientapi.McpDefinition{ToolAccessMode: mode, AllowedTools: grants, McpServerId: value.McpServerId, DisplayName: value.DisplayName, ClientProtocol: clientapi.McpDefinitionClientProtocol(value.ClientProtocol), AuthOwnership: clientapi.McpDefinitionAuthOwnership(value.AuthOwnership), RuntimePath: value.RuntimePath, Enabled: value.Enabled})
 	}
 	// Compile assistants
 	assistants := make([]clientapi.ManagedAssistantDefinition, 0, len(input.Content.Assistants))
@@ -181,11 +200,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error)
 		for i, s := range a.MemorySeed {
 			seed[i] = strings.TrimSpace(s)
 		}
-		mcpIds := make([]clientapi.McpServerId, len(a.McpServerIds))
-		for i, m := range a.McpServerIds {
-			mcpIds[i] = clientapi.McpServerId(m)
-		}
-		sort.Slice(mcpIds, func(i, j int) bool { return mcpIds[i] < mcpIds[j] })
+		bindings := clientAssistantBindings(a.McpBindings)
 		assistants = append(assistants, clientapi.ManagedAssistantDefinition{
 			AssistantDefinitionId: a.AssistantDefinitionId,
 			DisplayName:           a.DisplayName,
@@ -193,7 +208,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error)
 			SystemPrompt:          a.SystemPrompt,
 			ModelId:               a.ModelId,
 			MemorySeed:            seed,
-			McpServerIds:          mcpIds,
+			McpBindings:           bindings,
 			Enabled:               a.Enabled,
 		})
 	}
@@ -264,10 +279,30 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error)
 		publishedBy = &value
 	}
 	metadata := snapshotMetadata{PublishedAt: input.PublishedAt.UTC(), PublishedByUserID: publishedBy}
+	var v4Assistants []clientapi.ManagedAssistantDefinitionV4
+	if version == 4 {
+		v4Assistants = make([]clientapi.ManagedAssistantDefinitionV4, 0, len(assistants))
+		for _, a := range assistants {
+			ids := []clientapi.McpServerId{}
+			for _, original := range input.Content.Assistants {
+				if original.AssistantDefinitionId == a.AssistantDefinitionId {
+					for _, id := range original.McpServerIds {
+						ids = append(ids, id)
+					}
+				}
+			}
+			sort.Strings(ids)
+			v4Assistants = append(v4Assistants, clientapi.ManagedAssistantDefinitionV4{AssistantDefinitionId: a.AssistantDefinitionId, DisplayName: a.DisplayName, Description: a.Description, SystemPrompt: a.SystemPrompt, ModelId: a.ModelId, MemorySeed: a.MemorySeed, McpServerIds: ids, Enabled: a.Enabled})
+		}
+	}
 	descriptor := snapshotDescriptor{
 		DeploymentID: input.DeploymentID, SchemaVersion: version, ManagedGeneration: input.ManagedGeneration,
 		ReleaseID: input.ReleaseID, Providers: providers, Models: models, ImageGenerators: images, TTS: tts, ASR: asr, MCP: mcp, Policy: policy, Metadata: metadata,
 		Assistants: assistants, Starters: starters,
+	}
+	if version == 4 {
+		descriptor.MCP = v4Mcp(mcp)
+		descriptor.Assistants = v4Assistants
 	}
 	payload, err := json.Marshal(descriptor)
 	if err != nil {
@@ -292,6 +327,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error)
 	snapshot.Metadata.PublishedByUserId = metadata.PublishedByUserID
 	snapshot.Assistants = assistants
 	snapshot.Starters = starters
+	snapshot.V4Assistants = v4Assistants
 	encoded, err := json.Marshal(snapshot)
 	if err != nil {
 		return Snapshot{}, "", err
@@ -336,6 +372,10 @@ func HashSnapshot(value any) (string, error) {
 		Policy: snapshot.Policy, Metadata: metadata,
 	}
 	descriptor.Assistants = snapshot.Assistants
+	if snapshot.SchemaVersion == 4 {
+		descriptor.MCP = v4Mcp(snapshot.Mcp)
+		descriptor.Assistants = snapshot.V4Assistants
+	}
 	descriptor.Starters = snapshot.Starters
 	payload, err := json.Marshal(descriptor)
 	if err != nil {
@@ -359,9 +399,9 @@ func projectionToAdminAssistants(src []clientapi.ManagedAssistantDefinition) []a
 		for j, s := range a.MemorySeed {
 			seed[j] = string(s)
 		}
-		mcpIds := make([]adminapi.McpServerId, len(a.McpServerIds))
-		for j, m := range a.McpServerIds {
-			mcpIds[j] = adminapi.McpServerId(string(m))
+		bindings := make([]adminapi.AssistantMcpBinding, len(a.McpBindings))
+		for j, m := range a.McpBindings {
+			bindings[j] = adminapi.AssistantMcpBinding{McpServerId: m.McpServerId, ToolSelection: adminapi.AssistantMcpBindingToolSelection(m.ToolSelection), ToolNames: append([]string{}, m.ToolNames...)}
 		}
 		dst[i] = adminapi.ManagedAssistantDefinition{
 			AssistantDefinitionId: adminapi.AssistantDefinitionId(a.AssistantDefinitionId),
@@ -370,7 +410,7 @@ func projectionToAdminAssistants(src []clientapi.ManagedAssistantDefinition) []a
 			SystemPrompt:          a.SystemPrompt,
 			ModelId:               adminapi.ModelId(a.ModelId),
 			MemorySeed:            seed,
-			McpServerIds:          mcpIds,
+			McpBindings:           &bindings,
 			Enabled:               a.Enabled,
 		}
 	}
@@ -485,8 +525,11 @@ func projectionToAdminAsr(src []clientapi.AsrDefinition) []adminapi.AsrDefinitio
 func projectionToAdminMcp(src []clientapi.McpDefinition) []adminapi.McpDefinition {
 	dst := make([]adminapi.McpDefinition, len(src))
 	for i, v := range src {
+		mode := adminapi.McpDefinitionToolAccessMode(v.ToolAccessMode)
 		dst[i] = adminapi.McpDefinition{
 			McpServerId: v.McpServerId, DisplayName: v.DisplayName,
+			ToolAccessMode: &mode,
+			AllowedTools:   adminMcpGrants(v.AllowedTools),
 			ClientProtocol: adminapi.McpDefinitionClientProtocol(string(v.ClientProtocol)),
 			AuthOwnership:  adminapi.McpDefinitionAuthOwnership(string(v.AuthOwnership)),
 			RuntimePath:    v.RuntimePath, Enabled: v.Enabled,

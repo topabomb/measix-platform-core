@@ -4,7 +4,7 @@ import {
   Quasar, QLayout, QPage, QPageContainer,
   QCard, QCardSection, QCardActions, QInput, QBtn, QBanner,
   QSelect, QToggle, QDialog, QSeparator, QTab, QTabs, QBadge, QChip,
-  QList, QItem, QItemSection, QItemLabel, QMarkupTable, QSpinner, QIcon,
+  QList, QItem, QItemSection, QItemLabel, QMarkupTable, QSpinner, QIcon, QInnerLoading, QCheckbox,
   QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, QBtnToggle, QExpansionItem,
   ClosePopup,
 } from 'quasar'
@@ -44,7 +44,7 @@ function mountResourcesPage() {
             QInput, QBtn, QBanner, QSelect, QToggle, QDialog, QSeparator, QTab, QTabs,
             QList, QItem, QItemSection, QItemLabel, QMarkupTable, QChip, QBadge,
             QSpinner, QIcon, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown, QBtnToggle,
-            QExpansionItem,
+            QExpansionItem, QInnerLoading, QCheckbox,
           },
           directives: { ClosePopup },
         }], pinia, router],
@@ -475,7 +475,7 @@ describe('ResourcesPage', () => {
       systemPrompt: 'Help the operator.',
       memorySeed: [],
       modelId: 'mdl_missing',
-      mcpServerIds: [],
+      mcpBindings: [],
       enabled: true,
     })
     draft.validationResult = {
@@ -1041,7 +1041,7 @@ describe('ResourcesPage', () => {
           asr: [],
           mcp: [{ mcpServerId: 'mcp_1', displayName: 'Tools', authOwnership: 'ENTERPRISE_MANAGED', enabled: true }],
           policy: { policyId: 'pol_draft', allowLocalProviders: true, allowLocalTts: false, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true, defaultModelId: 'mdl_missing', defaultTtsId: 'tts_1' },
-          assistants: [{ assistantDefinitionId: 'asd_1', displayName: 'Field Helper', description: 'Helps field engineers', enabled: true, modelId: 'mdl_1', mcpServerIds: ['mcp_1'], systemPrompt: 'Help safely', memorySeed: ['Check safety'] }],
+          assistants: [{ assistantDefinitionId: 'asd_1', displayName: 'Field Helper', description: 'Helps field engineers', enabled: true, modelId: 'mdl_1', mcpBindings: [{ mcpServerId: 'mcp_1', toolSelection: 'ALLOWLIST', toolNames: ['read'] }], systemPrompt: 'Help safely', memorySeed: ['Check safety'] }],
           starters: [{ starterId: 'str_1', assistantDefinitionId: 'asd_1', title: 'Inspect device', prompt: 'Please inspect', sortOrder: 0, enabled: true, openingSnapshot: { format: 1, systemPrompt: '', initialContexts: [{ id: 'b2', content: '{{literal}} <tag>' }, { id: 'b1', content: '' }] } }],
           diffSummary: { added: 0, changed: 0, removed: 0 },
         }

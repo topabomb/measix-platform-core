@@ -4,6 +4,14 @@
 
 ## 权威与资料入口
 
+当前未稳定 v5 已升级 Direct MCP 工具许可。Android 仓库本轮未修改；下文历史 Preview/Starter 验证不证明其已消费新许可。消费者完成更新前不能宣称当前 v5 可端到端发布部署。
+
+具体对接要求见 [Direct MCP 工具治理方案 §5](direct-mcp-tool-governance.md)。v5 必填服务器 toolAccessMode/allowedTools 与助手 mcpBindings（toolSelection/toolNames）；ALL 明确表示对已绑定服务器不限制工具，数组必须为空；ALLOWLIST 至少一项，不能把空白名单补成全部。未绑定服务器不提供该服务器工具。拒绝缺失/null/未知枚举与 v5 旧 mcpServerIds；v4 独立保留。服务器 ALL 动态发现新增工具并默认每次调用确认；服务器 ALLOWLIST 要求已批准 name/完整 JCS 合同匹配，助手 ALLOWLIST 再按名称过滤，助手 ALL 不额外过滤。全部入口复验服务器权限；用户不能编辑企业许可。
+
+`contractHash` 使用 RFC 8785 JCS 对完整原始 Tool JSON 求 SHA-256，包含 description、input/outputSchema、annotations、_meta 和扩展字段，输出 `sha256:` 加小写十六进制。保持完整 Tool 数据而非只比较 name/inputSchema；使用共享摘要向量验证 Unicode、数字与属性序列的跨语言一致性。模型工具装配与每次调用准入都执行同一许可规则；确认策略复用现有 ToolBatchRunner 暂停/继续机制。Direct 名单不用于 Gateway 原子工具对，不创建 fallback。
+
+Core 交付的是 OpenAPI、生成材料与参考用例；Android 必须另行完成解码、领域模型、目录刷新、turn snapshot、所有调用入口防绕过、审批及设备 UI 的消费者验证。详见方案 §5 的文件 owner、建议顺序和验收清单。本轮禁止通过删除旧数据或改写历史 v4 release 适配协议。
+
 语义权威在 `topabomb/measix-architecture`，本包不复制其正文，只按文档名与章节引用：
 
 - **Control Protocol**：§8 认证、§10 配置、§11 Runtime。协议语义有异议时以它为准。
@@ -62,7 +70,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | SYSTEM_TTS.speechRate/pitch | 仅设备执行，无上游绑定、Runtime URL 或企业服务器密钥。仍为企业资源，可在 allowLocalTts=false 时作为 defaultTtsId；缺少可用设备引擎须明确报错，不切换云端 |
 | ASR.asrId/displayName/upstreamModelKey/language/clientProtocol | 保留资源身份、模型及可选语言；按 clientProtocol 分派 OpenAI multipart、DashScope HTTP JSON、OpenAI Realtime 或 DashScope Realtime。实时参数按当前协议映射，不把 WebSocket 转成文件上传 |
 | MCP.mcpServerId/displayName/enabled/authOwnership | EnterpriseMcpResource.id/name/enabled；适配层保留 MCP_STREAMABLE_HTTP、runtimePath 和实际 authOwnership（ENTERPRISE_MANAGED 或 NONE）；均使用 Relay，无 OAuth/上游凭据下发 |
-| Assistant.assistantDefinitionId/displayName/description/modelId/systemPrompt/mcpServerIds/enabled | EnterpriseAssistant 对应字段；缺省 description 可展示为空字符串；引用的 modelId 是平台稳定 ID，不是请求模型名 |
+| Assistant.assistantDefinitionId/displayName/description/modelId/systemPrompt/mcpBindings/enabled | EnterpriseAssistant 对应字段；v5 mcpBindings 是服务器+ALL/ALLOWLIST+工具名，v4 独立保留 mcpServerIds；缺省 description 可展示为空字符串；modelId 是平台稳定 ID，不是请求模型名 |
 | Assistant.memorySeed[] | 按作者顺序转换为只读 Seed。内部 ID 从 deploymentId、助手 ID、generation、索引确定；空数组有效，条目不得为空白。不按内容去重、不建立可变 Assistant Memory 副本，配置替换时整体换代 |
 | Starter.starterId/assistantDefinitionId/title/prompt/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击预填输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
 | Starter.openingSnapshot（v5 required；v4 不允许） | 消费 Core 编译后已固化的 System 与有序背景；Core Draft 的空白继承在编译时完成，Android 不从当前助手重新补空值。v5 选择时绑定 Draft，首发原子保存来源与背景；背景按字面处理，领域 System 沿 Android 既有 START 模板规则渲染。额外内容默认折叠、详情按需展开；v4 仍只预填。Core 编制与历史发布边界见 Core 源仓库 `docs/starter-opening-snapshots.md` |

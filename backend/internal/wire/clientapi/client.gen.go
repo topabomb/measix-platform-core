@@ -60,6 +60,24 @@ func (e AsrDefinitionSampleRate) Valid() bool {
 	}
 }
 
+// Defines values for AssistantMcpBindingToolSelection.
+const (
+	AssistantMcpBindingToolSelectionALL       AssistantMcpBindingToolSelection = "ALL"
+	AssistantMcpBindingToolSelectionALLOWLIST AssistantMcpBindingToolSelection = "ALLOWLIST"
+)
+
+// Valid indicates whether the value is a known member of the AssistantMcpBindingToolSelection enum.
+func (e AssistantMcpBindingToolSelection) Valid() bool {
+	switch e {
+	case AssistantMcpBindingToolSelectionALL:
+		return true
+	case AssistantMcpBindingToolSelectionALLOWLIST:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BootstrapDeviceStatus.
 const (
 	ACTIVE  BootstrapDeviceStatus = "ACTIVE"
@@ -362,16 +380,16 @@ func (e ManagedStateRuntimeStatus) Valid() bool {
 
 // Defines values for McpDefinitionAuthOwnership.
 const (
-	ENTERPRISEMANAGED McpDefinitionAuthOwnership = "ENTERPRISE_MANAGED"
-	NONE              McpDefinitionAuthOwnership = "NONE"
+	McpDefinitionAuthOwnershipENTERPRISEMANAGED McpDefinitionAuthOwnership = "ENTERPRISE_MANAGED"
+	McpDefinitionAuthOwnershipNONE              McpDefinitionAuthOwnership = "NONE"
 )
 
 // Valid indicates whether the value is a known member of the McpDefinitionAuthOwnership enum.
 func (e McpDefinitionAuthOwnership) Valid() bool {
 	switch e {
-	case ENTERPRISEMANAGED:
+	case McpDefinitionAuthOwnershipENTERPRISEMANAGED:
 		return true
-	case NONE:
+	case McpDefinitionAuthOwnershipNONE:
 		return true
 	default:
 		return false
@@ -387,6 +405,75 @@ const (
 func (e McpDefinitionClientProtocol) Valid() bool {
 	switch e {
 	case McpDefinitionClientProtocolMCPSTREAMABLEHTTP:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for McpDefinitionToolAccessMode.
+const (
+	McpDefinitionToolAccessModeALL       McpDefinitionToolAccessMode = "ALL"
+	McpDefinitionToolAccessModeALLOWLIST McpDefinitionToolAccessMode = "ALLOWLIST"
+)
+
+// Valid indicates whether the value is a known member of the McpDefinitionToolAccessMode enum.
+func (e McpDefinitionToolAccessMode) Valid() bool {
+	switch e {
+	case McpDefinitionToolAccessModeALL:
+		return true
+	case McpDefinitionToolAccessModeALLOWLIST:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for McpDefinitionV4AuthOwnership.
+const (
+	McpDefinitionV4AuthOwnershipENTERPRISEMANAGED McpDefinitionV4AuthOwnership = "ENTERPRISE_MANAGED"
+	McpDefinitionV4AuthOwnershipNONE              McpDefinitionV4AuthOwnership = "NONE"
+)
+
+// Valid indicates whether the value is a known member of the McpDefinitionV4AuthOwnership enum.
+func (e McpDefinitionV4AuthOwnership) Valid() bool {
+	switch e {
+	case McpDefinitionV4AuthOwnershipENTERPRISEMANAGED:
+		return true
+	case McpDefinitionV4AuthOwnershipNONE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for McpDefinitionV4ClientProtocol.
+const (
+	McpDefinitionV4ClientProtocolMCPSTREAMABLEHTTP McpDefinitionV4ClientProtocol = "MCP_STREAMABLE_HTTP"
+)
+
+// Valid indicates whether the value is a known member of the McpDefinitionV4ClientProtocol enum.
+func (e McpDefinitionV4ClientProtocol) Valid() bool {
+	switch e {
+	case McpDefinitionV4ClientProtocolMCPSTREAMABLEHTTP:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for McpToolGrantApprovalPolicy.
+const (
+	AUTO                McpToolGrantApprovalPolicy = "AUTO"
+	REQUIRECONFIRMATION McpToolGrantApprovalPolicy = "REQUIRE_CONFIRMATION"
+)
+
+// Valid indicates whether the value is a known member of the McpToolGrantApprovalPolicy enum.
+func (e McpToolGrantApprovalPolicy) Valid() bool {
+	switch e {
+	case AUTO:
+		return true
+	case REQUIRECONFIRMATION:
 		return true
 	default:
 		return false
@@ -916,6 +1003,18 @@ type AsrId = string
 // AssistantDefinitionId defines model for AssistantDefinitionId.
 type AssistantDefinitionId = string
 
+// AssistantMcpBinding defines model for AssistantMcpBinding.
+type AssistantMcpBinding struct {
+	McpServerId McpServerId `json:"mcpServerId"`
+	ToolNames   []string    `json:"toolNames"`
+
+	// ToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+	ToolSelection AssistantMcpBindingToolSelection `json:"toolSelection"`
+}
+
+// AssistantMcpBindingToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+type AssistantMcpBindingToolSelection string
+
 // AssistantStarterDefinition defines model for AssistantStarterDefinition.
 type AssistantStarterDefinition struct {
 	AssistantDefinitionId AssistantDefinitionId   `json:"assistantDefinitionId"`
@@ -1141,6 +1240,18 @@ type ManagedAssistantDefinition struct {
 	Description           *string               `json:"description,omitempty"`
 	DisplayName           string                `json:"displayName"`
 	Enabled               bool                  `json:"enabled"`
+	McpBindings           []AssistantMcpBinding `json:"mcpBindings"`
+	MemorySeed            []string              `json:"memorySeed"`
+	ModelId               ModelId               `json:"modelId"`
+	SystemPrompt          string                `json:"systemPrompt"`
+}
+
+// ManagedAssistantDefinitionV4 defines model for ManagedAssistantDefinitionV4.
+type ManagedAssistantDefinitionV4 struct {
+	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
+	Description           *string               `json:"description,omitempty"`
+	DisplayName           string                `json:"displayName"`
+	Enabled               bool                  `json:"enabled"`
 	McpServerIds          []McpServerId         `json:"mcpServerIds"`
 	MemorySeed            []string              `json:"memorySeed"`
 	ModelId               ModelId               `json:"modelId"`
@@ -1218,14 +1329,14 @@ type ManagedSnapshotSchemaVersion int
 
 // ManagedSnapshotV4 defines model for ManagedSnapshotV4.
 type ManagedSnapshotV4 struct {
-	Asr          []AsrDefinition              `json:"asr"`
-	Assistants   []ManagedAssistantDefinition `json:"assistants"`
-	DeploymentId DeploymentId                 `json:"deploymentId"`
+	Asr          []AsrDefinition                `json:"asr"`
+	Assistants   []ManagedAssistantDefinitionV4 `json:"assistants"`
+	DeploymentId DeploymentId                   `json:"deploymentId"`
 
 	// ImageGenerators Additive Snapshot v4 field; omission means an empty list.
 	ImageGenerators   *[]ImageGenerationDefinition `json:"imageGenerators,omitempty"`
 	ManagedGeneration int                          `json:"managedGeneration"`
-	Mcp               []McpDefinition              `json:"mcp"`
+	Mcp               []McpDefinitionV4            `json:"mcp"`
 	Metadata          struct {
 		PublishedAt       time.Time `json:"publishedAt"`
 		PublishedByUserId *UserId   `json:"publishedByUserId,omitempty"`
@@ -1260,12 +1371,16 @@ type ManagedStateRuntimeStatus string
 
 // McpDefinition defines model for McpDefinition.
 type McpDefinition struct {
+	AllowedTools   []McpToolGrant              `json:"allowedTools"`
 	AuthOwnership  McpDefinitionAuthOwnership  `json:"authOwnership"`
 	ClientProtocol McpDefinitionClientProtocol `json:"clientProtocol"`
 	DisplayName    string                      `json:"displayName"`
 	Enabled        bool                        `json:"enabled"`
 	McpServerId    McpServerId                 `json:"mcpServerId"`
 	RuntimePath    string                      `json:"runtimePath"`
+
+	// ToolAccessMode ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+	ToolAccessMode McpDefinitionToolAccessMode `json:"toolAccessMode"`
 }
 
 // McpDefinitionAuthOwnership defines model for McpDefinition.AuthOwnership.
@@ -1274,8 +1389,37 @@ type McpDefinitionAuthOwnership string
 // McpDefinitionClientProtocol defines model for McpDefinition.ClientProtocol.
 type McpDefinitionClientProtocol string
 
+// McpDefinitionToolAccessMode ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+type McpDefinitionToolAccessMode string
+
+// McpDefinitionV4 defines model for McpDefinitionV4.
+type McpDefinitionV4 struct {
+	AuthOwnership  McpDefinitionV4AuthOwnership  `json:"authOwnership"`
+	ClientProtocol McpDefinitionV4ClientProtocol `json:"clientProtocol"`
+	DisplayName    string                        `json:"displayName"`
+	Enabled        bool                          `json:"enabled"`
+	McpServerId    McpServerId                   `json:"mcpServerId"`
+	RuntimePath    string                        `json:"runtimePath"`
+}
+
+// McpDefinitionV4AuthOwnership defines model for McpDefinitionV4.AuthOwnership.
+type McpDefinitionV4AuthOwnership string
+
+// McpDefinitionV4ClientProtocol defines model for McpDefinitionV4.ClientProtocol.
+type McpDefinitionV4ClientProtocol string
+
 // McpServerId defines model for McpServerId.
 type McpServerId = string
+
+// McpToolGrant defines model for McpToolGrant.
+type McpToolGrant struct {
+	ApprovalPolicy McpToolGrantApprovalPolicy `json:"approvalPolicy"`
+	ContractHash   Sha256Hash                 `json:"contractHash"`
+	Name           string                     `json:"name"`
+}
+
+// McpToolGrantApprovalPolicy defines model for McpToolGrant.ApprovalPolicy.
+type McpToolGrantApprovalPolicy string
 
 // MeterQuantity defines model for MeterQuantity.
 type MeterQuantity struct {

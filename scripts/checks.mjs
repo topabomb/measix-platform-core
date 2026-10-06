@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
@@ -16,6 +16,9 @@ export function commandResult(result) {
 export function requireSuccess(result) {
   if (result.status !== 'PASS') throw new Error(result.output || 'Command failed')
   return result
+}
+export function hasGoFormatChanges(source, formatted) {
+  return source.replaceAll('\r\n', '\n') !== formatted.replaceAll('\r\n', '\n')
 }
 function run(command, args, cwd = ROOT) {
   return commandResult(spawnSync(command, args, { cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, shell: command === 'pnpm' && process.platform === 'win32', windowsHide: true }))
@@ -43,7 +46,14 @@ function formatCheck() {
   const files = requireSuccess(run('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'backend'])).output.split('\0').filter(f => f.endsWith('.go') && existsSync(join(ROOT, f)))
   let output = ''
   for (let i = 0; i < files.length; i += 64) output += requireSuccess(run('gofmt', ['-l', ...files.slice(i, i + 64)])).output
-  return commandResult({ status: output.trim() ? 1 : 0, stdout: output })
+  // gofmt also lists correctly formatted files checked out with CRLF. Check
+  // those candidates through stdin without rewriting their checkout bytes.
+  const changed = output.split(/\r?\n/).filter(Boolean).filter(file => {
+    const source = readFileSync(join(ROOT, file), 'utf8')
+    const result = requireSuccess(commandResult(spawnSync('gofmt', [], { input: source, cwd: ROOT, encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 })))
+    return hasGoFormatChanges(source, result.output)
+  })
+  return commandResult({ status: changed.length ? 1 : 0, stdout: changed.length ? changed.join('\n') + '\n' : '' })
 }
 function driftCheck() {
   const result = run('git', ['status', '--porcelain', '--', ...GENERATED])

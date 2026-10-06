@@ -71,7 +71,33 @@
       "clientProtocol": "MCP_STREAMABLE_HTTP",
       "runtimePath": "/mcp/v1",
       "authOwnership": "ENTERPRISE_MANAGED",
-      "enabled": true
+      "enabled": true,
+      "allowedTools": [
+        {
+          "name": "search_records",
+          "contractHash": "sha256:ad05d3be806915bfeb584e0c661b079cd285cc801d75911e20aa30da45fe2e18",
+          "approvalPolicy": "REQUIRE_CONFIRMATION",
+          "definition": {
+            "name": "search_records",
+            "description": "Search enterprise records",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ]
+            },
+            "annotations": {
+              "readOnlyHint": true
+            }
+          }
+        }
+      ],
+      "toolAccessMode": "ALLOWLIST"
     }
   ],
   "bindings": [],
@@ -104,10 +130,16 @@
         "先确认事实",
         "再说明依据"
       ],
-      "mcpServerIds": [
-        "mcp_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-      ],
-      "enabled": true
+      "enabled": true,
+      "mcpBindings": [
+        {
+          "mcpServerId": "mcp_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+          "toolNames": [
+            "search_records"
+          ],
+          "toolSelection": "ALLOWLIST"
+        }
+      ]
     },
     {
       "assistantDefinitionId": "asd_22222222-2222-4222-8222-222222222222",
@@ -115,8 +147,8 @@
       "systemPrompt": "帮助用户整理周报。",
       "modelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       "memorySeed": [],
-      "mcpServerIds": [],
-      "enabled": true
+      "enabled": true,
+      "mcpBindings": []
     }
   ],
   "starters": [

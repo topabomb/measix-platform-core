@@ -90,6 +90,20 @@ func TestOldClientReleaseVersionAndAppliedBoundary(t *testing.T) {
 				return snapshot, encoded
 			}
 			original, originalBytes := storeRelease(1, 4, content)
+			if tc.version == 0 {
+				for i := range content.Mcp {
+					content.Mcp[i].ToolAccessMode = new(adminapi.McpDefinitionToolAccessMode("ALL"))
+					content.Mcp[i].AllowedTools = &[]adminapi.McpToolGrant{}
+				}
+				for i := range content.Assistants {
+					bindings := []adminapi.AssistantMcpBinding{}
+					for _, id := range content.Assistants[i].McpServerIds {
+						bindings = append(bindings, adminapi.AssistantMcpBinding{McpServerId: id, ToolSelection: "ALL", ToolNames: []string{}})
+					}
+					content.Assistants[i].McpBindings = &bindings
+					content.Assistants[i].McpServerIds = nil
+				}
+			}
 			response := doJSON(t, h, http.MethodPut, "/api/client/v1/managed/applied", headers, map[string]any{"managedGeneration": 1, "snapshotHash": original.SnapshotHash})
 			if response.Code != http.StatusNoContent {
 				t.Fatalf("v4 Applied: %d", response.Code)

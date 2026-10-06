@@ -12,7 +12,7 @@ import (
 func TestSnapshotPreservesSeedOrderAndCanonicalStarterIDs(t *testing.T) {
 	content := validDraft(platformid.New(platformid.Upstream))
 	aid := platformid.New(platformid.Assistant)
-	content.Assistants = []adminapi.ManagedAssistantDefinition{{AssistantDefinitionId: aid, ModelId: content.Models[0].ModelId, MemorySeed: []string{" z first ", "a second"}, Enabled: true}}
+	content.Assistants = []adminapi.ManagedAssistantDefinition{{McpBindings: emptyMcpBindings(), AssistantDefinitionId: aid, ModelId: content.Models[0].ModelId, MemorySeed: []string{" z first ", "a second"}, Enabled: true}}
 	content.Starters = []adminapi.AssistantStarterDefinition{
 		{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: aid, SortOrder: 0},
 		{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: aid, SortOrder: 9},

@@ -1,3 +1,4 @@
+import { mcpToolsEn, mcpValidationEn, mcpProblemsEn } from './mcpTools'
 /**
  * English (en) translations for MEASIX Admin Console.
  *
@@ -22,6 +23,7 @@
  *   - experience:   managed assistant/starter editor (ManagedExperienceEditor.vue)
  */
 export default {
+  mcpTools: mcpToolsEn,
   brand: {
     description: 'Enterprise agent governance and coordination',
   },
@@ -641,7 +643,7 @@ export default {
         voice: 'Voice', voiceDesignPrompt: 'Voice design description', language: 'Language', sampleRate: 'Sample rate',
         vadThreshold: 'VAD threshold', silenceDurationMs: 'Silence duration', prefixPaddingMs: 'Prefix padding', prompt: 'Prompt',
         authOwnership: 'Credential ownership', modelId: 'Model', mcpServerIds: 'Tools (MCP)', memorySeed: 'Memory seeds',
-        systemPrompt: 'System prompt', title: 'Title', assistantDefinitionId: 'Assistant', upstreamId: 'Upstream',
+        systemPrompt: 'System prompt', title: 'Title', assistantDefinitionId: 'Assistant', upstreamId: 'Upstream', allowedTools: 'Allowed MCP tools', mcpBindings: 'Assistant tool selection',
         resourceId: 'Resource', transportPolicy: 'Transport', allowedMethods: 'Allowed HTTP methods', allowedPathPrefixes: 'Allowed paths',
         defaultModelId: 'Default chat model', defaultFastModelId: 'Fast model', defaultTitleModelId: 'Title model',
         defaultAttachmentInspectionModelId: 'Attachment inspection model', defaultSuggestionModelId: 'Suggestion model',
@@ -649,6 +651,7 @@ export default {
         defaultTtsId: 'Default TTS', defaultAsrId: 'Default ASR', defaultAssistantId: 'Assistant for first use',
       },
       issues: {
+        ...mcpValidationEn,
         missing_starter_opening: 'Create the opening context before publishing this starter.',
         invalid_starter_opening: 'Check the opening format and background titles. Background identifiers must be nonblank and unique; remove and recreate an invalid item.',
         invalid_candidate_id: 'An internal resource ID is invalid or duplicated. Remove and recreate the affected draft item.',
@@ -1202,6 +1205,7 @@ export default {
   session: {
   },
   problem: {
+    ...mcpProblemsEn,
     workspace_unavailable: 'The workspace operation could not complete. Refresh status and check the remote service connection. Resolve any pending operation first.',
     workspace_operation_pending: 'A workspace operation is still pending. Check and resolve that operation first.',
     workspace_revision_conflict: 'The workspace state changed. Refresh and review it again.',

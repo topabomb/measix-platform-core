@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
@@ -9,6 +9,7 @@ import { useSessionStore } from '../stores/session'
 import { useRemoteWorkspaceStore } from '../stores/remoteWorkspace'
 import { useActivationStore } from '../stores/activation'
 import ManagedExperienceEditor from '../components/ManagedExperienceEditor.vue'
+import McpToolsEditor from '../components/McpToolsEditor.vue'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -56,12 +57,18 @@ const previewOpen = ref(false)
 const reviewOpen = ref(false)
 const reviewing = ref(false)
 const validating = ref(false)
-const workspaceBusy = computed(() => draft.loading || draft.saving || validating.value || previewing.value || reviewing.value || publishing.value || addingWorkspaceMcp.value)
+const workspaceBusy = computed(() => draft.loading || draft.saving || draft.discovering || validating.value || previewing.value || reviewing.value || publishing.value || addingWorkspaceMcp.value)
 const workspaceVisible = computed(() => !reviewOpen.value && !previewOpen.value)
 const upstreams = ref<Upstream[]>([])
 const upstreamsLoading = ref(false)
 const upstreamError = ref<unknown>()
 const activeTab = ref<'overview' | 'models' | 'image-generation' | 'tts' | 'asr' | 'mcp' | 'assistants' | 'policy'>('overview')
+watch(activeTab, async () => {
+  await nextTick()
+  // Long MCP catalogs must not leave the next section's first controls under
+  // the fixed application header.
+  window.scrollTo({ top: 0, behavior: 'instant' })
+})
 const experienceEditor = ref<InstanceType<typeof ManagedExperienceEditor>>()
 const asrAudioSettingsOpen = ref(false)
 const canMutate = computed(() => Boolean(session.csrfToken))
@@ -1355,6 +1362,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   </q-item>
                 </q-list>
               </q-card-section>
+              <q-separator />
+              <McpToolsEditor :mcp="selectedMcp" :disabled="!canMutate || workspaceBusy" />
             </q-card>
             <q-card v-else flat bordered>
               <q-card-section class="text-grey-7 text-center">
@@ -1648,7 +1657,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <thead><tr><th>{{ $t('resources.preview.displayName') }}</th><th>{{ $t('resources.preview.auth') }}</th><th>{{ $t('common.status') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="m in preview.mcp" :key="m.mcpServerId">
-                    <td>{{ m.displayName }}<details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ m.mcpServerId }}</details></td>
+                    <td>{{ m.displayName }}<div v-if="m.toolAccessMode === 'ALL'" class="text-caption" data-cy="preview-mcp-all">{{ $t('mcpTools.serverAll') }}</div><div v-for="tool in m.allowedTools" :key="tool.name" data-cy="preview-mcp-tool">{{ tool.name }} · {{ $t(tool.approvalPolicy === 'AUTO' ? 'mcpTools.auto' : 'mcpTools.confirm') }}<details class="text-caption"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ tool.contractHash }}</details></div><details class="text-caption text-grey-7"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ m.mcpServerId }}</details></td>
                     <td>{{ $t(`authOwnership.${m.authOwnership}`) }}</td><td>{{ m.enabled ? $t('common.enabled') : $t('common.disabled') }}</td>
                   </tr>
                 </tbody>
@@ -1662,7 +1671,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <q-item-section>
                     <q-item-label>{{ a.displayName }} <q-badge class="q-ml-xs" :color="a.enabled ? 'positive' : 'grey'" :label="a.enabled ? $t('common.enabled') : $t('common.disabled')" /></q-item-label>
                     <div v-if="a.description" data-cy="preview-assistant-description" class="text-body2 q-mt-xs">{{ a.description }}</div>
-                    <q-item-label caption data-cy="preview-assistant-summary">{{ $t('resources.preview.usesModel') }}: {{ previewModelName(a.modelId) }} · MCP: {{ previewMcpNames(a.mcpServerIds) }}</q-item-label>
+                    <q-item-label caption data-cy="preview-assistant-summary">{{ $t('resources.preview.usesModel') }}: {{ previewModelName(a.modelId) }} · MCP: {{ previewMcpNames(a.mcpBindings?.map(binding => binding.mcpServerId) ?? []) }}</q-item-label>
+                    <div v-for="binding in a.mcpBindings" :key="binding.mcpServerId" class="text-caption" data-cy="preview-assistant-tools">{{ previewMcpNames([binding.mcpServerId]) }}: {{ binding.toolSelection === 'ALL' ? $t('mcpTools.assistantAll') : binding.toolNames.join(', ') }}</div>
                     <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.preview.instructions') }}</div>
                     <p class="q-my-xs" style="white-space: pre-wrap">{{ a.systemPrompt }}</p>
                     <div v-if="a.memorySeed.length" class="text-caption text-grey-7">{{ $t('resources.preview.memorySeeds') }}</div>
@@ -1719,6 +1729,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </q-card>
     </template>
     <div v-else class="text-body2 text-grey-7">{{ $t('resources.noDraft') }}</div>
+    <q-inner-loading :showing="draft.discovering"><q-spinner size="32px" color="primary" /><div class="q-mt-sm">{{ $t('mcpTools.discovering') }}</div></q-inner-loading>
   </q-page>
 </template>
 

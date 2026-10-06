@@ -756,6 +756,12 @@ export interface components {
             /** @enum {string} */
             authOwnership: "ENTERPRISE_MANAGED" | "NONE";
             enabled: boolean;
+            /**
+             * @description ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+             * @enum {string}
+             */
+            toolAccessMode: "ALL" | "ALLOWLIST";
+            allowedTools: components["schemas"]["McpToolGrant"][];
         };
         TimeoutPolicy: {
             connectMs: number;
@@ -921,14 +927,14 @@ export interface components {
             imageGenerators?: components["schemas"]["ImageGenerationDefinition"][];
             tts: components["schemas"]["TtsDefinition"][];
             asr: components["schemas"]["AsrDefinition"][];
-            mcp: components["schemas"]["McpDefinition"][];
+            mcp: components["schemas"]["McpDefinitionV4"][];
             policy: components["schemas"]["ManagedPolicy"];
             metadata: {
                 /** Format: date-time */
                 publishedAt: string;
                 publishedByUserId?: components["schemas"]["UserId"];
             };
-            assistants: components["schemas"]["ManagedAssistantDefinition"][];
+            assistants: components["schemas"]["ManagedAssistantDefinitionV4"][];
             starters: components["schemas"]["AssistantStarterDefinitionV4"][];
         };
         ManagedAssistantDefinition: {
@@ -938,7 +944,7 @@ export interface components {
             systemPrompt: string;
             modelId: components["schemas"]["ModelId"];
             memorySeed: string[];
-            mcpServerIds: components["schemas"]["McpServerId"][];
+            mcpBindings: components["schemas"]["AssistantMcpBinding"][];
             enabled: boolean;
         };
         AssistantStarterDefinition: {
@@ -991,6 +997,41 @@ export interface components {
             enterpriseTimezone: string;
             items: components["schemas"]["EnterpriseUpdateItem"][];
             truncated: boolean;
+        };
+        McpDefinitionV4: {
+            mcpServerId: components["schemas"]["McpServerId"];
+            displayName: string;
+            /** @enum {string} */
+            clientProtocol: "MCP_STREAMABLE_HTTP";
+            runtimePath: string;
+            /** @enum {string} */
+            authOwnership: "ENTERPRISE_MANAGED" | "NONE";
+            enabled: boolean;
+        };
+        ManagedAssistantDefinitionV4: {
+            assistantDefinitionId: components["schemas"]["AssistantDefinitionId"];
+            displayName: string;
+            description?: string;
+            systemPrompt: string;
+            modelId: components["schemas"]["ModelId"];
+            memorySeed: string[];
+            mcpServerIds: components["schemas"]["McpServerId"][];
+            enabled: boolean;
+        };
+        McpToolGrant: {
+            name: string;
+            contractHash: components["schemas"]["Sha256Hash"];
+            /** @enum {string} */
+            approvalPolicy: "AUTO" | "REQUIRE_CONFIRMATION";
+        };
+        AssistantMcpBinding: {
+            mcpServerId: components["schemas"]["McpServerId"];
+            /**
+             * @description ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+             * @enum {string}
+             */
+            toolSelection: "ALL" | "ALLOWLIST";
+            toolNames: string[];
         };
     };
     responses: {

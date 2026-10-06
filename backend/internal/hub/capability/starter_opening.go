@@ -13,6 +13,9 @@ import (
 // DecodeManagedDraftContent preserves absent legacy openings. Decoding never
 // authors instructions or writes back an immutable release or a mutable draft.
 func DecodeManagedDraftContent(raw []byte, target *adminapi.ManagedDraftContent) error {
+	if err := ValidateDraftMcpJSON(raw); err != nil {
+		return err
+	}
 	if err := ValidateDraftOpeningJSON(raw); err != nil {
 		return err
 	}

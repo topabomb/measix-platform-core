@@ -40,6 +40,23 @@ describe('EnterpriseUpdatesPage', () => {
     vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [], feedRevision: 0 })
   })
 
+  it('does not submit blank or whitespace-only announcement fields', async () => {
+    const fetchSpy = vi.mocked(client.apiFetch)
+    const wrapper = mountUpdates()
+    await flushPromises()
+    await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'Create')!.trigger('click')
+    const submit = () => wrapper.findAllComponents(QBtn).filter(button => button.props('label') === 'Create').at(-1)!
+    expect(submit().props('disable')).toBe(true)
+    await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Title')!.setValue('Title')
+    await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Content')!.setValue('   ')
+    expect(submit().props('disable')).toBe(true)
+    await submit().trigger('click')
+    expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+    await wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Content')!.setValue('Body')
+    expect(submit().props('disable')).toBe(false)
+    wrapper.unmount()
+  })
+
   it('uses understandable option labels while retaining protocol values', async () => {
     const fetchSpy = vi.mocked(client.apiFetch)
     const wrapper = mountUpdates()

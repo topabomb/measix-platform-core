@@ -6,6 +6,7 @@ toolchain go1.26.5
 
 require (
 	entgo.io/ent v0.14.6
+	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
 	github.com/getkin/kin-openapi v0.145.0
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/golang-jwt/jwt/v5 v5.3.1

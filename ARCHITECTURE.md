@@ -15,6 +15,8 @@ Admin Console   → Quasar/Vue SPA build
 
 It also owns executable API contracts, the ordered database migration history, qualification/system-test infrastructure, CI and operational procedures needed to prove those components satisfy architecture.
 
+Current Direct MCP v5 tool governance is implemented in Hub capability discovery/validation/projection and the Admin resource/assistant editors; see [the implementation and Android handoff](docs/direct-mcp-tool-governance.md). The semantic authority is Control Protocol §10.7.1. Relay keeps its opaque MCP transport boundary; planned Gateway remains a separate component.
+
 This document must not restate Publish semantics, Managed State semantics, stable ID meaning, Runtime admission rules or S0 Exit requirements. Those belong to `measix-architecture`.
 
 ## 2. Source ownership and current layout

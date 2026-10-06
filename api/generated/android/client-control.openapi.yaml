@@ -2187,6 +2187,8 @@ components:
       - runtimePath
       - authOwnership
       - enabled
+      - allowedTools
+      - toolAccessMode
       properties:
         mcpServerId:
           $ref: '#/components/schemas/McpServerId'
@@ -2207,6 +2209,15 @@ components:
           - NONE
         enabled:
           type: boolean
+        toolAccessMode:
+          description: ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+          type: string
+          enum: [ALL, ALLOWLIST]
+        allowedTools:
+          type: array
+          x-uniqueProperty: name
+          items:
+            $ref: '#/components/schemas/McpToolGrant'
     TimeoutPolicy:
       type: object
       additionalProperties: false
@@ -2717,7 +2728,7 @@ components:
         mcp:
           type: array
           items:
-            $ref: '#/components/schemas/McpDefinition'
+            $ref: '#/components/schemas/McpDefinitionV4'
         policy:
           $ref: '#/components/schemas/ManagedPolicy'
         metadata:
@@ -2734,7 +2745,7 @@ components:
         assistants:
           type: array
           items:
-            $ref: '#/components/schemas/ManagedAssistantDefinition'
+            $ref: '#/components/schemas/ManagedAssistantDefinitionV4'
         starters:
           type: array
           items:
@@ -2748,7 +2759,7 @@ components:
       - systemPrompt
       - modelId
       - memorySeed
-      - mcpServerIds
+      - mcpBindings
       - enabled
       properties:
         assistantDefinitionId:
@@ -2768,10 +2779,11 @@ components:
           items:
             type: string
             minLength: 1
-        mcpServerIds:
+        mcpBindings:
           type: array
+          x-uniqueProperty: mcpServerId
           items:
-            $ref: '#/components/schemas/McpServerId'
+            $ref: '#/components/schemas/AssistantMcpBinding'
         enabled:
           type: boolean
     AssistantStarterDefinition:
@@ -2928,6 +2940,103 @@ components:
             $ref: '#/components/schemas/EnterpriseUpdateItem'
         truncated:
           type: boolean
+    McpDefinitionV4:
+      type: object
+      additionalProperties: false
+      required:
+      - mcpServerId
+      - displayName
+      - clientProtocol
+      - runtimePath
+      - authOwnership
+      - enabled
+      properties:
+        mcpServerId:
+          $ref: '#/components/schemas/McpServerId'
+        displayName:
+          type: string
+          minLength: 1
+        clientProtocol:
+          type: string
+          enum:
+          - MCP_STREAMABLE_HTTP
+        runtimePath:
+          type: string
+          pattern: ^/[^?#]*$
+        authOwnership:
+          type: string
+          enum:
+          - ENTERPRISE_MANAGED
+          - NONE
+        enabled:
+          type: boolean
+    ManagedAssistantDefinitionV4:
+      type: object
+      additionalProperties: false
+      required:
+      - assistantDefinitionId
+      - displayName
+      - systemPrompt
+      - modelId
+      - memorySeed
+      - mcpServerIds
+      - enabled
+      properties:
+        assistantDefinitionId:
+          $ref: '#/components/schemas/AssistantDefinitionId'
+        displayName:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        systemPrompt:
+          type: string
+          minLength: 1
+        modelId:
+          $ref: '#/components/schemas/ModelId'
+        memorySeed:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        mcpServerIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpServerId'
+        enabled:
+          type: boolean
+    McpToolGrant:
+      type: object
+      additionalProperties: false
+      required: [name, contractHash, approvalPolicy]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          pattern: '^[^*]+$'
+        contractHash:
+          $ref: '#/components/schemas/Sha256Hash'
+        approvalPolicy:
+          type: string
+          enum: [AUTO, REQUIRE_CONFIRMATION]
+    AssistantMcpBinding:
+      type: object
+      additionalProperties: false
+      required: [mcpServerId, toolSelection, toolNames]
+      properties:
+        mcpServerId:
+          $ref: '#/components/schemas/McpServerId'
+        toolSelection:
+          description: ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+          type: string
+          enum: [ALL, ALLOWLIST]
+        toolNames:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            pattern: '^[^*]+$'
   responses:
     Problem:
       description: Problem response

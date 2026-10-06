@@ -106,7 +106,7 @@ func TestStarterDraftSystemInheritanceIsCompiledWithoutMutatingDraft(t *testing.
 			opening := testOpening()
 			opening.SystemPrompt = tc.authored
 			content := draft.Content
-			content.Assistants = []adminapi.ManagedAssistantDefinition{{AssistantDefinitionId: assistantID, SystemPrompt: tc.assistant}}
+			content.Assistants = []adminapi.ManagedAssistantDefinition{{McpBindings: emptyMcpBindings(), AssistantDefinitionId: assistantID, SystemPrompt: tc.assistant}}
 			content.Starters = []adminapi.AssistantStarterDefinition{{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: assistantID, OpeningSnapshot: opening}}
 			snapshot, hash, err := svc.CompileSnapshot(capability.SnapshotInput{DeploymentID: boot.DeploymentID, ReleaseID: platformid.New(platformid.Release), ManagedGeneration: 1, Content: content, PublishedAt: now})
 			if err != nil {
@@ -150,7 +150,7 @@ func TestStarterInheritanceCannotBypassAssistantSystemValidation(t *testing.T) {
 			}
 			assistantID := platformid.New(platformid.Assistant)
 			draft.Content = validDraft(up.UpstreamID)
-			draft.Content.Assistants = []adminapi.ManagedAssistantDefinition{{AssistantDefinitionId: assistantID, DisplayName: "Assistant", ModelId: draft.Content.Models[0].ModelId, SystemPrompt: system, MemorySeed: []string{}, Enabled: true}}
+			draft.Content.Assistants = []adminapi.ManagedAssistantDefinition{{McpBindings: emptyMcpBindings(), AssistantDefinitionId: assistantID, DisplayName: "Assistant", ModelId: draft.Content.Models[0].ModelId, SystemPrompt: system, MemorySeed: []string{}, Enabled: true}}
 			opening := testOpening()
 			opening.SystemPrompt = ""
 			draft.Content.Starters = []adminapi.AssistantStarterDefinition{{StarterId: platformid.New(platformid.Starter), AssistantDefinitionId: assistantID, Title: "Entry", Prompt: "Start", OpeningSnapshot: opening}}

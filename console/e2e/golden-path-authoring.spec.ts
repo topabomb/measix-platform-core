@@ -491,6 +491,13 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.fill('[data-cy="mcp-display-name"]', 'E2E Test MCP')
     await selectOption(page, 'mcp-upstream-select', /e2e-upstream/)
     await page.fill('[data-cy="mcp-runtime-path"]', '/mcp')
+    await page.locator('[data-cy="mcp-discover"]').click()
+    await expect(page.locator('[data-tool-name="tool-a"]')).toBeVisible()
+    await page.locator('[data-cy="mcp-tool-mode"]').getByRole('button', { name: 'Selected tools', exact: true }).click()
+    await page.locator('[data-tool-name="tool-a"] [data-cy="mcp-tool-select"]').click()
+    await page.locator('[data-cy="mcp-tool-details"]').click()
+    await expect(page.locator('[data-cy="mcp-tool-dialog"]')).toContainText('readOnlyHint')
+    await page.locator('[data-cy="mcp-tool-dialog"] button').filter({ hasText: 'close' }).click()
 
     // --- 4g: Configure Policy ---
     await page.click('[data-cy="config-section-policy"]')
@@ -506,7 +513,7 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     for (const flag of policyFlags) {
       const toggle = page.getByRole('switch', { name: flag.label })
       await expect(toggle).toBeVisible({ timeout: 5_000 })
-      await toggle.click({ force: true })
+      await toggle.click()
       await page.waitForTimeout(300)
       await expect(toggle).toHaveAttribute('aria-checked', 'true')
     }
@@ -534,6 +541,10 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await page.locator('[data-cy="assistant-name"]').fill('E2E Assistant')
     await page.click('[data-cy="assistant-section-connections"]')
     await selectOption(page, 'assistant-model', 'E2E Test Model')
+    await page.locator('[data-cy="assistant-mcp-use"]').click()
+    await expect(page.locator('[data-cy="assistant-tools-all"]')).toBeVisible()
+    await page.locator('[data-cy="assistant-tool-mode"]').getByRole('button', { name: 'Selected tools', exact: true }).click()
+    await page.locator('[data-cy="assistant-tools-select-all"]').click()
     await page.click('[data-cy="assistant-section-prompt"]')
     await page.locator('[data-cy="assistant-prompt"]').fill('Synthetic enterprise guidance')
     await page.click('[data-cy="assistant-section-memory"]')

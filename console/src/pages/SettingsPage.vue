@@ -142,7 +142,7 @@ onMounted(refresh)
             data-cy="settings-public-origin"
             @keyup.enter="requestSave"
           />
-          <div class="text-caption text-grey-7 q-mt-xs text-break">{{ settings.deploymentId }}</div>
+          <details class="text-caption text-grey-7 q-mt-xs text-break" data-cy="settings-technical-identity"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ settings.deploymentId }}</details>
           <div class="text-caption text-grey-7">{{ $t('settings.updatedAt') }}: {{ new Date(settings.updatedAt).toLocaleString() }}</div>
         </q-card-section>
         <q-card-actions align="right" class="q-px-sm q-py-xs">
@@ -170,7 +170,7 @@ onMounted(refresh)
           </q-item>
           <q-item>
             <q-item-section><q-item-label>{{ $t('settings.portalMode') }}</q-item-label></q-item-section>
-            <q-item-section side>{{ system?.portalMode ?? '—' }}</q-item-section>
+            <q-item-section side data-cy="settings-portal-mode">{{ system?.portalMode ? $t(`system.portalModes.${system.portalMode}`) : '—' }}</q-item-section>
           </q-item>
         </q-list>
         <q-card-section class="q-py-xs text-caption text-grey-7">{{ $t('settings.runtimeHint') }}</q-card-section>

@@ -31,6 +31,7 @@ export const useDraftStore = defineStore('draft', () => {
   const dirty = ref(false)
   const loading = ref(false)
   const saving = ref(false)
+  const discovering = ref(false)
   const validationResult = ref<ValidateDraftResponse>()
   const conflictRevision = ref<number | null>()
 
@@ -121,6 +122,7 @@ export const useDraftStore = defineStore('draft', () => {
       clientProtocol: 'MCP_STREAMABLE_HTTP',
       runtimePath: '/mcp',
       authOwnership: 'NONE',
+      toolAccessMode: 'ALL', allowedTools: [],
       enabled: true,
     })
     markDirty()
@@ -133,7 +135,7 @@ export const useDraftStore = defineStore('draft', () => {
     const assistantDefinitionId = createCandidateId('asd')
     content.assistants.push({
       assistantDefinitionId, displayName, systemPrompt: '', modelId: '',
-      memorySeed: [], mcpServerIds: [], enabled: true,
+      memorySeed: [], mcpBindings: [], enabled: true,
     })
     markDirty()
     return assistantDefinitionId
@@ -346,7 +348,7 @@ export const useDraftStore = defineStore('draft', () => {
       references.push('policy.defaultAsrId')
     } else if (kind === 'MCP') {
       for (const assistant of content.assistants) {
-        if (assistant.mcpServerIds.includes(resourceId)) references.push(`assistant:${assistant.assistantDefinitionId}.mcpServerIds`)
+        if (assistant.mcpServerIds?.includes(resourceId) || assistant.mcpBindings?.some(binding => binding.mcpServerId === resourceId)) references.push(`assistant:${assistant.assistantDefinitionId}.mcpBindings`)
       }
     }
     return references
@@ -412,8 +414,26 @@ export const useDraftStore = defineStore('draft', () => {
     return validationResult.value
   }
 
+  async function discoverMcpTools(mcpServerId: string, csrfToken: string, userId?: string) {
+    if (discovering.value) return
+    if (baselineRevision.value === undefined) throw new Error('draft is not loaded')
+    discovering.value = true
+    try {
+      if (dirty.value) await save(csrfToken)
+      const result = await apiFetch<Draft>(`/api/admin/v1/draft/mcp/${encodeURIComponent(mcpServerId)}:discover`, {
+        method: 'POST', body: JSON.stringify({ expectedDraftRevision: baselineRevision.value, ...(userId ? { userId } : {}) }),
+      }, csrfToken)
+      accept(result)
+      return result
+    } catch (error) {
+      if (error instanceof ApiProblem && error.status === 409) conflictRevision.value = error.currentDraftRevision ?? null
+      throw error
+    } finally { discovering.value = false }
+  }
+
   return {
-    baselineContent, baselineRevision, localContent, dirty, loading, saving, validationResult, conflictRevision,
+    baselineContent, baselineRevision, localContent, dirty, loading, saving, discovering, validationResult, conflictRevision,
+    discoverMcpTools,
     load, save, validate, addModel, addImageGeneration, addTts, addAsr, addMcp, addAssistant, removeAssistant, addStarter, removeStarter, moveStarter, markDirty,
     bindingFor, setBinding, setRuntimePath, removeBinding, resourceReferences, removeResource, setImageGenerationProtocol, setTtsProtocol, setAsrProtocol,
   }

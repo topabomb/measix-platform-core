@@ -2,6 +2,16 @@
 
 This document defines executable-contract ownership in `measix-platform-core`. Semantic meaning remains authoritative in `topabomb/measix-architecture`.
 
+## Direct MCP v5 tool governance
+
+Control Protocol §10.7.1 owns the upgraded, unpublished v5 semantics. The implementation and Android handoff are described in [Direct MCP tool governance](direct-mcp-tool-governance.md). Client v5 requires explicit `mcp[].allowedTools[]` (`name`, full-definition JCS `contractHash`, `approvalPolicy`) and `mcp[].toolAccessMode` and `assistants[].mcpBindings[]` (`mcpServerId`, `toolSelection`, `toolNames`). Both modes are ALL / ALLOWLIST: ALL requires an empty tool array and follows dynamic discovery; ALLOWLIST requires a nonempty list. No server binding means the assistant does not use that server. Missing/null fields and unknown modes are invalid; clearing a restricted list never silently enables ALL. An ALL server requires confirmation for every invocation. v5 no longer emits assistant `mcpServerIds`. v4 has separate generated DTOs and retains its published server-level references and canonical bytes.
+
+Admin retains optional new fields so existing durable drafts can be edited without destructive migration. New servers use ALL with an empty allowlist; new assistants start with no server bindings. Selecting a server defaults its binding to ALL. Save preserves unfinished drafts; Validate/Preview/Publish require the new closed references. Legacy assistants require an explicit conversion that retains the selected servers in ALL mode. Admin stores the reviewed full definition and a private discovery catalog; neither raw definition nor discovery credentials/source identity enters Client Snapshot. Discovery metadata is excluded from release diffs and canonical projection.
+
+`POST /api/admin/v1/draft/mcp/{mcpServerId}:discover` requires an Admin session, CSRF and `expectedDraftRevision`; workspace discovery additionally requires a connected `userId`. It uses the applied upstream configuration or selected user's workspace bearer, runs bounded Streamable HTTP initialize/list pagination outside the database transaction, and atomically saves the complete catalog only after rechecking source identity and draft revision. Discovery does not approve tools. Save rejects forged catalog or newly approved definitions outside the latest verified catalog. Failed discovery preserves existing catalog and draft revision; no upstream response body, URL or credential enters the error.
+
+The generator updates OpenAPI DTOs, v5 fixtures, portal transitive client schemas and the Core-owned Android export. Android source is a separate consumer: Core-only export verification is not proof of native decoder, call admission or confirmation support.
+
 ## Portal contract synchronization
 
 [Control Protocol §8](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) owns Bridge v3 document bootstrap and correlated native operations. Portal Session and Feed data use Core HTTP only; there are no native local-read methods or phone-side Portal data source. Native OpenAPI, shared cases, Android exports and Portal consumers implement this single profile. The fixed Preview identity and evidence-index boundary are in [S0 status](s0-execution-progress.md).

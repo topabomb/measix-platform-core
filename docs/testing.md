@@ -81,6 +81,14 @@ Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`
 
 ## 5. Determinism and real boundaries
 
+### Direct MCP v5 governance verification
+
+The current implementation, Android handoff and executed candidate evidence are recorded in [Direct MCP tool governance §7](direct-mcp-tool-governance.md). Contract/hash-vector, Hub discovery/draft/workspace and HTTP boundary tests cover ALL/ALLOWLIST, binding removal, nonempty restrictions and disabled-source preservation. The editors verify discovery failure, explicit drift review, search clearing, default ALL on binding and no silent widening when an allowlist is emptied. The browser harness adds `mcp-tool-governance.spec.ts` after authoring and before runtime traffic, against the same production Admin, Hub/Relay and deterministic MCP.
+
+`node scripts/checks.mjs fmt` ignores checkout-only CRLF differences after comparing actual gofmt output; it still rejects formatting drift and never rewrites files. Portal independently runs generation, typecheck/unit/build and both STANDARD/CUSTOM real browser lanes. Android consumer/device evidence remains separate and pending for this increment.
+
+`node scripts/e2e-harness.mjs --keep --manual` pauses after authoring and writes synthetic local test credentials in the isolated temp directory; use the real Admin UI for manual checks, then press Enter to continue the automated MCP/runtime/usage/topology phases. Failure injection lives only in the deterministic adapter. Manual screenshots and automatic 320px screenshots are local `.artifacts` evidence. This lane does not prove Android adoption or a new stage Freeze; its final report records dirty source/architecture state.
+
 ### Browser candidate execution
 
 `make s01-browser-candidate` builds the production Admin SPA and runs `node scripts/e2e-harness.mjs` with isolated SQLite, ports, keys, Hub/Relay processes and a deterministic Adapter. `golden-path-authoring.spec.ts` configures and publishes through the browser; the Test Client generates runtime traffic in the same environment; `golden-path-usage.spec.ts` then checks Usage/System. `topology-security.spec.ts` covers the public/private boundary. Do not combine results from unrelated databases into one business-flow claim. Playwright JSON defaults to `.artifacts/e2e-playwright.json`; failures retain traces. For a failure, record the exact commit, command, browser version, failing request/response and process teardown result before changing a timeout or assertion. This lane is browser evidence, not Android device or real supplier qualification.
@@ -353,6 +361,8 @@ This turns TDD from a convention into an enforceable development loop: Red may e
 No production token, Secret, enrollment code, refresh credential, real conversation or sensitive prompt may appear in fixtures, logs or artifacts. Security scenarios additionally assert that protected material does not appear in responses, DOM/persistent browser state, managed Snapshot or usage events.
 
 ## 20. Starter v5 cross-consumer verification
+
+Direct MCP v5 与 Admin 2026-10-06 增量的完整验证见 [工具治理实施](direct-mcp-tool-governance.md#7-验证计划与证据)及 [Admin 全页审查](admin-console-review-2026-10-06.md)。`node scripts/e2e-harness.mjs` 顺序运行 authoring、MCP 治理、五类 Runtime、usage、topology 和 Admin 全路由 review。后两类 UI 验证均用生产 SPA 与真实 API；review 在 1280/320px 检查 11 个页面与公告必填保护，MCP 验证另覆盖 64 工具搜索和有界分页。Android lane 仍仅在显式指定设备时执行。
 
 `MEASIX_E2E_ANDROID_SERIAL=emulator-5562 node scripts/e2e-harness.mjs` adds an opt-in native lane after the real Admin authoring/publish flow. Install the matching debug and androidTest APKs on a dedicated, fresh unbound emulator first; the harness never installs or clears app data and rejects the retained production-demo emulator. `ADB` may select the executable. The public Admin API issues temporary enrollment, adb reverse preserves canonical origin, and Android performs the actual HTTP sync, UI prefill/send, Room readback and context-detail reopen. The deterministic adapter verifies the exact published opening and absence of an additional Assistant System. Only synthetic request bodies are captured; transient enrollment files and reverse mapping are removed in finally. This is local Core/Android evidence, not a production-model or physical-device gate.
 

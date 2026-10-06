@@ -23,6 +23,8 @@ const INPUTS = [
   'measix-platform-core/api/fixtures/workspace/projection-files-only.json',
   'measix-platform-core/api/fixtures/problem/managed-snapshot-required.json',
   'measix-platform-core/docs/android-platform-integration.md',
+  'measix-platform-core/docs/direct-mcp-tool-governance.md',
+  'measix-platform-core/docs/admin-console-review-2026-10-06.md',
 ]
 
 function files(path) {

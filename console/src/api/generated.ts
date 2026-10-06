@@ -324,6 +324,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/draft/mcp/{mcpServerId}:discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Discover the saved draft source without calling tools; replace candidates only after complete success and revision/source recheck. */
+        post: operations["discoverMcpTools"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/draft:validate": {
         parameters: {
             query?: never;
@@ -1389,6 +1406,13 @@ export interface components {
             /** @enum {string} */
             authOwnership: "ENTERPRISE_MANAGED" | "NONE";
             enabled: boolean;
+            toolDiscovery?: components["schemas"]["McpToolDiscovery"];
+            /**
+             * @description ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+             * @enum {string}
+             */
+            toolAccessMode?: "ALL" | "ALLOWLIST";
+            allowedTools?: components["schemas"]["McpToolGrant"][];
         };
         TimeoutPolicy: {
             connectMs: number;
@@ -1450,8 +1474,10 @@ export interface components {
             systemPrompt: string;
             modelId: components["schemas"]["ModelId"];
             memorySeed: string[];
-            mcpServerIds: components["schemas"]["McpServerId"][];
+            /** @description Retained legacy draft references; explicit tool selection required before v5 publication. */
+            mcpServerIds?: components["schemas"]["McpServerId"][];
             enabled: boolean;
+            mcpBindings?: components["schemas"]["AssistantMcpBinding"][];
         };
         AssistantStarterDefinition: {
             starterId: components["schemas"]["StarterId"];
@@ -2327,6 +2353,42 @@ export interface components {
             contentFormat: components["schemas"]["EnterpriseUpdateContentFormat"];
             category: components["schemas"]["EnterpriseUpdateCategory"];
             severity: components["schemas"]["EnterpriseUpdateSeverity"];
+        };
+        /** @description Complete raw MCP Tool object including extension fields; checked by discovery and RFC 8785 hashing. */
+        McpToolDefinition: {
+            [key: string]: unknown;
+        };
+        McpDiscoveredTool: {
+            name: string;
+            contractHash: components["schemas"]["Sha256Hash"];
+            definition: components["schemas"]["McpToolDefinition"];
+        };
+        McpToolDiscovery: {
+            userId?: components["schemas"]["UserId"];
+            sourceHash: components["schemas"]["Sha256Hash"];
+            /** Format: date-time */
+            discoveredAt: string;
+            tools: components["schemas"]["McpDiscoveredTool"][];
+        };
+        DiscoverMcpToolsRequest: {
+            expectedDraftRevision: number;
+            userId?: components["schemas"]["UserId"];
+        };
+        McpToolGrant: {
+            name: string;
+            contractHash: components["schemas"]["Sha256Hash"];
+            /** @enum {string} */
+            approvalPolicy: "AUTO" | "REQUIRE_CONFIRMATION";
+            definition: components["schemas"]["McpToolDefinition"];
+        };
+        AssistantMcpBinding: {
+            mcpServerId: components["schemas"]["McpServerId"];
+            /**
+             * @description ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+             * @enum {string}
+             */
+            toolSelection: "ALL" | "ALLOWLIST";
+            toolNames: string[];
         };
     };
     responses: {
@@ -3216,6 +3278,41 @@ export interface operations {
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    discoverMcpTools: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                mcpServerId: components["schemas"]["McpServerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoverMcpToolsRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated draft with discovery candidates and a new revision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
         };
     };
     validateDraft: {

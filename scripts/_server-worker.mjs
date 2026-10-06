@@ -12,6 +12,7 @@ import { readFileSync, statSync } from 'node:fs'
 
 const { spaPort, spaDir, adapterPort, hubPort, relayPort, captureStarterRequests = false } = workerData
 let starterCapture = null
+let mcpMode = 'initial'
 
 // --- MIME types ---
 const MIME_TYPES = {
@@ -48,6 +49,12 @@ const adapterServer = http.createServer((req, res) => {
     } catch {}
 
     const path = url.pathname
+    // Isolated deterministic adapter control; never mounted by production Hub.
+    if (path === '/__mcp_mode' && req.method === 'POST') {
+      if (!['initial', 'added', 'drift', 'deleted', 'failure', 'large'].includes(bodyJSON?.mode)) { res.writeHead(400); res.end(); return }
+      mcpMode = bodyJSON.mode
+      res.writeHead(204); res.end(); return
+    }
     if (path === '/v1/chat/completions') {
       if (captureStarterRequests && starterCapture && Array.isArray(bodyJSON?.messages)) {
         const userTexts = bodyJSON.messages.filter(message => message.role === 'user').flatMap(message =>
@@ -111,6 +118,7 @@ const adapterServer = http.createServer((req, res) => {
       return
     }
     if (path === '/mcp') {
+      if (mcpMode === 'failure') { res.writeHead(503); res.end('private adapter error'); return }
       if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
       if (bodyJSON?.jsonrpc !== '2.0' || typeof bodyJSON.method !== 'string') {
         res.writeHead(400, { 'Content-Type': 'application/json' })
@@ -121,7 +129,11 @@ const adapterServer = http.createServer((req, res) => {
       const result = bodyJSON.method === 'initialize'
         ? { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'measix-test-adapter', version: '1.0.0' } }
         : bodyJSON.method === 'tools/list'
-          ? { tools: [{ name: 'tool-a', inputSchema: { type: 'object' } }] }
+          ? { tools: mcpMode === 'deleted' ? [] : [
+            { name: 'tool-a', description: mcpMode === 'drift' ? 'Changed read contract' : 'Read enterprise records', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true } },
+            ...(mcpMode === 'added' || mcpMode === 'drift' ? [{ name: 'tool-new', description: 'Newly discovered tool', inputSchema: { type: 'object' } }] : []),
+            ...(mcpMode === 'large' ? Array.from({ length: 63 }, (_, index) => ({ name: `tool-${String(index).padStart(3, '0')}`, description: `Enterprise catalog item ${index}`, inputSchema: { type: 'object' } })) : []),
+          ] }
           : bodyJSON.method === 'tools/call'
             ? { content: [{ type: 'text', text: 'tool-a executed' }] }
             : null

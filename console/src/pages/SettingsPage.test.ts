@@ -54,6 +54,8 @@ describe('SettingsPage', () => {
     expect(wrapper.text()).toContain('Asia/Shanghai')
     expect(wrapper.text()).toContain('https://core.example')
     expect(wrapper.text()).toContain('deployment-owned')
+    expect(wrapper.get('[data-cy="settings-portal-mode"]').text()).toBe('Standard workbench')
+    expect(wrapper.get('[data-cy="settings-technical-identity"]').element).not.toHaveProperty('open', true)
   })
 
   it('saves the trimmed name with optimistic revision and CSRF', async () => {

@@ -31,11 +31,14 @@ func TestSharedClientReferenceCases(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			updated, err := svc.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, c.Content)
+			// These compiler projection recipes deliberately omit private discovery
+			// provenance. Seed them as reference-test inputs, never as Admin writes.
+			data, err := json.Marshal(c.Content)
 			if err != nil {
 				t.Fatal(err)
 			}
-			result, err := svc.ValidateDraft(ctx, updated.DraftRevision)
+			store.Client.ManagedDraft.UpdateOneID(draft.DraftID).SetContentJSON(data).SetUpdatedByUserID(boot.AdminUserID).SaveX(ctx)
+			result, err := svc.ValidateDraft(ctx, draft.DraftRevision)
 			if err != nil {
 				t.Fatal(err)
 			}

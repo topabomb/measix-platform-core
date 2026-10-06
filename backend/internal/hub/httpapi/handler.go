@@ -526,6 +526,9 @@ func decodeStrictJSON(r *http.Request, target any) error {
 		if err := capability.ValidateDraftOpeningJSON(envelope["content"]); err != nil {
 			return err
 		}
+		if err := capability.ValidateDraftMcpJSON(envelope["content"]); err != nil {
+			return err
+		}
 		if err := json.Unmarshal(content["policy"], &policy); err != nil {
 			return err
 		}

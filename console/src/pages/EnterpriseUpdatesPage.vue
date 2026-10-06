@@ -82,6 +82,8 @@ const editContentFormat = ref<EnterpriseUpdateContentFormat>('PLAIN')
 const editCategory = ref<EnterpriseUpdateCategory>('NOTICE')
 const editSeverity = ref<EnterpriseUpdateSeverity>('INFO')
 const editing = ref(false)
+const canCreate = computed(() => Boolean(session.csrfToken && createTitle.value.trim() && createContent.value.trim()) && !creating.value)
+const canEdit = computed(() => Boolean(session.csrfToken && editItem.value && editTitle.value.trim() && editContent.value.trim()) && !editing.value)
 
 // Detail dialog
 const detailOpen = ref(false)
@@ -109,6 +111,7 @@ watch(search, () => {
 watch(statusFilter, () => { void refresh() })
 
 function openCreate() {
+  error.value = undefined
   createTitle.value = ''
   createContent.value = ''
   createContentFormat.value = 'PLAIN'
@@ -118,7 +121,7 @@ function openCreate() {
 }
 
 async function submitCreate() {
-  if (!session.csrfToken) return
+  if (!canCreate.value) return
   creating.value = true
   error.value = undefined
   try {
@@ -156,7 +159,7 @@ function openEdit(item: EnterpriseUpdate) {
 }
 
 async function submitEdit() {
-  if (!session.csrfToken || !editItem.value) return
+  if (!canEdit.value || !editItem.value) return
   editing.value = true
   error.value = undefined
   try {
@@ -323,7 +326,7 @@ onBeforeUnmount(() => {
         <q-separator />
         <q-card-actions align="right">
           <q-btn flat icon="arrow_back" :label="$t('common.cancel')" color="primary" @click="createOpen = false" />
-          <q-btn unelevated color="primary" :label="$t('common.create')" :loading="creating" @click="submitCreate" />
+          <q-btn unelevated color="primary" :label="$t('common.create')" :loading="creating" :disable="!canCreate" @click="submitCreate" />
         </q-card-actions>
       </q-card>
 
@@ -346,7 +349,7 @@ onBeforeUnmount(() => {
         <q-separator />
         <q-card-actions align="right">
           <q-btn flat icon="arrow_back" :label="$t('common.cancel')" color="primary" @click="editOpen = false" />
-          <q-btn unelevated color="primary" :label="$t('common.save')" :loading="editing" @click="submitEdit" />
+          <q-btn unelevated color="primary" :label="$t('common.save')" :loading="editing" :disable="!canEdit" @click="submitEdit" />
         </q-card-actions>
       </q-card>
 

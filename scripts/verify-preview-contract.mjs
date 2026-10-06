@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
+import { releaseAndroidRoot } from './lib/release-paths.mjs'
 
 export function androidContractFailures(clientSchema, coreManifest, androidSchema, androidManifest, platformWire) {
   const failures = []
@@ -22,7 +23,7 @@ export function androidContractFailures(clientSchema, coreManifest, androidSchem
 function main() {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
   const portal = resolve(root, '..', 'measix-enterprise-portal')
-  const android = resolve(root, '..', '..', 'rikkahub_mcp')
+  const android = releaseAndroidRoot(root)
   const baseline = JSON.parse(readFileSync(join(root, 'api', 'protocol-baseline.json'), 'utf8'))
   const failures = []
   for (const [name, expected] of Object.entries(baseline.documents ?? {})) {

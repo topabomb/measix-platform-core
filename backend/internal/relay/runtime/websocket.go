@@ -252,7 +252,9 @@ func (o *webSocketFrameObserver) consumeFrame() bool {
 }
 
 func (o *webSocketFrameObserver) inflate(compressed []byte) ([]byte, error) {
-	payload := append(append([]byte(nil), compressed...), 0x00, 0x00, 0xff, 0xff)
+	// RFC 7692 removes the sync-flush tail. Restore it and finish the raw
+	// DEFLATE stream with an empty final block so a valid message ends at EOF.
+	payload := append(append([]byte(nil), compressed...), 0x00, 0x00, 0xff, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff)
 	var reader io.ReadCloser
 	if len(o.dictionary) > 0 && !o.noContextTakeover {
 		reader = flate.NewReaderDict(bytes.NewReader(payload), o.dictionary)
@@ -266,10 +268,17 @@ func (o *webSocketFrameObserver) inflate(compressed []byte) ([]byte, error) {
 	}
 	if o.noContextTakeover {
 		o.dictionary = nil
-	} else if len(decoded) > 32768 {
-		o.dictionary = append(o.dictionary[:0], decoded[len(decoded)-32768:]...)
 	} else {
-		o.dictionary = append(o.dictionary[:0], decoded...)
+		// Context takeover retains the last 32 KiB across messages, including
+		// history preceding short messages.
+		const window = 32768
+		if len(decoded) >= window {
+			o.dictionary = append(o.dictionary[:0], decoded[len(decoded)-window:]...)
+		} else {
+			keep := min(len(o.dictionary), window-len(decoded))
+			copy(o.dictionary, o.dictionary[len(o.dictionary)-keep:])
+			o.dictionary = append(o.dictionary[:keep], decoded...)
+		}
 	}
 	return decoded, nil
 }

@@ -10,6 +10,8 @@ For the S0.2 internal Preview, `node scripts/build-preview-release.mjs <version>
 
 ### Core / Android protocol promotion
 
+Both preview packaging and `node scripts/verify-preview-contract.mjs` use `MEASIX_RELEASE_ANDROID_ROOT` for the Android checkout. Set it to the appropriate path on each computer; no machine-specific absolute path belongs in the repository. Without an override, both retain the existing `../../rikkahub_mcp` layout relative to Core.
+
 The implementation order, rolling support policy, failure-isolation requirements and device acceptance steps are maintained in [API contracts §11](api-contracts.md#11-coreandroid-协议升级参考与-v5-收敛计划). Follow that workflow for every Snapshot or control API change; a matching contract hash alone is not compatibility evidence.
 
 `release.json.compatibility` records three separate source identities: `snapshotSchemaVersions` is Core's supported release set, `snapshotPublicationSchemaVersion` is its new-publication format, and `androidSnapshotSchemaVersions` is the pinned Android build's explicit consumption set. The builder reads these from their implementation owners and rejects indeterminate sets; it does not infer Android support from Core, App version or a continuous range. These fields describe builds, not the active server release or a successful device run.

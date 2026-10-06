@@ -130,7 +130,7 @@ func NewRemote(raw string, client *http.Client) (http.Handler, error) {
 			return
 		}
 		defer response.Body.Close()
-		if response.StatusCode >= 300 && response.StatusCode < 400 {
+		if response.StatusCode >= 300 && response.StatusCode < 400 && response.StatusCode != http.StatusNotModified {
 			http.Error(w, "Portal upstream redirect rejected", http.StatusBadGateway)
 			return
 		}
@@ -140,7 +140,7 @@ func NewRemote(raw string, client *http.Client) (http.Handler, error) {
 			}
 		}
 		w.WriteHeader(response.StatusCode)
-		if r.Method == http.MethodGet {
+		if r.Method == http.MethodGet && response.StatusCode != http.StatusNotModified {
 			_, _ = io.Copy(w, response.Body)
 		}
 	}), nil

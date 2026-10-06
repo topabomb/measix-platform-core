@@ -5,6 +5,7 @@
 package adapter
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,13 +34,16 @@ type Adapter struct {
 	URL      string
 	ttsBytes []byte
 
-	mu            sync.Mutex
-	facts         []*RequestFact
-	cancelled     bool
-	timeout       time.Duration
-	server        *httptest.Server
-	injectHeaders map[string]string
-	injectStatus  int
+	mu                sync.Mutex
+	facts             []*RequestFact
+	cancelled         bool
+	cancellationCount int
+	activeStreams     int
+	streamRelease     chan struct{}
+	timeout           time.Duration
+	server            *httptest.Server
+	injectHeaders     map[string]string
+	injectStatus      int
 }
 
 // New starts a deterministic adapter on a random loopback port.
@@ -53,7 +57,48 @@ func New() *Adapter {
 }
 
 // Close shuts down the adapter server.
-func (a *Adapter) Close() { a.server.Close() }
+func (a *Adapter) Close() {
+	a.ReleaseChatStreams()
+	a.server.Close()
+}
+
+// HoldChatStreams keeps chat streams unfinished after their first flushed event.
+// Tests can cancel only after actually receiving that event, without sleep races.
+func (a *Adapter) HoldChatStreams() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.streamRelease == nil {
+		a.streamRelease = make(chan struct{})
+	}
+}
+
+func (a *Adapter) ReleaseChatStreams() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.streamRelease != nil {
+		close(a.streamRelease)
+		a.streamRelease = nil
+	}
+}
+
+func (a *Adapter) ActiveStreams() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.activeStreams
+}
+
+func (a *Adapter) CancellationCount() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cancellationCount
+}
+
+func (a *Adapter) recordCancellation() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cancelled = true
+	a.cancellationCount++
+}
 
 // Bytes returns the deterministic TTS binary payload.
 func (a *Adapter) Bytes() []byte { return a.ttsBytes }
@@ -110,6 +155,7 @@ func (a *Adapter) ClearCancelled() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.cancelled = false
+	a.cancellationCount = 0
 }
 
 // SetTimeout makes every subsequent request sleep before responding.
@@ -121,20 +167,21 @@ func (a *Adapter) SetTimeout(d time.Duration) {
 
 func (a *Adapter) serve(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
-	if a.timeout > 0 {
-		time.Sleep(a.timeout)
-	}
+	timeout := a.timeout
 	a.mu.Unlock()
+	if timeout > 0 {
+		timer := time.NewTimer(timeout)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-r.Context().Done():
+			a.recordCancellation()
+			return
+		}
+	}
 
 	fact := a.capture(r)
 	a.record(fact)
-
-	go func() {
-		<-r.Context().Done()
-		a.mu.Lock()
-		a.cancelled = true
-		a.mu.Unlock()
-	}()
 
 	switch {
 	case r.URL.Path == "/v1/realtime" || r.URL.Path == "/api-ws/v1/realtime":
@@ -269,6 +316,15 @@ func (a *Adapter) handleChat(w http.ResponseWriter, r *http.Request, fact *Reque
 		}
 	}
 	if streaming {
+		a.mu.Lock()
+		release := a.streamRelease
+		a.activeStreams++
+		a.mu.Unlock()
+		defer func() {
+			a.mu.Lock()
+			a.activeStreams--
+			a.mu.Unlock()
+		}()
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(http.StatusOK)
@@ -280,16 +336,35 @@ func (a *Adapter) handleChat(w http.ResponseWriter, r *http.Request, fact *Reque
 			`data: {"id":"1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
 			`data: [DONE]`,
 		}
-		for _, c := range chunks {
-			_, _ = io.WriteString(w, c+"\n\n")
+		for index, c := range chunks {
+			if _, err := io.WriteString(w, c+"\n\n"); err != nil {
+				a.recordCancellation()
+				return
+			}
 			if flusher != nil {
 				flusher.Flush()
+			}
+			if index == 0 && release != nil {
+				if waitForStreamRelease(r.Context(), release) {
+					a.recordCancellation()
+					return
+				}
 			}
 		}
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = io.WriteString(w, `{"id":"1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}]}`)
+}
+
+// Handler-return cancellation is deliberately excluded: it is normal completion.
+func waitForStreamRelease(ctx context.Context, release <-chan struct{}) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	case <-release:
+		return false
+	}
 }
 
 func (a *Adapter) handleSpeech(w http.ResponseWriter, r *http.Request) {

@@ -17,6 +17,42 @@ test('required backend evidence selectors name existing tests', () => {
   assert.deepEqual(missing,[])
 })
 
+test('CAP usage evidence requires both current browser scenarios and rejects missing or failed results', t => {
+  const root = resolve(import.meta.dirname, '..')
+  const artifact = resolve(root, '.artifacts/e2e-playwright.json')
+  const files = ['golden-path-authoring.spec.ts', 'golden-path-usage.spec.ts']
+  const titles = files.map(file => {
+    const source = readFileSync(resolve(root, 'console/e2e', file), 'utf8')
+    const title = [...source.matchAll(/test\('([^']+)'/g)].map(match => match[1]).find(title => title.startsWith('CAP-C6-001-'))
+    assert.ok(title, file)
+    return title
+  })
+  let results = new Map(titles.map(title => [title, 'passed']))
+  const originalRead = fs.readFileSync
+  const originalExists = fs.existsSync
+  t.mock.method(fs, 'existsSync', path => resolve(String(path)) === artifact || originalExists(path))
+  t.mock.method(fs, 'readFileSync', (path, ...args) => resolve(String(path)) === artifact
+    ? JSON.stringify({ suites: [{ specs: [...results].map(([title, status]) => ({ title, tests: [{ results: [{ status }] }] })) }] })
+    : originalRead(path, ...args))
+  syncBuiltinESMExports()
+  const evaluate = () => compileScenarioResults().find(row => row.id === 'CAP-C6-001')
+  try {
+    assert.equal(evaluate().result, 'PASS')
+    for (const title of titles) {
+      results = new Map(titles.map(title => [title, 'passed']))
+      results.delete(title)
+      assert.equal(evaluate().result, 'NOT_EXECUTED', title)
+      assert.ok(scenarioResultErrors([evaluate()]).length > 0)
+      results.set(title, 'failed')
+      assert.equal(evaluate().result, 'FAIL', title)
+      assert.ok(scenarioResultErrors([evaluate()]).length > 0)
+    }
+  } finally {
+    t.mock.restoreAll()
+    syncBuiltinESMExports()
+  }
+})
+
 test('CAP current wire gate requires every backend result including v5 opening isolation', t => {
   const root = resolve(import.meta.dirname, '..')
   const scenarios = JSON.parse(readFileSync(resolve(root, 'scripts/scenario-definitions.json'), 'utf8'))

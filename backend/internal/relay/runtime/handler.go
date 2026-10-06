@@ -320,10 +320,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) serveWithMeteringDegraded(w http.ResponseWriter, r *http.Request, route control.Route, upstream control.Upstream, runtimePath, requestID string, maxRequestBytes int64, reason string) {
-	if route.WorkspaceServiceID != "" {
-		writeProblem(w, http.StatusServiceUnavailable, "workspace_budget_unavailable", "Workspace budget admission is unavailable", requestID, nil, false)
-		return
-	}
 	slog.Warn("runtime request proceeding while budget or metering is degraded", "event", "runtime.metering_degraded", "requestId", requestID, "reason", reason)
 	h.serveProxy(w, r, route, upstream, runtimePath, requestID, &proxyResult{}, maxRequestBytes)
 }

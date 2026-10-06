@@ -5,11 +5,12 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { snapshotVersions, androidSnapshotVersions } from './lib/harness.mjs'
+import { releaseAndroidRoot } from './lib/release-paths.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORTAL = resolve(ROOT, '..', 'measix-enterprise-portal')
 const ARCHITECTURE = resolve(ROOT, '..', 'measix-architecture')
-const ANDROID = resolve(process.env.MEASIX_RELEASE_ANDROID_ROOT || resolve(ROOT, '..', '..', 'rikkahub_mcp'))
+const ANDROID = releaseAndroidRoot(ROOT)
 const version = process.argv[2]
 if (!version || !/^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$/.test(version)) fail('Usage: node scripts/build-preview-release.mjs <version>')
 if (!existsSync(join(PORTAL, 'package.json'))) fail(`Portal repository not found: ${PORTAL}`)

@@ -276,8 +276,8 @@ func TestBaseline(t *testing.T) {
 	t.Logf("BASELINE concurrent streaming duration (10 streams): %v", concDuration)
 
 	// --- §17.5b: 50-request concurrent burst ---
-	// Run a same-user burst to measure bounded memory growth and verify that
-	// requests above the configured in-flight budget are shed explicitly.
+	// Default UNLIMITED must admit the whole same-user burst. Metering
+	// lifecycle rows do not constitute an admission cap (usage-budget §5).
 	relayMemBeforeConc50 := env.RelayProcessMetrics()
 	conc50Start := time.Now()
 	conc50WG := make(chan error, 50)
@@ -297,17 +297,14 @@ func TestBaseline(t *testing.T) {
 	conc50Rejected := 0
 	for i := 0; i < 50; i++ {
 		if err := <-conc50WG; err != nil {
-			if strings.Contains(err.Error(), "code=in_flight_limit") {
-				conc50Rejected++
-				continue
-			}
+			conc50Rejected++
 			t.Errorf("concurrent stream burst #%d: %v", i, err)
 			continue
 		}
 		conc50Allowed++
 	}
-	if conc50Allowed == 0 || conc50Rejected == 0 {
-		t.Errorf("50-request burst did not exercise both admission and load shedding: allowed=%d rejected=%d", conc50Allowed, conc50Rejected)
+	if conc50Allowed != 50 || conc50Rejected != 0 {
+		t.Errorf("default unlimited burst must admit every request: allowed=%d rejected=%d", conc50Allowed, conc50Rejected)
 	}
 	conc50Duration := time.Since(conc50Start)
 	relayMemAfterConc50 := env.RelayProcessMetrics()
@@ -369,13 +366,14 @@ func TestBaseline(t *testing.T) {
 	// Start a streaming request and cancel it mid-stream, measure cleanup time.
 	// Verify the adapter actually observed the cancellation.
 	ad.ClearCancelled()
+	ad.HoldChatStreams()
 	cancelStart := time.Now()
-	cancelCtx, cancelFn := context.WithCancel(ctx)
-	go func() {
-		time.Sleep(100 * time.Millisecond) // Let the stream start
-		cancelFn()
-	}()
-	_ = tc.ChatCompletionStream(cancelCtx, ids.model, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, func([]byte) {})
+	cancelCtx, cancelFn := context.WithTimeout(ctx, 3*time.Second)
+	err = tc.ChatCompletionStream(cancelCtx, ids.model, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, func([]byte) { cancelFn() })
+	cancelFn()
+	if err == nil {
+		t.Fatal("held stream completed without cancellation")
+	}
 	cancelCleanupTime := time.Since(cancelStart)
 	t.Logf("BASELINE cancel release time: %v", cancelCleanupTime)
 
@@ -383,11 +381,15 @@ func TestBaseline(t *testing.T) {
 	// This proves cancel propagation through Relay, not just local context cancellation.
 	cancelObserved := false
 	for i := 0; i < 10; i++ {
-		if ad.Cancelled() {
+		if ad.CancellationCount() == 1 && ad.ActiveStreams() == 0 {
 			cancelObserved = true
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+	ad.ReleaseChatStreams()
+	if !cancelObserved {
+		t.Fatal("upstream did not release the cancelled stream")
 	}
 	t.Logf("BASELINE cancel adapter observed: %v", cancelObserved)
 

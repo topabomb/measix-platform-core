@@ -48,6 +48,8 @@ Core 的十四个云端协议/profile 为 4 LLM + 2 Image Generation + 3 TTS + 4
 
 四种 LLM 均必须产出一次调用、INPUT_TOKENS、OUTPUT_TOKENS、TOTAL_TOKENS；单个请求不能取得某项时该项显式 UNKNOWN/PARTIAL。缓存/推理为可得明细，不额外扣第二份预算。整数非负、字段关系矛盾、相同事件重复及 stream 中断均需有固定样例。
 
+SSE 旁路观察的单行、单事件及 Responses 去重键总字节分别最多 2 MiB；单事件最多 4096 个 data 行，去重历史最多 1024 个计量/终止事件，内容 delta 不保留历史。诊断最多 32 条、每条消息最多 512 字节。触及上界后释放观察缓冲与历史，保留已知量为 PARTIAL、缺失量为 UNKNOWN，并记录 `response_usage_observation_limit`；后续业务字节仍原样转发，不能因后续终止事件将结果升级为 EXACT。限制按事件而非整个 stream 累计，正常长流仍可计量。
+
 | clientProtocol | 最小传输与取值 | 合并/归一化方法 |
 |---|---|---|
 | `OPENAI_CHAT_COMPLETIONS` | POST chat/completions 的 JSON 与 SSE；`usage.prompt_tokens`、`completion_tokens`、`total_tokens`；`prompt_tokens_details.cached_tokens`、`completion_tokens_details.reasoning_tokens` 为明细 | 非流式读响应 usage；流式仅合并非 null usage，最终 usage chunk 可在 finish_reason 之后、choices 可为空。保存最后一个完整请求级 usage，不能累加所有 chunk。输入=prompt，输出=completion；总量优先 total，缺总量但输入输出完整时相加；缓存/推理已包含在对应大项。缺最终 usage 的 DONE 不代表零 token。 |

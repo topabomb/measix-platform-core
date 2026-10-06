@@ -178,31 +178,27 @@ func TestCAPC4030ClientMCP(t *testing.T) {
 func TestCAPC4022ClientStreamCancelPropagates(t *testing.T) {
 	env := newEnv(t)
 	defer env.close()
+	env.adapter.HoldChatStreams()
 	c := client.New(client.Options{RuntimeBaseURL: env.relayURL, AccessToken: env.token, ManagedGeneration: env.generation, InteractionID: env.interactionID})
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 	var observedErr error
 	var errCh = make(chan error, 1)
 	go func() {
-		errCh <- c.ChatCompletionStream(ctx, env.resourceIDs.model, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, func([]byte) {})
+		errCh <- c.ChatCompletionStream(ctx, env.resourceIDs.model, "/v1/chat/completions", `{"model":"gpt-test","stream":true}`, func([]byte) { cancel() })
 	}()
-	// Wait for at least one chunk to flow, then cancel the client.
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		if env.adapter.Cancelled() {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	cancel()
 	select {
 	case observedErr = <-errCh:
 	case <-time.After(3 * time.Second):
 		t.Fatal("client stream did not return after cancel")
 	}
+	if observedErr == nil {
+		t.Fatal("unfinished stream completed before cancellation")
+	}
 	// The adapter must observe cancellation of the upstream request.
-	deadline = time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if env.adapter.Cancelled() {
+		if env.adapter.CancellationCount() == 1 && env.adapter.ActiveStreams() == 0 {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

@@ -180,16 +180,23 @@ func TestCAPC404xx5xxTimeout(t *testing.T) {
 func TestCAPC4050CancellationObserved(t *testing.T) {
 	a := adapter.New()
 	defer a.Close()
-	ctx, cancel := context.WithCancel(context.Background())
+	a.HoldChatStreams()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, a.URL+"/v1/chat/completions", strings.NewReader(`{"model":"gpt-test","stream":true}`))
 	req.Header.Set("Content-Type", "application/json")
-	if _, err := http.DefaultClient.Do(req); err != nil {
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if _, err := bufio.NewReader(resp.Body).ReadString('\n'); err != nil {
 		t.Fatal(err)
 	}
 	cancel()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if a.Cancelled() {
+		if a.CancellationCount() == 1 && a.ActiveStreams() == 0 {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -219,4 +226,32 @@ func readAll(t *testing.T, resp *http.Response) []byte {
 		t.Fatal(err)
 	}
 	return body
+}
+
+func TestNormalAdapterCompletionIsNotCancellation(t *testing.T) {
+	ad := adapter.New()
+	defer ad.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, "POST", ad.URL+"/v1/chat/completions", strings.NewReader(`{"model":"gpt-test","stream":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil || !strings.Contains(string(body), "[DONE]") {
+		t.Fatalf("expected normal complete SSE: err=%v", err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for !ad.Cancelled() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if ad.Cancelled() {
+		t.Fatal("normal fully-read SSE completion is falsely recorded as client cancellation")
+	}
 }

@@ -4,6 +4,7 @@ package scenarios
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -18,7 +19,7 @@ import (
 // RLY-CON-005 — Cancel storm: goroutine/connection/resource cleanup.
 // Launch many concurrent streaming requests, cancel them all mid-stream,
 // then verify:
-//   - no goroutine leak (Relay RSS returns near baseline after GC);
+//   - bounded RSS growth after warming the same workload;
 //   - no panic or error in Relay logs;
 //   - adapter observed cancellations;
 //   - Relay remains responsive after the storm.
@@ -57,79 +58,85 @@ func TestRLYCON005CancelStorm(t *testing.T) {
 	clientToken, generation := gp.exchangeEnrollmentAndBootstrap(ctx, env.HubBaseURL, gp.lastEnrollmentCode)
 	ids := gp.getSnapshotResourceIDs(ctx, env.HubBaseURL, clientToken, generation, gp.lastModelID, gp.lastTtsID, gp.lastAsrID, gp.lastMcpID)
 
-	// Measure Relay RSS before the storm.
-	metricsBefore := env.RelayProcessMetrics()
-	t.Logf("relay RSS before cancel storm: %d bytes", metricsBefore.RSSBytes)
-
-	// Launch N concurrent streaming requests and cancel them all.
+	ad.HoldChatStreams()
 	const stormSize = 20
-	var wg sync.WaitGroup
-	cancelErrors := make([]error, stormSize)
-
-	for i := 0; i < stormSize; i++ {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
+	runStorm := func(round int) {
+		var wg sync.WaitGroup
+		ready := make(chan struct{}, stormSize)
+		cancelErrors := make([]error, stormSize)
+		cancels := make([]context.CancelFunc, stormSize)
+		for i := 0; i < stormSize; i++ {
 			streamCtx, streamCancel := context.WithCancel(ctx)
-			tc := client.New(client.Options{
-				RuntimeBaseURL:    env.RelayPubBaseURL,
-				AccessToken:       clientToken,
-				ManagedGeneration: generation,
-				InteractionID:     platformid.New(platformid.Interaction),
-			})
-			// Start a streaming request — it will block on the adapter's
-			// streaming response. We cancel it after a brief moment.
-			go func() {
-				time.Sleep(200 * time.Millisecond)
-				streamCancel()
-			}()
-			// The stream should be interrupted by the cancel, not hang.
-			err := tc.ChatCompletionStream(streamCtx, ids.model, "/v1/chat/completions",
-				`{"model":"gpt-test","stream":true}`, func([]byte) {})
-			if err == nil {
-				// Stream completed before cancel — acceptable.
-				return
+			cancels[i] = streamCancel
+			defer streamCancel()
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				tc := client.New(client.Options{
+					RuntimeBaseURL: env.RelayPubBaseURL, AccessToken: clientToken,
+					ManagedGeneration: generation, InteractionID: platformid.New(platformid.Interaction),
+				})
+				var firstChunk sync.Once
+				cancelErrors[idx] = tc.ChatCompletionStream(streamCtx, ids.model, "/v1/chat/completions",
+					`{"model":"gpt-test","stream":true}`, func([]byte) { firstChunk.Do(func() { ready <- struct{}{} }) })
+			}(i)
+		}
+		// Cancel only when every request is genuinely active and unfinished.
+		startDeadline := time.NewTimer(10 * time.Second)
+		defer startDeadline.Stop()
+		for i := 0; i < stormSize; i++ {
+			select {
+			case <-ready:
+			case <-startDeadline.C:
+				t.Fatal("not every storm stream delivered its first event")
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
 			}
-			// Error is expected from cancellation.
-			cancelErrors[idx] = err
-		}(i)
+		}
+		if active := ad.ActiveStreams(); active != stormSize {
+			t.Fatalf("active upstream streams=%d, want %d", active, stormSize)
+		}
+		for _, cancel := range cancels {
+			cancel()
+		}
+		wg.Wait()
+		for i, err := range cancelErrors {
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("storm stream %d must cancel mid-stream: %v", i, err)
+			}
+		}
+		deadline := time.Now().Add(3 * time.Second)
+		for time.Now().Before(deadline) && (ad.CancellationCount() != round*stormSize || ad.ActiveStreams() != 0) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if ad.CancellationCount() != round*stormSize || ad.ActiveStreams() != 0 {
+			t.Fatalf("storm upstream cleanup: cancelled=%d active=%d", ad.CancellationCount(), ad.ActiveStreams())
+		}
+		t.Logf("cancel storm round %d: %d/%d cancelled; active upstream streams=0", round, stormSize, stormSize)
 	}
 
-	// Wait for all storm goroutines to finish.
-	wg.Wait()
-
-	// Count how many were cancelled vs completed.
-	cancelledCount := 0
-	for _, e := range cancelErrors {
-		if e != nil {
-			cancelledCount++
+	// Warm the same 20-stream workload before taking the RSS baseline. Initial
+	// process allocation is not evidence of a leak; subsequent rounds must drain.
+	runStorm(1)
+	time.Sleep(2 * time.Second)
+	metricsBefore := env.RelayProcessMetrics()
+	if metricsBefore.RSSBytes <= 0 {
+		t.Fatal("Relay RSS measurement unavailable")
+	}
+	for round := 2; round <= 3; round++ {
+		runStorm(round)
+		time.Sleep(2 * time.Second)
+		metricsAfter := env.RelayProcessMetrics()
+		if metricsAfter.RSSBytes <= 0 {
+			t.Fatal("Relay RSS measurement unavailable")
+		}
+		rssGrowth := metricsAfter.RSSBytes - metricsBefore.RSSBytes
+		t.Logf("relay RSS after round %d: baseline=%d after=%d growth=%d bytes", round, metricsBefore.RSSBytes, metricsAfter.RSSBytes, rssGrowth)
+		if rssGrowth > 20*1024*1024 {
+			t.Errorf("relay RSS grew %d bytes after warmed cancel storm", rssGrowth)
 		}
 	}
-	t.Logf("cancel storm: %d/%d streams cancelled with error, %d completed normally", cancelledCount, stormSize, stormSize-cancelledCount)
-
-	// Verify the adapter observed cancellations during the storm.
-	// The deterministic adapter sets cancelled=true when any client context
-	// is cancelled. This is real evidence that cancel propagation worked
-	// for the storm — not a post-hoc re-test that erases storm evidence.
-	if !ad.Cancelled() {
-		t.Fatal("adapter did not observe any cancellations during cancel storm — cancel propagation may be broken")
-	}
-	t.Log("adapter observed cancellations during storm")
-
-	// Give the Relay a moment to clean up resources after the storm.
-	time.Sleep(2 * time.Second)
-
-	// Measure Relay RSS after cleanup.
-	metricsAfter := env.RelayProcessMetrics()
-	t.Logf("relay RSS after cancel storm: %d bytes", metricsAfter.RSSBytes)
-
-	// RSS should not have grown excessively (allow some overhead for GC).
-	// 20MB is a tight but reasonable bound for 20 cancelled streams with
-	// bounded buffers. 50MB was too permissive and could mask real leaks.
-	rssGrowth := metricsAfter.RSSBytes - metricsBefore.RSSBytes
-	if rssGrowth > 20*1024*1024 {
-		t.Errorf("relay RSS grew %d bytes after cancel storm — possible resource leak", rssGrowth)
-	}
+	ad.ReleaseChatStreams()
 
 	// Verify Relay is still responsive — send a normal request.
 	tc2 := client.New(client.Options{

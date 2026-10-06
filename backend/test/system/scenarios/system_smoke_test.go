@@ -273,7 +273,7 @@ func buildState(t *testing.T, upstreamURL string) (relaycontrolapi.RuntimeContro
 			{ResourceId: modelID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMODEL, ClientProtocol: relaycontrolapi.OPENAICHATCOMPLETIONS, RuntimeRouteId: modelRoute, LlmProfile: &relaycontrolapi.RuntimeLlmProfile{}},
 			{ResourceId: imageID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION, ClientProtocol: relaycontrolapi.OPENAIIMAGESGENERATIONS, RuntimeRouteId: imageRoute, ImageProfile: &relaycontrolapi.RuntimeImageProfile{MaxImagesPerRequest: 4, AllowedSizes: []string{"auto", "1024x1024"}}},
 			{ResourceId: ttsID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindTTS, ClientProtocol: relaycontrolapi.OPENAIAUDIOSPEECH, RuntimeRouteId: ttsRoute},
-			{ResourceId: asrID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.OPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: relaycontrolapi.N1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
+			{ResourceId: asrID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.OPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: 1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
 			{ResourceId: mcpID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMCP, ClientProtocol: relaycontrolapi.MCPSTREAMABLEHTTP, RuntimeRouteId: mcpRoute},
 		},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{

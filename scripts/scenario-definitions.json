@@ -765,7 +765,7 @@
     "artifact": "e2e-playwright.json",
     "testNames": [
       "CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish",
-      "CAP-C6-001-Usage Usage/System verification after four-capability traffic"
+      "CAP-C6-001-Usage Usage/System verification after five-capability traffic"
     ],
     "required": true
   },

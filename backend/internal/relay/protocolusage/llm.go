@@ -14,6 +14,12 @@ const (
 	OpenAIResponses       LLMProtocol = "OPENAI_RESPONSES"
 	GoogleGenerateContent LLMProtocol = "GOOGLE_GENERATE_CONTENT"
 	AnthropicMessages     LLMProtocol = "ANTHROPIC_MESSAGES"
+
+	maxLLMObservationBytes = 2 << 20
+	maxSSEDataLines        = 4096
+	maxLLMUsageEvents      = 1024
+	maxLLMDiagnostics      = 32
+	maxLLMDiagnosticBytes  = 512
 )
 
 // LLMOptions records profile-specific facts which cannot safely be inferred
@@ -34,13 +40,15 @@ type tokenSnapshot struct {
 }
 
 type llmState struct {
-	protocol    LLMProtocol
-	options     LLMOptions
-	snapshot    tokenSnapshot
-	terminal    bool
-	usageSeen   bool
-	diagnostics []Diagnostic
-	seenEvents  map[string]struct{}
+	protocol       LLMProtocol
+	options        LLMOptions
+	snapshot       tokenSnapshot
+	terminal       bool
+	usageSeen      bool
+	diagnostics    []Diagnostic
+	seenEvents     map[string]struct{}
+	seenEventBytes int
+	observationErr error
 }
 
 func ParseLLMJSON(protocol LLMProtocol, body []byte, options LLMOptions) Result {
@@ -58,7 +66,32 @@ func newLLMState(protocol LLMProtocol, options LLMOptions) *llmState {
 }
 
 func (s *llmState) addDiagnostic(code, message string) {
+	if len(message) > maxLLMDiagnosticBytes {
+		message = message[:maxLLMDiagnosticBytes]
+	}
+	for _, diagnostic := range s.diagnostics {
+		if diagnostic.Code == code && diagnostic.Message == message {
+			return
+		}
+	}
+	if len(s.diagnostics) >= maxLLMDiagnostics {
+		return
+	}
 	s.diagnostics = append(s.diagnostics, Diagnostic{Code: code, Message: message})
+}
+
+func (s *llmState) stopObservation() error {
+	if s.observationErr == nil {
+		s.observationErr = fmt.Errorf("LLM SSE observation exceeded its space limit")
+		// Always retain the limit diagnostic, even after many malformed events.
+		if len(s.diagnostics) == maxLLMDiagnostics {
+			s.diagnostics = s.diagnostics[:maxLLMDiagnostics-1]
+		}
+		s.addDiagnostic("response_usage_observation_limit", s.observationErr.Error())
+		s.seenEvents = nil
+		s.seenEventBytes = 0
+	}
+	return s.observationErr
 }
 
 func (s *llmState) consumeJSON(eventName, eventID string, data []byte) error {
@@ -86,22 +119,31 @@ func (s *llmState) consumeJSON(eventName, eventID string, data []byte) error {
 		} else if present {
 			response = nested
 		}
-		key := eventID + "|" + stringValue(response, "id") + "|" + integerKey(object, "sequence_number") + "|" + typeName
-		if key != "|||" {
-			if _, duplicate := s.seenEvents[key]; duplicate {
-				return nil
-			}
-			s.seenEvents[key] = struct{}{}
-		}
 		usage, present, err := rawObject(response, "usage")
 		if err != nil {
 			return err
 		}
+		terminal := typeName == "response.completed" || typeName == "response.incomplete" || typeName == "response.failed" ||
+			stringValue(response, "status") == "completed" || stringValue(response, "status") == "incomplete" || stringValue(response, "status") == "failed"
+		// Content deltas do not change meters and need no retained identity.
+		// Bound both the count and bytes of identities used for usage deduplication.
+		if present || terminal {
+			key := eventID + "|" + stringValue(response, "id") + "|" + integerKey(object, "sequence_number") + "|" + typeName
+			if key != "|||" {
+				if _, duplicate := s.seenEvents[key]; duplicate {
+					return nil
+				}
+				if len(s.seenEvents) >= maxLLMUsageEvents || len(key) > maxLLMObservationBytes-s.seenEventBytes {
+					return s.stopObservation()
+				}
+				s.seenEvents[key] = struct{}{}
+				s.seenEventBytes += len(key)
+			}
+		}
 		if present {
 			s.mergeOpenAIUsage(usage, "openai_responses_usage")
 		}
-		if typeName == "response.completed" || typeName == "response.incomplete" || typeName == "response.failed" ||
-			stringValue(response, "status") == "completed" || stringValue(response, "status") == "incomplete" || stringValue(response, "status") == "failed" {
+		if terminal {
 			s.terminal = true
 		}
 	case GoogleGenerateContent:
@@ -232,7 +274,7 @@ func (s *llmState) result(transportComplete bool) Result {
 		terminal = true
 	}
 	knownCompleteness := Partial
-	if terminal && transportComplete {
+	if terminal && transportComplete && s.observationErr == nil {
 		knownCompleteness = Exact
 	}
 	if !s.usageSeen {
@@ -297,12 +339,13 @@ func integerKey(object map[string]json.RawMessage, key string) string {
 }
 
 type LLMSSEObserver struct {
-	state     *llmState
-	buffer    []byte
-	eventName string
-	eventID   string
-	dataLines []string
-	finished  bool
+	state      *llmState
+	buffer     []byte
+	eventName  string
+	eventID    string
+	dataLines  []string
+	eventBytes int
+	finished   bool
 }
 
 func NewLLMSSEObserver(protocol LLMProtocol, options LLMOptions) *LLMSSEObserver {
@@ -313,30 +356,59 @@ func (o *LLMSSEObserver) Observe(chunk []byte) error {
 	if o.finished {
 		return fmt.Errorf("SSE observer already finished")
 	}
-	o.buffer = append(o.buffer, chunk...)
-	for {
-		index := bytes.IndexByte(o.buffer, '\n')
+	if o.state.observationErr != nil {
+		return o.state.observationErr
+	}
+	for len(chunk) > 0 {
+		index := bytes.IndexByte(chunk, '\n')
+		length := len(chunk)
+		if index >= 0 {
+			length = index
+		}
+		if length > maxLLMObservationBytes-len(o.buffer) {
+			return o.stopObservation()
+		}
+		needed := len(o.buffer) + length
+		if needed > cap(o.buffer) {
+			capacity := max(needed, min(maxLLMObservationBytes, max(4096, 2*cap(o.buffer))))
+			buffer := make([]byte, len(o.buffer), capacity)
+			copy(buffer, o.buffer)
+			o.buffer = buffer
+		}
+		o.buffer = append(o.buffer, chunk[:length]...)
 		if index < 0 {
 			break
 		}
-		line := o.buffer[:index]
-		o.buffer = o.buffer[index+1:]
+		chunk = chunk[index+1:]
+		line := o.buffer
 		if len(line) > 0 && line[len(line)-1] == '\r' {
 			line = line[:len(line)-1]
 		}
-		o.consumeLine(string(line))
+		if err := o.consumeLine(string(line)); err != nil {
+			return o.stopObservation()
+		}
+		o.buffer = o.buffer[:0]
 	}
 	return nil
 }
 
-func (o *LLMSSEObserver) consumeLine(line string) {
+func (o *LLMSSEObserver) stopObservation() error {
+	o.buffer, o.dataLines = nil, nil
+	o.eventName, o.eventID, o.eventBytes = "", "", 0
+	return o.state.stopObservation()
+}
+
+func (o *LLMSSEObserver) consumeLine(line string) error {
 	if line == "" {
-		o.dispatch()
-		return
+		return o.dispatch()
 	}
 	if strings.HasPrefix(line, ":") {
-		return
+		return nil
 	}
+	if len(line)+1 > maxLLMObservationBytes-o.eventBytes {
+		return o.stopObservation()
+	}
+	o.eventBytes += len(line) + 1
 	field, value, found := strings.Cut(line, ":")
 	if !found {
 		value = ""
@@ -350,23 +422,33 @@ func (o *LLMSSEObserver) consumeLine(line string) {
 	case "id":
 		o.eventID = value
 	case "data":
+		if len(o.dataLines) >= maxSSEDataLines {
+			return o.stopObservation()
+		}
 		o.dataLines = append(o.dataLines, value)
 	}
+	return nil
 }
 
-func (o *LLMSSEObserver) dispatch() {
+func (o *LLMSSEObserver) dispatch() error {
+	o.eventBytes = 0
 	if len(o.dataLines) == 0 {
 		o.eventName = ""
-		return
+		return nil
 	}
 	data := strings.Join(o.dataLines, "\n")
 	if strings.TrimSpace(data) == "[DONE]" {
 		o.state.terminal = true
 	} else if err := o.state.consumeJSON(o.eventName, o.eventID, []byte(data)); err != nil {
+		if o.state.observationErr != nil {
+			return o.stopObservation()
+		}
 		o.state.addDiagnostic("invalid_sse_usage_event", err.Error())
 	}
 	o.eventName = ""
-	o.dataLines = o.dataLines[:0]
+	// Release line strings rather than retaining response content in the backing array.
+	o.dataLines = nil
+	return nil
 }
 
 func (o *LLMSSEObserver) Finish(transportComplete bool) Result {
@@ -376,9 +458,13 @@ func (o *LLMSSEObserver) Finish(transportComplete bool) Result {
 			if line[len(line)-1] == '\r' {
 				line = line[:len(line)-1]
 			}
-			o.consumeLine(string(line))
+			_ = o.consumeLine(string(line))
 		}
-		o.dispatch()
+		if o.state.observationErr == nil {
+			_ = o.dispatch()
+		}
+		o.buffer, o.dataLines, o.state.seenEvents = nil, nil, nil
+		o.eventName, o.eventID = "", ""
 		o.finished = true
 	}
 	return o.state.result(transportComplete)

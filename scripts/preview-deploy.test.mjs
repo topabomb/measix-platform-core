@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { releaseAndroidRoot } from './lib/release-paths.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const read = path => readFileSync(resolve(ROOT, path), 'utf8')
@@ -61,8 +62,17 @@ test('PM2 uses one root-owned run script with fixed public and internal binds', 
 
 test('Windows release packaging normalizes Linux executable modes', () => {
   const builder = read('scripts/build-preview-release.mjs')
-  assert.match(builder, /MEASIX_RELEASE_ANDROID_ROOT/)
+  assert.match(builder, /const ANDROID = releaseAndroidRoot\(ROOT\)/)
   assert.match(builder, /createArchive\(stage, archive\)/)
   assert.match(builder, /find "\$temp" -type f -exec chmod 0644/)
   assert.match(builder, /chmod 0755 "\$temp"\/bin\/\* "\$temp"\/deploy\/\*\.sh/)
+})
+
+test('release builder and verifier resolve the same configurable Android checkout', () => {
+  assert.match(read('scripts/build-preview-release.mjs'), /import \{ releaseAndroidRoot \} from '\.\/lib\/release-paths\.mjs'/)
+  assert.match(read('scripts/verify-preview-contract.mjs'), /const android = releaseAndroidRoot\(root\)/)
+  for (const path of [resolve(ROOT, '../Android Projects/Measix_Pilot'), resolve(ROOT, '../other-computer/android')]) {
+    assert.equal(releaseAndroidRoot(ROOT, { MEASIX_RELEASE_ANDROID_ROOT: path }), path)
+  }
+  assert.equal(releaseAndroidRoot(ROOT, {}), resolve(ROOT, '../../rikkahub_mcp'))
 })

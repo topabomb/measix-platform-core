@@ -79,3 +79,54 @@ func TestPortalRemoteRejectsRedirectAndInvalidConfigurationWithoutFallback(t *te
 		}
 	}
 }
+
+func TestPortalRemoteConditionalGetAndHead(t *testing.T) {
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		for _, conditional := range []string{"", "If-None-Match", "If-Modified-Since"} {
+			t.Run(method+"/"+conditional, func(t *testing.T) {
+				upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
+						t.Error("credentials crossed static boundary")
+					}
+					w.Header().Set("ETag", `"asset-v1"`)
+					w.Header().Set("Last-Modified", "Mon, 05 Oct 2026 00:00:00 GMT")
+					w.Header().Set("Set-Cookie", "forbidden=true")
+					if conditional != "" && r.Header.Get(conditional) != "" {
+						w.WriteHeader(http.StatusNotModified)
+						return
+					}
+					_, _ = w.Write([]byte("asset"))
+				}))
+				defer upstream.Close()
+				h, err := portalstatic.NewRemote(upstream.URL, upstream.Client())
+				if err != nil {
+					t.Fatal(err)
+				}
+				r := httptest.NewRequest(method, "/portal/assets/app.js", nil)
+				r.Header.Set("Authorization", "Bearer synthetic")
+				r.Header.Set("Cookie", "synthetic=true")
+				if conditional == "If-None-Match" {
+					r.Header.Set(conditional, `"asset-v1"`)
+				}
+				if conditional == "If-Modified-Since" {
+					r.Header.Set(conditional, "Mon, 05 Oct 2026 00:00:00 GMT")
+				}
+				w := httptest.NewRecorder()
+				h.ServeHTTP(w, r)
+				wantStatus, wantBody := http.StatusOK, "asset"
+				if conditional != "" {
+					wantStatus, wantBody = http.StatusNotModified, ""
+				}
+				if method == http.MethodHead {
+					wantBody = ""
+				}
+				if w.Code != wantStatus || w.Body.String() != wantBody || w.Header().Get("ETag") != `"asset-v1"` || w.Header().Get("Last-Modified") == "" {
+					t.Fatalf("conditional projection: status=%d body=%q headers=%v", w.Code, w.Body.String(), w.Header())
+				}
+				if w.Header().Get("Set-Cookie") != "" || w.Header().Get("Cache-Control") != "no-store" || !strings.Contains(w.Header().Get("Content-Security-Policy"), "connect-src 'self'") {
+					t.Fatal("static upstream overrode Core authority")
+				}
+			})
+		}
+	}
+}

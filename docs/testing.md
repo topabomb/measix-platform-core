@@ -87,6 +87,8 @@ Critical architecture scenarios use stable IDs such as `HUB-*`, `RLY-*`, `ADM-*`
 
 Every automated deterministic test must use isolated temp data/ports, avoid order dependency, default to no public-network access, use synthetic credentials, bound asynchronous waits and clean up processes/files.
 
+Node HTTP harnesses allocate loopback ports through `scripts/lib/harness.mjs` and exclude Fetch-blocked ports. An OS-assigned free port can still be unusable by Node fetch or a browser, especially with a customized Windows dynamic port range. Allocation closes each probe and fails after 100 incompatible candidates; it does not change host networking or browser security settings. `scripts/harness-network.test.mjs` verifies blocked-port selection, bounded failure and an actual local HTTP fetch.
+
 Do not mock away the behavior under test:
 
 - Hub persistence tests use real SQLite;

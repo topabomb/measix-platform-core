@@ -149,15 +149,30 @@ export function deterministicAdapterVersion(root) {
 
 // --- Port and crypto utilities ---
 
-export function freePort() {
-  return new Promise((resolveP, rejectP) => {
-    const srv = net.createServer()
-    srv.listen(0, '127.0.0.1', () => {
-      const port = srv.address().port
-      srv.close(() => resolveP(port))
+// The OS can assign a listening port that Node fetch and browsers reject.
+// Keep HTTP harness origins compatible with https://fetch.spec.whatwg.org/#port-blocking.
+const blockedFetchPorts = new Set([
+  0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53,
+  69, 77, 79, 87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117,
+  119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514,
+  515, 526, 530, 531, 532, 540, 548, 554, 556, 563, 587, 601, 636, 989,
+  990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061,
+  6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
+])
+
+export async function freePort() {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const port = await new Promise((resolveP, rejectP) => {
+      const srv = net.createServer()
+      srv.on('error', rejectP)
+      srv.listen(0, '127.0.0.1', () => {
+        const assignedPort = srv.address().port
+        srv.close(() => resolveP(assignedPort))
+      })
     })
-    srv.on('error', rejectP)
-  })
+    if (!blockedFetchPorts.has(port)) return port
+  }
+  throw new Error('Cannot allocate a fetch-compatible loopback port after 100 attempts')
 }
 
 export function randomBytes(n) {

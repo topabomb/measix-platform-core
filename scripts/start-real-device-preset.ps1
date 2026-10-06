@@ -15,6 +15,7 @@ $relayTokenPath = Join-Path $secretRoot 'device-real-relay-service.token'
 $dbPath = Join-Path $dataRoot 'hub.db'
 $spoolPath = Join-Path $dataRoot 'relay-spool.db'
 $binaryPath = Join-Path $dataRoot 'bin\measix-device-demo.exe'
+$buildVersion = 'device-real-' + [Guid]::NewGuid().ToString('N')
 $pidPath = Join-Path $dataRoot 'process.json'
 $logRoot = Join-Path $dataRoot 'logs'
 
@@ -103,7 +104,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Database migration failed; startup stopped. Preserve $dbPath and its SQLite sidecar files. Inspect the migration error above and docs/database-migrations.md; verify a backup before repairing migration history or using a compatible binary. Do not reset existing data to resolve a schema or checksum mismatch." }
         & go run ./cmd/control-hub bootstrap-admin --if-empty --db $dbPath --master-key-file $masterKeyPath --jwt-private-key-file $jwtKeyPath --deployment-name 'MEASIX Device Demo' --username admin --display-name 'Device Demo Admin' --password-file $passwordPath
         if ($LASTEXITCODE -ne 0) { throw 'Admin bootstrap failed.' }
-        & go build -o $binaryPath ./cmd/device-demo
+        & go build -ldflags "-X main.buildVersion=$buildVersion" -o $binaryPath ./cmd/device-demo
         if ($LASTEXITCODE -ne 0) { throw 'Device-demo build failed.' }
     } finally { Pop-Location }
 
@@ -126,7 +127,7 @@ try {
     # argument boundaries, including spaces, embedded quotes and trailing slashes.
     $quotedArgs = ($args | ForEach-Object { '"' + ($_ -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"' }) -join ' '
     $process = Start-Process -FilePath $binaryPath -ArgumentList $quotedArgs -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logRoot 'device-demo.out.log') -RedirectStandardError (Join-Path $logRoot 'device-demo.err.log')
-    @{ pid = $process.Id; executable = $binaryPath; origin = $origin; startedAt = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $pidPath -NoNewline
+    @{ pid = $process.Id; executable = $binaryPath; origin = $origin; buildVersion = $buildVersion; startedAt = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $pidPath -NoNewline
 
     $ready = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
@@ -139,8 +140,23 @@ try {
     $env:MEASIX_REAL_DEVICE_ORIGIN = $origin
     $env:MEASIX_REAL_DEVICE_ADMIN_PASSWORD_FILE = $passwordPath
     $env:MEASIX_REAL_DEVICE_STATE = (Join-Path $dataRoot 'preset-state.json')
+    $env:MEASIX_REAL_DEVICE_BUILD_VERSION = $buildVersion
+    $resultPath = Join-Path $logRoot 'preset-result.json'
+    $env:MEASIX_REAL_DEVICE_RESULT = $resultPath
+    # A failed invocation must never report a previous attempt's result.
+    if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath -Force }
     & node scripts/real-device-preset.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'Real-device configuration publish failed.' }
+    $publishExitCode = $LASTEXITCODE
+    if ($publishExitCode -ne 0) {
+        $diagnostic = "Publisher exited with exit code $publishExitCode; inspect the output above."
+        if (Test-Path -LiteralPath $resultPath) {
+            try {
+                $result = Get-Content -Raw -LiteralPath $resultPath | ConvertFrom-Json
+                if ($result.ok -eq $false -and -not [string]::IsNullOrWhiteSpace($result.message)) { $diagnostic = $result.message }
+            } catch { } # Preserve the publisher failure if diagnostics are unreadable.
+        }
+        throw "Real-device configuration publish failed: $diagnostic Diagnostic file: $resultPath"
+    }
     $discovery = Invoke-RestMethod -UseBasicParsing "$origin/.well-known/measix"
     if ($discovery.clientApiBase -ne '/api/client/v1' -or $discovery.runtimeApiBase -ne '/runtime/v1') { throw 'Discovery did not expose the expected same-origin paths.' }
     Write-Output "Real-device preset is ready: $origin"

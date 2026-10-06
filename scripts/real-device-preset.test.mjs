@@ -155,12 +155,14 @@ finally { Write-Output ('STOPS=' + $global:presetTestStops) }
   }
 })
 
-async function runPreset(t, { validationErrors = [], changed = true } = {}) {
+async function runPreset(t, { validationErrors = [], changed = true, existingMcp = [], saveFailure = false,
+  servingBuild = 'device-real-test', relayBuild = servingBuild, missingRelayReads = 0 } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'measix-preset-test-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   const password = join(directory, 'password.txt')
   const keys = join(directory, 'keys.env')
   const state = join(directory, 'state.json')
+  const resultPath = join(directory, 'result.json')
   writeFileSync(password, 'synthetic-password')
   writeFileSync(keys, ['DEEPSEEK_API_KEY', 'MIMO_API_KEY', 'FIRECRAWL_API_KEY', 'DASHSCOPE_API_KEY']
     .map(key => `${key}=synthetic-key`).concat('ALIBABA_TOKEN_PLAN_BASE_URL=https://example.invalid/compatible-mode/v1').join('\n'))
@@ -170,6 +172,7 @@ async function runPreset(t, { validationErrors = [], changed = true } = {}) {
   writeFileSync(state, originalState)
   const requests = []
   let content
+  let statusReads = 0
   const server = createServer(async (request, response) => {
     const chunks = []
     for await (const chunk of request) chunks.push(chunk)
@@ -180,13 +183,21 @@ async function runPreset(t, { validationErrors = [], changed = true } = {}) {
     if (path === '/session/login') {
       response.setHeader('Set-Cookie', 'measix_admin_session=synthetic; HttpOnly')
       result = { csrfToken: 'synthetic-csrf' }
+    } else if (path === '/system/status') {
+      result = { buildVersion: servingBuild, ...(statusReads++ < missingRelayReads ? {} : { relayBuildVersion: relayBuild }) }
     } else if (path.startsWith('/upstreams/') && request.method === 'GET') {
       result = { upstreamId: path.split('/').at(-1), status: 'ACTIVE' }
     } else if (path === '/draft' && request.method === 'GET') {
-      result = { draftRevision: 41, content: { policy: { retainedPolicy: true } } }
+      result = { draftRevision: 41, content: { policy: { retainedPolicy: true }, mcp: existingMcp } }
     } else if (path === '/draft' && request.method === 'PUT') {
       content = body.content
-      result = { draftRevision: 42 }
+      const changedEvidence = content.mcp.some(server => JSON.stringify(server.toolDiscovery) !== JSON.stringify(
+        existingMcp.find(previous => previous.mcpServerId === server.mcpServerId)?.toolDiscovery,
+      ))
+      if (changedEvidence || saveFailure) {
+        response.statusCode = 422
+        result = { code: 'mcp_tool_evidence_required', message: 'Private diagnostic: synthetic-key' }
+      } else result = { draftRevision: 42 }
     } else if (path === '/draft:validate') {
       const missing = content.starters.flatMap((starter, i) => starter.openingSnapshot ? [] : [
         { code: 'missing_starter_opening', path: `starters[${i}].openingSnapshot` },
@@ -198,7 +209,7 @@ async function runPreset(t, { validationErrors = [], changed = true } = {}) {
     } else if (path === '/draft:publish') {
       result = { activationId: 'activation-test' }
     } else if (path === '/activations/activation-test') {
-      result = { state: 'COMPLETED' }
+      result = { state: 'COMPLETED', targetManagedGeneration: 8 }
     } else {
       response.statusCode = 500
       result = { code: 'unexpected_test_request' }
@@ -211,7 +222,8 @@ async function runPreset(t, { validationErrors = [], changed = true } = {}) {
   const child = spawn(process.execPath, [join(root, 'scripts/real-device-preset.mjs')], {
     env: { ...process.env, MEASIX_REAL_DEVICE_ORIGIN: `http://127.0.0.1:${server.address().port}`,
       MEASIX_REAL_DEVICE_ADMIN_PASSWORD_FILE: password, MEASIX_REAL_DEVICE_SUPPLIER_KEYS: keys,
-      MEASIX_REAL_DEVICE_STATE: state },
+      MEASIX_REAL_DEVICE_STATE: state, MEASIX_REAL_DEVICE_RESULT: resultPath,
+      MEASIX_REAL_DEVICE_BUILD_VERSION: 'device-real-test' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
@@ -221,7 +233,8 @@ async function runPreset(t, { validationErrors = [], changed = true } = {}) {
   assert.equal(readFileSync(state, 'utf8'), originalState, 'existing upstream identities must not be rewritten')
   assert.ok(!requests.some(item => ['/secrets', '/upstreams'].includes(item.path)), 'existing credentials must be reused')
   assert.ok(!output.includes('synthetic-password') && !output.includes('synthetic-key'), 'do not print secrets')
-  return { code, output, content, requests }
+  const summary = existsSync(resultPath) ? JSON.parse(readFileSync(resultPath, 'utf8')) : undefined
+  return { code, output, content, requests, summary }
 }
 
 test('real-device preset publishes complete authored v5 openings with existing upstreams', async t => {
@@ -266,6 +279,57 @@ test('real-device preset explicitly authors v5 MCP access and assistant bindings
   }
 })
 
+test('rerunning the preset preserves server-owned discovery by MCP ID after Admin discovery', async t => {
+  const discovery = { sourceHash: `sha256:${'1'.repeat(64)}`, discoveredAt: '2026-10-06T12:00:00Z', tools: [
+    { name: 'read', contractHash: `sha256:${'2'.repeat(64)}`, definition: { name: 'read', inputSchema: { type: 'object' }, _meta: { displayHint: 'retained' } } },
+  ] }
+  const result = await runPreset(t, { existingMcp: [
+    { mcpServerId: 'mcp_other', toolDiscovery: { ...discovery, tools: [] } },
+    { mcpServerId: 'mcp_3d005a2a-7e91-4abd-a1a4-5c7d4a2e1111', toolAccessMode: 'ALLOWLIST', allowedTools: [{ name: 'old' }], toolDiscovery: discovery },
+  ] })
+  assert.equal(result.code, 0, result.output)
+  assert.deepEqual(result.content.mcp[0].toolDiscovery, discovery)
+  assert.equal(result.content.mcp[0].toolAccessMode, 'ALL', 'preset still authors its explicit scope')
+  assert.deepEqual(result.content.mcp[0].allowedTools, [])
+  assert.ok(result.requests.some(item => item.path === '/draft:publish'))
+  assert.ok(!result.requests.some(item => item.path.endsWith(':discover')), 'ALL must not require a new discovery')
+})
+
+test('preset persists a safe failure diagnostic with the authoritative endpoint and code', async t => {
+  const result = await runPreset(t, { saveFailure: true })
+  assert.notEqual(result.code, 0)
+  assert.equal(result.summary?.ok, false)
+  assert.match(result.summary?.message || '', /PUT \/draft failed: HTTP 422; mcp_tool_evidence_required/)
+  assert.ok(!JSON.stringify(result.summary).includes('synthetic-key'))
+  assert.ok(!result.requests.some(item => ['/draft:validate', '/draft:preview', '/draft:publish'].includes(item.path)))
+})
+
+test('preset reports the generation actually activated, including an unchanged rerun', async t => {
+  for (const changed of [true, false]) {
+    const result = await runPreset(t, { changed })
+    assert.equal(result.code, 0, result.output)
+    assert.equal(result.summary?.ok, true)
+    assert.equal(result.summary?.publishedGeneration, changed ? 8 : 7)
+  }
+})
+
+test('preset refuses to mutate a responding Hub or Relay from another build', async t => {
+  for (const build of [{ servingBuild: 'old-build' }, { relayBuild: 'old-relay' }]) {
+    const result = await runPreset(t, build)
+    assert.notEqual(result.code, 0, result.output)
+    assert.match(result.output, /build.*mismatch/i)
+    assert.deepEqual(result.requests.map(item => item.path), ['/session/login', '/system/status'])
+  }
+})
+
+test('preset waits for a starting Relay to report its build before mutating', async t => {
+  const result = await runPreset(t, { missingRelayReads: 1 })
+  assert.equal(result.code, 0, result.output)
+  const statuses = result.requests.map((item, i) => item.path === '/system/status' ? i : -1).filter(i => i >= 0)
+  assert.equal(statuses.length, 2)
+  assert.ok(result.requests.findIndex(item => item.path.startsWith('/upstreams/')) > statuses.at(-1))
+})
+
 test('validation failure reports authoritative field path and prevents preview/publish', async t => {
   const result = await runPreset(t, { validationErrors: [
     { code: 'invalid_starter_opening', path: 'starters[1].openingSnapshot.initialContexts[0].content' },
@@ -281,4 +345,38 @@ test('database upgrade failure guidance preserves existing real-device data', ()
   assert.ok(failure, 'launcher must diagnose database preparation failure')
   assert.doesNotMatch(failure, /device:real:reset|delete and recreate/i)
   assert.match(failure, /preserv|backup/i)
+})
+
+test('Windows launcher reports this attempt\'s publication failure without reusing an old diagnostic', { skip: process.platform !== 'win32' }, async t => {
+  for (const report of [true, false]) {
+    await t.test(report ? 'endpoint diagnostic' : 'missing diagnostic', t => {
+      const directory = mkdtempSync(join(tmpdir(), 'measix publish failure '))
+      t.after(() => rmSync(directory, { recursive: true, force: true }))
+      const resultPath = join(directory, 'preset-result.json')
+      writeFileSync(resultPath, JSON.stringify({ ok: false, message: 'obsolete-private-diagnostic' }))
+      const probe = join(directory, 'publish.cjs')
+      writeFileSync(probe, (report ? `require('node:fs').writeFileSync(process.env.MEASIX_REAL_DEVICE_RESULT, JSON.stringify({ok:false,message:'PUT /draft failed: HTTP 422; mcp_tool_evidence_required'}));` : '') + 'process.exit(17)')
+      const source = readFileSync(join(root, 'scripts/start-real-device-preset.ps1'), 'utf8')
+      const start = source.indexOf('    $env:MEASIX_REAL_DEVICE_ORIGIN = $origin')
+      const publication = source.slice(start, source.indexOf('    $discovery =', start))
+        .replace('& node scripts/real-device-preset.mjs', '& node $probe')
+      const quote = value => "'" + value.replaceAll("'", "''") + "'"
+      const harness = join(directory, 'harness.ps1')
+      writeFileSync(harness, [
+        "$ErrorActionPreference = 'Stop'",
+        '$origin = ' + quote('http://127.0.0.1:9100'),
+        '$logRoot = $dataRoot = $passwordPath = ' + quote(directory),
+        '$probe = ' + quote(probe),
+        '$env:MEASIX_REAL_DEVICE_RESULT = ' + quote(resultPath),
+        'try {', publication, '} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }',
+      ].join('\n'))
+      const result = spawnSync('powershell.exe', ['-NoProfile', '-File', harness], { encoding: 'utf8', timeout: 15000 })
+      assert.ifError(result.error)
+      assert.equal(result.status, 1, result.stderr)
+      assert.match(result.stderr, report ? /PUT \/draft failed: HTTP 422; mcp_tool_evidence_required/ : /exit code 17/)
+      assert.match(result.stderr, /preset-result.json/)
+      assert.doesNotMatch(result.stderr, /obsolete-private-diagnostic/)
+      assert.equal(existsSync(resultPath), report, 'a stale result must be cleared before invoking the publisher')
+    })
+  }
 })

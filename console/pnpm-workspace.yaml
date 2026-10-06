@@ -1,3 +1,7 @@
+# Use physical package directories: Windows dependency junction traversal can
+# fail in a different terminal even when the virtual-store target is readable.
+nodeLinker: hoisted
+
 allowBuilds:
   '@parcel/watcher': true
   esbuild: true

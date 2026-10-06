@@ -8,6 +8,100 @@ import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 
+test('Windows preset launches native process with spaces and quotes intact', { skip: process.platform !== 'win32' }, t => {
+  const directory = mkdtempSync(join(tmpdir(), 'measix launch test '))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const probe = join(directory, 'argv probe.cjs')
+  writeFileSync(probe, 'console.log(JSON.stringify(process.argv.slice(2)))')
+  const expected = ['--db', 'J:\\Go Projects\\hub.db', '--assets', 'J:\\Go Projects\\dist\\', 'quoted "value"', '中文目录']
+  const psString = value => "'" + value.replaceAll("'", "''") + "'"
+  const launch = readFileSync(join(root, 'scripts/start-real-device-preset.ps1'), 'utf8')
+    .split(/\r?\n/).filter(line => /^    \$(quotedArgs|process) = /.test(line)).join('\n')
+  assert.ok(launch.includes('Start-Process'))
+  writeFileSync(join(directory, 'harness.ps1'), '\uFEFF' + [
+    "$ErrorActionPreference = 'Stop'",
+    '$binaryPath = ' + psString(process.execPath),
+    '$repoRoot = ' + psString(directory),
+    '$logRoot = $repoRoot',
+    '$args = @(' + [probe, ...expected].map(psString).join(', ') + ')',
+    launch.replace(' -PassThru', ' -Wait -PassThru'),
+    '$process.WaitForExit()',
+    'exit $process.ExitCode',
+  ].join('\n'), 'utf8')
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(directory, 'harness.ps1')], { encoding: 'utf8', timeout: 15000 })
+  assert.ifError(result.error)
+  const stderr = existsSync(join(directory, 'device-demo.err.log')) ? readFileSync(join(directory, 'device-demo.err.log'), 'utf8') : ''
+  assert.equal(result.status, 0, result.stderr + stderr)
+  assert.deepEqual(JSON.parse(readFileSync(join(directory, 'device-demo.out.log'), 'utf8')), expected)
+})
+
+test('Windows preset accepts internal listen overrides without changing the public origin', { skip: process.platform !== 'win32' }, t => {
+  const directory = mkdtempSync(join(tmpdir(), 'measix port test '))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const source = readFileSync(join(root, 'scripts/start-real-device-preset.ps1'), 'utf8').replaceAll('\r\n', '\n')
+  const start = source.lastIndexOf('    } finally { Pop-Location }') + '    } finally { Pop-Location }'.length
+  const construction = source.slice(start, source.indexOf('    $portalUpstream =', start))
+  const script = [
+    "$env:MEASIX_REAL_DEVICE_HUB_INTERNAL_LISTEN = '127.0.0.1:19101'",
+    "$env:MEASIX_REAL_DEVICE_RELAY_INTERNAL_LISTEN = '127.0.0.1:19103'",
+    "$origin = 'http://192.0.2.20:9100'",
+    '$uri = [Uri]$origin',
+    "$repoRoot = $portalRoot = $dbPath = $masterKeyPath = $jwtKeyPath = $relayTokenPath = $spoolPath = 'C:\\fixture'",
+    construction,
+    'ConvertTo-Json -InputObject @($args) -Compress',
+  ].join('\n')
+  const path = join(directory, 'ports.ps1')
+  writeFileSync(path, script)
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-File', path], { encoding: 'utf8', timeout: 15000 })
+  assert.ifError(result.error)
+  assert.equal(result.status, 0, result.stderr)
+  const args = JSON.parse(result.stdout)
+  assert.equal(args[args.indexOf('--hub-internal-listen') + 1], '127.0.0.1:19101')
+  assert.equal(args[args.indexOf('--relay-internal-listen') + 1], '127.0.0.1:19103')
+  assert.equal(args[args.indexOf('--public-origin') + 1], 'http://192.0.2.20:9100')
+})
+
+test('Windows preset selects a bindable loopback port when its default is occupied', { skip: process.platform !== 'win32' }, t => {
+  const directory = mkdtempSync(join(tmpdir(), 'measix busy port test '))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const source = readFileSync(join(root, 'scripts/start-real-device-preset.ps1'), 'utf8').replaceAll('\r\n', '\n')
+  const helper = source.match(/^function Get-AvailableLoopbackAddress[\s\S]*?^}/m)?.[0] || ''
+  const start = source.lastIndexOf('    } finally { Pop-Location }') + '    } finally { Pop-Location }'.length
+  const construction = source.slice(start, source.indexOf('    $portalUpstream =', start))
+    .replaceAll("'127.0.0.1:9101'", "('127.0.0.1:' + $busyPort)")
+    .replaceAll('Get-AvailableLoopbackAddress 9101', 'Get-AvailableLoopbackAddress $busyPort')
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    helper,
+    '$env:MEASIX_REAL_DEVICE_HUB_INTERNAL_LISTEN = $null',
+    "$env:MEASIX_REAL_DEVICE_RELAY_INTERNAL_LISTEN = '127.0.0.1:19103'",
+    "$origin = 'http://192.0.2.20:9100'",
+    '$uri = [Uri]$origin',
+    "$repoRoot = $portalRoot = $dbPath = $masterKeyPath = $jwtKeyPath = $relayTokenPath = $spoolPath = 'C:\\fixture'",
+    '$busy = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)',
+    '$busy.ExclusiveAddressUse = $true',
+    '$busy.Start()',
+    '$busyPort = $busy.LocalEndpoint.Port',
+    'try {',
+    construction,
+    '$selected = $args[([Array]::IndexOf($args, "--hub-internal-listen") + 1)]',
+    '$probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, [int]($selected.Split(":")[-1]))',
+    '$probe.ExclusiveAddressUse = $true',
+    'try { $probe.Start() } finally { $probe.Stop() }',
+    'ConvertTo-Json -InputObject @{ busy = $busyPort; args = @($args) } -Compress',
+    '} finally { $busy.Stop() }',
+  ].join('\n')
+  const path = join(directory, 'ports.ps1')
+  writeFileSync(path, script)
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-File', path], { encoding: 'utf8', timeout: 15000 })
+  assert.ifError(result.error)
+  assert.equal(result.status, 0, result.stderr)
+  const { busy, args } = JSON.parse(result.stdout)
+  const address = args[args.indexOf('--hub-internal-listen') + 1]
+  assert.match(address, /^127\.0\.0\.1:\d+$/)
+  assert.notEqual(Number(address.split(':')[1]), busy, 'must not select the occupied default')
+})
+
 test('Windows preset stop preserves ownership and only clears confirmed stopped records', { skip: process.platform !== 'win32' }, async t => {
   for (const scenario of ['stale', 'record-mismatch', 'actual-mismatch', 'normal', 'forced', 'failure', 'query-failure']) {
     await t.test(scenario, t => {
@@ -158,6 +252,18 @@ test('unchanged preset does not publish another release', async t => {
   const result = await runPreset(t, { changed: false })
   assert.equal(result.code, 0, result.output)
   assert.ok(!result.requests.some(item => item.path === '/draft:publish'))
+})
+
+test('real-device preset explicitly authors v5 MCP access and assistant bindings', async t => {
+  const result = await runPreset(t)
+  assert.equal(result.code, 0, result.output)
+  const server = result.content.mcp[0]
+  assert.equal(server.toolAccessMode, 'ALL')
+  assert.deepEqual(server.allowedTools, [])
+  for (const assistant of result.content.assistants) {
+    assert.deepEqual(assistant.mcpBindings, [{ mcpServerId: server.mcpServerId, toolSelection: 'ALL', toolNames: [] }])
+    assert.equal(Object.hasOwn(assistant, 'mcpServerIds'), false)
+  }
 })
 
 test('validation failure reports authoritative field path and prevents preview/publish', async t => {

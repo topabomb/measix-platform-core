@@ -25,6 +25,16 @@ npm run device:real
 
 ## 重置与停止
 
+内部监听优先使用 `127.0.0.1:9101`（Hub）和 `127.0.0.1:9103`（Relay）。未设置覆盖值时，启动器先探测端口；被占用或无法绑定则由系统分配空闲 loopback 端口，并避免两个内部服务选中同一端口。若需固定端口，可在启动前显式指定；覆盖值不会自动改写，公共入口保持不变：
+
+```powershell
+$env:MEASIX_REAL_DEVICE_HUB_INTERNAL_LISTEN = '127.0.0.1:19101'
+$env:MEASIX_REAL_DEVICE_RELAY_INTERNAL_LISTEN = '127.0.0.1:19103'
+npm run device:real
+```
+
+2026-10-06 修复 Windows `Start-Process` 参数边界：工作区路径含空格时必须显式引用参数，且保留嵌入引号与末尾反斜线。原生子进程回归测试修复前复现路径截断，修复后通过；内部端口覆盖与默认端口被占用时自动选取可绑定端口也经历 Red/Green。预设同时按既有 Control Protocol §10.7.1 补齐 Firecrawl 的 `toolAccessMode=ALL, allowedTools=[]`，以及两个助手的 `mcpBindings`（显式 ALL 和空 toolNames），移除预设中的旧 v5 `mcpServerIds` 写入；缺少字段的回归测试先失败再通过。`npm run test:tooling` 最新运行 62 项通过。实际在 NekoBox 占用 9103 时，不设置内部端口环境变量运行 `npm run device:real`，启动器选择替代 loopback 端口；已有 generation 1 保持 already-active，ready、Discovery、Admin 均为 HTTP 200，验证后停止服务。本次只修复启动与预设对现有合同的符合性，不改变 wire/state/security 合同；不作为阶段验收或真实模型调用证据。
+
 ```powershell
 npm run device:real:stop
 npm run device:real:reset

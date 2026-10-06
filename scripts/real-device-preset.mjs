@@ -204,11 +204,11 @@ const content = {
     { asrId: id.dashscopeAsr, displayName: '百炼云端录音转写（本机实验）', clientProtocol: 'DASHSCOPE_HTTP_ASR', upstreamModelKey: 'qwen-audio-3.0-asr-flash', runtimePath: '/api/v1/services/aigc/multimodal-generation/generation', enabled: true },
   ],
   mcp: [
-    { mcpServerId: id.firecrawl, displayName: 'Firecrawl 网页读取', clientProtocol: 'MCP_STREAMABLE_HTTP', runtimePath: '/mcp', authOwnership: 'NONE', enabled: true },
+    { mcpServerId: id.firecrawl, displayName: 'Firecrawl 网页读取', clientProtocol: 'MCP_STREAMABLE_HTTP', runtimePath: '/mcp', authOwnership: 'NONE', toolAccessMode: 'ALL', allowedTools: [], enabled: true },
   ],
   assistants: [
-    { assistantDefinitionId: id.workAssistant, displayName: '企业工作助手', description: '日常问答、工作梳理和公开网页资料查阅。', systemPrompt: '你是企业工作助手。用简明中文回答；需要读取公开网页时使用已授权的 Firecrawl 工具。不要声称知道未提供的企业内部事实。', modelId: id.deepseekModel, memorySeed: [], mcpServerIds: [id.firecrawl], enabled: true },
-    { assistantDefinitionId: id.qwenAssistant, displayName: '百炼问答助手（本机实验）', description: '使用百炼 Qwen 模型回答日常问题。', systemPrompt: '你是企业问答助手，使用简明中文，区分事实和推测。', modelId: id.qwenModel, memorySeed: [], mcpServerIds: [id.firecrawl], enabled: true },
+    { assistantDefinitionId: id.workAssistant, displayName: '企业工作助手', description: '日常问答、工作梳理和公开网页资料查阅。', systemPrompt: '你是企业工作助手。用简明中文回答；需要读取公开网页时使用已授权的 Firecrawl 工具。不要声称知道未提供的企业内部事实。', modelId: id.deepseekModel, memorySeed: [], mcpBindings: [{ mcpServerId: id.firecrawl, toolSelection: 'ALL', toolNames: [] }], enabled: true },
+    { assistantDefinitionId: id.qwenAssistant, displayName: '百炼问答助手（本机实验）', description: '使用百炼 Qwen 模型回答日常问题。', systemPrompt: '你是企业问答助手，使用简明中文，区分事实和推测。', modelId: id.qwenModel, memorySeed: [], mcpBindings: [{ mcpServerId: id.firecrawl, toolSelection: 'ALL', toolNames: [] }], enabled: true },
   ],
   starters: [
     { starterId: id.workStarter, assistantDefinitionId: id.workAssistant, title: '梳理今天的工作', prompt: '请帮我整理今天的工作安排。先问我今天最重要的目标和截止时间。', sortOrder: 0, enabled: true,

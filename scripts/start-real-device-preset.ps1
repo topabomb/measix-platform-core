@@ -30,6 +30,25 @@ function New-RandomFile([string]$Path, [int]$Length, [switch]$Text) {
     }
 }
 
+function Get-AvailableLoopbackAddress([int]$PreferredPort, [int[]]$ExcludePorts = @()) {
+    $candidate = $PreferredPort
+    while ($true) {
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $candidate)
+        $listener.ExclusiveAddressUse = $true
+        try {
+            try { $listener.Start() }
+            catch [System.Net.Sockets.SocketException] {
+                if ($candidate -eq 0) { throw }
+                $candidate = 0
+                continue
+            }
+            $selectedPort = $listener.LocalEndpoint.Port
+            if ($ExcludePorts -notcontains $selectedPort) { return "127.0.0.1:$selectedPort" }
+            $candidate = 0
+        } finally { $listener.Stop() }
+    }
+}
+
 function Get-DeviceIPv4 {
     $route = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop |
         Where-Object { $_.NextHop -ne '0.0.0.0' } | Sort-Object RouteMetric | Select-Object -First 1
@@ -88,8 +107,12 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Device-demo build failed.' }
     } finally { Pop-Location }
 
+    $hubInternalListen = $env:MEASIX_REAL_DEVICE_HUB_INTERNAL_LISTEN
+    if ([string]::IsNullOrWhiteSpace($hubInternalListen)) { $hubInternalListen = Get-AvailableLoopbackAddress 9101 }
+    $relayInternalListen = $env:MEASIX_REAL_DEVICE_RELAY_INTERNAL_LISTEN
+    if ([string]::IsNullOrWhiteSpace($relayInternalListen)) { $relayInternalListen = Get-AvailableLoopbackAddress 9103 @([int]($hubInternalListen.Split(':')[-1])) }
     $args = @(
-        '--listen', "$($uri.Host):$($uri.Port)", '--hub-internal-listen', '127.0.0.1:9101', '--relay-internal-listen', '127.0.0.1:9103',
+        '--listen', "$($uri.Host):$($uri.Port)", '--hub-internal-listen', $hubInternalListen, '--relay-internal-listen', $relayInternalListen,
         '--public-origin', $origin, '--db', $dbPath, '--master-key-file', $masterKeyPath, '--jwt-private-key-file', $jwtKeyPath,
         '--relay-service-token-file', $relayTokenPath, '--spool', $spoolPath,
         '--admin-assets-dir', (Join-Path $repoRoot 'console\dist\spa'), '--portal-assets-dir', (Join-Path $portalRoot 'dist')
@@ -99,7 +122,10 @@ try {
         if ($portalUpstream -notmatch '^https?://') { throw 'MEASIX_PORTAL_UPSTREAM_URL must be an HTTP or HTTPS URL.' }
         $args += @('--portal-upstream-url', $portalUpstream)
     }
-    $process = Start-Process -FilePath $binaryPath -ArgumentList $args -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logRoot 'device-demo.out.log') -RedirectStandardError (Join-Path $logRoot 'device-demo.err.log')
+    # Start-Process joins ArgumentList without quoting. Preserve native Windows
+    # argument boundaries, including spaces, embedded quotes and trailing slashes.
+    $quotedArgs = ($args | ForEach-Object { '"' + ($_ -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"' }) -join ' '
+    $process = Start-Process -FilePath $binaryPath -ArgumentList $quotedArgs -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logRoot 'device-demo.out.log') -RedirectStandardError (Join-Path $logRoot 'device-demo.err.log')
     @{ pid = $process.Id; executable = $binaryPath; origin = $origin; startedAt = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $pidPath -NoNewline
 
     $ready = $false

@@ -22,6 +22,7 @@ pnpm
 ```
 
 - `console/package.json` 与 `console/pnpm-lock.yaml` 是前端依赖/版本权威；
+- `console/pnpm-workspace.yaml` 固定 `nodeLinker: hoisted`：2026-10-06 用户终端直接访问 Quasar virtual-store 文件成功，但经 dependency junction 访问返回 UNKNOWN，CLI 因此报 MODULE_NOT_FOUND；重建单个 junction 仍失败。改用普通目录并按 frozen lockfile 重装，避免该链接访问路径；仅在安装命令临时指定 hoisted 会在后续运行时恢复默认布局，因此必须保存项目配置。配置后 npm→Windows PowerShell→pnpm 构建、typecheck 与 260 项前端测试通过，Quasar 目录确认不是链接；未改变依赖版本、wire 或架构语义。
 - production 输出为 `dist/spa`；same-origin 静态托管是发布要求，Hub main 通过 `--admin-assets-dir` 配置既有 static handler，部署/同源路由见 `docs/operations.md`；
 - 浏览器只调用 Control Hub Admin API，不直连 Relay internal API；
 - API DTO/type 来自 generated Admin OpenAPI；不维护平行手写 wire model；

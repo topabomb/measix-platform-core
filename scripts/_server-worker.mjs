@@ -51,7 +51,7 @@ const adapterServer = http.createServer((req, res) => {
     const path = url.pathname
     // Isolated deterministic adapter control; never mounted by production Hub.
     if (path === '/__mcp_mode' && req.method === 'POST') {
-      if (!['initial', 'added', 'drift', 'deleted', 'failure', 'large'].includes(bodyJSON?.mode)) { res.writeHead(400); res.end(); return }
+      if (!['initial', 'added', 'drift', 'deleted', 'failure', 'large', 'dense'].includes(bodyJSON?.mode)) { res.writeHead(400); res.end(); return }
       mcpMode = bodyJSON.mode
       res.writeHead(204); res.end(); return
     }
@@ -129,7 +129,13 @@ const adapterServer = http.createServer((req, res) => {
       const result = bodyJSON.method === 'initialize'
         ? { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'measix-test-adapter', version: '1.0.0' } }
         : bodyJSON.method === 'tools/list'
-          ? { tools: mcpMode === 'deleted' ? [] : [
+          ? { tools: mcpMode === 'dense' ? Array.from({ length: 27 }, (_, index) => ({
+            name: index === 0 ? 'firecrawl_agent' : index === 26 ? `research_${'very_long_tool_name_'.repeat(12)}26` : `research_${String(index).padStart(2, '0')}`,
+            description: index === 0
+              ? 'Structured website research: search public websites, read relevant pages and return evidence for the requested fields.\n' + 'Provide a research question and the fields you need. Results may combine several pages, with source links and structured records. '.repeat(6) + 'Complete definition end.'
+              : `Research catalog item ${index}: find source documents and summarize their contents. ` + 'Use the supplied filters to narrow the results and return sources for review. '.repeat(6),
+            inputSchema: { type: 'object', properties: { prompt: { type: 'string' } } },
+          })) : mcpMode === 'deleted' ? [] : [
             { name: 'tool-a', description: mcpMode === 'drift' ? 'Changed read contract' : 'Read enterprise records', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true } },
             ...(mcpMode === 'added' || mcpMode === 'drift' ? [{ name: 'tool-new', description: 'Newly discovered tool', inputSchema: { type: 'object' } }] : []),
             ...(mcpMode === 'large' ? Array.from({ length: 63 }, (_, index) => ({ name: `tool-${String(index).padStart(3, '0')}`, description: `Enterprise catalog item ${index}`, inputSchema: { type: 'object' } })) : []),

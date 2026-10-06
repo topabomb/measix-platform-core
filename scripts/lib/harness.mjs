@@ -11,7 +11,7 @@
  * the three harness scripts.
  */
 import { createHash, randomFillSync } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve, relative, extname, sep } from 'node:path'
 import { execFileSync, spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -110,7 +110,10 @@ export function collectFiles(dir) {
  * @returns {string} 'sha256:...' or 'not-built'
  */
 export function adminBuildHash(root) {
-  const distDir = join(root, 'console', 'dist', 'spa')
+  return adminBuildDirectoryHash(join(root, 'console', 'dist', 'spa'))
+}
+
+function adminBuildDirectoryHash(distDir) {
   if (!existsSync(distDir)) return 'not-built'
   const hash = createHash('sha256')
   for (const file of collectFiles(distDir).sort()) {
@@ -120,6 +123,20 @@ export function adminBuildHash(root) {
     hash.update('\0')
   }
   return 'sha256:' + hash.digest('hex')
+}
+
+/** Pin the served SPA to this isolated run instead of a shared, rebuildable dist. */
+export function snapshotAdminBuild(root, envRoot) {
+  const source = join(root, 'console', 'dist', 'spa')
+  const directory = join(envRoot, 'admin-spa')
+  if (!existsSync(join(source, 'index.html'))) throw new Error('Admin build index.html is missing; complete the production build first')
+  if (existsSync(directory)) throw new Error('Admin build snapshot directory already exists')
+  const buildHash = adminBuildDirectoryHash(source)
+  cpSync(source, directory, { recursive: true, force: false, errorOnExist: true })
+  if (adminBuildDirectoryHash(source) !== buildHash || adminBuildDirectoryHash(directory) !== buildHash) {
+    throw new Error('Admin production build changed while copying; complete the build and rerun')
+  }
+  return { directory, buildHash }
 }
 
 /**

@@ -84,9 +84,9 @@ it('bounds catalog rendering and preserves selections across pages and search', 
   const source = structuredClone(toRaw(mcp.toolDiscovery!.tools[0]!))
   mcp.toolDiscovery!.tools = Array.from({ length: 61 }, (_, i) => ({ ...source, name: `read_${i}`, definition: { ...source.definition, name: `read_${i}` } }))
   await flushPromises()
-  expect(wrapper.findAll('[data-tool-name]')).toHaveLength(25)
+  expect(wrapper.findAll('[data-tool-name]')).toHaveLength(50)
   wrapper.findAllComponents(QCheckbox)[0]!.vm.$emit('update:modelValue', true)
-  wrapper.getComponent(QPagination).vm.$emit('update:modelValue', 3)
+  wrapper.getComponent(QPagination).vm.$emit('update:modelValue', 2)
   await flushPromises()
   expect(wrapper.findAll('[data-tool-name]')).toHaveLength(11)
   expect(wrapper.find('[data-tool-name="read_50"]').exists()).toBe(true)
@@ -109,8 +109,39 @@ it('explains server restrictions without referring to the assistant binding swit
   await flushPromises()
   expect(wrapper.get('[data-cy="mcp-tools-no-catalog"]').text()).toContain('optional')
   expect(wrapper.get('[data-cy="mcp-tools-no-catalog"]').text()).not.toContain('apply its upstream')
-  expect(wrapper.get('[data-cy="mcp-tools-all"]').text()).toContain('does not add invocation confirmation')
+  expect(wrapper.get('[data-cy="mcp-tools-all"]').text()).toContain('New tools')
   expect(wrapper.findAllComponents(QSelect)).toHaveLength(0)
+})
+
+it('keeps ALL catalog viewing read-only without selection actions or dirtying the draft', async () => {
+  const { wrapper, mcp } = setup()
+  const draft = useDraftStore()
+  mcp.toolAccessMode = 'ALL'
+  await flushPromises()
+  expect(wrapper.find('[data-tool-name="read"]').exists()).toBe(false)
+  await wrapper.get('[data-cy="mcp-catalog-toggle"]').trigger('click')
+  expect(wrapper.find('[data-tool-name="read"]').exists()).toBe(true)
+  expect(wrapper.find('[data-cy="mcp-tools-select-all"]').exists()).toBe(false)
+  expect(wrapper.find('[data-cy="mcp-tools-clear"]').exists()).toBe(false)
+  expect(wrapper.findAllComponents(QCheckbox)).toHaveLength(0)
+  expect(wrapper.findAllComponents(QSelect)).toHaveLength(0)
+  expect(mcp.toolAccessMode).toBe('ALL')
+  expect(mcp.allowedTools).toEqual([])
+  expect(draft.dirty).toBe(false)
+})
+
+it('selects only matching catalog results while preserving outside selections and explicit policies', async () => {
+  const { wrapper, mcp } = setup()
+  const source = structuredClone(toRaw(mcp.toolDiscovery!.tools[0]!))
+  mcp.toolDiscovery!.tools.push({ ...source, name: 'write', definition: { ...source.definition, name: 'write', description: 'Write records' } })
+  mcp.allowedTools = [{ ...source, approvalPolicy: 'REQUIRE_CONFIRMATION' }]
+  wrapper.getComponent(QInput).vm.$emit('update:modelValue', 'write')
+  await flushPromises()
+  expect(wrapper.get('[data-cy="mcp-tools-select-all"]').text()).toContain('matching')
+  await wrapper.get('[data-cy="mcp-tools-select-all"]').trigger('click')
+  expect(mcp.allowedTools!.map(tool => [tool.name, tool.approvalPolicy])).toEqual([['read', 'REQUIRE_CONFIRMATION'], ['write', 'AUTO']])
+  await wrapper.get('[data-cy="mcp-tools-clear"]').trigger('click')
+  expect(mcp.allowedTools!.map(tool => tool.name)).toEqual(['read'])
 })
 
 it('keeps missing approved tools searchable and bounded instead of mounting every stale row', async () => {
@@ -119,12 +150,25 @@ it('keeps missing approved tools searchable and bounded instead of mounting ever
   mcp.allowedTools = Array.from({ length: 61 }, (_, i) => ({ ...source, name: `missing_${i}`, definition: { ...source.definition, name: `missing_${i}` }, approvalPolicy: 'REQUIRE_CONFIRMATION' as const }))
   mcp.toolDiscovery!.tools = []
   await flushPromises()
-  expect(wrapper.findAll('[data-cy="mcp-tool-missing"]')).toHaveLength(25)
+  expect(wrapper.findAll('[data-cy="mcp-tool-missing"]')).toHaveLength(50)
   wrapper.getComponent(QInput).vm.$emit('update:modelValue', 'missing_60')
   await flushPromises()
   expect(wrapper.findAll('[data-cy="mcp-tool-missing"]')).toHaveLength(1)
   await wrapper.get('[data-cy="mcp-tool-missing"] button').trigger('click')
   expect(mcp.allowedTools).toHaveLength(60)
+})
+
+it('clears the visible changed tool by its current description while retaining unrelated approvals', async () => {
+  const { wrapper, mcp } = setup()
+  const source = structuredClone(toRaw(mcp.toolDiscovery!.tools[0]!))
+  mcp.allowedTools = [{ ...source, approvalPolicy: 'REQUIRE_CONFIRMATION' }]
+  mcp.toolDiscovery!.tools[0]!.definition.description = 'Updated search purpose'
+  wrapper.getComponent(QInput).vm.$emit('update:modelValue', 'updated search')
+  await flushPromises()
+  expect(wrapper.find('[data-tool-name="read"]').exists()).toBe(true)
+  expect(wrapper.get('[data-cy="mcp-tools-clear"]').attributes('disabled')).toBeUndefined()
+  await wrapper.get('[data-cy="mcp-tools-clear"]').trigger('click')
+  expect(mcp.allowedTools).toEqual([])
 })
 
 it('retains approved definitions without labeling an undiscovered catalog as a confirmed deletion', async () => {

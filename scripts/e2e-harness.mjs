@@ -44,6 +44,7 @@ import {
   startHubAndRelay,
   cleanupEnvironment,
   writeMetaJson,
+  snapshotAdminBuild,
 } from './lib/harness.mjs'
 
 const ROOT = resolveRoot(import.meta.dirname)
@@ -122,11 +123,9 @@ if (!hubReady || !relayReady) {
 // --- Start same-origin SPA proxy ---
 
 log('starting same-origin SPA proxy (in worker)...')
-const spaDir = join(ROOT, 'console', 'dist', 'spa')
-if (!existsSync(spaDir)) {
-  log('SPA build not found. Run "make console-build" first.')
-  process.exit(1)
-}
+const adminBuild = snapshotAdminBuild(ROOT, env.envRoot)
+const spaDir = adminBuild.directory
+log(`Pinned production Admin build: ${adminBuild.buildHash}`)
 
 // Start HTTP servers (SPA proxy + Adapter) in a worker thread to avoid
 // blocking the Node.js event loop when using execSync for Playwright.
@@ -635,6 +634,8 @@ try {
 
   // Write meta.json for provenance regardless of pass/fail
   writeMetaJson(artifactsDir, 'e2e-playwright.json', ROOT, ARCH_REPO, 'node scripts/e2e-harness.mjs (orchestrated)', exitCode)
+  writeFileSync(join(artifactsDir, 'e2e-admin-build.json'), JSON.stringify({ ...adminBuild, capturedAt: new Date().toISOString() }, null, 2) + '\n')
+  writeMetaJson(artifactsDir, 'e2e-admin-build.json', ROOT, ARCH_REPO, 'node scripts/e2e-harness.mjs (served build snapshot)', exitCode)
 
   // Always run cleanup — temp dir, processes, servers
   cleanup()

@@ -1379,7 +1379,7 @@ type McpDefinition struct {
 	McpServerId    McpServerId                 `json:"mcpServerId"`
 	RuntimePath    string                      `json:"runtimePath"`
 
-	// ToolAccessMode ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+	// ToolAccessMode ALL follows dynamic discovery without additional invocation confirmation or published-contract hash locking; ALLOWLIST restricts to a nonempty reviewed list with explicit per-tool approval policy.
 	ToolAccessMode McpDefinitionToolAccessMode `json:"toolAccessMode"`
 }
 
@@ -1389,7 +1389,7 @@ type McpDefinitionAuthOwnership string
 // McpDefinitionClientProtocol defines model for McpDefinition.ClientProtocol.
 type McpDefinitionClientProtocol string
 
-// McpDefinitionToolAccessMode ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+// McpDefinitionToolAccessMode ALL follows dynamic discovery without additional invocation confirmation or published-contract hash locking; ALLOWLIST restricts to a nonempty reviewed list with explicit per-tool approval policy.
 type McpDefinitionToolAccessMode string
 
 // McpDefinitionV4 defines model for McpDefinitionV4.
@@ -1413,12 +1413,13 @@ type McpServerId = string
 
 // McpToolGrant defines model for McpToolGrant.
 type McpToolGrant struct {
+	// ApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. Independent of tool selection and does not bypass existing runtime or system permissions. Required explicitly; no decoder default.
 	ApprovalPolicy McpToolGrantApprovalPolicy `json:"approvalPolicy"`
 	ContractHash   Sha256Hash                 `json:"contractHash"`
 	Name           string                     `json:"name"`
 }
 
-// McpToolGrantApprovalPolicy defines model for McpToolGrant.ApprovalPolicy.
+// McpToolGrantApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. Independent of tool selection and does not bypass existing runtime or system permissions. Required explicitly; no decoder default.
 type McpToolGrantApprovalPolicy string
 
 // MeterQuantity defines model for MeterQuantity.

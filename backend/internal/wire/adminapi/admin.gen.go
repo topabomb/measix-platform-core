@@ -2773,7 +2773,7 @@ type McpDefinition struct {
 	McpServerId    McpServerId                 `json:"mcpServerId"`
 	RuntimePath    string                      `json:"runtimePath"`
 
-	// ToolAccessMode ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+	// ToolAccessMode ALL follows dynamic discovery without additional invocation confirmation or published-contract hash locking; ALLOWLIST restricts to a nonempty reviewed list with explicit per-tool approval policy.
 	ToolAccessMode *McpDefinitionToolAccessMode `json:"toolAccessMode,omitempty"`
 	ToolDiscovery  *McpToolDiscovery            `json:"toolDiscovery,omitempty"`
 }
@@ -2784,7 +2784,7 @@ type McpDefinitionAuthOwnership string
 // McpDefinitionClientProtocol defines model for McpDefinition.ClientProtocol.
 type McpDefinitionClientProtocol string
 
-// McpDefinitionToolAccessMode ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+// McpDefinitionToolAccessMode ALL follows dynamic discovery without additional invocation confirmation or published-contract hash locking; ALLOWLIST restricts to a nonempty reviewed list with explicit per-tool approval policy.
 type McpDefinitionToolAccessMode string
 
 // McpDiscoveredTool defines model for McpDiscoveredTool.
@@ -2812,6 +2812,7 @@ type McpToolDiscovery struct {
 
 // McpToolGrant defines model for McpToolGrant.
 type McpToolGrant struct {
+	// ApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, contract review, save and publish. Required explicitly; no decoder default.
 	ApprovalPolicy McpToolGrantApprovalPolicy `json:"approvalPolicy"`
 	ContractHash   Sha256Hash                 `json:"contractHash"`
 
@@ -2820,7 +2821,7 @@ type McpToolGrant struct {
 	Name       string            `json:"name"`
 }
 
-// McpToolGrantApprovalPolicy defines model for McpToolGrant.ApprovalPolicy.
+// McpToolGrantApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, contract review, save and publish. Required explicitly; no decoder default.
 type McpToolGrantApprovalPolicy string
 
 // MeterQuantity defines model for MeterQuantity.

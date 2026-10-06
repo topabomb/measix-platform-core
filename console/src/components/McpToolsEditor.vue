@@ -39,15 +39,16 @@ function selected(tool: Tool) { return grants.value.some(grant => grant.name ===
 function changed(tool: Tool) { return grants.value.some(grant => grant.name === tool.name && grant.contractHash !== tool.contractHash) }
 function select(tool: Tool, enabled: boolean) {
   props.mcp.allowedTools ??= []
+  const approvalPolicy = props.mcp.allowedTools.find(grant => grant.name === tool.name)?.approvalPolicy ?? 'AUTO'
   props.mcp.allowedTools = props.mcp.allowedTools.filter(grant => grant.name !== tool.name)
-  if (enabled) props.mcp.allowedTools.push({ ...structuredClone(toRaw(tool)), approvalPolicy: 'REQUIRE_CONFIRMATION' })
+  if (enabled) props.mcp.allowedTools.push({ ...structuredClone(toRaw(tool)), approvalPolicy })
   draft.markDirty()
 }
 function approve(tool: Tool) { select(tool, true) }
 function selectAll() {
   props.mcp.toolAccessMode = 'ALLOWLIST'
   props.mcp.allowedTools ??= []
-  for (const tool of candidates.value) if (!selected(tool)) props.mcp.allowedTools.push({ ...structuredClone(toRaw(tool)), approvalPolicy: 'REQUIRE_CONFIRMATION' })
+  for (const tool of candidates.value) if (!selected(tool)) props.mcp.allowedTools.push({ ...structuredClone(toRaw(tool)), approvalPolicy: 'AUTO' })
   draft.markDirty()
 }
 function clear() { props.mcp.allowedTools = []; draft.markDirty() }

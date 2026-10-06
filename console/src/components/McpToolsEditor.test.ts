@@ -17,26 +17,44 @@ function setup() {
   const wrapper = mount(McpToolsEditor, { props: { mcp }, global: { plugins: [[Quasar, { components: { QCardSection, QCard, QCheckbox, QBtn, QBtnToggle, QInput, QSelect, QBanner, QDialog, QSpace, QSeparator, QPagination }, directives: { ClosePopup } }]], stubs: { QDialog: true } } })
   return { wrapper, mcp }
 }
-it('selects an explicit current definition with confirmation and requires review after drift', async () => {
+it('selects a current definition without extra confirmation and preserves explicit confirmation after drift review', async () => {
   const { wrapper, mcp } = setup()
   wrapper.getComponent(QCheckbox).vm.$emit('update:modelValue', true)
   await flushPromises()
   expect(mcp.allowedTools).toHaveLength(1)
-  expect(mcp.allowedTools![0]!.approvalPolicy).toBe('REQUIRE_CONFIRMATION')
+  expect(mcp.allowedTools![0]!.approvalPolicy).toBe('AUTO')
+  wrapper.getComponent(QSelect).vm.$emit('update:modelValue', 'REQUIRE_CONFIRMATION')
+  await flushPromises()
   mcp.toolDiscovery!.tools[0]!.contractHash = `sha256:${'3'.repeat(64)}`
   await flushPromises()
   expect(wrapper.find('[data-cy="mcp-tool-reapprove"]').exists()).toBe(true)
   expect(mcp.allowedTools![0]!.contractHash).toBe(`sha256:${'1'.repeat(64)}`)
   await wrapper.get('[data-cy="mcp-tool-reapprove"]').trigger('click')
   expect(mcp.allowedTools![0]!.contractHash).toBe(`sha256:${'3'.repeat(64)}`)
+  expect(mcp.allowedTools![0]!.approvalPolicy).toBe('REQUIRE_CONFIRMATION')
   expect(wrapper.find('[data-cy="mcp-tool-reapprove"]').exists()).toBe(false)
 })
 it('does not use select-all to silently reapprove changed tools', async () => {
   const { wrapper, mcp } = setup()
   await wrapper.get('[data-cy="mcp-tools-select-all"]').trigger('click')
+  expect(mcp.allowedTools![0]!.approvalPolicy).toBe('AUTO')
+  mcp.allowedTools![0]!.approvalPolicy = 'REQUIRE_CONFIRMATION'
+  const source = structuredClone(toRaw(mcp.toolDiscovery!.tools[0]!))
+  mcp.toolDiscovery!.tools.push({ ...source, name: 'second', definition: { ...source.definition, name: 'second' } })
   mcp.toolDiscovery!.tools[0]!.contractHash = `sha256:${'3'.repeat(64)}`
   await wrapper.get('[data-cy="mcp-tools-select-all"]').trigger('click')
   expect(mcp.allowedTools![0]!.contractHash).toBe(`sha256:${'1'.repeat(64)}`)
+  expect(mcp.allowedTools!.map(tool => tool.approvalPolicy)).toEqual(['REQUIRE_CONFIRMATION', 'AUTO'])
+})
+it('preserves an explicit AUTO policy when reviewing a changed contract', async () => {
+  const { wrapper, mcp } = setup()
+  const tool = structuredClone(toRaw(mcp.toolDiscovery!.tools[0]!))
+  mcp.allowedTools = [{ ...tool, approvalPolicy: 'AUTO' }]
+  mcp.toolDiscovery!.tools[0]!.contractHash = `sha256:${'3'.repeat(64)}`
+  await flushPromises()
+  await wrapper.get('[data-cy="mcp-tool-reapprove"]').trigger('click')
+  expect(mcp.allowedTools![0]!.approvalPolicy).toBe('AUTO')
+  expect(mcp.allowedTools![0]!.contractHash).toBe(`sha256:${'3'.repeat(64)}`)
 })
 it('clearing the search restores the catalog', async () => {
   const { wrapper } = setup()
@@ -91,6 +109,8 @@ it('explains server restrictions without referring to the assistant binding swit
   await flushPromises()
   expect(wrapper.get('[data-cy="mcp-tools-no-catalog"]').text()).toContain('optional')
   expect(wrapper.get('[data-cy="mcp-tools-no-catalog"]').text()).not.toContain('apply its upstream')
+  expect(wrapper.get('[data-cy="mcp-tools-all"]').text()).toContain('does not add invocation confirmation')
+  expect(wrapper.findAllComponents(QSelect)).toHaveLength(0)
 })
 
 it('keeps missing approved tools searchable and bounded instead of mounting every stale row', async () => {

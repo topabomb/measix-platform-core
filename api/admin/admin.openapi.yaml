@@ -3774,7 +3774,7 @@ components:
         toolDiscovery:
           $ref: '#/components/schemas/McpToolDiscovery'
         toolAccessMode:
-          description: ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+          description: ALL follows dynamic discovery without additional invocation confirmation or published-contract hash locking; ALLOWLIST restricts to a nonempty reviewed list with explicit per-tool approval policy.
           type: string
           enum: [ALL, ALLOWLIST]
         allowedTools:
@@ -6228,6 +6228,7 @@ components:
         contractHash:
           $ref: '#/components/schemas/Sha256Hash'
         approvalPolicy:
+          description: AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, contract review, save and publish. Required explicitly; no decoder default.
           type: string
           enum: [AUTO, REQUIRE_CONFIRMATION]
         definition:

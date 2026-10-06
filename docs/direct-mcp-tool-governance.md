@@ -1,6 +1,6 @@
 # Direct MCP 工具编制、助手绑定与 Android 对接
 
-> 实施日期：2026-10-06。范围：未稳定 Snapshot v5 的 Core/Admin/Portal 增量；保全已发布 v4。Android 本次不修改。语义权威为同级 Architecture 的 Control Protocol §10.7、§10.14 与 Admin Product Requirements §9.5、§9.7；本文件维护具体实现、交互落实、消费者接线和验证证据。
+> 实施日期：2026-10-06。范围：未稳定 Snapshot v5 的 Core/Admin/Portal 增量；保全已发布 v4。Android 源码与原生消费者验证由 Android 仓库承担，本轮 Core 验证不代替原生验收。语义权威为同级 Architecture 的 Control Protocol §10.7、§10.14 与 Admin Product Requirements §9.5、§9.7；本文件维护具体实现、交互落实、消费者接线和验证证据。
 
 ## 1. 目标与验收边界
 
@@ -25,9 +25,9 @@
 
 本轮的工具编排是“绑定具体能力 + 助手指令 + 原生工具循环”。例如检索助手只绑定 `search_records`、`fetch_record`，指令规定先检索、再按 ID 读取、最后总结；资源上的确认策略决定原生循环是否暂停向用户确认。Core 不执行助手、不保证指令顺序、不新增工作流状态。若后续要求确定的依赖图、人工节点、幂等执行与补偿，应独立定义 Workflow 合同和执行 owner；Gateway 则负责工具发现/引用/授权，二者不能混作本次白名单功能。
 
-当前采用可选服务器和助手白名单，不提供 wildcard 或 ALL_EXCEPT 编制语法；其未来扩展须先定义实际场景和新的合同含义。资源 `toolAccessMode=ALL, allowedTools=[]` 表示不限制，动态发现全部工具且默认每次调用确认；ALLOWLIST 必须非空，按名称、合同 hash 与确认策略执行。助手已绑定服务器的 `toolSelection=ALL, toolNames=[]` 表示未编排，不额外限制；ALLOWLIST 必须非空，按名称过滤并不得越过服务器白名单。删除服务器 binding 表示该助手不用此 MCP，`enabled=false` 表示服务器停用。工具身份是 MCP 资源 ID 加大小写敏感原始 name；重命名按删除/新增处理。
+当前采用可选服务器和助手白名单，不提供 wildcard 或 ALL_EXCEPT 编制语法；其未来扩展须先定义实际场景和新的合同含义。资源 `toolAccessMode=ALL, allowedTools=[]` 表示不限制，动态发现全部工具，不增加调用确认或企业合同锁定；ALLOWLIST 必须非空，按名称、合同 hash 与确认策略执行。助手已绑定服务器的 `toolSelection=ALL, toolNames=[]` 表示未编排，不额外限制；ALLOWLIST 必须非空，按名称过滤并不得越过服务器白名单。删除服务器 binding 表示该助手不用此 MCP，`enabled=false` 表示服务器停用。工具身份是 MCP 资源 ID 加大小写敏感原始 name；重命名按删除/新增处理。
 
-Admin 草稿资源增加可缺省的 `toolAccessMode` / `allowedTools` 和只读 `toolDiscovery`。缺省表示存量未编制；新建明确写 ALL 和空名单，默认不限制。每项允许工具包含 name、contractHash、approvalPolicy，以及服务器审核保存的完整 definition。调用确认枚举为 AUTO / REQUIRE_CONFIRMATION；新选择默认要求确认。工具发现包含来源指纹、发现时间及完整候选定义。上述字段归唯一 Managed Draft owner；发现完成使用 expectedDraftRevision 比较并交换，网络 IO 不持有数据库事务或配置锁。普通 Save 不允许伪造发现记录或未经发现的批准定义。不限制模式发布无需先取得目录；发现目录只用于显示与编制可选限制。
+Admin 草稿资源增加可缺省的 `toolAccessMode` / `allowedTools` 和只读 `toolDiscovery`。缺省表示存量未编制；新建明确写 ALL 和空名单，默认不限制。每项允许工具包含 name、contractHash、approvalPolicy，以及服务器审核保存的完整 definition。调用确认枚举为 AUTO / REQUIRE_CONFIRMATION；新选择默认 AUTO（无需额外确认），管理员可明确选择 REQUIRE_CONFIRMATION（每次调用前确认）；合同重审、全选和保存发布保留已有显式策略。默认值只属于新建批准动作，不用于为缺失 wire 策略补值。工具发现包含来源指纹、发现时间及完整候选定义。上述字段归唯一 Managed Draft owner；发现完成使用 expectedDraftRevision 比较并交换，网络 IO 不持有数据库事务或配置锁。普通 Save 不允许伪造发现记录或未经发现的批准定义。不限制模式发布无需先取得目录；发现目录只用于显示与编制可选限制。
 
 Client v5 MCP 保留原标准资源字段并投影 toolAccessMode、允许项的 name/contractHash/approvalPolicy；不下发发现记录、完整定义、来源指纹、上游 URL 或 Secret。助手由 mcpServerIds 升级为 mcpBindings，每项为 mcpServerId、toolSelection 与明确 toolNames。Admin 保留只读 legacy 引用恢复材料，帮助存量草稿显式确认模式，不用读取动作推断全部授权。
 
@@ -44,7 +44,7 @@ v4 使用独立原始 McpDefinition/Assistant wire DTO；下载、重发布及 c
 | 使用此 MCP → 指定工具 | toolSelection=ALLOWLIST, toolNames=[...] | 仅所选名称，新增不自动加入 |
 | 指定工具但删完选择 | ALLOWLIST + []，校验错误 | 阻止发布，不能悄悄扩大为全部工具 |
 
-服务器资源的“企业工具权限”独立于助手编排：ALL 使用动态目录并逐次确认；ALLOWLIST 锁定审核的合同及确认策略，是所有入口共同上限。界面避免把两者都叫编排。服务器停用用 enabled，助手停用用绑定开关，不复用空名单。两种 ALL 均是显式 wire 枚举；缺失/null/未知枚举不补默认、不进入运行。
+服务器资源的“企业工具权限”独立于助手编排：ALL 使用动态目录，不增加调用确认；ALLOWLIST 按审核合同限制工具范围，是所有入口共同上限。工具范围、合同锁定和调用确认分别表达，助手选择不改变服务器确认策略。界面避免把两者都叫编排。服务器停用用 enabled，助手停用用绑定开关，不复用空名单。两种 ALL 均是显式 wire 枚举；缺失/null/未知枚举不补默认、不进入运行。
 
 ## 3. Core 工具发现与发布
 
@@ -106,9 +106,9 @@ Release 内容保存审核定义便于审查和追溯，Client Snapshot 不含�
 
 PlatformSnapshotMapper 将资源许可与助手 binding 映射到企业只读领域对象，不写用户 McpServerConfig/OAuth。在 ConfigurationResolver 和所有受管 MCP 入口按 toolAccessMode 应用服务器权限；企业助手按 toolSelection 应用可选子集，不能通过额外选择同服务器绕开。用户自有 MCP 仍按 allowLocalMcp 和原本地工具 policy 管理。
 
-McpCatalogDiscovery 保留完整 Tool；McpCatalogStore 区分远端已确认目录和企业发布许可。服务器 ALLOWLIST 时逐工具校验完整 JCS hash；服务器非空白名单时忽略新增，变更/删除的批准工具不可用；服务器无白名单则动态采用当前目录，助手非空名单再按名称过滤。无服务器白名单默认每次调用确认。目录刷新不得更新发布许可；本轮已发送 definitions 固定，检测失配后拒绝尚未承诺的新调用。已承诺调用的成功结果和未知结果处理沿原生命周期，禁止自动重放。
+McpCatalogDiscovery 保留完整 Tool；McpCatalogStore 区分远端已确认目录和企业发布许可。服务器 ALLOWLIST 时逐工具校验完整 JCS hash；服务器非空白名单时忽略新增，变更/删除的批准工具不可用；服务器无白名单则动态采用当前目录，助手非空名单再按名称过滤。服务器 ALL 不增加调用确认；服务器 ALLOWLIST 按显式 approvalPolicy 执行，AUTO 不追加企业确认，REQUIRE_CONFIRMATION 才逐次暂停等待用户允许。二者均保持原有运行准入和系统权限。目录刷新不得更新发布许可；本轮已发送 definitions 固定，检测失配后拒绝尚未承诺的新调用。已承诺调用的成功结果和未知结果处理沿原生命周期，禁止自动重放。
 
-TurnMcpCapabilitySnapshot 捕获经模式过滤后的当前工具；服务器 ALLOWLIST 要求 hash 匹配，ALL 使用真实动态定义和逐次确认，以及明确不可用结果；TurnToolSetFactory 接入企业 approvalPolicy。McpServerRuntime.admitInvocation 在原配置 writer/Session gate 内复验 name/hash/助手授权和确认要求，所有入口一致。复用已有 ToolBatchRunner 确认暂停/继续协议，不创建第二审批状态机。
+TurnMcpCapabilitySnapshot 捕获经模式过滤后的当前工具；服务器 ALLOWLIST 要求 hash 匹配，ALL 使用真实动态定义且不增加调用确认，以及明确不可用结果；TurnToolSetFactory 接入企业 approvalPolicy。McpServerRuntime.admitInvocation 在原配置 writer/Session gate 内复验 name/hash/助手授权和确认要求，所有入口一致。复用已有 ToolBatchRunner 确认暂停/继续协议，不创建第二审批状态机。
 
 设置页只读展示企业来源、强制启用、批准/可用工具及失配原因；助手页只读展示已绑定服务器和全部/指定工具模式。自动启用不自动调用；Starter 不 auto-send。Gateway 继续独立装配 discover/invoke 原子对，不能按 Direct 工具名单过滤它或建立互相 fallback。
 
@@ -148,4 +148,16 @@ Direct 适合少量稳定工具，模型直接看到当前可用 schema；有服
 
 追加 Admin 全页审查修复了目录无界渲染、服务器空白名单指向助手开关的错误提示、ALL 发现前置条件暗示、未发现误报删除、助手暂时缺失与权限越界混淆、空白公告可提交，以及全局设置的原始枚举文案。相关组件最小失败测试均已观察 Red 后通过 Green。额外 `go test -race` 因本机 CGO 未启用而未执行；不能将普通 Go 回归称作 race 检查通过。
 
-消费者边界：Portal 已同步并验证，Android 仓库保持原提交且工作树干净；没有运行或宣称新版 Android consumer/device 验证。指定实际 Android 路径运行跨仓库 Preview 合同比对仍 FAIL，剩余为 Android 新 DTO/fixtures/manifest 未接入；这是用户要求下一阶段再做的工作。Core/Portal 生成、测试和浏览器通过不能使该跨仓库 gate 转为 PASS。既有 preview.22 包和不可变 v4 Release 不受此次工作树修改影响。
+初次工具治理验收时，Portal 已同步并验证，Android 仓库尚未修改；没有运行或宣称新版 Android consumer/device 验证。该次跨仓库 Preview 合同比对仍 FAIL，剩余为 Android 新 DTO/fixtures/manifest 未接入。Android 后续源码和测试材料更新本身不等于消费者验证完成；其完成状态以 Android 仓库的实际验证为准。Core/Portal 生成、测试和浏览器通过不能使该跨仓库 gate 转为 PASS。既有 preview.22 包和不可变 v4 Release 不受此次工作树修改影响。
+
+## 8. 2026-10-06 调用确认纠偏
+
+按用户明确要求撤回 ALL 隐含逐次确认，工具范围、审核合同锁定、调用确认分别定义。当前 v5 wire 结构和枚举保持不变；服务器 ALL 动态发现、不追加企业确认、不锁定审核合同，助手 ALL 不增加过滤，ALLOWLIST 的 AUTO/REQUIRE_CONFIRMATION 显式生效。身份、资源、generation、额度和系统权限沿原运行准入；Relay 继续透明转发。
+
+Admin 新选工具及选择当前全部的新增项默认 AUTO，中文为“无需额外确认”。已有显式策略在全选、重新审核合同、保存重开、Preview/Publish 中保留。重新审核曾重置策略的问题已通过最小测试定位并修复；明确取消选择或切换服务器 ALL 会按该动作移除对应批准项，不在其他动作中重写策略。Android 接线只在 REQUIRE_CONFIRMATION 时复用原确认循环；ALL 和 AUTO 不追加企业确认，助手筛选不修改策略。
+
+本轮最小 Red 为四个失败断言：单选默认、全选默认、AUTO 合同重审保留、ALL 提示；定向 Green 为两组件 12 用例。日志 `.artifacts/mcp-approval-red.log` / `mcp-approval-green.log`。手工中文版真实 Admin 已验证默认 AUTO、显式确认保存重开、ALL 的实际 Preview、切回 ALLOWLIST 的空名单保护及 320px 无横向溢出；截图 `.artifacts/mcp-approval-manual-default.png`、`mcp-approval-manual-explicit.png`、`mcp-approval-manual-all.png`、`mcp-approval-manual-mobile.png`。完整自动验证结果与来源/产物复核记录在本节后续验收记录中。
+
+本轮当前候选验证：Go 全量、vet、组件 smoke 通过；Admin 42 文件 260 用例、typecheck、E2E typecheck、production build 通过；Portal 13 文件 95 用例、typecheck、production build 和 STANDARD/CUSTOM 各 2 个真实浏览器用例通过；Node 工具脚本 59 用例、格式检查通过。完整生产 Admin+Hub/Relay 浏览器链路 8 用例通过，0 skipped/flaky/unexpected，覆盖显式确认与 AUTO 并存时的重审、全选新增项、保存重开、Preview/Publish，以及 ALL 动态目录和全页窄屏回归。
+
+本轮没有修改 Ent、依赖或 Relay 生产代码，不将历史 Ent/race 结果作为本轮新检查。只重新生成当前受影响的 wire/fixture/Android 导出，并逐项比对两轮产物；结果、源文件/产物摘要及 Git 提交收据见 `.artifacts/mcp-approval-verification.json`。Android 消费者合同比对另存 `mcp-approval-cross-contract.log`，材料差异必须在 Android 仓库同步后独立验证，本轮不声明原生消费通过或新的 S0 Freeze。

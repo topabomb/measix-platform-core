@@ -39,7 +39,7 @@ Root repository 的 npm orchestration、实际开发命令与 system harness 生
 
 ### Direct MCP 工具治理
 
-[完整实施方案及安卓对接要求](direct-mcp-tool-governance.md)落实 Control Protocol §10.7.1 与 Admin Product Requirements。`McpToolsEditor` 从当前保存的实际 binding 发现工具；有未保存编辑时先保存，再发现。发现仅更新候选目录，支持名称/说明搜索、完整合同只读详情、显式逐项选择/选择当前全部/清空、每项 `AUTO` 或 `REQUIRE_CONFIRMATION`（默认后者）。同名合同变更单独复核；“选择当前全部”不复核已有变更许可。删除工具保留失效提示供显式移除。远端失败保全目录并展示可恢复错误。
+[完整实施方案及安卓对接要求](direct-mcp-tool-governance.md)落实 Control Protocol §10.7.1 与 Admin Product Requirements。`McpToolsEditor` 从当前保存的实际 binding 发现工具；有未保存编辑时先保存，再发现。发现仅更新候选目录，支持名称/说明搜索、完整合同只读详情、显式逐项选择/选择当前全部/清空、每项 `AUTO`（无需额外确认）或 `REQUIRE_CONFIRMATION`（每次调用前确认），新批准默认 AUTO。工具范围与确认独立，ALL 不追加确认；合同重审保留原策略，选择当前全部仅给新增项写 AUTO。既有策略由管理员明确修改，不在读取或解码时补默认。同名合同变更单独复核；“选择当前全部”不复核已有变更许可。删除工具保留失效提示供显式移除。远端失败保全目录并展示可恢复错误。
 
 `AssistantMcpToolsEditor` 先通过“使用此 MCP”绑定服务器，默认 ALL；需要编排时选择 ALLOWLIST 并至少选择一项。服务器为 ALLOWLIST 时选项来自已批准名单，为 ALL 时来自发现目录；全选只复制当前名称，恢复动态全部需要主动切换模式。服务器非空限制导致的越界引用保留供修复。旧草稿通过明确动作把原服务器转换为 ALL，不在读取时自动赋权。Snapshot Preview 显示服务器权限、确认策略及助手全部/指定工具模式。发现期间阻止再次提交；成功以 CAS 草稿为基线，失败保留作者编辑。
 

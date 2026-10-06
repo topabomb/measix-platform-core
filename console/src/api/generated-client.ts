@@ -757,7 +757,7 @@ export interface components {
             authOwnership: "ENTERPRISE_MANAGED" | "NONE";
             enabled: boolean;
             /**
-             * @description ALL follows dynamic discovery with confirmation; ALLOWLIST restricts to a nonempty reviewed list.
+             * @description ALL follows dynamic discovery without additional invocation confirmation or published-contract hash locking; ALLOWLIST restricts to a nonempty reviewed list with explicit per-tool approval policy.
              * @enum {string}
              */
             toolAccessMode: "ALL" | "ALLOWLIST";
@@ -1021,7 +1021,10 @@ export interface components {
         McpToolGrant: {
             name: string;
             contractHash: components["schemas"]["Sha256Hash"];
-            /** @enum {string} */
+            /**
+             * @description AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. Independent of tool selection and does not bypass existing runtime or system permissions. Required explicitly; no decoder default.
+             * @enum {string}
+             */
             approvalPolicy: "AUTO" | "REQUIRE_CONFIRMATION";
         };
         AssistantMcpBinding: {

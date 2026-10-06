@@ -1,12 +1,65 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, writeFileSync, rmSync, mkdirSync, copyFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
+
+test('Windows preset stop preserves ownership and only clears confirmed stopped records', { skip: process.platform !== 'win32' }, async t => {
+  for (const scenario of ['stale', 'record-mismatch', 'actual-mismatch', 'normal', 'forced', 'failure', 'query-failure']) {
+    await t.test(scenario, t => {
+      const directory = mkdtempSync(join(tmpdir(), 'measix-stop-test-'))
+      t.after(() => rmSync(directory, { recursive: true, force: true }))
+      mkdirSync(join(directory, 'scripts'))
+      const data = join(directory, '.data', 'device-real')
+      mkdirSync(data, { recursive: true })
+      copyFileSync(join(root, 'scripts/stop-real-device-preset.ps1'), join(directory, 'scripts/stop-real-device-preset.ps1'))
+      const expected = join(data, 'bin', 'measix-device-demo.exe')
+      const statePath = join(data, 'process.json')
+      const original = JSON.stringify({ pid: 12345, executable: ['stale', 'record-mismatch'].includes(scenario) ? `${expected}.temporary` : expected })
+      writeFileSync(statePath, original)
+      writeFileSync(join(directory, 'harness.ps1'), `
+$ErrorActionPreference = 'Stop'
+$global:presetTestAlive = '${scenario}' -ne 'stale'
+$global:presetTestStops = 0
+$global:presetTestActual = Join-Path $PSScriptRoot '.data\\device-real\\bin\\measix-device-demo.exe'
+if ('${scenario}' -eq 'actual-mismatch') { $global:presetTestActual += '.unrelated' }
+function Get-CimInstance {
+    param($ClassName, $Filter, $ErrorAction)
+    if ('${scenario}' -eq 'query-failure') { throw 'Synthetic query failure' }
+    if ($global:presetTestAlive) { [pscustomobject]@{ ExecutablePath = $global:presetTestActual } }
+}
+function Stop-Process {
+    param($Id, [switch]$Force, $ErrorAction)
+    $global:presetTestStops++
+    if ('${scenario}' -eq 'normal' -or ('${scenario}' -eq 'forced' -and $Force)) { $global:presetTestAlive = $false }
+}
+function Wait-Process { param($Id, $Timeout, $ErrorAction) }
+try { & (Join-Path $PSScriptRoot 'scripts\\stop-real-device-preset.ps1') }
+catch { Write-Output ('FAILURE: ' + $_.Exception.Message) }
+finally { Write-Output ('STOPS=' + $global:presetTestStops) }
+`)
+      const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(directory, 'harness.ps1')], { encoding: 'utf8', timeout: 15000 })
+      assert.ifError(result.error)
+      assert.equal(result.status, 0, result.stderr)
+      const preserve = ['record-mismatch', 'actual-mismatch', 'failure', 'query-failure'].includes(scenario)
+      assert.equal(existsSync(statePath), preserve, result.stdout)
+      if (preserve) {
+        assert.equal(readFileSync(statePath, 'utf8'), original)
+        assert.match(result.stdout, /FAILURE:/)
+      } else assert.doesNotMatch(result.stdout, /FAILURE:/)
+      const stops = scenario === 'normal' ? 1 : ['forced', 'failure'].includes(scenario) ? 2 : 0
+      assert.match(result.stdout, new RegExp('STOPS=' + stops))
+      if (scenario.endsWith('mismatch')) {
+        assert.match(result.stdout, /PID 12345/)
+        assert.match(result.stdout, /Recorded:.*Expected:.*Actual:/)
+      }
+    })
+  }
+})
 
 async function runPreset(t, { validationErrors = [], changed = true } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'measix-preset-test-'))

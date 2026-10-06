@@ -7,30 +7,25 @@ if (-not (Test-Path -LiteralPath $pidPath)) {
     exit 0
 }
 $state = Get-Content -Raw -LiteralPath $pidPath | ConvertFrom-Json
-if ($state.executable -ne (Join-Path $dataRoot 'bin\measix-device-demo.exe')) {
-    throw 'Refusing to stop a process not created by the real-device preset.'
+$recordedPid = 0
+if (-not [int]::TryParse([string]$state.pid, [ref]$recordedPid) -or $recordedPid -le 0) {
+    throw 'Invalid real-device preset PID; process record preserved.'
 }
-try {
-    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($state.pid)" -ErrorAction SilentlyContinue
-    if ($null -ne $process -and $process.ExecutablePath -eq $state.executable) {
-        # The process can exit after the ownership check and before the signal.
-        # Treat that race as an already-completed stop, not as a launcher failure.
-        Stop-Process -Id $state.pid -ErrorAction SilentlyContinue
-        # Bounded wait: Wait-Process without -Timeout can block forever, and a
-        # process that ignores the request must still be escalated.
-        Wait-Process -Id $state.pid -Timeout 10 -ErrorAction SilentlyContinue
-        $stillRunning = Get-Process -Id $state.pid -ErrorAction SilentlyContinue
-        if ($null -ne $stillRunning) {
-            Stop-Process -Id $state.pid -Force -ErrorAction SilentlyContinue
-            Wait-Process -Id $state.pid -Timeout 10 -ErrorAction SilentlyContinue
-            Write-Output "Force-stopped real-device preset PID $($state.pid)."
-        } else {
-            Write-Output "Stopped real-device preset PID $($state.pid)."
-        }
-    } else {
-        Write-Output 'Recorded real-device preset process is not running; removing stale state.'
+$expectedExecutable = Join-Path $dataRoot 'bin\measix-device-demo.exe'
+# A failed query is not evidence that the process has exited.
+$process = Get-CimInstance Win32_Process -Filter "ProcessId=$recordedPid" -ErrorAction Stop
+foreach ($forceStop in @($false, $true)) {
+    if ($null -eq $process) { break }
+    if ($state.executable -ne $expectedExecutable -or $process.ExecutablePath -ne $expectedExecutable) {
+        throw "Real-device preset process identity mismatch for PID $recordedPid. Recorded: $($state.executable); Expected: $expectedExecutable; Actual: $($process.ExecutablePath). No stop requested for this mismatched process; process record and data preserved. Verify the instance before manual cleanup."
     }
-} finally {
-    # Always clear the PID file, otherwise the next start misreads stale state.
-    Remove-Item -LiteralPath $pidPath -Force -ErrorAction SilentlyContinue
+    # An exit between inspection and signaling is harmless; verify afterward.
+    Stop-Process -Id $recordedPid -Force:$forceStop -ErrorAction SilentlyContinue
+    Wait-Process -Id $recordedPid -Timeout 10 -ErrorAction SilentlyContinue
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$recordedPid" -ErrorAction Stop
 }
+if ($null -ne $process) {
+    throw "Real-device preset PID $recordedPid remains running after stop attempts; process record and data preserved. Check permissions and process status before retrying."
+}
+Remove-Item -LiteralPath $pidPath -Force
+Write-Output "Real-device preset PID $recordedPid is no longer running; process record cleared."

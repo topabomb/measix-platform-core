@@ -21,7 +21,7 @@ scripts/               Node browser/candidate orchestration and evidence tooling
 docs/                  implementation instructions and evidence
 ```
 
-Gateway source/OpenAPI and production service packaging are S0.3 work, not current directories.
+Gateway source/OpenAPI and three-daemon production qualification remain S0.3 work. The current two-daemon Preview packaging is under `deploy/preview/`; see [deployment](s02-preview-deployment.md).
 
 ## 2. Local bootstrap and startup
 
@@ -47,6 +47,19 @@ These are development HTTP endpoints, not production origin/TLS qualification. T
 
 Run `npm run device:real` from the Core root. It builds production Admin/Portal assets, runs shared database migrations, preserves deployment credentials, starts the local same-origin Hub/Relay, and publishes the explicit v5 preset. The actual origin is printed after readiness and stored in `.data/device-real/process.json`; do not reuse an old LAN address. The Admin password is in ignored `.secrets/device-real-admin-password.txt`.
 
+The preset runs one local `device-demo` process under a LAN HTTP origin (no Caddy). Default public port is 9100. It selects the default-gateway IPv4; to choose a reachable origin/interface or fixed private ports, set before launch:
+
+```powershell
+$env:MEASIX_REAL_DEVICE_ORIGIN = 'http://192.0.2.20:9100'
+$env:MEASIX_REAL_DEVICE_HUB_INTERNAL_LISTEN = '127.0.0.1:19101'
+$env:MEASIX_REAL_DEVICE_RELAY_INTERNAL_LISTEN = '127.0.0.1:19103'
+npm run device:real
+```
+
+The address is documentation-only. Without private-port overrides, 9101/9103 are tried first and unavailable ports get bounded loopback allocation; explicit overrides are not silently changed. Public origin remains the Android Discovery/Client/Runtime owner. On the phone, create a dedicated user/enrollment through Admin; permit the development binary on the selected private network when required.
+
+`npm run device:real:stop` stops only its recorded process after matching its executable identity. Missing PID clears a stale record; identity/query/stop failure preserves the record for diagnosis. `npm run device:real:reset` explicitly discards and recreates only this preset's isolated data after stopping it. Never use reset, direct DB edits or ordinary setup to bypass an unknown schema/checksum or process-identity error.
+
 Every invocation builds the current local Core and sibling Portal working trees, including uncommitted source changes. It stops the previously owned process and runs the newly built binary with a unique `buildVersion`, recorded in `process.json` and the publisher result. Before changing any preset configuration, the publisher authenticates and checks that both Hub and Relay report this invocation's build identity through Admin System Status. A responding older process at the public origin is rejected; a Relay still starting has a bounded wait to report its identity. Readiness alone does not establish which build is serving the origin.
 
 The preset owns the isolated `.data/device-real` draft: rerunning restores its predefined resources and three complete Starter openings. Do not point it at a shared or production database. Manual Admin publications remain immutable releases, but their edits are not the preset's next draft. `npm run device:real:stop` stops its owned process. `device:real:reset` deletes isolated data and is only for an explicit decision to discard it, never an upgrade/checksum repair.
@@ -57,7 +70,7 @@ Supplier credentials come from ignored `.secrets/supplier-keys.env`; existing AC
 
 Publisher results are saved in `.data/device-real/logs/preset-result.json`. The launcher clears the old result before each invocation and includes the current endpoint, HTTP status and problem code (or publisher exit code if no result was written) in its final failure. API response bodies and credentials are excluded. Preserve the database, SQLite sidecars, protected files and diagnostic on failure; rerun after correcting the reported cause.
 
-Use actual Admin authoring and a dedicated Android emulator for UI/context verification. Keep the retained production demo separate. [Starter verification](starter-opening-snapshots.md#10-实施及验收记录) records browser, device, deterministic-adapter and supplier boundaries separately.
+Use actual Admin authoring and a dedicated Android emulator for UI/context verification. Keep the retained production demo separate. Commands and acceptance boundaries are in [testing](testing.md#starter-与协议兼容); historical results are in the [evidence index](s0-execution-progress.md#历史证据入口).
 
 ## 3. Normal checks
 

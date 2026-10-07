@@ -48,4 +48,4 @@ SQLite connections remain owned by `internal/common/sqliteutil`. Relay spool sch
 
 000002 新增工作区控制数据；000003 为预算/用量增加互斥目标分支，保留已有归属和外键引用。带历史结算数据的升级及 foreign_key_check 由 `migrations/workspace_upgrade_test.go` 覆盖。不得编辑已部署迁移记录或以清库替代升级。
 
-详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。
+详见[远程工作区实现参考](remote-workspace-implementation.md)；历史联调只在[证据索引](s0-execution-progress.md)定位。

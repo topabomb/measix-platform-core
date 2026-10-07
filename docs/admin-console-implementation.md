@@ -100,7 +100,15 @@ Usage 分析统一使用显式时间窗（快捷 24 小时、7/30/90 天，自�
 
 具体“必须做什么”只引用 architecture；当前实现与验证结果见 [当前状态](s0-execution-progress.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。
 
-S0.2 Assistant/Memory Seed/Starter 由 Resources 内的 `ManagedExperienceEditor.vue` 编辑，复用唯一 DraftStore/generated DTO/Save/Validate/Preview/Publish 流程；Seed 支持空数组及作者顺序，Starter 绑定 Assistant，删除 Assistant 同时移除其 local Draft Starters。Policy 在同一 Draft owner 中把十项可选默认值分为“主要默认值”和“辅助模型默认值”两组；清空即删除字段，附件检查选择器只列出已启用且支持 IMAGE 输入的模型。删除模型先检查六个模型默认引用和 Assistant/binding 引用，不通过数组名猜测类型；Validation issue 携带 resourceKind/resourceId/field 并导航到对应分区。Review diff 与 canonical Preview 覆盖资源、Binding、Policy 的十项默认值、Assistant 和 Starter；有未保存编辑时不运行 saved-Draft Preview/Validate。Starter 列表仅呈现摘要与编辑/移动操作，完整长文本在共享 `.app-dialog--lg` 单列对话框中编辑，header/footer 固定而 `.app-dialog__body` 滚动，开场上下文默认折叠。`editingStarterId` 定位 `draft.localContent` 原条目，关闭/完成只退出视图，未保存修改保留，不建立第二 store 或保存 API。新建 System 覆盖留空，空白显示继承当前助手及只读预览，非空覆盖逐字保留；恢复继承会确认后清空覆盖，旧缺失 opening 需显式初始化。背景 ID/原文/顺序保留，删除仅改本地 Draft；`draft.moveStarter` 仅调整同助手条目顺序，sortOrder 仍用于存储/排序但不作数字输入。Preview 使用同一 compiler 的纯文本折叠详情。409 即使没有可选 currentDraftRevision 也保留重新加载入口，取消时不丢本地编辑。Validate issue 先退出 Preview/Review、显示编辑工作区，再打开对应 Starter 编辑对话框、展开并定位嵌套字段；busy 期间不接纳导航；异步 Review/Preview/Save/Publish 共用 busy 状态，并验证 revision/dirty 后接纳结果。`ResourcesPage` 的工作区在 Preview/Review 期间通过 `v-show` 隐藏而不卸载，保留已选助手与内部页签；隐藏期间设置 inert、禁用编辑，并通过 `ManagedExperienceEditor.active` 隐藏 teleport 对话框，返回后恢复原编辑位置。完整实施说明见 [Starter 开场快照](starter-opening-snapshots.md)。不存在第二套 API/store/schema。EnterpriseUpdatesPage 继续使用独立 Feed API；两者仍需按 ERX gate 证明真实 consumer 产品闭环。新增 Gateway profile 与运维状态不得借用现有页面截图声称已经实现。
+S0.2 Assistant/Memory Seed/Starter 由 Resources 内的 `ManagedExperienceEditor.vue` 编辑，复用唯一 DraftStore/generated DTO/Save/Validate/Preview/Publish；不建立第二套 API/store/schema。Seed 支持空数组与作者顺序，删除 Assistant 同时移除其 local Draft Starters。
+
+Policy 在同一 Draft owner 中把十项默认值分为主要/辅助两组；清空删除字段，附件检查只列启用且支持 IMAGE 的模型。删除模型检查六个模型默认与 Assistant/binding 引用。Review/canonical Preview 使用同一 compiler；有未保存编辑时不运行 saved-Draft Preview/Validate。
+
+Starter 列表只显示摘要和编辑/移动操作；长文本在共享 `.app-dialog--lg` 单列对话框内编辑，固定 header/footer、内部滚动，开场上下文默认折叠。`editingStarterId` 定位原 `draft.localContent` 条目；关闭/完成不丢未保存修改。System 空白继承当前助手，非空覆盖逐字保留，恢复继承需确认；旧 missing opening 明确初始化。背景 ID/原文/顺序保全，`draft.moveStarter` 调整同助手顺序，不提供 sortOrder 数字输入。后端历史发布与编译约束见 [API 参考](api-contracts.md#starter-v5-开场)。
+
+409 保留 reload 入口，即使无可选 currentDraftRevision，取消也不丢编辑。Validation issue 使用 resourceKind/resourceId/field 导航；先退出 Preview/Review，再打开目标编辑器、展开并定位嵌套字段。异步 Review/Preview/Save/Publish 共用 busy，按 revision/dirty 接纳结果，busy 不接纳导航。Resources 工作区使用 v-show 保留助手/页签；隐藏期间 inert、禁用编辑并通过 `ManagedExperienceEditor.active` 隐藏 teleport 对话框。
+
+EnterpriseUpdates 继续使用独立 Feed API；ERX/真实消费和 Gateway 新能力需各自证据，不能由当前界面截图推导完成。
 
 不要通过增加第二套 schema、自由 JSON editor、客户端自定义 Provider body/header DSL 或隐藏失败状态来绕过这些要求。
 
@@ -152,7 +160,7 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 
 远程工作区配置、用户空间、文件操作及四类安全预览的源码所有者和交互边界统一记录于远程工作区实现参考。新增 pdf.js worker 必须以 JavaScript MIME 提供；文件预览按需加载，查看工作区详情不触发 DAV/VM。
 
-详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。
+详见[远程工作区实现参考](remote-workspace-implementation.md)，验证入口统一见[测试说明](testing.md#远程工作区专项验证)。
 
 文件列表增加“新建文本”，普通 UTF-8 文本与 Markdown 操作菜单提供“编辑文本”；预览内直接下载。编辑器按同次 GET 的 ETag 条件保存，支持另存新文件，保留 BOM/换行；冲突或未知结果保留草稿并阻止原写入重放。关闭/路由离开有未保存确认。文件可用性变化取消 IO，但同一空间的编辑器保留文字供复制；重新恢复访问后覆盖原文件仍须重新读取核实。服务未配置、企业关闭、用户未开通和文件暂不可用分别呈现，不把服务开关或 MCP 状态当作文件授权。
 

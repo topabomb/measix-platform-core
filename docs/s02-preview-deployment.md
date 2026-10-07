@@ -2,7 +2,7 @@
 
 本手册对应单机 NVIDIA DGX Spark 的内部 Preview。Spark 只运行 MEASIX Hub/Relay，由现有的 root PM2 管理；Spark 不安装 Caddy。另一台已经加入同一 Tailscale 网络的入口服务器负责 TLS、子域名和反向代理，并由入口维护者独立配置和验收。
 
-S0.2 固定的 Preview 组合为 `0.2.0-preview.22`；其源码和归档摘要见[发布说明](release.md#s02-sealed-preview-composition)。本手册可用于该组合的部署和恢复。构建包存在不代表某台机器已安装此版本，现场须核对运行进程及私有部署记录。
+S0.2 固定的 Preview 组合为 `0.2.0-preview.22`；其源码和归档摘要见[固定组合](s0-execution-progress.md#固定-s02-preview-组合)。本手册可用于该组合的部署和恢复。构建包存在不代表某台机器已安装此版本，现场须核对运行进程及私有部署记录。
 
 ## 1. 当前目标环境
 
@@ -77,13 +77,13 @@ export MEASIX_PUBLIC_ORIGIN=https://<approved-subdomain>
 node scripts/build-preview-release.mjs <version>
 ```
 
-发布门禁会固定 Architecture/Core/Portal/Android commit、协议 hash、Snapshot v4、Portal Bridge v3 和 Enrollment v1，并输出：
+先固定 Architecture/Core/Portal 构建包，再用原 Android APK 验证，在已有发行记录登记具体版本对应、包/APK 摘要和结果链接；部署所测原包，无需重建。打包本身不声明 Android 兼容，可选自动证据入口见[发布文档](release.md#core-验证与打包)。默认输出：
 
 ```text
-.artifacts/releases/measix-core-<version>-linux-arm64.tar.gz
+.artifacts/releases/measix-core-<version>-linux-arm64-candidate.tar.gz
 ```
 
-归档只包含 Linux ARM64 二进制、静态资源、部署文件、`release.json` 和 `SHA256SUMS`，不包含源码、数据库、日志或秘密。
+归档包含 Linux ARM64 二进制、静态资源、部署文件、`release.json`、`COMPATIBILITY.md` 和 `SHA256SUMS`；不包含源码、APK、数据库、现场运行日志或秘密。消费结果通常保留在既有发行/CI 记录，仅可选证据打包会附其副本；报告/日志遵守原脱敏要求。
 
 ## 5. 正式部署前检查（只读）
 
@@ -213,7 +213,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' https://<approved-subdomain>/int
 2. 在企业配置中至少建立一个真实模型、必要的系统 TTS 或 MCP、一个默认助手和一个 Starter；仅为实际可用的能力设置默认值。
 3. 保存草稿，依次执行 Validate、Snapshot Preview、Review、Publish，并等待 Activation `COMPLETED`。
 4. 确认 Relay `/ready` 为 200，Admin System 显示 active generation 与 control revision 已收敛。
-5. 接入前确认真机安装的是 `preview.22` 固定 Android commit 构建的 APK，并在私有记录中保存 applicationId 与 APK SHA-256；不得用历史安装包代表当前验收。
+5. 接入前确认真机 APK 与本次 release 固定 Android commit 对应，记录 applicationId、versionName/versionCode、签名/变体和 APK SHA-256；preview.22 历史组合按其原 manifest 核对，不能混用新包证据。Android 20 尚未正式发布，Debug 验证不等于正式发行。
 6. 创建内部成员和一小时一次性接入资料，在 Android 真机粘贴或扫码接入；接入资料属于凭据，不写入 Git 或共享日志。
 7. Android 完成同步、默认助手真实请求、Usage 回查和应用重启恢复后，才把该发布标为“可用”。
 

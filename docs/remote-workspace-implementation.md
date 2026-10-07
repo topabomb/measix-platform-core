@@ -1,6 +1,6 @@
 # 远程工作区集成实现
 
-本文是 Core/Relay/Admin 当前源码的实现参考。跨组件语义以 [S1 合同](../../measix-architecture/docs/10-runtime-foundation/s1/measix-s1-remote-workspace-contract-spec.md) 为准；产品选择、异常边界及完整验收矩阵保留在 [实施方案](remote-workspace-integration-plan.md)。本次实现不等于 Android 文件界面、完整 S1 compute/storage 计量或生产部署已交付。
+本文是 Core/Relay/Admin 当前源码的实现参考。跨组件语义与验收边界以 [S1 合同](../../measix-architecture/docs/10-runtime-foundation/s1/measix-s1-remote-workspace-contract-spec.md) 为准。Android 原生实现由其仓库维护；Core 导出不替代设备证据，也不证明完整 S1 compute/storage 计量或生产部署。
 
 ## 所有者和入口
 
@@ -12,9 +12,11 @@
 | Relay | `internal/relay/control/`、`runtime/`：按已验证用户及 MCP ID 选择 immutable binding，取消失效在途请求 |
 | Secret | `internal/hub/upstream/secret_transaction.go`：在业务事务中复用 SecretBox/SecretVersion；不建立派生密钥或第二份凭据表 |
 | Admin | `RemoteWorkspacesPage.vue`、`WorkspacePanel.vue`、`WorkspaceFiles.vue`、`WorkspacePreview.vue`、`WorkspaceTextEditor.vue`：全部通过同源 Admin API |
-| 第三方服务 | Agent Space 拥有账号、空间、VM、磁盘和文件；本轮未修改其源码 |
+| 第三方服务 | Agent Space 拥有账号、空间、VM、磁盘和文件；独立发布并以管理/MCP/DAV 合同接入 |
 
-当前适配 Agent Space 的管理 v1、资源摘要、MCP 和 WebDAV 合同。Admin 填写地址和管理凭据后即可保存并启用，不要求人工声明版本或能力；配置不包含第三方提交号，也不按固定提交号设置运行门禁。连接检查和实际请求校验响应、空间身份与凭据，失败按对应合同处理。确切测试源码和镜像身份记录在 [联调记录](remote-workspace-verification.md)，用于复现验收。管理凭据保存为版本化 Secret 引用。
+当前适配 Agent Space 的管理 v1、资源摘要、MCP 和 WebDAV 合同。Admin 填写地址和管理凭据后即可保存并启用，不要求人工声明版本或能力；配置不包含第三方提交号，也不按固定提交号设置运行门禁。连接检查和实际请求校验响应、空间身份与凭据，失败按对应合同处理。历史测试源码和镜像身份由[证据索引](s0-execution-progress.md#历史证据入口)定位，当前联调须重新固定输入。管理凭据保存为版本化 Secret 引用。
+
+新绑定把 `usr_<uuid>` 映射为远端 `measix_<uuid>`，Hub 持久保存实际 remoteUsername 与 agentSpaceId。用户显示名/本地 username 修改不重命名远端；历史账号只能经明确核实/接管关联原空间，不从同名账号推断身份。配置迁移继续核对已绑定原目标，不能重建空间替代恢复。
 
 ## DAV 未知操作的断开恢复
 
@@ -89,22 +91,9 @@ Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/worksp
 - `WorkspaceProjection` 的 `schemaVersion: 1` 是独立 Client 控制接口，必填 `serviceState: NOT_CONFIGURED | DISABLED | ENABLED` 区分企业配置意图；`state` 表示用户生命周期，`filesAvailable`/`mcpAvailable` 各自表示实际准入。ENABLED 不等于远端健康。Android generated 导出和 Client 投影样例已同步，不代表 Android 消费端 UI 或真实设备传输完成。未发布的工作区合同直接更新，不新增兼容探测/回退分支；Snapshot 保持 v5。
 - 共享历史 Snapshot v4/v5 的发布字节、hash、republish 保持原协议；不在旧实体中填造假的 Upstream。
 
-## 验证和边界
+## 验证和发布边界
 
-当前候选的执行记录见 [联调验收记录](remote-workspace-verification.md)。确定性异常测试与真实服务测试各有责任：Go 测试覆盖响应丢失、恢复、身份/版本、租约、XML/路径/条件和历史升级；真实固定镜像验证管理、Relay MCP、VM/DAV、双用户隔离和传输；生产构建 Admin 通过实际浏览器操作审查。
-
-可重复联调入口：
-
-```powershell
-pnpm -C console build
-node scripts/workspace-integration.mjs --config .artifacts/workspace-test.json
-```
-
-联调私有配置文件包含 `adminOrigin`、`mcpOrigin`、`davOrigin`、`managementTokenFile`（只含 token 的文件）、`releaseIdentity`、`imageIdentity`；后两项仅记录测试源码和镜像身份，不发送给服务配置 API。脚本只允许 loopback 服务，创建独立临时 Core 库和带独立 UUID 的用户，最后删除本次新建的远端空间并停止测试进程；数据库、日志与脱敏 evidence 保留用于诊断。失败的远端写入不得自动重放，失败时保留数据库、日志及未完成的远端目标供核查，停止本次 Core 进程。凭据输入文件及测试数据库不得提交。
-
-该脚本不部署第三方服务、不核验真实生产版本、不替代浏览器/Android 验收，也不宣称整个 S1 已完成。部署及回滚仍遵循现有 Core 数据库备份和 Agent Space 独立发布流程。
-
-`--ui-only --output <目录>` 启动全新、未配置的隔离 Admin 环境供实际网页操作；`--keep-ui` 在脚本通过后保留一个已开通的审查用户。两种模式把测试登录资料写入输出目录的私有 `ui-env.json`，不把凭据打印到终端。
+执行命令、私有测试配置与真实服务/浏览器分层统一见[测试说明](testing.md#远程工作区专项验证)。历史场景、构建/镜像定位及未确认的间歇大文件传输风险统一见[证据索引](s0-execution-progress.md)。当前脚本通过不等于生产、Android 或完整 S1 验收。部署与恢复仍遵循 Core 数据库备份和 Agent Space 独立发布流程。
 
 ### 文件 HTTP 状态与 DAV 完成语义
 

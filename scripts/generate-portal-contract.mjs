@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { platformContractIdentity } from './lib/release-contract.mjs'
 const root = resolve(import.meta.dirname, '..')
 execFileSync('go', ['run', './cmd/generate-portal-feed-schema'], { cwd: resolve(root, 'backend'), stdio: 'inherit' })
 const output = resolve(root, 'api/generated/android/portal')
@@ -15,4 +16,5 @@ for (const source of sources) {
   writeFileSync(resolve(output, name), data)
   artifacts[name] = { source: 'api/' + source, sha256: createHash('sha256').update(data).digest('hex') }
 }
-writeFileSync(resolve(output, 'manifest.json'), JSON.stringify({ bridgeVersion: 3, artifacts }, null, 2) + '\n')
+const identity = platformContractIdentity(readFileSync(resolve(root, 'api/protocol-baseline.json')))
+writeFileSync(resolve(output, 'manifest.json'), JSON.stringify({ ...identity, bridgeVersion: 3, artifacts }, null, 2) + '\n')

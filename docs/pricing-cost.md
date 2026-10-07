@@ -1,9 +1,6 @@
 # Pricing and cost analysis implementation
 
-This describes the S0.2 `preview.22` Admin pricing implementation. Product semantics live
-in the sibling architecture Control Protocol §19; the Admin OpenAPI owns the wire.
-No database migration, Relay behavior change, currency conversion, or cost budget is
-introduced. Portal and Android contracts remain unchanged.
+This describes the current Admin pricing implementation. Product semantics live in the sibling architecture Control Protocol §19; the Admin OpenAPI owns the wire. Historical Preview identity is maintained in the [status index](s0-execution-progress.md). Pricing uses existing usage facts and Admin configuration; currency conversion and cost-based admission budgets are outside this implementation.
 
 ## Calculation
 

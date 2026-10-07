@@ -1,6 +1,6 @@
 # Direct MCP 工具治理实施与 Android 对接
 
-语义权威为同级架构仓库的 [Control Protocol §10.7.1](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) 和 [Admin Product Requirements §9.5](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-admin-console-product-requirements.md)。本文件维护 Core 实现、操作与消费者接线；版本扩展见 [协议兼容实现](protocol-compatibility.md)。当前编制使用 Snapshot v5，已发布 v4 保留独立 DTO、原始 bytes/hash 和重新发布路径。
+语义权威为同级架构仓库的 [Control Protocol §10.7.1](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) 和 [Admin Product Requirements §9.5](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-admin-console-product-requirements.md)。本文件维护 Core 实现、操作与消费者接线；版本扩展见[响应消费规则](android-platform-integration.md#响应扩展与适配规则)。当前编制使用 Snapshot v5，已发布 v4 保留独立 DTO、原始 bytes/hash 和重新发布路径。
 
 ## 实现归属
 

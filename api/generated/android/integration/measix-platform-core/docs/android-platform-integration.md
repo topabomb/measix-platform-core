@@ -1,20 +1,26 @@
 # Android 平台协议消费说明
 
-本说明面向 Android 维护方，描述当前源码的协议消费边界。Discovery protocolVersion="1"、Snapshot v4/v5、Portal Bridge v3 与 Enrollment formatVersion=1 是当前支持组合；新草稿发布 v5，保全已发布 v4。历史封版身份见 `docs/s0-execution-progress.md`，当前 Starter 实施及验证见 Core 源仓库的 `docs/starter-opening-snapshots.md`，两者不能混作同一部署证据。
+本说明面向 Android 维护方，描述当前源码的协议消费边界。Discovery protocolVersion="1"、Snapshot v4/v5、Portal Bridge v3 与 Enrollment formatVersion=1 是当前支持组合；新草稿发布 v5，保全已发布 v4。历史封版身份见 `docs/s0-execution-progress.md`，当前 Starter 编译机制见 Core 源仓库的 `docs/api-contracts.md`，验证入口见 `docs/testing.md`，两者不能混作同一部署证据。
+
+## 版本身份交接
+
+Core 已从同一基线导出 Client/Portal 的 `platformContractVersion`、`supportedPlatformContractVersions`、`coreBaselineVersion` 与 `baselineHash`；Client 导出同时交付 `protocol-baseline.json`。Android 导入固定材料，主合同与语义基准进入只读构建信息，支持集合由 Android 自己声明。应用产品版本仍由 Gradle 的 `versionName/versionCode` 拥有，不从合同号推算。
+
+Android 的文件调整、BuildConfig 字段、最终 APK 核验、发行记录及消费证据要求统一见 Core 源仓库的 `docs/release.md`「Android 端调整方案」。导出包不复制整套发布文档。当前 Android 20 未正式发布，本轮 Core 导出不表示 Android 已完成适配。
 
 ## 响应扩展与适配规则
 
 以 Control Protocol §2.1、§10.10.3 为唯一语义。Client/Portal HTTP 响应及 Bridge v3 响应，在支持版本内递归忽略未知字段；包含 Snapshot v4/v5 的所有子对象。不维护未知字段白名单，不因字段新增使整份企业配置失败。解析模式应按边界设置：响应允许扩展；Admin/Client 写入、Enrollment 资料、Bridge 请求/params 和内部控制指令保持封闭。已知字段错型、必填/null、权限模式、工具策略、引用、重复键、大小限制、来源/身份/generation、ETag/body hash 仍须验证，不补默认值或降级。合法未知 schemaVersion 在 DTO 前分类为不兼容；配置错误不撤销有效企业身份，也不破坏个人空间、历史或退出。
 
-本轮不改 v4/v5 descriptor、历史 bytes/hash；忽略未知字段不等于重算原始 JSON hash。Snapshot 按既有 ETag/body hash 合同验证；MCP Tool contractHash 仍覆盖完整原始 Tool JCS，不能删扩展字段。Bridge 返回按捕获的请求方法验证已知结果，result/error 必须互斥；未知能力声明只忽略，未知错误码保留为失败并中性提示，不能推断授权变化。
+现有 v4/v5 descriptor、历史 bytes/hash 按原完整性合同保全；忽略未知字段不等于重算原始 JSON hash。Snapshot 按既有 ETag/body hash 合同验证；MCP Tool contractHash 仍覆盖完整原始 Tool JCS，不能删扩展字段。Bridge 返回按捕获的请求方法验证已知结果，result/error 必须互斥；未知能力声明只忽略，未知错误码保留为失败并中性提示，不能推断授权变化。
 
 内容失败的技术信息提供稳定 code、非敏感 JSON 路径和原因，例如 /mcp/0/toolAccessMode：不支持的值；不记录原值、正文、凭据或内部地址。未知普通字段不产生错误。共享 snapshot-reception-cases 与 cases.json 包含正向扩展、已知错误、未知版本及历史版本测试；基础控制也须覆盖嵌套新增字段。
 
-Core 导出只更新消费者合同，不能修复已安装 Android 的严格 decoder。Android 仓库本轮未改、未验证；后续以实际支持 APK 验证响应/命令分离、原子应用和失败隔离后再宣称设备端完成。只改 Kotlin Json.ignoreUnknownKeys 而不检查其他 mapper/领域校验并不充分。
+Core 导出只更新消费者合同，不能修复已安装 Android 的严格 decoder。原生实现与设备验证由 Android 仓库拥有；只有采用对应固定材料的实际 APK 验证响应/命令分离、原子应用和失败隔离后，才能声明消费兼容。只改 Kotlin Json.ignoreUnknownKeys 而不检查其他 mapper/领域校验并不充分。
 
 ## 权威与资料入口
 
-当前未稳定 v5 已升级 Direct MCP 工具许可。Android 源码接入和消费者验证由 Android 仓库承担；下文历史 Preview/Starter 验证不证明新版许可已消费。消费者更新及原生验证完成前不能宣称当前 v5 可端到端发布部署。
+当前候选 v5 包含 Direct MCP 工具许可。Android 源码接入和消费者验证由 Android 仓库承担；历史 Preview/Starter 记录不证明后续材料已消费。发布时必须核对所选 APK、合同摘要和实际测试。Android `0.0.20 / 20` 尚未正式发行，不能据版本名判断具体候选协议。
 
 工具许可、目录 JCS、调用门控和确认策略的具体 owner 与验收材料统一见 [Direct MCP Android 接线](direct-mcp-tool-governance.md#android-接线)。不删除旧数据或改写历史 v4 Release；Android 消费者必须独立验证。
 
@@ -79,7 +85,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | Assistant.assistantDefinitionId/displayName/description/modelId/systemPrompt/mcpBindings/enabled | EnterpriseAssistant 对应字段；v5 mcpBindings 是服务器+ALL/ALLOWLIST+工具名，v4 独立保留 mcpServerIds；缺省 description 可展示为空字符串；modelId 是平台稳定 ID，不是请求模型名 |
 | Assistant.memorySeed[] | 按作者顺序转换为只读 Seed。内部 ID 从 deploymentId、助手 ID、generation、索引确定；空数组有效，条目不得为空白。不按内容去重、不建立可变 Assistant Memory 副本，配置替换时整体换代 |
 | Starter.starterId/assistantDefinitionId/title/prompt/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击预填输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
-| Starter.openingSnapshot（v5 required；v4 不允许） | 消费 Core 编译后已固化的 System 与有序背景；Core Draft 的空白继承在编译时完成，Android 不从当前助手重新补空值。v5 选择时绑定 Draft，首发原子保存来源与背景；背景按字面处理，领域 System 沿 Android 既有 START 模板规则渲染。额外内容默认折叠、详情按需展开；v4 仍只预填。Core 编制与历史发布边界见 Core 源仓库 `docs/starter-opening-snapshots.md` |
+| Starter.openingSnapshot（v5 required；v4 不解释此字段） | 消费 Core 编译后已固化的 System 与有序背景；Core Draft 的空白继承在编译时完成，Android 不从当前助手重新补空值。v5 选择时绑定 Draft，首发原子保存来源与背景；背景按字面处理，领域 System 沿 Android 既有 START 模板规则渲染。额外内容默认折叠、详情按需展开；v4 仍只预填。Core 编制与历史发布边界见 Core 源仓库 `docs/api-contracts.md` |
 | policy 五项 allowLocal* | EnterprisePolicy 五项必填 Boolean；缺失/null/错误类型均拒绝。只控制本企业域内用户原配置准入，不复制用户定义、端点和密钥 |
 | defaultModelId/defaultFastModelId/defaultTitleModelId/defaultAttachmentInspectionModelId/defaultSuggestionModelId/defaultCompressModelId | 分别映射 defaults.chatModelId/fastModelId/titleModelId/attachmentInspectionModelId/suggestionModelId/compressModelId。六项都可省略且互不推导，非空引用必须指向已启用模型；附件检查默认还必须支持 IMAGE 输入 |
 | defaultImageGenerationId/defaultTtsId/defaultAsrId/defaultAssistantId | 分别映射 defaults.imageGenerationModelId/ttsId/asrId/assistantId；显式无效引用不回退首项。没有用户已选助手时采用 defaultAssistantId；用户已选助手失效时呈现选择与修复入口，不静默改选默认助手。未提供的默认值保持未指定，由既有本域选择规则处理 |
@@ -169,6 +175,6 @@ HTTP 成功不代表所有写操作成功，必须检查 `WorkspaceFileResult.ou
 
 ## 合同回归入口
 
-`api/fixtures/client-integration/` 提供基础、四模型协议、两种文生图、四种 TTS、四种 ASR、策略拒绝、HTTP 时序及 Runtime 请求样例。接入资料、Portal Native Bridge 与 Feed 的正反例分别在 `api/fixtures/enrollment/` 和 `api/fixtures/portal/`。Android 应消费同一份 Core 导出并对当前资料进行严格解析、引用校验及执行分派；导出包本身不包含真机运行结果。
+`api/fixtures/client-integration/` 提供基础、四模型协议、两种文生图、四种 TTS、四种 ASR、策略拒绝、HTTP 时序及 Runtime 请求样例。接入资料、Portal Native Bridge 与 Feed 的正反例分别在 `api/fixtures/enrollment/` 和 `api/fixtures/portal/`。Android 应消费固定来源的 Core 导出，按上述响应扩展规则解析，并校验已知字段、引用及执行分派；导出包本身不包含真机运行结果。
 
 Core 的合同、身份/会话与 Relay 测试证明服务端行为，Portal 生产浏览器测试证明网页及 Hub 生命周期；Android 的 Realm、WebView、相机/麦克风、系统朗读与资源运行仍以对应设备记录为准。封版记录只引用实际完成的场景结果，不把某次历史模拟器失败或浏览器替身当作当前设备状态。

@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { androidContractFailures } from './verify-preview-contract.mjs'
+import { platformContractIdentity } from './lib/release-contract.mjs'
 
 const schema = Buffer.from('openapi: 3.0.3\ncomponents: {}\n')
 const digest = createHash('sha256').update(schema).digest('hex')
@@ -34,24 +35,32 @@ test('production preview verifier uses the configured Android checkout across di
     cpSync(join(actualRoot, 'scripts/lib'), join(root, 'scripts/lib'), { recursive: true })
     const names = ['api/client/client-control.openapi.yaml', 'api/admin/admin.openapi.yaml', 'api/internal/relay-control.openapi.yaml', 'api/internal/usage-ingest.openapi.yaml']
     for (const name of names) put(root, name, schema)
-    put(root, 'api/protocol-baseline.json', json({ baseline: 'test', policy: 'test', documents: Object.fromEntries(names.map(name => [name, `sha256:${digest}`])) }))
+    const baseline = json({ platformContractVersion: 2, supportedPlatformContractVersions: [2], coreBaselineVersion: '0.2.0-preview.23', baseline: 'test', policy: 'test', documents: Object.fromEntries(names.map(name => [name, `sha256:${digest}`])) })
+    const identity = platformContractIdentity(Buffer.from(baseline))
+    const versionedManifest = { ...manifest, ...identity }
+    const portalManifest = { ...identity, bridgeVersion: 3, artifacts: { 'test.json': { source: 'api/portal/test.json', sha256: createHash('sha256').update('{}').digest('hex') } } }
+    put(root, 'api/protocol-baseline.json', baseline)
+    put(root, 'api/generated/android/protocol-baseline.json', baseline)
+    put(root, 'api/portal/test.json', '{}')
+    put(root, 'api/generated/android/portal/test.json', '{}')
     put(root, 'api/generated/android/client-control.openapi.yaml', schema)
-    put(root, 'api/generated/android/manifest.json', json(manifest))
-    put(root, 'api/generated/android/portal/manifest.json', json({ artifacts: {} }))
+    put(root, 'api/generated/android/manifest.json', json(versionedManifest))
+    put(root, 'api/generated/android/portal/manifest.json', json(portalManifest))
     put(root, 'api/fixtures/client-integration/snapshot-reception-cases.json', '{}')
     put(join(root, '..', 'measix-enterprise-portal'), 'src/api/contract.json', json({ artifacts: {} }))
     for (const android of [customAndroid, defaultAndroid]) {
       put(android, 'app/src/test/resources/contracts/platform/client-control.openapi.yaml', schema)
-      put(android, 'app/src/test/resources/contracts/platform/manifest.json', json(android === customAndroid ? manifest : { ...manifest, sourceHash: 'stale' }))
+      put(android, 'app/src/test/resources/contracts/platform/manifest.json', json(android === customAndroid ? versionedManifest : { ...versionedManifest, sourceHash: 'stale' }))
       put(android, 'app/src/test/resources/contracts/platform/snapshot-reception-cases.json', '{}')
-      put(android, 'app/src/test/resources/contracts/portal/manifest.json', json({ artifacts: {} }))
+      put(android, 'app/src/test/resources/contracts/portal/manifest.json', json(portalManifest))
+      put(android, 'app/src/test/resources/contracts/portal/test.json', '{}')
       put(android, 'app/src/main/java/net/weero/measix/pilot/data/enterprise/PlatformWire.kt', header)
     }
     const run = env => spawnSync(process.execPath, [join(root, 'scripts/verify-preview-contract.mjs')], { cwd: root, env, encoding: 'utf8' })
     const overridden = run({ ...process.env, MEASIX_RELEASE_ANDROID_ROOT: customAndroid })
     assert.equal(overridden.status, 0, overridden.stderr)
     // Without an override, the existing default layout remains supported.
-    put(defaultAndroid, 'app/src/test/resources/contracts/platform/manifest.json', json(manifest))
+    put(defaultAndroid, 'app/src/test/resources/contracts/platform/manifest.json', json(versionedManifest))
     const env = { ...process.env }
     delete env.MEASIX_RELEASE_ANDROID_ROOT
     const fallback = run(env)

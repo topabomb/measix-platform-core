@@ -94,7 +94,7 @@ Start Hub/Relay, wait for explicit readiness, verify desired/applied control sta
 | Hub | `/live`, `/ready` | Authenticated Admin System API | Ready after initialization; Relay runtime can still be `DEGRADED` |
 | Relay | `/live`, `/ready` | Private `/internal/v1/control/status`, service authentication | Ready once control state exists; spool degradation is separate |
 
-OpenAPI/router registrations own exact responses. The unauthenticated System health endpoint only probes the local DB connection; full schema/Relay/usage diagnostics stay in authenticated System status and the maintenance command. Hub System reports the current schema identity expected by the binary, computed from the embedded initialization SQL. It forwards Relay spool state, pending count and oldest age; absent observations remain unknown, not zero. Ingest lag is separate from backlog. Hub build identity defaults to `dev` unless supplied at build time; release provenance must pin binaries and static assets.
+OpenAPI/router registrations own exact responses. The unauthenticated System health endpoint only probes the local DB connection; full schema/Relay/usage diagnostics stay in authenticated System status and the maintenance command. Hub System reports the current schema identity expected by the binary, computed from the ordered embedded migration filenames, versions and checksums. It forwards Relay spool state, pending count and oldest age; absent observations remain unknown, not zero. Ingest lag is separate from backlog. Hub build identity defaults to `dev` unless supplied at build time; release provenance must pin binaries and static assets.
 
 ## 5. Shutdown and durability
 
@@ -133,7 +133,7 @@ Hub/Relay use the common safe JSON logger on stdout with `service`, `buildVersio
 
 Authenticated Admin exposes 15/60-minute telemetry and up to 200 recent redacted events from exactly four fixed Hub/Relay stdout/stderr files. Reads are tail-bounded to 2 MiB per file and 4 KiB per line; arbitrary paths, PM2 manager logs and remote-Caddy logs are never accepted. The System page uses at most 60 lightweight SVG points and Quasar virtual scrolling. PM2 logrotate owns file rotation; no centralized log-search platform is required.
 
-Never emit tokens, cookies, credentials, enrollment/session/signing material, private endpoints, toolRef/claims, raw prompts/bodies/tool arguments/results or direct personal identity. Test normal and failure diagnostics for forbidden material. References: [systemd service lifecycle](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [journald retention](https://www.freedesktop.org/software/systemd/man/252/journald.conf.html); documentation is not runtime qualification.
+Never emit tokens, cookies, credentials, enrollment/session/signing material, private endpoints, toolRef/claims, raw prompts/bodies/tool arguments/results or direct personal identity. Test normal and failure diagnostics for forbidden material. Concrete PM2 supervision and log rotation are maintained in the [Preview runbook](s02-preview-deployment.md#13-日志与排障); S0.3 three-daemon lifecycle qualification still needs its own evidence.
 
 ## 8. Troubleshooting and release gate
 
@@ -144,13 +144,13 @@ Never emit tokens, cookies, credentials, enrollment/session/signing material, pr
 | Hub ready but runtime degraded | Compare desired/applied revision and activation; readiness is not convergence |
 | `/admin` missing or deep links fail | Check actual static host/ingress; verify `--admin-assets-dir`, `index.html` and same-origin ingress |
 | Schema/check disagreement | Preserve the database and migration error, compare the packaged migration set, and restore the pre-upgrade backup if needed; never edit history rows |
-| Repeated process crash | Preserve diagnostics/persistent data; no production restart-rate-limit package exists yet |
+| Repeated process crash | Preserve diagnostics/data; inspect only measix-hub/measix-relay PM2 logs, exit cause and restart count. The Preview ecosystem has bounded rapid-restart settings; S0.3 topology qualification remains separate |
 
 Deployment must pin artifacts, verify checksums, back up, apply the packaged forward migrations, validate readiness/control/static routing and run smoke/recovery checks. Downgrade means restoring both the pre-upgrade release and its backup; migration files/history are never reversed in place. RC also needs isolated restore, spool replay, resource/load, supervision and log-redaction proof; see [release](release.md) and [testing](testing.md).
 
 ## 9. Optional remote workspace service
 
-Agent Space remains independently deployed. Core startup, login, migrations and unrelated resources do not require it. See [implementation and recovery](remote-workspace-implementation.md) and [verified candidate evidence](remote-workspace-verification.md).
+Agent Space remains independently deployed. Core startup, login, migrations and unrelated resources do not require it. See [implementation and recovery](remote-workspace-implementation.md) and [historical evidence index](s0-execution-progress.md#历史证据入口).
 
 Back up and check the database, deploy a Relay that explicitly supports control protocol v2, apply/check migrations 002 and 003, then start the matching Hub/Admin. Enable the service through the remote workspace switch and **Save configuration**. Provision a test user and verify files before optionally adding/publishing the MCP definition. Do not bypass the version check or manufacture an Upstream to carry per-user credentials.
 

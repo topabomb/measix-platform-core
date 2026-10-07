@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { snapshotVersions, androidSnapshotVersions } from './lib/harness.mjs'
+import { snapshotVersions } from './lib/harness.mjs'
 import { releaseAndroidRoot } from './lib/release-paths.mjs'
+import { assertReleaseOutputAvailable, compatibilitySummary, payloadHash, pinnedFile, validateConsumerEvidence } from './lib/release-contract.mjs'
+import { parseVerificationArgs, verifyPreviewContract } from './verify-preview-contract.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORTAL = resolve(ROOT, '..', 'measix-enterprise-portal')
@@ -13,21 +15,35 @@ const ARCHITECTURE = resolve(ROOT, '..', 'measix-architecture')
 const ANDROID = releaseAndroidRoot(ROOT)
 const version = process.argv[2]
 if (!version || !/^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$/.test(version)) fail('Usage: node scripts/build-preview-release.mjs <version>')
+const explicitCandidate = process.argv.slice(3).includes('--candidate')
+if (process.argv.slice(3).filter(arg => arg === '--candidate').length > 1) fail('Duplicate --candidate')
+const options = parseVerificationArgs(process.argv.slice(3).filter(arg => arg !== '--candidate'))
+if (options.version) fail('Specify the product version only as the first positional argument')
+// Ordinary packaging is independent of Android evidence. Existing evidence flags
+// opt into the stricter bundled verification workflow.
+const candidate = explicitCandidate || (!options.androidRelease && !options.evidence && (!options.mode || options.mode === 'core'))
+options.mode ??= candidate ? 'core' : 'independent'
+options.version = version
+const packageName = `measix-core-${version}-linux-arm64${candidate ? '-candidate' : ''}`
+const outputDir = join(ROOT, '.artifacts', 'releases')
+const stage = join(outputDir, packageName)
+const archive = join(outputDir, `${packageName}.tar.gz`)
+try { assertReleaseOutputAvailable(stage, archive) } catch (error) { fail(error.message) }
+if (candidate && (options.mode !== 'core' || options.androidRelease || options.evidence)) fail('Candidate is core-only and cannot claim Android verification')
+if (!candidate && (options.mode === 'core' || !options.androidRelease || !options.evidence)) fail('Bundled verification requires --android-release RECORD --evidence PROOF; omit both for ordinary Core packaging')
 if (!existsSync(join(PORTAL, 'package.json'))) fail(`Portal repository not found: ${PORTAL}`)
 if (git(ROOT, ['status', '--porcelain']).trim()) fail('Core worktree must be clean before building a release')
 if (git(PORTAL, ['status', '--porcelain']).trim()) fail('Portal worktree must be clean before building a release')
 if (git(ARCHITECTURE, ['status', '--porcelain']).trim()) fail('Architecture worktree must be clean before building a release')
-if (git(ANDROID, ['status', '--porcelain']).trim()) fail('Android worktree must be clean before building a release')
+if (options.mode === 'joint' && git(ANDROID, ['status', '--porcelain']).trim()) fail('Android worktree must be clean before building a release')
 run('node', ['scripts/checks.mjs', 'generate'], ROOT)
 if (git(ROOT, ['status', '--porcelain']).trim()) fail('Generated contracts or dependencies drift from committed sources')
 run('pnpm', ['generate:api'], PORTAL)
 if (git(PORTAL, ['status', '--porcelain']).trim()) fail('Portal generated contracts drift from committed sources')
-run('node', ['scripts/verify-preview-contract.mjs'], ROOT)
-
-const packageName = `measix-core-${version}-linux-arm64`
-const outputDir = join(ROOT, '.artifacts', 'releases')
-const stage = join(outputDir, packageName)
-rmSync(stage, { recursive: true, force: true })
+const verification = verifyPreviewContract(ROOT, options)
+mkdirSync(outputDir, { recursive: true })
+// Atomic reservation: a concurrent builder cannot reuse this output identity.
+mkdirSync(stage)
 mkdirSync(join(stage, 'bin'), { recursive: true })
 mkdirSync(join(stage, 'assets'), { recursive: true })
 mkdirSync(join(stage, 'deploy'), { recursive: true })
@@ -54,24 +70,53 @@ const release = {
   formatVersion: 1,
   product: 'MEASIX Core S0.2 Preview',
   version,
+  ...verification.identity,
+  publicationStatus: candidate ? 'UNVERIFIED_CANDIDATE' : 'VERIFIED_PREVIEW',
+  buildHash: payloadHash(stage),
   target: { os: 'linux', arch: 'arm64', platform: 'NVIDIA DGX Spark' },
   builtAt: new Date().toISOString(),
   source: {
     architectureCommit: git(ARCHITECTURE, ['rev-parse', 'HEAD']).trim(),
     coreCommit: git(ROOT, ['rev-parse', 'HEAD']).trim(),
     portalCommit: git(PORTAL, ['rev-parse', 'HEAD']).trim(),
-    androidCommit: git(ANDROID, ['rev-parse', 'HEAD']).trim(),
+    androidCommit: verification.association?.release.record.sourceCommit ?? null,
   },
   protocols: Object.fromEntries(protocolFiles.map(path => [path, `sha256:${sha256(join(ROOT, path))}`])),
   compatibility: compatibilityEvidence(),
   schemaMigrationIdentity: migrationIdentity(),
 }
+if (verification.association) {
+  const association = verification.association
+  association.evidence = validateConsumerEvidence(resolve(options.evidence), association.release, {
+    version, sourceCommit: release.source.coreCommit, architectureCommit: release.source.architectureCommit,
+    portalCommit: release.source.portalCommit, baselineHash: release.baselineHash, buildHash: release.buildHash,
+  })
+  const a = association.release.record, apk = association.evidence.artifact
+  release.compatibility.verifiedAndroid = [{
+    applicationId: a.applicationId, versionName: a.versionName, versionCode: a.versionCode, status: a.status,
+    sourceCommit: a.sourceCommit, platformContractVersion: a.platformContractVersion,
+    supportedPlatformContractVersions: a.supportedPlatformContractVersions, coreBaselineVersion: a.coreBaselineVersion,
+    apkSha256: apk.sha256, abi: apk.abi, variant: apk.variant, signingCertificateSha256: apk.signingCertificateSha256,
+    releaseRecordHash: association.release.recordHash, evidenceHash: association.evidence.evidenceHash,
+  }]
+  const evidenceDir = join(stage, 'compatibility/consumer')
+  mkdirSync(evidenceDir, { recursive: true })
+  cpSync(resolve(options.androidRelease), join(stage, 'compatibility/android-release.json'))
+  cpSync(resolve(options.evidence), join(evidenceDir, 'evidence.json'))
+  for (const check of association.evidence.proof.checks) {
+    for (const item of [check.report, check.log]) {
+      const original = pinnedFile(association.evidence.base, item.path)
+      const copy = resolve(evidenceDir, item.path)
+      mkdirSync(dirname(copy), { recursive: true })
+      cpSync(original, copy)
+    }
+  }
+}
 writeFileSync(join(stage, 'release.json'), JSON.stringify(release, null, 2) + '\n')
+writeFileSync(join(stage, 'COMPATIBILITY.md'), compatibilitySummary(release))
 
 const files = walk(stage).filter(path => basename(path) !== 'SHA256SUMS').sort()
 writeFileSync(join(stage, 'SHA256SUMS'), files.map(path => `${sha256(path)}  ${relative(stage, path).split(sep).join('/')}`).join('\n') + '\n')
-const archive = join(outputDir, `${packageName}.tar.gz`)
-rmSync(archive, { force: true })
 createArchive(stage, archive)
 console.log(archive)
 
@@ -108,18 +153,21 @@ function migrationIdentity() {
 
 function compatibilityEvidence() {
   const portalContract = JSON.parse(readFileSync(join(PORTAL, 'src', 'api', 'contract.json'), 'utf8'))
-  const androidPortal = JSON.parse(readFileSync(join(ANDROID, 'app', 'src', 'test', 'resources', 'contracts', 'portal', 'manifest.json'), 'utf8'))
+  const association = verification.association
+  const androidPortal = association ? JSON.parse(readFileSync(join(association.release.base, association.release.record.contracts.directory, 'portal/manifest.json'), 'utf8')) : null
   return {
     baseline: JSON.parse(readFileSync(join(ROOT, 'api', 'protocol-baseline.json'), 'utf8')).baseline,
     clientProtocolVersion: '1',
     snapshotSchemaVersions: snapshotVersions(ROOT).supported,
     snapshotPublicationSchemaVersion: snapshotVersions(ROOT).current,
-    androidSnapshotSchemaVersions: androidSnapshotVersions(ANDROID),
+    androidSnapshotSchemaVersions: association?.release.record.snapshotSchemaVersions ?? null,
     enrollmentFormatVersion: 1,
-    portalBridgeVersion: androidPortal.bridgeVersion,
+    portalBridgeVersion: 3,
     portalArtifacts: portalContract.artifacts,
-    androidClientContract: `sha256:${sha256(join(ANDROID, 'app', 'src', 'test', 'resources', 'contracts', 'platform', 'client-control.openapi.yaml'))}`,
-    androidPortalArtifacts: androidPortal.artifacts,
+    androidClientContract: association ? `sha256:${sha256(association.release.clientFile)}` : null,
+    androidPortalArtifacts: androidPortal?.artifacts ?? null,
+    verificationMode: options.mode,
+    verifiedAndroid: [],
   }
 }
 

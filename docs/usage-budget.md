@@ -1,11 +1,11 @@
 # 生产用量解析与用户额度实现
 
-> 状态：S0.2 `preview.22` 的实现与维护说明；当前封版身份见 [S0 状态](s0-execution-progress.md)。
+> 本文描述当前源码的实现与维护；固定 preview.22 组合与历史验证见[状态和证据索引](s0-execution-progress.md)。
 > 产品/阶段权威：[S0.2 用量与额度合同](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-usage-budget-contract-spec.md)。
 > Wire authority：[Control Protocol](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md)；精确 HTTP schema 在本仓库 OpenAPI 中实现。
 > 本文拥有具体代码组织、解析和事务实现，不另定义预算产品语义或阶段验收结果。
 
-## 1. 实施后的当前基础
+## 1. 当前实现基础
 
 - `backend/internal/relay/runtime` 负责透明代理、统一预算准入和请求观察；`protocolusage` 负责生产协议解析，`relay/metering` 以同一 SQLite spool 承载批量投递、重试和恢复。
 - `hub/usage` 负责语义计量、归属、查询与结算；`hub/budget` 负责规则、自然周期计数、原子占用、幂等结算和待核对状态，不以查询聚合代替准入计数器。
@@ -13,7 +13,7 @@
 - Portal 在受限本人 Session 下提供首页摘要及“我的用量与额度”，复用 Core 投影，不持有预算真源。
 - Android 消费当前 Client OpenAPI，在企业空间展示本人额度，并在 Model、Image Generation、TTS、ASR、Realtime ASR 与 MCP 的平台运行时边界统一解析结构化 Problem；固定 Portal 深链不开放任意 URL。
 
-只支持当前合同。服务端使用唯一当前初始化 SQL，不维护旧原型迁移或双读；运行期间的 spool 持久性、故障恢复与幂等性须用保留的在途数据验证，不能靠清库伪装恢复成功。具体开发库处理见 [数据库说明](database-migrations.md)。
+服务端使用共享 append-only migration history；保留支持版本的数据与既有用量/结算归属。运行期间的 spool 持久性、故障恢复与幂等性须用保留的在途数据验证，不能靠清库伪装恢复成功。升级与历史记录约束见[数据库说明](database-migrations.md)。
 
 ## 2. 代码组织与依赖
 
@@ -84,7 +84,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 | clientProtocol | 生产提取方法 | 预算及其他格式行为 |
 |---|---|---|
 | `OPENAI_AUDIO_TRANSCRIPTIONS` | 增量观察 multipart 的 `file` 音频 part，不把 multipart 边界/其他字段计入时长；WAV 按实际提交样本统计。响应 JSON 的 `usage.type=duration`/`usage.seconds` 或 verbose JSON `duration` 可作为有来源的供应商时长；`usage.type=tokens` 只存可得 token 明细，不能换算秒数 | WAV 的平台 AUDIO_SECONDS 优先实际样本口径；非 WAV 可使用已验证的供应商 duration（事后结算）。首次完整交付必须支持 WAV；MP3/M4A/WebM 等无可靠时长来源时只声明请求计数并将时长标记 UNKNOWN，不引入 ffmpeg 或完整媒体解码框架，也不因计量缺口拒绝合法上传。 |
-| `DASHSCOPE_HTTP_ASR` | 增量读取 `input.messages[].content[].input_audio.data` 的 Data URI，增量 Base64 解码后送同一 WAV scanner；`parameters.format/sample_rate` 只作一致性检查。当前非流式响应解析 `usage.duration`（秒），不把 output.text 字数/句子 end_time 当音频总时长 | WAV 按样本计平台时长；供应商 duration 独立记录并显示来源/精度，不能重复加入 AUDIO_SECONDS。URL 音频不由 Relay 另行 fetch；只在已验证供应商完整 duration 可用时支持其事后时长预算。新官网的 HTTP ASR SSE 句级 usage 不在当前最小 Android profile 内，不猜其增量/累计关系；启用时长预算且不受支持时明确拒绝。 |
+| `DASHSCOPE_HTTP_ASR` | 增量读取 `input.messages[].content[].input_audio.data` 的 Data URI，增量 Base64 解码后送同一 WAV scanner；`parameters.format/sample_rate` 只作一致性检查。当前非流式响应解析 `usage.duration`（秒），不把 output.text 字数/句子 end_time 当音频总时长 | WAV 按样本计平台时长；供应商 duration 独立记录并显示来源/精度，不能重复加入 AUDIO_SECONDS。URL 音频不由 Relay 另行 fetch；只在已验证供应商完整 duration 可用时支持其事后时长预算。新官网的 HTTP ASR SSE 句级 usage 不在当前最小 Android profile 内，不猜其增量/累计关系；不受支持的模式保留明确计量降级与 UNKNOWN/待核对诊断，不因计量缺口拒绝合法请求。 |
 
 采用“实际提交音频时长”作为 WAV/实时 ASR 共同平台额度口径；供应商处理/舍入时长是另一个有来源的诊断值，不覆盖已有精确样本计数。样本不完整保留已确认的量并标 PARTIAL。压缩格式供应商来源若作为预算量，需在资源能力及 Admin/Portal 明细中标明来源，禁止静默换单位。
 
@@ -102,11 +102,11 @@ WebSocket 生产观察器必须支持文本帧分片、continuation、控制帧�
 
 ### 3.6 共同完成标准和官方依据
 
-每个 profile 都交付生产实现、声明的 meter capability、正常/缺字段/分块/取消固定输入与预期结果，适用时还有缓存、推理和格式变化用例。capability 必须是“协议 + 当前配置/模型/格式可证明的指标”，不能仅根据枚举宣告所有兼容供应商都精确。TOTAL_TOKENS 达量停后续；无法取得必需指标的资源在启用对应预算时失败关闭，次数或无限模式继续依照正常传输合同。Core 的 profile 测试覆盖生产解析；其他仓库不重新实现计量。
+每个 profile 都交付生产实现、声明的 meter capability、正常/缺字段/分块/取消固定输入与预期结果，适用时还有缓存、推理和格式变化用例。capability 必须是“协议 + 当前配置/模型/格式可证明的指标”，不能仅根据枚举宣告所有兼容供应商都精确。TOTAL_TOKENS 达量停后续；无法取得已配置额度的必需指标时保留 UNKNOWN/PARTIAL 并记录降级，不伪造无限或精确用量，也不因此拒绝合法请求；只有读取权威规则确认额度耗尽才作预算拒绝。Core 的 profile 测试覆盖生产解析；其他仓库不重新实现计量。
 
 最低固定算例：Chat/Responses 输入 100、输出 20、缓存 40、推理 5 → 总量 120（不变成 165）；Gemini prompt 100、candidate 20、thought 5、total 125 → 输出 25/总量 125；Claude input 10、cache creation 30、cache read 60、output 20 → 输入 100/总量 120。重复最终 usage 不增加这些数值。TTS 文本 `你😀 A` 为 4 个 Unicode 码点。16 kHz 单声道 PCM16 的 32,000 有效音频字节为 1 秒，分任意块结果相同；RIFF/multipart/Base64/WS 封装不增加时长。上述为合成验证算例，不冒充供应商实测。
 
-以下官方链接供当前 profile 的字段差异核对；可执行合同与 fixtures 固定实际支持范围，官网新增产品不自动扩大本项目声明：
+以下是 profile 实现使用的外部字段参考入口，网页会变化；本仓库 OpenAPI、生产解析与固定 fixtures 决定实际支持范围，官网新增产品不自动扩大本项目声明：
 
 - [OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)：usage、include_usage 和流中断；[Responses usage](https://developers.openai.com/api/reference/cli/resources/responses/methods/retrieve)：输入/输出/总量；事件解析同时使用当前仓库 Responses 样例。
 - [Gemini GenerateContent](https://ai.google.dev/api/generate-content)：usageMetadata；[Gemini TTS](https://ai.google.dev/gemini-api/docs/speech-generation)：contents/text 音频生成。
@@ -146,11 +146,11 @@ Hub SQLite/Ent 使用三类逻辑数据：
 
 整数指标使用足够范围的整数，音频以整数毫秒存储和运算，在 UI 转为分钟；禁止浮点累计额度。TOTAL_TOKENS 与其明细不重复更新总量计数。
 
-Hub 原子准入事务检查所有适用规则、周期和用户当前活动请求数，再创建唯一 requestId 占用并返回决策。使用数据库条件更新/事务串行化处理竞争及 SQLite busy，不能用进程 map 锁代替数据库原子性；网络调用不置于 DB 写事务内。每次企业 Runtime 调用都会尝试这个轻量准入入口；Hub 或计量存储不可用时记录降级诊断并继续转发，不能把计量依赖变成 Runtime 可用性依赖。
+Hub 原子准入事务检查所有适用规则、周期与可确定的额度占用，再创建唯一 requestId 占用并返回决策。使用数据库条件更新/事务串行化处理竞争及 SQLite busy，不能用进程 map 锁代替数据库原子性；网络调用不置于 DB 写事务内。每次企业 Runtime 调用都会尝试这个轻量准入入口；Hub 或计量存储不可用时记录降级诊断并继续转发，不能把计量依赖变成 Runtime 可用性依赖。
 
-可预知字符/时长同时预占；未知最终 token 只检查已知耗尽状态并占一个在途位置，不能伪造精确 token 预留。请求数、字符硬上限和 token 到量停后续的差别由 Hub 状态明确投影给两端。
+可预知字符/时长同时预占；未知最终 token 只检查已知耗尽状态并记录在途生命周期，不能伪造精确 token 预留。请求数、字符硬上限和 token 到量停后续的差别由 Hub 状态明确投影给两端。
 
-Relay 在转发之前持久记录准入/执行身份，并将允许、开始尝试和最终结果纳入可恢复状态。若 Hub 已占用但回复丢失，以相同 requestId 重试获得同一决策；超时不换 ID 二次占用。只能证明未开始转发时释放；转发发生与进程崩溃之间无法判定的窗口保持待核对。spool 承载这些生命周期记录，在响应结束前已持久保存准入与执行身份。
+Relay 在转发之前尝试持久记录准入/执行身份，并将允许、开始尝试和最终结果纳入可恢复状态；持久化失败须诊断降级，不因计量落盘失败拒绝本可执行的业务请求。若 Hub 已占用但回复丢失，以相同 requestId 重试获得同一决策；超时不换 ID 二次占用。只能证明未开始转发时释放；转发发生与进程崩溃之间无法判定的窗口保持待核对。成功落盘的 spool 承载这些生命周期记录；降级期间不能宣称未持久保存的身份和用量具有恢复保证。
 
 结算事务一次性去重、入账、更新周期计数、释放已解决的活动占用。Relay 收到 durable ACK 后才清理已交付记录。重启从 durable 状态恢复，不能按短 TTL 无条件丢弃计量事实。上游明确 HTTP 400、以及未收到响应头的连接失败按已验证无供应商语义消耗自动收口，不制造人工任务；客户端取消、超时和收到响应头后的断流继续保留 UNKNOWN/PARTIAL。待核对记录不计入活动并发，也不阻断后续请求；Admin 提供查询和受审计的简洁确认入口，迟到可靠计量仍能修正，不能重复扣整笔或冲掉审计。
 
@@ -158,7 +158,7 @@ Relay 在转发之前持久记录准入/执行身份，并将允许、开始尝�
 
 ## 6. 接口与下发合同
 
-当前 API v1、Snapshot v4、Bridge v3 的精确字段与路径以本仓库 OpenAPI 为准；合同变更同步生成产物、fixtures 和消费者。预算业务修订独立于协议版本。
+当前 API v1、Snapshot v4/v5、Bridge v3 的精确字段与路径以本仓库 OpenAPI 为准；合同变更同步生成产物、fixtures 和消费者。预算业务修订独立于协议版本。
 
 | 文件/合同 | 当前职责 |
 |---|---|
@@ -167,7 +167,7 @@ Relay 在转发之前持久记录准入/执行身份，并将允许、开始尝�
 | `api/admin/admin.openapi.yaml` | 五能力用户额度、模板/覆盖/审计、用量筛选与分析；区分拒绝数与消耗请求数 |
 | `api/client/client-control.openapi.yaml` | `/api/client/v1/budgets` 使用 Client Bearer；`/api/portal/v1/budgets` 与 `/api/portal/v1/usage/*` 使用受限本人 Portal Session，不接受指定 userId 或模板元数据 |
 | Runtime Problem | 只有预算明确耗尽返回 `budget_exhausted`（429）；它给出能力/指标/周期及可得 resetAt，准入拒绝使用 forwarded=false，只有可确定整体自动恢复时间才给 Retry-After。计量服务不可用、计量落盘失败、计量生命周期行与待核对积压只产生诊断，不作为 Runtime Problem 返回。已删除身份的 Runtime 与 refresh credential 统一返回 401 `enterprise_identity_deleted` |
-| Snapshot v4 | 不含预算余额、动态规则或模板元数据；可选 `imageGenerators` 与 `policy.defaultImageGenerationId` 缺失分别表示空/未设置，当前 writer 显式写数组 |
+| Snapshot v4/v5 | 不含预算余额、动态规则或模板元数据；可选 `imageGenerators` 与 `policy.defaultImageGenerationId` 缺失分别表示空/未设置，当前 writer 显式写数组 |
 | Bridge v3 | 没有预算方法；Portal 使用同源 HttpOnly Cookie，不增加 token 通道 |
 
 Portal API 在每个 handler 从 authenticatePortal 推导 userId，查询和详情都在 DB 层强制归属；不能只前端隐藏。用户响应去除内部 route、Secret、管理审计及其他用户信息；使用 no-store 和已有来源/会话检查。Admin 权限仍走 Admin API。
@@ -195,4 +195,4 @@ Portal 本人数据读取复用 source/session 的取消和用户隔离。打开
 
 MCP workspaceTarget 使用 v2 固定归属，贯穿准入、Relay spool、UsageFact 和历史详情；不从当前用户空间反查补写归属。旧 upstream 归属继续读取。源字段和恢复边界由远程工作区实现参考统一说明。
 
-详见 [远程工作区实现参考](remote-workspace-implementation.md) 与 [当前联调记录](remote-workspace-verification.md)。
+详见[远程工作区实现参考](remote-workspace-implementation.md)；历史联调由[证据索引](s0-execution-progress.md)定位。

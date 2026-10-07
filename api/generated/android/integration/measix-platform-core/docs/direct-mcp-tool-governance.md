@@ -1,6 +1,6 @@
 # Direct MCP 工具治理实施与 Android 对接
 
-语义权威为同级架构仓库的 [Control Protocol §10.7.1](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md) 和 [Admin Product Requirements §9.5](../../measix-architecture/docs/10-runtime-foundation/s0/measix-s0-admin-console-product-requirements.md)。本文件维护 Core 实现、操作与消费者接线；版本扩展见 [协议兼容实现](protocol-compatibility.md)。当前编制使用 Snapshot v5，已发布 v4 保留独立 DTO、原始 bytes/hash 和重新发布路径。
+语义权威为同级架构仓库的 Control Protocol §10.7.1（源仓库：`measix-architecture/docs/10-runtime-foundation/s0/measix-s0-control-protocol.md`） 和 Admin Product Requirements §9.5（源仓库：`measix-architecture/docs/10-runtime-foundation/s0/measix-s0-admin-console-product-requirements.md`）。本文件维护 Core 实现、操作与消费者接线；版本扩展见[响应消费规则](android-platform-integration.md#响应扩展与适配规则)。当前编制使用 Snapshot v5，已发布 v4 保留独立 DTO、原始 bytes/hash 和重新发布路径。
 
 ## 实现归属
 
@@ -61,9 +61,9 @@
 
 ## 验证入口与边界
 
-- 后端：在 `backend` 运行 `go test ./internal/hub/capability ./internal/hub/httpapi ./internal/contract -count=1`；完整回归见 [testing](testing.md)。
+- 后端：在 `backend` 运行 `go test ./internal/hub/capability ./internal/hub/httpapi ./internal/contract -count=1`；完整回归见 testing（源仓库：`measix-platform-core/docs/testing.md`）。
 - Admin：`pnpm -C console test`、`typecheck`、`e2e:typecheck`、`build`。
 - 浏览器：完成 production build 后运行 `node scripts/e2e-harness.mjs`，使用真实 Hub/Relay、隔离 SQLite 和确定性 MCP；`e2e/mcp-tool-governance.spec.ts` 覆盖发现/编制/确认/保存/发布、drift/失败/删除、长目录/分页和 320px；`admin-console-review.spec.ts` 覆盖 11 个管理路由及公告输入保护。
 - 启动脚本：`node --test scripts/real-device-preset.test.mjs scripts/admin-build-snapshot.test.mjs`；浏览器 harness 固定服务的 SPA 副本及 hash，设备 preset 回传同 ID 发现记录，验证构建身份并保全重启数据。
 
-运行日志、截图和构建身份留在本地 `.artifacts/`，提交和变更历史由 Git 保存。本文件不重复历史测试计数或移动候选的 PASS。Core 回归与导出不能替代 Android 原生 consumer/device、真实供应商执行或阶段 Freeze；发布流程见 [release](release.md)。
+运行日志、截图和构建身份留在本地 `.artifacts/`，提交和变更历史由 Git 保存。本文件不重复历史测试计数或移动候选的 PASS。Core 回归与导出不能替代 Android 原生 consumer/device、真实供应商执行或阶段 Freeze；发布流程见 release（源仓库：`measix-platform-core/docs/release.md`）。

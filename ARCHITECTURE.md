@@ -186,24 +186,13 @@ See `docs/testing.md` for executable test organization, CI design, and the TDD c
 
 ### Local documents
 
-- `ARCHITECTURE.md` (this file) — implementation dependency/source ownership boundaries and documentation governance.
-- `docs/s0-execution-progress.md` — fixed S0.2 Preview composition, delivered scope, evidence boundary and later-stage boundary.
-- `docs/admin-console-implementation.md` — concrete Admin implementation decisions/facts; does not restate Product/UX requirements.
-- `docs/api-contracts.md` — executable contract/codegen/freeze workflow.
-- `docs/development.md` — engineering workflow and actual local/system harness commands.
-- `docs/testing.md` — executable test organization, CI design, and TDD.
-- `docs/database-migrations.md` — persistence initialization, migration and recovery workflow.
-- `docs/operations.md` — runtime operations.
-- `docs/release.md` — freeze/RC evidence composition.
-- `docs/remote-workspace-implementation.md` — optional Agent Space integration owners, recovery, file access and protocol implementation.
-- `docs/usage-budget.md` — current metering and budget implementation.
-- `docs/pricing-cost.md` — current pricing and cost calculation.
+[README](README.md#文档导航) 是唯一完整导航。本文维护依赖/源码边界；docs/ 的各文档分别维护合同、实现、运行、测试和发布事实。固定 Preview 组合、当前源码范围与历史证据只在 [status index](docs/s0-execution-progress.md)维护，不重复抄到功能参考。
 
 ### Documentation rule
 
 A local document contains only information needed to implement, run, test or operate this repository. If a paragraph merely re-explains an architecture requirement without adding a local implementation consequence, replace it with a reference.
 
-Do not maintain the same current-state claim in multiple documents. `docs/s0-execution-progress.md` is the S0.2 implementation and seal summary; release manifests and actual runs carry the reproducible evidence.
+Do not maintain the same current-state claim in multiple documents. `docs/s0-execution-progress.md` owns the implementation/seal summary and historical evidence index; release manifests and actual runs carry the reproducible evidence. After implementation, merge durable mechanisms and commands into their existing references and remove the completed plan. Keep unresolved risks and actual evidence pointers, not repeated test counts or repair diaries.
 
 Stage-specific reading order is maintained only in `topabomb/measix-architecture/docs/measix-stage-document-index.md`.
 
@@ -237,6 +226,8 @@ Code layout, component decomposition, dependency choice, DB index, build tooling
 ### S0.1 Client Contract Freeze
 
 MEASIX has an internal Preview and no formal public release. Supported Snapshot versions and data-preservation boundaries follow Control Protocol §10.10.1–2. Current Starter v5 retains published v4 semantics and immutable data; database changes follow the existing append-only migration owner. Current candidate acceptance still requires the actual source/build/contract/artifact chain; retained old reports never certify current work. See [release procedures](docs/release.md).
+
+Core release association follows the adopted [version association rules](../measix-architecture/docs/00-platform/measix-versioning-and-compatibility-plan.md). The identity source is `api/protocol-baseline.json`; Client and Portal exports share it. [Release procedures](docs/release.md) own packaging and Android handoff. Ordinary packaging does not require Android evidence: test the fixed package with the original APK, then record the actual product-version pair, artifact hashes and result links in the existing release record. The stricter evidence-bundling tools remain optional. Version metadata does not change runtime protocols, migration ownership or stage gates, and cannot alone certify compatibility.
 
 ## 8. Change boundary
 

@@ -57,6 +57,10 @@ func TestSYSI0001CanonicalFixturesDecodeWithGeneratedWire(t *testing.T) {
 	_ = decodeFixture[usageingestapi.UsageSettlementBatch](t, "usage/request-batch.json", true)
 	_ = decodeFixture[adminapi.BudgetTemplate](t, "budget/template.json", true)
 	_ = decodeFixture[adminapi.UserUsagePage](t, "usage/user-analytics.json", true)
+	_ = decodeFixture[adminapi.SetPasswordRequest](t, "admin/accounts/set-password.json", true)
+	_ = decodeFixture[adminapi.SetUserRoleRequest](t, "admin/accounts/set-role.json", true)
+	_ = decodeFixture[adminapi.User](t, "admin/accounts/user.json", true)
+	_ = decodeFixture[adminapi.DeleteUpstreamRequest](t, "admin/upstreams/delete.json", true)
 
 	// C0 canonical full-profile snapshot fixtures must decode with strict wire types.
 	_ = decodeFixture[clientapi.ManagedSnapshotV4](t, "client-integration/snapshot-v4.json", true)

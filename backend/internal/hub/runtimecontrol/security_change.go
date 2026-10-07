@@ -15,7 +15,7 @@ import (
 	"measix/platform/ent/deletedprincipal"
 	"measix/platform/ent/predicate"
 	"measix/platform/ent/session"
-	"measix/platform/ent/user"
+	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/wire/relaycontrolapi"
 	"measix/platform/internal/wire/relaystate"
 	"measix/platform/pkg/platformid"
@@ -140,15 +140,6 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 		if row.Username != deleteInput.ConfirmationUsername {
 			return ActivationResult{}, ErrDeleteConfirmation
 		}
-		if row.Role == "ADMIN" {
-			count, err := s.Client.User.Query().Where(user.RoleEQ("ADMIN"), user.StatusEQ("ACTIVE")).Count(ctx)
-			if err != nil {
-				return ActivationResult{}, err
-			}
-			if count <= 1 {
-				return ActivationResult{}, ErrDeleteLastAdmin
-			}
-		}
 	}
 
 	if securitySubject(operation) == securityUserEnable {
@@ -188,6 +179,33 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 		return ActivationResult{}, err
 	}
 	defer tx.Rollback()
+	if securitySubject(operation) == securityUserDisable || securitySubject(operation) == securityUserDelete || securitySubject(operation) == securityUserEnable {
+		if err := identity.RequireActiveAdmin(ctx, tx, adminUserID); err != nil {
+			return ActivationResult{}, err
+		}
+		row, err := tx.User.Get(ctx, subjectID)
+		if err != nil {
+			return ActivationResult{}, err
+		}
+		deleted, err := tx.DeletedPrincipal.Query().Where(deletedprincipal.IDEQ(subjectID)).Exist(ctx)
+		if err != nil {
+			return ActivationResult{}, err
+		}
+		if deleted {
+			return ActivationResult{}, identity.ErrDeletionInProgress
+		}
+		if securitySubject(operation) == securityUserDelete && row.Username != deleteInput.ConfirmationUsername {
+			return ActivationResult{}, ErrDeleteConfirmation
+		}
+		if securitySubject(operation) != securityUserEnable {
+			if err := identity.GuardAdminRemoval(ctx, tx, adminUserID, row); err != nil {
+				if securitySubject(operation) == securityUserDelete && errors.Is(err, identity.ErrLastAdmin) {
+					return ActivationResult{}, ErrDeleteLastAdmin
+				}
+				return ActivationResult{}, err
+			}
+		}
+	}
 	pending, err := tx.Activation.Query().Where(activation.StateIn("APPLYING", "UNKNOWN")).Count(ctx)
 	if err != nil {
 		return ActivationResult{}, err

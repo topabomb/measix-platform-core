@@ -30,6 +30,12 @@ export class ApiProblem extends Error {
   }
 }
 
+// A transport or server failure cannot prove that a non-idempotent command
+// rolled back. Callers must refresh state and require an explicit new action.
+export function commandResultUncertain(cause: unknown): boolean {
+  return !(cause instanceof ApiProblem) || cause.status >= 500
+}
+
 export function setUnauthorizedHandler(handler: UnauthorizedHandler) {
   unauthorizedHandler = handler
 }

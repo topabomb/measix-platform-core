@@ -36,6 +36,10 @@ Hub 的 Admin login guard 使用有界、自动过期的进程内 username/sourc
 
 Root repository 的 npm orchestration、实际开发命令与 system harness 生命周期由 `docs/development.md` 维护，不在本文重复。
 
+`UsersPage` 详情 actions menu 提供他人密码重设和管理员授予/撤销；打开时先 GET 当前用户，读取期间禁止重复打开；若角色已变化则刷新并提示核对，不将已选动作反转。`AdminAccountDialog` 使用具体动作作为提交按钮文案，只提交角色命令，不覆盖资料或启用状态。操作员密码与目标新密码只保留在对话框内存，取消、关闭、成功、失败和卸载均清理；角色冲突关闭后刷新目标并保留冲突提示，网络或 5xx 未知结果提示人工确认且不自动重放。创建 ADMIN 和无密码用户晋升要求初始化密码，已有密码晋升保留原值；`passwordConfigured` 仅为服务端派生展示字段。当前账号的危险动作禁用，自助修改仍走账号菜单。
+
+`UpstreamsPage` 详情提供删除确认，每次打开（含关闭后重开）先 GET 最新连接，再使用其 `configRevision` 做条件删除；读取失败时禁止提交。引用冲突保留详情并展示本地化错误和刷新入口；版本冲突、网络或 5xx 未知结果要求 GET 刷新后才能再次提交，GET 404 则关闭详情并刷新列表。服务端删除边界和保全范围见 [API 合同](api-contracts.md)。这些管理操作不增加配置项、数据库迁移或浏览器持久状态。
+
 ## 2. 当前源码组织
 
 Direct MCP 的组件、草稿并发处理、目录交互及 Android 接线统一见 [工具治理实施](direct-mcp-tool-governance.md)。

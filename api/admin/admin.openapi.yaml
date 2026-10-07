@@ -116,6 +116,8 @@ paths:
           $ref: '#/components/responses/Problem'
         '409':
           $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
       requestBody:
         required: true
         content:
@@ -185,6 +187,8 @@ paths:
         '404':
           $ref: '#/components/responses/Problem'
         '409':
+          $ref: '#/components/responses/Problem'
+        '429':
           $ref: '#/components/responses/Problem'
       requestBody:
         required: true
@@ -291,6 +295,10 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
       requestBody:
         required: true
         content:
@@ -300,6 +308,38 @@ paths:
       parameters:
       - *id002
       - *id001
+  /api/admin/v1/users/{userId}:set-role:
+    post:
+      operationId: setUserRole
+      description: Change only the role with expectedRole protection and current administrator password verification. Initialize a missing password atomically when granting ADMIN. Revoke target Admin Web sessions on an actual role change.
+      parameters:
+      - *id002
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetUserRoleRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/users/{userId}/enrollments:
     post:
       operationId: createEnrollment
@@ -1068,6 +1108,31 @@ paths:
       parameters:
       - *id008
       - *id001
+    delete:
+      operationId: deleteUpstream
+      description: Delete an unreferenced connection and its configuration revisions. Preserve Secrets, historical usage, immutable Releases and terminal Activation facts.
+      parameters:
+      - *id008
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteUpstreamRequest'
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/upstreams/{upstreamId}:test:
     post:
       operationId: testUpstream
@@ -4130,11 +4195,16 @@ components:
       - status
       - createdAt
       - updatedAt
+      - passwordConfigured
       properties:
         userId:
           $ref: '#/components/schemas/UserId'
         username:
           type: string
+        passwordConfigured:
+          type: boolean
+          readOnly: true
+          description: Derived from existing password material. A configured password does not grant MEMBER access to the Admin Console.
         displayName:
           type: string
         role:
@@ -4170,6 +4240,17 @@ components:
           enum:
           - ADMIN
           - MEMBER
+        currentPassword:
+          type: string
+          description: Required when creating ADMIN; verifies the acting administrator.
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+          description: Required when creating ADMIN; not accepted for MEMBER creation.
+        confirmPassword:
+          type: string
+          description: Required and equal to newPassword when creating ADMIN.
     UpdateUserRequest:
       type: object
       additionalProperties: false
@@ -4187,6 +4268,49 @@ components:
           enum:
           - ADMIN
           - MEMBER
+        expectedRole:
+          type: string
+          enum: [ADMIN, MEMBER]
+          description: Required for an actual role change; checked in the mutation transaction.
+        currentPassword:
+          type: string
+          description: Required for an actual role change; verifies the acting administrator.
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+          description: Only for granting ADMIN to a user without a configured password.
+        confirmPassword:
+          type: string
+    DeleteUpstreamRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedConfigRevision]
+      properties:
+        expectedConfigRevision:
+          type: integer
+          minimum: 1
+    SetUserRoleRequest:
+      type: object
+      additionalProperties: false
+      required: [role, expectedRole, currentPassword]
+      properties:
+        role:
+          type: string
+          enum: [ADMIN, MEMBER]
+        expectedRole:
+          type: string
+          enum: [ADMIN, MEMBER]
+        currentPassword:
+          type: string
+          minLength: 1
+          maxLength: 128
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+        confirmPassword:
+          type: string
     DeleteUserRequest:
       type: object
       additionalProperties: false
@@ -4206,7 +4330,16 @@ components:
       additionalProperties: false
       required:
       - newPassword
+      - currentPassword
+      - confirmPassword
       properties:
+        currentPassword:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: The acting administrator's password, never the target's old password.
+        confirmPassword:
+          type: string
         newPassword:
           type: string
           minLength: 12

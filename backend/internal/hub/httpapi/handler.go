@@ -189,7 +189,8 @@ func (h *adminHandler) ListUsers(w http.ResponseWriter, r *http.Request, params 
 }
 
 func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request, params adminapi.CreateUserParams) {
-	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -198,7 +199,7 @@ func (h *adminHandler) CreateUser(w http.ResponseWriter, r *http.Request, params
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	u, err := h.identity.CreateUserView(r.Context(), request.Username, request.DisplayName, string(request.Role))
+	u, err := h.identity.CreateAccount(r.Context(), identity.AdminAccountAuthorization{UserID: admin.UserID, Password: valueOrEmptyString(request.CurrentPassword), Source: adminLoginSource(r)}, request.Username, request.DisplayName, string(request.Role), valueOrEmptyString(request.NewPassword), valueOrEmptyString(request.ConfirmPassword))
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -220,7 +221,8 @@ func (h *adminHandler) GetUser(w http.ResponseWriter, r *http.Request, userID ad
 }
 
 func (h *adminHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.UpdateUserParams) {
-	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -229,7 +231,11 @@ func (h *adminHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userID
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	u, err := h.identity.UpdateUserView(r.Context(), userID, request.Username, request.DisplayName, string(request.Role))
+	expectedRole := ""
+	if request.ExpectedRole != nil {
+		expectedRole = string(*request.ExpectedRole)
+	}
+	u, err := h.identity.UpdateAccount(r.Context(), identity.AdminAccountAuthorization{UserID: admin.UserID, Password: valueOrEmptyString(request.CurrentPassword), Source: adminLoginSource(r)}, userID, request.Username, request.DisplayName, string(request.Role), expectedRole, valueOrEmptyString(request.NewPassword), valueOrEmptyString(request.ConfirmPassword))
 	if err != nil {
 		writeIdentityError(w, err)
 		return
@@ -238,7 +244,8 @@ func (h *adminHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userID
 }
 
 func (h *adminHandler) SetPassword(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.SetPasswordParams) {
-	if _, err := h.authenticateAdmin(r, params.XCSRFToken, true); err != nil {
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
 		writeIdentityError(w, err)
 		return
 	}
@@ -247,11 +254,30 @@ func (h *adminHandler) SetPassword(w http.ResponseWriter, r *http.Request, userI
 		writeProblem(w, http.StatusBadRequest, "invalid_request", "Invalid request")
 		return
 	}
-	if err := h.identity.SetPassword(r.Context(), userID, request.NewPassword); err != nil {
+	if err := h.identity.ResetAccountPassword(r.Context(), identity.AdminAccountAuthorization{UserID: admin.UserID, Password: request.CurrentPassword, Source: adminLoginSource(r)}, userID, request.NewPassword, request.ConfirmPassword); err != nil {
 		writeIdentityError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *adminHandler) SetUserRole(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.SetUserRoleParams) {
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	var request adminapi.SetUserRoleRequest
+	if decodeStrictJSON(r, &request) != nil {
+		writeProblem(w, 400, "invalid_request", "Invalid request")
+		return
+	}
+	u, err := h.identity.SetAccountRole(r.Context(), identity.AdminAccountAuthorization{UserID: admin.UserID, Password: request.CurrentPassword, Source: adminLoginSource(r)}, userID, string(request.Role), string(request.ExpectedRole), valueOrEmptyString(request.NewPassword), valueOrEmptyString(request.ConfirmPassword))
+	if err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, userWire(u))
 }
 
 func (h *adminHandler) CreateEnrollment(w http.ResponseWriter, r *http.Request, userID adminapi.UserId, params adminapi.CreateEnrollmentParams) {
@@ -471,13 +497,14 @@ func managedStateWire(state identity.ManagedStateView, applied *int) clientapi.M
 
 func userWire(u identity.UserView) adminapi.User {
 	return adminapi.User{
-		UserId:      u.ID,
-		Username:    u.Username,
-		DisplayName: u.DisplayName,
-		Role:        adminapi.UserRole(u.Role),
-		Status:      adminapi.UserStatus(u.Status),
-		CreatedAt:   u.CreatedAt,
-		UpdatedAt:   u.UpdatedAt,
+		PasswordConfigured: &u.PasswordConfigured,
+		UserId:             u.ID,
+		Username:           u.Username,
+		DisplayName:        u.DisplayName,
+		Role:               adminapi.UserRole(u.Role),
+		Status:             adminapi.UserStatus(u.Status),
+		CreatedAt:          u.CreatedAt,
+		UpdatedAt:          u.UpdatedAt,
 	}
 }
 
@@ -553,7 +580,28 @@ func decodeStrictJSON(r *http.Request, target any) error {
 }
 
 func writeIdentityError(w http.ResponseWriter, err error) {
+	var throttled *identity.LoginThrottledError
+	if errors.As(err, &throttled) {
+		seconds := max(int64(1), int64((throttled.RetryAfter+time.Second-1)/time.Second))
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", seconds))
+		writeProblem(w, 429, "login_throttled", "Authentication temporarily throttled")
+		return
+	}
 	switch {
+	case errors.Is(err, identity.ErrOwnPasswordReset):
+		writeProblem(w, 409, "cannot_reset_own_password", "Use the account menu to change your own password")
+	case errors.Is(err, identity.ErrCurrentAdmin):
+		writeProblem(w, 409, "cannot_modify_current_admin", "Sign in as another administrator")
+	case errors.Is(err, identity.ErrLastAdmin):
+		writeProblem(w, 409, "cannot_remove_last_admin", "Keep a login-capable administrator")
+	case errors.Is(err, identity.ErrRoleConflict):
+		writeProblem(w, 409, "user_role_conflict", "Reload the current role")
+	case errors.Is(err, identity.ErrAdminPasswordRequired):
+		writeProblem(w, 400, "admin_password_required", "Set a password when granting administrator access")
+	case errors.Is(err, identity.ErrPasswordConfirmation):
+		writeProblem(w, 400, "password_confirmation_mismatch", "Password confirmation does not match")
+	case errors.Is(err, identity.ErrDeletionInProgress):
+		writeProblem(w, 409, "user_deletion_in_progress", "User deletion is in progress")
 	case errors.Is(err, identity.ErrIdentityDeleted):
 		writeProblem(w, http.StatusUnauthorized, "enterprise_identity_deleted", "Enterprise identity was deleted")
 	case errors.Is(err, identity.ErrExpired):

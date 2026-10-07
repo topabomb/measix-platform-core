@@ -4,7 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { copyToClipboard } from 'quasar'
 import type { components } from '../api/generated'
-import { apiFetch } from '../api/client'
+import { ApiProblem, apiFetch, commandResultUncertain } from '../api/client'
+import AdminAccountDialog from '../components/AdminAccountDialog.vue'
 import { costAmounts } from '../api/cost'
 import { encodeEnrollmentMaterial } from '../api/enrollment'
 import { cursorPath } from '../api/pagination'
@@ -71,8 +72,61 @@ const deleting = ref(false)
 const enrollment = ref<Enrollment>()
 const enrollmentMaterial = ref('')
 const enrollmentCopied = ref(false)
-const createForm = ref({ username: '', displayName: '', role: 'MEMBER' as 'ADMIN' | 'MEMBER' })
+const emptyCreateForm = () => ({ username: '', displayName: '', role: 'MEMBER' as 'ADMIN' | 'MEMBER', currentPassword: '', newPassword: '', confirmPassword: '' })
+const createForm = ref(emptyCreateForm())
+const creating = ref(false)
+const createUncertain = ref(false)
+const accountTarget = ref<User>()
+const accountMode = ref<'password' | 'role'>('password')
+const accountOpen = ref(false)
+const loadingAccount = ref(false)
+const accountNotice = ref('')
+const canCreate = computed(() => {
+  const form = createForm.value
+  const count = Array.from(form.newPassword).length
+  return canMutate.value && Boolean(form.username.trim() && form.displayName.trim()) && (form.role === 'MEMBER' || Boolean(form.currentPassword && count >= 12 && count <= 128 && form.newPassword === form.confirmPassword))
+})
+watch(createOpen, open => { if (!open) { createForm.value = emptyCreateForm(); createUncertain.value = false } })
+watch(() => createForm.value.role, () => { createForm.value.currentPassword = ''; createForm.value.newPassword = ''; createForm.value.confirmPassword = '' })
 const canMutate = computed(() => Boolean(session.csrfToken))
+
+async function beginAccountManagement(mode: 'password' | 'role') {
+  if (!selected.value || !canMutate.value || loadingAccount.value || accountOpen.value || selected.value.userId === session.session?.user.userId) return
+  const id = selected.value.userId
+  const displayedRole = selected.value.role
+  loadingAccount.value = true
+  error.value = undefined
+  accountNotice.value = ''
+  try {
+    const current = await apiFetch<User>(`/api/admin/v1/users/${encodeURIComponent(id)}`)
+    if (selected.value?.userId !== id) return
+    selected.value = current
+    if (mode === 'role' && current.role !== displayedRole) {
+      await refresh()
+      error.value = new ApiProblem(409, 'user_role_conflict', 'User role changed')
+      return
+    }
+    accountTarget.value = { ...current }
+    accountMode.value = mode
+    accountOpen.value = true
+  } catch (cause) { error.value = cause } finally { loadingAccount.value = false }
+}
+
+async function reloadAccount(id: string) {
+  const user = await apiFetch<User>(`/api/admin/v1/users/${encodeURIComponent(id)}`)
+  if (selected.value?.userId === id) selected.value = user
+  await refresh()
+}
+
+async function accountCompleted(id: string, user?: User) {
+  accountNotice.value = $t('users.accountUpdated')
+  if (user && selected.value?.userId === id) selected.value = user
+  try { await reloadAccount(id) } catch (cause) { error.value = cause }
+}
+
+async function accountConflict(id: string, cause: unknown) {
+  try { await reloadAccount(id); error.value = cause } catch (reloadError) { error.value = reloadError }
+}
 
 async function refresh() {
   const query = new URLSearchParams({ limit: '50' })
@@ -88,19 +142,27 @@ watch(search, () => {
 })
 
 async function createUser() {
-  if (!session.csrfToken) return
+  if (!session.csrfToken || !canCreate.value || creating.value) return
+  creating.value = true
   error.value = undefined
+  createUncertain.value = false
   try {
-    await apiFetch<User>('/api/admin/v1/users', { method: 'POST', body: JSON.stringify(createForm.value) }, session.csrfToken)
+    const { username, displayName, role, currentPassword, newPassword, confirmPassword } = createForm.value
+    const body: components['schemas']['CreateUserRequest'] = { username, displayName, role }
+    if (role === 'ADMIN') Object.assign(body, { currentPassword, newPassword, confirmPassword })
+    await apiFetch<User>('/api/admin/v1/users', { method: 'POST', body: JSON.stringify(body) }, session.csrfToken)
     createOpen.value = false
-    createForm.value = { username: '', displayName: '', role: 'MEMBER' }
     await refresh()
   } catch (cause) {
     error.value = cause
-  }
+    createUncertain.value = commandResultUncertain(cause)
+    createForm.value.currentPassword = ''; createForm.value.newPassword = ''; createForm.value.confirmPassword = ''
+  } finally { creating.value = false }
 }
 
 async function openUser(user: User) {
+  accountOpen.value = false
+  accountNotice.value = ''
   selected.value = user
   hasUserWorkspace.value = false
   activeUserSection.value = 'devices'
@@ -346,12 +408,14 @@ onMounted(async () => {
   }
 })
 onBeforeUnmount(() => {
+  createForm.value = emptyCreateForm()
+  accountTarget.value = undefined
   deviceSequence++
   usageSequence++
   if (searchTimer) clearTimeout(searchTimer)
 })
 
-defineExpose({ beginDeleteUser })
+defineExpose({ beginDeleteUser, beginAccountManagement })
 </script>
 
 <template>
@@ -363,6 +427,7 @@ defineExpose({ beginDeleteUser })
       </template>
     </PageHeader>
     <ProblemBanner :error="error" class="q-mb-xs" />
+    <q-banner v-if="accountNotice" dense class="bg-green-1 q-mb-xs" data-cy="account-update-result">{{ accountNotice }}</q-banner>
     <q-banner v-if="activation.activation && !activation.succeeded" class="bg-orange-1 q-mb-xs rounded-borders">
       <div class="row items-center justify-between"><span>{{ $t('users.securityActivation', { id: activation.activation.activationId }) }}</span><StatusChip :value="activation.activation.state" /></div>
       <div v-if="activation.activation.errorCode" class="text-caption">{{ activation.activation.errorCode }}</div>
@@ -394,17 +459,24 @@ defineExpose({ beginDeleteUser })
       <CursorPager :page="pageNumber" :count="users.length" :has-next="Boolean(nextCursor)" :loading="loading" @previous="previousPage" @next="nextPage" />
     </q-card>
 
-    <q-dialog v-model="createOpen">
+    <q-dialog v-model="createOpen" :persistent="creating">
       <q-card class="app-dialog app-dialog--sm">
         <q-card-section class="text-h6">{{ $t('users.createUser') }}</q-card-section>
         <q-card-section class="q-gutter-xs">
           <q-input v-model="createForm.username" outlined dense :label="$t('users.username')" data-cy="user-form-username" />
           <q-input v-model="createForm.displayName" outlined dense :label="$t('users.displayName')" data-cy="user-form-display-name" />
-          <q-select v-model="createForm.role" outlined dense :label="$t('users.role')" :options="['MEMBER','ADMIN'].map(value => ({label: $t(`roles.${value}`), value}))" emit-value map-options />
+          <q-select v-model="createForm.role" outlined dense :label="$t('users.role')" :options="['MEMBER','ADMIN'].map(value => ({label: $t(`roles.${value}`), value}))" emit-value map-options :disable="creating" />
+          <q-banner v-if="createUncertain" dense class="bg-orange-1">{{ $t('users.resultUncertain') }}</q-banner>
+          <ProblemBanner :error="error" />
+          <template v-if="createForm.role === 'ADMIN'">
+            <q-input v-model="createForm.currentPassword" type="password" outlined dense :label="$t('users.actorPassword')" autocomplete="current-password" :disable="creating" data-cy="create-admin-current-password" />
+            <q-input v-model="createForm.newPassword" type="password" outlined dense :label="$t('account.newPassword')" :hint="$t('account.passwordRule')" autocomplete="new-password" :disable="creating" data-cy="create-admin-new-password" />
+            <q-input v-model="createForm.confirmPassword" type="password" outlined dense :label="$t('account.confirmPassword')" autocomplete="new-password" :disable="creating" data-cy="create-admin-confirm-password" />
+          </template>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat :label="$t('common.cancel')" v-close-popup />
-          <q-btn color="primary" :label="$t('common.create')" data-cy="user-form-submit" :disable="!createForm.username.trim() || !createForm.displayName.trim()" @click="createUser" />
+          <q-btn flat :label="$t('common.cancel')" :disable="creating" v-close-popup />
+          <q-btn color="primary" :label="$t('common.create')" data-cy="user-form-submit" :loading="creating" :disable="!canCreate" @click="createUser" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -419,10 +491,17 @@ defineExpose({ beginDeleteUser })
         </q-card-section>
         <q-separator />
         <q-card-section class="row items-center q-gutter-xs q-py-xs">
+          <span v-if="selected.role === 'ADMIN' && !selected.passwordConfigured" class="text-warning text-caption">{{ $t('users.passwordMissing') }}</span>
           <q-btn unelevated no-caps color="primary" :label="$t('users.generateEnrollment')" @click="createEnrollment" data-cy="generate-enrollment-btn" />
           <q-btn-dropdown outline dense no-caps :label="$t('common.actions')">
             <q-list dense>
-              <q-item clickable v-close-popup @click="toggleUser">
+              <q-item clickable v-close-popup :disable="!canMutate || loadingAccount || selected.userId === session.session?.user.userId" data-cy="set-user-password" @click="beginAccountManagement('password')">
+                <q-item-section avatar><q-icon name="password" /></q-item-section><q-item-section>{{ $t('users.resetPassword') }}</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup :disable="!canMutate || loadingAccount || selected.userId === session.session?.user.userId" data-cy="set-user-role" @click="beginAccountManagement('role')">
+                <q-item-section avatar><q-icon name="admin_panel_settings" /></q-item-section><q-item-section>{{ $t(selected.role === 'ADMIN' ? 'users.removeAdmin' : 'users.grantAdmin') }}</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup :disable="!canMutate || selected.userId === session.session?.user.userId" @click="toggleUser">
                 <q-item-section avatar><q-icon :name="selected.status === 'ACTIVE' ? 'block' : 'check_circle'" /></q-item-section>
                 <q-item-section>{{ selected.status === 'ACTIVE' ? $t('common.disable') : $t('common.enable') }}</q-item-section>
               </q-item>
@@ -491,6 +570,8 @@ defineExpose({ beginDeleteUser })
       </q-card>
       </template>
     </DetailWorkspace>
+
+    <AdminAccountDialog v-if="accountTarget" v-model="accountOpen" :user="accountTarget" :mode="accountMode" :csrf-token="session.csrfToken" @completed="accountCompleted" @conflict="accountConflict" />
 
     <q-dialog v-model="deleteOpen">
       <q-card v-if="selected" class="app-dialog app-dialog--sm" data-cy="delete-user-dialog">

@@ -30,6 +30,36 @@ func (h *fullAdminHandler) CreateSecret(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusCreated, adminapi.Secret{SecretId: view.SecretID, Name: view.Name, SecretVersion: view.SecretVersion})
 }
 
+func (h *fullAdminHandler) DeleteUpstream(w http.ResponseWriter, r *http.Request, upstreamID adminapi.UpstreamId, params adminapi.DeleteUpstreamParams) {
+	admin, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	var request adminapi.DeleteUpstreamRequest
+	if decodeStrictJSON(r, &request) != nil {
+		writeProblem(w, 400, "invalid_request", "Invalid deletion request")
+		return
+	}
+	err = h.services.Upstream.DeleteUpstream(r.Context(), admin.UserID, upstreamID, request.ExpectedConfigRevision)
+	switch {
+	case errors.Is(err, upstream.ErrInUse):
+		writeProblem(w, 409, "upstream_in_use", "Connection is referenced by a draft or retained release")
+	case errors.Is(err, upstream.ErrRevisionConflict):
+		writeProblem(w, 409, "stale_upstream_config_revision", "Reload the connection before deleting")
+	case errors.Is(err, upstream.ErrActivationInProgress):
+		writeProblem(w, 409, "activation_in_progress", "Wait for runtime activation to finish")
+	case errors.Is(err, upstream.ErrNotFound):
+		writeProblem(w, 404, "upstream_not_found", "Connection not found")
+	case errors.Is(err, upstream.ErrInvalidConfig):
+		writeProblem(w, 400, "invalid_request", "Stored references could not be checked or revision is invalid")
+	case err != nil:
+		writeIdentityError(w, err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func (h *fullAdminHandler) ListSecrets(w http.ResponseWriter, r *http.Request, params adminapi.ListSecretsParams) {
 	if _, err := h.authenticateAdmin(r, "", false); err != nil {
 		writeIdentityError(w, err)

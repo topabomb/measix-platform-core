@@ -4,7 +4,7 @@
     2
   ],
   "coreBaselineVersion": "0.2.0-preview.23",
-  "baselineHash": "sha256:097e1406ef789ba8c0b05a1204edd94167a87b230855a5c2c443d077f95f0725",
+  "baselineHash": "sha256:806d74389e10ac282d64b960201f099291dbd1dd2a9b3d5edfb0b54da857b6c8",
   "bridgeVersion": 3,
   "artifacts": {
     "portal-contract.openapi.json": {

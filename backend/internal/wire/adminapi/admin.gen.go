@@ -932,6 +932,42 @@ func (e RuntimeBindingDefinitionTransportPolicy) Valid() bool {
 	}
 }
 
+// Defines values for SetUserRoleRequestExpectedRole.
+const (
+	SetUserRoleRequestExpectedRoleADMIN  SetUserRoleRequestExpectedRole = "ADMIN"
+	SetUserRoleRequestExpectedRoleMEMBER SetUserRoleRequestExpectedRole = "MEMBER"
+)
+
+// Valid indicates whether the value is a known member of the SetUserRoleRequestExpectedRole enum.
+func (e SetUserRoleRequestExpectedRole) Valid() bool {
+	switch e {
+	case SetUserRoleRequestExpectedRoleADMIN:
+		return true
+	case SetUserRoleRequestExpectedRoleMEMBER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SetUserRoleRequestRole.
+const (
+	SetUserRoleRequestRoleADMIN  SetUserRoleRequestRole = "ADMIN"
+	SetUserRoleRequestRoleMEMBER SetUserRoleRequestRole = "MEMBER"
+)
+
+// Valid indicates whether the value is a known member of the SetUserRoleRequestRole enum.
+func (e SetUserRoleRequestRole) Valid() bool {
+	switch e {
+	case SetUserRoleRequestRoleADMIN:
+		return true
+	case SetUserRoleRequestRoleMEMBER:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StarterOpeningSnapshotFormat.
 const (
 	StarterOpeningSnapshotFormatN1 StarterOpeningSnapshotFormat = 1
@@ -1061,6 +1097,24 @@ func (e TtsDefinitionClientProtocol) Valid() bool {
 	case TtsDefinitionClientProtocolOPENAIAUDIOSPEECH:
 		return true
 	case TtsDefinitionClientProtocolSYSTEMTTS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateUserRequestExpectedRole.
+const (
+	UpdateUserRequestExpectedRoleADMIN  UpdateUserRequestExpectedRole = "ADMIN"
+	UpdateUserRequestExpectedRoleMEMBER UpdateUserRequestExpectedRole = "MEMBER"
+)
+
+// Valid indicates whether the value is a known member of the UpdateUserRequestExpectedRole enum.
+func (e UpdateUserRequestExpectedRole) Valid() bool {
+	switch e {
+	case UpdateUserRequestExpectedRoleADMIN:
+		return true
+	case UpdateUserRequestExpectedRoleMEMBER:
 		return true
 	default:
 		return false
@@ -2510,13 +2564,26 @@ type CreateUpstreamRequest struct {
 
 // CreateUserRequest defines model for CreateUserRequest.
 type CreateUserRequest struct {
-	DisplayName string                `json:"displayName"`
+	// ConfirmPassword Required and equal to newPassword when creating ADMIN.
+	ConfirmPassword *string `json:"confirmPassword,omitempty"`
+
+	// CurrentPassword Required when creating ADMIN; verifies the acting administrator.
+	CurrentPassword *string `json:"currentPassword,omitempty"`
+	DisplayName     string  `json:"displayName"`
+
+	// NewPassword Required when creating ADMIN; not accepted for MEMBER creation.
+	NewPassword *string               `json:"newPassword,omitempty"`
 	Role        CreateUserRequestRole `json:"role"`
 	Username    string                `json:"username"`
 }
 
 // CreateUserRequestRole defines model for CreateUserRequest.Role.
 type CreateUserRequestRole string
+
+// DeleteUpstreamRequest defines model for DeleteUpstreamRequest.
+type DeleteUpstreamRequest struct {
+	ExpectedConfigRevision int `json:"expectedConfigRevision"`
+}
 
 // DeleteUserRequest defines model for DeleteUserRequest.
 type DeleteUserRequest struct {
@@ -3207,8 +3274,27 @@ type SessionId = string
 
 // SetPasswordRequest defines model for SetPasswordRequest.
 type SetPasswordRequest struct {
-	NewPassword string `json:"newPassword"`
+	ConfirmPassword string `json:"confirmPassword"`
+
+	// CurrentPassword The acting administrator's password, never the target's old password.
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
 }
+
+// SetUserRoleRequest defines model for SetUserRoleRequest.
+type SetUserRoleRequest struct {
+	ConfirmPassword *string                        `json:"confirmPassword,omitempty"`
+	CurrentPassword string                         `json:"currentPassword"`
+	ExpectedRole    SetUserRoleRequestExpectedRole `json:"expectedRole"`
+	NewPassword     *string                        `json:"newPassword,omitempty"`
+	Role            SetUserRoleRequestRole         `json:"role"`
+}
+
+// SetUserRoleRequestExpectedRole defines model for SetUserRoleRequest.ExpectedRole.
+type SetUserRoleRequestExpectedRole string
+
+// SetUserRoleRequestRole defines model for SetUserRoleRequest.Role.
+type SetUserRoleRequestRole string
 
 // Sha256Hash defines model for Sha256Hash.
 type Sha256Hash = string
@@ -3431,10 +3517,23 @@ type UpdateUpstreamRequest struct {
 
 // UpdateUserRequest defines model for UpdateUserRequest.
 type UpdateUserRequest struct {
-	DisplayName string                `json:"displayName"`
+	ConfirmPassword *string `json:"confirmPassword,omitempty"`
+
+	// CurrentPassword Required for an actual role change; verifies the acting administrator.
+	CurrentPassword *string `json:"currentPassword,omitempty"`
+	DisplayName     string  `json:"displayName"`
+
+	// ExpectedRole Required for an actual role change; checked in the mutation transaction.
+	ExpectedRole *UpdateUserRequestExpectedRole `json:"expectedRole,omitempty"`
+
+	// NewPassword Only for granting ADMIN to a user without a configured password.
+	NewPassword *string               `json:"newPassword,omitempty"`
 	Role        UpdateUserRequestRole `json:"role"`
 	Username    string                `json:"username"`
 }
+
+// UpdateUserRequestExpectedRole Required for an actual role change; checked in the mutation transaction.
+type UpdateUserRequestExpectedRole string
 
 // UpdateUserRequestRole defines model for UpdateUserRequest.Role.
 type UpdateUserRequestRole string
@@ -3566,13 +3665,16 @@ type UsageTrendPoint struct {
 
 // User defines model for User.
 type User struct {
-	CreatedAt   time.Time  `json:"createdAt"`
-	DisplayName string     `json:"displayName"`
-	Role        UserRole   `json:"role"`
-	Status      UserStatus `json:"status"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
-	UserId      UserId     `json:"userId"`
-	Username    string     `json:"username"`
+	CreatedAt   time.Time `json:"createdAt"`
+	DisplayName string    `json:"displayName"`
+
+	// PasswordConfigured Derived from existing password material. A configured password does not grant MEMBER access to the Admin Console.
+	PasswordConfigured *bool      `json:"passwordConfigured,omitempty"`
+	Role               UserRole   `json:"role"`
+	Status             UserStatus `json:"status"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	UserId             UserId     `json:"userId"`
+	Username           string     `json:"username"`
 }
 
 // UserRole defines model for User.Role.
@@ -4120,6 +4222,11 @@ type CreateUpstreamParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// DeleteUpstreamParams defines parameters for DeleteUpstream.
+type DeleteUpstreamParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // UpdateUpstreamParams defines parameters for UpdateUpstream.
 type UpdateUpstreamParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
@@ -4414,6 +4521,11 @@ type SetPasswordParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// SetUserRoleParams defines parameters for SetUserRole.
+type SetUserRoleParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // CreateBudgetTemplateJSONRequestBody defines body for CreateBudgetTemplate for application/json ContentType.
 type CreateBudgetTemplateJSONRequestBody = CreateBudgetTemplateRequest
 
@@ -4471,6 +4583,9 @@ type ChangeOwnPasswordJSONRequestBody = ChangeOwnPasswordRequest
 // CreateUpstreamJSONRequestBody defines body for CreateUpstream for application/json ContentType.
 type CreateUpstreamJSONRequestBody = CreateUpstreamRequest
 
+// DeleteUpstreamJSONRequestBody defines body for DeleteUpstream for application/json ContentType.
+type DeleteUpstreamJSONRequestBody = DeleteUpstreamRequest
+
 // UpdateUpstreamJSONRequestBody defines body for UpdateUpstream for application/json ContentType.
 type UpdateUpstreamJSONRequestBody = UpdateUpstreamRequest
 
@@ -4503,6 +4618,9 @@ type MutateAdminWorkspaceFileJSONRequestBody = WorkspaceFileMutation
 
 // SetPasswordJSONRequestBody defines body for SetPassword for application/json ContentType.
 type SetPasswordJSONRequestBody = SetPasswordRequest
+
+// SetUserRoleJSONRequestBody defines body for SetUserRole for application/json ContentType.
+type SetUserRoleJSONRequestBody = SetUserRoleRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -4663,6 +4781,9 @@ type ServerInterface interface {
 	// (POST /api/admin/v1/upstreams)
 	CreateUpstream(w http.ResponseWriter, r *http.Request, params CreateUpstreamParams)
 
+	// (DELETE /api/admin/v1/upstreams/{upstreamId})
+	DeleteUpstream(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId, params DeleteUpstreamParams)
+
 	// (GET /api/admin/v1/upstreams/{upstreamId})
 	GetUpstream(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId)
 
@@ -4773,6 +4894,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/users/{userId}:set-password)
 	SetPassword(w http.ResponseWriter, r *http.Request, userId UserId, params SetPasswordParams)
+
+	// (POST /api/admin/v1/users/{userId}:set-role)
+	SetUserRole(w http.ResponseWriter, r *http.Request, userId UserId, params SetUserRoleParams)
 
 	// (GET /api/admin/v1/workspace-operations/{operationId})
 	GetWorkspaceOperation(w http.ResponseWriter, r *http.Request, operationId WorkspaceOperationId)
@@ -5042,6 +5166,11 @@ func (_ Unimplemented) CreateUpstream(w http.ResponseWriter, r *http.Request, pa
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (DELETE /api/admin/v1/upstreams/{upstreamId})
+func (_ Unimplemented) DeleteUpstream(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId, params DeleteUpstreamParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/admin/v1/upstreams/{upstreamId})
 func (_ Unimplemented) GetUpstream(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -5224,6 +5353,11 @@ func (_ Unimplemented) EnableUser(w http.ResponseWriter, r *http.Request, userId
 
 // (POST /api/admin/v1/users/{userId}:set-password)
 func (_ Unimplemented) SetPassword(w http.ResponseWriter, r *http.Request, userId UserId, params SetPasswordParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/users/{userId}:set-role)
+func (_ Unimplemented) SetUserRole(w http.ResponseWriter, r *http.Request, userId UserId, params SetUserRoleParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -7696,6 +7830,60 @@ func (siw *ServerInterfaceWrapper) CreateUpstream(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateUpstream(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteUpstream operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUpstream(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "upstreamId" -------------
+	var upstreamId UpstreamId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "upstreamId", chi.URLParam(r, "upstreamId"), &upstreamId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "upstreamId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteUpstreamParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUpstream(w, r, upstreamId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10413,6 +10601,60 @@ func (siw *ServerInterfaceWrapper) SetPassword(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// SetUserRole operation middleware
+func (siw *ServerInterfaceWrapper) SetUserRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetUserRoleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetUserRole(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetWorkspaceOperation operation middleware
 func (siw *ServerInterfaceWrapper) GetWorkspaceOperation(w http.ResponseWriter, r *http.Request) {
 
@@ -10589,6 +10831,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}:set-password", wrapper.SetPassword)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}:set-role", wrapper.SetUserRole)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/enrollments", wrapper.CreateEnrollment)
 	})
 	r.Group(func(r chi.Router) {
@@ -10671,6 +10916,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/upstreams", wrapper.CreateUpstream)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/admin/v1/upstreams/{upstreamId}", wrapper.DeleteUpstream)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/upstreams/{upstreamId}", wrapper.GetUpstream)

@@ -35,6 +35,8 @@ builder 仍要求固定且干净的 Core、Portal、architecture，检查生成�
 
 包内 `UNVERIFIED_CANDIDATE` 和空 `verifiedAndroid` 表示**打包时未附机器校验的 Android 结果**，不表示已知不兼容；后续对应结论以引用该包摘要的发行记录为准。兼容记录与包分开保存，无须将包“转正”或重打；对外发布仍须满足原有发布/阶段要求。正式身份不可复用，未发布修订也须保全不同 commit/hash 的产物。
 
+内部未正式发布的 Preview 同版本更新仍固定新的源码 commit 和包 hash：在新的空输出位置构建，保留原包；Spark 可使用 `releases/<version>-<commit>` 区分部署目录，包内版本和平台基线不随目录后缀变化。切换与备份按[部署手册](s02-preview-deployment.md#11-升级)执行，现场记录必须区分同版本的具体构建。
+
 最小发行记录示意（尖括号必须换成真实值）：
 
 ```text

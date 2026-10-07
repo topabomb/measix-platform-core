@@ -77,6 +77,94 @@ describe('UpstreamsPage', () => {
     vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [], nextCursor: undefined })
   })
 
+  it.each([new TypeError('Connection closed'), new client.ApiProblem(502, 'http_error', 'Bad gateway')])('refreshes before reopening an unknown deletion and never replays it (%s)', async (failure) => {
+    const stream = { upstreamId: 'ups_unknown', name: 'Unknown connection', configRevision: 3, status: 'INACTIVE' }
+    let reads = 0
+    const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') throw failure
+      if (path.includes('/upstreams?')) return { items: [stream] }
+      reads++
+      return { ...stream, configRevision: reads + 3 }
+    })
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.findComponent(QItem).trigger('click')
+    await wrapper.get('[data-cy="delete-upstream-btn"]').trigger('click')
+    await flushPromises()
+    document.querySelector<HTMLButtonElement>('[data-cy="confirm-delete-upstream"]')!.click()
+    await flushPromises()
+    expect(document.body.textContent).toContain('The deletion result is unconfirmed.')
+    expect(document.querySelector<HTMLButtonElement>('[data-cy="confirm-delete-upstream"]')!.disabled).toBe(true)
+    const dialog = wrapper.findAllComponents(QDialog).find(item => item.props('modelValue') === true)!
+    dialog.vm.$emit('update:modelValue', false)
+    await flushPromises()
+    const beforeReopen = reads
+    await wrapper.get('[data-cy="delete-upstream-btn"]').trigger('click')
+    await flushPromises()
+    expect(reads).toBe(beforeReopen + 1)
+    expect(fetchSpy.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
+    document.querySelector<HTMLButtonElement>('[data-cy="confirm-delete-upstream"]')!.click()
+    await flushPromises()
+    const deletes = fetchSpy.mock.calls.filter(([, init]) => init?.method === 'DELETE')
+    expect(JSON.parse(deletes[1]![1]!.body as string)).toEqual({ expectedConfigRevision: reads + 3 })
+    wrapper.unmount()
+  })
+
+  it('reloads the selected revision before retrying a stale deletion', async () => {
+    const stream = { upstreamId: 'ups_stale', name: 'Changed connection', configRevision: 3, status: 'INACTIVE' }
+    const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') throw new client.ApiProblem(409, 'stale_upstream_config_revision', 'Changed')
+      if (path.includes('/upstreams?')) return { items: [stream] }
+      return { ...stream, configRevision: 4 }
+    })
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.findComponent(QItem).trigger('click')
+    await wrapper.get('[data-cy="delete-upstream-btn"]').trigger('click')
+    await flushPromises()
+    document.querySelector<HTMLButtonElement>('[data-cy="confirm-delete-upstream"]')!.click()
+    await flushPromises()
+    const reload = document.querySelector<HTMLButtonElement>('[data-cy="reload-delete-upstream"]')
+    expect(reload).not.toBeNull()
+    reload!.click()
+    await flushPromises()
+    expect(fetchSpy.mock.calls.some(([path]) => path === '/api/admin/v1/upstreams/ups_stale')).toBe(true)
+    document.querySelector<HTMLButtonElement>('[data-cy="confirm-delete-upstream"]')!.click()
+    await flushPromises()
+    const deletes = fetchSpy.mock.calls.filter(([, init]) => init?.method === 'DELETE')
+    expect(JSON.parse(deletes[1]![1]!.body as string)).toEqual({ expectedConfigRevision: 4 })
+  })
+
+  it('offers deletion of a connection and keeps the detail on a reference conflict', async () => {
+    const stream = { upstreamId: 'ups_delete', name: 'Unused connection', configRevision: 3, status: 'ACTIVE' }
+    const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') throw new client.ApiProblem(409, 'upstream_in_use', 'Referenced')
+      if (path.includes('/upstreams?')) return { items: [stream] }
+      return stream
+    })
+    const { wrapper, pinia } = mountUpstreamsPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+    const button = wrapper.find('[data-cy="delete-upstream-btn"]')
+    expect(button.exists()).toBe(true)
+    await button.trigger('click')
+    await flushPromises()
+    const submit = wrapper.findAllComponents(QBtn).find(btn => btn.attributes('data-cy') === 'confirm-delete-upstream')
+    expect(submit).toBeTruthy()
+    await submit!.trigger('click')
+    await flushPromises()
+    const call = fetchSpy.mock.calls.find(([, init]) => init?.method === 'DELETE')
+    expect(call?.[0]).toBe('/api/admin/v1/upstreams/ups_delete')
+    expect(JSON.parse(call![1]!.body as string)).toEqual({ expectedConfigRevision: 3 })
+    expect(wrapper.text()).toContain('Unused connection')
+    expect(wrapper.text()).toContain('referenced')
+    wrapper.unmount()
+  })
+
   it('does not suggest recovery after an upstream activation completes', async () => {
     const { wrapper, pinia } = mountUpstreamsPage()
     setupSession(pinia)

@@ -132,6 +132,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/users/{userId}:set-role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Change only the role with expectedRole protection and current administrator password verification. Initialize a missing password atomically when granting ADMIN. Revoke target Admin Web sessions on an actual role change. */
+        post: operations["setUserRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/users/{userId}/enrollments": {
         parameters: {
             query?: never;
@@ -480,7 +497,8 @@ export interface paths {
         get: operations["getUpstream"];
         put: operations["updateUpstream"];
         post?: never;
-        delete?: never;
+        /** @description Delete an unreferenced connection and its configuration revisions. Preserve Secrets, historical usage, immutable Releases and terminal Activation facts. */
+        delete: operations["deleteUpstream"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1521,6 +1539,8 @@ export interface components {
         User: {
             userId: components["schemas"]["UserId"];
             username: string;
+            /** @description Derived from existing password material. A configured password does not grant MEMBER access to the Admin Console. */
+            readonly passwordConfigured: boolean;
             displayName: string;
             /** @enum {string} */
             role: "ADMIN" | "MEMBER";
@@ -1536,18 +1556,49 @@ export interface components {
             displayName: string;
             /** @enum {string} */
             role: "ADMIN" | "MEMBER";
+            /** @description Required when creating ADMIN; verifies the acting administrator. */
+            currentPassword?: string;
+            /** @description Required when creating ADMIN; not accepted for MEMBER creation. */
+            newPassword?: string;
+            /** @description Required and equal to newPassword when creating ADMIN. */
+            confirmPassword?: string;
         };
         UpdateUserRequest: {
             username: string;
             displayName: string;
             /** @enum {string} */
             role: "ADMIN" | "MEMBER";
+            /**
+             * @description Required for an actual role change; checked in the mutation transaction.
+             * @enum {string}
+             */
+            expectedRole?: "ADMIN" | "MEMBER";
+            /** @description Required for an actual role change; verifies the acting administrator. */
+            currentPassword?: string;
+            /** @description Only for granting ADMIN to a user without a configured password. */
+            newPassword?: string;
+            confirmPassword?: string;
+        };
+        DeleteUpstreamRequest: {
+            expectedConfigRevision: number;
+        };
+        SetUserRoleRequest: {
+            /** @enum {string} */
+            role: "ADMIN" | "MEMBER";
+            /** @enum {string} */
+            expectedRole: "ADMIN" | "MEMBER";
+            currentPassword: string;
+            newPassword?: string;
+            confirmPassword?: string;
         };
         DeleteUserRequest: {
             confirmationUsername: string;
             reason: string;
         };
         SetPasswordRequest: {
+            /** @description The acting administrator's password, never the target's old password. */
+            currentPassword: string;
+            confirmPassword: string;
             newPassword: string;
         };
         ChangeOwnPasswordRequest: {
@@ -2547,6 +2598,7 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     changeOwnPassword: {
@@ -2632,6 +2684,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     deleteUser: {
@@ -2754,6 +2807,42 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+        };
+    };
+    setUserRole: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetUserRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
         };
     };
     createEnrollment: {
@@ -3622,6 +3711,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Upstream"];
                 };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    deleteUpstream: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                upstreamId: components["schemas"]["UpstreamId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteUpstreamRequest"];
+            };
+        };
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             400: components["responses"]["Problem"];
             401: components["responses"]["Problem"];

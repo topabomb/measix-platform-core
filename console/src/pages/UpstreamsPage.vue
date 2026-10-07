@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
-import { apiFetch, ApiProblem } from '../api/client'
+import { apiFetch, ApiProblem, commandResultUncertain } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -44,8 +44,60 @@ const createOpen = ref(false)
 const testing = ref(false)
 const applyConfirmOpen = ref(false)
 const applying = ref(false)
+const deleteOpen = ref(false)
+const deleting = ref(false)
+const deleteUncertain = ref(false)
+const deleteNeedsReload = ref(false)
 const testResult = ref<UpstreamTestResult>()
 const canMutate = computed(() => Boolean(session.csrfToken))
+
+async function beginDeleteUpstream() {
+  if (!selected.value || !canMutate.value || deleting.value) return
+  deleteNeedsReload.value = true
+  deleteOpen.value = true
+  await reloadDeleteTarget()
+}
+
+async function deleteUpstream() {
+  if (!selected.value || !session.csrfToken || deleting.value || deleteNeedsReload.value) return
+  const target = selected.value
+  deleting.value = true
+  deleteUncertain.value = false
+  error.value = undefined
+  try {
+    const body: components['schemas']['DeleteUpstreamRequest'] = { expectedConfigRevision: target.configRevision }
+    await apiFetch<void>(`/api/admin/v1/upstreams/${encodeURIComponent(target.upstreamId)}`, { method: 'DELETE', body: JSON.stringify(body) }, session.csrfToken)
+    deleteOpen.value = false
+    if (selected.value?.upstreamId === target.upstreamId) { selected.value = undefined; editMode.value = false }
+    await refresh()
+  } catch (cause) {
+    error.value = cause
+    deleteUncertain.value = commandResultUncertain(cause)
+    deleteNeedsReload.value = deleteUncertain.value || cause instanceof ApiProblem && cause.code === 'stale_upstream_config_revision'
+  } finally { deleting.value = false }
+}
+
+async function reloadDeleteTarget() {
+  if (!selected.value || deleting.value) return
+  const id = selected.value.upstreamId
+  deleting.value = true
+  deleteNeedsReload.value = true
+  try {
+    const current = await apiFetch<Upstream>(`/api/admin/v1/upstreams/${encodeURIComponent(id)}`)
+    if (selected.value?.upstreamId !== id) return
+    selected.value = current
+    deleteNeedsReload.value = false
+    deleteUncertain.value = false
+    error.value = undefined
+  } catch (cause) {
+    error.value = cause
+    if (cause instanceof ApiProblem && cause.status === 404) {
+      deleteOpen.value = false
+      if (selected.value?.upstreamId === id) { selected.value = undefined; editMode.value = false }
+      await refresh()
+    }
+  } finally { deleting.value = false }
+}
 
 // Editing state for existing upstream candidate
 const editMode = ref(false)
@@ -568,6 +620,7 @@ onBeforeUnmount(() => {
             </template>
             <q-btn outline color="secondary" :label="$t('upstreams.test')" :loading="testing" @click="testUpstream" data-cy="upstream-test-btn" />
             <q-btn outline color="positive" :loading="applying" :label="$t(candidateVsActive?.pending ? 'upstreams.apply' : 'upstreams.reapply')" @click="applyConfirmOpen = true" data-cy="upstream-apply-btn" />
+            <q-btn flat color="negative" :label="$t('upstreams.deleteConnection')" :disable="!canMutate || saving || applying || deleting" data-cy="delete-upstream-btn" @click="beginDeleteUpstream" />
           </div>
 
           <!-- Read-only or editable config -->
@@ -676,6 +729,14 @@ onBeforeUnmount(() => {
       </q-card>
       </template>
     </DetailWorkspace>
+
+    <q-dialog v-model="deleteOpen" :persistent="deleting">
+      <q-card v-if="selected" class="app-dialog app-dialog--sm" data-cy="delete-upstream-dialog">
+        <q-card-section><div class="text-h6">{{ $t('upstreams.deleteConnection') }}</div><div class="text-body2 q-mt-xs">{{ $t('upstreams.deleteHint', { name: selected.name }) }}</div></q-card-section>
+        <q-card-section><q-banner v-if="deleteUncertain" dense class="bg-orange-1">{{ $t('upstreams.deleteUncertain') }}</q-banner><ProblemBanner v-else :error="error" /></q-card-section>
+        <q-card-actions align="right"><q-btn flat :label="$t('common.cancel')" :disable="deleting" v-close-popup /><q-btn flat :label="$t('common.refresh')" :loading="deleting" data-cy="reload-delete-upstream" @click="reloadDeleteTarget" /><q-btn color="negative" :label="$t('upstreams.deleteConnection')" :disable="deleteNeedsReload || !canMutate" :loading="deleting" data-cy="confirm-delete-upstream" @click="deleteUpstream" /></q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <q-dialog v-model="applyConfirmOpen">
       <q-card class="app-dialog app-dialog--sm">

@@ -604,7 +604,7 @@ func optionalString(value string) *string {
 }
 
 func userView(row *ent.User) UserView {
-	return UserView{ID: row.ID, Username: row.Username, DisplayName: row.DisplayName, Role: row.Role, Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return UserView{ID: row.ID, Username: row.Username, DisplayName: row.DisplayName, Role: row.Role, Status: row.Status, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, PasswordConfigured: row.PasswordHash != nil && *row.PasswordHash != ""}
 }
 
 func deviceView(row *ent.Device) DeviceView {

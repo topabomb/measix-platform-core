@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/hub/identity"
 	"measix/platform/internal/hub/runtimecontrol"
 	"measix/platform/internal/wire/adminapi"
 )
@@ -303,6 +304,8 @@ func entNotFoundActivation(err error) bool { return runtimecontrol.IsActivationN
 
 func writeRuntimeControlError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, identity.ErrCurrentAdmin), errors.Is(err, identity.ErrLastAdmin), errors.Is(err, identity.ErrNotAuthorized), errors.Is(err, identity.ErrDeletionInProgress):
+		writeIdentityError(w, err)
 	case errors.Is(err, runtimecontrol.ErrIdempotencyConflict):
 		writeProblem(w, http.StatusConflict, "idempotency_conflict", "Idempotency conflict")
 	case errors.Is(err, runtimecontrol.ErrActivationInProgress):

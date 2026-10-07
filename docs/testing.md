@@ -56,7 +56,7 @@ Node 端口分配统一走 harness，排除 Fetch-blocked ports；探测有界�
 
 ## 浏览器与 Android 专项
 
-`make s01-browser-candidate` 构建生产 SPA 后执行唯一 `node scripts/e2e-harness.mjs`。同一隔离 DB/Hub/Relay/Adapter 中依次进行 authoring/publish、MCP、五类 Runtime、Usage/System、topology 和 Admin 路由 review；不能拼接不同环境的通过结果证明业务闭环。
+`make s01-browser-candidate` 构建生产 SPA 后执行唯一 `node scripts/e2e-harness.mjs`。同一隔离 DB/Hub/Relay/Adapter 中依次进行 authoring/publish、MCP、五类 Runtime、Usage/System、topology、Admin 路由 review 和账号/无引用上游删除；不能拼接不同环境的通过结果证明业务闭环。`console/e2e/admin-accounts.spec.ts` 覆盖创建管理员、无密码晋升、他人密码重设、撤销后再次授予不会复活旧 Cookie、真实并发角色冲突刷新后的提示、保留发布引用保护，以及桌面/390px 的操作对话框。
 
 Harness 保存所服务 SPA 的固定副本与 build hash，避免共享 dist 重建导致混合 chunks。`e2e-admin-build.json` 绑定本次页面构建；默认 Playwright JSON 为 `.artifacts/e2e-playwright.json`，失败留 trace。手工检查用 `node scripts/e2e-harness.mjs --keep --manual`，登录资料只写隔离私有目录；按提示继续后才执行后续自动阶段。
 

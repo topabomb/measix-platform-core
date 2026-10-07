@@ -12,6 +12,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { h } from 'vue'
 import UsersPage from './UsersPage.vue'
+import AdminAccountDialog from '../components/AdminAccountDialog.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusChip from '../components/StatusChip.vue'
 import { useSessionStore } from '../stores/session'
@@ -26,7 +27,7 @@ vi.mock('qrcode', () => ({
   },
 }))
 
-function mountUsersPage() {
+function mountUsersPage(attach = false) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const router = createRouter({
@@ -43,6 +44,7 @@ function mountUsersPage() {
       },
     },
     {
+      attachTo: attach ? document.body : undefined,
       global: {
         plugins: [[Quasar, {
           components: {
@@ -72,7 +74,93 @@ function setupSession(pinia: ReturnType<typeof createPinia>) {
 
 describe('UsersPage', () => {
   beforeEach(() => {
+    vi.restoreAllMocks()
     vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [], nextCursor: undefined })
+  })
+
+  it('keeps the role conflict visible after refreshing the target and list', async () => {
+    const user = { userId: 'usr_target', username: 'target', displayName: 'Target', role: 'MEMBER', status: 'ACTIVE', passwordConfigured: true }
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/users/usr_target') return user
+      if (path.includes('/users?')) return { items: [user] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="user-row"]').trigger('click')
+    const page = wrapper.findComponent(UsersPage)
+    await (page.vm as unknown as { beginAccountManagement: (mode: 'role') => Promise<void> }).beginAccountManagement('role')
+    page.findComponent(AdminAccountDialog).vm.$emit('conflict', user.userId, new client.ApiProblem(409, 'user_role_conflict', 'Role changed'))
+    await flushPromises()
+    expect(wrapper.text()).toContain('Someone changed this account’s role.')
+    wrapper.unmount()
+  })
+
+  it('keeps the first requested action while its account refresh is pending', async () => {
+    const user = { userId: 'usr_target', username: 'target', displayName: 'Target', role: 'MEMBER', status: 'ACTIVE', passwordConfigured: true }
+    let resolveUser!: (value: typeof user) => void
+    const pendingUser = new Promise<typeof user>(resolve => { resolveUser = resolve })
+    const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/users/usr_target') return pendingUser
+      if (path.includes('/users?')) return { items: [user] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="user-row"]').trigger('click')
+    const page = wrapper.findComponent(UsersPage)
+    const vm = page.vm as unknown as { beginAccountManagement: (mode: 'role' | 'password') => Promise<void> }
+    const roleOpen = vm.beginAccountManagement('role')
+    const passwordOpen = vm.beginAccountManagement('password')
+    resolveUser(user)
+    await Promise.all([roleOpen, passwordOpen])
+    await flushPromises()
+    expect(fetchSpy.mock.calls.filter(([path]) => path === '/api/admin/v1/users/usr_target')).toHaveLength(1)
+    expect(page.findComponent(AdminAccountDialog).props('mode')).toBe('role')
+    wrapper.unmount()
+  })
+
+  it('never turns a grant action into removal when the role changed during opening', async () => {
+    const user = { userId: 'usr_target', username: 'target', displayName: 'Target', role: 'MEMBER', status: 'ACTIVE', passwordConfigured: true }
+    let changed = false
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/users/usr_target') return { ...user, role: 'ADMIN' }
+      if (path.includes('/users?')) return { items: [{ ...user, role: changed ? 'ADMIN' : 'MEMBER' }] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="user-row"]').trigger('click')
+    changed = true
+    const page = wrapper.findComponent(UsersPage)
+    await (page.vm as unknown as { beginAccountManagement: (mode: 'role') => Promise<void> }).beginAccountManagement('role')
+    await flushPromises()
+    expect(page.findComponent(AdminAccountDialog).exists()).toBe(false)
+    expect(wrapper.text()).toContain('Someone changed this account’s role.')
+    expect(wrapper.get('[data-cy="user-detail"]').text()).toContain('Admin')
+    wrapper.unmount()
+  })
+
+
+  it('offers password reset and administrator assignment for another user', async () => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.includes('/devices')) return { items: [] }
+      if (path.startsWith('/api/admin/v1/users')) return { items: [{ userId: 'usr_target', username: 'target', displayName: 'Target', role: 'MEMBER', status: 'ACTIVE', passwordConfigured: false }] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage(true)
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.find('[data-cy="user-row"]').trigger('click')
+    await flushPromises()
+    wrapper.find('[data-cy="user-detail"]').findComponent(QBtnDropdown).vm.show()
+    await flushPromises()
+    await vi.waitFor(() => expect(document.querySelector('[data-cy="set-user-password"]')).not.toBeNull())
+    expect(document.querySelector('[data-cy="set-user-role"]')).not.toBeNull()
+    wrapper.unmount()
   })
 
   it('renders a user list with display name, role and status', async () => {

@@ -186,10 +186,13 @@ if (!existsSync(artifactsDir)) {
 //   Phase D: golden-path-usage.spec.ts (usage, system, persistence, logout)
 let exitCode = 1
 
+const playwrightReports = []
+
 async function runPlaywrightSpec(specFile, phaseName) {
   // Each phase writes to its own temp JSON file to avoid overwriting.
   // Results are merged into e2e-playwright.json at the end.
   const tempOutput = join(artifactsDir, `_e2e-${phaseName}.json`)
+  playwrightReports.push(tempOutput)
   const phaseEnv = {
     ...e2eEnv,
     PLAYWRIGHT_JSON_OUTPUT_FILE: tempOutput,
@@ -597,6 +600,9 @@ try {
   log('Phase F: all Admin routes, responsive layout and input guards...')
   const phaseF = await runPlaywrightSpec('e2e/admin-console-review.spec.ts', 'admin-review')
   if (phaseF !== 0) throw new Error(`Admin review failed (exit ${phaseF})`)
+
+  const accounts = await runPlaywrightSpec('e2e/admin-accounts.spec.ts', 'admin-accounts')
+  if (accounts !== 0) throw new Error(`Admin account and upstream verification failed (exit ${accounts})`)
   log('Phase F PASSED')
 
   exitCode = 0
@@ -610,13 +616,7 @@ try {
   try { worker.terminate() } catch {}
 
   // Merge per-phase Playwright JSON results into the final artifact
-  const tempFiles = [
-    join(artifactsDir, '_e2e-authoring.json'),
-    join(artifactsDir, '_e2e-mcp.json'),
-    join(artifactsDir, '_e2e-usage.json'),
-    join(artifactsDir, '_e2e-topology.json'),
-    join(artifactsDir, '_e2e-admin-review.json'),
-  ].filter(f => existsSync(f))
+  const tempFiles = playwrightReports.filter(f => existsSync(f))
   if (tempFiles.length === 0) {
     // Writing meta without a refreshed artifact would let a stale
     // e2e-playwright.json be presented as evidence for this run.

@@ -230,16 +230,18 @@ sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$backup" "$MEASIX_ROOT/curr
 
 ## 11. 升级
 
-1. 解压新 release 并校验 SHA256；
+1. 解压新 release 并校验 SHA256；同版本修订使用独立的 `releases/<version>-<commit>` 目录，保留原包与原 release，不能原地覆盖运行文件；
 2. 使用旧 release 创建并验证备份；
 3. `sudo pm2 stop measix-hub measix-relay`，不得停止其他 PM2 app；
 4. 用新 binary 执行 `migrate` 和 `check`；
 5. 从新 release 安装新的 `$MEASIX_ROOT/run.sh` 与 `$MEASIX_ROOT/ecosystem.config.cjs`；
 6. 原子切换 `current`；
-7. `sudo pm2 startOrReload "$MEASIX_ROOT/ecosystem.config.cjs"`，然后 `sudo pm2 save`；
-8. 执行第 7–9 节验收；确认完成后删除 staging 和旧 release，只保留当前 release 与最近一次已验证数据备份。
+7. 依次 `sudo pm2 startOrReload "$MEASIX_ROOT/ecosystem.config.cjs" --only measix-hub` 和 `--only measix-relay`，然后 `sudo pm2 save`；
+8. 执行第 7–9 节验收；更新私有现场记录中的源码 commit、包 hash、实际目录和备份位置。保留已验证的备份及其对应旧程序恢复链，临时 staging 的清理不得破坏仍受支持数据的恢复能力。
 
 `config/public-origin` 属于持久配置，升级不得被模板覆盖。新增 optional 配置不提升 config version；required 配置或语义改变必须提供明确转换步骤。
+
+没有 SQL 迁移的程序更新直接保留现有 Hub DB、Relay spool、配置和密钥，仅切换程序目录。需要可无损回退时，先阻断外部新连接，验收通过后再开放；开放并接受新请求后，不得直接恢复旧数据库而丢弃新写入或已轮换的客户端凭据。
 
 ## 12. 数据恢复（不依赖旧版回退）
 

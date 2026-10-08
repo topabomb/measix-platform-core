@@ -47,7 +47,9 @@ SQLite connections remain owned by `internal/common/sqliteutil`. Relay spool sch
 
 000004 保存 generation 高水位、独立保留规则与有界清理审计，并为保留版本增加差异摘要缓存。迁移从所有 Release、Activation target 和当前 generation 初始化高水位；从原 Snapshot 为全部 admission（含待核对请求）补录资源名称。后续 admission 在同一事务记录名称，不依赖可清理的发布记录。迁移不改现存发布内容、Snapshot/hash、用量或结算字节。
 
-升级前须保留原包与完整备份；旧 binary 不接受 schema 4，回退需恢复迁移前备份，不能只切换 binary。清理移除逻辑发布数据，SQLite 空闲页供后续写入复用，不在在线服务中执行 VACUUM。升级与名称/编号保全由 `migrations/release_history_upgrade_test.go` 验证。
+000005 将 budget_requests、request_usages 和 pricing_rules 的 upstreamId 保留为历史归属 ID，解除它们对 operational 上游行的外键依赖。其余外键、互斥目标校验、索引及用量自增高水位保留；迁移逐列复制原值，并验证完整外键图后提交。删除连接不改历史准入、结算、用量和定价数据，迟到结算仍引用原 admission。带实际迁移结构的删除及字节保全由 `migrations/upstream_history_upgrade_test.go` 验证，不能仅以 Ent 临时测试结构证明生产外键行为。
+
+升级前须保留原包与完整备份；旧 binary 不接受 schema 5，回退需恢复对应迁移前备份，不能只切换 binary。清理移除逻辑发布数据，SQLite 空闲页供后续写入复用，不在在线服务中执行 VACUUM。发布名称/编号保全由 `migrations/release_history_upgrade_test.go` 验证。
 
 
 ## 远程工作区迁移

@@ -31,6 +31,17 @@ or reinterpret old attribution. The persistence transition is documented in
 
 ## Read models and UI
 
+- Pricing updates validate the expected revision inside the SQLite write transaction;
+  the response is the set committed by that transaction, not a later concurrent edit.
+- The panel keeps the list readable and edits one rule in a dialog. Resource options
+  reuse the saved enterprise draft and existing paged picker; retained rules preserve
+  historical IDs even when their operational objects are gone. Scope, compatible
+  meters, unit price and local effective interval are reviewed before full-set PUT.
+  Local date editing preserves milliseconds and the exclusive end boundary; unit
+  sizes accept the existing `k`/`M` shorthand without converting prices to floats.
+  Failed writes require a refresh before another submission; an existing rule is
+  reloaded into the editor so a new revision cannot authorize an old form silently.
+
 - Use one bounded cursor scan over filtered request facts with a batch join to the
   current semantic revision. Reuse the same evaluator for global summary, daily
   trend, resource/protocol distribution, and request list/detail.

@@ -180,6 +180,8 @@ Runtime Problem 提供结构化 budget 上下文（能力、资源、阻断指�
 
 ## 7. Admin 与 Portal 页面落地
 
+待核对分页支持勾选本页后批量确认，复用每条请求的既有 `:resolve` 命令和审计事务；不增加批量接口或跨请求事务。确认前展示所选请求并要求说明，逐条处理后分别显示成功、失败与未执行；网络/服务端结果未知时停止剩余命令并刷新，不自动重试。刷新或翻页清除选择，执行期间禁用重复确认和翻页。列表突出缺失的业务计量和已观测业务量，`REQUESTS=1` 留在请求详情解释调用事实，不再逐行重复。
+
 Admin 在 UsersPage 用户详情提供“用量与额度”：MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力先选择无限/有限，有限模式编辑自然周期及累计规则，显示已用/在途/剩余/恢复、阻断原因和变更历史。图片只提供 REQUESTS/REQUESTED_IMAGES。默认无限、限额模板与用户覆盖由服务端配置来源区分；无限仍展示用量，零为禁用该指标额度。历史图表时间筛选与当前额度卡分开，不提供资源级预算。
 
 一级 `Budget Templates` 位于 Users 与 Resources 之间，复用同一个 `BudgetRuleEditor`。一个用户最多指派一个 live-linked 模板；显式能力覆盖优先，清除覆盖恢复模板/默认，解除模板保留显式覆盖。模板修改在单事务中更新所有指派用户的未覆盖能力；被指派模板禁止删除。模板名称、ID、revision、assignment 和详细来源只出现在 Admin API/UI，不能进入 Client、Portal、Snapshot、Runtime 或 Android。

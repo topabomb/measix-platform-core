@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"measix/platform/ent"
 	"measix/platform/pkg/platformid"
 )
 
@@ -29,6 +30,11 @@ func (s *Service) PricingSet(ctx context.Context) (int, []PricingRuleRecord, err
 	if err != nil {
 		return 0, nil, err
 	}
+	rules := pricingRecords(rows)
+	return pricingRevision(rules), rules, nil
+}
+
+func pricingRecords(rows []*ent.PricingRule) []PricingRuleRecord {
 	rules := make([]PricingRuleRecord, 0, len(rows))
 	for _, row := range rows {
 		rules = append(rules, PricingRuleRecord{
@@ -38,17 +44,10 @@ func (s *Service) PricingSet(ctx context.Context) (int, []PricingRuleRecord, err
 		})
 	}
 	sort.Slice(rules, func(i, j int) bool { return rules[i].ID < rules[j].ID })
-	return pricingRevision(rules), rules, nil
+	return rules
 }
 
 func (s *Service) ReplacePricingSet(ctx context.Context, expectedRevision int, rules []PricingRuleRecord) (int, []PricingRuleRecord, error) {
-	currentRevision, _, err := s.PricingSet(ctx)
-	if err != nil {
-		return 0, nil, err
-	}
-	if currentRevision != expectedRevision {
-		return 0, nil, ErrPricingRevisionConflict
-	}
 	seen := map[string]struct{}{}
 	for _, rule := range rules {
 		if err := validatePricingRecord(rule); err != nil {
@@ -65,6 +64,13 @@ func (s *Service) ReplacePricingSet(ctx context.Context, expectedRevision int, r
 		return 0, nil, err
 	}
 	defer tx.Rollback()
+	current, err := tx.PricingRule.Query().All(ctx)
+	if err != nil {
+		return 0, nil, err
+	}
+	if pricingRevision(pricingRecords(current)) != expectedRevision {
+		return 0, nil, ErrPricingRevisionConflict
+	}
 	if _, err := tx.PricingRule.Delete().Exec(ctx); err != nil {
 		return 0, nil, err
 	}
@@ -83,10 +89,15 @@ func (s *Service) ReplacePricingSet(ctx context.Context, expectedRevision int, r
 			return 0, nil, err
 		}
 	}
+	stored, err := tx.PricingRule.Query().All(ctx)
+	if err != nil {
+		return 0, nil, err
+	}
+	result := pricingRecords(stored)
 	if err := tx.Commit(); err != nil {
 		return 0, nil, err
 	}
-	return s.PricingSet(ctx)
+	return pricingRevision(result), result, nil
 }
 
 func validatePricingRecord(rule PricingRuleRecord) error {

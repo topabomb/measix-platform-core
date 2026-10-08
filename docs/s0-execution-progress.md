@@ -60,7 +60,7 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 | 归档 SHA-256 | `09f333bb49e789ae3181f0a72f87b917d58e5865138e833e9837f78f4edbfb61` |
 | buildHash / baselineHash | `sha256:cb8bcd87f85bcd34f892c57e527d9f46a662e18fc226aa691f4d291ebfdd6855` / `sha256:389b429ae51eb8d8cfbbf927c028ad298b0e1471edb668b86e28cb778224804b` |
 
-新归档为 `.artifacts/releases/measix-core-0.2.0-preview.23-linux-arm64-candidate.tar.gz`，分类仍是 `UNVERIFIED_CANDIDATE`。完整 Go 测试/vet、Console 300 项及 Portal 101 项测试、类型检查/构建、生成漂移与 11 项真实 Hub/Relay/生产 SPA 浏览器用例通过。新增用例覆盖零/一/多发现连接、版本诊断、空强制集合和无人绑定的 enabled MCP 发布/投影；原 v4 bytes/hash 与恢复回归通过。
+原归档保存在 `.artifacts/releases/measix-core-0.2.0-preview.23-linux-arm64-candidate-a144405.tar.gz`，分类仍是 `UNVERIFIED_CANDIDATE`。完整 Go 测试/vet、Console 300 项及 Portal 101 项测试、类型检查/构建、生成漂移与 11 项真实 Hub/Relay/生产 SPA 浏览器用例通过。新增用例覆盖零/一/多发现连接、版本诊断、空强制集合和无人绑定的 enabled MCP 发布/投影；原 v4 bytes/hash 与恢复回归通过。
 
 现场包与全部文件摘要匹配，Hub/Relay 实际进程指向该构建；迁移 5→5、应用 0 项，完整性及外键检查通过。停服前草稿、4 份发布原始正文/快照、所有表记录数、配置/密钥和原 active generation 30 保全，9 个无关 PM2 进程 PID 不变。公共 HTTPS 的 Admin/Portal/Discovery/readiness 与内部路径隔离通过；生产 Admin 使用真实工作区连接成功发现 5 个工具，仅更新目录证据，未发布配置。证据在 `.artifacts/mcp-delivery-20261008/` 及私有现场记录。
 

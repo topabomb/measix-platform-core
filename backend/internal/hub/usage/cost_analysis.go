@@ -191,7 +191,11 @@ func priceRequest(view RequestView, rules []*ent.PricingRule) (CostBreakdown, er
 		if err := charge("REQUESTED_IMAGES", nil); err != nil {
 			return result, err
 		}
-	case ResourceKindTTS, ResourceKindASR:
+	case ResourceKindASR:
+		if err := charge("AUDIO_SECONDS", nil); err != nil {
+			return result, err
+		}
+	case ResourceKindTTS:
 		for _, meter := range []string{"CHARACTERS", "AUDIO_SECONDS"} {
 			if err := charge(meter, nil); err != nil {
 				return result, err

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { apiFetch } from '../api/client'
+import { ApiProblem, apiFetch, commandResultUncertain } from '../api/client'
 import { useCursorPager } from '../composables/useCursorPager'
 import CursorPager from './CursorPager.vue'
 import type { PricingMeter, ReconciliationPage, ReconciliationView, ResolveReconciliationRequest } from '../api/usageBudget'
@@ -25,12 +25,37 @@ const session = useSessionStore()
 const listPath = ref('/api/admin/v1/usage/reconciliations?limit=50')
 const { items, nextCursor, pageNumber, loading, error, reset: load, nextPage, previousPage } = useCursorPager<ReconciliationView, ReconciliationPage>(listPath, path => apiFetch<ReconciliationPage>(path))
 const resolving = ref(false)
-const selected = ref<ReconciliationView>()
+const selectedIds = ref<string[]>([])
+const targets = ref<ReconciliationView[]>([])
+const bulkReview = ref(false)
+const selectedPage = computed(() => items.value.filter(item => item.state === 'PENDING' && selectedIds.value.includes(item.requestId)))
+const completed = ref(false)
+const uncertain = ref(false)
+const outcomes = ref<Array<{ item: ReconciliationView; status: 'success' | 'failed' | 'remaining'; error?: unknown }>>([])
+const resultCounts = computed(() => ({ success: outcomes.value.filter(item => item.status === 'success').length, failed: outcomes.value.filter(item => item.status === 'failed').length, remaining: outcomes.value.filter(item => item.status === 'remaining').length }))
+let mounted = true
 const detail = ref<ReconciliationView>()
 const dialogOpen = ref(false)
 const reason = ref('')
 
-const canResolve = computed(() => Boolean(session.csrfToken && selected.value && reason.value.trim()))
+const canResolve = computed(() => Boolean(session.csrfToken && targets.value.length && reason.value.trim() && !completed.value && !resolving.value))
+const allSelected = computed({
+  get: () => Boolean(selectedPage.value.length && selectedPage.value.length === items.value.filter(item => item.state === 'PENDING').length),
+  set: (value: boolean) => { selectedIds.value = value ? items.value.filter(item => item.state === 'PENDING').map(item => item.requestId) : [] },
+})
+watch(items, () => { selectedIds.value = selectedIds.value.filter(id => items.value.some(item => item.requestId === id && item.state === 'PENDING')) })
+onBeforeUnmount(() => { mounted = false })
+
+function observedBusiness(item: ReconciliationView) { return item.observed.filter(meter => meter.meter !== 'REQUESTS') }
+function incompleteMeters(item: ReconciliationView): string {
+  const semantic = item.request?.semanticMeters ?? []
+  const business = semantic.filter(meter => meter.meter !== 'REQUESTS' && (meter.meter !== 'TOTAL_TOKENS' || !semantic.some(other => other.meter === 'INPUT_TOKENS')))
+  let meters: PricingMeter[] = business.filter(meter => meter.confidence !== 'EXACT').map(meter => meter.meter)
+  if (!business.length && !observedBusiness(item).length && item.forwarded !== false) {
+    meters = item.capability === 'MODEL' ? ['INPUT_TOKENS', 'OUTPUT_TOKENS'] : item.capability === 'ASR' ? ['AUDIO_SECONDS'] : item.capability === 'TTS' ? ['CHARACTERS'] : item.capability === 'IMAGE_GENERATION' ? ['REQUESTED_IMAGES'] : []
+  }
+  return meters.map(meter => $t('usage.meters.' + meter)).join(' / ')
+}
 
 function meterValue(quantity: string, meter: PricingMeter): string {
   return formatMeter(quantity, meter, locale.value, unitLabels.value)
@@ -48,14 +73,29 @@ function errorClassText(value: string): string {
 }
 
 async function refresh() {
+  selectedIds.value = []
   await load()
   if (!error.value && detail.value && !items.value.some(item => item.requestId === detail.value?.requestId)) detail.value = undefined
 }
 
 function openResolve(item: ReconciliationView) {
-  selected.value = item
+  openReviews([item])
+}
+
+function openReviews(rows: ReconciliationView[], bulk = false) {
+  bulkReview.value = bulk
+  targets.value = [...rows]
   reason.value = ''
+  outcomes.value = []
+  completed.value = false
+  uncertain.value = false
   dialogOpen.value = true
+}
+
+async function turnPage(next: boolean) {
+  selectedIds.value = []
+  detail.value = undefined
+  await (next ? nextPage() : previousPage())
 }
 
 function openDetail(item: ReconciliationView) {
@@ -71,24 +111,31 @@ function resourceName(item: ReconciliationView): string {
 }
 
 async function resolve() {
-  if (!selected.value || !session.csrfToken || !canResolve.value) return
+  if (!session.csrfToken || !canResolve.value) return
   resolving.value = true
-  error.value = undefined
+  const csrf = session.csrfToken
+  const request: ResolveReconciliationRequest = { expectedState: 'PENDING', action: 'RELEASE_UNCERTAIN', reason: reason.value.trim() }
+  outcomes.value = targets.value.map(item => ({ item, status: 'remaining' }))
   try {
-    const request: ResolveReconciliationRequest = {
-      expectedState: 'PENDING',
-      action: 'RELEASE_UNCERTAIN',
-      reason: reason.value.trim(),
+    for (const outcome of outcomes.value) {
+      if (!mounted) break
+      try {
+        await apiFetch<ReconciliationView>(`/api/admin/v1/usage/reconciliations/${outcome.item.requestId}:resolve`, { method: 'POST', body: JSON.stringify(request) }, csrf)
+        outcome.status = 'success'
+        items.value = items.value.filter(item => item.requestId !== outcome.item.requestId)
+        if (detail.value?.requestId === outcome.item.requestId) detail.value = undefined
+      } catch (cause) {
+        outcome.status = 'failed'
+        outcome.error = cause
+        if (commandResultUncertain(cause) || cause instanceof ApiProblem && (cause.status === 401 || cause.status === 403)) {
+          uncertain.value = commandResultUncertain(cause)
+          break
+        }
+      }
     }
-    await apiFetch<ReconciliationView>(`/api/admin/v1/usage/reconciliations/${selected.value.requestId}:resolve`, {
-      method: 'POST',
-      body: JSON.stringify(request),
-    }, session.csrfToken)
-    dialogOpen.value = false
-    if (detail.value?.requestId === selected.value.requestId) detail.value = undefined
-    await refresh()
-  } catch (cause) {
-    error.value = cause
+    completed.value = true
+    if (!bulkReview.value && targets.value.length === 1 && resultCounts.value.success === 1) dialogOpen.value = false
+    if (mounted) await refresh()
   } finally {
     resolving.value = false
   }
@@ -106,7 +153,12 @@ onMounted(refresh)
             <div class="text-subtitle1">{{ $t('usage.reconciliation.title') }}</div>
             <div class="text-caption text-grey-7">{{ $t('usage.reconciliation.subtitle') }}</div>
           </div>
-          <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
+          <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" :disable="resolving" @click="refresh" />
+        </q-card-section>
+        <q-card-section v-if="items.length" class="row items-center q-gutter-sm q-py-xs">
+          <q-checkbox v-model="allSelected" :label="$t('usage.reconciliation.selectPage')" :disable="loading || resolving" data-cy="reconciliation-select-page" />
+          <span class="text-caption">{{ $t('usage.reconciliation.selection', { count: selectedPage.length }) }}</span>
+          <q-btn outline color="primary" :label="$t('usage.reconciliation.batchResolve')" :disable="!selectedPage.length || loading || resolving" @click="openReviews(selectedPage, true)" data-cy="reconciliation-batch-btn" />
         </q-card-section>
         <ProblemBanner :error="error" class="q-mx-md q-mb-sm" />
         <LoadingState v-if="loading && !items.length" />
@@ -120,6 +172,9 @@ onMounted(refresh)
             data-cy="reconciliation-row"
             @click="openDetail(item)"
           >
+            <q-item-section side>
+              <q-checkbox v-model="selectedIds" :val="item.requestId" :aria-label="$t('usage.reconciliation.selectRequest', { resource: resourceName(item) })" :disable="loading || resolving || item.state !== 'PENDING'" data-cy="reconciliation-select" @click.stop />
+            </q-item-section>
             <q-item-section>
               <q-item-label class="row items-center q-gutter-xs">
                 <span class="text-weight-medium">{{ resourceName(item) }}</span>
@@ -147,13 +202,15 @@ onMounted(refresh)
                 <q-chip v-if="item.upstreamHttpStatus && item.upstreamHttpStatus !== item.httpStatus" dense class="text-grey-8">{{ $t('usage.reconciliation.upstream') }} {{ item.upstreamHttpStatus }}</q-chip>
               </div>
               <div class="row q-gutter-xs q-mt-xs">
-                <q-chip v-for="meter in item.observed" :key="`observed:${meter.meter}`" dense outline color="primary">
+                <q-chip v-for="meter in observedBusiness(item)" :key="`observed:${meter.meter}`" dense outline color="primary">
                   {{ $t('usage.reconciliation.observed') }} {{ $t(`usage.meters.${meter.meter}`) }}: {{ meterValue(meter.quantity, meter.meter) }}
                 </q-chip>
                 <q-chip v-for="meter in item.reservation" :key="`reserved:${meter.meter}`" dense outline color="grey-7">
                   {{ $t('usage.reconciliation.reserved') }} {{ $t(`usage.meters.${meter.meter}`) }}: {{ meterValue(meter.quantity, meter.meter) }}
                 </q-chip>
               </div>
+              <q-item-label v-if="incompleteMeters(item)" caption class="text-negative q-mt-xs">{{ $t('usage.reconciliation.missingMeters', { meters: incompleteMeters(item) }) }}</q-item-label>
+              <q-item-label v-if="!observedBusiness(item).length" caption class="q-mt-xs">{{ $t('usage.reconciliation.noReliableUsage') }}</q-item-label>
             </q-item-section>
             <q-item-section side>
               <q-icon v-if="item.request" name="chevron_right" color="grey-6" />
@@ -162,7 +219,7 @@ onMounted(refresh)
           </q-item>
         </q-list>
         <q-card-section v-else class="text-grey-7">{{ $t('usage.reconciliation.empty') }}</q-card-section>
-        <CursorPager :page="pageNumber" :count="items.length" :has-next="Boolean(nextCursor)" :loading="loading" @previous="previousPage" @next="nextPage" />
+        <CursorPager :page="pageNumber" :count="items.length" :has-next="Boolean(nextCursor)" :loading="loading || resolving" @previous="turnPage(false)" @next="turnPage(true)" />
       </q-card>
     </template>
 
@@ -173,7 +230,7 @@ onMounted(refresh)
           <div class="text-body2 q-mt-xs">{{ reasonText(detail.reconciliationReason) }}</div>
           <div class="text-caption text-grey-7 q-mt-xs text-break">{{ detail.requestId }}</div>
           <div class="row q-gutter-xs q-mt-sm">
-            <q-chip v-for="meter in detail.observed" :key="`detail-observed:${meter.meter}`" dense outline color="primary">
+            <q-chip v-for="meter in observedBusiness(detail)" :key="`detail-observed:${meter.meter}`" dense outline color="primary">
               {{ $t('usage.reconciliation.observed') }} {{ $t(`usage.meters.${meter.meter}`) }}: {{ meterValue(meter.quantity, meter.meter) }}
             </q-chip>
             <q-chip v-for="meter in detail.reservation" :key="`detail-reserved:${meter.meter}`" dense outline color="grey-7">
@@ -191,15 +248,28 @@ onMounted(refresh)
   <q-dialog v-model="dialogOpen" persistent>
     <q-card class="reconciliation-dialog" data-cy="reconciliation-dialog">
       <q-card-section>
-        <div class="text-h6">{{ $t('usage.reconciliation.resolveTitle') }}</div>
+        <div class="text-h6">{{ targets.length > 1 ? $t('usage.reconciliation.batchTitle', { count: targets.length }) : $t('usage.reconciliation.resolveTitle') }}</div>
         <div class="text-body2 text-grey-7 q-mt-xs">{{ $t('usage.reconciliation.resolveWarning') }}</div>
       </q-card-section>
+      <q-card-section v-if="targets.length" class="q-pt-none">
+        <div v-if="resolving">{{ $t('usage.reconciliation.batchProgress', { done: resultCounts.success + resultCounts.failed, total: targets.length }) }}</div>
+        <div v-if="completed" role="status">{{ $t('usage.reconciliation.batchResult', resultCounts) }}</div>
+        <div v-if="uncertain" class="text-negative q-mt-sm">{{ $t('usage.reconciliation.batchUncertain') }}</div>
+        <q-list class="reconciliation-preview" separator>
+          <q-item v-for="item in targets" :key="item.requestId">
+            <q-item-section><q-item-label>{{ resourceName(item) }} · {{ identity(item) }}</q-item-label><q-item-label caption>{{ new Date(item.request?.startedAt || item.startedAt || item.admittedAt).toLocaleString() }}</q-item-label>
+              <ProblemBanner v-if="completed" :error="outcomes.find(outcome => outcome.item.requestId === item.requestId)?.error" />
+            </q-item-section>
+            <q-item-section v-if="completed" side>{{ $t('usage.reconciliation.' + (outcomes.find(outcome => outcome.item.requestId === item.requestId)?.status === 'success' ? 'batchSuccess' : outcomes.find(outcome => outcome.item.requestId === item.requestId)?.status === 'failed' ? 'batchFailed' : 'batchRemaining')) }}</q-item-section>
+          </q-item>
+        </q-list>
+      </q-card-section>
       <q-card-section class="q-pt-none q-gutter-sm">
-        <q-input v-model="reason" outlined autogrow :label="$t('usage.reconciliation.reason')" maxlength="500" counter data-cy="reconciliation-reason" />
+        <q-input v-model="reason" outlined autogrow :label="$t('usage.reconciliation.reason')" maxlength="500" counter :disable="resolving || completed" data-cy="reconciliation-reason" />
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat :label="$t('common.cancel')" v-close-popup :disable="resolving" />
-        <q-btn color="primary" :label="$t('usage.reconciliation.confirm')" :disable="!canResolve" :loading="resolving" data-cy="confirm-reconciliation" @click="resolve" />
+        <q-btn flat :label="completed ? $t('common.close') : $t('common.cancel')" v-close-popup :disable="resolving" />
+        <q-btn v-if="!completed" color="primary" :label="$t('usage.reconciliation.confirm')" :disable="!canResolve" :loading="resolving" data-cy="confirm-reconciliation" @click="resolve" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -209,6 +279,7 @@ onMounted(refresh)
 .reconciliation-dialog {
   width: min(560px, calc(100vw - 32px));
 }
+.reconciliation-preview { max-height: 240px; overflow: auto; }
 
 .reconciliation-context {
   border-top: 1px solid rgba(0, 0, 0, 0.12);

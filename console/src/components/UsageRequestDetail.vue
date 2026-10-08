@@ -84,6 +84,7 @@ function meterValue(item: MeterQuantity): string {
           <div>{{ meterLabel(meter.meter) }}</div>
           <div class="text-weight-medium">{{ meterValue(meter) }}</div>
           <div class="text-caption text-grey-7">{{ $t(`status.${meter.confidence}`) }}</div>
+          <div v-if="meter.meter === 'REQUESTS'" class="text-caption text-grey-7">{{ $t('usage.reconciliation.requestCountHint') }}</div>
         </div>
       </div>
       <div v-else class="text-body2 text-grey-7 q-mt-xs">{{ $t('usage.noSemanticMeters') }}</div>

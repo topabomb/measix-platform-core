@@ -85,3 +85,31 @@ func TestHUBPRS002ReplacePricingSetValidation(t *testing.T) {
 		t.Fatalf("expected ErrInvalidBatch for duplicate ids, got %v", err)
 	}
 }
+
+func TestPricingConcurrentEditorsCannotOverwriteSameRevision(t *testing.T) {
+	store := testutil.OpenStore(t)
+	ctx := context.Background()
+	service := NewService(store.Client)
+	start := make(chan struct{})
+	results := make(chan error, 16)
+	for i := 0; i < cap(results); i++ {
+		go func() {
+			<-start
+			_, _, err := service.ReplacePricingSet(ctx, 0, []PricingRuleRecord{pricingRule(platformid.New(platformid.PricingRule), time.Now().UTC())})
+			results <- err
+		}()
+	}
+	close(start)
+	successes := 0
+	for i := 0; i < cap(results); i++ {
+		err := <-results
+		if err == nil {
+			successes++
+		} else if !errors.Is(err, ErrPricingRevisionConflict) {
+			t.Fatalf("unexpected concurrent pricing error: %v", err)
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("same revision was accepted by %d editors; want exactly one", successes)
+	}
+}

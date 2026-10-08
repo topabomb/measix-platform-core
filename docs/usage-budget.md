@@ -134,6 +134,8 @@ WebSocket 生产观察器必须支持文本帧分片、continuation、控制帧�
 
 计量记录需要来源、完整度、协议归属及 settlement revision。同 requestId 同 revision 同内容幂等；相同 revision 不同内容拒绝并诊断；后续可靠修正只应用差额且留历史。避免 sourceEventId 每 meter 重复导致其他指标被丢弃。保留事实事件与修正轨迹，不用修改资源当前名称解释历史。
 
+准入事务将对应 generation Snapshot 的原资源显示名保存到 `BudgetRequest.resource_display_name`；用量查询优先读该准入上下文，旧记录缺名称时才从仍存在的原 Snapshot 回退，最终保留稳定 ID。历史 Release 清理前通过 migration 004 补齐旧准入（包括待核对请求）；新准入同样捕获名称，迟到结算不从当前草稿补名。migration 005 将账本 upstreamId 与 operational 上游行的存活解耦，保留原 ID 和用量/结算字节；具体 DDL、约束及恢复边界统一见[迁移说明](database-migrations.md#发布历史迁移)。
+
 清单查询保持时间窗和 keyset 分页；用户/协议/资源汇总和按日趋势采用数据库聚合，避免加载全量 rows 或每条请求 N+1 查询。额度读写走独立计数桶，不能每次扫描使用历史。明细保留策略不能清空累计预算；统计归档与预算权威分离。
 
 ## 5. 预算存储与事务

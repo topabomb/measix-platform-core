@@ -83,6 +83,28 @@ node scripts/e2e-harness.mjs
 
 真实供应商 lane 单独记录实际调用和失败：ACTIVE、ready、连通不证明凭据/授权或模型可用；关联 browser-authored release/hash、设备 Applied 与实际响应。所有凭据和原始私人正文排除在证据外。
 
+## 发布历史与上游删除专项验证
+
+语义以 Control Protocol §16 及 Hub/Admin Testing Spec 为准；具体迁移机制见[数据库迁移](database-migrations.md#发布历史迁移)，操作流程见[Spark 部署手册](s02-preview-deployment.md#101-发布历史清理与连接删除)。
+
+从 `backend/` 执行：
+
+```text
+go test ./migrations ./internal/hub/capability ./internal/hub/httpapi ./internal/hub/upstream ./internal/hub/budget ./internal/hub/usage -count=1
+```
+
+`capability/history_test.go` 验证保护项、过期预览、半开时间范围、有界批次、规则并集/关闭及自动清理不改变运行状态；HTTP 测试覆盖 Cookie/CSRF、规则修订、引用诊断和清理后独立删除。预算/用量回归验证清理前准入名称固化、所有资源类型历史展示及迟到结算/重放；历史重发分别验证新请求拒绝已清理源与已完成命令的幂等返回。
+
+迁移必须测试真实 SQL 结构：`release_history_upgrade_test.go` 覆盖原名称与 generation 高水位；`upstream_history_upgrade_test.go` 从带历史准入、结算、待核对、用量和定价的旧库升级，调用真实删除服务，再逐列比对历史值、自增高水位和其他约束。Ent 临时建库不包含全部历史 DDL 外键，不能替代该升级测试。
+
+从 Core 根目录执行受影响 UI 回归：
+
+```text
+pnpm -C console test --run src/components/ReleaseHistoryTools.test.ts src/pages/ReleasesPage.test.ts src/pages/UpstreamsPage.test.ts
+```
+
+测试预览/确认、规则与审计、列表选择和失败后的重新预览；真实浏览器还须使用生产 SPA 核对实际候选、清理后保留记录、引用解除及独立删除。现场证据绑定包摘要，区分管理员并发新发布/设备正常 Applied 更新和清理副作用，不宣称这些专项结果已覆盖所有 Admin/Android 门禁。
+
 ## 远程工作区专项验证
 
 工作区机制见[实现参考](remote-workspace-implementation.md)。Go 检查响应丢失/UNKNOWN 恢复、身份/绑定/config、租约、XML/路径/条件、历史迁移及预算；生产 Console 检查配置、生命周期、文本字节往返/冲突和资源查询在途切换。

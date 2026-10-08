@@ -31,6 +31,25 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 
 当前合同身份读取 `api/protocol-baseline.json`，真实支持读取实现和固定消费者构建；不由状态页赋值。源码存在不等于某现场已部署，运行版本须核对进程、active release 和私有部署记录。
 
+## preview.23 固定候选与验证
+
+2026-10-08 的发布历史清理/上游删除候选已在 Spark 完成内部升级与实际操作验证。以下身份绑定当次归档，后续源码或文档提交不改写原包：
+
+| 项目 | 固定身份 |
+| --- | --- |
+| Core 版本 / 包分类 | `0.2.0-preview.23` / `UNVERIFIED_CANDIDATE` |
+| Architecture / Core / Portal 提交 | `5fea0fe8e4a8e6f867cac9a1c013da18dda69c83` / `027f3a5e5931efc6c0e38b17bdf045d43ccfd71b` / `824b138d11dcc20c8b58135bdbeafba625e28ce3` |
+| 归档 SHA-256 | `57f4907f53933fc0930c304323eb69867f88ec567b7a65c168db2b4b3a1e4847` |
+| buildHash | `sha256:9fd443f23bda6b6b2ffd0cac3212366fd430b9fa3c9b5466d820c9cdc3ec59af` |
+| baselineHash | `sha256:2d1226ee463e35b3c69b1e5b4ecf36a71be067d0cbc7b5456e2c3057c5030089` |
+| Hub schema / migration identity | `5` / `sha256:2753bb2a075a831a6f9eeddc8a2bfff5b193b633a8c24fbeb572abe5883744b3` |
+
+归档为 `.artifacts/releases/measix-core-0.2.0-preview.23-linux-arm64-candidate.tar.gz`；包内 `release.json` 与 `SHA256SUMS` 固定原始构建。具体站点地址、进程、备份路径与权限只维护在私有部署记录。
+
+该候选完成全量 Go 测试/vet、Console 类型检查/单元回归/生产构建、tooling、生成一致性/drift 与 Core 合同材料检查。真实历史库副本及现场迁移验证原数据、自增高水位、完整性和其他外键保全；线上实际清理指定终态历史版本并独立删除无引用连接，保留版本原 content/Snapshot/hash、差异摘要与 1,320 条原用量及记账事实不变，自动规则保持关闭。并发新增发布及设备向该发布推进的 Applied 报告单独核对，不误记为清理修改。
+
+上述结论只对应本固定构建和此次边界；未新增固定 APK、OEM/生产签名或完整 ERX/CAP 验收。原始结果定位见下表，现场恢复须同时保留匹配 schema 的旧程序和已验证完整备份。
+
 ## 历史证据入口
 
 以下路径为历史材料定位，部分位于 Git 忽略目录或工作区外；换机/缺失时从原归档取得，不从摘要重造结果。每份结果只适用于其所记输入与运行，不认证当前 head。
@@ -44,6 +63,7 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 | 2026-09-30 资源摘要/配置简化 | `.artifacts/resources-review-final/`、`.artifacts/workspace-config-simplify/` | evidence、browser-evidence、source-inputs 固定同轮构建/合同与镜像；后续提交须重新验证 |
 | 2026-10-02 v5 跨端专项 | `%USERPROFILE%\Documents\MeasixValidation\2026-10-02-v5` | `core/v5-protocol`、`core/starter-e2e`、`android/v5-protocol` 与 `binaries` 保存源码/build/APK/设备与失败；候选为 Architecture 07fdf4e、Core 34decd0、Portal 6b96d10、Android 3d47418de |
 | 2026-10-04 DAV 未知操作恢复 | `.data/device-real/recovery-dav-20261004/` | 在线备份后经正式 API 核实断开、改配置、恢复原空间和显式 DAV；本机开发恢复，非生产或手机直连 DAV |
+| 2026-10-08 发布历史/上游删除 | `.artifacts/release-cleanup-20261008/deployment-final.json`、`postconditions.json` 及浏览器截图 | 上述 preview.23 固定包的真实迁移、指定清理/删除、历史数据与其他服务保全；原始站点材料私有，不代替完整跨端门禁 |
 
 10-02 专项包含未来版本拒绝时身份/历史/个人/退出、v4 覆盖安装、v4/v5/历史 v4切换、Starter 首发和实际工作区文件消费。分模块通过结果不等于一条全模块设备命令全部通过；系统 TTS/ADB 环境中断保留，真实麦克风、PRoot 镜像、OEM/正式签名安装未覆盖。之后工具许可或响应扩展修订仍须验证实际采用其材料的消费者，不能沿用此前整包结论。
 

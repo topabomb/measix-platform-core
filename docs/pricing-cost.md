@@ -2,6 +2,12 @@
 
 This describes the current Admin pricing implementation. Product semantics live in the sibling architecture Control Protocol §19; the Admin OpenAPI owns the wire. Historical Preview identity is maintained in the [status index](s0-execution-progress.md). Pricing uses existing usage facts and Admin configuration; currency conversion and cost-based admission budgets are outside this implementation.
 
+Deleting an unused operational upstream preserves its pricing rules and original
+upstream IDs in usage facts. Historical scope matching uses those IDs without
+requiring the connection row to exist; deletion does not change the pricing set
+or reinterpret old attribution. The persistence transition is documented in
+[database migrations](database-migrations.md#发布历史迁移), under Control Protocol §16.
+
 ## Calculation
 
 1. Read the current whole pricing set once per analysis. For each retained request,

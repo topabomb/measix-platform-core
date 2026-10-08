@@ -44,11 +44,27 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 | baselineHash | `sha256:2d1226ee463e35b3c69b1e5b4ecf36a71be067d0cbc7b5456e2c3057c5030089` |
 | Hub schema / migration identity | `5` / `sha256:2753bb2a075a831a6f9eeddc8a2bfff5b193b633a8c24fbeb572abe5883744b3` |
 
-归档为 `.artifacts/releases/measix-core-0.2.0-preview.23-linux-arm64-candidate.tar.gz`；包内 `release.json` 与 `SHA256SUMS` 固定原始构建。具体站点地址、进程、备份路径与权限只维护在私有部署记录。
+原包现保存在 `.artifacts/releases/measix-core-0.2.0-preview.23-linux-arm64-candidate-027f3a5.tar.gz`；包内 `release.json` 与 `SHA256SUMS` 固定原始构建。具体站点地址、进程、备份路径与权限只维护在私有部署记录。
 
 该候选完成全量 Go 测试/vet、Console 类型检查/单元回归/生产构建、tooling、生成一致性/drift 与 Core 合同材料检查。真实历史库副本及现场迁移验证原数据、自增高水位、完整性和其他外键保全；线上实际清理指定终态历史版本并独立删除无引用连接，保留版本原 content/Snapshot/hash、差异摘要与 1,320 条原用量及记账事实不变，自动规则保持关闭。并发新增发布及设备向该发布推进的 Applied 报告单独核对，不误记为清理修改。
 
 上述结论只对应本固定构建和此次边界；未新增固定 APK、OEM/生产签名或完整 ERX/CAP 验收。原始结果定位见下表，现场恢复须同时保留匹配 schema 的旧程序和已验证完整备份。
+
+### 同版本 MCP 修订
+
+目录发现及助手强制项修订于 2026-10-08 在 Spark 完成部署。版本仍为 `0.2.0-preview.23`，合同 2、Snapshot v5/v4 支持集合及 SQL schema 5 不变；新包与上述原包分别保全。
+
+| 项目 | 固定身份 |
+| --- | --- |
+| Architecture / Core / Portal 提交 | `f6b028de261e33f52fb3edc275e13f9c6621fd3f` / `a1444056f5336b5739a1015e5c0f492705446e0e` / `4dc23b3dd2d6cd44d4668bbb60b0f914bea54940` |
+| 归档 SHA-256 | `09f333bb49e789ae3181f0a72f87b917d58e5865138e833e9837f78f4edbfb61` |
+| buildHash / baselineHash | `sha256:cb8bcd87f85bcd34f892c57e527d9f46a662e18fc226aa691f4d291ebfdd6855` / `sha256:389b429ae51eb8d8cfbbf927c028ad298b0e1471edb668b86e28cb778224804b` |
+
+新归档为 `.artifacts/releases/measix-core-0.2.0-preview.23-linux-arm64-candidate.tar.gz`，分类仍是 `UNVERIFIED_CANDIDATE`。完整 Go 测试/vet、Console 300 项及 Portal 101 项测试、类型检查/构建、生成漂移与 11 项真实 Hub/Relay/生产 SPA 浏览器用例通过。新增用例覆盖零/一/多发现连接、版本诊断、空强制集合和无人绑定的 enabled MCP 发布/投影；原 v4 bytes/hash 与恢复回归通过。
+
+现场包与全部文件摘要匹配，Hub/Relay 实际进程指向该构建；迁移 5→5、应用 0 项，完整性及外键检查通过。停服前草稿、4 份发布原始正文/快照、所有表记录数、配置/密钥和原 active generation 30 保全，9 个无关 PM2 进程 PID 不变。公共 HTTPS 的 Admin/Portal/Discovery/readiness 与内部路径隔离通过；生产 Admin 使用真实工作区连接成功发现 5 个工具，仅更新目录证据，未发布配置。证据在 `.artifacts/mcp-delivery-20261008/` 及私有现场记录。
+
+`mcpBindings` 的强制项与用户额外选择规则见[工具治理与 Android 接线](direct-mcp-tool-governance.md)。Android 解析、偏好写入、选择投影和执行复验仍待实施，未运行该新组合的原生 consumer/device 或真实 tools/call；Core 导出和此次部署不宣称 Android 已支持新语义。
 
 ## 历史证据入口
 

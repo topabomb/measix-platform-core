@@ -66,6 +66,22 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 
 `mcpBindings` 的强制项与用户额外选择规则见[工具治理与 Android 接线](direct-mcp-tool-governance.md)。Android 解析、偏好写入、选择投影和执行复验仍待实施，未运行该新组合的原生 consumer/device 或真实 tools/call；Core 导出和此次部署不宣称 Android 已支持新语义。
 
+### 同版本定价与核对修订
+
+2026-10-08 定价管理与批量核对修订已在 Spark 部署，版本仍为 `0.2.0-preview.23`。资源/上游可按名称选择，计量随资源类型约束；列表显示范围、价格与本地生效区间。待核对支持当前页多选、统一原因、执行前预览及逐项结果；请求数事实保留在详情，列表移除重复的单次请求徽标。
+
+| 项目 | 固定身份 |
+| --- | --- |
+| Architecture / Core / Portal 提交 | `8da4d4c05018d581c08663c2ec9265588e53246c` / `0bd2cf86a8bd899c353565ea136b0a594d362eaf` / `4dc23b3dd2d6cd44d4668bbb60b0f914bea54940` |
+| 归档 SHA-256 | `6ee41a147df01dd32be89a1bd660f0644168bd46607b302d371923ec8b0ef27f` |
+| buildHash / baselineHash | `sha256:d8aad71b7a0fccca3a2d4f7e1f78c3baa377744ce2fbcca1b5c9930e4c07a429` / `sha256:389b429ae51eb8d8cfbbf927c028ad298b0e1471edb668b86e28cb778224804b` |
+
+归档为 `.artifacts/releases/measix-core-0.2.0-preview.23-linux-arm64-candidate.tar.gz`，分类仍为 `UNVERIFIED_CANDIDATE`；原 MCP 包独立保全。此次修正 ASR 对全局字符价格的错误缺价判定、定价修订并发校验，以及失败写入后刷新仍保留旧表单导致覆盖的风险。规则优先级、完成时生效区间、输入/缓存拆分及未知成本保留经回归核对。
+
+完整 Go 测试、usage vet、Console 类型检查、307 项单元测试与生产构建通过；11 项真实 Hub/Relay 和生产 SPA 浏览器用例全部通过。打包后的 Admin 静态文件与浏览器测试构建逐文件相同。线上 Hub/Relay 进程指向本固定构建，readiness 为 200；迁移 5→5、应用 0 项，schema/migration identity 不变。停服最终备份验证并离机保存；正式迁移前后所有 Hub 表记录数、定价/发布/草稿/状态事实与配置/密钥一致，完整性及外键检查通过；9 个无关 PM2 进程 PID/状态不变。
+
+公共 HTTPS 的 Discovery、Admin、Portal 和 readiness 返回 200，内部路径返回 404，Admin index 与原包摘要相同。生产页面实际验证名称搜索、TTS 计量联动及批量核对预览；未保存价格或执行生产核对。原始证据在 `.artifacts/pricing-release-*.log`、`.artifacts/pricing-delivery-20261008/` 和私有部署记录。本次未运行新的 Android/真实供应商账单验收，不扩展原消费兼容声明。
+
 ## 历史证据入口
 
 以下路径为历史材料定位，部分位于 Git 忽略目录或工作区外；换机/缺失时从原归档取得，不从摘要重造结果。每份结果只适用于其所记输入与运行，不认证当前 head。

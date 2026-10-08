@@ -1,0 +1,15 @@
+{
+  "platformContractVersion": 2,
+  "supportedPlatformContractVersions": [
+    2
+  ],
+  "coreBaselineVersion": "0.2.0-preview.23",
+  "baseline": "S0.2/v5-response-extensibility-preview",
+  "policy": "Unpublished Snapshot v5 uses Starter openings and explicit Direct MCP server toolAccessMode ALL/ALLOWLIST and assistant mcpBindings with toolSelection ALL/ALLOWLIST; ALL follows dynamic discovery without reviewed-contract locking or additional invocation confirmation; tool selection is independent from explicit per-tool approvalPolicy, new editor grants default AUTO and existing policies are preserved; ALLOWLIST must be nonempty, allowedTools and toolNames are required, full Tool JCS contractHash and AUTO/REQUIRE_CONFIRMATION policy. v5 server-only assistant references are retired; missing tool fields require explicit draft authoring. Retained published v4 uses independent DTOs, original bytes/hash and republish recovery. API v1, Bridge v3, Relay workspace protocol v2 and usage targetVersion 2 remain unchanged. Current v5 Android consumer verification is pending; Core-generated exports alone do not prove deployment compatibility. Gateway remains a separate later stage. Supported Client/Portal/Bridge response objects recursively ignore unknown fields; commands remain closed, known execution and permission semantics remain validated. Snapshot v4/v5 descriptor and historical bytes/hash are unchanged. Bridge capability advertisements tolerate unknown methods without enabling them and unknown error codes remain failures. Android source is outside this change and requires actual consumer verification. Admin release history supports bounded preview/execute cleanup and optional retention, protecting current control targets while keeping generation, usage, session and idempotency facts independent. Client, Snapshot and Relay wire contracts are unchanged. Unpublished v5 assistant mcpBindings denote mandatory servers, not the exclusive enterprise server set. Enabled unbound enterprise MCP may be explicitly selected through existing per-user assistant usage preferences; mandatory tool restrictions take precedence over duplicate selection. Removing a binding removes its mandatory status and assistant restriction. Published v4 retains its original reference semantics. No product, platform-contract, Snapshot or database version changes; Android consumer implementation and verification remain pending.",
+  "documents": {
+    "api/admin/admin.openapi.yaml": "sha256:5b48aa21f0d1101b71406c294a526c8086a201a9ace7105f29bb853dc2c2ff3c",
+    "api/client/client-control.openapi.yaml": "sha256:e7e457c52decf4ac92c94c90dd27af0b7593c7358a1231ac05f1785c6a195079",
+    "api/internal/relay-control.openapi.yaml": "sha256:4d53542a652e89c99e2a340b7d4e2d4e86821c3782c418cb7041ac2ed4aec1fd",
+    "api/internal/usage-ingest.openapi.yaml": "sha256:0e73594260ad086b13f3e785bc65135616eec7cab142387419223ddc6724423f"
+  }
+}

@@ -1,0 +1,371 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { useSessionStore } from './session'
+import { useDraftStore } from './draft'
+import { useActivationStore } from './activation'
+import { setUnauthorizedHandler } from '../api/client'
+import type { components } from '../api/generated'
+
+type Draft = components['schemas']['Draft']
+
+function emptyDraft(): Draft {
+  return {
+    draftId: 'dft_00000000-0000-4000-8000-000000000001',
+    draftRevision: 1,
+    content: {
+      providers: [], models: [], tts: [], asr: [], mcp: [], bindings: [], assistants: [], starters: [],
+      policy: {
+        policyId: 'pol_00000000-0000-4000-8000-000000000001',
+        allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true,
+      },
+    },
+  }
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  vi.unstubAllGlobals()
+  setUnauthorizedHandler(undefined)
+})
+
+describe('SessionStore', () => {
+  it('sends the explicit remember-login choice without persisting credentials in the store', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
+      user: { userId: 'usr_00000000-0000-4000-8000-000000000001', displayName: 'Admin', role: 'ADMIN' },
+      csrfToken: 'csrf-1', expiresAt: '2026-09-18T12:00:00Z',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = useSessionStore()
+    await store.login('admin', 'correct horse battery staple', true)
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      username: 'admin', password: 'correct horse battery staple', rememberMe: true,
+    })
+    expect(store.session).toBeDefined()
+    expect(JSON.stringify(store.$state)).not.toContain('correct horse battery staple')
+  })
+
+  it('clears session when the central API hook reports 401', async () => {
+    // First call: successful session restore.
+    // Second call: 401 Unauthorized.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        user: { userId: 'usr_00000000-0000-4000-8000-000000000001', displayName: 'Admin', role: 'ADMIN' },
+        csrfToken: 'csrf-1', expiresAt: '2026-08-19T12:00:00Z',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ type: 'about:blank', title: 'Unauthorized', status: 401, code: 'invalid_admin_session' }),
+        { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
+      ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = useSessionStore()
+    await store.restore()
+    expect(store.authenticated).toBe(true)
+    expect(store.csrfToken).toBe('csrf-1')
+
+    // Register the central 401 handler that clears the session.
+    setUnauthorizedHandler(() => { store.clear() })
+
+    // The next API call gets 401 — the central hook must clear the session.
+    await expect(store.restore()).rejects.toMatchObject({ status: 401 })
+    expect(store.authenticated).toBe(false)
+    expect(store.csrfToken).toBeUndefined()
+  })
+})
+
+describe('DraftStore', () => {
+  it('keeps edits made during save and saves them against the acknowledged revision', async () => {
+    const initial = emptyDraft()
+    let completeSave!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeSave = resolve }))
+      .mockImplementationOnce(async (_path, init) => {
+        const body = JSON.parse(init.body)
+        expect(body.expectedDraftRevision).toBe(2)
+        expect(body.content.policy.allowLocalMcp).toBe(false)
+        return new Response(JSON.stringify({ ...initial, draftRevision: 3, content: body.content }))
+      })
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDraftStore()
+    await store.load()
+    store.markDirty()
+    const saving = store.save('csrf')
+    store.localContent!.policy.allowLocalMcp = false
+    store.markDirty()
+    completeSave(new Response(JSON.stringify({ ...initial, draftRevision: 2 })))
+    await saving
+    expect(store.localContent!.policy.allowLocalMcp).toBe(false)
+    expect(store.baselineContent!.policy.allowLocalMcp).toBe(true)
+    expect(store.dirty).toBe(true)
+    await store.save('csrf')
+    expect(store.dirty).toBe(false)
+  })
+
+  it('merges server-owned discovery while retaining edits made during discovery', async () => {
+    const initial = emptyDraft()
+    initial.content.mcp = [{ mcpServerId: 'mcp_1', displayName: 'Original', clientProtocol: 'MCP_STREAMABLE_HTTP', runtimePath: '/mcp', authOwnership: 'NONE', toolAccessMode: 'ALL', allowedTools: [], enabled: true }]
+    const discovered = structuredClone(initial)
+    discovered.draftRevision = 2
+    discovered.content.mcp[0]!.toolDiscovery = { sourceHash: `sha256:${'1'.repeat(64)}`, discoveredAt: '2026-10-06T00:00:00Z', tools: [] }
+    let completeDiscovery!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeDiscovery = resolve }))
+      .mockImplementationOnce(async (_path, init) => {
+        const body = JSON.parse(init.body)
+        expect(body.expectedDraftRevision).toBe(2)
+        expect(body.content.mcp[0].displayName).toBe('Edited during discovery')
+        expect(body.content.mcp[0].toolDiscovery).toEqual(discovered.content.mcp[0]!.toolDiscovery)
+        return new Response(JSON.stringify({ ...discovered, draftRevision: 3, content: body.content }))
+      })
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDraftStore()
+    await store.load()
+    const discovering = store.discoverMcpTools('mcp_1', 'csrf')
+    store.localContent!.mcp[0]!.displayName = 'Edited during discovery'
+    store.markDirty()
+    completeDiscovery(new Response(JSON.stringify(discovered)))
+    await discovering
+    expect(store.localContent!.mcp[0]!.displayName).toBe('Edited during discovery')
+    expect(store.dirty).toBe(true)
+    await store.save('csrf')
+  })
+
+  it('does not overwrite a reloaded draft with a late discovery response', async () => {
+    const initial = emptyDraft()
+    const reloaded = structuredClone(initial)
+    reloaded.draftRevision = 2
+    reloaded.content.policy.allowLocalMcp = false
+    let completeDiscovery!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeDiscovery = resolve }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(reloaded))))
+    const store = useDraftStore()
+    await store.load()
+    const discovering = store.discoverMcpTools('mcp_1', 'csrf')
+    await store.load()
+    completeDiscovery(new Response(JSON.stringify({ ...initial, draftRevision: 3 })))
+    await discovering
+    expect(store.baselineRevision).toBe(2)
+    expect(store.localContent!.policy.allowLocalMcp).toBe(false)
+  })
+
+  it.each(['save', 'discover'] as const)('ignores a late %s conflict after a reload', async operation => {
+    const initial = emptyDraft()
+    let completeRequest!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeRequest = resolve }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...initial, draftRevision: 3 }))))
+    const store = useDraftStore()
+    await store.load()
+    const request = operation === 'save' ? store.save('csrf') : store.discoverMcpTools('mcp_1', 'csrf')
+    const rejected = expect(request).rejects.toMatchObject({ code: 'stale_draft_revision' })
+    await store.load()
+    completeRequest(new Response(JSON.stringify({ code: 'stale_draft_revision', currentDraftRevision: 2 }), { status: 409 }))
+    await rejected
+    expect(store.baselineRevision).toBe(3)
+    expect(store.conflictRevision).toBeUndefined()
+  })
+
+  it('stops save-and-discover when new edits arrive during its save', async () => {
+    const initial = emptyDraft()
+    let completeSave!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeSave = resolve }))
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDraftStore()
+    await store.load()
+    store.markDirty()
+    const discovering = store.discoverMcpTools('mcp_1', 'csrf')
+    const rejected = expect(discovering).rejects.toMatchObject({ code: 'draft_changed_during_save' })
+    store.localContent!.policy.allowLocalMcp = false
+    store.markDirty()
+    completeSave(new Response(JSON.stringify({ ...initial, draftRevision: 2 })))
+    await rejected
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(store.localContent!.policy.allowLocalMcp).toBe(false)
+    expect(store.dirty).toBe(true)
+    expect(store.discovering).toBe(false)
+  })
+
+  it('keeps edits made while reloading and ignores older load responses', async () => {
+    const initial = emptyDraft()
+    let completeOlder!: (response: Response) => void
+    let completeNewer!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeOlder = resolve }))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { completeNewer = resolve })))
+    const store = useDraftStore()
+    await store.load()
+    const older = store.load()
+    const newer = store.load()
+    store.localContent!.policy.allowLocalMcp = false
+    store.markDirty()
+    completeNewer(new Response(JSON.stringify({ ...initial, draftRevision: 3 })))
+    await newer
+    completeOlder(new Response(JSON.stringify({ ...initial, draftRevision: 2 })))
+    await older
+    expect(store.baselineRevision).toBe(1)
+    expect(store.conflictRevision).toBe(3)
+    expect(store.localContent!.policy.allowLocalMcp).toBe(false)
+    expect(store.dirty).toBe(true)
+  })
+
+  it('preserves missing and authored Starter openings across save, reload and revision conflict', async () => {
+    const initial = emptyDraft()
+    initial.content.assistants.push({ assistantDefinitionId: 'asd_1', displayName: 'A', systemPrompt: 'Base', modelId: 'mdl_1', mcpBindings: [], memorySeed: [], enabled: true })
+    initial.content.starters.push({ starterId: 'str_old', assistantDefinitionId: 'asd_1', title: 'Old', prompt: 'Q', enabled: false, sortOrder: 0 })
+    let savedDraft: Draft
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial)))
+      .mockImplementationOnce(async (_path, init) => {
+        const body = JSON.parse(init.body)
+        expect(body.expectedDraftRevision).toBe(1)
+        savedDraft = { ...initial, draftRevision: 2, content: body.content }
+        return new Response(JSON.stringify(savedDraft))
+      })
+      .mockImplementationOnce(async () => new Response(JSON.stringify(savedDraft)))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 409, code: 'stale_draft_revision', currentDraftRevision: 3 }), { status: 409, headers: { 'Content-Type': 'application/problem+json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDraftStore()
+    await store.load()
+    expect(store.localContent!.starters[0]!.openingSnapshot).toBeUndefined()
+    const id = store.addStarter('asd_1', 'New')
+    const starter = store.localContent!.starters.find(item => item.starterId === id)!
+    starter.openingSnapshot!.systemPrompt = ''
+    starter.openingSnapshot!.initialContexts = [{ id: 'b2', content: '' }, { id: 'b1', content: '{{value}} <raw>' }]
+    await store.save('csrf')
+    await store.load()
+    expect(store.localContent!.starters[0]!.openingSnapshot).toBeUndefined()
+    expect(store.localContent!.starters[1]!.openingSnapshot).toEqual({ format: 1, systemPrompt: '', initialContexts: [{ id: 'b2', content: '' }, { id: 'b1', content: '{{value}} <raw>' }] })
+    expect(store.dirty).toBe(false)
+    store.localContent!.starters[1]!.openingSnapshot!.systemPrompt = 'Unsaved'
+    store.markDirty()
+    await expect(store.save('csrf')).rejects.toMatchObject({ code: 'stale_draft_revision' })
+    expect(store.localContent!.starters[1]!.openingSnapshot!.systemPrompt).toBe('Unsaved')
+    expect(store.localContent!.starters[1]!.openingSnapshot!.initialContexts.map(item => item.id)).toEqual(['b2', 'b1'])
+    expect(store.dirty).toBe(true)
+    expect(store.baselineRevision).toBe(2)
+  })
+
+  it('upserts a runtime binding for a resource and reuses its stable runtimeRouteId', async () => {
+    const initial = emptyDraft()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+
+    const store = useDraftStore()
+    await store.load()
+    const modelId = store.addModel('prv_00000000-0000-4000-8000-000000000001')
+
+    store.setBinding(modelId, 'ups_00000000-0000-4000-8000-000000000001', 'HTTP_STREAMING_SSE')
+    const first = store.bindingFor(modelId)
+    expect(first).toBeDefined()
+    expect(first!.upstreamId).toBe('ups_00000000-0000-4000-8000-000000000001')
+    expect(first!.transportPolicy).toBe('HTTP_STREAMING_SSE')
+    expect(first!.allowedMethods).toContain('POST')
+    expect(first!.allowedPathPrefixes).toContain('/')
+
+    // Editing keeps the same runtimeRouteId so candidate IDs are stable.
+    store.setBinding(modelId, 'ups_00000000-0000-4000-8000-000000000002', 'HTTP_REQUEST_RESPONSE')
+    const second = store.bindingFor(modelId)
+    expect(second!.runtimeRouteId).toBe(first!.runtimeRouteId)
+    expect(second!.upstreamId).toBe('ups_00000000-0000-4000-8000-000000000002')
+    expect(second!.transportPolicy).toBe('HTTP_REQUEST_RESPONSE')
+  })
+
+  it('removes a binding when the resource is unbound (empty upstream)', async () => {
+    const initial = emptyDraft()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+
+    const store = useDraftStore()
+    await store.load()
+    const modelId = store.addModel('prv_00000000-0000-4000-8000-000000000001')
+    store.setBinding(modelId, 'ups_00000000-0000-4000-8000-000000000001', 'HTTP_STREAMING_SSE')
+    expect(store.bindingFor(modelId)).toBeDefined()
+
+    store.setBinding(modelId, '', 'HTTP_STREAMING_SSE')
+    expect(store.bindingFor(modelId)).toBeUndefined()
+  })
+
+  it('keeps local dirty content and stable candidate ids after stale revision conflict', async () => {
+    const initial = emptyDraft()
+    initial.draftRevision = 7
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, code: 'stale_draft_revision', currentDraftRevision: 8 }), { status: 409, headers: { 'Content-Type': 'application/problem+json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = useDraftStore()
+    await store.load()
+    const modelId = store.addModel('prv_00000000-0000-4000-8000-000000000001')
+    expect(store.dirty).toBe(true)
+    await expect(store.save('csrf-1')).rejects.toMatchObject({ code: 'stale_draft_revision' })
+    expect(store.dirty).toBe(true)
+    expect(store.localContent?.models.some((model) => model.modelId === modelId)).toBe(true)
+    expect(store.conflictRevision).toBe(8)
+  })
+
+  it('marks an unbound resource deletion dirty and blocks referenced resources', async () => {
+    const initial = emptyDraft()
+    initial.content.models.push({
+      modelId: 'mdl_00000000-0000-4000-8000-000000000001',
+      providerId: 'prv_00000000-0000-4000-8000-000000000001', displayName: 'Model', upstreamModelKey: 'model',
+      runtimePath: '/v1/chat/completions', inputModalities: ['TEXT'], outputModalities: ['TEXT'], capabilities: [], enabled: true,
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(initial), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const store = useDraftStore()
+    await store.load()
+
+    expect(store.removeResource('MODEL', initial.content.models[0]!.modelId)).toEqual({ removed: true, references: [] })
+    expect(store.dirty).toBe(true)
+
+    const modelId = initial.content.models[0]!.modelId
+    initial.content.policy.defaultModelId = modelId
+    initial.content.policy.defaultFastModelId = modelId
+    initial.content.policy.defaultTitleModelId = modelId
+    initial.content.policy.defaultAttachmentInspectionModelId = modelId
+    initial.content.policy.defaultSuggestionModelId = modelId
+    initial.content.policy.defaultCompressModelId = modelId
+    await store.load()
+    const blocked = store.removeResource('MODEL', modelId)
+    expect(blocked.removed).toBe(false)
+    expect(blocked.references).toEqual([
+      'policy.defaultModelId',
+      'policy.defaultFastModelId',
+      'policy.defaultTitleModelId',
+      'policy.defaultAttachmentInspectionModelId',
+      'policy.defaultSuggestionModelId',
+      'policy.defaultCompressModelId',
+    ])
+    expect(store.localContent!.models).toHaveLength(1)
+  })
+})
+
+describe('ActivationStore', () => {
+  it('scopes retry keys to the exact command target and payload', () => {
+    const store = useActivationStore()
+    const first = store.beginCommand('PUBLISH', 'draft:7:[]')
+    expect(store.beginCommand('PUBLISH', 'draft:7:[]')).toBe(first)
+    expect(store.beginCommand('PUBLISH', 'draft:8:[]')).not.toBe(first)
+    const second = store.retryKey
+    expect(store.beginCommand('PUBLISH', 'release:other')).not.toBe(second)
+  })
+
+  it('reuses one idempotency key for retry and reports success only after COMPLETED', async () => {
+    const store = useActivationStore()
+    const key = store.beginCommand('PUBLISH')
+    expect(key).toMatch(/^idem_/)
+    expect(store.retryKey).toBe(key)
+    store.accept({ activationId: 'act_00000000-0000-4000-8000-000000000001', kind: 'PUBLISH', state: 'APPLYING', desiredControlRevision: 9, createdAt: '2026-08-19T10:00:00Z', updatedAt: '2026-08-19T10:00:00Z' })
+    expect(store.succeeded).toBe(false)
+    store.accept({ activationId: 'act_00000000-0000-4000-8000-000000000001', kind: 'PUBLISH', state: 'COMPLETED', desiredControlRevision: 9, createdAt: '2026-08-19T10:00:00Z', updatedAt: '2026-08-19T10:00:01Z' })
+    expect(store.succeeded).toBe(true)
+    expect(store.retryKey).toBe(key)
+  })
+})

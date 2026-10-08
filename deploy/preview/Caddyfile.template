@@ -1,0 +1,15 @@
+__MEASIX_PUBLIC_ORIGIN__ {
+	@private path /internal /internal/*
+	handle @private {
+		respond 404
+	}
+
+	@runtime path /runtime/v1 /runtime/v1/*
+	handle @runtime {
+		reverse_proxy __MEASIX_SPARK_TAILSCALE_IP__:9002
+	}
+
+	handle {
+		reverse_proxy __MEASIX_SPARK_TAILSCALE_IP__:9004
+	}
+}

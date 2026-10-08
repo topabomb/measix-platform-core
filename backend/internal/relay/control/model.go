@@ -1,0 +1,67 @@
+package control
+
+import (
+	"crypto/ed25519"
+	"net/url"
+	"time"
+
+	"measix/platform/internal/wire/relaycontrolapi"
+)
+
+type Route struct {
+	ID                  string
+	UpstreamID          string
+	WorkspaceServiceID  string
+	AllowedMethods      map[string]struct{}
+	AllowedPathPrefixes []string
+	TransportPolicy     relaycontrolapi.RuntimeRouteSpecTransportPolicy
+	TimeoutPolicy       relaycontrolapi.TimeoutPolicy
+}
+
+type Resource struct {
+	ID             string
+	RouteID        string
+	Kind           relaycontrolapi.ResourceRouteResourceKind
+	ClientProtocol relaycontrolapi.ResourceRouteClientProtocol
+	AudioProfile   *relaycontrolapi.RuntimeAudioProfile
+	LLMProfile     *relaycontrolapi.RuntimeLlmProfile
+	ModelMapping   *relaycontrolapi.RuntimeModelMapping
+	ImageProfile   *relaycontrolapi.RuntimeImageProfile
+}
+
+type UpstreamAuth struct {
+	Type       relaycontrolapi.RuntimeUpstreamAuthType
+	Token      string
+	HeaderName string
+	Value      string
+	Username   string
+	Password   string
+}
+
+type Upstream struct {
+	ID                    string
+	BaseURL               *url.URL
+	Enabled               bool
+	TransportCapabilities map[string]struct{}
+	SecretRef             *relaycontrolapi.SecretRef
+	Auth                  UpstreamAuth
+}
+
+type State struct {
+	ProtocolVersion         int
+	ControlRevision         int
+	BundleHash              string
+	ActiveManagedGeneration int
+	DeploymentID            string
+	AuthKeys                map[string]ed25519.PublicKey
+	DisabledUsers           map[string]struct{}
+	DeletedUsers            map[string]struct{}
+	RevokedDevices          map[string]struct{}
+	RevokedSessions         map[string]struct{}
+	Resources               map[string]Resource
+	Routes                  map[string]Route
+	Upstreams               map[string]Upstream
+	UserBindings            map[string]relaycontrolapi.UserRuntimeBinding
+	OperationalLimits       relaycontrolapi.OperationalLimits
+	AppliedAt               time.Time
+}

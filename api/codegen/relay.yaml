@@ -1,0 +1,7 @@
+package: relaycontrolapi
+output: backend/internal/wire/relaycontrolapi/relay.gen.go
+generate:
+  models: true
+  chi-server: true
+output-options:
+  skip-prune: true

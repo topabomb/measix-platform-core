@@ -1,0 +1,169 @@
+param(
+    [switch]$Reset
+)
+
+$ErrorActionPreference = 'Stop'
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$backendRoot = Join-Path $repoRoot 'backend'
+$portalRoot = Join-Path $repoRoot '..\measix-enterprise-portal'
+$dataRoot = Join-Path $repoRoot '.data\device-real'
+$secretRoot = Join-Path $repoRoot '.secrets'
+$passwordPath = Join-Path $secretRoot 'device-real-admin-password.txt'
+$masterKeyPath = Join-Path $secretRoot 'device-real-master.key'
+$jwtKeyPath = Join-Path $secretRoot 'device-real-jwt-ed25519.seed'
+$relayTokenPath = Join-Path $secretRoot 'device-real-relay-service.token'
+$dbPath = Join-Path $dataRoot 'hub.db'
+$spoolPath = Join-Path $dataRoot 'relay-spool.db'
+$binaryPath = Join-Path $dataRoot 'bin\measix-device-demo.exe'
+$buildVersion = 'device-real-' + [Guid]::NewGuid().ToString('N')
+$pidPath = Join-Path $dataRoot 'process.json'
+$logRoot = Join-Path $dataRoot 'logs'
+
+function New-RandomFile([string]$Path, [int]$Length, [switch]$Text) {
+    if (Test-Path -LiteralPath $Path) { return }
+    $bytes = [byte[]]::new($Length)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    if ($Text) {
+        [System.IO.File]::WriteAllText($Path, ([Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')) + [Environment]::NewLine)
+    } else {
+        [System.IO.File]::WriteAllBytes($Path, $bytes)
+    }
+}
+
+function Get-AvailableLoopbackAddress([int]$PreferredPort, [int[]]$ExcludePorts = @()) {
+    $candidate = $PreferredPort
+    while ($true) {
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $candidate)
+        $listener.ExclusiveAddressUse = $true
+        try {
+            try { $listener.Start() }
+            catch [System.Net.Sockets.SocketException] {
+                if ($candidate -eq 0) { throw }
+                $candidate = 0
+                continue
+            }
+            $selectedPort = $listener.LocalEndpoint.Port
+            if ($ExcludePorts -notcontains $selectedPort) { return "127.0.0.1:$selectedPort" }
+            $candidate = 0
+        } finally { $listener.Stop() }
+    }
+}
+
+function Get-DeviceIPv4 {
+    $route = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop |
+        Where-Object { $_.NextHop -ne '0.0.0.0' } | Sort-Object RouteMetric | Select-Object -First 1
+    if ($null -eq $route) { throw 'No active IPv4 default route. Set MEASIX_REAL_DEVICE_ORIGIN explicitly after connecting the LAN.' }
+    $address = Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $route.InterfaceIndex -ErrorAction Stop |
+        Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254*' } | Select-Object -First 1
+    if ($null -eq $address) { throw 'No usable IPv4 address on the default-route interface. Set MEASIX_REAL_DEVICE_ORIGIN explicitly.' }
+    return $address.IPAddress
+}
+
+if ($Reset) {
+    & (Join-Path $PSScriptRoot 'stop-real-device-preset.ps1')
+    if (Test-Path -LiteralPath $dataRoot) {
+        $resolved = (Resolve-Path $dataRoot).Path
+        if (-not $resolved.StartsWith((Resolve-Path (Join-Path $repoRoot '.data')).Path)) { throw 'Unsafe device-real data path.' }
+        Remove-Item -LiteralPath $resolved -Recurse -Force
+    }
+}
+if (Test-Path -LiteralPath $pidPath) {
+    & (Join-Path $PSScriptRoot 'stop-real-device-preset.ps1')
+}
+
+$origin = $env:MEASIX_REAL_DEVICE_ORIGIN
+if ([string]::IsNullOrWhiteSpace($origin)) { $origin = "http://$(Get-DeviceIPv4):9100" }
+if ($origin -notmatch '^https?://[^/]+$') { throw 'MEASIX_REAL_DEVICE_ORIGIN must be an origin such as http://192.0.2.20:9100; replace the documentation address.' }
+$uri = [Uri]$origin
+if ($uri.Scheme -ne 'http') { throw 'The local real-device preset serves HTTP only. Use an HTTP LAN origin.' }
+
+New-Item -ItemType Directory -Force -Path $dataRoot, $secretRoot, $logRoot, (Split-Path -Parent $binaryPath) | Out-Null
+New-RandomFile $masterKeyPath 32
+New-RandomFile $jwtKeyPath 32
+New-RandomFile $relayTokenPath 32 -Text
+if (-not (Test-Path -LiteralPath $passwordPath)) {
+    $bytes = [byte[]]::new(18)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    [System.IO.File]::WriteAllText($passwordPath, "measix-device-$([BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant())" + [Environment]::NewLine)
+}
+if (-not (Test-Path -LiteralPath (Join-Path $secretRoot 'supplier-keys.env'))) {
+    throw "Missing ignored supplier key file: $(Join-Path $secretRoot 'supplier-keys.env')"
+}
+
+Push-Location $repoRoot
+try {
+    & pnpm -C console build
+    if ($LASTEXITCODE -ne 0) { throw 'Admin Console build failed.' }
+    & pnpm -C $portalRoot build
+    if ($LASTEXITCODE -ne 0) { throw 'Enterprise Portal build failed.' }
+    Push-Location $backendRoot
+    try {
+        & go run ./cmd/devmigrate --db $dbPath
+        if ($LASTEXITCODE -ne 0) { throw "Database migration failed; startup stopped. Preserve $dbPath and its SQLite sidecar files. Inspect the migration error above and docs/database-migrations.md; verify a backup before repairing migration history or using a compatible binary. Do not reset existing data to resolve a schema or checksum mismatch." }
+        & go run ./cmd/control-hub bootstrap-admin --if-empty --db $dbPath --master-key-file $masterKeyPath --jwt-private-key-file $jwtKeyPath --deployment-name 'MEASIX Device Demo' --username admin --display-name 'Device Demo Admin' --password-file $passwordPath
+        if ($LASTEXITCODE -ne 0) { throw 'Admin bootstrap failed.' }
+        & go build -ldflags "-X main.buildVersion=$buildVersion" -o $binaryPath ./cmd/device-demo
+        if ($LASTEXITCODE -ne 0) { throw 'Device-demo build failed.' }
+    } finally { Pop-Location }
+
+    $hubInternalListen = $env:MEASIX_REAL_DEVICE_HUB_INTERNAL_LISTEN
+    if ([string]::IsNullOrWhiteSpace($hubInternalListen)) { $hubInternalListen = Get-AvailableLoopbackAddress 9101 }
+    $relayInternalListen = $env:MEASIX_REAL_DEVICE_RELAY_INTERNAL_LISTEN
+    if ([string]::IsNullOrWhiteSpace($relayInternalListen)) { $relayInternalListen = Get-AvailableLoopbackAddress 9103 @([int]($hubInternalListen.Split(':')[-1])) }
+    $args = @(
+        '--listen', "$($uri.Host):$($uri.Port)", '--hub-internal-listen', $hubInternalListen, '--relay-internal-listen', $relayInternalListen,
+        '--public-origin', $origin, '--db', $dbPath, '--master-key-file', $masterKeyPath, '--jwt-private-key-file', $jwtKeyPath,
+        '--relay-service-token-file', $relayTokenPath, '--spool', $spoolPath,
+        '--admin-assets-dir', (Join-Path $repoRoot 'console\dist\spa'), '--portal-assets-dir', (Join-Path $portalRoot 'dist')
+    )
+    $portalUpstream = $env:MEASIX_PORTAL_UPSTREAM_URL
+    if (-not [string]::IsNullOrWhiteSpace($portalUpstream)) {
+        if ($portalUpstream -notmatch '^https?://') { throw 'MEASIX_PORTAL_UPSTREAM_URL must be an HTTP or HTTPS URL.' }
+        $args += @('--portal-upstream-url', $portalUpstream)
+    }
+    # Start-Process joins ArgumentList without quoting. Preserve native Windows
+    # argument boundaries, including spaces, embedded quotes and trailing slashes.
+    $quotedArgs = ($args | ForEach-Object { '"' + ($_ -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"' }) -join ' '
+    $process = Start-Process -FilePath $binaryPath -ArgumentList $quotedArgs -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logRoot 'device-demo.out.log') -RedirectStandardError (Join-Path $logRoot 'device-demo.err.log')
+    @{ pid = $process.Id; executable = $binaryPath; origin = $origin; buildVersion = $buildVersion; startedAt = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $pidPath -NoNewline
+
+    $ready = $false
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        try {
+            $response = Invoke-WebRequest -UseBasicParsing "$origin/ready" -TimeoutSec 2
+            if ($response.StatusCode -eq 200) { $ready = $true; break }
+        } catch { Start-Sleep -Milliseconds 500 }
+    }
+    if (-not $ready) { throw "Device-demo did not become ready. Inspect $logRoot" }
+    $env:MEASIX_REAL_DEVICE_ORIGIN = $origin
+    $env:MEASIX_REAL_DEVICE_ADMIN_PASSWORD_FILE = $passwordPath
+    $env:MEASIX_REAL_DEVICE_STATE = (Join-Path $dataRoot 'preset-state.json')
+    $env:MEASIX_REAL_DEVICE_BUILD_VERSION = $buildVersion
+    $resultPath = Join-Path $logRoot 'preset-result.json'
+    $env:MEASIX_REAL_DEVICE_RESULT = $resultPath
+    # A failed invocation must never report a previous attempt's result.
+    if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath -Force }
+    & node scripts/real-device-preset.mjs
+    $publishExitCode = $LASTEXITCODE
+    if ($publishExitCode -ne 0) {
+        $diagnostic = "Publisher exited with exit code $publishExitCode; inspect the output above."
+        if (Test-Path -LiteralPath $resultPath) {
+            try {
+                $result = Get-Content -Raw -LiteralPath $resultPath | ConvertFrom-Json
+                if ($result.ok -eq $false -and -not [string]::IsNullOrWhiteSpace($result.message)) { $diagnostic = $result.message }
+            } catch { } # Preserve the publisher failure if diagnostics are unreadable.
+        }
+        throw "Real-device configuration publish failed: $diagnostic Diagnostic file: $resultPath"
+    }
+    $discovery = Invoke-RestMethod -UseBasicParsing "$origin/.well-known/measix"
+    if ($discovery.clientApiBase -ne '/api/client/v1' -or $discovery.runtimeApiBase -ne '/runtime/v1') { throw 'Discovery did not expose the expected same-origin paths.' }
+    Write-Output "Real-device preset is ready: $origin"
+    Write-Output "Admin: $origin/admin/"
+    Write-Output "Admin password file: $passwordPath"
+    Write-Output 'Create a member and enrollment material in Admin > Users, then scan or paste it in Android.'
+} catch {
+    if (Test-Path -LiteralPath $pidPath) { & (Join-Path $PSScriptRoot 'stop-real-device-preset.ps1') }
+    throw
+} finally { Pop-Location }

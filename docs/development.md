@@ -1,152 +1,125 @@
 # Development Workflow
 
-This document defines how engineers work on `measix-platform-core` locally or entirely through GitHub. It does not redefine platform behavior.
+This document owns executable local workflows, not platform semantics. Toolchain versions come from `backend/go.mod`, package manifests/lockfiles and `.github/workflows/ci-gate.yml`; architecture does not pin patch versions.
 
-## 1. Toolchain baseline
+## 1. Environment and source layout
 
-S0 architecture fixes the major implementation stack:
+Use the repository-pinned Go/Node/pnpm toolchains. GNU Make with a POSIX shell is required for the complete Make/CI workflow. Native PowerShell can run the direct Go/Node/pnpm commands below; it is not a POSIX Make recipe executor.
 
-- Go 1.26.x;
-- OpenAPI 3.0.3;
-- `oapi-codegen/v2` / `kin-openapi`;
-- SQLite with `modernc.org/sqlite`;
-- Ent + Atlas versioned migrations;
-- Vue 3 + TypeScript + Quasar;
-- Pinia + Vue Router;
-- `openapi-typescript`;
-- pnpm.
-
-Exact patch/tool versions become authoritative in repository-controlled toolchain files and lockfiles when I0 initializes them. Do not duplicate floating version tables across multiple Markdown files.
-
-## 2. Development modes
-
-### Local-first
-
-A local checkout is the fastest Red/Green loop:
+Current layout:
 
 ```text
-branch
-→ smallest failing test
-→ run narrow test locally
-→ implement
-→ rerun narrow test
-→ affected component suite
-→ push / PR
-→ GitHub CI independently verifies
+api/                   four OpenAPI documents, fixtures, Android export
+backend/cmd/           Hub, Relay, development/export utilities
+backend/internal/      common, generated wire, Hub and Relay implementation
+backend/ent/           schema and generated persistence code
+backend/migrations/    ordered embedded Hub database migrations
+backend/test/system/   Go harness, deterministic adapter/client, tagged scenarios
+console/src/           Admin UI
+console/e2e/           browser assertions
+scripts/               Node browser/candidate orchestration and evidence tooling
+docs/                  implementation instructions and evidence
 ```
 
-Local configuration uses synthetic/test credentials only. Development must not require production configuration or public Provider access for normal T0–T3 work.
+Gateway source/OpenAPI and three-daemon production qualification remain S0.3 work. The current two-daemon Preview packaging is under `deploy/preview/`; see [deployment](s02-preview-deployment.md).
 
-### GitHub-only
+## 2. Local bootstrap and startup
 
-When development is performed through GitHub/API/coding-agent access without a local executor:
+Install dependencies from the root and console lockfiles. `npm run setup` invokes `scripts/dev-setup.mjs`: exclusively creates missing synthetic key files, applies or verifies the shared migration history and bootstraps with `--if-empty`. A repeat against a current managed development DB preserves keys/credentials. It reports the protected password-file location, not plaintext. This is not a production installer or reset tool. It uses the shared append-only migration owner described in [Database migrations](database-migrations.md); unrecognized data or checksum conflicts stop startup without deleting business data.
+
+`npm start`/`npm run dev` starts the development Hub, Relay and console; usage ingestion targets private Hub port 8081. Alternatively, run these in separate terminals **from backend/** using setup's synthetic files:
 
 ```text
-branch
-→ Draft PR
-→ commit Red test
-→ GitHub Actions executes and fails as expected
-→ inspect failing check/log
-→ commit implementation
-→ GitHub Actions executes latest SHA and passes
-→ inspect checks/artifacts
-→ refactor / rerun
+go run ./cmd/control-hub run --listen 127.0.0.1:8080 --internal-listen 127.0.0.1:8081 --db ../.data/hub.db --master-key-file ../.secrets/master.key --jwt-private-key-file ../.secrets/jwt-ed25519.seed --relay-internal-url http://127.0.0.1:8091 --relay-service-token-file ../.secrets/relay-service.token
+
+go run ./cmd/runtime-relay --public-listen 127.0.0.1:8090 --internal-listen 127.0.0.1:8091 --spool ../.data/relay-spool.db --hub-internal-url http://127.0.0.1:8081 --hub-service-token-file ../.secrets/relay-service.token
 ```
 
-GitHub Actions is the executor in this mode. Static code review alone is not test execution.
-
-See `docs/tdd.md` for the evidence contract.
-
-## 3. I0 target repository structure
-
-The implementation is organized around executable ownership, not around duplicating architecture documents:
+In another terminal from the repository root:
 
 ```text
-api/          executable wire contracts + canonical fixtures
-backend/      Go binaries, packages, Ent, migrations
-console/      Admin Console source/build
-test/         qualification + S0 system harness
-.github/      CI/PR automation
+pnpm -C console dev
 ```
 
-Subdirectories are created when their implementation lands. The source tree, not an old documentation snapshot, is authoritative for concrete package/file locations.
+These are development HTTP endpoints, not production origin/TLS qualification. To exercise the complete same-origin path, build the console and Portal, configure their Hub asset directories, then use the checked-in [Caddy ingress recipe](operations.md#one-public-origin). Discovery, enrollment, Snapshot, Runtime and Portal must use this public origin. `go run`/`concurrently` provide no production restart/rate-limit/log-retention guarantee.
 
-## 4. Bootstrap expectations
+### Actual Android / Admin development environment
 
-I0 must establish reproducible tool setup for both local CI-equivalent execution and GitHub Actions. Before I1 work begins, the repository must be able to:
+Run `npm run device:real` from the Core root. It builds production Admin/Portal assets, runs shared database migrations, preserves deployment credentials, starts the local same-origin Hub/Relay, and publishes the explicit v5 preset. The actual origin is printed after readiness and stored in `.data/device-real/process.json`; do not reuse an old LAN address. The Admin password is in ignored `.secrets/device-real-admin-password.txt`.
 
-- build `control-hub` and `runtime-relay` health skeletons;
-- validate all four OpenAPI documents;
-- reproduce generated Go/TS/Android wire artifacts or verify their exported generation inputs;
-- replay SQLite migrations from an empty database;
-- build the Quasar production shell;
-- execute deterministic T0/T1/T2 CI.
+The preset runs one local `device-demo` process under a LAN HTTP origin (no Caddy). Default public port is 9100. It selects the default-gateway IPv4; to choose a reachable origin/interface or fixed private ports, set before launch:
 
-The exact commands become part of repository tooling when those artifacts land. Documentation must be updated in the same PR that introduces or changes a command.
+```powershell
+$env:MEASIX_REAL_DEVICE_ORIGIN = 'http://192.0.2.20:9100'
+$env:MEASIX_REAL_DEVICE_HUB_INTERNAL_LISTEN = '127.0.0.1:19101'
+$env:MEASIX_REAL_DEVICE_RELAY_INTERNAL_LISTEN = '127.0.0.1:19103'
+npm run device:real
+```
 
-## 5. Branch/PR development
+The address is documentation-only. Without private-port overrides, 9101/9103 are tried first and unavailable ports get bounded loopback allocation; explicit overrides are not silently changed. Public origin remains the Android Discovery/Client/Runtime owner. On the phone, create a dedicated user/enrollment through Admin; permit the development binary on the selected private network when required.
 
-Use a short-lived branch for implementation work. Open a Draft PR early for multi-commit TDD and cross-component work.
+`npm run device:real:stop` stops only its recorded process after matching its executable identity. Missing PID clears a stale record; identity/query/stop failure preserves the record for diagnosis. `npm run device:real:reset` explicitly discards and recreates only this preset's isolated data after stopping it. Never use reset, direct DB edits or ordinary setup to bypass an unknown schema/checksum or process-identity error.
 
-The PR is the coordination object for:
+Every invocation builds the current local Core and sibling Portal working trees, including uncommitted source changes. It stops the previously owned process and runs the newly built binary with a unique `buildVersion`, recorded in `process.json` and the publisher result. Before changing any preset configuration, the publisher authenticates and checks that both Hub and Relay report this invocation's build identity through Admin System Status. A responding older process at the public origin is rejected; a Relay still starting has a bounded wait to report its identity. Readiness alone does not establish which build is serving the origin.
 
-- architecture linkage;
-- Red/Green evidence;
-- generated-code drift;
-- migration review;
-- required CI checks;
-- review discussion;
-- eventual release/test manifest references.
+The preset owns the isolated `.data/device-real` draft: rerunning restores its predefined resources and three complete Starter openings. Do not point it at a shared or production database. Manual Admin publications remain immutable releases, but their edits are not the preset's next draft. `npm run device:real:stop` stops its owned process. `device:real:reset` deletes isolated data and is only for an explicit decision to discard it, never an upgrade/checksum repair.
 
-Direct pushes to `main` should stop once branch protection/required checks are enabled.
+When replacing the preset draft, echo the existing server-owned `toolDiscovery` unchanged for the matching MCP ID. Discovering tools in Admin must not break a later restart. ALL remains explicit, with an empty `allowedTools` list; it does not require a new discovery. An unchanged client projection keeps its current published generation while the program and static assets are rebuilt. A changed projection publishes and reports the generation from the completed activation.
 
-## 6. Code-generation workflow
+Supplier credentials come from ignored `.secrets/supplier-keys.env`; existing ACTIVE upstreams and their Secret references are reused. Changing the file does not rotate a saved Secret: use normal Admin Secret/upstream candidate/apply actions for intentional rotation. ACTIVE and `/ready` prove configuration activation and process readiness, not supplier authorization or model availability. Verify actual resource invocation separately and retain the provider diagnostic on failure. Missing Starter opening, validation or migration errors stop publication/startup with their original code and path.
 
-For any OpenAPI/schema-derived artifact:
+Publisher results are saved in `.data/device-real/logs/preset-result.json`. The launcher clears the old result before each invocation and includes the current endpoint, HTTP status and problem code (or publisher exit code if no result was written) in its final failure. API response bodies and credentials are excluded. Preserve the database, SQLite sidecars, protected files and diagnostic on failure; rerun after correcting the reported cause.
+
+Use actual Admin authoring and a dedicated Android emulator for UI/context verification. Keep the retained production demo separate. Commands and acceptance boundaries are in [testing](testing.md#starter-与协议兼容); historical results are in the [evidence index](s0-execution-progress.md#历史证据入口).
+
+## 3. Normal checks
+
+From `backend/`:
 
 ```text
-change authoritative source
-→ validate source
-→ regenerate deterministically
-→ inspect diff
-→ run fixture/contract tests
-→ run generated-drift check
-→ commit source + expected generated artifacts together where repository policy requires them committed
+go test ./... -count=1
+go vet ./...
+go test ./internal/contract -count=1
+go test -tags=smoke ./test/system/scenarios/ -count=1 -timeout 5m
+go test ./test/system/adapter/ ./test/system/client/ -count=1 -timeout 2m
 ```
 
-Never make the generated output the first or only source of a protocol change.
-
-## 7. Database workflow
-
-Schema work follows:
+From the repository root:
 
 ```text
-failing domain/repository/migration test
-→ Ent schema change
-→ Atlas migrate diff
-→ review SQL
-→ empty replay + upgrade test
-→ implementation Green
+pnpm -C console typecheck
+pnpm -C console test --run
+pnpm -C console build
 ```
 
-See `docs/database-migrations.md`.
+Ordinary `go test ./...` does not execute build-tagged smoke/candidate scenarios. Build, unit and component tests do not prove browser, real Adapter, Android or Freeze acceptance.
 
-## 8. Frontend workflow
+From either PowerShell or POSIX, `node scripts/checks.mjs generate` owns regeneration; `fmt`, `drift` and `static` are sibling commands. `npm run test:tooling` validates failure/pin rules, the command-line contract of every `./cmd` invocation in repository tooling, and that each required freeze artifact has a producer that also writes its metadata. These are local tools: `make ci` runs tests only and does not regenerate or compare generated files, so run `make generate` yourself after changing contracts or fixtures and commit the derived output with the source. Generation intentionally can change derived files: inspect and commit source plus expected outputs together, never hand-edit generated types.
 
-Admin Console development separates:
+## 4. API and database changes
 
-- generated Admin API types;
-- API/problem/session infrastructure;
-- Pinia workflow state;
-- feature components;
-- pages/layout.
+Semantic changes start in the owning architecture contract, then OpenAPI → canonical fixtures → generated artifacts → tests → implementation. `make generate` delegates to that same Node owner and installs locked console dependencies before generation. It covers four Go wire surfaces, Android Client OpenAPI export/manifest, Ent, canonical client fixtures, the Android integration export and Admin TypeScript. It does not produce a schema checksum file: there is none. Android export is not Kotlin consumer implementation. See [API contracts](api-contracts.md).
 
-Frontend tests may stub Hub for component-level T1/T2, but system/RC browser lanes use a real Hub as required by the architecture Testing Specs.
+Schema changes add an immutable, sequential SQL migration and update Ent/generated code. Preserve a previous-version fixture when a new migration is introduced, and test empty initialization, upgrade data preservation, idempotence, per-file atomic failure and backup/recovery. `devmigrate` is only a compatibility wrapper around the same embedded migrator used by `control-hub migrate`. See [database migrations](database-migrations.md).
 
-## 9. Runtime Relay workflow
+## 5. System and browser ownership
 
-Relay data-path changes must be tested against real HTTP/TCP boundaries for streaming, cancellation, header handling and forwarding behavior. In-memory mocks do not replace required Relay T2/T3 scenarios.
+There are two real implementations of test orchestration, not one physical harness:
 
-## 10. Keeping docs accurate
+- `backend/test/system/{harness,adapter,client,scenarios}`: Go component/system environment and tagged scenarios.
+- `scripts/lib/harness.mjs`, `scripts/e2e-harness.mjs`: Node process/static-host/browser/candidate orchestration. The browser candidate gate has a single entry (`node scripts/e2e-harness.mjs`); no parallel orchestrator or artifact exists.
+- `console/e2e/`: browser actions/assertions; it must not recreate its own daemon lifecycle.
 
-When implementation changes how developers actually build/run/test/operate the repository, update the owning implementation document in the same PR. When behavior meaning changes, update architecture first instead.
+Keep orchestration out of feature tests. Share contracts/fixtures and align evidence, rather than declaring the two environments identical. A scenario requiring browser → traffic → Usage/System closure must run those steps against the **same** runtime, not combine unrelated Green runs.
+
+Bounded T3 is `make system-test`; the explicit S0.1 candidate lanes are `make s01-candidate-test` and `make s01-browser-candidate`. The browser entry builds production SPA and runs `node scripts/e2e-harness.mjs`; run it on an isolated candidate because it creates processes and artifacts. Browser entrypoints and failure diagnosis are in [testing](testing.md).
+
+Harness requirements: isolated DB/ports, real migrations and real component processes, synthetic secrets, deadline polling, reliable teardown, safe diagnostics. Bootstrap may create initial identity/keys; business objects under test must use the declared public/Admin product surface, not direct DB writes or Relay internal control shortcuts.
+
+## 6. TDD, CI and evidence
+
+Use a meaningful observed Red → Green → Refactor loop for behavior/regressions; documentation-only changes do not require artificial Red. Run the narrow test, affected component checks and real-boundary tests appropriate to risk.
+
+GitHub-only work uses a Draft PR and actual check/log inspection; current CI triggers on PRs to `main` and pushes to `main`, not arbitrary branch pushes. CI's four work jobs are static-contract, backend-test, system-test and console-test, aggregated by ci-gate. It excludes browser T4.1 and real external qualification.
+
+Evidence tooling rejects failed commands, dirty/mismatched source/build/contract/artifact pins and incomplete one-run Adapter profiles. It creates new candidate artifacts without overwriting existing files. The CAP runner pins current v5 resource/contract evidence, including shared v4/v5 defaults and strict Starter opening wire checks; it does not replace Starter product/consumer verification or S0.2 ERX; independent clean-source replay rebuilds pinned commits and reruns the required path before finalization. See [testing](testing.md) and [release](release.md); candidate acceptance requires each named gate rather than a wrapper target.

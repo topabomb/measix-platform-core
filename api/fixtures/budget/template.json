@@ -1,0 +1,48 @@
+{
+  "assignedUserCount": 2,
+  "budgetTemplateId": "bgt_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "createdAt": "2026-09-20T00:00:00Z",
+  "description": "Default managed usage limits",
+  "name": "Standard",
+  "revision": 3,
+  "rules": [
+    {
+      "capability": "MODEL",
+      "limits": [
+        {
+          "limit": "100",
+          "meter": "REQUESTS",
+          "period": "DAY"
+        }
+      ],
+      "mode": "LIMITED"
+    },
+    {
+      "capability": "IMAGE_GENERATION",
+      "limits": [
+        {
+          "limit": "20",
+          "meter": "REQUESTED_IMAGES",
+          "period": "DAY"
+        }
+      ],
+      "mode": "LIMITED"
+    },
+    {
+      "capability": "TTS",
+      "limits": [],
+      "mode": "UNLIMITED"
+    },
+    {
+      "capability": "ASR",
+      "limits": [],
+      "mode": "UNLIMITED"
+    },
+    {
+      "capability": "MCP",
+      "limits": [],
+      "mode": "UNLIMITED"
+    }
+  ],
+  "updatedAt": "2026-09-20T01:00:00Z"
+}

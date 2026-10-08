@@ -1,0 +1,35 @@
+{
+  "platformContractVersion": 2,
+  "supportedPlatformContractVersions": [
+    2
+  ],
+  "coreBaselineVersion": "0.2.0-preview.23",
+  "baselineHash": "sha256:389b429ae51eb8d8cfbbf927c028ad298b0e1471edb668b86e28cb778224804b",
+  "bridgeVersion": 3,
+  "artifacts": {
+    "portal-contract.openapi.json": {
+      "source": "api/portal/portal-contract.openapi.json",
+      "sha256": "6b7c86c58d38fbbc641eab87bf1035973b9cfe37ec244c91bed587c353bbe372"
+    },
+    "client-feed.schemas.json": {
+      "source": "api/portal/client-feed.schemas.json",
+      "sha256": "4221516537948d2744d82a0d5172cfbd3e4c4a0f939c60d94d8d654b5c8c8681"
+    },
+    "native-vectors.json": {
+      "source": "api/fixtures/portal/native-vectors.json",
+      "sha256": "79668fcdb9cc7b158afdbc8e4e81bcd96a6069928160b0867d49e512b7f2f85a"
+    },
+    "feed-vectors.json": {
+      "source": "api/fixtures/portal/feed-vectors.json",
+      "sha256": "6c4545ffeb986bed9ee2b08226f239502262f843d99a6f3b78300a128629765e"
+    },
+    "platform-v1.json": {
+      "source": "api/fixtures/enrollment/platform-v1.json",
+      "sha256": "3ac391412640d571dd03220fbfd88487e1d1e47a6b1d6f8a86ee09ae821d340a"
+    },
+    "cases.json": {
+      "source": "api/fixtures/enrollment/cases.json",
+      "sha256": "62e162ce79f73fd602f559fbe9fcfa9331e028e4805fb8b065f8ccf326482a03"
+    }
+  }
+}

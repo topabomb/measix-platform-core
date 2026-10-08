@@ -153,7 +153,7 @@ func (h *fullAdminHandler) ListWorkspaces(w http.ResponseWriter, r *http.Request
 	if _, ok := h.workspaceAuth(w, r, "", false); !ok {
 		return
 	}
-	out, err := h.services.Workspace.ListWorkspaces(r.Context(), id, optionalString(p.Search), optionalString(p.Cursor))
+	out, err := h.services.Workspace.ListWorkspaces(r.Context(), id, optionalString(p.Search), optionalString(p.Cursor), p.DiscoveryEligible != nil && *p.DiscoveryEligible)
 	if err != nil {
 		writeWorkspaceError(w, err)
 		return

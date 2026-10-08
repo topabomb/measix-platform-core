@@ -82,7 +82,7 @@ Direct MCP 的企业共享凭据或 NONE 模式现在即可使用；企业动态
 | SYSTEM_TTS.speechRate/pitch | 仅设备执行，无上游绑定、Runtime URL 或企业服务器密钥。仍为企业资源，可在 allowLocalTts=false 时作为 defaultTtsId；缺少可用设备引擎须明确报错，不切换云端 |
 | ASR.asrId/displayName/upstreamModelKey/language/clientProtocol | 保留资源身份、模型及可选语言；按 clientProtocol 分派 OpenAI multipart、DashScope HTTP JSON、OpenAI Realtime 或 DashScope Realtime。实时参数按当前协议映射，不把 WebSocket 转成文件上传 |
 | MCP.mcpServerId/displayName/enabled/authOwnership | EnterpriseMcpResource.id/name/enabled；适配层保留 MCP_STREAMABLE_HTTP、runtimePath 和实际 authOwnership（ENTERPRISE_MANAGED 或 NONE）；均使用 Relay，无 OAuth/上游凭据下发 |
-| Assistant.assistantDefinitionId/displayName/description/modelId/systemPrompt/mcpBindings/enabled | EnterpriseAssistant 对应字段；v5 mcpBindings 是服务器+ALL/ALLOWLIST+工具名，v4 独立保留 mcpServerIds；缺省 description 可展示为空字符串；modelId 是平台稳定 ID，不是请求模型名 |
+| Assistant.assistantDefinitionId/displayName/description/modelId/systemPrompt/mcpBindings/enabled | EnterpriseAssistant 对应字段；未正式发布 v5 mcpBindings 是强制服务器+ALL/ALLOWLIST+工具名，非强制 enabled 企业服务允许本域用户显式选用，具体装配/偏好/执行接线见 [Direct MCP](direct-mcp-tool-governance.md#android-接线)；v4 独立保留原 mcpServerIds 引用语义；缺省 description 可展示为空字符串；modelId 是平台稳定 ID，不是请求模型名 |
 | Assistant.memorySeed[] | 按作者顺序转换为只读 Seed。内部 ID 从 deploymentId、助手 ID、generation、索引确定；空数组有效，条目不得为空白。不按内容去重、不建立可变 Assistant Memory 副本，配置替换时整体换代 |
 | Starter.starterId/assistantDefinitionId/title/prompt/sortOrder/enabled | EnterpriseStarter 对应字段；仅启用且助手有效的入口可操作。展示按 sortOrder、starterId 排序。点击预填输入草稿，由用户发送，不新增 Portal 聊天写入 Bridge |
 | Starter.openingSnapshot（v5 required；v4 不解释此字段） | 消费 Core 编译后已固化的 System 与有序背景；Core Draft 的空白继承在编译时完成，Android 不从当前助手重新补空值。v5 选择时绑定 Draft，首发原子保存来源与背景；背景按字面处理，领域 System 沿 Android 既有 START 模板规则渲染。额外内容默认折叠、详情按需展开；v4 仍只预填。Core 编制与历史发布边界见 Core 源仓库 `docs/api-contracts.md` |

@@ -298,7 +298,7 @@ func mcpGovernanceIssues(content adminapi.ManagedDraftContent) []adminapi.Valida
 	for i, a := range content.Assistants {
 		path := fmt.Sprintf("assistants[%d].mcpBindings", i)
 		if a.McpBindings == nil || len(a.McpServerIds) > 0 {
-			issue("missing_mcp_tool_bindings", path, "Choose the servers this assistant uses; legacy references need explicit conversion", "ASSISTANT", a.AssistantDefinitionId, "mcpBindings")
+			issue("missing_mcp_tool_bindings", path, "Author mandatory MCP bindings (an empty list is valid); legacy references need explicit conversion", "ASSISTANT", a.AssistantDefinitionId, "mcpBindings")
 			continue
 		}
 		servers := map[string]bool{}

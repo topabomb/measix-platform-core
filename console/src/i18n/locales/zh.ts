@@ -694,7 +694,7 @@ export default {
         voice: '音色', voiceDesignPrompt: '音色设计描述', language: '语言', sampleRate: '采样率',
         vadThreshold: '语音检测阈值', silenceDurationMs: '静音时长', prefixPaddingMs: '前置缓冲', prompt: '提示词',
         authOwnership: '凭据归属', modelId: '模型', mcpServerIds: '工具（MCP）', memorySeed: '记忆种子',
-        systemPrompt: '系统提示词', title: '标题', assistantDefinitionId: '企业助手', upstreamId: '上游连接', allowedTools: '允许的 MCP 工具', mcpBindings: '助手工具选择',
+        systemPrompt: '系统提示词', title: '标题', assistantDefinitionId: '企业助手', upstreamId: '上游连接', allowedTools: '允许的 MCP 工具', mcpBindings: '助手强制启用项',
         resourceId: '资源', transportPolicy: '传输方式', allowedMethods: '允许的 HTTP 方法', allowedPathPrefixes: '允许的路径',
         defaultModelId: '默认对话模型', defaultFastModelId: '快速模型', defaultTitleModelId: '标题生成模型',
         defaultAttachmentInspectionModelId: '附件检查模型', defaultSuggestionModelId: '建议生成模型',

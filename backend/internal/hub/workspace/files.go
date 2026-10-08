@@ -2,9 +2,11 @@ package workspace
 
 import (
 	"context"
+	"entgo.io/ent/dialect/sql"
 	"errors"
 	"measix/platform/ent"
 	"measix/platform/ent/agentspace"
+	"measix/platform/ent/user"
 	remoteapi "measix/platform/internal/hub/agentspace"
 	"measix/platform/internal/wire/adminapi"
 	"measix/platform/pkg/platformid"
@@ -155,13 +157,31 @@ func (s *Service) RevealDAV(ctx context.Context, actor, userID string, authorize
 	}
 	return adminapi.WorkspaceDAVConnection{DavUrl: raw, Username: access.Username, Token: access.Token}, nil
 }
-func (s *Service) ListWorkspaces(ctx context.Context, id, search, cursor string) (adminapi.WorkspaceList, error) {
+func (s *Service) ListWorkspaces(ctx context.Context, id, search, cursor string, discoveryEligible bool) (adminapi.WorkspaceList, error) {
+	out := adminapi.WorkspaceList{Items: []adminapi.WorkspaceListItem{}}
 	query := s.Client.AgentSpace.Query().Where(agentspace.WorkspaceServiceIDEQ(id), agentspace.IDGT(cursor))
+	if discoveryEligible {
+		service, err := s.Client.WorkspaceService.Get(ctx, id)
+		if err != nil {
+			return out, err
+		}
+		if !service.Enabled || service.State != "ACTIVE" || service.ActiveConfigRevision == nil {
+			return out, nil
+		}
+		query.Where(agentspace.StateEQ("CONNECTED"), agentspace.IntentEQ("CONNECTED"), agentspace.RemoteActiveEQ(true), agentspace.StopPendingEQ(false), agentspace.McpSecretIDNEQ(""), agentspace.McpSecretVersionGT(0))
+		// AgentSpace deliberately has no user FK: cleanup survives user removal.
+		query.Where(func(s *sql.Selector) {
+			users := sql.Table(user.Table)
+			s.Where(sql.In(s.C(agentspace.FieldID), sql.Select(users.C(user.FieldID)).From(users).Where(sql.EQ(users.C(user.FieldStatus), "ACTIVE"))))
+		})
+	}
 	if search != "" {
-		query = query.Where(agentspace.RemoteUsernameContains(search))
+		query.Where(func(s *sql.Selector) {
+			users := sql.Table(user.Table)
+			s.Where(sql.Or(sql.Contains(s.C(agentspace.FieldRemoteUsername), search), sql.In(s.C(agentspace.FieldID), sql.Select(users.C(user.FieldID)).From(users).Where(sql.Or(sql.Contains(users.C(user.FieldDisplayName), search), sql.Contains(users.C(user.FieldUsername), search))))))
+		})
 	}
 	rows, err := query.Order(ent.Asc(agentspace.FieldID)).Limit(51).All(ctx)
-	out := adminapi.WorkspaceList{Items: []adminapi.WorkspaceListItem{}}
 	if err != nil {
 		return out, err
 	}

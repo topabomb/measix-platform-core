@@ -694,7 +694,7 @@ export default {
         voice: 'Voice', voiceDesignPrompt: 'Voice design description', language: 'Language', sampleRate: 'Sample rate',
         vadThreshold: 'VAD threshold', silenceDurationMs: 'Silence duration', prefixPaddingMs: 'Prefix padding', prompt: 'Prompt',
         authOwnership: 'Credential ownership', modelId: 'Model', mcpServerIds: 'Tools (MCP)', memorySeed: 'Memory seeds',
-        systemPrompt: 'System prompt', title: 'Title', assistantDefinitionId: 'Assistant', upstreamId: 'Upstream', allowedTools: 'Allowed MCP tools', mcpBindings: 'Assistant tool selection',
+        systemPrompt: 'System prompt', title: 'Title', assistantDefinitionId: 'Assistant', upstreamId: 'Upstream', allowedTools: 'Allowed MCP tools', mcpBindings: 'Required assistant MCP servers',
         resourceId: 'Resource', transportPolicy: 'Transport', allowedMethods: 'Allowed HTTP methods', allowedPathPrefixes: 'Allowed paths',
         defaultModelId: 'Default chat model', defaultFastModelId: 'Fast model', defaultTitleModelId: 'Title model',
         defaultAttachmentInspectionModelId: 'Attachment inspection model', defaultSuggestionModelId: 'Suggestion model',

@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch, toRaw, nextTick } from 'vue'
+import { computed, ref, watch, toRaw, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { useDraftStore } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
 import PagedEntityPicker from './PagedEntityPicker.vue'
+import type { EntityPickerOption } from './PagedEntityPicker.vue'
 import ProblemBanner from './ProblemBanner.vue'
 import McpToolSummary from './McpToolSummary.vue'
 import McpToolDetailDialog from './McpToolDetailDialog.vue'
-import { fetchUserPickerPage, resolveUserPickerOption } from '../api/entityPickerSources'
+import { fetchWorkspaceDiscoveryPage } from '../api/entityPickerSources'
 
 type Mcp = components['schemas']['McpDefinition']
 type Tool = components['schemas']['McpDiscoveredTool']
@@ -25,8 +26,15 @@ const catalogOpen = computed(() => props.mcp.toolAccessMode === 'ALLOWLIST' || s
 const error = ref<unknown>()
 const detail = ref<Tool>()
 const userId = ref<string>()
-const workspace = computed(() => Boolean(draft.bindingFor(props.mcp.mcpServerId)?.workspaceServiceId))
-const locked = computed(() => props.disabled || draft.discovering || draft.saving)
+const workspaceServiceId = computed(() => draft.bindingFor(props.mcp.mcpServerId)?.workspaceServiceId)
+const workspace = computed(() => Boolean(workspaceServiceId.value))
+const preparing = ref(false)
+const chooseConnection = ref(false)
+const noConnections = ref(false)
+const selectedConnection = ref<EntityPickerOption>()
+let discoverySequence = 0
+const locked = computed(() => props.disabled || preparing.value || draft.discovering || draft.saving)
+const fetchConnections = (query: string, cursor?: string) => fetchWorkspaceDiscoveryPage(workspaceServiceId.value!, query, cursor)
 const candidates = computed(() => props.mcp.toolDiscovery?.tools ?? [])
 const grants = computed(() => props.mcp.allowedTools ?? [])
 const rows = computed(() => {
@@ -76,12 +84,36 @@ function mode(value: Mcp['toolAccessMode']) {
   draft.markDirty()
 }
 function remove(name: string) { props.mcp.allowedTools = grants.value.filter(grant => grant.name !== name); draft.markDirty() }
-async function discover() {
+async function discover(user?: string, current = discoverySequence) {
   error.value = undefined
-  try { await draft.discoverMcpTools(props.mcp.mcpServerId, session.csrfToken!, workspace.value ? userId.value : undefined); showCatalog.value = true }
-  catch (e) { error.value = e }
+  chooseConnection.value = false
+  try { await draft.discoverMcpTools(props.mcp.mcpServerId, session.csrfToken!, user); if (current === discoverySequence) showCatalog.value = true }
+  catch (e) { if (current === discoverySequence) error.value = e }
 }
-watch(() => props.mcp.mcpServerId, () => { query.value = ''; page.value = 1; showCatalog.value = false; error.value = undefined; detail.value = undefined; userId.value = props.mcp.toolDiscovery?.userId }, { immediate: true })
+async function beginDiscovery() {
+  if (locked.value || !props.mcp.enabled) return
+  const current = ++discoverySequence
+  error.value = undefined
+  noConnections.value = false
+  selectedConnection.value = undefined
+  userId.value = undefined
+  if (!workspaceServiceId.value) { await discover(undefined, current); return }
+  preparing.value = true
+  try {
+    const page = await fetchConnections('')
+    if (current !== discoverySequence) return
+    if (page.items.length === 1 && !page.nextCursor) {
+      selectedConnection.value = page.items[0]!
+      userId.value = selectedConnection.value.value
+      await discover(userId.value, current)
+    } else if (!page.items.length && !page.nextCursor) noConnections.value = true
+    else chooseConnection.value = true
+  } catch (e) { if (current === discoverySequence) error.value = e }
+  finally { if (current === discoverySequence) preparing.value = false }
+}
+function cancelConnection() { chooseConnection.value = false; userId.value = undefined; selectedConnection.value = undefined }
+watch([() => props.mcp.mcpServerId, workspaceServiceId], () => { discoverySequence++; query.value = ''; page.value = 1; showCatalog.value = false; error.value = undefined; detail.value = undefined; userId.value = undefined; selectedConnection.value = undefined; chooseConnection.value = false; noConnections.value = false; preparing.value = false }, { immediate: true })
+onBeforeUnmount(() => { discoverySequence++ })
 watch(() => props.mcp.toolAccessMode, () => { query.value = ''; page.value = 1; showCatalog.value = false })
 watch(query, () => { page.value = 1 })
 watch(() => props.mcp.toolDiscovery?.discoveredAt, () => { page.value = 1 })
@@ -96,14 +128,27 @@ watch(page, async () => { await nextTick(); catalogTop.value?.scrollIntoView?.({
     <q-btn-toggle :model-value="mcp.toolAccessMode" no-caps unelevated spread toggle-color="primary" :options="[{ label: t('mcpTools.allTools'), value: 'ALL' }, { label: t('mcpTools.selectedTools'), value: 'ALLOWLIST' }]" :disable="locked" data-cy="mcp-tool-mode" @update:model-value="mode" />
     <div v-if="mcp.toolAccessMode === 'ALL'" class="text-body2 text-grey-7" data-cy="mcp-tools-all">{{ t('mcpTools.allSummary') }}</div>
     <q-banner v-else-if="mcp.toolAccessMode === 'ALLOWLIST' && !grants.length" dense class="bg-orange-1" data-cy="mcp-tools-empty-error">{{ t('mcpTools.serverEmptySelection') }}</q-banner>
-    <PagedEntityPicker v-if="workspace" v-model="userId" :label="t('mcpTools.discoveryUser')" :empty-label="t('mcpTools.chooseUser')" :fetch-page="fetchUserPickerPage" :resolve-option="resolveUserPickerOption" :disabled="locked" />
-    <div v-if="workspace" class="text-caption text-grey-7">{{ t('mcpTools.userHint') }}</div>
+    <div class="text-subtitle2 q-pt-sm">{{ t('mcpTools.catalogLabel') }}</div>
+    <template v-if="chooseConnection">
+      <PagedEntityPicker v-model="userId" :selected-option="selectedConnection" :label="t('mcpTools.discoveryUser')" :empty-label="t('mcpTools.chooseUser')" :fetch-page="fetchConnections" :disabled="locked" @selected="selectedConnection = $event" />
+      <div class="text-caption text-grey-7">{{ t('mcpTools.userHint') }}</div>
+      <div class="row q-gutter-sm">
+        <q-btn outline color="primary" no-caps :label="draft.dirty ? t('mcpTools.saveDiscover') : t('mcpTools.discover')" :disable="locked || !mcp.enabled || !userId" data-cy="mcp-discover-confirm" @click="discover(userId)" />
+        <q-btn flat no-caps :label="t('common.cancel')" :disable="locked" @click="cancelConnection" />
+      </div>
+    </template>
+    <q-banner v-if="noConnections" dense class="bg-orange-1" data-cy="mcp-discovery-no-connections">
+      {{ t('mcpTools.noConnections') }}
+      <q-btn flat no-caps color="primary" href="/admin/remote-workspaces" :label="t('mcpTools.manageWorkspaces')" data-cy="mcp-manage-workspaces" />
+    </q-banner>
+    <div v-if="workspace && selectedConnection && !chooseConnection" class="text-caption text-grey-7" data-cy="mcp-discovery-connection">{{ t('mcpTools.usingConnection', { name: selectedConnection.label }) }}</div>
     <div class="row items-center q-gutter-sm">
-      <q-btn outline color="primary" icon="refresh" no-caps :label="draft.dirty ? t('mcpTools.saveDiscover') : t('mcpTools.discover')" :loading="draft.discovering" :disable="locked || !mcp.enabled || (workspace && !userId)" data-cy="mcp-discover" @click="discover" />
+      <q-btn v-if="!chooseConnection" outline color="primary" icon="refresh" no-caps :label="draft.dirty ? t('mcpTools.saveDiscover') : t('mcpTools.discover')" :loading="preparing || draft.discovering" :disable="locked || !mcp.enabled" data-cy="mcp-discover" @click="beginDiscovery" />
       <q-btn v-if="mcp.toolAccessMode === 'ALL' && mcp.toolDiscovery" flat color="primary" no-caps :icon="catalogOpen ? 'expand_less' : 'expand_more'" :label="catalogOpen ? t('mcpTools.hideCatalog') : t('mcpTools.viewCatalog', { count: candidates.length })" :aria-expanded="catalogOpen" data-cy="mcp-catalog-toggle" @click="showCatalog = !showCatalog" />
     </div>
     <div v-if="draft.dirty" class="text-caption text-grey-7" data-cy="mcp-discover-save-hint">{{ t('mcpTools.saveDiscoverHint') }}</div>
     <ProblemBanner :error="error" />
+    <div v-if="error && mcp.toolDiscovery" class="text-caption text-grey-7" data-cy="mcp-previous-catalog-retained">{{ t('mcpTools.previousCatalogRetained') }}</div>
     <q-banner v-if="mcp.allowedTools === undefined || !mcp.toolAccessMode" dense class="bg-orange-1">{{ t('mcpTools.unauthored') }}</q-banner>
     <div v-if="!mcp.toolDiscovery" class="text-body2 text-grey-7" data-cy="mcp-tools-no-catalog">{{ t(mcp.toolAccessMode === 'ALL' ? 'mcpTools.optionalDiscovery' : workspace ? 'mcpTools.workspaceNotDiscovered' : 'mcpTools.notDiscovered') }}</div>
     <div v-if="(mcp.toolDiscovery || grants.length) && catalogOpen" class="mcp-catalog">

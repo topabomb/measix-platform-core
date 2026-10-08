@@ -963,11 +963,11 @@ type AssistantMcpBinding struct {
 	McpServerId McpServerId `json:"mcpServerId"`
 	ToolNames   []string    `json:"toolNames"`
 
-	// ToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+	// ToolSelection ALL adds no assistant tool restriction for this mandatory server; ALLOWLIST requires a nonempty list within server permissions. Removing the binding removes the mandatory selection and its assistant tool restriction, but users may explicitly select the server while it remains enabled. Duplicate user selection cannot bypass a mandatory binding.
 	ToolSelection AssistantMcpBindingToolSelection `json:"toolSelection"`
 }
 
-// AssistantMcpBindingToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+// AssistantMcpBindingToolSelection ALL adds no assistant tool restriction for this mandatory server; ALLOWLIST requires a nonempty list within server permissions. Removing the binding removes the mandatory selection and its assistant tool restriction, but users may explicitly select the server while it remains enabled. Duplicate user selection cannot bypass a mandatory binding.
 type AssistantMcpBindingToolSelection string
 
 // AssistantStarterDefinition defines model for AssistantStarterDefinition.
@@ -1195,10 +1195,12 @@ type ManagedAssistantDefinition struct {
 	Description           *string               `json:"description,omitempty"`
 	DisplayName           string                `json:"displayName"`
 	Enabled               bool                  `json:"enabled"`
-	McpBindings           []AssistantMcpBinding `json:"mcpBindings"`
-	MemorySeed            []string              `json:"memorySeed"`
-	ModelId               ModelId               `json:"modelId"`
-	SystemPrompt          string                `json:"systemPrompt"`
+
+	// McpBindings Mandatory MCP servers for this assistant in unpublished Snapshot v5. Empty means no mandatory servers. Users may explicitly select other enabled enterprise servers from the same Snapshot; absence does not deny access. Missing or null is invalid in published Client snapshots and remains unauthored in Admin drafts. Mandatory bindings and their tool restrictions cannot be removed or bypassed by user preferences.
+	McpBindings  []AssistantMcpBinding `json:"mcpBindings"`
+	MemorySeed   []string              `json:"memorySeed"`
+	ModelId      ModelId               `json:"modelId"`
+	SystemPrompt string                `json:"systemPrompt"`
 }
 
 // ManagedAssistantDefinitionV4 defines model for ManagedAssistantDefinitionV4.

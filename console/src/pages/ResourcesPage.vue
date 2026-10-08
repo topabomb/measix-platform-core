@@ -1671,7 +1671,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <q-item-section>
                     <q-item-label>{{ a.displayName }} <q-badge class="q-ml-xs" :color="a.enabled ? 'positive' : 'grey'" :label="a.enabled ? $t('common.enabled') : $t('common.disabled')" /></q-item-label>
                     <div v-if="a.description" data-cy="preview-assistant-description" class="text-body2 q-mt-xs">{{ a.description }}</div>
-                    <q-item-label caption data-cy="preview-assistant-summary">{{ $t('resources.preview.usesModel') }}: {{ previewModelName(a.modelId) }} · MCP: {{ previewMcpNames(a.mcpBindings?.map(binding => binding.mcpServerId) ?? []) }}</q-item-label>
+                    <q-item-label caption data-cy="preview-assistant-summary">{{ $t('resources.preview.usesModel') }}: {{ previewModelName(a.modelId) }} · {{ $t('mcpTools.assistantTools') }}: {{ previewMcpNames(a.mcpBindings?.map(binding => binding.mcpServerId) ?? []) }}</q-item-label>
+                    <div v-if="a.mcpBindings?.length === 0" class="text-caption" data-cy="preview-assistant-optional">{{ $t('mcpTools.noRequiredServers') }}</div>
                     <div v-for="binding in a.mcpBindings" :key="binding.mcpServerId" class="text-caption" data-cy="preview-assistant-tools">{{ previewMcpNames([binding.mcpServerId]) }}: {{ binding.toolSelection === 'ALL' ? $t('mcpTools.assistantAll') : binding.toolNames.join(', ') }}</div>
                     <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.preview.instructions') }}</div>
                     <p class="q-my-xs" style="white-space: pre-wrap">{{ a.systemPrompt }}</p>

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
 
 test('Direct MCP allowlist, assistant subset, discovery failure, drift review and mobile interaction', async ({ page, request }) => {
   const adapter = process.env.MEASIX_E2E_ADAPTER_URL!
@@ -20,6 +21,13 @@ test('Direct MCP allowlist, assistant subset, discovery failure, drift review an
   }
   await openMcp()
   const tools = page.locator('[data-cy="mcp-tools-editor"]')
+  // An unsupported negotiated version has its own safe diagnostic and preserves the catalog.
+  await mode('old-version')
+  await tools.locator('[data-cy="mcp-discover"]').click()
+  await expect(tools.locator('[data-cy="problem-banner"]')).toContainText('2024-11-05')
+  await expect(tools.locator('[data-cy="problem-banner"]')).toContainText('2025-11-25, 2025-06-18, 2025-03-26')
+  await expect(tools.locator('[data-cy="mcp-previous-catalog-retained"]')).toBeVisible()
+  await mode('initial')
   await expect(tools.locator('[data-tool-name="tool-a"] [data-cy="mcp-tool-select"]')).toHaveAttribute('aria-checked', 'true')
   const approval = (name: string) => tools.locator(`[data-tool-name="${name}"] [data-cy="mcp-tool-approval"]`)
   await expect(approval('tool-a')).toContainText('No additional confirmation')
@@ -115,8 +123,28 @@ test('Direct MCP allowlist, assistant subset, discovery failure, drift review an
   await page.getByText('E2E Assistant', { exact: true }).first().click()
   await page.locator('[data-cy="assistant-section-connections"]').click()
   const useServer = page.locator('[data-cy="assistant-mcp-use"]')
+  await expect(useServer).toContainText('Require this MCP')
   await useServer.click()
   await expect(page.locator('[data-cy="assistant-tool-mode"]')).toHaveCount(0)
+  await expect(page.locator('[data-cy="assistant-mcp-optional"]')).toContainText('Users can select')
+  await page.locator('[data-cy="draft-save-btn"]').click()
+  await expect(page.locator('[data-cy="draft-save-btn"]')).toBeDisabled()
+  await page.locator('[data-cy="draft-preview-btn"]').click()
+  await preview.getByText('MCP (1)', { exact: true }).click()
+  await expect(preview.locator('[data-cy="preview-mcp-all"]')).toBeVisible()
+  await preview.getByText('Assistants (1)', { exact: true }).click()
+  await expect(preview.locator('[data-cy="preview-assistant-optional"]')).toContainText('No required MCP servers')
+  await expect(preview.locator('[data-cy="preview-assistant-tools"]')).toHaveCount(0)
+  await preview.getByRole('button', { name: 'Close', exact: true }).click()
+  await page.locator('[data-cy="draft-review-btn"]').click()
+  page.once('dialog', dialog => dialog.accept())
+  await page.locator('[data-cy="draft-publish-btn"]').click()
+  await expect(page.locator('[data-cy="publish-outcome"]')).toContainText('Configuration published', { timeout: 60_000 })
+  await page.reload()
+  await page.locator('[data-cy="config-section-assistants"]').click()
+  await page.getByText('E2E Assistant', { exact: true }).first().click()
+  await page.locator('[data-cy="assistant-section-connections"]').click()
+  await expect(useServer).toHaveAttribute('aria-checked', 'false')
   await useServer.click()
   await expect(page.locator('[data-cy="assistant-tools-all"]')).toBeVisible()
   await page.locator('[data-cy="draft-save-btn"]').click()
@@ -224,4 +252,95 @@ test('Direct MCP allowlist, assistant subset, discovery failure, drift review an
   await expect(page.locator('[data-cy="assistant-mcp-tools"]')).toContainText('tool-062')
   await page.locator('[data-cy="assistant-tool-mode"]').getByRole('button', { name: 'All tools', exact: true }).click()
   await mode('initial')
+})
+
+test('Workspace discovery separates directory identity from enterprise permissions using real Core APIs', async ({ page, request }) => {
+  const adapter = process.env.MEASIX_E2E_ADAPTER_URL!
+  await page.goto('/admin/')
+  await page.locator('[data-cy="login-username"]').fill('admin')
+  await page.locator('[data-cy="login-password"]').fill(process.env.MEASIX_E2E_ADMIN_PASSWORD!)
+  await page.locator('[data-cy="login-submit"]').click()
+  await expect(page).toHaveURL(/\/admin\/(overview)?$/)
+  const session = await page.request.get('/api/admin/v1/session').then(r => r.json())
+  const api = async (path: string, method = 'GET', data?: unknown) => {
+    const response = await page.request.fetch(path, { method, data, headers: { 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': `idem_${randomUUID()}` } })
+    expect(response.ok(), `${method} ${path}: ${await response.text()}`).toBe(true)
+    return response.status() === 204 ? undefined : response.json()
+  }
+  const complete = async (operation: { operationId: string }) => {
+    await expect.poll(async () => (await api(`/api/admin/v1/workspace-operations/${operation.operationId}`)).state, { timeout: 30000 }).toBe('COMPLETED')
+  }
+  const secret = await api('/api/admin/v1/secrets', 'POST', { name: 'Discovery fixture management', value: 'workspace-management-test' })
+  const service = await api('/api/admin/v1/remote-workspace/services', 'POST', { name: 'Discovery workspace', expectedRevision: 0, config: { adminOrigin: adapter, mcpOrigin: adapter, managementSecret: { secretId: secret.secretId, secretVersion: secret.secretVersion }, connectTimeoutMs: 1000, idleTimeoutMs: 1000 } })
+  const servicePath = `/api/admin/v1/remote-workspace/services/${service.workspaceServiceId}`
+  await complete(await api(`${servicePath}/apply`, 'POST'))
+  const originalDraft = await api('/api/admin/v1/draft')
+  await api(`${servicePath}/mcp-draft`, 'POST', { expectedDraftRevision: originalDraft.draftRevision })
+  const staged = await api('/api/admin/v1/draft')
+  const workspaceMcp = staged.content.mcp.find((m: { mcpServerId: string }) => m.mcpServerId === service.mcpServerId)
+  Object.assign(workspaceMcp, { displayName: 'Discovery workspace', toolAccessMode: 'ALL', allowedTools: [] })
+  await api('/api/admin/v1/draft', 'PUT', { expectedDraftRevision: staged.draftRevision, content: staged.content })
+  const users: { userId: string; username: string }[] = []
+  const command = async (user: { userId: string }, action: string) => {
+    const path = `/api/admin/v1/users/${user.userId}/workspace`
+    const view = await api(path)
+    await complete(await api(path, 'POST', { action, expectedRevision: view.bindingRevision, ...(action === 'DELETE' ? { confirmation: view.agentSpaceId } : {}) }))
+  }
+  const openWorkspaceMcp = async () => {
+    await page.goto('/admin/resources')
+    await page.locator('[data-cy="config-section-mcp"]').click()
+    await page.getByText('Discovery workspace', { exact: true }).first().click()
+  }
+  try {
+    await openWorkspaceMcp()
+    const tools = page.locator('[data-cy="mcp-tools-editor"]')
+    await expect(tools.locator('[data-cy="entity-picker-trigger"]')).toHaveCount(0)
+    await tools.locator('[data-cy="mcp-discover"]').click()
+    await expect(tools.locator('[data-cy="mcp-discovery-no-connections"]')).toBeVisible()
+    await expect(tools.locator('[data-cy="mcp-manage-workspaces"]')).toHaveAttribute('href', '/admin/remote-workspaces')
+    for (const name of ['Alice', 'Bob']) {
+      const user = await api('/api/admin/v1/users', 'POST', { username: `discovery_${name.toLowerCase()}`, displayName: name, role: 'MEMBER' })
+      users.push(user)
+      await command(user, 'CREATE')
+      if (name === 'Alice') {
+        expect((await api(`/api/admin/v1/users/${user.userId}/workspace`)).mcpAvailable).toBe(false)
+        expect((await request.post(`${adapter}/__mcp_mode`, { data: { mode: 'old-version' } })).ok()).toBe(true)
+        await tools.locator('[data-cy="mcp-discover"]').click()
+        await expect(tools.locator('[data-cy="mcp-discovery-connection"]')).toContainText('Alice')
+        await expect(tools.locator('[data-cy="problem-banner"]')).toContainText('2024-11-05')
+        await expect(tools.locator('[data-cy="mcp-previous-catalog-retained"]')).toHaveCount(0)
+        await expect(tools.locator('[data-cy="entity-picker-trigger"]')).toHaveCount(0)
+        expect((await request.post(`${adapter}/__mcp_mode`, { data: { mode: 'initial' } })).ok()).toBe(true)
+        await tools.locator('[data-cy="mcp-discover"]').click()
+        await expect(tools.locator('[data-tool-name="tool-a"]')).toBeVisible()
+        const draft = await api('/api/admin/v1/draft')
+        expect(draft.content.mcp.find((m: { mcpServerId: string }) => m.mcpServerId === service.mcpServerId).toolDiscovery.userId).toBe(user.userId)
+      }
+    }
+    await tools.locator('[data-cy="mcp-discover"]').click()
+    await expect(tools.locator('[data-cy="entity-picker-trigger"]')).toBeVisible()
+    await tools.locator('[data-cy="entity-picker-trigger"]').click()
+    await expect(page.locator('[data-cy="entity-picker-option"]')).toHaveCount(2)
+    await page.locator('[data-cy="entity-picker-option"]').filter({ hasText: 'Bob' }).click()
+    await tools.locator('[data-cy="mcp-discover-confirm"]').click()
+    await expect(tools.locator('[data-cy="mcp-discovery-connection"]')).toContainText('Bob')
+    await expect.poll(async () => {
+      const draft = await api('/api/admin/v1/draft')
+      return draft.content.mcp.find((m: { mcpServerId: string }) => m.mcpServerId === service.mcpServerId).toolDiscovery.userId
+    }).toBe(users[1]!.userId)
+    await expect(tools.locator('[data-cy="mcp-discover"]')).toBeEnabled()
+    await expect(tools.locator('[data-cy="problem-banner"]')).toHaveCount(0)
+    await page.screenshot({ path: '../.artifacts/mcp-workspace-discovery-desktop.png', fullPage: true })
+    await page.setViewportSize({ width: 320, height: 720 })
+    await tools.locator('[data-cy="mcp-discover"]').click()
+    await expect(tools.locator('[data-cy="mcp-discover-confirm"]')).toBeDisabled()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.screenshot({ path: '../.artifacts/mcp-workspace-discovery-mobile.png', fullPage: true })
+  } finally {
+    expect((await request.post(`${adapter}/__mcp_mode`, { data: { mode: 'initial' } })).ok()).toBe(true)
+    for (const user of users) await command(user, 'DELETE')
+    await complete(await api(`${servicePath}/disable`, 'POST'))
+    const latest = await api('/api/admin/v1/draft')
+    await api('/api/admin/v1/draft', 'PUT', { expectedDraftRevision: latest.draftRevision, content: originalDraft.content })
+  }
 })

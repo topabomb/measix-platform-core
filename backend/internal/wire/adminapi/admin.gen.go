@@ -2283,11 +2283,11 @@ type AssistantMcpBinding struct {
 	McpServerId McpServerId `json:"mcpServerId"`
 	ToolNames   []string    `json:"toolNames"`
 
-	// ToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+	// ToolSelection ALL adds no assistant tool restriction for this mandatory server; ALLOWLIST requires a nonempty list within server permissions. Removing the binding removes the mandatory selection and its assistant tool restriction, but users may explicitly select the server while it remains enabled. Duplicate user selection cannot bypass a mandatory binding.
 	ToolSelection AssistantMcpBindingToolSelection `json:"toolSelection"`
 }
 
-// AssistantMcpBindingToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+// AssistantMcpBindingToolSelection ALL adds no assistant tool restriction for this mandatory server; ALLOWLIST requires a nonempty list within server permissions. Removing the binding removes the mandatory selection and its assistant tool restriction, but users may explicitly select the server while it remains enabled. Duplicate user selection cannot bypass a mandatory binding.
 type AssistantMcpBindingToolSelection string
 
 // AssistantStarterDefinition defines model for AssistantStarterDefinition.
@@ -2785,11 +2785,13 @@ type LoginRequest struct {
 
 // ManagedAssistantDefinition defines model for ManagedAssistantDefinition.
 type ManagedAssistantDefinition struct {
-	AssistantDefinitionId AssistantDefinitionId  `json:"assistantDefinitionId"`
-	Description           *string                `json:"description,omitempty"`
-	DisplayName           string                 `json:"displayName"`
-	Enabled               bool                   `json:"enabled"`
-	McpBindings           *[]AssistantMcpBinding `json:"mcpBindings,omitempty"`
+	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
+	Description           *string               `json:"description,omitempty"`
+	DisplayName           string                `json:"displayName"`
+	Enabled               bool                  `json:"enabled"`
+
+	// McpBindings Mandatory MCP servers for this assistant in unpublished Snapshot v5. Empty means no mandatory servers. Users may explicitly select other enabled enterprise servers from the same Snapshot; absence does not deny access. Missing or null is invalid in published Client snapshots and remains unauthored in Admin drafts. Mandatory bindings and their tool restrictions cannot be removed or bypassed by user preferences.
+	McpBindings *[]AssistantMcpBinding `json:"mcpBindings,omitempty"`
 
 	// McpServerIds Retained legacy draft references; explicit tool selection required before v5 publication.
 	McpServerIds []McpServerId `json:"mcpServerIds,omitempty"`
@@ -2998,16 +3000,22 @@ type Problem struct {
 	ActivationId *ActivationId  `json:"activationId,omitempty"`
 	Budget       *BudgetContext `json:"budget,omitempty"`
 
-	// Code Stable machine-readable reason. Authentication uses unauthenticated; destructive user lifecycle values include delete_confirmation_mismatch, cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight.
-	Code                    string     `json:"code"`
-	CurrentDraftRevision    *int       `json:"currentDraftRevision,omitempty"`
-	Detail                  *string    `json:"detail,omitempty"`
-	Forwarded               *bool      `json:"forwarded,omitempty"`
-	RequestId               *RequestId `json:"requestId,omitempty"`
-	Status                  int        `json:"status"`
-	TargetManagedGeneration *int       `json:"targetManagedGeneration,omitempty"`
-	Title                   string     `json:"title"`
-	Type                    string     `json:"type"`
+	// Code Stable machine-readable reason. Authentication uses unauthenticated; destructive user lifecycle values include delete_confirmation_mismatch, cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight. MCP discovery uses mcp_discovery_version for an unsupported negotiated version, separately from mcp_discovery_protocol for an invalid response or catalog.
+	Code                 string  `json:"code"`
+	CurrentDraftRevision *int    `json:"currentDraftRevision,omitempty"`
+	Detail               *string `json:"detail,omitempty"`
+	Forwarded            *bool   `json:"forwarded,omitempty"`
+
+	// ReceivedMcpProtocolVersion Safe transient diagnostic for mcp_discovery_version. Never contains a remote body or credential.
+	ReceivedMcpProtocolVersion *string    `json:"receivedMcpProtocolVersion,omitempty"`
+	RequestId                  *RequestId `json:"requestId,omitempty"`
+	Status                     int        `json:"status"`
+
+	// SupportedMcpProtocolVersions Protocol versions supported by this discovery implementation.
+	SupportedMcpProtocolVersions *[]string `json:"supportedMcpProtocolVersions,omitempty"`
+	TargetManagedGeneration      *int      `json:"targetManagedGeneration,omitempty"`
+	Title                        string    `json:"title"`
+	Type                         string    `json:"type"`
 }
 
 // ProcessTelemetry defines model for ProcessTelemetry.
@@ -4262,8 +4270,10 @@ type StageWorkspaceMCPParams struct {
 
 // ListWorkspacesParams defines parameters for ListWorkspaces.
 type ListWorkspacesParams struct {
-	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Search *string `form:"search,omitempty" json:"search,omitempty"`
+	// DiscoveryEligible Return only active users with a connected authenticated workspace in this active service. Independent of MCP publication; discovery revalidates the connection before use.
+	DiscoveryEligible *bool   `form:"discoveryEligible,omitempty" json:"discoveryEligible,omitempty"`
+	Cursor            *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Search            *string `form:"search,omitempty" json:"search,omitempty"`
 }
 
 // ListSecretsParams defines parameters for ListSecrets.
@@ -7576,6 +7586,19 @@ func (siw *ServerInterfaceWrapper) ListWorkspaces(w http.ResponseWriter, r *http
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListWorkspacesParams
+
+	// ------------- Optional query parameter "discoveryEligible" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "discoveryEligible", r.URL.Query(), &params.DiscoveryEligible, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "discoveryEligible"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "discoveryEligible", Err: err})
+		}
+		return
+	}
 
 	// ------------- Optional query parameter "cursor" -------------
 

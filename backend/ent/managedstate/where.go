@@ -74,6 +74,11 @@ func ActiveManagedGeneration(v int64) predicate.ManagedState {
 	return predicate.ManagedState(sql.FieldEQ(FieldActiveManagedGeneration, v))
 }
 
+// LastAssignedGeneration applies equality check predicate on the "last_assigned_generation" field. It's identical to LastAssignedGenerationEQ.
+func LastAssignedGeneration(v int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldEQ(FieldLastAssignedGeneration, v))
+}
+
 // DesiredControlRevision applies equality check predicate on the "desired_control_revision" field. It's identical to DesiredControlRevisionEQ.
 func DesiredControlRevision(v int64) predicate.ManagedState {
 	return predicate.ManagedState(sql.FieldEQ(FieldDesiredControlRevision, v))
@@ -212,6 +217,46 @@ func ActiveManagedGenerationLT(v int64) predicate.ManagedState {
 // ActiveManagedGenerationLTE applies the LTE predicate on the "active_managed_generation" field.
 func ActiveManagedGenerationLTE(v int64) predicate.ManagedState {
 	return predicate.ManagedState(sql.FieldLTE(FieldActiveManagedGeneration, v))
+}
+
+// LastAssignedGenerationEQ applies the EQ predicate on the "last_assigned_generation" field.
+func LastAssignedGenerationEQ(v int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldEQ(FieldLastAssignedGeneration, v))
+}
+
+// LastAssignedGenerationNEQ applies the NEQ predicate on the "last_assigned_generation" field.
+func LastAssignedGenerationNEQ(v int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldNEQ(FieldLastAssignedGeneration, v))
+}
+
+// LastAssignedGenerationIn applies the In predicate on the "last_assigned_generation" field.
+func LastAssignedGenerationIn(vs ...int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldIn(FieldLastAssignedGeneration, vs...))
+}
+
+// LastAssignedGenerationNotIn applies the NotIn predicate on the "last_assigned_generation" field.
+func LastAssignedGenerationNotIn(vs ...int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldNotIn(FieldLastAssignedGeneration, vs...))
+}
+
+// LastAssignedGenerationGT applies the GT predicate on the "last_assigned_generation" field.
+func LastAssignedGenerationGT(v int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldGT(FieldLastAssignedGeneration, v))
+}
+
+// LastAssignedGenerationGTE applies the GTE predicate on the "last_assigned_generation" field.
+func LastAssignedGenerationGTE(v int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldGTE(FieldLastAssignedGeneration, v))
+}
+
+// LastAssignedGenerationLT applies the LT predicate on the "last_assigned_generation" field.
+func LastAssignedGenerationLT(v int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldLT(FieldLastAssignedGeneration, v))
+}
+
+// LastAssignedGenerationLTE applies the LTE predicate on the "last_assigned_generation" field.
+func LastAssignedGenerationLTE(v int64) predicate.ManagedState {
+	return predicate.ManagedState(sql.FieldLTE(FieldLastAssignedGeneration, v))
 }
 
 // DesiredControlRevisionEQ applies the EQ predicate on the "desired_control_revision" field.

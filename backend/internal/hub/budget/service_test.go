@@ -92,6 +92,33 @@ func (f *budgetFixture) admit(requestID string, capability Capability, resourceI
 	}
 }
 
+func TestAdmissionKeepsOriginalResourceNameForLateSettlementAfterPurge(t *testing.T) {
+	f := newBudgetFixture(t, "UTC")
+	ctx := context.Background()
+	model := platformid.New(platformid.Model)
+	releaseID := platformid.New(platformid.Release)
+	f.client.ManagedRelease.Create().SetID(releaseID).SetManagedGeneration(7).SetStatus("SUPERSEDED").SetReleaseContentJSON([]byte(`{"bindings":[]}`)).SetSnapshotJSON([]byte(`{"models":[{"modelId":"` + model + `","displayName":"Original model"}]}`)).SetSnapshotHash("original").SetSourceDraftRevision(1).SetCreatedByUserID(f.adminID).SetCreatedAt(f.now).SaveX(ctx)
+	input := f.admit(platformid.New(platformid.Request), CapabilityModel, model, ProtocolOpenAIChatCompletions, nil)
+	first, err := f.service.Admit(ctx, input)
+	if err != nil || !first.Allowed {
+		t.Fatalf("admit=%+v %v", first, err)
+	}
+	if err = f.client.ManagedRelease.DeleteOneID(releaseID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	row := f.client.BudgetRequest.GetX(ctx, input.RequestID)
+	if row.ResourceDisplayName != "Original model" {
+		t.Fatalf("original context lost: %+v", row)
+	}
+	replay, err := f.service.Admit(ctx, input)
+	if err != nil || !replay.Allowed {
+		t.Fatalf("delayed replay=%+v %v", replay, err)
+	}
+	if f.client.BudgetRequest.GetX(ctx, input.RequestID).ResourceDisplayName != "Original model" {
+		t.Fatal("retry replaced original resource name")
+	}
+}
+
 func TestDefaultUnlimitedAndExactProtocolSet(t *testing.T) {
 	f := newBudgetFixture(t, "UTC")
 	ctx := context.Background()

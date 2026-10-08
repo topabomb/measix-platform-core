@@ -67,6 +67,12 @@ const RELEASE = {
 }
 
 describe('ReleasesPage', () => {
+  it('offers cleanup and retention controls alongside release history', async () => {
+    const { wrapper } = mountReleases()
+    await flushPromises()
+    expect(wrapper.find('[data-cy="release-cleanup-open"]').exists()).toBe(true)
+    expect(wrapper.find('[data-cy="release-retention-open"]').exists()).toBe(true)
+  })
   it('labels a completed operation without presenting it as pending', async () => {
     const { wrapper, pinia } = mountReleases()
     useActivationStore(pinia).accept({ activationId: 'act_1', kind: 'PUBLISH', state: 'COMPLETED', desiredControlRevision: 5, createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z' })

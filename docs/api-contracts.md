@@ -67,6 +67,9 @@ Core 先选择生成的 v4/v5 DTO，再进入对应 adapter。PublishedContent �
 - Admin 自助密码修改需要 Cookie Session + CSRF，在同一事务改 Argon2id hash 并撤销该管理员全部 Web Sessions；显式失败为 `invalid_current_password` 与 `password_confirmation_mismatch`，人类错误文本不是兼容键。
 - Admin 的他人密码重设和角色命令还需操作员当前密码；`users/{id}:set-role` 携带 `expectedRole`，旧 PUT 的角色变更进入相同领域校验。新 ADMIN 或无密码用户晋升需原子初始化密码；响应 `passwordConfigured` 从已有 hash 派生。角色变更、密码重设与目标 Web Session 撤销在同一事务，Android 身份不变；当前管理员与最后一个可登录管理员保护按 Control Protocol §22.2 执行。请求密码不存入浏览器持久状态、日志或新增数据库字段。
 - `DELETE upstreams/{id}` 携带 `expectedConfigRevision`；事务内保护草稿、全部保留 Release 的 binding 引用及在途 Activation。可删除无引用的 ACTIVE/INACTIVE 连接及其配置修订，保留 Secret、用量、Release 原始字节/hash 和终态操作记录。冲突使用 `upstream_in_use`、`activation_in_progress`、`stale_upstream_config_revision`。
+- `GET upstreams/{id}/references` 返回草稿、保留版本及在途操作诊断；应用过配置不表示仍有引用。诊断不替代删除事务的最终校验。
+- Release history 由 capability 统一预览、执行和自动清理。`releases/retention` 独立修订配置；默认关闭，最近 N 条与最近 D 天取保留并集。`releases/cleanup:preview` 接受明确 ID、半开时间范围或已保存规则，`releases/cleanup` 携带相同选择与 previewHash，在事务内重算并拒绝 `stale_release_cleanup_preview`。ACTIVE/STAGED/当前控制目标受保护，未就绪或 APPLYING/UNKNOWN 阻止执行，每次最多 200 条。
+- 清理不推进控制修订或 managedGeneration，不删除 admission/usage/settlement/session/终态控制事实；保留版本的原始 diff 在删除前驱前固化。后续编号由 ManagedState 高水位分配，Republish 在持久事务中重验源存在。原幂等结果在源清理后仍可查询，新重发/下载已清理版本返回不存在。规则与清理审计独立保留最近 200 次，查询入口为 `releases/cleanup/audit`；小时自动清理复用 Hub reconciler。
 
 Enrollment 原文向量覆盖重复键、UTF-8 上限、origin/expiry/source；固定时钟下允许 RFC3339 小写 t/z、UTC +00:00、至多九位小数、不接受 leap second，输出大写 T/Z。Go 测试使用局部格式 validator，不放宽全局 HTTP 验证。Bridge 向量另验 method/result 关联、URL trust、chunk progression 和生命周期，schema 通过不能替代这些条件。
 

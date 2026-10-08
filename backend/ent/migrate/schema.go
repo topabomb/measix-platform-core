@@ -254,6 +254,7 @@ var (
 		{Name: "device_id", Type: field.TypeString, Nullable: true},
 		{Name: "capability", Type: field.TypeEnum, Enums: []string{"MODEL", "IMAGE_GENERATION", "TTS", "ASR", "MCP"}},
 		{Name: "resource_id", Type: field.TypeString},
+		{Name: "resource_display_name", Type: field.TypeString, Default: ""},
 		{Name: "client_protocol", Type: field.TypeString},
 		{Name: "upstream_id", Type: field.TypeString, Nullable: true},
 		{Name: "workspace_target_json", Type: field.TypeBytes, Nullable: true},
@@ -283,12 +284,12 @@ var (
 			{
 				Name:    "budgetrequest_user_id_capability_state",
 				Unique:  false,
-				Columns: []*schema.Column{BudgetRequestsColumns[3], BudgetRequestsColumns[6], BudgetRequestsColumns[18]},
+				Columns: []*schema.Column{BudgetRequestsColumns[3], BudgetRequestsColumns[6], BudgetRequestsColumns[19]},
 			},
 			{
 				Name:    "budgetrequest_state_updated_at",
 				Unique:  false,
-				Columns: []*schema.Column{BudgetRequestsColumns[18], BudgetRequestsColumns[26]},
+				Columns: []*schema.Column{BudgetRequestsColumns[19], BudgetRequestsColumns[27]},
 			},
 		},
 	}
@@ -439,6 +440,9 @@ var (
 		{Name: "timezone", Type: field.TypeString, Default: "UTC"},
 		{Name: "public_origin", Type: field.TypeString, Default: ""},
 		{Name: "feed_revision", Type: field.TypeInt64, Default: 0},
+		{Name: "release_retention_json", Type: field.TypeBytes, Nullable: true},
+		{Name: "release_retention_revision", Type: field.TypeInt64, Default: 1},
+		{Name: "release_cleanup_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
@@ -602,6 +606,7 @@ var (
 		{Name: "release_content_json", Type: field.TypeBytes},
 		{Name: "snapshot_json", Type: field.TypeBytes},
 		{Name: "snapshot_hash", Type: field.TypeString},
+		{Name: "diff_summary_json", Type: field.TypeBytes, Nullable: true},
 		{Name: "source_draft_revision", Type: field.TypeInt64},
 		{Name: "created_by_user_id", Type: field.TypeString},
 		{Name: "created_at", Type: field.TypeTime},
@@ -624,6 +629,7 @@ var (
 		{Name: "id", Type: field.TypeString},
 		{Name: "active_release_id", Type: field.TypeString, Nullable: true},
 		{Name: "active_managed_generation", Type: field.TypeInt64},
+		{Name: "last_assigned_generation", Type: field.TypeInt64, Default: 0},
 		{Name: "desired_control_revision", Type: field.TypeInt64},
 		{Name: "desired_bundle_hash", Type: field.TypeString, Nullable: true},
 		{Name: "managed_state_revision", Type: field.TypeInt64},
@@ -671,6 +677,20 @@ var (
 		Name:       "pricing_rules",
 		Columns:    PricingRulesColumns,
 		PrimaryKey: []*schema.Column{PricingRulesColumns[0]},
+	}
+	// ReleaseHistoryAuditsColumns holds the columns for the "release_history_audits" table.
+	ReleaseHistoryAuditsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "actor_user_id", Type: field.TypeString},
+		{Name: "kind", Type: field.TypeString},
+		{Name: "details_json", Type: field.TypeBytes},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// ReleaseHistoryAuditsTable holds the schema information for the "release_history_audits" table.
+	ReleaseHistoryAuditsTable = &schema.Table{
+		Name:       "release_history_audits",
+		Columns:    ReleaseHistoryAuditsColumns,
+		PrimaryKey: []*schema.Column{ReleaseHistoryAuditsColumns[0]},
 	}
 	// RequestUsagesColumns holds the columns for the "request_usages" table.
 	RequestUsagesColumns = []*schema.Column{
@@ -1106,6 +1126,7 @@ var (
 		ManagedStatesTable,
 		PortalSessionsTable,
 		PricingRulesTable,
+		ReleaseHistoryAuditsTable,
 		RequestUsagesTable,
 		SecretsTable,
 		SecretVersionsTable,

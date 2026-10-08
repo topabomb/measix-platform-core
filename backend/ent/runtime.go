@@ -16,6 +16,7 @@ import (
 	"measix/platform/ent/deploymentsettingaudit"
 	"measix/platform/ent/device"
 	"measix/platform/ent/enterpriseupdate"
+	"measix/platform/ent/managedstate"
 	"measix/platform/ent/portalsession"
 	"measix/platform/ent/schema"
 	"measix/platform/ent/usageevent"
@@ -78,26 +79,30 @@ func init() {
 	budgetlimit.LimitQuantityValidator = budgetlimitDescLimitQuantity.Validators[0].(func(int64) error)
 	budgetrequestFields := schema.BudgetRequest{}.Fields()
 	_ = budgetrequestFields
+	// budgetrequestDescResourceDisplayName is the schema descriptor for resource_display_name field.
+	budgetrequestDescResourceDisplayName := budgetrequestFields[8].Descriptor()
+	// budgetrequest.DefaultResourceDisplayName holds the default value on creation for the resource_display_name field.
+	budgetrequest.DefaultResourceDisplayName = budgetrequestDescResourceDisplayName.Default.(string)
 	// budgetrequestDescManagedGeneration is the schema descriptor for managed_generation field.
-	budgetrequestDescManagedGeneration := budgetrequestFields[11].Descriptor()
+	budgetrequestDescManagedGeneration := budgetrequestFields[12].Descriptor()
 	// budgetrequest.ManagedGenerationValidator is a validator for the "managed_generation" field. It is called by the builders before save.
 	budgetrequest.ManagedGenerationValidator = budgetrequestDescManagedGeneration.Validators[0].(func(int64) error)
 	// budgetrequestDescControlRevision is the schema descriptor for control_revision field.
-	budgetrequestDescControlRevision := budgetrequestFields[12].Descriptor()
+	budgetrequestDescControlRevision := budgetrequestFields[13].Descriptor()
 	// budgetrequest.ControlRevisionValidator is a validator for the "control_revision" field. It is called by the builders before save.
 	budgetrequest.ControlRevisionValidator = budgetrequestDescControlRevision.Validators[0].(func(int64) error)
 	// budgetrequestDescBudgetRevision is the schema descriptor for budget_revision field.
-	budgetrequestDescBudgetRevision := budgetrequestFields[14].Descriptor()
+	budgetrequestDescBudgetRevision := budgetrequestFields[15].Descriptor()
 	// budgetrequest.DefaultBudgetRevision holds the default value on creation for the budget_revision field.
 	budgetrequest.DefaultBudgetRevision = budgetrequestDescBudgetRevision.Default.(int64)
 	// budgetrequestDescLastSettlementRevision is the schema descriptor for last_settlement_revision field.
-	budgetrequestDescLastSettlementRevision := budgetrequestFields[22].Descriptor()
+	budgetrequestDescLastSettlementRevision := budgetrequestFields[23].Descriptor()
 	// budgetrequest.DefaultLastSettlementRevision holds the default value on creation for the last_settlement_revision field.
 	budgetrequest.DefaultLastSettlementRevision = budgetrequestDescLastSettlementRevision.Default.(int64)
 	// budgetrequest.LastSettlementRevisionValidator is a validator for the "last_settlement_revision" field. It is called by the builders before save.
 	budgetrequest.LastSettlementRevisionValidator = budgetrequestDescLastSettlementRevision.Validators[0].(func(int64) error)
 	// budgetrequestDescLastLifecycleRevision is the schema descriptor for last_lifecycle_revision field.
-	budgetrequestDescLastLifecycleRevision := budgetrequestFields[23].Descriptor()
+	budgetrequestDescLastLifecycleRevision := budgetrequestFields[24].Descriptor()
 	// budgetrequest.DefaultLastLifecycleRevision holds the default value on creation for the last_lifecycle_revision field.
 	budgetrequest.DefaultLastLifecycleRevision = budgetrequestDescLastLifecycleRevision.Default.(int64)
 	// budgetrequest.LastLifecycleRevisionValidator is a validator for the "last_lifecycle_revision" field. It is called by the builders before save.
@@ -148,6 +153,10 @@ func init() {
 	deploymentDescFeedRevision := deploymentFields[5].Descriptor()
 	// deployment.DefaultFeedRevision holds the default value on creation for the feed_revision field.
 	deployment.DefaultFeedRevision = deploymentDescFeedRevision.Default.(int64)
+	// deploymentDescReleaseRetentionRevision is the schema descriptor for release_retention_revision field.
+	deploymentDescReleaseRetentionRevision := deploymentFields[7].Descriptor()
+	// deployment.DefaultReleaseRetentionRevision holds the default value on creation for the release_retention_revision field.
+	deployment.DefaultReleaseRetentionRevision = deploymentDescReleaseRetentionRevision.Default.(int64)
 	deploymentsettingauditFields := schema.DeploymentSettingAudit{}.Fields()
 	_ = deploymentsettingauditFields
 	// deploymentsettingauditDescOldPublicOrigin is the schema descriptor for old_public_origin field.
@@ -178,6 +187,12 @@ func init() {
 	enterpriseupdateDescSeverity := enterpriseupdateFields[5].Descriptor()
 	// enterpriseupdate.DefaultSeverity holds the default value on creation for the severity field.
 	enterpriseupdate.DefaultSeverity = enterpriseupdateDescSeverity.Default.(string)
+	managedstateFields := schema.ManagedState{}.Fields()
+	_ = managedstateFields
+	// managedstateDescLastAssignedGeneration is the schema descriptor for last_assigned_generation field.
+	managedstateDescLastAssignedGeneration := managedstateFields[3].Descriptor()
+	// managedstate.DefaultLastAssignedGeneration holds the default value on creation for the last_assigned_generation field.
+	managedstate.DefaultLastAssignedGeneration = managedstateDescLastAssignedGeneration.Default.(int64)
 	portalsessionFields := schema.PortalSession{}.Fields()
 	_ = portalsessionFields
 	// portalsessionDescConsumed is the schema descriptor for consumed field.

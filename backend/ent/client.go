@@ -36,6 +36,7 @@ import (
 	"measix/platform/ent/managedstate"
 	"measix/platform/ent/portalsession"
 	"measix/platform/ent/pricingrule"
+	"measix/platform/ent/releasehistoryaudit"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/secret"
 	"measix/platform/ent/secretversion"
@@ -113,6 +114,8 @@ type Client struct {
 	PortalSession *PortalSessionClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
+	// ReleaseHistoryAudit is the client for interacting with the ReleaseHistoryAudit builders.
+	ReleaseHistoryAudit *ReleaseHistoryAuditClient
 	// RequestUsage is the client for interacting with the RequestUsage builders.
 	RequestUsage *RequestUsageClient
 	// Secret is the client for interacting with the Secret builders.
@@ -179,6 +182,7 @@ func (c *Client) init() {
 	c.ManagedState = NewManagedStateClient(c.config)
 	c.PortalSession = NewPortalSessionClient(c.config)
 	c.PricingRule = NewPricingRuleClient(c.config)
+	c.ReleaseHistoryAudit = NewReleaseHistoryAuditClient(c.config)
 	c.RequestUsage = NewRequestUsageClient(c.config)
 	c.Secret = NewSecretClient(c.config)
 	c.SecretVersion = NewSecretVersionClient(c.config)
@@ -311,6 +315,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ManagedState:             NewManagedStateClient(cfg),
 		PortalSession:            NewPortalSessionClient(cfg),
 		PricingRule:              NewPricingRuleClient(cfg),
+		ReleaseHistoryAudit:      NewReleaseHistoryAuditClient(cfg),
 		RequestUsage:             NewRequestUsageClient(cfg),
 		Secret:                   NewSecretClient(cfg),
 		SecretVersion:            NewSecretVersionClient(cfg),
@@ -370,6 +375,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ManagedState:             NewManagedStateClient(cfg),
 		PortalSession:            NewPortalSessionClient(cfg),
 		PricingRule:              NewPricingRuleClient(cfg),
+		ReleaseHistoryAudit:      NewReleaseHistoryAuditClient(cfg),
 		RequestUsage:             NewRequestUsageClient(cfg),
 		Secret:                   NewSecretClient(cfg),
 		SecretVersion:            NewSecretVersionClient(cfg),
@@ -420,10 +426,11 @@ func (c *Client) Use(hooks ...Hook) {
 		c.DeletedCredential, c.DeletedPrincipal, c.Deployment,
 		c.DeploymentSettingAudit, c.Device, c.Enrollment, c.EnterpriseUpdate,
 		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
-		c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion,
-		c.SemanticUsage, c.Session, c.Upstream, c.UpstreamConfigRevision,
-		c.UsageDetail, c.UsageEvent, c.User, c.UserBudget, c.WorkspaceAudit,
-		c.WorkspaceOperation, c.WorkspaceService, c.WorkspaceServiceConfig,
+		c.PortalSession, c.PricingRule, c.ReleaseHistoryAudit, c.RequestUsage,
+		c.Secret, c.SecretVersion, c.SemanticUsage, c.Session, c.Upstream,
+		c.UpstreamConfigRevision, c.UsageDetail, c.UsageEvent, c.User, c.UserBudget,
+		c.WorkspaceAudit, c.WorkspaceOperation, c.WorkspaceService,
+		c.WorkspaceServiceConfig,
 	} {
 		n.Use(hooks...)
 	}
@@ -439,10 +446,11 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.DeletedCredential, c.DeletedPrincipal, c.Deployment,
 		c.DeploymentSettingAudit, c.Device, c.Enrollment, c.EnterpriseUpdate,
 		c.IdempotencyRecord, c.ManagedDraft, c.ManagedRelease, c.ManagedState,
-		c.PortalSession, c.PricingRule, c.RequestUsage, c.Secret, c.SecretVersion,
-		c.SemanticUsage, c.Session, c.Upstream, c.UpstreamConfigRevision,
-		c.UsageDetail, c.UsageEvent, c.User, c.UserBudget, c.WorkspaceAudit,
-		c.WorkspaceOperation, c.WorkspaceService, c.WorkspaceServiceConfig,
+		c.PortalSession, c.PricingRule, c.ReleaseHistoryAudit, c.RequestUsage,
+		c.Secret, c.SecretVersion, c.SemanticUsage, c.Session, c.Upstream,
+		c.UpstreamConfigRevision, c.UsageDetail, c.UsageEvent, c.User, c.UserBudget,
+		c.WorkspaceAudit, c.WorkspaceOperation, c.WorkspaceService,
+		c.WorkspaceServiceConfig,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -501,6 +509,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PortalSession.mutate(ctx, m)
 	case *PricingRuleMutation:
 		return c.PricingRule.mutate(ctx, m)
+	case *ReleaseHistoryAuditMutation:
+		return c.ReleaseHistoryAudit.mutate(ctx, m)
 	case *RequestUsageMutation:
 		return c.RequestUsage.mutate(ctx, m)
 	case *SecretMutation:
@@ -3893,6 +3903,139 @@ func (c *PricingRuleClient) mutate(ctx context.Context, m *PricingRuleMutation) 
 	}
 }
 
+// ReleaseHistoryAuditClient is a client for the ReleaseHistoryAudit schema.
+type ReleaseHistoryAuditClient struct {
+	config
+}
+
+// NewReleaseHistoryAuditClient returns a client for the ReleaseHistoryAudit from the given config.
+func NewReleaseHistoryAuditClient(c config) *ReleaseHistoryAuditClient {
+	return &ReleaseHistoryAuditClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `releasehistoryaudit.Hooks(f(g(h())))`.
+func (c *ReleaseHistoryAuditClient) Use(hooks ...Hook) {
+	c.hooks.ReleaseHistoryAudit = append(c.hooks.ReleaseHistoryAudit, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `releasehistoryaudit.Intercept(f(g(h())))`.
+func (c *ReleaseHistoryAuditClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ReleaseHistoryAudit = append(c.inters.ReleaseHistoryAudit, interceptors...)
+}
+
+// Create returns a builder for creating a ReleaseHistoryAudit entity.
+func (c *ReleaseHistoryAuditClient) Create() *ReleaseHistoryAuditCreate {
+	mutation := newReleaseHistoryAuditMutation(c.config, OpCreate)
+	return &ReleaseHistoryAuditCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ReleaseHistoryAudit entities.
+func (c *ReleaseHistoryAuditClient) CreateBulk(builders ...*ReleaseHistoryAuditCreate) *ReleaseHistoryAuditCreateBulk {
+	return &ReleaseHistoryAuditCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ReleaseHistoryAuditClient) MapCreateBulk(slice any, setFunc func(*ReleaseHistoryAuditCreate, int)) *ReleaseHistoryAuditCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ReleaseHistoryAuditCreateBulk{err: fmt.Errorf("calling to ReleaseHistoryAuditClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ReleaseHistoryAuditCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ReleaseHistoryAuditCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ReleaseHistoryAudit.
+func (c *ReleaseHistoryAuditClient) Update() *ReleaseHistoryAuditUpdate {
+	mutation := newReleaseHistoryAuditMutation(c.config, OpUpdate)
+	return &ReleaseHistoryAuditUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ReleaseHistoryAuditClient) UpdateOne(_m *ReleaseHistoryAudit) *ReleaseHistoryAuditUpdateOne {
+	mutation := newReleaseHistoryAuditMutation(c.config, OpUpdateOne, withReleaseHistoryAudit(_m))
+	return &ReleaseHistoryAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ReleaseHistoryAuditClient) UpdateOneID(id int) *ReleaseHistoryAuditUpdateOne {
+	mutation := newReleaseHistoryAuditMutation(c.config, OpUpdateOne, withReleaseHistoryAuditID(id))
+	return &ReleaseHistoryAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ReleaseHistoryAudit.
+func (c *ReleaseHistoryAuditClient) Delete() *ReleaseHistoryAuditDelete {
+	mutation := newReleaseHistoryAuditMutation(c.config, OpDelete)
+	return &ReleaseHistoryAuditDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ReleaseHistoryAuditClient) DeleteOne(_m *ReleaseHistoryAudit) *ReleaseHistoryAuditDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ReleaseHistoryAuditClient) DeleteOneID(id int) *ReleaseHistoryAuditDeleteOne {
+	builder := c.Delete().Where(releasehistoryaudit.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ReleaseHistoryAuditDeleteOne{builder}
+}
+
+// Query returns a query builder for ReleaseHistoryAudit.
+func (c *ReleaseHistoryAuditClient) Query() *ReleaseHistoryAuditQuery {
+	return &ReleaseHistoryAuditQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeReleaseHistoryAudit},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ReleaseHistoryAudit entity by its id.
+func (c *ReleaseHistoryAuditClient) Get(ctx context.Context, id int) (*ReleaseHistoryAudit, error) {
+	return c.Query().Where(releasehistoryaudit.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ReleaseHistoryAuditClient) GetX(ctx context.Context, id int) *ReleaseHistoryAudit {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ReleaseHistoryAuditClient) Hooks() []Hook {
+	return c.hooks.ReleaseHistoryAudit
+}
+
+// Interceptors returns the client interceptors.
+func (c *ReleaseHistoryAuditClient) Interceptors() []Interceptor {
+	return c.inters.ReleaseHistoryAudit
+}
+
+func (c *ReleaseHistoryAuditClient) mutate(ctx context.Context, m *ReleaseHistoryAuditMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ReleaseHistoryAuditCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ReleaseHistoryAuditUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ReleaseHistoryAuditUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ReleaseHistoryAuditDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ReleaseHistoryAudit mutation op: %q", m.Op())
+	}
+}
+
 // RequestUsageClient is a client for the RequestUsage schema.
 type RequestUsageClient struct {
 	config
@@ -5896,10 +6039,11 @@ type (
 		BudgetTemplate, BudgetTemplateAssignment, BudgetTemplateAudit,
 		DeletedCredential, DeletedPrincipal, Deployment, DeploymentSettingAudit,
 		Device, Enrollment, EnterpriseUpdate, IdempotencyRecord, ManagedDraft,
-		ManagedRelease, ManagedState, PortalSession, PricingRule, RequestUsage, Secret,
-		SecretVersion, SemanticUsage, Session, Upstream, UpstreamConfigRevision,
-		UsageDetail, UsageEvent, User, UserBudget, WorkspaceAudit, WorkspaceOperation,
-		WorkspaceService, WorkspaceServiceConfig []ent.Hook
+		ManagedRelease, ManagedState, PortalSession, PricingRule, ReleaseHistoryAudit,
+		RequestUsage, Secret, SecretVersion, SemanticUsage, Session, Upstream,
+		UpstreamConfigRevision, UsageDetail, UsageEvent, User, UserBudget,
+		WorkspaceAudit, WorkspaceOperation, WorkspaceService,
+		WorkspaceServiceConfig []ent.Hook
 	}
 	inters struct {
 		Activation, AgentSpace, BudgetAllocation, BudgetAudit, BudgetBucket,
@@ -5907,9 +6051,10 @@ type (
 		BudgetTemplate, BudgetTemplateAssignment, BudgetTemplateAudit,
 		DeletedCredential, DeletedPrincipal, Deployment, DeploymentSettingAudit,
 		Device, Enrollment, EnterpriseUpdate, IdempotencyRecord, ManagedDraft,
-		ManagedRelease, ManagedState, PortalSession, PricingRule, RequestUsage, Secret,
-		SecretVersion, SemanticUsage, Session, Upstream, UpstreamConfigRevision,
-		UsageDetail, UsageEvent, User, UserBudget, WorkspaceAudit, WorkspaceOperation,
-		WorkspaceService, WorkspaceServiceConfig []ent.Interceptor
+		ManagedRelease, ManagedState, PortalSession, PricingRule, ReleaseHistoryAudit,
+		RequestUsage, Secret, SecretVersion, SemanticUsage, Session, Upstream,
+		UpstreamConfigRevision, UsageDetail, UsageEvent, User, UserBudget,
+		WorkspaceAudit, WorkspaceOperation, WorkspaceService,
+		WorkspaceServiceConfig []ent.Interceptor
 	}
 )

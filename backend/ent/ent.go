@@ -31,6 +31,7 @@ import (
 	"measix/platform/ent/managedstate"
 	"measix/platform/ent/portalsession"
 	"measix/platform/ent/pricingrule"
+	"measix/platform/ent/releasehistoryaudit"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/secret"
 	"measix/platform/ent/secretversion"
@@ -137,6 +138,7 @@ func checkColumn(t, c string) error {
 			managedstate.Table:             managedstate.ValidColumn,
 			portalsession.Table:            portalsession.ValidColumn,
 			pricingrule.Table:              pricingrule.ValidColumn,
+			releasehistoryaudit.Table:      releasehistoryaudit.ValidColumn,
 			requestusage.Table:             requestusage.ValidColumn,
 			secret.Table:                   secret.ValidColumn,
 			secretversion.Table:            secretversion.ValidColumn,

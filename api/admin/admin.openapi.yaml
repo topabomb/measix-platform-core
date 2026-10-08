@@ -988,6 +988,145 @@ paths:
       - *id007
       - *id001
       - *id003
+  /api/admin/v1/releases/retention:
+    get:
+      operationId: getReleaseRetention
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseRetention'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: updateReleaseRetention
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseRetention'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReleaseRetentionRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/releases/cleanup:preview:
+    post:
+      operationId: previewReleaseCleanup
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseCleanupPreview'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseCleanupSelection'
+      parameters:
+      - *id001
+  /api/admin/v1/releases/cleanup:
+    post:
+      operationId: executeReleaseCleanup
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseCleanupResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteReleaseCleanupRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/releases/cleanup/audit:
+    get:
+      operationId: listReleaseHistoryAudit
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseHistoryAuditPage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/upstreams/{upstreamId}/references:
+    get:
+      operationId: getUpstreamReferences
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamReferences'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - name: upstreamId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UpstreamId'
   /api/admin/v1/activations/{activationId}:
     get:
       operationId: getActivation
@@ -6125,6 +6264,174 @@ components:
           maxItems: 200
           items: { $ref: '#/components/schemas/SystemEvent' }
         truncated: { type: boolean }
+    ReleaseRetentionRule:
+      type: "object"
+      additionalProperties: false
+      required: ["enabled"]
+      properties:
+        enabled:
+          type: "boolean"
+        keepLast:
+          type: "integer"
+          minimum: 1
+          maximum: 1000
+        keepDays:
+          type: "integer"
+          minimum: 1
+          maximum: 36500
+      description: "Keep union of latest N and within D days; disabled by default."
+    ReleaseRetention:
+      type: "object"
+      additionalProperties: false
+      required: ["revision","rule"]
+      properties:
+        revision:
+          type: "integer"
+        rule:
+          $ref: "#/components/schemas/ReleaseRetentionRule"
+        lastCleanupAt:
+          type: "string"
+          format: "date-time"
+    UpdateReleaseRetentionRequest:
+      type: "object"
+      additionalProperties: false
+      required: ["expectedRevision","rule"]
+      properties:
+        expectedRevision:
+          type: "integer"
+        rule:
+          $ref: "#/components/schemas/ReleaseRetentionRule"
+    ReleaseCleanupSelection:
+      type: "object"
+      additionalProperties: false
+      required: []
+      properties:
+        releaseIds:
+          type: "array"
+          items:
+            type: "string"
+          maxItems: 200
+          minItems: 1
+          uniqueItems: true
+        publishedBefore:
+          type: "string"
+          format: "date-time"
+        publishedAfter:
+          type: "string"
+          format: "date-time"
+        useRetentionRule:
+          type: "boolean"
+      description: "Exactly one mode: explicit IDs, half-open time window, or saved retention rule. Max 200 deletions per execution."
+    ReleaseCleanupItem:
+      type: "object"
+      additionalProperties: false
+      required: ["releaseId","managedGeneration","status","bytes","reason"]
+      properties:
+        releaseId:
+          type: "string"
+        managedGeneration:
+          type: "integer"
+        status:
+          type: "string"
+        bytes:
+          type: "integer"
+          format: "int64"
+        reason:
+          type: "string"
+    ReleaseCleanupPreview:
+      type: "object"
+      additionalProperties: false
+      required: ["previewHash","candidates","protected","reclaimableBytes","hasMore","activationBlocked","releasedUpstreamIds"]
+      properties:
+        previewHash:
+          type: "string"
+        candidates:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ReleaseCleanupItem"
+          maxItems: 200
+        protected:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ReleaseCleanupItem"
+        reclaimableBytes:
+          type: "integer"
+          format: "int64"
+        hasMore:
+          type: "boolean"
+        activationBlocked:
+          type: "boolean"
+        releasedUpstreamIds:
+          type: "array"
+          items:
+            type: "string"
+    ExecuteReleaseCleanupRequest:
+      type: "object"
+      additionalProperties: false
+      required: ["selection","previewHash"]
+      properties:
+        selection:
+          $ref: "#/components/schemas/ReleaseCleanupSelection"
+        previewHash:
+          type: "string"
+    ReleaseCleanupResult:
+      type: "object"
+      additionalProperties: false
+      required: ["deletedCount","reclaimedBytes","auditId"]
+      properties:
+        deletedCount:
+          type: "integer"
+        reclaimedBytes:
+          type: "integer"
+          format: "int64"
+        auditId:
+          type: "integer"
+    ReleaseHistoryAudit:
+      type: "object"
+      additionalProperties: false
+      required: ["auditId","actorUserId","kind","createdAt","releaseGenerations","reclaimedBytes"]
+      properties:
+        auditId:
+          type: "integer"
+        actorUserId:
+          type: "string"
+        kind:
+          type: "string"
+        createdAt:
+          type: "string"
+          format: "date-time"
+        releaseGenerations:
+          type: "array"
+          items:
+            type: "integer"
+        reclaimedBytes:
+          type: "integer"
+          format: "int64"
+        rule:
+          $ref: "#/components/schemas/ReleaseRetentionRule"
+    ReleaseHistoryAuditPage:
+      type: "object"
+      additionalProperties: false
+      required: ["items"]
+      properties:
+        items:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ReleaseHistoryAudit"
+          maxItems: 200
+    UpstreamReferences:
+      type: "object"
+      additionalProperties: false
+      required: ["draftReferenced","releases","activationBlocked"]
+      properties:
+        draftReferenced:
+          type: "boolean"
+        releases:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ReleaseCleanupItem"
+        activationBlocked:
+          type: "boolean"
     DeploymentSettings:
       type: object
       additionalProperties: false

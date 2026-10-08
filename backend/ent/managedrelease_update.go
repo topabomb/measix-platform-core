@@ -89,6 +89,18 @@ func (_u *ManagedReleaseUpdate) SetNillableSnapshotHash(v *string) *ManagedRelea
 	return _u
 }
 
+// SetDiffSummaryJSON sets the "diff_summary_json" field.
+func (_u *ManagedReleaseUpdate) SetDiffSummaryJSON(v []byte) *ManagedReleaseUpdate {
+	_u.mutation.SetDiffSummaryJSON(v)
+	return _u
+}
+
+// ClearDiffSummaryJSON clears the value of the "diff_summary_json" field.
+func (_u *ManagedReleaseUpdate) ClearDiffSummaryJSON() *ManagedReleaseUpdate {
+	_u.mutation.ClearDiffSummaryJSON()
+	return _u
+}
+
 // SetSourceDraftRevision sets the "source_draft_revision" field.
 func (_u *ManagedReleaseUpdate) SetSourceDraftRevision(v int64) *ManagedReleaseUpdate {
 	_u.mutation.ResetSourceDraftRevision()
@@ -197,6 +209,12 @@ func (_u *ManagedReleaseUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.SnapshotHash(); ok {
 		_spec.SetField(managedrelease.FieldSnapshotHash, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.DiffSummaryJSON(); ok {
+		_spec.SetField(managedrelease.FieldDiffSummaryJSON, field.TypeBytes, value)
+	}
+	if _u.mutation.DiffSummaryJSONCleared() {
+		_spec.ClearField(managedrelease.FieldDiffSummaryJSON, field.TypeBytes)
+	}
 	if value, ok := _u.mutation.SourceDraftRevision(); ok {
 		_spec.SetField(managedrelease.FieldSourceDraftRevision, field.TypeInt64, value)
 	}
@@ -287,6 +305,18 @@ func (_u *ManagedReleaseUpdateOne) SetNillableSnapshotHash(v *string) *ManagedRe
 	if v != nil {
 		_u.SetSnapshotHash(*v)
 	}
+	return _u
+}
+
+// SetDiffSummaryJSON sets the "diff_summary_json" field.
+func (_u *ManagedReleaseUpdateOne) SetDiffSummaryJSON(v []byte) *ManagedReleaseUpdateOne {
+	_u.mutation.SetDiffSummaryJSON(v)
+	return _u
+}
+
+// ClearDiffSummaryJSON clears the value of the "diff_summary_json" field.
+func (_u *ManagedReleaseUpdateOne) ClearDiffSummaryJSON() *ManagedReleaseUpdateOne {
+	_u.mutation.ClearDiffSummaryJSON()
 	return _u
 }
 
@@ -427,6 +457,12 @@ func (_u *ManagedReleaseUpdateOne) sqlSave(ctx context.Context) (_node *ManagedR
 	}
 	if value, ok := _u.mutation.SnapshotHash(); ok {
 		_spec.SetField(managedrelease.FieldSnapshotHash, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DiffSummaryJSON(); ok {
+		_spec.SetField(managedrelease.FieldDiffSummaryJSON, field.TypeBytes, value)
+	}
+	if _u.mutation.DiffSummaryJSONCleared() {
+		_spec.ClearField(managedrelease.FieldDiffSummaryJSON, field.TypeBytes)
 	}
 	if value, ok := _u.mutation.SourceDraftRevision(); ok {
 		_spec.SetField(managedrelease.FieldSourceDraftRevision, field.TypeInt64, value)

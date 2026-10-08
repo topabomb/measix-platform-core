@@ -102,6 +102,8 @@ Usage 分析统一使用显式时间窗（快捷 24 小时、7/30/90 天，自�
 
 ## 4. 实现范围与后续验证
 
+`ReleasesPage` 的选择框和详情入口复用 `ReleaseHistoryTools`，提供单条/批量、UTC 半开时间范围、已保存规则清理。先显示 Hub 返回的候选、受保护原因、移除字节和上游引用解除数量，再执行一次绑定预览的命令。冲突或响应未知时消耗预览并刷新列表，必须显式重新预览；不自动重试删除。保留规则在独立对话框配置，保存启用后自动清理，明确说明不可直接回滚；同处显示最近有界规则/清理操作。Upstreams 展示实际草稿及保留版本引用并链接对应编辑/发布页面，“配置已应用”只表示配置应用状态。
+
 具体“必须做什么”只引用 architecture；当前实现与验证结果见 [当前状态](s0-execution-progress.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。
 
 S0.2 Assistant/Memory Seed/Starter 由 Resources 内的 `ManagedExperienceEditor.vue` 编辑，复用唯一 DraftStore/generated DTO/Save/Validate/Preview/Publish；不建立第二套 API/store/schema。Seed 支持空数组与作者顺序，删除 Assistant 同时移除其 local Draft Starters。

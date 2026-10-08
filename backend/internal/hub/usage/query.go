@@ -19,7 +19,7 @@ import (
 	"measix/platform/ent/semanticusage"
 	"measix/platform/ent/user"
 	"measix/platform/internal/hub/budget"
-	"measix/platform/internal/wire/clientapi"
+	"measix/platform/internal/hub/capability"
 	"measix/platform/pkg/platformid"
 )
 
@@ -325,35 +325,29 @@ func (s *Service) resourceNames(ctx context.Context, views []RequestView) error 
 	}
 	names := make(map[int]map[string]string, len(releases))
 	for _, release := range releases {
-		var snapshot clientapi.ManagedSnapshot
-		if err := json.Unmarshal(release.SnapshotJSON, &snapshot); err != nil {
+		resources, err := capability.SnapshotResourceNames(release.SnapshotJSON)
+		if err != nil {
 			return err
-		}
-		resources := make(map[string]string)
-		for _, provider := range snapshot.Providers {
-			resources[provider.ProviderId] = provider.DisplayName
-		}
-		for _, model := range snapshot.Models {
-			resources[model.ModelId] = model.DisplayName
-		}
-		if snapshot.ImageGenerators != nil {
-			for _, image := range *snapshot.ImageGenerators {
-				resources[image.ImageId] = image.DisplayName
-			}
-		}
-		for _, speech := range snapshot.Tts {
-			resources[speech.TtsId] = speech.DisplayName
-		}
-		for _, speech := range snapshot.Asr {
-			resources[speech.AsrId] = speech.DisplayName
-		}
-		for _, tool := range snapshot.Mcp {
-			resources[tool.McpServerId] = tool.DisplayName
 		}
 		names[int(release.ManagedGeneration)] = resources
 	}
+	requestIDs := make([]string, 0, len(views))
+	for _, v := range views {
+		requestIDs = append(requestIDs, v.RequestID)
+	}
+	admissions, err := s.Client.BudgetRequest.Query().Where(budgetrequest.IDIn(requestIDs...)).Select(budgetrequest.FieldID, budgetrequest.FieldResourceDisplayName).All(ctx)
+	if err != nil {
+		return err
+	}
+	admittedNames := map[string]string{}
+	for _, row := range admissions {
+		admittedNames[row.ID] = row.ResourceDisplayName
+	}
 	for i := range views {
 		views[i].ResourceDisplayName = names[views[i].ManagedGeneration][views[i].ResourceID]
+		if name := admittedNames[views[i].RequestID]; name != "" {
+			views[i].ResourceDisplayName = name
+		}
 	}
 	return nil
 }

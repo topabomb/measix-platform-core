@@ -21,6 +21,7 @@ func (BudgetRequest) Fields() []ent.Field {
 		field.String("device_id").Optional().Nillable().Immutable(),
 		field.Enum("capability").Values("MODEL", "IMAGE_GENERATION", "TTS", "ASR", "MCP").Immutable(),
 		field.String("resource_id").Immutable(),
+		field.String("resource_display_name").Default("").Immutable(),
 		field.String("client_protocol").Immutable(),
 		field.String("upstream_id").Optional().Immutable(),
 		field.Bytes("workspace_target_json").Optional().Immutable(),

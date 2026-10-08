@@ -347,7 +347,11 @@ func (s *Service) persistPublishIntent(ctx context.Context, intent publishIntent
 	if err != nil {
 		return rollback(err)
 	}
-	if managed.DesiredControlRevision+1 != int64(intent.ControlRevision) {
+	next, err := capability.NextGeneration(ctx, tx.Client())
+	if err != nil {
+		return rollback(err)
+	}
+	if next != intent.Generation || managed.DesiredControlRevision+1 != int64(intent.ControlRevision) {
 		return rollback(ErrActivationInProgress)
 	}
 
@@ -392,6 +396,7 @@ func (s *Service) persistPublishIntent(ctx context.Context, intent publishIntent
 		return rollback(err)
 	}
 	if _, err := tx.ManagedState.UpdateOneID("current").
+		SetLastAssignedGeneration(int64(intent.Generation)).
 		SetDesiredControlRevision(int64(intent.ControlRevision)).
 		SetDesiredBundleHash(intent.BundleHash).
 		SetRuntimeStatus("ACTIVATING").
@@ -582,14 +587,7 @@ func activationView(row *ent.Activation) ActivationResult {
 }
 
 func (s *Service) nextGeneration(ctx context.Context) (int, error) {
-	latest, err := s.Client.ManagedRelease.Query().Order(ent.Desc(managedrelease.FieldManagedGeneration)).First(ctx)
-	if ent.IsNotFound(err) {
-		return 1, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	return int(latest.ManagedGeneration) + 1, nil
+	return capability.NextGeneration(ctx, s.Client)
 }
 
 func publishRequestHash(request PublishRequest) (string, error) {

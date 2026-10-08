@@ -89,6 +89,11 @@ func SnapshotHash(v string) predicate.ManagedRelease {
 	return predicate.ManagedRelease(sql.FieldEQ(FieldSnapshotHash, v))
 }
 
+// DiffSummaryJSON applies equality check predicate on the "diff_summary_json" field. It's identical to DiffSummaryJSONEQ.
+func DiffSummaryJSON(v []byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldEQ(FieldDiffSummaryJSON, v))
+}
+
 // SourceDraftRevision applies equality check predicate on the "source_draft_revision" field. It's identical to SourceDraftRevisionEQ.
 func SourceDraftRevision(v int64) predicate.ManagedRelease {
 	return predicate.ManagedRelease(sql.FieldEQ(FieldSourceDraftRevision, v))
@@ -352,6 +357,56 @@ func SnapshotHashEqualFold(v string) predicate.ManagedRelease {
 // SnapshotHashContainsFold applies the ContainsFold predicate on the "snapshot_hash" field.
 func SnapshotHashContainsFold(v string) predicate.ManagedRelease {
 	return predicate.ManagedRelease(sql.FieldContainsFold(FieldSnapshotHash, v))
+}
+
+// DiffSummaryJSONEQ applies the EQ predicate on the "diff_summary_json" field.
+func DiffSummaryJSONEQ(v []byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldEQ(FieldDiffSummaryJSON, v))
+}
+
+// DiffSummaryJSONNEQ applies the NEQ predicate on the "diff_summary_json" field.
+func DiffSummaryJSONNEQ(v []byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldNEQ(FieldDiffSummaryJSON, v))
+}
+
+// DiffSummaryJSONIn applies the In predicate on the "diff_summary_json" field.
+func DiffSummaryJSONIn(vs ...[]byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldIn(FieldDiffSummaryJSON, vs...))
+}
+
+// DiffSummaryJSONNotIn applies the NotIn predicate on the "diff_summary_json" field.
+func DiffSummaryJSONNotIn(vs ...[]byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldNotIn(FieldDiffSummaryJSON, vs...))
+}
+
+// DiffSummaryJSONGT applies the GT predicate on the "diff_summary_json" field.
+func DiffSummaryJSONGT(v []byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldGT(FieldDiffSummaryJSON, v))
+}
+
+// DiffSummaryJSONGTE applies the GTE predicate on the "diff_summary_json" field.
+func DiffSummaryJSONGTE(v []byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldGTE(FieldDiffSummaryJSON, v))
+}
+
+// DiffSummaryJSONLT applies the LT predicate on the "diff_summary_json" field.
+func DiffSummaryJSONLT(v []byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldLT(FieldDiffSummaryJSON, v))
+}
+
+// DiffSummaryJSONLTE applies the LTE predicate on the "diff_summary_json" field.
+func DiffSummaryJSONLTE(v []byte) predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldLTE(FieldDiffSummaryJSON, v))
+}
+
+// DiffSummaryJSONIsNil applies the IsNil predicate on the "diff_summary_json" field.
+func DiffSummaryJSONIsNil() predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldIsNull(FieldDiffSummaryJSON))
+}
+
+// DiffSummaryJSONNotNil applies the NotNil predicate on the "diff_summary_json" field.
+func DiffSummaryJSONNotNil() predicate.ManagedRelease {
+	return predicate.ManagedRelease(sql.FieldNotNull(FieldDiffSummaryJSON))
 }
 
 // SourceDraftRevisionEQ applies the EQ predicate on the "source_draft_revision" field.

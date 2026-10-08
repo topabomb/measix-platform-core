@@ -32,6 +32,7 @@ import (
 	"measix/platform/ent/portalsession"
 	"measix/platform/ent/predicate"
 	"measix/platform/ent/pricingrule"
+	"measix/platform/ent/releasehistoryaudit"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/secret"
 	"measix/platform/ent/secretversion"
@@ -88,6 +89,7 @@ const (
 	TypeManagedState             = "ManagedState"
 	TypePortalSession            = "PortalSession"
 	TypePricingRule              = "PricingRule"
+	TypeReleaseHistoryAudit      = "ReleaseHistoryAudit"
 	TypeRequestUsage             = "RequestUsage"
 	TypeSecret                   = "Secret"
 	TypeSecretVersion            = "SecretVersion"
@@ -7479,6 +7481,7 @@ type BudgetRequestMutation struct {
 	device_id                   *string
 	capability                  *budgetrequest.Capability
 	resource_id                 *string
+	resource_display_name       *string
 	client_protocol             *string
 	upstream_id                 *string
 	workspace_target_json       *[]byte
@@ -7892,6 +7895,42 @@ func (m *BudgetRequestMutation) OldResourceID(ctx context.Context) (v string, er
 // ResetResourceID resets all changes to the "resource_id" field.
 func (m *BudgetRequestMutation) ResetResourceID() {
 	m.resource_id = nil
+}
+
+// SetResourceDisplayName sets the "resource_display_name" field.
+func (m *BudgetRequestMutation) SetResourceDisplayName(s string) {
+	m.resource_display_name = &s
+}
+
+// ResourceDisplayName returns the value of the "resource_display_name" field in the mutation.
+func (m *BudgetRequestMutation) ResourceDisplayName() (r string, exists bool) {
+	v := m.resource_display_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResourceDisplayName returns the old "resource_display_name" field's value of the BudgetRequest entity.
+// If the BudgetRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BudgetRequestMutation) OldResourceDisplayName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResourceDisplayName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResourceDisplayName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResourceDisplayName: %w", err)
+	}
+	return oldValue.ResourceDisplayName, nil
+}
+
+// ResetResourceDisplayName resets all changes to the "resource_display_name" field.
+func (m *BudgetRequestMutation) ResetResourceDisplayName() {
+	m.resource_display_name = nil
 }
 
 // SetClientProtocol sets the "client_protocol" field.
@@ -8863,7 +8902,7 @@ func (m *BudgetRequestMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BudgetRequestMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 27)
 	if m.request_hash != nil {
 		fields = append(fields, budgetrequest.FieldRequestHash)
 	}
@@ -8884,6 +8923,9 @@ func (m *BudgetRequestMutation) Fields() []string {
 	}
 	if m.resource_id != nil {
 		fields = append(fields, budgetrequest.FieldResourceID)
+	}
+	if m.resource_display_name != nil {
+		fields = append(fields, budgetrequest.FieldResourceDisplayName)
 	}
 	if m.client_protocol != nil {
 		fields = append(fields, budgetrequest.FieldClientProtocol)
@@ -8964,6 +9006,8 @@ func (m *BudgetRequestMutation) Field(name string) (ent.Value, bool) {
 		return m.Capability()
 	case budgetrequest.FieldResourceID:
 		return m.ResourceID()
+	case budgetrequest.FieldResourceDisplayName:
+		return m.ResourceDisplayName()
 	case budgetrequest.FieldClientProtocol:
 		return m.ClientProtocol()
 	case budgetrequest.FieldUpstreamID:
@@ -9025,6 +9069,8 @@ func (m *BudgetRequestMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldCapability(ctx)
 	case budgetrequest.FieldResourceID:
 		return m.OldResourceID(ctx)
+	case budgetrequest.FieldResourceDisplayName:
+		return m.OldResourceDisplayName(ctx)
 	case budgetrequest.FieldClientProtocol:
 		return m.OldClientProtocol(ctx)
 	case budgetrequest.FieldUpstreamID:
@@ -9120,6 +9166,13 @@ func (m *BudgetRequestMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetResourceID(v)
+		return nil
+	case budgetrequest.FieldResourceDisplayName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResourceDisplayName(v)
 		return nil
 	case budgetrequest.FieldClientProtocol:
 		v, ok := value.(string)
@@ -9455,6 +9508,9 @@ func (m *BudgetRequestMutation) ResetField(name string) error {
 		return nil
 	case budgetrequest.FieldResourceID:
 		m.ResetResourceID()
+		return nil
+	case budgetrequest.FieldResourceDisplayName:
+		m.ResetResourceDisplayName()
 		return nil
 	case budgetrequest.FieldClientProtocol:
 		m.ResetClientProtocol()
@@ -13456,21 +13512,25 @@ func (m *DeletedPrincipalMutation) ResetEdge(name string) error {
 // DeploymentMutation represents an operation that mutates the Deployment nodes in the graph.
 type DeploymentMutation struct {
 	config
-	op               Op
-	typ              string
-	id               *string
-	name             *string
-	status           *string
-	timezone         *string
-	public_origin    *string
-	feed_revision    *int64
-	addfeed_revision *int64
-	created_at       *time.Time
-	updated_at       *time.Time
-	clearedFields    map[string]struct{}
-	done             bool
-	oldValue         func(context.Context) (*Deployment, error)
-	predicates       []predicate.Deployment
+	op                            Op
+	typ                           string
+	id                            *string
+	name                          *string
+	status                        *string
+	timezone                      *string
+	public_origin                 *string
+	feed_revision                 *int64
+	addfeed_revision              *int64
+	release_retention_json        *[]byte
+	release_retention_revision    *int64
+	addrelease_retention_revision *int64
+	release_cleanup_at            *time.Time
+	created_at                    *time.Time
+	updated_at                    *time.Time
+	clearedFields                 map[string]struct{}
+	done                          bool
+	oldValue                      func(context.Context) (*Deployment, error)
+	predicates                    []predicate.Deployment
 }
 
 var _ ent.Mutation = (*DeploymentMutation)(nil)
@@ -13777,6 +13837,160 @@ func (m *DeploymentMutation) ResetFeedRevision() {
 	m.addfeed_revision = nil
 }
 
+// SetReleaseRetentionJSON sets the "release_retention_json" field.
+func (m *DeploymentMutation) SetReleaseRetentionJSON(b []byte) {
+	m.release_retention_json = &b
+}
+
+// ReleaseRetentionJSON returns the value of the "release_retention_json" field in the mutation.
+func (m *DeploymentMutation) ReleaseRetentionJSON() (r []byte, exists bool) {
+	v := m.release_retention_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReleaseRetentionJSON returns the old "release_retention_json" field's value of the Deployment entity.
+// If the Deployment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentMutation) OldReleaseRetentionJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReleaseRetentionJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReleaseRetentionJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReleaseRetentionJSON: %w", err)
+	}
+	return oldValue.ReleaseRetentionJSON, nil
+}
+
+// ClearReleaseRetentionJSON clears the value of the "release_retention_json" field.
+func (m *DeploymentMutation) ClearReleaseRetentionJSON() {
+	m.release_retention_json = nil
+	m.clearedFields[deployment.FieldReleaseRetentionJSON] = struct{}{}
+}
+
+// ReleaseRetentionJSONCleared returns if the "release_retention_json" field was cleared in this mutation.
+func (m *DeploymentMutation) ReleaseRetentionJSONCleared() bool {
+	_, ok := m.clearedFields[deployment.FieldReleaseRetentionJSON]
+	return ok
+}
+
+// ResetReleaseRetentionJSON resets all changes to the "release_retention_json" field.
+func (m *DeploymentMutation) ResetReleaseRetentionJSON() {
+	m.release_retention_json = nil
+	delete(m.clearedFields, deployment.FieldReleaseRetentionJSON)
+}
+
+// SetReleaseRetentionRevision sets the "release_retention_revision" field.
+func (m *DeploymentMutation) SetReleaseRetentionRevision(i int64) {
+	m.release_retention_revision = &i
+	m.addrelease_retention_revision = nil
+}
+
+// ReleaseRetentionRevision returns the value of the "release_retention_revision" field in the mutation.
+func (m *DeploymentMutation) ReleaseRetentionRevision() (r int64, exists bool) {
+	v := m.release_retention_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReleaseRetentionRevision returns the old "release_retention_revision" field's value of the Deployment entity.
+// If the Deployment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentMutation) OldReleaseRetentionRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReleaseRetentionRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReleaseRetentionRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReleaseRetentionRevision: %w", err)
+	}
+	return oldValue.ReleaseRetentionRevision, nil
+}
+
+// AddReleaseRetentionRevision adds i to the "release_retention_revision" field.
+func (m *DeploymentMutation) AddReleaseRetentionRevision(i int64) {
+	if m.addrelease_retention_revision != nil {
+		*m.addrelease_retention_revision += i
+	} else {
+		m.addrelease_retention_revision = &i
+	}
+}
+
+// AddedReleaseRetentionRevision returns the value that was added to the "release_retention_revision" field in this mutation.
+func (m *DeploymentMutation) AddedReleaseRetentionRevision() (r int64, exists bool) {
+	v := m.addrelease_retention_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetReleaseRetentionRevision resets all changes to the "release_retention_revision" field.
+func (m *DeploymentMutation) ResetReleaseRetentionRevision() {
+	m.release_retention_revision = nil
+	m.addrelease_retention_revision = nil
+}
+
+// SetReleaseCleanupAt sets the "release_cleanup_at" field.
+func (m *DeploymentMutation) SetReleaseCleanupAt(t time.Time) {
+	m.release_cleanup_at = &t
+}
+
+// ReleaseCleanupAt returns the value of the "release_cleanup_at" field in the mutation.
+func (m *DeploymentMutation) ReleaseCleanupAt() (r time.Time, exists bool) {
+	v := m.release_cleanup_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReleaseCleanupAt returns the old "release_cleanup_at" field's value of the Deployment entity.
+// If the Deployment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentMutation) OldReleaseCleanupAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReleaseCleanupAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReleaseCleanupAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReleaseCleanupAt: %w", err)
+	}
+	return oldValue.ReleaseCleanupAt, nil
+}
+
+// ClearReleaseCleanupAt clears the value of the "release_cleanup_at" field.
+func (m *DeploymentMutation) ClearReleaseCleanupAt() {
+	m.release_cleanup_at = nil
+	m.clearedFields[deployment.FieldReleaseCleanupAt] = struct{}{}
+}
+
+// ReleaseCleanupAtCleared returns if the "release_cleanup_at" field was cleared in this mutation.
+func (m *DeploymentMutation) ReleaseCleanupAtCleared() bool {
+	_, ok := m.clearedFields[deployment.FieldReleaseCleanupAt]
+	return ok
+}
+
+// ResetReleaseCleanupAt resets all changes to the "release_cleanup_at" field.
+func (m *DeploymentMutation) ResetReleaseCleanupAt() {
+	m.release_cleanup_at = nil
+	delete(m.clearedFields, deployment.FieldReleaseCleanupAt)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *DeploymentMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -13883,7 +14097,7 @@ func (m *DeploymentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DeploymentMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 10)
 	if m.name != nil {
 		fields = append(fields, deployment.FieldName)
 	}
@@ -13898,6 +14112,15 @@ func (m *DeploymentMutation) Fields() []string {
 	}
 	if m.feed_revision != nil {
 		fields = append(fields, deployment.FieldFeedRevision)
+	}
+	if m.release_retention_json != nil {
+		fields = append(fields, deployment.FieldReleaseRetentionJSON)
+	}
+	if m.release_retention_revision != nil {
+		fields = append(fields, deployment.FieldReleaseRetentionRevision)
+	}
+	if m.release_cleanup_at != nil {
+		fields = append(fields, deployment.FieldReleaseCleanupAt)
 	}
 	if m.created_at != nil {
 		fields = append(fields, deployment.FieldCreatedAt)
@@ -13923,6 +14146,12 @@ func (m *DeploymentMutation) Field(name string) (ent.Value, bool) {
 		return m.PublicOrigin()
 	case deployment.FieldFeedRevision:
 		return m.FeedRevision()
+	case deployment.FieldReleaseRetentionJSON:
+		return m.ReleaseRetentionJSON()
+	case deployment.FieldReleaseRetentionRevision:
+		return m.ReleaseRetentionRevision()
+	case deployment.FieldReleaseCleanupAt:
+		return m.ReleaseCleanupAt()
 	case deployment.FieldCreatedAt:
 		return m.CreatedAt()
 	case deployment.FieldUpdatedAt:
@@ -13946,6 +14175,12 @@ func (m *DeploymentMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldPublicOrigin(ctx)
 	case deployment.FieldFeedRevision:
 		return m.OldFeedRevision(ctx)
+	case deployment.FieldReleaseRetentionJSON:
+		return m.OldReleaseRetentionJSON(ctx)
+	case deployment.FieldReleaseRetentionRevision:
+		return m.OldReleaseRetentionRevision(ctx)
+	case deployment.FieldReleaseCleanupAt:
+		return m.OldReleaseCleanupAt(ctx)
 	case deployment.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case deployment.FieldUpdatedAt:
@@ -13994,6 +14229,27 @@ func (m *DeploymentMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetFeedRevision(v)
 		return nil
+	case deployment.FieldReleaseRetentionJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReleaseRetentionJSON(v)
+		return nil
+	case deployment.FieldReleaseRetentionRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReleaseRetentionRevision(v)
+		return nil
+	case deployment.FieldReleaseCleanupAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReleaseCleanupAt(v)
+		return nil
 	case deployment.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -14019,6 +14275,9 @@ func (m *DeploymentMutation) AddedFields() []string {
 	if m.addfeed_revision != nil {
 		fields = append(fields, deployment.FieldFeedRevision)
 	}
+	if m.addrelease_retention_revision != nil {
+		fields = append(fields, deployment.FieldReleaseRetentionRevision)
+	}
 	return fields
 }
 
@@ -14029,6 +14288,8 @@ func (m *DeploymentMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case deployment.FieldFeedRevision:
 		return m.AddedFeedRevision()
+	case deployment.FieldReleaseRetentionRevision:
+		return m.AddedReleaseRetentionRevision()
 	}
 	return nil, false
 }
@@ -14045,6 +14306,13 @@ func (m *DeploymentMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddFeedRevision(v)
 		return nil
+	case deployment.FieldReleaseRetentionRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddReleaseRetentionRevision(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Deployment numeric field %s", name)
 }
@@ -14052,7 +14320,14 @@ func (m *DeploymentMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *DeploymentMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(deployment.FieldReleaseRetentionJSON) {
+		fields = append(fields, deployment.FieldReleaseRetentionJSON)
+	}
+	if m.FieldCleared(deployment.FieldReleaseCleanupAt) {
+		fields = append(fields, deployment.FieldReleaseCleanupAt)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -14065,6 +14340,14 @@ func (m *DeploymentMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *DeploymentMutation) ClearField(name string) error {
+	switch name {
+	case deployment.FieldReleaseRetentionJSON:
+		m.ClearReleaseRetentionJSON()
+		return nil
+	case deployment.FieldReleaseCleanupAt:
+		m.ClearReleaseCleanupAt()
+		return nil
+	}
 	return fmt.Errorf("unknown Deployment nullable field %s", name)
 }
 
@@ -14086,6 +14369,15 @@ func (m *DeploymentMutation) ResetField(name string) error {
 		return nil
 	case deployment.FieldFeedRevision:
 		m.ResetFeedRevision()
+		return nil
+	case deployment.FieldReleaseRetentionJSON:
+		m.ResetReleaseRetentionJSON()
+		return nil
+	case deployment.FieldReleaseRetentionRevision:
+		m.ResetReleaseRetentionRevision()
+		return nil
+	case deployment.FieldReleaseCleanupAt:
+		m.ResetReleaseCleanupAt()
 		return nil
 	case deployment.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -18547,6 +18839,7 @@ type ManagedReleaseMutation struct {
 	release_content_json     *[]byte
 	snapshot_json            *[]byte
 	snapshot_hash            *string
+	diff_summary_json        *[]byte
 	source_draft_revision    *int64
 	addsource_draft_revision *int64
 	created_by_user_id       *string
@@ -18861,6 +19154,55 @@ func (m *ManagedReleaseMutation) ResetSnapshotHash() {
 	m.snapshot_hash = nil
 }
 
+// SetDiffSummaryJSON sets the "diff_summary_json" field.
+func (m *ManagedReleaseMutation) SetDiffSummaryJSON(b []byte) {
+	m.diff_summary_json = &b
+}
+
+// DiffSummaryJSON returns the value of the "diff_summary_json" field in the mutation.
+func (m *ManagedReleaseMutation) DiffSummaryJSON() (r []byte, exists bool) {
+	v := m.diff_summary_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiffSummaryJSON returns the old "diff_summary_json" field's value of the ManagedRelease entity.
+// If the ManagedRelease object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManagedReleaseMutation) OldDiffSummaryJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiffSummaryJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiffSummaryJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiffSummaryJSON: %w", err)
+	}
+	return oldValue.DiffSummaryJSON, nil
+}
+
+// ClearDiffSummaryJSON clears the value of the "diff_summary_json" field.
+func (m *ManagedReleaseMutation) ClearDiffSummaryJSON() {
+	m.diff_summary_json = nil
+	m.clearedFields[managedrelease.FieldDiffSummaryJSON] = struct{}{}
+}
+
+// DiffSummaryJSONCleared returns if the "diff_summary_json" field was cleared in this mutation.
+func (m *ManagedReleaseMutation) DiffSummaryJSONCleared() bool {
+	_, ok := m.clearedFields[managedrelease.FieldDiffSummaryJSON]
+	return ok
+}
+
+// ResetDiffSummaryJSON resets all changes to the "diff_summary_json" field.
+func (m *ManagedReleaseMutation) ResetDiffSummaryJSON() {
+	m.diff_summary_json = nil
+	delete(m.clearedFields, managedrelease.FieldDiffSummaryJSON)
+}
+
 // SetSourceDraftRevision sets the "source_draft_revision" field.
 func (m *ManagedReleaseMutation) SetSourceDraftRevision(i int64) {
 	m.source_draft_revision = &i
@@ -19023,7 +19365,7 @@ func (m *ManagedReleaseMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ManagedReleaseMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.managed_generation != nil {
 		fields = append(fields, managedrelease.FieldManagedGeneration)
 	}
@@ -19038,6 +19380,9 @@ func (m *ManagedReleaseMutation) Fields() []string {
 	}
 	if m.snapshot_hash != nil {
 		fields = append(fields, managedrelease.FieldSnapshotHash)
+	}
+	if m.diff_summary_json != nil {
+		fields = append(fields, managedrelease.FieldDiffSummaryJSON)
 	}
 	if m.source_draft_revision != nil {
 		fields = append(fields, managedrelease.FieldSourceDraftRevision)
@@ -19066,6 +19411,8 @@ func (m *ManagedReleaseMutation) Field(name string) (ent.Value, bool) {
 		return m.SnapshotJSON()
 	case managedrelease.FieldSnapshotHash:
 		return m.SnapshotHash()
+	case managedrelease.FieldDiffSummaryJSON:
+		return m.DiffSummaryJSON()
 	case managedrelease.FieldSourceDraftRevision:
 		return m.SourceDraftRevision()
 	case managedrelease.FieldCreatedByUserID:
@@ -19091,6 +19438,8 @@ func (m *ManagedReleaseMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldSnapshotJSON(ctx)
 	case managedrelease.FieldSnapshotHash:
 		return m.OldSnapshotHash(ctx)
+	case managedrelease.FieldDiffSummaryJSON:
+		return m.OldDiffSummaryJSON(ctx)
 	case managedrelease.FieldSourceDraftRevision:
 		return m.OldSourceDraftRevision(ctx)
 	case managedrelease.FieldCreatedByUserID:
@@ -19140,6 +19489,13 @@ func (m *ManagedReleaseMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSnapshotHash(v)
+		return nil
+	case managedrelease.FieldDiffSummaryJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiffSummaryJSON(v)
 		return nil
 	case managedrelease.FieldSourceDraftRevision:
 		v, ok := value.(int64)
@@ -19218,7 +19574,11 @@ func (m *ManagedReleaseMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *ManagedReleaseMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(managedrelease.FieldDiffSummaryJSON) {
+		fields = append(fields, managedrelease.FieldDiffSummaryJSON)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -19231,6 +19591,11 @@ func (m *ManagedReleaseMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *ManagedReleaseMutation) ClearField(name string) error {
+	switch name {
+	case managedrelease.FieldDiffSummaryJSON:
+		m.ClearDiffSummaryJSON()
+		return nil
+	}
 	return fmt.Errorf("unknown ManagedRelease nullable field %s", name)
 }
 
@@ -19252,6 +19617,9 @@ func (m *ManagedReleaseMutation) ResetField(name string) error {
 		return nil
 	case managedrelease.FieldSnapshotHash:
 		m.ResetSnapshotHash()
+		return nil
+	case managedrelease.FieldDiffSummaryJSON:
+		m.ResetDiffSummaryJSON()
 		return nil
 	case managedrelease.FieldSourceDraftRevision:
 		m.ResetSourceDraftRevision()
@@ -19323,6 +19691,8 @@ type ManagedStateMutation struct {
 	active_release_id            *string
 	active_managed_generation    *int64
 	addactive_managed_generation *int64
+	last_assigned_generation     *int64
+	addlast_assigned_generation  *int64
 	desired_control_revision     *int64
 	adddesired_control_revision  *int64
 	desired_bundle_hash          *string
@@ -19543,6 +19913,62 @@ func (m *ManagedStateMutation) AddedActiveManagedGeneration() (r int64, exists b
 func (m *ManagedStateMutation) ResetActiveManagedGeneration() {
 	m.active_managed_generation = nil
 	m.addactive_managed_generation = nil
+}
+
+// SetLastAssignedGeneration sets the "last_assigned_generation" field.
+func (m *ManagedStateMutation) SetLastAssignedGeneration(i int64) {
+	m.last_assigned_generation = &i
+	m.addlast_assigned_generation = nil
+}
+
+// LastAssignedGeneration returns the value of the "last_assigned_generation" field in the mutation.
+func (m *ManagedStateMutation) LastAssignedGeneration() (r int64, exists bool) {
+	v := m.last_assigned_generation
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastAssignedGeneration returns the old "last_assigned_generation" field's value of the ManagedState entity.
+// If the ManagedState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ManagedStateMutation) OldLastAssignedGeneration(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastAssignedGeneration is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastAssignedGeneration requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastAssignedGeneration: %w", err)
+	}
+	return oldValue.LastAssignedGeneration, nil
+}
+
+// AddLastAssignedGeneration adds i to the "last_assigned_generation" field.
+func (m *ManagedStateMutation) AddLastAssignedGeneration(i int64) {
+	if m.addlast_assigned_generation != nil {
+		*m.addlast_assigned_generation += i
+	} else {
+		m.addlast_assigned_generation = &i
+	}
+}
+
+// AddedLastAssignedGeneration returns the value that was added to the "last_assigned_generation" field in this mutation.
+func (m *ManagedStateMutation) AddedLastAssignedGeneration() (r int64, exists bool) {
+	v := m.addlast_assigned_generation
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLastAssignedGeneration resets all changes to the "last_assigned_generation" field.
+func (m *ManagedStateMutation) ResetLastAssignedGeneration() {
+	m.last_assigned_generation = nil
+	m.addlast_assigned_generation = nil
 }
 
 // SetDesiredControlRevision sets the "desired_control_revision" field.
@@ -19812,12 +20238,15 @@ func (m *ManagedStateMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ManagedStateMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.active_release_id != nil {
 		fields = append(fields, managedstate.FieldActiveReleaseID)
 	}
 	if m.active_managed_generation != nil {
 		fields = append(fields, managedstate.FieldActiveManagedGeneration)
+	}
+	if m.last_assigned_generation != nil {
+		fields = append(fields, managedstate.FieldLastAssignedGeneration)
 	}
 	if m.desired_control_revision != nil {
 		fields = append(fields, managedstate.FieldDesiredControlRevision)
@@ -19846,6 +20275,8 @@ func (m *ManagedStateMutation) Field(name string) (ent.Value, bool) {
 		return m.ActiveReleaseID()
 	case managedstate.FieldActiveManagedGeneration:
 		return m.ActiveManagedGeneration()
+	case managedstate.FieldLastAssignedGeneration:
+		return m.LastAssignedGeneration()
 	case managedstate.FieldDesiredControlRevision:
 		return m.DesiredControlRevision()
 	case managedstate.FieldDesiredBundleHash:
@@ -19869,6 +20300,8 @@ func (m *ManagedStateMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldActiveReleaseID(ctx)
 	case managedstate.FieldActiveManagedGeneration:
 		return m.OldActiveManagedGeneration(ctx)
+	case managedstate.FieldLastAssignedGeneration:
+		return m.OldLastAssignedGeneration(ctx)
 	case managedstate.FieldDesiredControlRevision:
 		return m.OldDesiredControlRevision(ctx)
 	case managedstate.FieldDesiredBundleHash:
@@ -19901,6 +20334,13 @@ func (m *ManagedStateMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetActiveManagedGeneration(v)
+		return nil
+	case managedstate.FieldLastAssignedGeneration:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastAssignedGeneration(v)
 		return nil
 	case managedstate.FieldDesiredControlRevision:
 		v, ok := value.(int64)
@@ -19948,6 +20388,9 @@ func (m *ManagedStateMutation) AddedFields() []string {
 	if m.addactive_managed_generation != nil {
 		fields = append(fields, managedstate.FieldActiveManagedGeneration)
 	}
+	if m.addlast_assigned_generation != nil {
+		fields = append(fields, managedstate.FieldLastAssignedGeneration)
+	}
 	if m.adddesired_control_revision != nil {
 		fields = append(fields, managedstate.FieldDesiredControlRevision)
 	}
@@ -19964,6 +20407,8 @@ func (m *ManagedStateMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case managedstate.FieldActiveManagedGeneration:
 		return m.AddedActiveManagedGeneration()
+	case managedstate.FieldLastAssignedGeneration:
+		return m.AddedLastAssignedGeneration()
 	case managedstate.FieldDesiredControlRevision:
 		return m.AddedDesiredControlRevision()
 	case managedstate.FieldManagedStateRevision:
@@ -19983,6 +20428,13 @@ func (m *ManagedStateMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddActiveManagedGeneration(v)
+		return nil
+	case managedstate.FieldLastAssignedGeneration:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLastAssignedGeneration(v)
 		return nil
 	case managedstate.FieldDesiredControlRevision:
 		v, ok := value.(int64)
@@ -20045,6 +20497,9 @@ func (m *ManagedStateMutation) ResetField(name string) error {
 		return nil
 	case managedstate.FieldActiveManagedGeneration:
 		m.ResetActiveManagedGeneration()
+		return nil
+	case managedstate.FieldLastAssignedGeneration:
+		m.ResetLastAssignedGeneration()
 		return nil
 	case managedstate.FieldDesiredControlRevision:
 		m.ResetDesiredControlRevision()
@@ -21613,6 +22068,500 @@ func (m *PricingRuleMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *PricingRuleMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown PricingRule edge %s", name)
+}
+
+// ReleaseHistoryAuditMutation represents an operation that mutates the ReleaseHistoryAudit nodes in the graph.
+type ReleaseHistoryAuditMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	actor_user_id *string
+	kind          *string
+	details_json  *[]byte
+	created_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*ReleaseHistoryAudit, error)
+	predicates    []predicate.ReleaseHistoryAudit
+}
+
+var _ ent.Mutation = (*ReleaseHistoryAuditMutation)(nil)
+
+// releasehistoryauditOption allows management of the mutation configuration using functional options.
+type releasehistoryauditOption func(*ReleaseHistoryAuditMutation)
+
+// newReleaseHistoryAuditMutation creates new mutation for the ReleaseHistoryAudit entity.
+func newReleaseHistoryAuditMutation(c config, op Op, opts ...releasehistoryauditOption) *ReleaseHistoryAuditMutation {
+	m := &ReleaseHistoryAuditMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeReleaseHistoryAudit,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withReleaseHistoryAuditID sets the ID field of the mutation.
+func withReleaseHistoryAuditID(id int) releasehistoryauditOption {
+	return func(m *ReleaseHistoryAuditMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ReleaseHistoryAudit
+		)
+		m.oldValue = func(ctx context.Context) (*ReleaseHistoryAudit, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ReleaseHistoryAudit.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withReleaseHistoryAudit sets the old ReleaseHistoryAudit of the mutation.
+func withReleaseHistoryAudit(node *ReleaseHistoryAudit) releasehistoryauditOption {
+	return func(m *ReleaseHistoryAuditMutation) {
+		m.oldValue = func(context.Context) (*ReleaseHistoryAudit, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ReleaseHistoryAuditMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ReleaseHistoryAuditMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of ReleaseHistoryAudit entities.
+func (m *ReleaseHistoryAuditMutation) SetID(id int) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ReleaseHistoryAuditMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ReleaseHistoryAuditMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ReleaseHistoryAudit.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetActorUserID sets the "actor_user_id" field.
+func (m *ReleaseHistoryAuditMutation) SetActorUserID(s string) {
+	m.actor_user_id = &s
+}
+
+// ActorUserID returns the value of the "actor_user_id" field in the mutation.
+func (m *ReleaseHistoryAuditMutation) ActorUserID() (r string, exists bool) {
+	v := m.actor_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorUserID returns the old "actor_user_id" field's value of the ReleaseHistoryAudit entity.
+// If the ReleaseHistoryAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ReleaseHistoryAuditMutation) OldActorUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorUserID: %w", err)
+	}
+	return oldValue.ActorUserID, nil
+}
+
+// ResetActorUserID resets all changes to the "actor_user_id" field.
+func (m *ReleaseHistoryAuditMutation) ResetActorUserID() {
+	m.actor_user_id = nil
+}
+
+// SetKind sets the "kind" field.
+func (m *ReleaseHistoryAuditMutation) SetKind(s string) {
+	m.kind = &s
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *ReleaseHistoryAuditMutation) Kind() (r string, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the ReleaseHistoryAudit entity.
+// If the ReleaseHistoryAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ReleaseHistoryAuditMutation) OldKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *ReleaseHistoryAuditMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetDetailsJSON sets the "details_json" field.
+func (m *ReleaseHistoryAuditMutation) SetDetailsJSON(b []byte) {
+	m.details_json = &b
+}
+
+// DetailsJSON returns the value of the "details_json" field in the mutation.
+func (m *ReleaseHistoryAuditMutation) DetailsJSON() (r []byte, exists bool) {
+	v := m.details_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDetailsJSON returns the old "details_json" field's value of the ReleaseHistoryAudit entity.
+// If the ReleaseHistoryAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ReleaseHistoryAuditMutation) OldDetailsJSON(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDetailsJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDetailsJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDetailsJSON: %w", err)
+	}
+	return oldValue.DetailsJSON, nil
+}
+
+// ResetDetailsJSON resets all changes to the "details_json" field.
+func (m *ReleaseHistoryAuditMutation) ResetDetailsJSON() {
+	m.details_json = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ReleaseHistoryAuditMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ReleaseHistoryAuditMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ReleaseHistoryAudit entity.
+// If the ReleaseHistoryAudit object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ReleaseHistoryAuditMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ReleaseHistoryAuditMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the ReleaseHistoryAuditMutation builder.
+func (m *ReleaseHistoryAuditMutation) Where(ps ...predicate.ReleaseHistoryAudit) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ReleaseHistoryAuditMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ReleaseHistoryAuditMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ReleaseHistoryAudit, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ReleaseHistoryAuditMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ReleaseHistoryAuditMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ReleaseHistoryAudit).
+func (m *ReleaseHistoryAuditMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ReleaseHistoryAuditMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.actor_user_id != nil {
+		fields = append(fields, releasehistoryaudit.FieldActorUserID)
+	}
+	if m.kind != nil {
+		fields = append(fields, releasehistoryaudit.FieldKind)
+	}
+	if m.details_json != nil {
+		fields = append(fields, releasehistoryaudit.FieldDetailsJSON)
+	}
+	if m.created_at != nil {
+		fields = append(fields, releasehistoryaudit.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ReleaseHistoryAuditMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case releasehistoryaudit.FieldActorUserID:
+		return m.ActorUserID()
+	case releasehistoryaudit.FieldKind:
+		return m.Kind()
+	case releasehistoryaudit.FieldDetailsJSON:
+		return m.DetailsJSON()
+	case releasehistoryaudit.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ReleaseHistoryAuditMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case releasehistoryaudit.FieldActorUserID:
+		return m.OldActorUserID(ctx)
+	case releasehistoryaudit.FieldKind:
+		return m.OldKind(ctx)
+	case releasehistoryaudit.FieldDetailsJSON:
+		return m.OldDetailsJSON(ctx)
+	case releasehistoryaudit.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown ReleaseHistoryAudit field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ReleaseHistoryAuditMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case releasehistoryaudit.FieldActorUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorUserID(v)
+		return nil
+	case releasehistoryaudit.FieldKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case releasehistoryaudit.FieldDetailsJSON:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDetailsJSON(v)
+		return nil
+	case releasehistoryaudit.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ReleaseHistoryAudit field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ReleaseHistoryAuditMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ReleaseHistoryAuditMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ReleaseHistoryAuditMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown ReleaseHistoryAudit numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ReleaseHistoryAuditMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ReleaseHistoryAuditMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ReleaseHistoryAuditMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown ReleaseHistoryAudit nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ReleaseHistoryAuditMutation) ResetField(name string) error {
+	switch name {
+	case releasehistoryaudit.FieldActorUserID:
+		m.ResetActorUserID()
+		return nil
+	case releasehistoryaudit.FieldKind:
+		m.ResetKind()
+		return nil
+	case releasehistoryaudit.FieldDetailsJSON:
+		m.ResetDetailsJSON()
+		return nil
+	case releasehistoryaudit.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ReleaseHistoryAudit field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ReleaseHistoryAuditMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ReleaseHistoryAuditMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ReleaseHistoryAuditMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ReleaseHistoryAuditMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ReleaseHistoryAuditMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ReleaseHistoryAuditMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ReleaseHistoryAuditMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ReleaseHistoryAudit unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ReleaseHistoryAuditMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ReleaseHistoryAudit edge %s", name)
 }
 
 // RequestUsageMutation represents an operation that mutates the RequestUsage nodes in the graph.

@@ -455,6 +455,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/releases/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getReleaseRetention"];
+        put: operations["updateReleaseRetention"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/releases/cleanup:preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewReleaseCleanup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/releases/cleanup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["executeReleaseCleanup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/releases/cleanup/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listReleaseHistoryAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/upstreams/{upstreamId}/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUpstreamReferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/activations/{activationId}": {
         parameters: {
             query?: never;
@@ -2334,6 +2414,78 @@ export interface components {
             items: components["schemas"]["SystemEvent"][];
             truncated: boolean;
         };
+        /** @description Keep union of latest N and within D days; disabled by default. */
+        ReleaseRetentionRule: {
+            enabled: boolean;
+            keepLast?: number;
+            keepDays?: number;
+        };
+        ReleaseRetention: {
+            revision: number;
+            rule: components["schemas"]["ReleaseRetentionRule"];
+            /** Format: date-time */
+            lastCleanupAt?: string;
+        };
+        UpdateReleaseRetentionRequest: {
+            expectedRevision: number;
+            rule: components["schemas"]["ReleaseRetentionRule"];
+        };
+        /** @description Exactly one mode: explicit IDs, half-open time window, or saved retention rule. Max 200 deletions per execution. */
+        ReleaseCleanupSelection: {
+            releaseIds?: string[];
+            /** Format: date-time */
+            publishedBefore?: string;
+            /** Format: date-time */
+            publishedAfter?: string;
+            useRetentionRule?: boolean;
+        };
+        ReleaseCleanupItem: {
+            releaseId: string;
+            managedGeneration: number;
+            status: string;
+            /** Format: int64 */
+            bytes: number;
+            reason: string;
+        };
+        ReleaseCleanupPreview: {
+            previewHash: string;
+            candidates: components["schemas"]["ReleaseCleanupItem"][];
+            protected: components["schemas"]["ReleaseCleanupItem"][];
+            /** Format: int64 */
+            reclaimableBytes: number;
+            hasMore: boolean;
+            activationBlocked: boolean;
+            releasedUpstreamIds: string[];
+        };
+        ExecuteReleaseCleanupRequest: {
+            selection: components["schemas"]["ReleaseCleanupSelection"];
+            previewHash: string;
+        };
+        ReleaseCleanupResult: {
+            deletedCount: number;
+            /** Format: int64 */
+            reclaimedBytes: number;
+            auditId: number;
+        };
+        ReleaseHistoryAudit: {
+            auditId: number;
+            actorUserId: string;
+            kind: string;
+            /** Format: date-time */
+            createdAt: string;
+            releaseGenerations: number[];
+            /** Format: int64 */
+            reclaimedBytes: number;
+            rule?: components["schemas"]["ReleaseRetentionRule"];
+        };
+        ReleaseHistoryAuditPage: {
+            items: components["schemas"]["ReleaseHistoryAudit"][];
+        };
+        UpstreamReferences: {
+            draftReferenced: boolean;
+            releases: components["schemas"]["ReleaseCleanupItem"][];
+            activationBlocked: boolean;
+        };
         DeploymentSettings: {
             deploymentId: components["schemas"]["DeploymentId"];
             /** @description Human-facing enterprise name shown to enrolled users and Portal sessions. */
@@ -3577,6 +3729,171 @@ export interface operations {
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    getReleaseRetention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseRetention"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    updateReleaseRetention: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReleaseRetentionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseRetention"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    previewReleaseCleanup: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseCleanupSelection"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseCleanupPreview"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    executeReleaseCleanup: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecuteReleaseCleanupRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseCleanupResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listReleaseHistoryAudit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseHistoryAuditPage"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getUpstreamReferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upstreamId: components["schemas"]["UpstreamId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpstreamReferences"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
     getActivation: {

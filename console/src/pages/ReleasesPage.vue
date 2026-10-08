@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
+import ReleaseHistoryTools from '../components/ReleaseHistoryTools.vue'
 import PageHeader from '../components/PageHeader.vue'
 import LoadingState from '../components/LoadingState.vue'
 import ProblemBanner from '../components/ProblemBanner.vue'
@@ -22,6 +23,9 @@ type ResourceDiff = components['schemas']['ResourceDiff']
 
 const session = useSessionStore()
 const detailRelease = ref<Release>()
+const selectedReleaseIds = ref<string[]>([])
+const historyTools = ref<InstanceType<typeof ReleaseHistoryTools>>()
+async function historyCleaned() { selectedReleaseIds.value = []; detailRelease.value = undefined; await refresh() }
 const activation = useActivationStore()
 const listPath = ref('/api/admin/v1/releases?limit=50')
 const {
@@ -34,6 +38,10 @@ const {
   nextPage,
   previousPage,
 } = useCursorPager<Release, ReleasePage>(listPath, path => apiFetch<ReleasePage>(path))
+
+function selectPage() {
+  selectedReleaseIds.value = [...new Set([...selectedReleaseIds.value, ...releases.value.filter(r => r.status === 'SUPERSEDED' || r.status === 'ACTIVATION_FAILED').map(r => r.releaseId)])].slice(0, 200)
+}
 
 async function refresh() {
   await resetReleases()
@@ -94,6 +102,7 @@ onMounted(refresh)
   <q-page class="admin-page" data-cy="releases-page">
     <PageHeader :title="$t('releases.title')" :subtitle="$t('releases.subtitle')">
       <template #actions>
+        <ReleaseHistoryTools ref="historyTools" :selection="selectedReleaseIds" @cleaned="historyCleaned" />
         <q-btn flat icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" @click="refresh" />
       </template>
     </PageHeader>
@@ -115,10 +124,13 @@ onMounted(refresh)
     <q-card v-else flat bordered>
       <q-card-section class="row items-center justify-between q-py-xs">
         <div class="text-subtitle2">{{ $t('releases.title') }}</div>
+        <q-btn flat dense :label="$t('releaseHistory.selectPage')" data-cy="release-select-page" @click="selectPage" />
+        <q-btn v-if="selectedReleaseIds.length" flat dense :label="$t('releaseHistory.clearSelection', { count: selectedReleaseIds.length })" @click="selectedReleaseIds = []" />
       </q-card-section>
       <q-separator />
       <q-list separator>
         <q-item v-for="release in releases" :key="release.releaseId" clickable @click="showDetail(release)">
+          <q-item-section side><q-checkbox v-model="selectedReleaseIds" :val="release.releaseId" :disable="release.status === 'ACTIVE' || release.status === 'STAGED'" :aria-label="$t('releases.versionLabel', { generation: release.managedGeneration })" @click.stop /></q-item-section>
           <q-item-section>
             <q-item-label>{{ $t('releases.versionLabel', { generation: release.managedGeneration }) }}</q-item-label>
             <q-item-label caption>
@@ -188,6 +200,7 @@ onMounted(refresh)
         <q-separator />
         <q-card-actions align="right">
           <q-btn flat icon="arrow_back" :label="$t('common.close')" color="primary" @click="detailRelease = undefined" />
+          <q-btn flat color="negative" :label="$t('releaseHistory.cleanup')" :disable="detailRelease.status === 'ACTIVE' || detailRelease.status === 'STAGED' || !session.csrfToken" @click="historyTools?.openCleanup([detailRelease.releaseId])" />
           <q-btn outline color="primary" :label="$t('releases.republish')" :disable="!session.csrfToken" @click="republish(detailRelease)" />
         </q-card-actions>
       </q-card>

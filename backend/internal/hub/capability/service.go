@@ -337,39 +337,51 @@ func (s *Service) previousRelease(ctx context.Context, row *ent.ManagedRelease) 
 	return prev, nil
 }
 
-func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRelease) (ReleaseView, error) {
+func releaseSummary(row, prev *ent.ManagedRelease) (adminapi.DiffSummary, int, error) {
 	var current, previous *adminapi.ManagedDraftContent
 	if err := ValidateDraftOpeningJSON(row.ReleaseContentJSON); err != nil {
-		return ReleaseView{}, err
+		return adminapi.DiffSummary{}, 0, err
 	}
 	if err := json.Unmarshal(row.ReleaseContentJSON, &current); err != nil {
-		return ReleaseView{}, err
+		return adminapi.DiffSummary{}, 0, err
 	}
 	if current == nil {
-		return ReleaseView{}, fmt.Errorf("invalid persisted release content")
+		return adminapi.DiffSummary{}, 0, fmt.Errorf("invalid persisted release content")
 	}
 	normalizedCurrent, snapshotSchemaVersion, err := PublishedContent(*current, row.SnapshotJSON)
 	if err != nil {
-		return ReleaseView{}, err
+		return adminapi.DiffSummary{}, 0, err
 	}
 	current = &normalizedCurrent
+	if len(row.DiffSummaryJSON) > 0 {
+		var cached adminapi.DiffSummary
+		err := json.Unmarshal(row.DiffSummaryJSON, &cached)
+		return cached, snapshotSchemaVersion, err
+	}
 	if prev != nil {
 		if err := ValidateDraftOpeningJSON(prev.ReleaseContentJSON); err != nil {
-			return ReleaseView{}, err
+			return adminapi.DiffSummary{}, 0, err
 		}
 		if err := json.Unmarshal(prev.ReleaseContentJSON, &previous); err != nil {
-			return ReleaseView{}, err
+			return adminapi.DiffSummary{}, 0, err
 		}
 		if previous == nil {
-			return ReleaseView{}, fmt.Errorf("invalid previous release content")
+			return adminapi.DiffSummary{}, 0, fmt.Errorf("invalid previous release content")
 		}
 		normalizedPrevious, _, err := PublishedContent(*previous, prev.SnapshotJSON)
 		if err != nil {
-			return ReleaseView{}, err
+			return adminapi.DiffSummary{}, 0, err
 		}
 		previous = &normalizedPrevious
 	}
-	diff := releaseContentDiff(current, previous)
+	return releaseContentDiff(current, previous), snapshotSchemaVersion, nil
+}
+
+func (s *Service) buildReleaseView(ctx context.Context, row, prev *ent.ManagedRelease) (ReleaseView, error) {
+	diff, snapshotSchemaVersion, err := releaseSummary(row, prev)
+	if err != nil {
+		return ReleaseView{}, err
+	}
 	history, err := s.activationHistory(ctx, int(row.ManagedGeneration))
 	if err != nil {
 		return ReleaseView{}, err
@@ -638,14 +650,16 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 	if !validation.Valid {
 		return ReleaseView{}, ErrInvalidDraft
 	}
-	generation := 1
-	latest, err := s.Client.ManagedRelease.Query().Order(ent.Desc(managedrelease.FieldManagedGeneration)).First(ctx)
-	if err == nil {
-		generation = int(latest.ManagedGeneration) + 1
-	} else if !ent.IsNotFound(err) {
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
 		return ReleaseView{}, err
 	}
-	deployment, err := s.Client.Deployment.Query().Only(ctx)
+	defer tx.Rollback()
+	generation, err := NextGeneration(ctx, tx.Client())
+	if err != nil {
+		return ReleaseView{}, err
+	}
+	deployment, err := tx.Deployment.Query().Only(ctx)
 	if err != nil {
 		return ReleaseView{}, err
 	}
@@ -670,7 +684,7 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 	if err != nil {
 		return ReleaseView{}, err
 	}
-	created, err := s.Client.ManagedRelease.Create().
+	created, err := tx.ManagedRelease.Create().
 		SetID(releaseID).
 		SetManagedGeneration(int64(generation)).
 		SetStatus("STAGED").
@@ -684,6 +698,13 @@ func (s *Service) StageRelease(ctx context.Context, createdBy string, expectedDr
 	if err != nil {
 		return ReleaseView{}, err
 	}
+	if _, err := tx.ManagedState.UpdateOneID("current").SetLastAssignedGeneration(int64(generation)).Save(ctx); err != nil {
+		return ReleaseView{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ReleaseView{}, err
+	}
+	created = created.Unwrap()
 	prev, err := s.previousRelease(ctx, created)
 	if err != nil {
 		return ReleaseView{}, err

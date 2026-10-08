@@ -15,6 +15,8 @@ const (
 	FieldActiveReleaseID = "active_release_id"
 	// FieldActiveManagedGeneration holds the string denoting the active_managed_generation field in the database.
 	FieldActiveManagedGeneration = "active_managed_generation"
+	// FieldLastAssignedGeneration holds the string denoting the last_assigned_generation field in the database.
+	FieldLastAssignedGeneration = "last_assigned_generation"
 	// FieldDesiredControlRevision holds the string denoting the desired_control_revision field in the database.
 	FieldDesiredControlRevision = "desired_control_revision"
 	// FieldDesiredBundleHash holds the string denoting the desired_bundle_hash field in the database.
@@ -34,6 +36,7 @@ var Columns = []string{
 	FieldID,
 	FieldActiveReleaseID,
 	FieldActiveManagedGeneration,
+	FieldLastAssignedGeneration,
 	FieldDesiredControlRevision,
 	FieldDesiredBundleHash,
 	FieldManagedStateRevision,
@@ -51,6 +54,11 @@ func ValidColumn(column string) bool {
 	return false
 }
 
+var (
+	// DefaultLastAssignedGeneration holds the default value on creation for the "last_assigned_generation" field.
+	DefaultLastAssignedGeneration int64
+)
+
 // OrderOption defines the ordering options for the ManagedState queries.
 type OrderOption func(*sql.Selector)
 
@@ -67,6 +75,11 @@ func ByActiveReleaseID(opts ...sql.OrderTermOption) OrderOption {
 // ByActiveManagedGeneration orders the results by the active_managed_generation field.
 func ByActiveManagedGeneration(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldActiveManagedGeneration, opts...).ToFunc()
+}
+
+// ByLastAssignedGeneration orders the results by the last_assigned_generation field.
+func ByLastAssignedGeneration(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastAssignedGeneration, opts...).ToFunc()
 }
 
 // ByDesiredControlRevision orders the results by the desired_control_revision field.

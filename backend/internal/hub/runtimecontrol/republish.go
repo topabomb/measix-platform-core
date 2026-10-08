@@ -18,6 +18,13 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	if platformid.Validate(platformid.User, adminUserID) != nil || platformid.Validate(platformid.Idempotency, idempotencyKey) != nil || platformid.Validate(platformid.Release, sourceReleaseID) != nil {
 		return ActivationResult{}, fmt.Errorf("invalid republish request")
 	}
+	path := "/api/admin/v1/releases/" + sourceReleaseID + ":republish"
+	requestHash := hashOperation(struct {
+		ReleaseID string `json:"releaseId"`
+	}{sourceReleaseID})
+	if existing, found, err := s.findOperationIdempotent(ctx, adminUserID, path, idempotencyKey, requestHash); err != nil || found {
+		return existing, err
+	}
 	source, err := s.Client.ManagedRelease.Get(ctx, sourceReleaseID)
 	if err != nil {
 		return ActivationResult{}, err
@@ -29,13 +36,6 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	content, sourceVersion, err := capability.PublishedContent(content, source.SnapshotJSON)
 	if err != nil {
 		return ActivationResult{}, err
-	}
-	path := "/api/admin/v1/releases/" + sourceReleaseID + ":republish"
-	requestHash := hashOperation(struct {
-		ReleaseID string `json:"releaseId"`
-	}{sourceReleaseID})
-	if existing, found, err := s.findOperationIdempotent(ctx, adminUserID, path, idempotencyKey, requestHash); err != nil || found {
-		return existing, err
 	}
 	managed, err := s.Client.ManagedState.Get(ctx, "current")
 	if err != nil {
@@ -89,6 +89,16 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	if pending != 0 {
 		return ActivationResult{}, ErrActivationInProgress
 	}
+	if _, err := tx.ManagedRelease.Get(ctx, sourceReleaseID); err != nil {
+		return ActivationResult{}, err
+	}
+	next, err := capability.NextGeneration(ctx, tx.Client())
+	if err != nil {
+		return ActivationResult{}, err
+	}
+	if next != generation {
+		return ActivationResult{}, ErrActivationInProgress
+	}
 	fresh, err := tx.ManagedState.Get(ctx, "current")
 	if err != nil || fresh.DesiredControlRevision+1 != int64(controlRevision) {
 		return ActivationResult{}, ErrActivationInProgress
@@ -112,7 +122,7 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 		return ActivationResult{}, err
 	}
 	if _, err := tx.ManagedState.UpdateOneID("current").
-		SetDesiredControlRevision(int64(controlRevision)).SetDesiredBundleHash(string(hash)).SetRuntimeStatus("ACTIVATING").
+		SetLastAssignedGeneration(int64(generation)).SetDesiredControlRevision(int64(controlRevision)).SetDesiredBundleHash(string(hash)).SetRuntimeStatus("ACTIVATING").
 		SetManagedStateRevision(fresh.ManagedStateRevision + 1).SetUpdatedAt(now).Save(ctx); err != nil {
 		return ActivationResult{}, err
 	}

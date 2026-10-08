@@ -1,6 +1,6 @@
 # 实现状态与历史证据索引
 
-文档核对日期：2026-10-07。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
+文档核对日期：2026-10-08。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
 
 ## 固定 S0.2 Preview 组合
 
@@ -24,6 +24,7 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 相对于上述固定包，当前源码还包括：
 
 - Snapshot v5 的 Starter 固化开场与 published v4 读取/Republish 保全；规则见 [API 参考](api-contracts.md#snapshot-编译与历史数据)。
+- 发布历史预览/手动/规则清理、上游实际引用诊断、独立编号与历史名称保全；见 [API 参考](api-contracts.md)和[迁移](database-migrations.md#发布历史迁移)。
 - v5 Direct MCP 发现、ALL/ALLOWLIST、助手 binding 和 AUTO/REQUIRE_CONFIRMATION；见[工具治理](direct-mcp-tool-governance.md)。
 - Agent Space 服务/用户生命周期、MCP binding、DAV 文件/文本编辑/预览与管理员资源摘要；见[工作区参考](remote-workspace-implementation.md)。
 - append-only migrations、数据库保全启动、固定 build identity 的真机开发预设，以及 supported-version 响应扩展校验；见[迁移](database-migrations.md)、[开发](development.md)、[API](api-contracts.md)。

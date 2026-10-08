@@ -28,6 +28,8 @@ const (
 	FieldCapability = "capability"
 	// FieldResourceID holds the string denoting the resource_id field in the database.
 	FieldResourceID = "resource_id"
+	// FieldResourceDisplayName holds the string denoting the resource_display_name field in the database.
+	FieldResourceDisplayName = "resource_display_name"
 	// FieldClientProtocol holds the string denoting the client_protocol field in the database.
 	FieldClientProtocol = "client_protocol"
 	// FieldUpstreamID holds the string denoting the upstream_id field in the database.
@@ -89,6 +91,7 @@ var Columns = []string{
 	FieldDeviceID,
 	FieldCapability,
 	FieldResourceID,
+	FieldResourceDisplayName,
 	FieldClientProtocol,
 	FieldUpstreamID,
 	FieldWorkspaceTargetJSON,
@@ -121,6 +124,8 @@ func ValidColumn(column string) bool {
 }
 
 var (
+	// DefaultResourceDisplayName holds the default value on creation for the "resource_display_name" field.
+	DefaultResourceDisplayName string
 	// ManagedGenerationValidator is a validator for the "managed_generation" field. It is called by the builders before save.
 	ManagedGenerationValidator func(int64) error
 	// ControlRevisionValidator is a validator for the "control_revision" field. It is called by the builders before save.
@@ -279,6 +284,11 @@ func ByCapability(opts ...sql.OrderTermOption) OrderOption {
 // ByResourceID orders the results by the resource_id field.
 func ByResourceID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldResourceID, opts...).ToFunc()
+}
+
+// ByResourceDisplayName orders the results by the resource_display_name field.
+func ByResourceDisplayName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResourceDisplayName, opts...).ToFunc()
 }
 
 // ByClientProtocol orders the results by the client_protocol field.

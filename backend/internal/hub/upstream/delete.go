@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"measix/platform/internal/wire/adminapi"
 
 	"measix/platform/ent"
 	"measix/platform/ent/activation"
@@ -85,26 +86,88 @@ func (s *Service) DeleteUpstream(ctx context.Context, actorID, id string, expect
 }
 
 func rejectUpstreamReference(raw []byte, id string) error {
+	ids, err := ReferencedUpstreams(raw)
+	if err != nil {
+		return err
+	}
+	for _, ref := range ids {
+		if ref == id {
+			return ErrInUse
+		}
+	}
+	return nil
+}
+
+func ReferencedUpstreams(raw []byte) ([]string, error) {
 	var content struct {
 		Bindings json.RawMessage `json:"bindings"`
 	}
 	if json.Unmarshal(raw, &content) != nil || len(content.Bindings) == 0 || bytes.Equal(bytes.TrimSpace(content.Bindings), []byte("null")) {
-		return ErrInvalidConfig
+		return nil, ErrInvalidConfig
 	}
 	var bindings []struct {
 		UpstreamID string `json:"upstreamId"`
 		TargetKind string `json:"targetKind"`
 	}
 	if json.Unmarshal(content.Bindings, &bindings) != nil {
-		return ErrInvalidConfig
+		return nil, ErrInvalidConfig
 	}
+	ids := []string{}
 	for _, binding := range bindings {
-		if binding.UpstreamID == id {
-			return ErrInUse
-		}
 		if binding.UpstreamID == "" && binding.TargetKind != "REMOTE_WORKSPACE" {
-			return ErrInvalidConfig
+			return nil, ErrInvalidConfig
+		}
+		if binding.UpstreamID != "" {
+			ids = append(ids, binding.UpstreamID)
 		}
 	}
-	return nil
+	return ids, nil
+}
+
+func (s *Service) GetReferences(ctx context.Context, id string) (adminapi.UpstreamReferences, error) {
+	out := adminapi.UpstreamReferences{Releases: []adminapi.ReleaseCleanupItem{}}
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return out, err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Upstream.Get(ctx, id); err != nil {
+		return out, err
+	}
+	out.ActivationBlocked, err = tx.Activation.Query().Where(activation.StateIn("APPLYING", "UNKNOWN")).Exist(ctx)
+	if err != nil {
+		return out, err
+	}
+	drafts, err := tx.ManagedDraft.Query().All(ctx)
+	if err != nil {
+		return out, err
+	}
+	for _, d := range drafts {
+		e := rejectUpstreamReference(d.ContentJSON, id)
+		if errors.Is(e, ErrInUse) {
+			out.DraftReferenced = true
+		} else if e != nil {
+			return out, e
+		}
+	}
+	after := int64(0)
+	for {
+		rows, e := tx.ManagedRelease.Query().Where(managedrelease.ManagedGenerationGT(after)).Order(ent.Asc(managedrelease.FieldManagedGeneration)).Limit(16).All(ctx)
+		if e != nil {
+			return out, e
+		}
+		for _, r := range rows {
+			e := rejectUpstreamReference(r.ReleaseContentJSON, id)
+			if errors.Is(e, ErrInUse) {
+				out.Releases = append(out.Releases, adminapi.ReleaseCleanupItem{ReleaseId: r.ID, ManagedGeneration: int(r.ManagedGeneration), Status: r.Status})
+			} else if e != nil {
+				return out, e
+			}
+		}
+		if len(rows) < 16 {
+			break
+		}
+		after = rows[len(rows)-1].ManagedGeneration
+	}
+	return out, nil
 }

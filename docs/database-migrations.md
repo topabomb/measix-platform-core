@@ -43,6 +43,12 @@ Update the Ent schema and generated code, add the next SQL file, and test at lea
 
 SQLite connections remain owned by `internal/common/sqliteutil`. Relay spool schema is a separate owner and must be backed up or replay-qualified independently.
 
+## 发布历史迁移
+
+000004 保存 generation 高水位、独立保留规则与有界清理审计，并为保留版本增加差异摘要缓存。迁移从所有 Release、Activation target 和当前 generation 初始化高水位；从原 Snapshot 为全部 admission（含待核对请求）补录资源名称。后续 admission 在同一事务记录名称，不依赖可清理的发布记录。迁移不改现存发布内容、Snapshot/hash、用量或结算字节。
+
+升级前须保留原包与完整备份；旧 binary 不接受 schema 4，回退需恢复迁移前备份，不能只切换 binary。清理移除逻辑发布数据，SQLite 空闲页供后续写入复用，不在在线服务中执行 VACUUM。升级与名称/编号保全由 `migrations/release_history_upgrade_test.go` 验证。
+
 
 ## 远程工作区迁移
 

@@ -22,6 +22,7 @@ import (
 	"measix/platform/ent/manageddraft"
 	"measix/platform/ent/managedrelease"
 	"measix/platform/ent/portalsession"
+	"measix/platform/ent/releasehistoryaudit"
 	"measix/platform/ent/requestusage"
 	"measix/platform/ent/secretversion"
 	"measix/platform/ent/semanticusage"
@@ -193,6 +194,9 @@ func purgeUserData(ctx context.Context, tx *ent.Tx, userID, deletionActivationID
 		return err
 	}
 	if _, err = tx.ManagedDraft.Update().Where(manageddraft.UpdatedByUserIDEQ(userID)).SetUpdatedByUserID(deletedActorID).Save(ctx); err != nil {
+		return err
+	}
+	if _, err = tx.ReleaseHistoryAudit.Update().Where(releasehistoryaudit.ActorUserIDEQ(userID)).SetActorUserID(deletedActorID).Save(ctx); err != nil {
 		return err
 	}
 	if _, err = tx.ManagedRelease.Update().Where(managedrelease.CreatedByUserIDEQ(userID)).SetCreatedByUserID(deletedActorID).Save(ctx); err != nil {

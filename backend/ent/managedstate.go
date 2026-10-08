@@ -21,6 +21,8 @@ type ManagedState struct {
 	ActiveReleaseID *string `json:"active_release_id,omitempty"`
 	// ActiveManagedGeneration holds the value of the "active_managed_generation" field.
 	ActiveManagedGeneration int64 `json:"active_managed_generation,omitempty"`
+	// LastAssignedGeneration holds the value of the "last_assigned_generation" field.
+	LastAssignedGeneration int64 `json:"last_assigned_generation,omitempty"`
 	// DesiredControlRevision holds the value of the "desired_control_revision" field.
 	DesiredControlRevision int64 `json:"desired_control_revision,omitempty"`
 	// DesiredBundleHash holds the value of the "desired_bundle_hash" field.
@@ -39,7 +41,7 @@ func (*ManagedState) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case managedstate.FieldActiveManagedGeneration, managedstate.FieldDesiredControlRevision, managedstate.FieldManagedStateRevision:
+		case managedstate.FieldActiveManagedGeneration, managedstate.FieldLastAssignedGeneration, managedstate.FieldDesiredControlRevision, managedstate.FieldManagedStateRevision:
 			values[i] = new(sql.NullInt64)
 		case managedstate.FieldID, managedstate.FieldActiveReleaseID, managedstate.FieldDesiredBundleHash, managedstate.FieldRuntimeStatus:
 			values[i] = new(sql.NullString)
@@ -78,6 +80,12 @@ func (_m *ManagedState) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field active_managed_generation", values[i])
 			} else if value.Valid {
 				_m.ActiveManagedGeneration = value.Int64
+			}
+		case managedstate.FieldLastAssignedGeneration:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field last_assigned_generation", values[i])
+			} else if value.Valid {
+				_m.LastAssignedGeneration = value.Int64
 			}
 		case managedstate.FieldDesiredControlRevision:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -153,6 +161,9 @@ func (_m *ManagedState) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("active_managed_generation=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ActiveManagedGeneration))
+	builder.WriteString(", ")
+	builder.WriteString("last_assigned_generation=")
+	builder.WriteString(fmt.Sprintf("%v", _m.LastAssignedGeneration))
 	builder.WriteString(", ")
 	builder.WriteString("desired_control_revision=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DesiredControlRevision))

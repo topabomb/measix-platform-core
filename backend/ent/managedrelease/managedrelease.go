@@ -21,6 +21,8 @@ const (
 	FieldSnapshotJSON = "snapshot_json"
 	// FieldSnapshotHash holds the string denoting the snapshot_hash field in the database.
 	FieldSnapshotHash = "snapshot_hash"
+	// FieldDiffSummaryJSON holds the string denoting the diff_summary_json field in the database.
+	FieldDiffSummaryJSON = "diff_summary_json"
 	// FieldSourceDraftRevision holds the string denoting the source_draft_revision field in the database.
 	FieldSourceDraftRevision = "source_draft_revision"
 	// FieldCreatedByUserID holds the string denoting the created_by_user_id field in the database.
@@ -39,6 +41,7 @@ var Columns = []string{
 	FieldReleaseContentJSON,
 	FieldSnapshotJSON,
 	FieldSnapshotHash,
+	FieldDiffSummaryJSON,
 	FieldSourceDraftRevision,
 	FieldCreatedByUserID,
 	FieldCreatedAt,

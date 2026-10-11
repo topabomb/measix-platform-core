@@ -2374,6 +2374,25 @@ paths:
         description: Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
         schema:
           $ref: '#/components/schemas/AgentSpaceId'
+      - name: preview
+        in: query
+        required: false
+        description: Native video preview; requires expectedEtag. Supported video types are served inline; default downloads remain attachments.
+        schema:
+          type: string
+          enum: [video]
+      - name: expectedEtag
+        in: query
+        required: false
+        description: Strong ETag forwarded as If-Match for a fixed-version media URL; conflicting If-Match is rejected.
+        schema:
+          type: string
+          maxLength: 1024
+      - name: If-Range
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: Full content or HEAD metadata.
@@ -2708,6 +2727,25 @@ paths:
         description: Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
         schema:
           $ref: '#/components/schemas/AgentSpaceId'
+      - name: preview
+        in: query
+        required: false
+        description: Native video preview; requires expectedEtag. Supported video types are served inline; default downloads remain attachments.
+        schema:
+          type: string
+          enum: [video]
+      - name: expectedEtag
+        in: query
+        required: false
+        description: Strong ETag forwarded as If-Match for a fixed-version media URL; conflicting If-Match is rejected.
+        schema:
+          type: string
+          maxLength: 1024
+      - name: If-Range
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: Full content or HEAD metadata.
@@ -2851,6 +2889,62 @@ paths:
         bytes. '
 components:
   schemas:
+    DAVResourceId:
+      type: string
+      pattern: ^dav_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DAVAccessMode:
+      type: string
+      enum: [READ_ONLY, FULL]
+    WebDAVDefinition:
+      type: object
+      additionalProperties: false
+      required: [resourceId, displayName, enabled, clientProtocol, authOwnership, rootPathTemplate, purpose]
+      properties:
+        resourceId:
+          $ref: '#/components/schemas/DAVResourceId'
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        enabled:
+          type: boolean
+        purpose:
+          type: string
+          enum: [WORKSPACE_FILE_EXCHANGE]
+        clientProtocol:
+          type: string
+          enum: [WEBDAV]
+        authOwnership:
+          type: string
+          enum: [ENTERPRISE_MANAGED]
+        rootPathTemplate:
+          type: string
+          pattern: '^/runtime/v1/resources/dav_[0-9a-f-]{36}/spaces/\{agentSpaceId\}/dav/$'
+    WorkspaceDAVProjection:
+      type: object
+      additionalProperties: false
+      required: [resourceId, available, reason]
+      properties:
+        resourceId:
+          $ref: '#/components/schemas/DAVResourceId'
+        available:
+          type: boolean
+        reason:
+          type: string
+        accessMode:
+          $ref: '#/components/schemas/DAVAccessMode'
+        bindingRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        desiredAccessMode:
+          $ref: '#/components/schemas/DAVAccessMode'
+        desiredBindingRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        lastConfirmedAccessMode:
+          $ref: '#/components/schemas/DAVAccessMode'
     WorkspaceServiceId:
       type: string
       pattern: ^wss_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -3160,6 +3254,11 @@ components:
       - mcpReason
       - filesReason
       properties:
+        fileExchangeWebdavResourceId:
+          $ref: '#/components/schemas/DAVResourceId'
+          # Sole designated DAV; absent when service or published resource is disabled.
+        webdav:
+          $ref: '#/components/schemas/WorkspaceDAVProjection'
         schemaVersion:
           type: integer
           enum:
@@ -3218,6 +3317,12 @@ components:
       - mcpServerId
       - mcpPublished
       properties:
+        davResourceId:
+          $ref: '#/components/schemas/DAVResourceId'
+        davPublishedEnabled:
+          type: boolean
+        davDraftEnabled:
+          type: boolean
         workspaceServiceId:
           $ref: '#/components/schemas/WorkspaceServiceId'
         type:
@@ -3314,6 +3419,12 @@ components:
       - action
       - expectedRevision
       properties:
+        davAccessMode:
+          $ref: '#/components/schemas/DAVAccessMode'
+        expectedDAVRevision:
+          type: integer
+          format: int64
+          minimum: 1
         managementSecret:
           # CONTINUE only: verified replacement for this operation, never a change of target.
           $ref: '#/components/schemas/SecretRef'
@@ -3330,6 +3441,7 @@ components:
           - RESET_MCP
           - SET_DAV
           - REVOKE_DAV
+          - SET_DAV_ACCESS
         expectedRevision:
           type: integer
           minimum: 0
@@ -3577,6 +3689,7 @@ components:
           - TTS
           - ASR
           - MCP
+          - WEBDAV
           - POLICY
           - BINDING
           - ASSISTANT
@@ -3913,7 +4026,7 @@ components:
         workspaceServiceId:
           $ref: '#/components/schemas/WorkspaceServiceId'
       description: 'Exactly one target: legacy upstreamId (targetKind omitted or UPSTREAM), or targetKind REMOTE_WORKSPACE
-        plus workspaceServiceId. WorkspaceService targets are MCP-only.'
+        plus workspaceServiceId. WorkspaceService targets are explicit MCP or WEBDAV resources.'
       not:
         not:
           oneOf:
@@ -3995,6 +4108,10 @@ components:
       - assistants
       - starters
       properties:
+        webdav:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebDAVDefinition'
         providers:
           type: array
           items:
@@ -4849,6 +4966,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/McpDefinition'
+        webdav:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebDAVDefinition'
         policy:
           $ref: '#/components/schemas/ManagedPolicy'
         assistants:
@@ -4874,6 +4995,7 @@ components:
       - TTS
       - ASR
       - MCP
+      - WEBDAV
       - POLICY
       - ASSISTANT
       - STARTER
@@ -5011,7 +5133,7 @@ components:
           type: string
     ResourceKind:
       type: string
-      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
+      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION, WEBDAV]
     UsageClientProtocol:
       type: string
       enum:
@@ -5029,6 +5151,7 @@ components:
       - OPENAI_REALTIME_TRANSCRIPTION
       - DASHSCOPE_REALTIME_ASR
       - MCP_STREAMABLE_HTTP
+      - WEBDAV
     UsageCompleteness:
       type: string
       enum: [EXACT, PARTIAL, UNKNOWN]
@@ -5774,6 +5897,10 @@ components:
       - settlementState
       - semanticMeters
       properties:
+        httpMethod:
+          type: string
+        statisticsOnly:
+          type: boolean
         requestId:
           $ref: '#/components/schemas/RequestId'
         interactionId:
@@ -5867,6 +5994,7 @@ components:
           type: integer
           enum:
           - 2
+          - 3
     RequestUsagePage:
       type: object
       additionalProperties: false

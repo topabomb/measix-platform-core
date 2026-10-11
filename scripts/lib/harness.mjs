@@ -249,6 +249,7 @@ export async function createFreshEnvironment(root, opts = {}) {
     buildStdio = 'inherit',
     migrateStdio = 'inherit',
     bootstrapStdio = 'inherit',
+    hubBinarySource = null,
   } = opts
 
   const { execSync } = await import('node:child_process')
@@ -294,7 +295,8 @@ export async function createFreshEnvironment(root, opts = {}) {
 
   // Build binaries
   try {
-    execSync(`go build -o "${hubBin}" ./cmd/control-hub`, { cwd: backendDir, stdio: buildStdio })
+    if (hubBinarySource) cpSync(resolve(hubBinarySource), hubBin, { errorOnExist: true, force: false })
+    else execSync(`go build -o "${hubBin}" ./cmd/control-hub`, { cwd: backendDir, stdio: buildStdio })
     execSync(`go build -o "${relayBin}" ./cmd/runtime-relay`, { cwd: backendDir, stdio: buildStdio })
   } catch (e) {
     rmSync(envRoot, { recursive: true, force: true })
@@ -303,7 +305,8 @@ export async function createFreshEnvironment(root, opts = {}) {
 
   // Initialize the current schema on a fresh database.
   try {
-    execSync(`go run ./cmd/devmigrate --db "${hubDB}"`, { cwd: backendDir, stdio: migrateStdio })
+    if (hubBinarySource) execFileSync(hubBin, ['migrate', '--db', hubDB], { cwd: backendDir, stdio: migrateStdio, windowsHide: true })
+    else execSync(`go run ./cmd/devmigrate --db "${hubDB}"`, { cwd: backendDir, stdio: migrateStdio })
   } catch (e) {
     rmSync(envRoot, { recursive: true, force: true })
     throw new Error(`Current schema initialization failed: ${e.message}`)
@@ -311,7 +314,8 @@ export async function createFreshEnvironment(root, opts = {}) {
 
   // Bootstrap admin
   try {
-    execSync(
+    if (hubBinarySource) execFileSync(hubBin, ['bootstrap-admin', '--db', hubDB, '--master-key-file', masterKeyFile, '--jwt-private-key-file', jwtKeyFile, '--deployment-name', deploymentName, '--username', 'admin', '--display-name', displayName, '--password-file', pwFile], { cwd: backendDir, stdio: bootstrapStdio, windowsHide: true })
+    else execSync(
       `go run ./cmd/control-hub bootstrap-admin` +
       ` --db "${hubDB}"` +
       ` --master-key-file "${masterKeyFile}"` +
@@ -352,7 +356,8 @@ export function startHubAndRelay(env, opts = {}) {
     '--relay-internal-url', env.relayIntBaseURL,
     '--relay-service-token-file', env.relayTokenFile,
     '--reconcile-interval', '2s',
-  ], { cwd: env.envRoot, stdio: stdioOpt })
+    ...(opts.accessTokenTTL ? ['--access-token-ttl', opts.accessTokenTTL] : []),
+  ], { cwd: env.envRoot, stdio: stdioOpt, windowsHide: true })
 
   const relayProc = spawn(env.relayBin, [
     '--public-listen', `127.0.0.1:${env.relayPubPort}`,
@@ -360,7 +365,7 @@ export function startHubAndRelay(env, opts = {}) {
     '--spool', env.spoolPath,
     '--hub-internal-url', env.hubInternalBaseURL,
     '--hub-service-token-file', env.relayTokenFile,
-  ], { cwd: env.envRoot, stdio: stdioOpt })
+  ], { cwd: env.envRoot, stdio: stdioOpt, windowsHide: true })
 
   if (stdio === 'pipe') {
     hubProc.stdout.on('data', (d) => process.stdout.write(`[hub] ${d}`))

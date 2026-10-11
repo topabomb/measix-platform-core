@@ -31,6 +31,12 @@ type WorkspaceService struct {
 	McpServerID string `json:"mcp_server_id,omitempty"`
 	// RuntimeRouteID holds the value of the "runtime_route_id" field.
 	RuntimeRouteID string `json:"runtime_route_id,omitempty"`
+	// DavResourceID holds the value of the "dav_resource_id" field.
+	DavResourceID string `json:"dav_resource_id,omitempty"`
+	// DavRuntimeRouteID holds the value of the "dav_runtime_route_id" field.
+	DavRuntimeRouteID string `json:"dav_runtime_route_id,omitempty"`
+	// DavStaged holds the value of the "dav_staged" field.
+	DavStaged bool `json:"dav_staged,omitempty"`
 	// DiagnosticCode holds the value of the "diagnostic_code" field.
 	DiagnosticCode string `json:"diagnostic_code,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -45,11 +51,11 @@ func (*WorkspaceService) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case workspaceservice.FieldEnabled:
+		case workspaceservice.FieldEnabled, workspaceservice.FieldDavStaged:
 			values[i] = new(sql.NullBool)
 		case workspaceservice.FieldConfigRevision, workspaceservice.FieldActiveConfigRevision:
 			values[i] = new(sql.NullInt64)
-		case workspaceservice.FieldID, workspaceservice.FieldName, workspaceservice.FieldState, workspaceservice.FieldMcpServerID, workspaceservice.FieldRuntimeRouteID, workspaceservice.FieldDiagnosticCode:
+		case workspaceservice.FieldID, workspaceservice.FieldName, workspaceservice.FieldState, workspaceservice.FieldMcpServerID, workspaceservice.FieldRuntimeRouteID, workspaceservice.FieldDavResourceID, workspaceservice.FieldDavRuntimeRouteID, workspaceservice.FieldDiagnosticCode:
 			values[i] = new(sql.NullString)
 		case workspaceservice.FieldCreatedAt, workspaceservice.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -116,6 +122,24 @@ func (_m *WorkspaceService) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field runtime_route_id", values[i])
 			} else if value.Valid {
 				_m.RuntimeRouteID = value.String
+			}
+		case workspaceservice.FieldDavResourceID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field dav_resource_id", values[i])
+			} else if value.Valid {
+				_m.DavResourceID = value.String
+			}
+		case workspaceservice.FieldDavRuntimeRouteID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field dav_runtime_route_id", values[i])
+			} else if value.Valid {
+				_m.DavRuntimeRouteID = value.String
+			}
+		case workspaceservice.FieldDavStaged:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field dav_staged", values[i])
+			} else if value.Valid {
+				_m.DavStaged = value.Bool
 			}
 		case workspaceservice.FieldDiagnosticCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -193,6 +217,15 @@ func (_m *WorkspaceService) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("runtime_route_id=")
 	builder.WriteString(_m.RuntimeRouteID)
+	builder.WriteString(", ")
+	builder.WriteString("dav_resource_id=")
+	builder.WriteString(_m.DavResourceID)
+	builder.WriteString(", ")
+	builder.WriteString("dav_runtime_route_id=")
+	builder.WriteString(_m.DavRuntimeRouteID)
+	builder.WriteString(", ")
+	builder.WriteString("dav_staged=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DavStaged))
 	builder.WriteString(", ")
 	builder.WriteString("diagnostic_code=")
 	builder.WriteString(_m.DiagnosticCode)

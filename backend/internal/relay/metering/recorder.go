@@ -79,6 +79,12 @@ func (r *Recorder) Record(settlement usageingestapi.UsageSettlement) (err error)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
 	defer cancel()
+	if settlement.StatisticsOnly != nil && *settlement.StatisticsOnly {
+		if settlement.Request.ResourceKind != "WEBDAV" || settlement.Request.ClientProtocol != "WEBDAV" || len(settlement.Meters) != 0 {
+			return errors.New("invalid statistics-only request")
+		}
+		return r.Spool.SaveStatistics(ctx, settlement.RequestId, payload, settlement.OccurredAt)
+	}
 	return r.Spool.AppendSettlement(ctx, settlement.RequestId, payload, settlement.OccurredAt)
 }
 

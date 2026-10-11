@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"measix/platform/ent"
 	"measix/platform/ent/workspaceoperation"
 	"measix/platform/ent/workspaceserviceconfig"
@@ -120,10 +121,35 @@ func (s *Service) syncIdentity(ctx context.Context) error {
 				return e
 			}
 		} else if row.Intent == "CONNECTED" && row.State == "DISCONNECTED" && workspaceService.State == "ACTIVE" {
-			// A system resume preserves prior connection intent. It never restores DAV.
+			// A system resume preserves both connection and explicit file-access
+			// intent; authorized DAV is restored, explicitly revoked DAV is not.
 			_, e = s.Command(ctx, user.ID, platformid.New(platformid.Idempotency), user.ID, adminapi.WorkspaceCommand{Action: "RESTORE", ExpectedRevision: int(row.BindingRevision)})
 			if e != nil && e != ErrPending {
 				return e
+			}
+		} else if row.Intent == "CONNECTED" && row.State == "CONNECTED" && !row.DavConfirmed && row.DiagnosticCode == "dav_credential_unavailable" && s.ApplyControl != nil {
+			// Withdraw the rejected version through the same durable Activation
+			// machinery. A stable phase identity deduplicates repeated feedback;
+			// no remote key is written and explicit administrator recovery remains
+			// a separate operation with a new DAV revision.
+			phase := fmt.Sprintf("dav-unavailable/%s/%d/%s/%d", row.ID, row.DavBindingRevision, row.DavSecretID, row.DavSecretVersion)
+			if _, _, e = s.ApplyControl(ctx, row.ID, phase); e != nil {
+				return e
+			}
+		} else if row.Intent == "CONNECTED" && row.State == "CONNECTED" && row.RemoteActive && !row.StopPending && workspaceService.State == "ACTIVE" && row.FileAccessIntent == "AUTHORIZED" && !row.DavConfirmed && (row.DavSecretID == "" || row.DavSecretVersion == 0) && workspaceService.ActiveConfigRevision != nil {
+			cfg, e := s.config(ctx, workspaceService.ID, *workspaceService.ActiveConfigRevision)
+			if e != nil {
+				return e
+			}
+			if str(cfg.DavOrigin) != "" {
+				// Only a missing credential is eligible for automatic issuance.
+				// A previously confirmed key rejected by the upstream may have
+				// been replaced externally; never overwrite that ownership change.
+				// begin also refuses pending/unknown remote writes.
+				_, e = s.Command(ctx, user.ID, platformid.New(platformid.Idempotency), user.ID, adminapi.WorkspaceCommand{Action: "SET_DAV", ExpectedRevision: int(row.BindingRevision)})
+				if e != nil && e != ErrPending && e != ErrConflict {
+					return e
+				}
 			}
 		}
 	}

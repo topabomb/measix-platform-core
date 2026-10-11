@@ -33,6 +33,10 @@ type RequestUsage struct {
 	ResourceKind string `json:"resource_kind,omitempty"`
 	// ClientProtocol holds the value of the "client_protocol" field.
 	ClientProtocol string `json:"client_protocol,omitempty"`
+	// HTTPMethod holds the value of the "http_method" field.
+	HTTPMethod string `json:"http_method,omitempty"`
+	// StatisticsOnly holds the value of the "statistics_only" field.
+	StatisticsOnly bool `json:"statistics_only,omitempty"`
 	// RuntimeRouteID holds the value of the "runtime_route_id" field.
 	RuntimeRouteID string `json:"runtime_route_id,omitempty"`
 	// UpstreamID holds the value of the "upstream_id" field.
@@ -81,11 +85,11 @@ func (*RequestUsage) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case requestusage.FieldWorkspaceTargetJSON:
 			values[i] = new([]byte)
-		case requestusage.FieldForwarded:
+		case requestusage.FieldStatisticsOnly, requestusage.FieldForwarded:
 			values[i] = new(sql.NullBool)
 		case requestusage.FieldID, requestusage.FieldManagedGeneration, requestusage.FieldControlRevision, requestusage.FieldHTTPStatus, requestusage.FieldUpstreamHTTPStatus, requestusage.FieldRequestBytes, requestusage.FieldResponseBytes, requestusage.FieldDurationMs, requestusage.FieldSettlementRevision, requestusage.FieldBudgetRevision:
 			values[i] = new(sql.NullInt64)
-		case requestusage.FieldRequestID, requestusage.FieldInteractionID, requestusage.FieldDeploymentID, requestusage.FieldUserID, requestusage.FieldDeviceID, requestusage.FieldResourceID, requestusage.FieldResourceKind, requestusage.FieldClientProtocol, requestusage.FieldRuntimeRouteID, requestusage.FieldUpstreamID, requestusage.FieldErrorClass, requestusage.FieldRequestCompleteness, requestusage.FieldSettlementState:
+		case requestusage.FieldRequestID, requestusage.FieldInteractionID, requestusage.FieldDeploymentID, requestusage.FieldUserID, requestusage.FieldDeviceID, requestusage.FieldResourceID, requestusage.FieldResourceKind, requestusage.FieldClientProtocol, requestusage.FieldHTTPMethod, requestusage.FieldRuntimeRouteID, requestusage.FieldUpstreamID, requestusage.FieldErrorClass, requestusage.FieldRequestCompleteness, requestusage.FieldSettlementState:
 			values[i] = new(sql.NullString)
 		case requestusage.FieldStartedAt, requestusage.FieldCompletedAt, requestusage.FieldIngestedAt:
 			values[i] = new(sql.NullTime)
@@ -159,6 +163,18 @@ func (_m *RequestUsage) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field client_protocol", values[i])
 			} else if value.Valid {
 				_m.ClientProtocol = value.String
+			}
+		case requestusage.FieldHTTPMethod:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field http_method", values[i])
+			} else if value.Valid {
+				_m.HTTPMethod = value.String
+			}
+		case requestusage.FieldStatisticsOnly:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field statistics_only", values[i])
+			} else if value.Valid {
+				_m.StatisticsOnly = value.Bool
 			}
 		case requestusage.FieldRuntimeRouteID:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -339,6 +355,12 @@ func (_m *RequestUsage) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("client_protocol=")
 	builder.WriteString(_m.ClientProtocol)
+	builder.WriteString(", ")
+	builder.WriteString("http_method=")
+	builder.WriteString(_m.HTTPMethod)
+	builder.WriteString(", ")
+	builder.WriteString("statistics_only=")
+	builder.WriteString(fmt.Sprintf("%v", _m.StatisticsOnly))
 	builder.WriteString(", ")
 	builder.WriteString("runtime_route_id=")
 	builder.WriteString(_m.RuntimeRouteID)

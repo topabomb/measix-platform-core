@@ -114,6 +114,31 @@ func DavSecretVersion(v int64) predicate.AgentSpace {
 	return predicate.AgentSpace(sql.FieldEQ(FieldDavSecretVersion, v))
 }
 
+// FileAccessIntent applies equality check predicate on the "file_access_intent" field. It's identical to FileAccessIntentEQ.
+func FileAccessIntent(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldFileAccessIntent, v))
+}
+
+// DavAccessMode applies equality check predicate on the "dav_access_mode" field. It's identical to DavAccessModeEQ.
+func DavAccessMode(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldDavAccessMode, v))
+}
+
+// DavBindingRevision applies equality check predicate on the "dav_binding_revision" field. It's identical to DavBindingRevisionEQ.
+func DavBindingRevision(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldDavBindingRevision, v))
+}
+
+// DavAppliedAccessMode applies equality check predicate on the "dav_applied_access_mode" field. It's identical to DavAppliedAccessModeEQ.
+func DavAppliedAccessMode(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedRevision applies equality check predicate on the "dav_applied_revision" field. It's identical to DavAppliedRevisionEQ.
+func DavAppliedRevision(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldDavAppliedRevision, v))
+}
+
 // DavConfirmed applies equality check predicate on the "dav_confirmed" field. It's identical to DavConfirmedEQ.
 func DavConfirmed(v bool) predicate.AgentSpace {
 	return predicate.AgentSpace(sql.FieldEQ(FieldDavConfirmed, v))
@@ -777,6 +802,281 @@ func DavSecretVersionIsNil() predicate.AgentSpace {
 // DavSecretVersionNotNil applies the NotNil predicate on the "dav_secret_version" field.
 func DavSecretVersionNotNil() predicate.AgentSpace {
 	return predicate.AgentSpace(sql.FieldNotNull(FieldDavSecretVersion))
+}
+
+// FileAccessIntentEQ applies the EQ predicate on the "file_access_intent" field.
+func FileAccessIntentEQ(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentNEQ applies the NEQ predicate on the "file_access_intent" field.
+func FileAccessIntentNEQ(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNEQ(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentIn applies the In predicate on the "file_access_intent" field.
+func FileAccessIntentIn(vs ...string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldIn(FieldFileAccessIntent, vs...))
+}
+
+// FileAccessIntentNotIn applies the NotIn predicate on the "file_access_intent" field.
+func FileAccessIntentNotIn(vs ...string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNotIn(FieldFileAccessIntent, vs...))
+}
+
+// FileAccessIntentGT applies the GT predicate on the "file_access_intent" field.
+func FileAccessIntentGT(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGT(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentGTE applies the GTE predicate on the "file_access_intent" field.
+func FileAccessIntentGTE(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGTE(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentLT applies the LT predicate on the "file_access_intent" field.
+func FileAccessIntentLT(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLT(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentLTE applies the LTE predicate on the "file_access_intent" field.
+func FileAccessIntentLTE(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLTE(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentContains applies the Contains predicate on the "file_access_intent" field.
+func FileAccessIntentContains(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldContains(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentHasPrefix applies the HasPrefix predicate on the "file_access_intent" field.
+func FileAccessIntentHasPrefix(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldHasPrefix(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentHasSuffix applies the HasSuffix predicate on the "file_access_intent" field.
+func FileAccessIntentHasSuffix(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldHasSuffix(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentEqualFold applies the EqualFold predicate on the "file_access_intent" field.
+func FileAccessIntentEqualFold(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEqualFold(FieldFileAccessIntent, v))
+}
+
+// FileAccessIntentContainsFold applies the ContainsFold predicate on the "file_access_intent" field.
+func FileAccessIntentContainsFold(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldContainsFold(FieldFileAccessIntent, v))
+}
+
+// DavAccessModeEQ applies the EQ predicate on the "dav_access_mode" field.
+func DavAccessModeEQ(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldDavAccessMode, v))
+}
+
+// DavAccessModeNEQ applies the NEQ predicate on the "dav_access_mode" field.
+func DavAccessModeNEQ(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNEQ(FieldDavAccessMode, v))
+}
+
+// DavAccessModeIn applies the In predicate on the "dav_access_mode" field.
+func DavAccessModeIn(vs ...string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldIn(FieldDavAccessMode, vs...))
+}
+
+// DavAccessModeNotIn applies the NotIn predicate on the "dav_access_mode" field.
+func DavAccessModeNotIn(vs ...string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNotIn(FieldDavAccessMode, vs...))
+}
+
+// DavAccessModeGT applies the GT predicate on the "dav_access_mode" field.
+func DavAccessModeGT(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGT(FieldDavAccessMode, v))
+}
+
+// DavAccessModeGTE applies the GTE predicate on the "dav_access_mode" field.
+func DavAccessModeGTE(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGTE(FieldDavAccessMode, v))
+}
+
+// DavAccessModeLT applies the LT predicate on the "dav_access_mode" field.
+func DavAccessModeLT(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLT(FieldDavAccessMode, v))
+}
+
+// DavAccessModeLTE applies the LTE predicate on the "dav_access_mode" field.
+func DavAccessModeLTE(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLTE(FieldDavAccessMode, v))
+}
+
+// DavAccessModeContains applies the Contains predicate on the "dav_access_mode" field.
+func DavAccessModeContains(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldContains(FieldDavAccessMode, v))
+}
+
+// DavAccessModeHasPrefix applies the HasPrefix predicate on the "dav_access_mode" field.
+func DavAccessModeHasPrefix(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldHasPrefix(FieldDavAccessMode, v))
+}
+
+// DavAccessModeHasSuffix applies the HasSuffix predicate on the "dav_access_mode" field.
+func DavAccessModeHasSuffix(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldHasSuffix(FieldDavAccessMode, v))
+}
+
+// DavAccessModeEqualFold applies the EqualFold predicate on the "dav_access_mode" field.
+func DavAccessModeEqualFold(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEqualFold(FieldDavAccessMode, v))
+}
+
+// DavAccessModeContainsFold applies the ContainsFold predicate on the "dav_access_mode" field.
+func DavAccessModeContainsFold(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldContainsFold(FieldDavAccessMode, v))
+}
+
+// DavBindingRevisionEQ applies the EQ predicate on the "dav_binding_revision" field.
+func DavBindingRevisionEQ(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionNEQ applies the NEQ predicate on the "dav_binding_revision" field.
+func DavBindingRevisionNEQ(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNEQ(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionIn applies the In predicate on the "dav_binding_revision" field.
+func DavBindingRevisionIn(vs ...int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldIn(FieldDavBindingRevision, vs...))
+}
+
+// DavBindingRevisionNotIn applies the NotIn predicate on the "dav_binding_revision" field.
+func DavBindingRevisionNotIn(vs ...int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNotIn(FieldDavBindingRevision, vs...))
+}
+
+// DavBindingRevisionGT applies the GT predicate on the "dav_binding_revision" field.
+func DavBindingRevisionGT(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGT(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionGTE applies the GTE predicate on the "dav_binding_revision" field.
+func DavBindingRevisionGTE(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGTE(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionLT applies the LT predicate on the "dav_binding_revision" field.
+func DavBindingRevisionLT(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLT(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionLTE applies the LTE predicate on the "dav_binding_revision" field.
+func DavBindingRevisionLTE(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLTE(FieldDavBindingRevision, v))
+}
+
+// DavAppliedAccessModeEQ applies the EQ predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeEQ(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeNEQ applies the NEQ predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeNEQ(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNEQ(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeIn applies the In predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeIn(vs ...string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldIn(FieldDavAppliedAccessMode, vs...))
+}
+
+// DavAppliedAccessModeNotIn applies the NotIn predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeNotIn(vs ...string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNotIn(FieldDavAppliedAccessMode, vs...))
+}
+
+// DavAppliedAccessModeGT applies the GT predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeGT(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGT(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeGTE applies the GTE predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeGTE(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGTE(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeLT applies the LT predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeLT(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLT(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeLTE applies the LTE predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeLTE(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLTE(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeContains applies the Contains predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeContains(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldContains(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeHasPrefix applies the HasPrefix predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeHasPrefix(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldHasPrefix(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeHasSuffix applies the HasSuffix predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeHasSuffix(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldHasSuffix(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeEqualFold applies the EqualFold predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeEqualFold(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEqualFold(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedAccessModeContainsFold applies the ContainsFold predicate on the "dav_applied_access_mode" field.
+func DavAppliedAccessModeContainsFold(v string) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldContainsFold(FieldDavAppliedAccessMode, v))
+}
+
+// DavAppliedRevisionEQ applies the EQ predicate on the "dav_applied_revision" field.
+func DavAppliedRevisionEQ(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldEQ(FieldDavAppliedRevision, v))
+}
+
+// DavAppliedRevisionNEQ applies the NEQ predicate on the "dav_applied_revision" field.
+func DavAppliedRevisionNEQ(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNEQ(FieldDavAppliedRevision, v))
+}
+
+// DavAppliedRevisionIn applies the In predicate on the "dav_applied_revision" field.
+func DavAppliedRevisionIn(vs ...int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldIn(FieldDavAppliedRevision, vs...))
+}
+
+// DavAppliedRevisionNotIn applies the NotIn predicate on the "dav_applied_revision" field.
+func DavAppliedRevisionNotIn(vs ...int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldNotIn(FieldDavAppliedRevision, vs...))
+}
+
+// DavAppliedRevisionGT applies the GT predicate on the "dav_applied_revision" field.
+func DavAppliedRevisionGT(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGT(FieldDavAppliedRevision, v))
+}
+
+// DavAppliedRevisionGTE applies the GTE predicate on the "dav_applied_revision" field.
+func DavAppliedRevisionGTE(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldGTE(FieldDavAppliedRevision, v))
+}
+
+// DavAppliedRevisionLT applies the LT predicate on the "dav_applied_revision" field.
+func DavAppliedRevisionLT(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLT(FieldDavAppliedRevision, v))
+}
+
+// DavAppliedRevisionLTE applies the LTE predicate on the "dav_applied_revision" field.
+func DavAppliedRevisionLTE(v int64) predicate.AgentSpace {
+	return predicate.AgentSpace(sql.FieldLTE(FieldDavAppliedRevision, v))
 }
 
 // DavConfirmedEQ applies the EQ predicate on the "dav_confirmed" field.

@@ -37,6 +37,16 @@ type AgentSpace struct {
 	DavSecretID string `json:"dav_secret_id,omitempty"`
 	// DavSecretVersion holds the value of the "dav_secret_version" field.
 	DavSecretVersion int64 `json:"dav_secret_version,omitempty"`
+	// FileAccessIntent holds the value of the "file_access_intent" field.
+	FileAccessIntent string `json:"file_access_intent,omitempty"`
+	// DavAccessMode holds the value of the "dav_access_mode" field.
+	DavAccessMode string `json:"dav_access_mode,omitempty"`
+	// DavBindingRevision holds the value of the "dav_binding_revision" field.
+	DavBindingRevision int64 `json:"dav_binding_revision,omitempty"`
+	// DavAppliedAccessMode holds the value of the "dav_applied_access_mode" field.
+	DavAppliedAccessMode string `json:"dav_applied_access_mode,omitempty"`
+	// DavAppliedRevision holds the value of the "dav_applied_revision" field.
+	DavAppliedRevision int64 `json:"dav_applied_revision,omitempty"`
 	// DavConfirmed holds the value of the "dav_confirmed" field.
 	DavConfirmed bool `json:"dav_confirmed,omitempty"`
 	// RemoteActive holds the value of the "remote_active" field.
@@ -63,9 +73,9 @@ func (*AgentSpace) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case agentspace.FieldDavConfirmed, agentspace.FieldRemoteActive, agentspace.FieldStopPending:
 			values[i] = new(sql.NullBool)
-		case agentspace.FieldBindingRevision, agentspace.FieldMcpSecretVersion, agentspace.FieldDavSecretVersion, agentspace.FieldAppliedControlRevision:
+		case agentspace.FieldBindingRevision, agentspace.FieldMcpSecretVersion, agentspace.FieldDavSecretVersion, agentspace.FieldDavBindingRevision, agentspace.FieldDavAppliedRevision, agentspace.FieldAppliedControlRevision:
 			values[i] = new(sql.NullInt64)
-		case agentspace.FieldID, agentspace.FieldWorkspaceServiceID, agentspace.FieldRemoteUsername, agentspace.FieldAgentSpaceID, agentspace.FieldIntent, agentspace.FieldState, agentspace.FieldMcpSecretID, agentspace.FieldDavSecretID, agentspace.FieldDiagnosticCode:
+		case agentspace.FieldID, agentspace.FieldWorkspaceServiceID, agentspace.FieldRemoteUsername, agentspace.FieldAgentSpaceID, agentspace.FieldIntent, agentspace.FieldState, agentspace.FieldMcpSecretID, agentspace.FieldDavSecretID, agentspace.FieldFileAccessIntent, agentspace.FieldDavAccessMode, agentspace.FieldDavAppliedAccessMode, agentspace.FieldDiagnosticCode:
 			values[i] = new(sql.NullString)
 		case agentspace.FieldObservedAt, agentspace.FieldCreatedAt, agentspace.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -149,6 +159,36 @@ func (_m *AgentSpace) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field dav_secret_version", values[i])
 			} else if value.Valid {
 				_m.DavSecretVersion = value.Int64
+			}
+		case agentspace.FieldFileAccessIntent:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field file_access_intent", values[i])
+			} else if value.Valid {
+				_m.FileAccessIntent = value.String
+			}
+		case agentspace.FieldDavAccessMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field dav_access_mode", values[i])
+			} else if value.Valid {
+				_m.DavAccessMode = value.String
+			}
+		case agentspace.FieldDavBindingRevision:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field dav_binding_revision", values[i])
+			} else if value.Valid {
+				_m.DavBindingRevision = value.Int64
+			}
+		case agentspace.FieldDavAppliedAccessMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field dav_applied_access_mode", values[i])
+			} else if value.Valid {
+				_m.DavAppliedAccessMode = value.String
+			}
+		case agentspace.FieldDavAppliedRevision:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field dav_applied_revision", values[i])
+			} else if value.Valid {
+				_m.DavAppliedRevision = value.Int64
 			}
 		case agentspace.FieldDavConfirmed:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -264,6 +304,21 @@ func (_m *AgentSpace) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("dav_secret_version=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DavSecretVersion))
+	builder.WriteString(", ")
+	builder.WriteString("file_access_intent=")
+	builder.WriteString(_m.FileAccessIntent)
+	builder.WriteString(", ")
+	builder.WriteString("dav_access_mode=")
+	builder.WriteString(_m.DavAccessMode)
+	builder.WriteString(", ")
+	builder.WriteString("dav_binding_revision=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DavBindingRevision))
+	builder.WriteString(", ")
+	builder.WriteString("dav_applied_access_mode=")
+	builder.WriteString(_m.DavAppliedAccessMode)
+	builder.WriteString(", ")
+	builder.WriteString("dav_applied_revision=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DavAppliedRevision))
 	builder.WriteString(", ")
 	builder.WriteString("dav_confirmed=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DavConfirmed))

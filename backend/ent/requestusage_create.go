@@ -84,6 +84,34 @@ func (_c *RequestUsageCreate) SetClientProtocol(v string) *RequestUsageCreate {
 	return _c
 }
 
+// SetHTTPMethod sets the "http_method" field.
+func (_c *RequestUsageCreate) SetHTTPMethod(v string) *RequestUsageCreate {
+	_c.mutation.SetHTTPMethod(v)
+	return _c
+}
+
+// SetNillableHTTPMethod sets the "http_method" field if the given value is not nil.
+func (_c *RequestUsageCreate) SetNillableHTTPMethod(v *string) *RequestUsageCreate {
+	if v != nil {
+		_c.SetHTTPMethod(*v)
+	}
+	return _c
+}
+
+// SetStatisticsOnly sets the "statistics_only" field.
+func (_c *RequestUsageCreate) SetStatisticsOnly(v bool) *RequestUsageCreate {
+	_c.mutation.SetStatisticsOnly(v)
+	return _c
+}
+
+// SetNillableStatisticsOnly sets the "statistics_only" field if the given value is not nil.
+func (_c *RequestUsageCreate) SetNillableStatisticsOnly(v *bool) *RequestUsageCreate {
+	if v != nil {
+		_c.SetStatisticsOnly(*v)
+	}
+	return _c
+}
+
 // SetRuntimeRouteID sets the "runtime_route_id" field.
 func (_c *RequestUsageCreate) SetRuntimeRouteID(v string) *RequestUsageCreate {
 	_c.mutation.SetRuntimeRouteID(v)
@@ -235,6 +263,7 @@ func (_c *RequestUsageCreate) Mutation() *RequestUsageMutation {
 
 // Save creates the RequestUsage in the database.
 func (_c *RequestUsageCreate) Save(ctx context.Context) (*RequestUsage, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -260,6 +289,18 @@ func (_c *RequestUsageCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *RequestUsageCreate) defaults() {
+	if _, ok := _c.mutation.HTTPMethod(); !ok {
+		v := requestusage.DefaultHTTPMethod
+		_c.mutation.SetHTTPMethod(v)
+	}
+	if _, ok := _c.mutation.StatisticsOnly(); !ok {
+		v := requestusage.DefaultStatisticsOnly
+		_c.mutation.SetStatisticsOnly(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *RequestUsageCreate) check() error {
 	if _, ok := _c.mutation.RequestID(); !ok {
@@ -279,6 +320,12 @@ func (_c *RequestUsageCreate) check() error {
 	}
 	if _, ok := _c.mutation.ClientProtocol(); !ok {
 		return &ValidationError{Name: "client_protocol", err: errors.New(`ent: missing required field "RequestUsage.client_protocol"`)}
+	}
+	if _, ok := _c.mutation.HTTPMethod(); !ok {
+		return &ValidationError{Name: "http_method", err: errors.New(`ent: missing required field "RequestUsage.http_method"`)}
+	}
+	if _, ok := _c.mutation.StatisticsOnly(); !ok {
+		return &ValidationError{Name: "statistics_only", err: errors.New(`ent: missing required field "RequestUsage.statistics_only"`)}
 	}
 	if _, ok := _c.mutation.RuntimeRouteID(); !ok {
 		return &ValidationError{Name: "runtime_route_id", err: errors.New(`ent: missing required field "RequestUsage.runtime_route_id"`)}
@@ -389,6 +436,14 @@ func (_c *RequestUsageCreate) createSpec() (*RequestUsage, *sqlgraph.CreateSpec)
 		_spec.SetField(requestusage.FieldClientProtocol, field.TypeString, value)
 		_node.ClientProtocol = value
 	}
+	if value, ok := _c.mutation.HTTPMethod(); ok {
+		_spec.SetField(requestusage.FieldHTTPMethod, field.TypeString, value)
+		_node.HTTPMethod = value
+	}
+	if value, ok := _c.mutation.StatisticsOnly(); ok {
+		_spec.SetField(requestusage.FieldStatisticsOnly, field.TypeBool, value)
+		_node.StatisticsOnly = value
+	}
 	if value, ok := _c.mutation.RuntimeRouteID(); ok {
 		_spec.SetField(requestusage.FieldRuntimeRouteID, field.TypeString, value)
 		_node.RuntimeRouteID = value
@@ -486,6 +541,7 @@ func (_c *RequestUsageCreateBulk) Save(ctx context.Context) ([]*RequestUsage, er
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*RequestUsageMutation)
 				if !ok {

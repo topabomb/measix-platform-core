@@ -31,6 +31,8 @@ type WorkspaceOperation struct {
 	ConfigRevision int64 `json:"config_revision,omitempty"`
 	// BindingRevision holds the value of the "binding_revision" field.
 	BindingRevision int64 `json:"binding_revision,omitempty"`
+	// DavBindingRevision holds the value of the "dav_binding_revision" field.
+	DavBindingRevision int64 `json:"dav_binding_revision,omitempty"`
 	// TargetJSON holds the value of the "target_json" field.
 	TargetJSON []byte `json:"target_json,omitempty"`
 	// State holds the value of the "state" field.
@@ -65,7 +67,7 @@ func (*WorkspaceOperation) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case workspaceoperation.FieldTargetJSON, workspaceoperation.FieldResultJSON:
 			values[i] = new([]byte)
-		case workspaceoperation.FieldConfigRevision, workspaceoperation.FieldBindingRevision, workspaceoperation.FieldCandidateSecretVersion:
+		case workspaceoperation.FieldConfigRevision, workspaceoperation.FieldBindingRevision, workspaceoperation.FieldDavBindingRevision, workspaceoperation.FieldCandidateSecretVersion:
 			values[i] = new(sql.NullInt64)
 		case workspaceoperation.FieldID, workspaceoperation.FieldWorkspaceServiceID, workspaceoperation.FieldUserID, workspaceoperation.FieldAction, workspaceoperation.FieldIdempotencyKey, workspaceoperation.FieldRequestHash, workspaceoperation.FieldState, workspaceoperation.FieldStep, workspaceoperation.FieldCandidateSecretID, workspaceoperation.FieldActivationID, workspaceoperation.FieldDiagnosticCode, workspaceoperation.FieldEvidence, workspaceoperation.FieldCreatedByUserID:
 			values[i] = new(sql.NullString)
@@ -133,6 +135,12 @@ func (_m *WorkspaceOperation) assignValues(columns []string, values []any) error
 				return fmt.Errorf("unexpected type %T for field binding_revision", values[i])
 			} else if value.Valid {
 				_m.BindingRevision = value.Int64
+			}
+		case workspaceoperation.FieldDavBindingRevision:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field dav_binding_revision", values[i])
+			} else if value.Valid {
+				_m.DavBindingRevision = value.Int64
 			}
 		case workspaceoperation.FieldTargetJSON:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -262,6 +270,9 @@ func (_m *WorkspaceOperation) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("binding_revision=")
 	builder.WriteString(fmt.Sprintf("%v", _m.BindingRevision))
+	builder.WriteString(", ")
+	builder.WriteString("dav_binding_revision=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DavBindingRevision))
 	builder.WriteString(", ")
 	builder.WriteString("target_json=")
 	builder.WriteString(fmt.Sprintf("%v", _m.TargetJSON))

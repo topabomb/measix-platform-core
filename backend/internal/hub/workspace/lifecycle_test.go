@@ -419,7 +419,7 @@ func TestLostCreateRequiresExplicitTakeoverOfOriginalSpace(t *testing.T) {
 		}
 	}
 	view, _ = s.Projection(ctx, user)
-	if !view.McpAvailable || view.FilesAvailable || view.AgentSpaceId == nil || *view.AgentSpaceId != f.space || f.creates != 1 {
+	if !view.McpAvailable || !view.FilesAvailable || view.AgentSpaceId == nil || *view.AgentSpaceId != f.space || f.creates != 1 || f.davWrites != 1 {
 		t.Fatalf("takeover %+v", view)
 	}
 }

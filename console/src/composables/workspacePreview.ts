@@ -1,11 +1,12 @@
 import { Marked } from 'marked'
 import DOMPurify from 'dompurify'
 
-export function previewKind(name: string): 'markdown' | 'text' | 'image' | 'pdf' | 'download' {
+export function previewKind(name: string): 'markdown' | 'text' | 'image' | 'pdf' | 'video' | 'download' {
  const ext = name.split('.').pop()?.toLowerCase() ?? ''
  if (['md','markdown'].includes(ext)) return 'markdown'
  if (['txt','log','json','yaml','yml','toml','csv','xml','js','ts','py','go','rs','sh','css','sql'].includes(ext)) return 'text'
  if (['jpg','jpeg','png','webp','gif','bmp'].includes(ext)) return 'image'
+ if (['mp4','m4v','webm','ogv'].includes(ext)) return 'video'
  return ext === 'pdf' ? 'pdf' : 'download'
 }
 export function decodeWorkspaceText(bytes: Uint8Array): string {

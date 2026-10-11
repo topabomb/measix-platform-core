@@ -106,7 +106,7 @@ func (c *Client) davRequest(ctx context.Context, name, token, p, method string, 
 		return nil, &Error{Code: "invalid_file_request"}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	for _, key := range []string{"Range", "If-Match", "If-None-Match", "Depth", "Destination", "Overwrite", "If", "Content-Type"} {
+	for _, key := range []string{"Range", "If-Range", "If-Match", "If-None-Match", "Depth", "Destination", "Overwrite", "If", "Content-Type"} {
 		if value := headers.Get(key); value != "" {
 			req.Header.Set(key, value)
 		}
@@ -313,7 +313,7 @@ func (c *Client) Content(ctx context.Context, name, token, p, method string, bod
 		}
 	}
 	filtered := http.Header{}
-	for _, key := range []string{"Range", "If-Match", "If-None-Match", "Content-Type"} {
+	for _, key := range []string{"Range", "If-Range", "If-Match", "If-None-Match", "Content-Type"} {
 		if value := headers.Get(key); value != "" {
 			filtered.Set(key, value)
 		}

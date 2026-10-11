@@ -120,6 +120,76 @@ func (_c *AgentSpaceCreate) SetNillableDavSecretVersion(v *int64) *AgentSpaceCre
 	return _c
 }
 
+// SetFileAccessIntent sets the "file_access_intent" field.
+func (_c *AgentSpaceCreate) SetFileAccessIntent(v string) *AgentSpaceCreate {
+	_c.mutation.SetFileAccessIntent(v)
+	return _c
+}
+
+// SetNillableFileAccessIntent sets the "file_access_intent" field if the given value is not nil.
+func (_c *AgentSpaceCreate) SetNillableFileAccessIntent(v *string) *AgentSpaceCreate {
+	if v != nil {
+		_c.SetFileAccessIntent(*v)
+	}
+	return _c
+}
+
+// SetDavAccessMode sets the "dav_access_mode" field.
+func (_c *AgentSpaceCreate) SetDavAccessMode(v string) *AgentSpaceCreate {
+	_c.mutation.SetDavAccessMode(v)
+	return _c
+}
+
+// SetNillableDavAccessMode sets the "dav_access_mode" field if the given value is not nil.
+func (_c *AgentSpaceCreate) SetNillableDavAccessMode(v *string) *AgentSpaceCreate {
+	if v != nil {
+		_c.SetDavAccessMode(*v)
+	}
+	return _c
+}
+
+// SetDavBindingRevision sets the "dav_binding_revision" field.
+func (_c *AgentSpaceCreate) SetDavBindingRevision(v int64) *AgentSpaceCreate {
+	_c.mutation.SetDavBindingRevision(v)
+	return _c
+}
+
+// SetNillableDavBindingRevision sets the "dav_binding_revision" field if the given value is not nil.
+func (_c *AgentSpaceCreate) SetNillableDavBindingRevision(v *int64) *AgentSpaceCreate {
+	if v != nil {
+		_c.SetDavBindingRevision(*v)
+	}
+	return _c
+}
+
+// SetDavAppliedAccessMode sets the "dav_applied_access_mode" field.
+func (_c *AgentSpaceCreate) SetDavAppliedAccessMode(v string) *AgentSpaceCreate {
+	_c.mutation.SetDavAppliedAccessMode(v)
+	return _c
+}
+
+// SetNillableDavAppliedAccessMode sets the "dav_applied_access_mode" field if the given value is not nil.
+func (_c *AgentSpaceCreate) SetNillableDavAppliedAccessMode(v *string) *AgentSpaceCreate {
+	if v != nil {
+		_c.SetDavAppliedAccessMode(*v)
+	}
+	return _c
+}
+
+// SetDavAppliedRevision sets the "dav_applied_revision" field.
+func (_c *AgentSpaceCreate) SetDavAppliedRevision(v int64) *AgentSpaceCreate {
+	_c.mutation.SetDavAppliedRevision(v)
+	return _c
+}
+
+// SetNillableDavAppliedRevision sets the "dav_applied_revision" field if the given value is not nil.
+func (_c *AgentSpaceCreate) SetNillableDavAppliedRevision(v *int64) *AgentSpaceCreate {
+	if v != nil {
+		_c.SetDavAppliedRevision(*v)
+	}
+	return _c
+}
+
 // SetDavConfirmed sets the "dav_confirmed" field.
 func (_c *AgentSpaceCreate) SetDavConfirmed(v bool) *AgentSpaceCreate {
 	_c.mutation.SetDavConfirmed(v)
@@ -205,6 +275,7 @@ func (_c *AgentSpaceCreate) Mutation() *AgentSpaceMutation {
 
 // Save creates the AgentSpace in the database.
 func (_c *AgentSpaceCreate) Save(ctx context.Context) (*AgentSpace, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -230,6 +301,30 @@ func (_c *AgentSpaceCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *AgentSpaceCreate) defaults() {
+	if _, ok := _c.mutation.FileAccessIntent(); !ok {
+		v := agentspace.DefaultFileAccessIntent
+		_c.mutation.SetFileAccessIntent(v)
+	}
+	if _, ok := _c.mutation.DavAccessMode(); !ok {
+		v := agentspace.DefaultDavAccessMode
+		_c.mutation.SetDavAccessMode(v)
+	}
+	if _, ok := _c.mutation.DavBindingRevision(); !ok {
+		v := agentspace.DefaultDavBindingRevision
+		_c.mutation.SetDavBindingRevision(v)
+	}
+	if _, ok := _c.mutation.DavAppliedAccessMode(); !ok {
+		v := agentspace.DefaultDavAppliedAccessMode
+		_c.mutation.SetDavAppliedAccessMode(v)
+	}
+	if _, ok := _c.mutation.DavAppliedRevision(); !ok {
+		v := agentspace.DefaultDavAppliedRevision
+		_c.mutation.SetDavAppliedRevision(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *AgentSpaceCreate) check() error {
 	if _, ok := _c.mutation.WorkspaceServiceID(); !ok {
@@ -246,6 +341,21 @@ func (_c *AgentSpaceCreate) check() error {
 	}
 	if _, ok := _c.mutation.State(); !ok {
 		return &ValidationError{Name: "state", err: errors.New(`ent: missing required field "AgentSpace.state"`)}
+	}
+	if _, ok := _c.mutation.FileAccessIntent(); !ok {
+		return &ValidationError{Name: "file_access_intent", err: errors.New(`ent: missing required field "AgentSpace.file_access_intent"`)}
+	}
+	if _, ok := _c.mutation.DavAccessMode(); !ok {
+		return &ValidationError{Name: "dav_access_mode", err: errors.New(`ent: missing required field "AgentSpace.dav_access_mode"`)}
+	}
+	if _, ok := _c.mutation.DavBindingRevision(); !ok {
+		return &ValidationError{Name: "dav_binding_revision", err: errors.New(`ent: missing required field "AgentSpace.dav_binding_revision"`)}
+	}
+	if _, ok := _c.mutation.DavAppliedAccessMode(); !ok {
+		return &ValidationError{Name: "dav_applied_access_mode", err: errors.New(`ent: missing required field "AgentSpace.dav_applied_access_mode"`)}
+	}
+	if _, ok := _c.mutation.DavAppliedRevision(); !ok {
+		return &ValidationError{Name: "dav_applied_revision", err: errors.New(`ent: missing required field "AgentSpace.dav_applied_revision"`)}
 	}
 	if _, ok := _c.mutation.DavConfirmed(); !ok {
 		return &ValidationError{Name: "dav_confirmed", err: errors.New(`ent: missing required field "AgentSpace.dav_confirmed"`)}
@@ -337,6 +447,26 @@ func (_c *AgentSpaceCreate) createSpec() (*AgentSpace, *sqlgraph.CreateSpec) {
 		_spec.SetField(agentspace.FieldDavSecretVersion, field.TypeInt64, value)
 		_node.DavSecretVersion = value
 	}
+	if value, ok := _c.mutation.FileAccessIntent(); ok {
+		_spec.SetField(agentspace.FieldFileAccessIntent, field.TypeString, value)
+		_node.FileAccessIntent = value
+	}
+	if value, ok := _c.mutation.DavAccessMode(); ok {
+		_spec.SetField(agentspace.FieldDavAccessMode, field.TypeString, value)
+		_node.DavAccessMode = value
+	}
+	if value, ok := _c.mutation.DavBindingRevision(); ok {
+		_spec.SetField(agentspace.FieldDavBindingRevision, field.TypeInt64, value)
+		_node.DavBindingRevision = value
+	}
+	if value, ok := _c.mutation.DavAppliedAccessMode(); ok {
+		_spec.SetField(agentspace.FieldDavAppliedAccessMode, field.TypeString, value)
+		_node.DavAppliedAccessMode = value
+	}
+	if value, ok := _c.mutation.DavAppliedRevision(); ok {
+		_spec.SetField(agentspace.FieldDavAppliedRevision, field.TypeInt64, value)
+		_node.DavAppliedRevision = value
+	}
 	if value, ok := _c.mutation.DavConfirmed(); ok {
 		_spec.SetField(agentspace.FieldDavConfirmed, field.TypeBool, value)
 		_node.DavConfirmed = value
@@ -390,6 +520,7 @@ func (_c *AgentSpaceCreateBulk) Save(ctx context.Context) ([]*AgentSpace, error)
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*AgentSpaceMutation)
 				if !ok {

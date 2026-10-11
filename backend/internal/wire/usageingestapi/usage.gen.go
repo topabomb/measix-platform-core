@@ -146,52 +146,55 @@ func (e BudgetSource) Valid() bool {
 
 // Defines values for ClientProtocol.
 const (
-	ANTHROPICMESSAGES             ClientProtocol = "ANTHROPIC_MESSAGES"
-	DASHSCOPEHTTPASR              ClientProtocol = "DASHSCOPE_HTTP_ASR"
-	DASHSCOPEMULTIMODALGENERATION ClientProtocol = "DASHSCOPE_MULTIMODAL_GENERATION"
-	DASHSCOPEREALTIMEASR          ClientProtocol = "DASHSCOPE_REALTIME_ASR"
-	GEMINIGENERATECONTENTTTS      ClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
-	GOOGLEGENERATECONTENT         ClientProtocol = "GOOGLE_GENERATE_CONTENT"
-	MCPSTREAMABLEHTTP             ClientProtocol = "MCP_STREAMABLE_HTTP"
-	MIMOCHATCOMPLETIONSTTS        ClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
-	OPENAIAUDIOSPEECH             ClientProtocol = "OPENAI_AUDIO_SPEECH"
-	OPENAIAUDIOTRANSCRIPTIONS     ClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
-	OPENAICHATCOMPLETIONS         ClientProtocol = "OPENAI_CHAT_COMPLETIONS"
-	OPENAIIMAGESGENERATIONS       ClientProtocol = "OPENAI_IMAGES_GENERATIONS"
-	OPENAIREALTIMETRANSCRIPTION   ClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
-	OPENAIRESPONSES               ClientProtocol = "OPENAI_RESPONSES"
+	ClientProtocolANTHROPICMESSAGES             ClientProtocol = "ANTHROPIC_MESSAGES"
+	ClientProtocolDASHSCOPEHTTPASR              ClientProtocol = "DASHSCOPE_HTTP_ASR"
+	ClientProtocolDASHSCOPEMULTIMODALGENERATION ClientProtocol = "DASHSCOPE_MULTIMODAL_GENERATION"
+	ClientProtocolDASHSCOPEREALTIMEASR          ClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	ClientProtocolGEMINIGENERATECONTENTTTS      ClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	ClientProtocolGOOGLEGENERATECONTENT         ClientProtocol = "GOOGLE_GENERATE_CONTENT"
+	ClientProtocolMCPSTREAMABLEHTTP             ClientProtocol = "MCP_STREAMABLE_HTTP"
+	ClientProtocolMIMOCHATCOMPLETIONSTTS        ClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	ClientProtocolOPENAIAUDIOSPEECH             ClientProtocol = "OPENAI_AUDIO_SPEECH"
+	ClientProtocolOPENAIAUDIOTRANSCRIPTIONS     ClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	ClientProtocolOPENAICHATCOMPLETIONS         ClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	ClientProtocolOPENAIIMAGESGENERATIONS       ClientProtocol = "OPENAI_IMAGES_GENERATIONS"
+	ClientProtocolOPENAIREALTIMETRANSCRIPTION   ClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
+	ClientProtocolOPENAIRESPONSES               ClientProtocol = "OPENAI_RESPONSES"
+	ClientProtocolWEBDAV                        ClientProtocol = "WEBDAV"
 )
 
 // Valid indicates whether the value is a known member of the ClientProtocol enum.
 func (e ClientProtocol) Valid() bool {
 	switch e {
-	case ANTHROPICMESSAGES:
+	case ClientProtocolANTHROPICMESSAGES:
 		return true
-	case DASHSCOPEHTTPASR:
+	case ClientProtocolDASHSCOPEHTTPASR:
 		return true
-	case DASHSCOPEMULTIMODALGENERATION:
+	case ClientProtocolDASHSCOPEMULTIMODALGENERATION:
 		return true
-	case DASHSCOPEREALTIMEASR:
+	case ClientProtocolDASHSCOPEREALTIMEASR:
 		return true
-	case GEMINIGENERATECONTENTTTS:
+	case ClientProtocolGEMINIGENERATECONTENTTTS:
 		return true
-	case GOOGLEGENERATECONTENT:
+	case ClientProtocolGOOGLEGENERATECONTENT:
 		return true
-	case MCPSTREAMABLEHTTP:
+	case ClientProtocolMCPSTREAMABLEHTTP:
 		return true
-	case MIMOCHATCOMPLETIONSTTS:
+	case ClientProtocolMIMOCHATCOMPLETIONSTTS:
 		return true
-	case OPENAIAUDIOSPEECH:
+	case ClientProtocolOPENAIAUDIOSPEECH:
 		return true
-	case OPENAIAUDIOTRANSCRIPTIONS:
+	case ClientProtocolOPENAIAUDIOTRANSCRIPTIONS:
 		return true
-	case OPENAICHATCOMPLETIONS:
+	case ClientProtocolOPENAICHATCOMPLETIONS:
 		return true
-	case OPENAIIMAGESGENERATIONS:
+	case ClientProtocolOPENAIIMAGESGENERATIONS:
 		return true
-	case OPENAIREALTIMETRANSCRIPTION:
+	case ClientProtocolOPENAIREALTIMETRANSCRIPTION:
 		return true
-	case OPENAIRESPONSES:
+	case ClientProtocolOPENAIRESPONSES:
+		return true
+	case ClientProtocolWEBDAV:
 		return true
 	default:
 		return false
@@ -201,12 +204,15 @@ func (e ClientProtocol) Valid() bool {
 // Defines values for RequestUsageFactTargetVersion.
 const (
 	RequestUsageFactTargetVersionN2 RequestUsageFactTargetVersion = 2
+	RequestUsageFactTargetVersionN3 RequestUsageFactTargetVersion = 3
 )
 
 // Valid indicates whether the value is a known member of the RequestUsageFactTargetVersion enum.
 func (e RequestUsageFactTargetVersion) Valid() bool {
 	switch e {
 	case RequestUsageFactTargetVersionN2:
+		return true
+	case RequestUsageFactTargetVersionN3:
 		return true
 	default:
 		return false
@@ -220,6 +226,7 @@ const (
 	ResourceKindMCP             ResourceKind = "MCP"
 	ResourceKindMODEL           ResourceKind = "MODEL"
 	ResourceKindTTS             ResourceKind = "TTS"
+	ResourceKindWEBDAV          ResourceKind = "WEBDAV"
 )
 
 // Valid indicates whether the value is a known member of the ResourceKind enum.
@@ -234,6 +241,8 @@ func (e ResourceKind) Valid() bool {
 	case ResourceKindMODEL:
 		return true
 	case ResourceKindTTS:
+		return true
+	case ResourceKindWEBDAV:
 		return true
 	default:
 		return false
@@ -410,6 +419,12 @@ type BudgetSource string
 // ClientProtocol defines model for ClientProtocol.
 type ClientProtocol string
 
+// DAVSecretRef defines model for DAVSecretRef.
+type DAVSecretRef struct {
+	SecretId      string `json:"secretId"`
+	SecretVersion int    `json:"secretVersion"`
+}
+
 // DeploymentId defines model for DeploymentId.
 type DeploymentId = string
 
@@ -452,6 +467,7 @@ type RequestUsageFact struct {
 	ClientProtocol  ClientProtocol `json:"clientProtocol"`
 	CompletedAt     time.Time      `json:"completedAt"`
 	ControlRevision int            `json:"controlRevision"`
+	DavSecretRef    *DAVSecretRef  `json:"davSecretRef,omitempty"`
 	DeploymentId    DeploymentId   `json:"deploymentId"`
 	DeviceId        *DeviceId      `json:"deviceId,omitempty"`
 	DurationMs      int64          `json:"durationMs"`
@@ -459,6 +475,7 @@ type RequestUsageFact struct {
 
 	// Forwarded False only for a proven-unforwarded durable denial. Such a fact still requires complete resource, runtime route and upstream attribution.
 	Forwarded          bool                           `json:"forwarded"`
+	HttpMethod         *string                        `json:"httpMethod,omitempty"`
 	HttpStatus         int                            `json:"httpStatus"`
 	InteractionId      *InteractionId                 `json:"interactionId,omitempty"`
 	ManagedGeneration  int                            `json:"managedGeneration"`
@@ -515,6 +532,9 @@ type UsageSettlement struct {
 	Revision      int                  `json:"revision"`
 	SourceEventId string               `json:"sourceEventId"`
 	State         UsageSettlementState `json:"state"`
+
+	// StatisticsOnly True only for WEBDAV request statistics. No admission, semantic meters, budget or cost effects.
+	StatisticsOnly *bool `json:"statisticsOnly,omitempty"`
 }
 
 // UsageSettlementState defines model for UsageSettlement.State.

@@ -45,6 +45,7 @@ type snapshotDescriptor struct {
 	TTS               []clientapi.TtsDefinition             `json:"tts"`
 	ASR               []clientapi.AsrDefinition             `json:"asr"`
 	MCP               any                                   `json:"mcp"`
+	WebDAV            *[]clientapi.WebDAVDefinition         `json:"webdav,omitempty"`
 	Policy            clientapi.ManagedPolicy               `json:"policy"`
 	Metadata          snapshotMetadata                      `json:"metadata"`
 	Assistants        any                                   `json:"assistants"`
@@ -104,6 +105,8 @@ type snapshotMetadata struct {
 }
 
 func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error) {
+	// Absence in an explicitly versioned historical release is hash-significant.
+	originalDAV := input.Content.Webdav
 	input.Content = NormalizeManagedDraftContent(input.Content)
 	version := input.SchemaVersion
 	if version == 0 {
@@ -300,6 +303,18 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error)
 		ReleaseID: input.ReleaseID, Providers: providers, Models: models, ImageGenerators: images, TTS: tts, ASR: asr, MCP: mcp, Policy: policy, Metadata: metadata,
 		Assistants: assistants, Starters: starters,
 	}
+	if version == 5 && (input.SchemaVersion == 0 || originalDAV != nil) {
+		definitions := make([]clientapi.WebDAVDefinition, 0, len(webdavDefinitions(input.Content)))
+		for _, value := range webdavDefinitions(input.Content) {
+			definitions = append(definitions, clientapi.WebDAVDefinition{
+				ResourceId: value.ResourceId, DisplayName: value.DisplayName, Enabled: value.Enabled,
+				ClientProtocol: clientapi.WebDAVDefinitionClientProtocol(value.ClientProtocol),
+				AuthOwnership:  clientapi.WebDAVDefinitionAuthOwnership(value.AuthOwnership),
+				Purpose:        clientapi.WebDAVDefinitionPurpose(value.Purpose), RootPathTemplate: value.RootPathTemplate,
+			})
+		}
+		descriptor.WebDAV = &definitions
+	}
 	if version == 4 {
 		descriptor.MCP = v4Mcp(mcp)
 		descriptor.Assistants = v4Assistants
@@ -322,6 +337,7 @@ func (s *Service) CompileSnapshot(input SnapshotInput) (Snapshot, string, error)
 	snapshot.Tts = tts
 	snapshot.Asr = asr
 	snapshot.Mcp = mcp
+	snapshot.Webdav = descriptor.WebDAV
 	snapshot.Policy = policy
 	snapshot.Metadata.PublishedAt = metadata.PublishedAt
 	snapshot.Metadata.PublishedByUserId = metadata.PublishedByUserID
@@ -372,6 +388,9 @@ func HashSnapshot(value any) (string, error) {
 		Policy: snapshot.Policy, Metadata: metadata,
 	}
 	descriptor.Assistants = snapshot.Assistants
+	if snapshot.SchemaVersion == 5 {
+		descriptor.WebDAV = snapshot.Webdav
+	}
 	if snapshot.SchemaVersion == 4 {
 		descriptor.MCP = v4Mcp(snapshot.Mcp)
 		descriptor.Assistants = snapshot.V4Assistants

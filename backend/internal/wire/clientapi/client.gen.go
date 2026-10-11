@@ -204,6 +204,24 @@ func (e BudgetStatus) Valid() bool {
 	}
 }
 
+// Defines values for DAVAccessMode.
+const (
+	FULL     DAVAccessMode = "FULL"
+	READONLY DAVAccessMode = "READ_ONLY"
+)
+
+// Valid indicates whether the value is a known member of the DAVAccessMode enum.
+func (e DAVAccessMode) Valid() bool {
+	switch e {
+	case FULL:
+		return true
+	case READONLY:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DiscoveryProduct.
 const (
 	MEASIXAGENTPLATFORM DiscoveryProduct = "MEASIX_AGENT_PLATFORM"
@@ -616,6 +634,7 @@ const (
 	ResourceKindMCP             ResourceKind = "MCP"
 	ResourceKindMODEL           ResourceKind = "MODEL"
 	ResourceKindTTS             ResourceKind = "TTS"
+	ResourceKindWEBDAV          ResourceKind = "WEBDAV"
 )
 
 // Valid indicates whether the value is a known member of the ResourceKind enum.
@@ -630,6 +649,8 @@ func (e ResourceKind) Valid() bool {
 	case ResourceKindMODEL:
 		return true
 	case ResourceKindTTS:
+		return true
+	case ResourceKindWEBDAV:
 		return true
 	default:
 		return false
@@ -691,6 +712,7 @@ const (
 	UsageClientProtocolOPENAIIMAGESGENERATIONS       UsageClientProtocol = "OPENAI_IMAGES_GENERATIONS"
 	UsageClientProtocolOPENAIREALTIMETRANSCRIPTION   UsageClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
 	UsageClientProtocolOPENAIRESPONSES               UsageClientProtocol = "OPENAI_RESPONSES"
+	UsageClientProtocolWEBDAV                        UsageClientProtocol = "WEBDAV"
 )
 
 // Valid indicates whether the value is a known member of the UsageClientProtocol enum.
@@ -723,6 +745,8 @@ func (e UsageClientProtocol) Valid() bool {
 	case UsageClientProtocolOPENAIREALTIMETRANSCRIPTION:
 		return true
 	case UsageClientProtocolOPENAIRESPONSES:
+		return true
+	case UsageClientProtocolWEBDAV:
 		return true
 	default:
 		return false
@@ -780,6 +804,51 @@ func (e UsageMeter) Valid() bool {
 	case REQUESTS:
 		return true
 	case TOTALTOKENS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WebDAVDefinitionAuthOwnership.
+const (
+	WebDAVDefinitionAuthOwnershipENTERPRISEMANAGED WebDAVDefinitionAuthOwnership = "ENTERPRISE_MANAGED"
+)
+
+// Valid indicates whether the value is a known member of the WebDAVDefinitionAuthOwnership enum.
+func (e WebDAVDefinitionAuthOwnership) Valid() bool {
+	switch e {
+	case WebDAVDefinitionAuthOwnershipENTERPRISEMANAGED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WebDAVDefinitionClientProtocol.
+const (
+	WebDAVDefinitionClientProtocolWEBDAV WebDAVDefinitionClientProtocol = "WEBDAV"
+)
+
+// Valid indicates whether the value is a known member of the WebDAVDefinitionClientProtocol enum.
+func (e WebDAVDefinitionClientProtocol) Valid() bool {
+	switch e {
+	case WebDAVDefinitionClientProtocolWEBDAV:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WebDAVDefinitionPurpose.
+const (
+	WORKSPACEFILEEXCHANGE WebDAVDefinitionPurpose = "WORKSPACE_FILE_EXCHANGE"
+)
+
+// Valid indicates whether the value is a known member of the WebDAVDefinitionPurpose enum.
+func (e WebDAVDefinitionPurpose) Valid() bool {
+	switch e {
+	case WORKSPACEFILEEXCHANGE:
 		return true
 	default:
 		return false
@@ -918,6 +987,36 @@ func (e WorkspaceProjectionState) Valid() bool {
 	case RESTORING:
 		return true
 	case UNPROVISIONED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DownloadClientWorkspaceFileParamsPreview.
+const (
+	DownloadClientWorkspaceFileParamsPreviewVideo DownloadClientWorkspaceFileParamsPreview = "video"
+)
+
+// Valid indicates whether the value is a known member of the DownloadClientWorkspaceFileParamsPreview enum.
+func (e DownloadClientWorkspaceFileParamsPreview) Valid() bool {
+	switch e {
+	case DownloadClientWorkspaceFileParamsPreviewVideo:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HeadClientWorkspaceFileParamsPreview.
+const (
+	HeadClientWorkspaceFileParamsPreviewVideo HeadClientWorkspaceFileParamsPreview = "video"
+)
+
+// Valid indicates whether the value is a known member of the HeadClientWorkspaceFileParamsPreview enum.
+func (e HeadClientWorkspaceFileParamsPreview) Valid() bool {
+	switch e {
+	case HeadClientWorkspaceFileParamsPreviewVideo:
 		return true
 	default:
 		return false
@@ -1071,6 +1170,12 @@ type BudgetSource string
 
 // BudgetStatus defines model for BudgetStatus.
 type BudgetStatus string
+
+// DAVAccessMode defines model for DAVAccessMode.
+type DAVAccessMode string
+
+// DAVResourceId defines model for DAVResourceId.
+type DAVResourceId = string
 
 // DeploymentId defines model for DeploymentId.
 type DeploymentId = string
@@ -1259,6 +1364,7 @@ type ManagedSnapshot struct {
 	SnapshotHash  Sha256Hash                   `json:"snapshotHash"`
 	Starters      []AssistantStarterDefinition `json:"starters"`
 	Tts           []TtsDefinition              `json:"tts"`
+	Webdav        *[]WebDAVDefinition          `json:"webdav,omitempty"`
 }
 
 // ManagedSnapshotSchemaVersion defines model for ManagedSnapshot.SchemaVersion.
@@ -1497,6 +1603,7 @@ type RequestUsageView struct {
 	DurationMs          int                             `json:"durationMs"`
 	ErrorClass          *string                         `json:"errorClass,omitempty"`
 	Forwarded           bool                            `json:"forwarded"`
+	HttpMethod          *string                         `json:"httpMethod,omitempty"`
 	HttpStatus          *int                            `json:"httpStatus,omitempty"`
 	InteractionId       *InteractionId                  `json:"interactionId,omitempty"`
 	RequestBytes        int                             `json:"requestBytes"`
@@ -1509,6 +1616,7 @@ type RequestUsageView struct {
 	SemanticMeters      []MeterQuantity                 `json:"semanticMeters"`
 	SettlementState     RequestUsageViewSettlementState `json:"settlementState"`
 	StartedAt           time.Time                       `json:"startedAt"`
+	StatisticsOnly      *bool                           `json:"statisticsOnly,omitempty"`
 }
 
 // RequestUsageViewSettlementState defines model for RequestUsageView.SettlementState.
@@ -1658,6 +1766,35 @@ type UserBudgetView struct {
 // UserId defines model for UserId.
 type UserId = string
 
+// WebDAVDefinition defines model for WebDAVDefinition.
+type WebDAVDefinition struct {
+	AuthOwnership    WebDAVDefinitionAuthOwnership  `json:"authOwnership"`
+	ClientProtocol   WebDAVDefinitionClientProtocol `json:"clientProtocol"`
+	DisplayName      string                         `json:"displayName"`
+	Enabled          bool                           `json:"enabled"`
+	Purpose          WebDAVDefinitionPurpose        `json:"purpose"`
+	ResourceId       DAVResourceId                  `json:"resourceId"`
+	RootPathTemplate string                         `json:"rootPathTemplate"`
+}
+
+// WebDAVDefinitionAuthOwnership defines model for WebDAVDefinition.AuthOwnership.
+type WebDAVDefinitionAuthOwnership string
+
+// WebDAVDefinitionClientProtocol defines model for WebDAVDefinition.ClientProtocol.
+type WebDAVDefinitionClientProtocol string
+
+// WebDAVDefinitionPurpose defines model for WebDAVDefinition.Purpose.
+type WebDAVDefinitionPurpose string
+
+// WorkspaceDAVProjection defines model for WorkspaceDAVProjection.
+type WorkspaceDAVProjection struct {
+	AccessMode      *DAVAccessMode `json:"accessMode,omitempty"`
+	Available       bool           `json:"available"`
+	BindingRevision *int64         `json:"bindingRevision,omitempty"`
+	Reason          string         `json:"reason"`
+	ResourceId      DAVResourceId  `json:"resourceId"`
+}
+
 // WorkspaceFileEntry defines model for WorkspaceFileEntry.
 type WorkspaceFileEntry struct {
 	Etag       *string                `json:"etag,omitempty"`
@@ -1713,20 +1850,22 @@ type WorkspaceOperationId = string
 
 // WorkspaceProjection defines model for WorkspaceProjection.
 type WorkspaceProjection struct {
-	AgentSpaceId    *AgentSpaceId                    `json:"agentSpaceId,omitempty"`
-	BindingRevision int                              `json:"bindingRevision"`
-	FilesAvailable  bool                             `json:"filesAvailable"`
-	FilesReason     string                           `json:"filesReason"`
-	McpAvailable    bool                             `json:"mcpAvailable"`
-	McpReason       string                           `json:"mcpReason"`
-	McpServerId     *McpServerId                     `json:"mcpServerId,omitempty"`
-	ObservedAt      *time.Time                       `json:"observedAt,omitempty"`
-	OperationId     *WorkspaceOperationId            `json:"operationId,omitempty"`
-	SchemaVersion   WorkspaceProjectionSchemaVersion `json:"schemaVersion"`
+	AgentSpaceId                 *AgentSpaceId                    `json:"agentSpaceId,omitempty"`
+	BindingRevision              int                              `json:"bindingRevision"`
+	FileExchangeWebdavResourceId *DAVResourceId                   `json:"fileExchangeWebdavResourceId,omitempty"`
+	FilesAvailable               bool                             `json:"filesAvailable"`
+	FilesReason                  string                           `json:"filesReason"`
+	McpAvailable                 bool                             `json:"mcpAvailable"`
+	McpReason                    string                           `json:"mcpReason"`
+	McpServerId                  *McpServerId                     `json:"mcpServerId,omitempty"`
+	ObservedAt                   *time.Time                       `json:"observedAt,omitempty"`
+	OperationId                  *WorkspaceOperationId            `json:"operationId,omitempty"`
+	SchemaVersion                WorkspaceProjectionSchemaVersion `json:"schemaVersion"`
 
 	// ServiceState Configured enable intent, independent of this user lifecycle and remote health. ENABLED does not imply filesAvailable.
 	ServiceState WorkspaceProjectionServiceState `json:"serviceState"`
 	State        WorkspaceProjectionState        `json:"state"`
+	Webdav       *WorkspaceDAVProjection         `json:"webdav,omitempty"`
 }
 
 // WorkspaceProjectionSchemaVersion defines model for WorkspaceProjection.SchemaVersion.
@@ -1775,10 +1914,20 @@ type DownloadClientWorkspaceFileParams struct {
 
 	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
 	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
-	Range        *string      `json:"Range,omitempty"`
-	IfMatch      *string      `json:"If-Match,omitempty"`
-	IfNoneMatch  *string      `json:"If-None-Match,omitempty"`
+
+	// Preview Native video preview; requires expectedEtag. Supported video types are served inline; default downloads remain attachments.
+	Preview *DownloadClientWorkspaceFileParamsPreview `form:"preview,omitempty" json:"preview,omitempty"`
+
+	// ExpectedEtag Strong ETag forwarded as If-Match for a fixed-version media URL; conflicting If-Match is rejected.
+	ExpectedEtag *string `form:"expectedEtag,omitempty" json:"expectedEtag,omitempty"`
+	Range        *string `json:"Range,omitempty"`
+	IfMatch      *string `json:"If-Match,omitempty"`
+	IfNoneMatch  *string `json:"If-None-Match,omitempty"`
+	IfRange      *string `json:"If-Range,omitempty"`
 }
+
+// DownloadClientWorkspaceFileParamsPreview defines parameters for DownloadClientWorkspaceFile.
+type DownloadClientWorkspaceFileParamsPreview string
 
 // HeadClientWorkspaceFileParams defines parameters for HeadClientWorkspaceFile.
 type HeadClientWorkspaceFileParams struct {
@@ -1786,10 +1935,20 @@ type HeadClientWorkspaceFileParams struct {
 
 	// AgentSpaceId Expected space from WorkspaceProjection; mismatch is 409. Never selects a user.
 	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
-	Range        *string      `json:"Range,omitempty"`
-	IfMatch      *string      `json:"If-Match,omitempty"`
-	IfNoneMatch  *string      `json:"If-None-Match,omitempty"`
+
+	// Preview Native video preview; requires expectedEtag. Supported video types are served inline; default downloads remain attachments.
+	Preview *HeadClientWorkspaceFileParamsPreview `form:"preview,omitempty" json:"preview,omitempty"`
+
+	// ExpectedEtag Strong ETag forwarded as If-Match for a fixed-version media URL; conflicting If-Match is rejected.
+	ExpectedEtag *string `form:"expectedEtag,omitempty" json:"expectedEtag,omitempty"`
+	Range        *string `json:"Range,omitempty"`
+	IfMatch      *string `json:"If-Match,omitempty"`
+	IfNoneMatch  *string `json:"If-None-Match,omitempty"`
+	IfRange      *string `json:"If-Range,omitempty"`
 }
+
+// HeadClientWorkspaceFileParamsPreview defines parameters for HeadClientWorkspaceFile.
+type HeadClientWorkspaceFileParamsPreview string
 
 // UploadClientWorkspaceFileParams defines parameters for UploadClientWorkspaceFile.
 type UploadClientWorkspaceFileParams struct {
@@ -2562,6 +2721,32 @@ func (siw *ServerInterfaceWrapper) DownloadClientWorkspaceFile(w http.ResponseWr
 		return
 	}
 
+	// ------------- Optional query parameter "preview" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "preview", r.URL.Query(), &params.Preview, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "preview"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "preview", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "expectedEtag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "expectedEtag", r.URL.Query(), &params.ExpectedEtag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedEtag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedEtag", Err: err})
+		}
+		return
+	}
+
 	headers := r.Header
 
 	// ------------- Optional header parameter "Range" -------------
@@ -2618,6 +2803,25 @@ func (siw *ServerInterfaceWrapper) DownloadClientWorkspaceFile(w http.ResponseWr
 		}
 
 		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	// ------------- Optional header parameter "If-Range" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Range")]; found {
+		var IfRange string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Range", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Range", valueList[0], &IfRange, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Range", Err: err})
+			return
+		}
+
+		params.IfRange = &IfRange
 
 	}
 
@@ -2667,6 +2871,32 @@ func (siw *ServerInterfaceWrapper) HeadClientWorkspaceFile(w http.ResponseWriter
 		return
 	}
 
+	// ------------- Optional query parameter "preview" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "preview", r.URL.Query(), &params.Preview, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "preview"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "preview", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "expectedEtag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "expectedEtag", r.URL.Query(), &params.ExpectedEtag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedEtag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedEtag", Err: err})
+		}
+		return
+	}
+
 	headers := r.Header
 
 	// ------------- Optional header parameter "Range" -------------
@@ -2723,6 +2953,25 @@ func (siw *ServerInterfaceWrapper) HeadClientWorkspaceFile(w http.ResponseWriter
 		}
 
 		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	// ------------- Optional header parameter "If-Range" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Range")]; found {
+		var IfRange string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Range", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Range", valueList[0], &IfRange, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Range", Err: err})
+			return
+		}
+
+		params.IfRange = &IfRange
 
 	}
 

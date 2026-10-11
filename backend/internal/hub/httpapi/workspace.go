@@ -8,6 +8,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"strings"
 	"sync/atomic"
 
 	"measix/platform/ent"
@@ -291,6 +292,11 @@ func (h *fullClientHandler) GetWorkspace(w http.ResponseWriter, r *http.Request)
 		writeWorkspaceError(w, err)
 		return
 	}
+	if out.Webdav != nil {
+		out.Webdav.DesiredAccessMode = nil
+		out.Webdav.DesiredBindingRevision = nil
+		out.Webdav.LastConfirmedAccessMode = nil
+	}
 	writeJSON(w, 200, out)
 }
 func (h *fullClientHandler) clientWorkspaceFiles(w http.ResponseWriter, r *http.Request, action, path string) {
@@ -333,6 +339,25 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 	if service == nil {
 		writeWorkspaceError(w, workspace.ErrUnavailable)
 		return
+	}
+	mediaType := ""
+	requestHeaders := r.Header.Clone()
+	if action == "GET" || action == "HEAD" {
+		query := r.URL.Query()
+		if query.Get("preview") != "" {
+			mediaType = map[string]string{".mp4": "video/mp4", ".m4v": "video/mp4", ".webm": "video/webm", ".ogv": "video/ogg"}[strings.ToLower(path.Ext(filePath))]
+			if query.Get("preview") != "video" || mediaType == "" || query.Get("expectedEtag") == "" || len(query["preview"]) != 1 {
+				writeWorkspaceError(w, workspace.ErrInvalid)
+				return
+			}
+		}
+		if expected := query.Get("expectedEtag"); expected != "" {
+			if !strongMediaETag(expected) || len(query["expectedEtag"]) != 1 || requestHeaders.Get("If-Match") != "" && requestHeaders.Get("If-Match") != expected {
+				writeWorkspaceError(w, workspace.ErrInvalid)
+				return
+			}
+			requestHeaders.Set("If-Match", expected)
+		}
 	}
 	var mutation adminapi.WorkspaceFileMutation
 	if action == "MUTATE" {
@@ -385,7 +410,7 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 			defer stream.Close()
 			body = &workspaceCountingReader{reader: stream, count: &bytes}
 		}
-		response, err := access.Remote.Content(access.Context, access.Username, access.Token, filePath, action, body, r.Header)
+		response, err := access.Remote.Content(access.Context, access.Username, access.Token, filePath, action, body, requestHeaders)
 		if err != nil {
 			var re *remoteapi.Error
 			if errors.As(err, &re) && re.Unknown {
@@ -409,6 +434,10 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": path.Base(filePath)}))
+		if mediaType != "" {
+			w.Header().Set("Content-Type", mediaType)
+			w.Header().Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": path.Base(filePath)}))
+		}
 		w.WriteHeader(response.StatusCode)
 		stream := remoteapi.IdleBody(response.Body, access.Idle)
 		defer stream.Close()
@@ -420,6 +449,18 @@ func serveWorkspaceFiles(w http.ResponseWriter, r *http.Request, service *worksp
 		}
 		outcome = "SUCCEEDED"
 	}
+}
+
+func strongMediaETag(value string) bool {
+	if len(value) < 2 || len(value) > 1024 || value[0] != '"' || value[len(value)-1] != '"' {
+		return false
+	}
+	for _, c := range []byte(value[1 : len(value)-1]) {
+		if c < 0x21 || c == '"' || c == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 // Keep transport diagnostics separate from the public unknown-result contract.

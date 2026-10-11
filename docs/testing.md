@@ -98,6 +98,25 @@ node scripts/workspace-integration.mjs --config <local-config.json> --output <ne
 
 `--ui-only --output <directory>` 建立未配置环境供真实网页操作；`--keep-ui` 在通过后保留审查用户。登录资料写私有 `ui-env.json`，不输出到终端。脚本不安装第三方服务，不代替生产版本核验、浏览器或 Android 验收；完整 S1 compute/storage 计量仍按阶段权威推进。间歇传输失败记录与未确认根因见[历史证据和风险](s0-execution-progress.md#保留的失败边界)。
 
+### WebDAV、实际旧库与大文件验证
+
+`scripts/webdav-acceptance.mjs` 用固定旧 Hub 二进制建立有用户、空间、文件、SecretVersion、Release、未发布草稿及显式撤销的库，再备份、升级两次并逐表比较原列。另恢复备份运行旧版 check 和业务读取。必须传新的输出目录，失败证据不覆盖。
+
+~~~text
+node scripts/webdav-acceptance.mjs --previous-hub <old-hub> --tools-container <isolated-caddy-container> --output <new-directory> --keep
+node scripts/webdav-transfer-acceptance.mjs <environment.private.json> <real-video-over-4gib.mp4>
+node scripts/fixtures/dav-client/verify.mjs <environment.private.json>
+node scripts/webdav-lifecycle-acceptance.mjs <environment.private.json>
+~~~
+
+Caddy 容器需安装 Caddy，映射 9080 到本机回环地址，并把输出父目录挂到 /evidence。每轮使用专用容器；脚本结束只回收本机子进程，终止 `docker exec` 客户端不能保证容器内 Caddy 已退出，调用者须停止并移除该轮专用容器，重新运行使用新容器，不能复用可能仍运行旧入口的容器。不得清理用户原有容器。
+
+缺省上游是 `scripts/fixtures/workspace-dav-server`（x/net/webdav v0.61.0 的独立标准服务及确定性管理替身），不代表真实 Agent Space。传 `--upstream-config <private-json>` 使用显式指定的真实实例，支持局域网 HTTP；配置键为 adminOrigin/mcpOrigin/davOrigin/managementTokenFile/releaseIdentity。只创建本轮独立账号，首次查询保存原账号清单。凭据、私有 env、DB 和日志不能随公开结果上传。
+
+真实实例受容量限制时，本轮依用户要求传 `--512mib` 使用 512 MiB 视频；独立 DAV 的 >4 GiB 结果分开记录。流式校验 SHA-256，覆盖短 JWT 到期、标准方法、只读权限、跨边界 Range、Files 视频及 DAV 基础统计。`--verify-existing transfer-<timestamp>` 仅补验该轮已上传的 Files 视频与统计，重新读取并校验摘要，另写报告而不改原失败证据。
+
+标准消费者使用固定 `webdav@5.11.0`；在 `scripts/fixtures/dav-client` 先运行 npm ci，再运行上面的 verify。它只注入平台 Bearer，实际验证目录、Unicode/百分号、PUT/GET/COPY/MOVE/stat/DELETE。该结果不能替代 Android 原包验证。浏览器另检查生产 SPA 的资源开关、权限、Files 原生视频和用量；记录构建摘要及实际操作。服务收尾只清理本轮创建的测试对象，保留旧库及原始证据。
+
 ## CI、TDD 与变更证据
 
 ### 当前 CI

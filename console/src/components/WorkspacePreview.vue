@@ -12,6 +12,8 @@ const emit=defineEmits<{close:[]}>()
 const kind=computed(()=>previewKind(props.path))
 const error=ref<unknown>(),loading=ref(true),text=ref(''),html=ref(''),imageUrl=ref('')
 const raw=ref(false)
+const video=ref<HTMLVideoElement>()
+const videoUrl=computed(()=>workspaceFileUrl(props.baseUrl,props.spaceId,'content',props.path)+'&'+new URLSearchParams({preview:'video',expectedEtag:props.etag??''}))
 const canvas=ref<HTMLCanvasElement>(),markdown=ref<HTMLElement>(),page=ref(1),pages=ref(0),zoom=ref(1)
 const controller=new AbortController(),urls:string[]=[]
 let task:PDFDocumentLoadingTask|undefined,pdf:PDFDocumentProxy|undefined,render:RenderTask|undefined,closed=false
@@ -41,6 +43,10 @@ async function changePage(delta:number){page.value=Math.max(1,Math.min(pages.val
 onMounted(async()=>{
  try{
   if(kind.value==='download')return
+  if(kind.value==='video'){
+   if(!props.etag||props.etag.startsWith('W/'))throw new Error('文件缺少可固定的视频版本，请刷新目录后重试，或下载后播放。')
+   return
+  }
   const data=await bytes(props.path,props.etag,kind.value==='text'||kind.value==='markdown'?2*1024*1024:limit)
   if(closed)return
   if(kind.value==='image')imageUrl.value=await raster(data)
@@ -60,12 +66,13 @@ onMounted(async()=>{
   }
  }catch(e){if(!closed)error.value=e}finally{loading.value=false}
 })
-onBeforeUnmount(()=>{closed=true;controller.abort();render?.cancel();void task?.destroy();for(const url of urls)URL.revokeObjectURL(url)})
+onBeforeUnmount(()=>{closed=true;controller.abort();if(video.value){video.value.pause();video.value.removeAttribute('src');video.value.load()}render?.cancel();void task?.destroy();for(const url of urls)URL.revokeObjectURL(url)})
 </script>
 <template>
  <q-card class="workspace-preview"><q-card-section class="row items-center no-wrap q-gutter-sm"><div class="text-subtitle1 ellipsis col">{{path}}</div><q-btn flat label="下载" @click="downloadWorkspaceFile(baseUrl,spaceId,path)"/><q-btn flat round icon="close" aria-label="关闭预览" @click="emit('close')"/></q-card-section><q-separator/>
   <q-card-section><ProblemBanner :error="error"/><q-spinner v-if="loading" size="32px"/>
    <p v-if="kind==='download'">此类型不在网页中执行或预览，请下载后使用合适的软件打开。</p>
+   <template v-if="kind==='video'&&!loading&&!error"><video ref="video" :src="videoUrl" controls playsinline preload="metadata" style="width:100%;max-height:70vh" @error="error=new Error('视频无法播放，可能是文件版本变化、访问失效或浏览器不支持此编码。请刷新目录后重试，或下载后播放。')"/><p class="text-caption text-grey-7">按需读取视频，不会先下载整个文件。编码支持取决于当前浏览器。</p></template>
    <template v-if="kind==='pdf'&&pages"><div class="row items-center q-gutter-sm q-mb-sm"><q-btn flat icon="chevron_left" aria-label="上一页" :disable="page===1" @click="changePage(-1)"/><span>{{page}} / {{pages}}</span><q-btn flat icon="chevron_right" aria-label="下一页" :disable="page===pages" @click="changePage(1)"/><q-select v-model="zoom" dense outlined label="缩放" style="width:120px" :options="[0.5,1,1.5,2]" @update:model-value="draw"/></div><div class="pdf-scroll"><canvas ref="canvas"/></div></template>
    <template v-if="imageUrl"><q-select v-model="zoom" dense outlined label="缩放" :options="[0.5,1,1.5,2]" style="width:120px"/><div class="image-scroll"><img :src="imageUrl" :alt="path" class="image-preview" :style="{width:zoom*100+'%',maxHeight:zoom*70+'vh'}"/></div></template>
    <q-toggle v-if="kind==='markdown'&&!loading" v-model="raw" label="查看原文"/>

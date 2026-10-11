@@ -122,7 +122,7 @@ func TestDashScopeImageGenerationIsValidatedMeteredAndForwardedTransparently(t *
 		_, _ = w.Write(responseBody)
 	}))
 	defer upstream.Close()
-	fixture, imageID := imageRuntimeFixtureForProtocol(t, upstream.URL, platformid.New(platformid.Deployment), relaycontrolapi.DASHSCOPEMULTIMODALGENERATION, path)
+	fixture, imageID := imageRuntimeFixtureForProtocol(t, upstream.URL, platformid.New(platformid.Deployment), relaycontrolapi.ResourceRouteClientProtocolDASHSCOPEMULTIMODALGENERATION, path)
 	defer fixture.close()
 
 	request := fixture.request(t, nil, http.MethodPost, imageID, path, bytes.NewReader(wantBody), "application/json")
@@ -250,7 +250,7 @@ func imageRuntimeFixture(t *testing.T, upstreamURL string) (*runtimeFixture, str
 }
 
 func imageRuntimeFixtureForDeployment(t *testing.T, upstreamURL, deploymentID string) (*runtimeFixture, string) {
-	return imageRuntimeFixtureForProtocol(t, upstreamURL, deploymentID, relaycontrolapi.OPENAIIMAGESGENERATIONS, "/v1/images/generations")
+	return imageRuntimeFixtureForProtocol(t, upstreamURL, deploymentID, relaycontrolapi.ResourceRouteClientProtocolOPENAIIMAGESGENERATIONS, "/v1/images/generations")
 }
 
 func imageRuntimeFixtureForProtocol(t *testing.T, upstreamURL, deploymentID string, protocol relaycontrolapi.ResourceRouteClientProtocol, runtimePath string) (*runtimeFixture, string) {

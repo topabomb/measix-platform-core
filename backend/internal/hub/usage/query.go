@@ -67,6 +67,7 @@ const (
 	ResourceKindTTS      ResourceKind = "TTS"
 	ResourceKindASR      ResourceKind = "ASR"
 	ResourceKindMCP      ResourceKind = "MCP"
+	ResourceKindDAV      ResourceKind = "WEBDAV"
 )
 
 type RequestStatus string
@@ -93,6 +94,8 @@ type Filter struct {
 }
 
 type RequestView struct {
+	HTTPMethod          string
+	StatisticsOnly      bool
 	RequestID           string
 	InteractionID       *string
 	DeploymentID        string
@@ -136,6 +139,7 @@ func requestView(row *ent.RequestUsage) RequestView {
 		upstreamStatus = &value
 	}
 	return RequestView{
+		HTTPMethod: row.HTTPMethod, StatisticsOnly: row.StatisticsOnly,
 		RequestID: row.RequestID, InteractionID: row.InteractionID, DeploymentID: row.DeploymentID, UserID: row.UserID, DeviceID: row.DeviceID,
 		ResourceID: row.ResourceID, ResourceKind: ResourceKind(row.ResourceKind), ClientProtocol: row.ClientProtocol,
 		RuntimeRouteID: row.RuntimeRouteID, UpstreamID: row.UpstreamID, WorkspaceTargetJSON: row.WorkspaceTargetJSON, ManagedGeneration: int(row.ManagedGeneration), ControlRevision: int(row.ControlRevision),
@@ -350,6 +354,11 @@ func (s *Service) resourceNames(ctx context.Context, views []RequestView) error 
 		for _, tool := range snapshot.Mcp {
 			resources[tool.McpServerId] = tool.DisplayName
 		}
+		if snapshot.Webdav != nil {
+			for _, dav := range *snapshot.Webdav {
+				resources[dav.ResourceId] = dav.DisplayName
+			}
+		}
 		names[int(release.ManagedGeneration)] = resources
 	}
 	for i := range views {
@@ -406,6 +415,8 @@ func resourceKindPrefix(kind ResourceKind) string {
 		return "asr_"
 	case ResourceKindMCP:
 		return "mcp_"
+	case ResourceKindDAV:
+		return "dav_"
 	default:
 		return ""
 	}
@@ -652,7 +663,7 @@ func (f Filter) Validate() error {
 		return ErrInvalidBatch
 	}
 	switch f.ResourceKind {
-	case "", ResourceKindProvider, ResourceKindModel, ResourceKindImage, ResourceKindTTS, ResourceKindASR, ResourceKindMCP:
+	case "", ResourceKindProvider, ResourceKindModel, ResourceKindImage, ResourceKindTTS, ResourceKindASR, ResourceKindMCP, ResourceKindDAV:
 	default:
 		return ErrInvalidBatch
 	}
@@ -674,7 +685,7 @@ func validClientProtocol(value string) bool {
 		"OPENAI_IMAGES_GENERATIONS", "DASHSCOPE_MULTIMODAL_GENERATION",
 		"OPENAI_AUDIO_SPEECH", "GEMINI_GENERATE_CONTENT_TTS", "MIMO_CHAT_COMPLETIONS_TTS",
 		"OPENAI_AUDIO_TRANSCRIPTIONS", "DASHSCOPE_HTTP_ASR", "OPENAI_REALTIME_TRANSCRIPTION",
-		"DASHSCOPE_REALTIME_ASR", "MCP_STREAMABLE_HTTP":
+		"DASHSCOPE_REALTIME_ASR", "MCP_STREAMABLE_HTTP", "WEBDAV":
 		return true
 	default:
 		return false

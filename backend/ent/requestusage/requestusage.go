@@ -27,6 +27,10 @@ const (
 	FieldResourceKind = "resource_kind"
 	// FieldClientProtocol holds the string denoting the client_protocol field in the database.
 	FieldClientProtocol = "client_protocol"
+	// FieldHTTPMethod holds the string denoting the http_method field in the database.
+	FieldHTTPMethod = "http_method"
+	// FieldStatisticsOnly holds the string denoting the statistics_only field in the database.
+	FieldStatisticsOnly = "statistics_only"
 	// FieldRuntimeRouteID holds the string denoting the runtime_route_id field in the database.
 	FieldRuntimeRouteID = "runtime_route_id"
 	// FieldUpstreamID holds the string denoting the upstream_id field in the database.
@@ -80,6 +84,8 @@ var Columns = []string{
 	FieldResourceID,
 	FieldResourceKind,
 	FieldClientProtocol,
+	FieldHTTPMethod,
+	FieldStatisticsOnly,
 	FieldRuntimeRouteID,
 	FieldUpstreamID,
 	FieldWorkspaceTargetJSON,
@@ -110,6 +116,13 @@ func ValidColumn(column string) bool {
 	}
 	return false
 }
+
+var (
+	// DefaultHTTPMethod holds the default value on creation for the "http_method" field.
+	DefaultHTTPMethod string
+	// DefaultStatisticsOnly holds the default value on creation for the "statistics_only" field.
+	DefaultStatisticsOnly bool
+)
 
 // OrderOption defines the ordering options for the RequestUsage queries.
 type OrderOption func(*sql.Selector)
@@ -157,6 +170,16 @@ func ByResourceKind(opts ...sql.OrderTermOption) OrderOption {
 // ByClientProtocol orders the results by the client_protocol field.
 func ByClientProtocol(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldClientProtocol, opts...).ToFunc()
+}
+
+// ByHTTPMethod orders the results by the http_method field.
+func ByHTTPMethod(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHTTPMethod, opts...).ToFunc()
+}
+
+// ByStatisticsOnly orders the results by the statistics_only field.
+func ByStatisticsOnly(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatisticsOnly, opts...).ToFunc()
 }
 
 // ByRuntimeRouteID orders the results by the runtime_route_id field.

@@ -41,6 +41,27 @@ func TestDAVDeleteAcceptsCompletedRepresentation(t *testing.T) {
 	response.Body.Close()
 }
 
+func TestFilesPreserveIfRangeForNativeMedia(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("If-Range") != `"video-v1"` || r.Header.Get("Range") != "bytes=4294967296-" {
+			t.Error("lost range condition")
+		}
+		w.Header().Set("Content-Range", "bytes 4294967296-4294967296/4294967297")
+		w.WriteHeader(206)
+		_, _ = w.Write([]byte{0})
+	}))
+	defer server.Close()
+	c, _ := New(server.URL, server.URL, server.URL, "admin")
+	response, err := c.Content(context.Background(), "alice", "dav", "video.mp4", "GET", nil, http.Header{"Range": {"bytes=4294967296-"}, "If-Range": {`"video-v1"`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 206 {
+		t.Fatal(response.StatusCode)
+	}
+}
+
 func TestDAVRangeFailurePreservesValidatedLength(t *testing.T) {
 	for raw, want := range map[string]string{"bytes */4294967296": "bytes */4294967296", "bytes */0": "bytes */0", "": "", "bytes */-1": "", "bytes */9223372036854775808": "", "bytes 1-2/3": "", "bytes */+1": ""} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

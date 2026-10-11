@@ -11,9 +11,11 @@ import (
 )
 
 type accessClaims struct {
-	DeploymentID string `json:"deploymentId"`
-	DeviceID     string `json:"deviceId"`
-	SessionID    string `json:"sessionId"`
+	SigningKeyID      string           `json:"-"`
+	DeploymentID      string           `json:"deploymentId"`
+	DeviceID          string           `json:"deviceId"`
+	SessionID         string           `json:"sessionId"`
+	SessionValidUntil *jwt.NumericDate `json:"sessionValidUntil,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -27,6 +29,7 @@ func (h *Handler) authenticate(state *control.State, value string) (*accessClaim
 				return nil, jwt.ErrSignatureInvalid
 			}
 			kid, _ := token.Header["kid"].(string)
+			claims.SigningKeyID = kid
 			key, ok := state.AuthKeys[kid]
 			if !ok || len(key) != ed25519.PublicKeySize {
 				return nil, jwt.ErrTokenUnverifiable

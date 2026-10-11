@@ -1326,6 +1326,13 @@ type AgentSpaceMutation struct {
 	dav_secret_id               *string
 	dav_secret_version          *int64
 	adddav_secret_version       *int64
+	file_access_intent          *string
+	dav_access_mode             *string
+	dav_binding_revision        *int64
+	adddav_binding_revision     *int64
+	dav_applied_access_mode     *string
+	dav_applied_revision        *int64
+	adddav_applied_revision     *int64
 	dav_confirmed               *bool
 	remote_active               *bool
 	stop_pending                *bool
@@ -1932,6 +1939,226 @@ func (m *AgentSpaceMutation) ResetDavSecretVersion() {
 	delete(m.clearedFields, agentspace.FieldDavSecretVersion)
 }
 
+// SetFileAccessIntent sets the "file_access_intent" field.
+func (m *AgentSpaceMutation) SetFileAccessIntent(s string) {
+	m.file_access_intent = &s
+}
+
+// FileAccessIntent returns the value of the "file_access_intent" field in the mutation.
+func (m *AgentSpaceMutation) FileAccessIntent() (r string, exists bool) {
+	v := m.file_access_intent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFileAccessIntent returns the old "file_access_intent" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldFileAccessIntent(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFileAccessIntent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFileAccessIntent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFileAccessIntent: %w", err)
+	}
+	return oldValue.FileAccessIntent, nil
+}
+
+// ResetFileAccessIntent resets all changes to the "file_access_intent" field.
+func (m *AgentSpaceMutation) ResetFileAccessIntent() {
+	m.file_access_intent = nil
+}
+
+// SetDavAccessMode sets the "dav_access_mode" field.
+func (m *AgentSpaceMutation) SetDavAccessMode(s string) {
+	m.dav_access_mode = &s
+}
+
+// DavAccessMode returns the value of the "dav_access_mode" field in the mutation.
+func (m *AgentSpaceMutation) DavAccessMode() (r string, exists bool) {
+	v := m.dav_access_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavAccessMode returns the old "dav_access_mode" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldDavAccessMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavAccessMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavAccessMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavAccessMode: %w", err)
+	}
+	return oldValue.DavAccessMode, nil
+}
+
+// ResetDavAccessMode resets all changes to the "dav_access_mode" field.
+func (m *AgentSpaceMutation) ResetDavAccessMode() {
+	m.dav_access_mode = nil
+}
+
+// SetDavBindingRevision sets the "dav_binding_revision" field.
+func (m *AgentSpaceMutation) SetDavBindingRevision(i int64) {
+	m.dav_binding_revision = &i
+	m.adddav_binding_revision = nil
+}
+
+// DavBindingRevision returns the value of the "dav_binding_revision" field in the mutation.
+func (m *AgentSpaceMutation) DavBindingRevision() (r int64, exists bool) {
+	v := m.dav_binding_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavBindingRevision returns the old "dav_binding_revision" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldDavBindingRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavBindingRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavBindingRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavBindingRevision: %w", err)
+	}
+	return oldValue.DavBindingRevision, nil
+}
+
+// AddDavBindingRevision adds i to the "dav_binding_revision" field.
+func (m *AgentSpaceMutation) AddDavBindingRevision(i int64) {
+	if m.adddav_binding_revision != nil {
+		*m.adddav_binding_revision += i
+	} else {
+		m.adddav_binding_revision = &i
+	}
+}
+
+// AddedDavBindingRevision returns the value that was added to the "dav_binding_revision" field in this mutation.
+func (m *AgentSpaceMutation) AddedDavBindingRevision() (r int64, exists bool) {
+	v := m.adddav_binding_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDavBindingRevision resets all changes to the "dav_binding_revision" field.
+func (m *AgentSpaceMutation) ResetDavBindingRevision() {
+	m.dav_binding_revision = nil
+	m.adddav_binding_revision = nil
+}
+
+// SetDavAppliedAccessMode sets the "dav_applied_access_mode" field.
+func (m *AgentSpaceMutation) SetDavAppliedAccessMode(s string) {
+	m.dav_applied_access_mode = &s
+}
+
+// DavAppliedAccessMode returns the value of the "dav_applied_access_mode" field in the mutation.
+func (m *AgentSpaceMutation) DavAppliedAccessMode() (r string, exists bool) {
+	v := m.dav_applied_access_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavAppliedAccessMode returns the old "dav_applied_access_mode" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldDavAppliedAccessMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavAppliedAccessMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavAppliedAccessMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavAppliedAccessMode: %w", err)
+	}
+	return oldValue.DavAppliedAccessMode, nil
+}
+
+// ResetDavAppliedAccessMode resets all changes to the "dav_applied_access_mode" field.
+func (m *AgentSpaceMutation) ResetDavAppliedAccessMode() {
+	m.dav_applied_access_mode = nil
+}
+
+// SetDavAppliedRevision sets the "dav_applied_revision" field.
+func (m *AgentSpaceMutation) SetDavAppliedRevision(i int64) {
+	m.dav_applied_revision = &i
+	m.adddav_applied_revision = nil
+}
+
+// DavAppliedRevision returns the value of the "dav_applied_revision" field in the mutation.
+func (m *AgentSpaceMutation) DavAppliedRevision() (r int64, exists bool) {
+	v := m.dav_applied_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavAppliedRevision returns the old "dav_applied_revision" field's value of the AgentSpace entity.
+// If the AgentSpace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AgentSpaceMutation) OldDavAppliedRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavAppliedRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavAppliedRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavAppliedRevision: %w", err)
+	}
+	return oldValue.DavAppliedRevision, nil
+}
+
+// AddDavAppliedRevision adds i to the "dav_applied_revision" field.
+func (m *AgentSpaceMutation) AddDavAppliedRevision(i int64) {
+	if m.adddav_applied_revision != nil {
+		*m.adddav_applied_revision += i
+	} else {
+		m.adddav_applied_revision = &i
+	}
+}
+
+// AddedDavAppliedRevision returns the value that was added to the "dav_applied_revision" field in this mutation.
+func (m *AgentSpaceMutation) AddedDavAppliedRevision() (r int64, exists bool) {
+	v := m.adddav_applied_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDavAppliedRevision resets all changes to the "dav_applied_revision" field.
+func (m *AgentSpaceMutation) ResetDavAppliedRevision() {
+	m.dav_applied_revision = nil
+	m.adddav_applied_revision = nil
+}
+
 // SetDavConfirmed sets the "dav_confirmed" field.
 func (m *AgentSpaceMutation) SetDavConfirmed(b bool) {
 	m.dav_confirmed = &b
@@ -2314,7 +2541,7 @@ func (m *AgentSpaceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AgentSpaceMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 23)
 	if m.workspace_service_id != nil {
 		fields = append(fields, agentspace.FieldWorkspaceServiceID)
 	}
@@ -2344,6 +2571,21 @@ func (m *AgentSpaceMutation) Fields() []string {
 	}
 	if m.dav_secret_version != nil {
 		fields = append(fields, agentspace.FieldDavSecretVersion)
+	}
+	if m.file_access_intent != nil {
+		fields = append(fields, agentspace.FieldFileAccessIntent)
+	}
+	if m.dav_access_mode != nil {
+		fields = append(fields, agentspace.FieldDavAccessMode)
+	}
+	if m.dav_binding_revision != nil {
+		fields = append(fields, agentspace.FieldDavBindingRevision)
+	}
+	if m.dav_applied_access_mode != nil {
+		fields = append(fields, agentspace.FieldDavAppliedAccessMode)
+	}
+	if m.dav_applied_revision != nil {
+		fields = append(fields, agentspace.FieldDavAppliedRevision)
 	}
 	if m.dav_confirmed != nil {
 		fields = append(fields, agentspace.FieldDavConfirmed)
@@ -2397,6 +2639,16 @@ func (m *AgentSpaceMutation) Field(name string) (ent.Value, bool) {
 		return m.DavSecretID()
 	case agentspace.FieldDavSecretVersion:
 		return m.DavSecretVersion()
+	case agentspace.FieldFileAccessIntent:
+		return m.FileAccessIntent()
+	case agentspace.FieldDavAccessMode:
+		return m.DavAccessMode()
+	case agentspace.FieldDavBindingRevision:
+		return m.DavBindingRevision()
+	case agentspace.FieldDavAppliedAccessMode:
+		return m.DavAppliedAccessMode()
+	case agentspace.FieldDavAppliedRevision:
+		return m.DavAppliedRevision()
 	case agentspace.FieldDavConfirmed:
 		return m.DavConfirmed()
 	case agentspace.FieldRemoteActive:
@@ -2442,6 +2694,16 @@ func (m *AgentSpaceMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldDavSecretID(ctx)
 	case agentspace.FieldDavSecretVersion:
 		return m.OldDavSecretVersion(ctx)
+	case agentspace.FieldFileAccessIntent:
+		return m.OldFileAccessIntent(ctx)
+	case agentspace.FieldDavAccessMode:
+		return m.OldDavAccessMode(ctx)
+	case agentspace.FieldDavBindingRevision:
+		return m.OldDavBindingRevision(ctx)
+	case agentspace.FieldDavAppliedAccessMode:
+		return m.OldDavAppliedAccessMode(ctx)
+	case agentspace.FieldDavAppliedRevision:
+		return m.OldDavAppliedRevision(ctx)
 	case agentspace.FieldDavConfirmed:
 		return m.OldDavConfirmed(ctx)
 	case agentspace.FieldRemoteActive:
@@ -2537,6 +2799,41 @@ func (m *AgentSpaceMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetDavSecretVersion(v)
 		return nil
+	case agentspace.FieldFileAccessIntent:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFileAccessIntent(v)
+		return nil
+	case agentspace.FieldDavAccessMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavAccessMode(v)
+		return nil
+	case agentspace.FieldDavBindingRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavBindingRevision(v)
+		return nil
+	case agentspace.FieldDavAppliedAccessMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavAppliedAccessMode(v)
+		return nil
+	case agentspace.FieldDavAppliedRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavAppliedRevision(v)
+		return nil
 	case agentspace.FieldDavConfirmed:
 		v, ok := value.(bool)
 		if !ok {
@@ -2610,6 +2907,12 @@ func (m *AgentSpaceMutation) AddedFields() []string {
 	if m.adddav_secret_version != nil {
 		fields = append(fields, agentspace.FieldDavSecretVersion)
 	}
+	if m.adddav_binding_revision != nil {
+		fields = append(fields, agentspace.FieldDavBindingRevision)
+	}
+	if m.adddav_applied_revision != nil {
+		fields = append(fields, agentspace.FieldDavAppliedRevision)
+	}
 	if m.addapplied_control_revision != nil {
 		fields = append(fields, agentspace.FieldAppliedControlRevision)
 	}
@@ -2627,6 +2930,10 @@ func (m *AgentSpaceMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedMcpSecretVersion()
 	case agentspace.FieldDavSecretVersion:
 		return m.AddedDavSecretVersion()
+	case agentspace.FieldDavBindingRevision:
+		return m.AddedDavBindingRevision()
+	case agentspace.FieldDavAppliedRevision:
+		return m.AddedDavAppliedRevision()
 	case agentspace.FieldAppliedControlRevision:
 		return m.AddedAppliedControlRevision()
 	}
@@ -2658,6 +2965,20 @@ func (m *AgentSpaceMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddDavSecretVersion(v)
+		return nil
+	case agentspace.FieldDavBindingRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDavBindingRevision(v)
+		return nil
+	case agentspace.FieldDavAppliedRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDavAppliedRevision(v)
 		return nil
 	case agentspace.FieldAppliedControlRevision:
 		v, ok := value.(int64)
@@ -2773,6 +3094,21 @@ func (m *AgentSpaceMutation) ResetField(name string) error {
 		return nil
 	case agentspace.FieldDavSecretVersion:
 		m.ResetDavSecretVersion()
+		return nil
+	case agentspace.FieldFileAccessIntent:
+		m.ResetFileAccessIntent()
+		return nil
+	case agentspace.FieldDavAccessMode:
+		m.ResetDavAccessMode()
+		return nil
+	case agentspace.FieldDavBindingRevision:
+		m.ResetDavBindingRevision()
+		return nil
+	case agentspace.FieldDavAppliedAccessMode:
+		m.ResetDavAppliedAccessMode()
+		return nil
+	case agentspace.FieldDavAppliedRevision:
+		m.ResetDavAppliedRevision()
 		return nil
 	case agentspace.FieldDavConfirmed:
 		m.ResetDavConfirmed()
@@ -21629,6 +21965,8 @@ type RequestUsageMutation struct {
 	resource_id             *string
 	resource_kind           *string
 	client_protocol         *string
+	http_method             *string
+	statistics_only         *bool
 	runtime_route_id        *string
 	upstream_id             *string
 	workspace_target_json   *[]byte
@@ -22079,6 +22417,78 @@ func (m *RequestUsageMutation) OldClientProtocol(ctx context.Context) (v string,
 // ResetClientProtocol resets all changes to the "client_protocol" field.
 func (m *RequestUsageMutation) ResetClientProtocol() {
 	m.client_protocol = nil
+}
+
+// SetHTTPMethod sets the "http_method" field.
+func (m *RequestUsageMutation) SetHTTPMethod(s string) {
+	m.http_method = &s
+}
+
+// HTTPMethod returns the value of the "http_method" field in the mutation.
+func (m *RequestUsageMutation) HTTPMethod() (r string, exists bool) {
+	v := m.http_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHTTPMethod returns the old "http_method" field's value of the RequestUsage entity.
+// If the RequestUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestUsageMutation) OldHTTPMethod(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHTTPMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHTTPMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHTTPMethod: %w", err)
+	}
+	return oldValue.HTTPMethod, nil
+}
+
+// ResetHTTPMethod resets all changes to the "http_method" field.
+func (m *RequestUsageMutation) ResetHTTPMethod() {
+	m.http_method = nil
+}
+
+// SetStatisticsOnly sets the "statistics_only" field.
+func (m *RequestUsageMutation) SetStatisticsOnly(b bool) {
+	m.statistics_only = &b
+}
+
+// StatisticsOnly returns the value of the "statistics_only" field in the mutation.
+func (m *RequestUsageMutation) StatisticsOnly() (r bool, exists bool) {
+	v := m.statistics_only
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatisticsOnly returns the old "statistics_only" field's value of the RequestUsage entity.
+// If the RequestUsage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestUsageMutation) OldStatisticsOnly(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatisticsOnly is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatisticsOnly requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatisticsOnly: %w", err)
+	}
+	return oldValue.StatisticsOnly, nil
+}
+
+// ResetStatisticsOnly resets all changes to the "statistics_only" field.
+func (m *RequestUsageMutation) ResetStatisticsOnly() {
+	m.statistics_only = nil
 }
 
 // SetRuntimeRouteID sets the "runtime_route_id" field.
@@ -23032,7 +23442,7 @@ func (m *RequestUsageMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RequestUsageMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 29)
 	if m.request_id != nil {
 		fields = append(fields, requestusage.FieldRequestID)
 	}
@@ -23056,6 +23466,12 @@ func (m *RequestUsageMutation) Fields() []string {
 	}
 	if m.client_protocol != nil {
 		fields = append(fields, requestusage.FieldClientProtocol)
+	}
+	if m.http_method != nil {
+		fields = append(fields, requestusage.FieldHTTPMethod)
+	}
+	if m.statistics_only != nil {
+		fields = append(fields, requestusage.FieldStatisticsOnly)
 	}
 	if m.runtime_route_id != nil {
 		fields = append(fields, requestusage.FieldRuntimeRouteID)
@@ -23138,6 +23554,10 @@ func (m *RequestUsageMutation) Field(name string) (ent.Value, bool) {
 		return m.ResourceKind()
 	case requestusage.FieldClientProtocol:
 		return m.ClientProtocol()
+	case requestusage.FieldHTTPMethod:
+		return m.HTTPMethod()
+	case requestusage.FieldStatisticsOnly:
+		return m.StatisticsOnly()
 	case requestusage.FieldRuntimeRouteID:
 		return m.RuntimeRouteID()
 	case requestusage.FieldUpstreamID:
@@ -23201,6 +23621,10 @@ func (m *RequestUsageMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldResourceKind(ctx)
 	case requestusage.FieldClientProtocol:
 		return m.OldClientProtocol(ctx)
+	case requestusage.FieldHTTPMethod:
+		return m.OldHTTPMethod(ctx)
+	case requestusage.FieldStatisticsOnly:
+		return m.OldStatisticsOnly(ctx)
 	case requestusage.FieldRuntimeRouteID:
 		return m.OldRuntimeRouteID(ctx)
 	case requestusage.FieldUpstreamID:
@@ -23303,6 +23727,20 @@ func (m *RequestUsageMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetClientProtocol(v)
+		return nil
+	case requestusage.FieldHTTPMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHTTPMethod(v)
+		return nil
+	case requestusage.FieldStatisticsOnly:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatisticsOnly(v)
 		return nil
 	case requestusage.FieldRuntimeRouteID:
 		v, ok := value.(string)
@@ -23659,6 +24097,12 @@ func (m *RequestUsageMutation) ResetField(name string) error {
 		return nil
 	case requestusage.FieldClientProtocol:
 		m.ResetClientProtocol()
+		return nil
+	case requestusage.FieldHTTPMethod:
+		m.ResetHTTPMethod()
+		return nil
+	case requestusage.FieldStatisticsOnly:
+		m.ResetStatisticsOnly()
 		return nil
 	case requestusage.FieldRuntimeRouteID:
 		m.ResetRuntimeRouteID()
@@ -32299,6 +32743,8 @@ type WorkspaceOperationMutation struct {
 	addconfig_revision          *int64
 	binding_revision            *int64
 	addbinding_revision         *int64
+	dav_binding_revision        *int64
+	adddav_binding_revision     *int64
 	target_json                 *[]byte
 	state                       *string
 	step                        *string
@@ -32725,6 +33171,62 @@ func (m *WorkspaceOperationMutation) AddedBindingRevision() (r int64, exists boo
 func (m *WorkspaceOperationMutation) ResetBindingRevision() {
 	m.binding_revision = nil
 	m.addbinding_revision = nil
+}
+
+// SetDavBindingRevision sets the "dav_binding_revision" field.
+func (m *WorkspaceOperationMutation) SetDavBindingRevision(i int64) {
+	m.dav_binding_revision = &i
+	m.adddav_binding_revision = nil
+}
+
+// DavBindingRevision returns the value of the "dav_binding_revision" field in the mutation.
+func (m *WorkspaceOperationMutation) DavBindingRevision() (r int64, exists bool) {
+	v := m.dav_binding_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavBindingRevision returns the old "dav_binding_revision" field's value of the WorkspaceOperation entity.
+// If the WorkspaceOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceOperationMutation) OldDavBindingRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavBindingRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavBindingRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavBindingRevision: %w", err)
+	}
+	return oldValue.DavBindingRevision, nil
+}
+
+// AddDavBindingRevision adds i to the "dav_binding_revision" field.
+func (m *WorkspaceOperationMutation) AddDavBindingRevision(i int64) {
+	if m.adddav_binding_revision != nil {
+		*m.adddav_binding_revision += i
+	} else {
+		m.adddav_binding_revision = &i
+	}
+}
+
+// AddedDavBindingRevision returns the value that was added to the "dav_binding_revision" field in this mutation.
+func (m *WorkspaceOperationMutation) AddedDavBindingRevision() (r int64, exists bool) {
+	v := m.adddav_binding_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDavBindingRevision resets all changes to the "dav_binding_revision" field.
+func (m *WorkspaceOperationMutation) ResetDavBindingRevision() {
+	m.dav_binding_revision = nil
+	m.adddav_binding_revision = nil
 }
 
 // SetTargetJSON sets the "target_json" field.
@@ -33292,7 +33794,7 @@ func (m *WorkspaceOperationMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *WorkspaceOperationMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 20)
 	if m.workspace_service_id != nil {
 		fields = append(fields, workspaceoperation.FieldWorkspaceServiceID)
 	}
@@ -33313,6 +33815,9 @@ func (m *WorkspaceOperationMutation) Fields() []string {
 	}
 	if m.binding_revision != nil {
 		fields = append(fields, workspaceoperation.FieldBindingRevision)
+	}
+	if m.dav_binding_revision != nil {
+		fields = append(fields, workspaceoperation.FieldDavBindingRevision)
 	}
 	if m.target_json != nil {
 		fields = append(fields, workspaceoperation.FieldTargetJSON)
@@ -33372,6 +33877,8 @@ func (m *WorkspaceOperationMutation) Field(name string) (ent.Value, bool) {
 		return m.ConfigRevision()
 	case workspaceoperation.FieldBindingRevision:
 		return m.BindingRevision()
+	case workspaceoperation.FieldDavBindingRevision:
+		return m.DavBindingRevision()
 	case workspaceoperation.FieldTargetJSON:
 		return m.TargetJSON()
 	case workspaceoperation.FieldState:
@@ -33419,6 +33926,8 @@ func (m *WorkspaceOperationMutation) OldField(ctx context.Context, name string) 
 		return m.OldConfigRevision(ctx)
 	case workspaceoperation.FieldBindingRevision:
 		return m.OldBindingRevision(ctx)
+	case workspaceoperation.FieldDavBindingRevision:
+		return m.OldDavBindingRevision(ctx)
 	case workspaceoperation.FieldTargetJSON:
 		return m.OldTargetJSON(ctx)
 	case workspaceoperation.FieldState:
@@ -33500,6 +34009,13 @@ func (m *WorkspaceOperationMutation) SetField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetBindingRevision(v)
+		return nil
+	case workspaceoperation.FieldDavBindingRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavBindingRevision(v)
 		return nil
 	case workspaceoperation.FieldTargetJSON:
 		v, ok := value.([]byte)
@@ -33599,6 +34115,9 @@ func (m *WorkspaceOperationMutation) AddedFields() []string {
 	if m.addbinding_revision != nil {
 		fields = append(fields, workspaceoperation.FieldBindingRevision)
 	}
+	if m.adddav_binding_revision != nil {
+		fields = append(fields, workspaceoperation.FieldDavBindingRevision)
+	}
 	if m.addcandidate_secret_version != nil {
 		fields = append(fields, workspaceoperation.FieldCandidateSecretVersion)
 	}
@@ -33614,6 +34133,8 @@ func (m *WorkspaceOperationMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedConfigRevision()
 	case workspaceoperation.FieldBindingRevision:
 		return m.AddedBindingRevision()
+	case workspaceoperation.FieldDavBindingRevision:
+		return m.AddedDavBindingRevision()
 	case workspaceoperation.FieldCandidateSecretVersion:
 		return m.AddedCandidateSecretVersion()
 	}
@@ -33638,6 +34159,13 @@ func (m *WorkspaceOperationMutation) AddField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddBindingRevision(v)
+		return nil
+	case workspaceoperation.FieldDavBindingRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDavBindingRevision(v)
 		return nil
 	case workspaceoperation.FieldCandidateSecretVersion:
 		v, ok := value.(int64)
@@ -33738,6 +34266,9 @@ func (m *WorkspaceOperationMutation) ResetField(name string) error {
 		return nil
 	case workspaceoperation.FieldBindingRevision:
 		m.ResetBindingRevision()
+		return nil
+	case workspaceoperation.FieldDavBindingRevision:
+		m.ResetDavBindingRevision()
 		return nil
 	case workspaceoperation.FieldTargetJSON:
 		m.ResetTargetJSON()
@@ -33842,6 +34373,9 @@ type WorkspaceServiceMutation struct {
 	state                     *string
 	mcp_server_id             *string
 	runtime_route_id          *string
+	dav_resource_id           *string
+	dav_runtime_route_id      *string
+	dav_staged                *bool
 	diagnostic_code           *string
 	created_at                *time.Time
 	updated_at                *time.Time
@@ -34261,6 +34795,114 @@ func (m *WorkspaceServiceMutation) ResetRuntimeRouteID() {
 	m.runtime_route_id = nil
 }
 
+// SetDavResourceID sets the "dav_resource_id" field.
+func (m *WorkspaceServiceMutation) SetDavResourceID(s string) {
+	m.dav_resource_id = &s
+}
+
+// DavResourceID returns the value of the "dav_resource_id" field in the mutation.
+func (m *WorkspaceServiceMutation) DavResourceID() (r string, exists bool) {
+	v := m.dav_resource_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavResourceID returns the old "dav_resource_id" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldDavResourceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavResourceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavResourceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavResourceID: %w", err)
+	}
+	return oldValue.DavResourceID, nil
+}
+
+// ResetDavResourceID resets all changes to the "dav_resource_id" field.
+func (m *WorkspaceServiceMutation) ResetDavResourceID() {
+	m.dav_resource_id = nil
+}
+
+// SetDavRuntimeRouteID sets the "dav_runtime_route_id" field.
+func (m *WorkspaceServiceMutation) SetDavRuntimeRouteID(s string) {
+	m.dav_runtime_route_id = &s
+}
+
+// DavRuntimeRouteID returns the value of the "dav_runtime_route_id" field in the mutation.
+func (m *WorkspaceServiceMutation) DavRuntimeRouteID() (r string, exists bool) {
+	v := m.dav_runtime_route_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavRuntimeRouteID returns the old "dav_runtime_route_id" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldDavRuntimeRouteID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavRuntimeRouteID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavRuntimeRouteID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavRuntimeRouteID: %w", err)
+	}
+	return oldValue.DavRuntimeRouteID, nil
+}
+
+// ResetDavRuntimeRouteID resets all changes to the "dav_runtime_route_id" field.
+func (m *WorkspaceServiceMutation) ResetDavRuntimeRouteID() {
+	m.dav_runtime_route_id = nil
+}
+
+// SetDavStaged sets the "dav_staged" field.
+func (m *WorkspaceServiceMutation) SetDavStaged(b bool) {
+	m.dav_staged = &b
+}
+
+// DavStaged returns the value of the "dav_staged" field in the mutation.
+func (m *WorkspaceServiceMutation) DavStaged() (r bool, exists bool) {
+	v := m.dav_staged
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDavStaged returns the old "dav_staged" field's value of the WorkspaceService entity.
+// If the WorkspaceService object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceServiceMutation) OldDavStaged(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDavStaged is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDavStaged requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDavStaged: %w", err)
+	}
+	return oldValue.DavStaged, nil
+}
+
+// ResetDavStaged resets all changes to the "dav_staged" field.
+func (m *WorkspaceServiceMutation) ResetDavStaged() {
+	m.dav_staged = nil
+}
+
 // SetDiagnosticCode sets the "diagnostic_code" field.
 func (m *WorkspaceServiceMutation) SetDiagnosticCode(s string) {
 	m.diagnostic_code = &s
@@ -34416,7 +35058,7 @@ func (m *WorkspaceServiceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *WorkspaceServiceMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 13)
 	if m.name != nil {
 		fields = append(fields, workspaceservice.FieldName)
 	}
@@ -34437,6 +35079,15 @@ func (m *WorkspaceServiceMutation) Fields() []string {
 	}
 	if m.runtime_route_id != nil {
 		fields = append(fields, workspaceservice.FieldRuntimeRouteID)
+	}
+	if m.dav_resource_id != nil {
+		fields = append(fields, workspaceservice.FieldDavResourceID)
+	}
+	if m.dav_runtime_route_id != nil {
+		fields = append(fields, workspaceservice.FieldDavRuntimeRouteID)
+	}
+	if m.dav_staged != nil {
+		fields = append(fields, workspaceservice.FieldDavStaged)
 	}
 	if m.diagnostic_code != nil {
 		fields = append(fields, workspaceservice.FieldDiagnosticCode)
@@ -34469,6 +35120,12 @@ func (m *WorkspaceServiceMutation) Field(name string) (ent.Value, bool) {
 		return m.McpServerID()
 	case workspaceservice.FieldRuntimeRouteID:
 		return m.RuntimeRouteID()
+	case workspaceservice.FieldDavResourceID:
+		return m.DavResourceID()
+	case workspaceservice.FieldDavRuntimeRouteID:
+		return m.DavRuntimeRouteID()
+	case workspaceservice.FieldDavStaged:
+		return m.DavStaged()
 	case workspaceservice.FieldDiagnosticCode:
 		return m.DiagnosticCode()
 	case workspaceservice.FieldCreatedAt:
@@ -34498,6 +35155,12 @@ func (m *WorkspaceServiceMutation) OldField(ctx context.Context, name string) (e
 		return m.OldMcpServerID(ctx)
 	case workspaceservice.FieldRuntimeRouteID:
 		return m.OldRuntimeRouteID(ctx)
+	case workspaceservice.FieldDavResourceID:
+		return m.OldDavResourceID(ctx)
+	case workspaceservice.FieldDavRuntimeRouteID:
+		return m.OldDavRuntimeRouteID(ctx)
+	case workspaceservice.FieldDavStaged:
+		return m.OldDavStaged(ctx)
 	case workspaceservice.FieldDiagnosticCode:
 		return m.OldDiagnosticCode(ctx)
 	case workspaceservice.FieldCreatedAt:
@@ -34561,6 +35224,27 @@ func (m *WorkspaceServiceMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRuntimeRouteID(v)
+		return nil
+	case workspaceservice.FieldDavResourceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavResourceID(v)
+		return nil
+	case workspaceservice.FieldDavRuntimeRouteID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavRuntimeRouteID(v)
+		return nil
+	case workspaceservice.FieldDavStaged:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDavStaged(v)
 		return nil
 	case workspaceservice.FieldDiagnosticCode:
 		v, ok := value.(string)
@@ -34694,6 +35378,15 @@ func (m *WorkspaceServiceMutation) ResetField(name string) error {
 		return nil
 	case workspaceservice.FieldRuntimeRouteID:
 		m.ResetRuntimeRouteID()
+		return nil
+	case workspaceservice.FieldDavResourceID:
+		m.ResetDavResourceID()
+		return nil
+	case workspaceservice.FieldDavRuntimeRouteID:
+		m.ResetDavRuntimeRouteID()
+		return nil
+	case workspaceservice.FieldDavStaged:
+		m.ResetDavStaged()
 		return nil
 	case workspaceservice.FieldDiagnosticCode:
 		m.ResetDiagnosticCode()

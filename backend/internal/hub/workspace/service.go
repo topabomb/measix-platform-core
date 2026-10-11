@@ -113,6 +113,13 @@ func (s *Service) published(ctx context.Context, workspaceService, mcp string) b
 			enabled = true
 		}
 	}
+	if content.Webdav != nil {
+		for _, d := range *content.Webdav {
+			if d.ResourceId == mcp && d.Enabled {
+				enabled = true
+			}
+		}
+	}
 	for _, b := range content.Bindings {
 		if enabled && b.ResourceId == mcp && b.TargetKind != nil && *b.TargetKind == "REMOTE_WORKSPACE" && str(b.WorkspaceServiceId) == workspaceService {
 			return true
@@ -126,6 +133,18 @@ func (s *Service) view(ctx context.Context, row *ent.WorkspaceService) (adminapi
 		return adminapi.WorkspaceService{}, err
 	}
 	out := adminapi.WorkspaceService{WorkspaceServiceId: row.ID, Type: "AGENT_SPACE", Name: row.Name, ConfigRevision: int(row.ConfigRevision), Enabled: row.Enabled, State: adminapi.WorkspaceServiceState(row.State), Config: cfg, McpServerId: row.McpServerID, McpPublished: s.published(ctx, row.ID, row.McpServerID)}
+	out.DavResourceId = ptr(row.DavResourceID)
+	out.DavPublishedEnabled = ptr(s.published(ctx, row.ID, row.DavResourceID))
+	if draft, e := s.Client.ManagedDraft.Query().Only(ctx); e == nil {
+		var content adminapi.ManagedDraftContent
+		if json.Unmarshal(draft.ContentJSON, &content) == nil && content.Webdav != nil {
+			for _, d := range *content.Webdav {
+				if d.ResourceId == row.DavResourceID {
+					out.DavDraftEnabled = ptr(d.Enabled)
+				}
+			}
+		}
+	}
 	if row.ActiveConfigRevision != nil {
 		out.ActiveConfigRevision = ptr(int(*row.ActiveConfigRevision))
 	}
@@ -198,7 +217,7 @@ func (s *Service) Save(ctx context.Context, actor, key, id string, input adminap
 			return adminapi.WorkspaceService{}, ErrConflict
 		}
 		id = platformid.New(platformid.WorkspaceService)
-		row, err = tx.WorkspaceService.Create().SetID(id).SetName(strings.TrimSpace(input.Name)).SetConfigRevision(1).SetEnabled(false).SetState("SAVED").SetMcpServerID(platformid.New(platformid.MCP)).SetRuntimeRouteID(platformid.New(platformid.Route)).SetCreatedAt(now).SetUpdatedAt(now).Save(ctx)
+		row, err = tx.WorkspaceService.Create().SetID(id).SetName(strings.TrimSpace(input.Name)).SetConfigRevision(1).SetEnabled(false).SetState("SAVED").SetMcpServerID(platformid.New(platformid.MCP)).SetRuntimeRouteID(platformid.New(platformid.Route)).SetDavResourceID(platformid.New(platformid.WebDAV)).SetDavRuntimeRouteID(platformid.New(platformid.Route)).SetCreatedAt(now).SetUpdatedAt(now).Save(ctx)
 	} else {
 		row, err = tx.WorkspaceService.Get(ctx, id)
 		if err != nil {
@@ -316,6 +335,7 @@ func (s *Service) Projection(ctx context.Context, userID string) (adminapi.Works
 			out.ServiceState = "DISABLED"
 		}
 		for _, service := range services {
+			s.projectDAV(ctx, &out, service, nil)
 			if service.Enabled {
 				out.ServiceState = "ENABLED"
 				break
@@ -381,6 +401,7 @@ func (s *Service) Projection(ctx context.Context, userID string) (adminapi.Works
 	} else if !ent.IsNotFound(e) {
 		return out, e
 	}
+	s.projectDAV(ctx, &out, workspaceService, row)
 	return out, nil
 }
 func operationView(row *ent.WorkspaceOperation) adminapi.WorkspaceOperation {

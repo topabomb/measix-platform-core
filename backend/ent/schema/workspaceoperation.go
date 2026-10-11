@@ -13,6 +13,7 @@ func (WorkspaceOperation) Fields() []ent.Field {
 		field.String("id").Immutable(), field.String("workspace_service_id").Immutable(), field.String("user_id").Optional(),
 		field.String("action").Immutable(), field.String("idempotency_key").Immutable(), field.String("request_hash").Immutable(),
 		field.Int64("config_revision").Immutable(), field.Int64("binding_revision").Immutable(),
+		field.Int64("dav_binding_revision").Default(0).Immutable(),
 		// Only verified recovery may fill an unknown space ID or replace the
 		// management secret reference. Service, address and account stay fixed.
 		field.Bytes("target_json"),

@@ -62,6 +62,7 @@ type State struct {
 	Routes                  map[string]Route
 	Upstreams               map[string]Upstream
 	UserBindings            map[string]relaycontrolapi.UserRuntimeBinding
+	DAVBindings             map[string]relaycontrolapi.UserDAVBinding
 	OperationalLimits       relaycontrolapi.OperationalLimits
 	AppliedAt               time.Time
 }

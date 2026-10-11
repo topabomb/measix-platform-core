@@ -24,6 +24,14 @@ type App struct {
 	Telemetry        *observability.Recorder
 }
 
+// chi's wildcard handles only registered methods. Register the RFC 4918
+// methods once, before any router is constructed (including parallel tests).
+func init() {
+	for _, method := range []string{"PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK"} {
+		chi.RegisterMethod(method)
+	}
+}
+
 func New(serviceToken, buildVersion string, spool *metering.Spool, recorder *metering.Recorder, budgetClient budget.Client) *App {
 	h := &health.State{}
 	store := control.NewStore(nil)

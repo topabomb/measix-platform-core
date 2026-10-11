@@ -100,6 +100,21 @@ async function switchTab(wrapper: ReturnType<typeof mount>, name: string) {
 }
 
 describe('ResourcesPage', () => {
+  it('edits the derived DAV switch in the shared draft without exposing add or delete', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    const draft = useDraftStore(pinia)
+    draft.localContent!.webdav = [{ resourceId: 'dav_test', displayName: 'Workspace files', enabled: true, clientProtocol: 'WEBDAV', authOwnership: 'ENTERPRISE_MANAGED', purpose: 'WORKSPACE_FILE_EXCHANGE', rootPathTemplate: '/runtime/v1/resources/dav_test/spaces/{agentSpaceId}/dav/' }]
+    await switchTab(wrapper, 'webdav')
+    expect(wrapper.text()).toContain('默认文件交换空间')
+    const panel = wrapper.get('[data-cy="webdav-editor"]')
+    expect(panel.findAllComponents(QBtn).some((button: { props(name: string): string }) => ['add', 'delete'].includes(button.props('icon')))).toBe(false)
+    await panel.findComponent(QToggle).setValue(false)
+    expect(draft.localContent!.webdav![0]!.enabled).toBe(false)
+    expect(draft.dirty).toBe(true)
+    wrapper.unmount()
+  })
   it('does not ask administrators to maintain a Starter description', async () => {
     const { wrapper, pinia } = mountResourcesPage()
     setupSession(pinia)

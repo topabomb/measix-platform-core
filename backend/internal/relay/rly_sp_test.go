@@ -277,7 +277,7 @@ func usageEventLocal(now time.Time) usageingestapi.UsageSettlement {
 		Request: usageingestapi.RequestUsageFact{
 			DeploymentId: platformid.New(platformid.Deployment), UserId: platformid.New(platformid.User),
 			ResourceId: platformid.New(platformid.Model), ResourceKind: usageingestapi.ResourceKindMODEL,
-			ClientProtocol: usageingestapi.OPENAIRESPONSES, RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: platformid.New(platformid.Upstream),
+			ClientProtocol: usageingestapi.ClientProtocolOPENAIRESPONSES, RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: platformid.New(platformid.Upstream),
 			ManagedGeneration: 1, ControlRevision: 1, StartedAt: now, CompletedAt: now,
 			Forwarded: true, HttpStatus: 200, RequestBytes: 1, ResponseBytes: 1,
 		},

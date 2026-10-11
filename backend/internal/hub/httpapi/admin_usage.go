@@ -425,6 +425,7 @@ func requestUsageWire(row usage.RequestView) adminapi.RequestUsageView {
 		semantic = append(semantic, adminapi.MeterQuantity{Meter: adminapi.PricingMeter(meter.Meter), Quantity: meter.Quantity, Confidence: adminMeterConfidence(meter.Confidence)})
 	}
 	result := adminapi.RequestUsageView{
+		HttpMethod: &row.HTTPMethod, StatisticsOnly: &row.StatisticsOnly,
 		RequestId: row.RequestID, InteractionId: row.InteractionID, DeploymentId: row.DeploymentID,
 		UserId: row.UserID, DeviceId: row.DeviceID, ResourceId: row.ResourceID, RuntimeRouteId: row.RuntimeRouteID,
 		ResourceKind: adminapi.ResourceKind(row.ResourceKind), ClientProtocol: adminapi.UsageClientProtocol(row.ClientProtocol),
@@ -441,12 +442,17 @@ func requestUsageWire(row usage.RequestView) adminapi.RequestUsageView {
 		var target adminapi.WorkspaceTarget
 		if json.Unmarshal(row.WorkspaceTargetJSON, &target) == nil {
 			version := adminapi.RequestUsageViewTargetVersion(2)
+			if row.StatisticsOnly {
+				version = 3
+			}
 			result.TargetVersion = &version
 			result.WorkspaceTarget = &target
 		}
 	}
 	cost := adminCostWire(row.Cost)
-	result.Cost = &cost
+	if !row.StatisticsOnly {
+		result.Cost = &cost
+	}
 	if row.Budget != nil {
 		result.Budget = adminBudgetContext(*row.Budget)
 	}

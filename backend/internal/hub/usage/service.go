@@ -44,10 +44,13 @@ func NewService(client *ent.Client, budgets ...*budget.Service) *Service {
 }
 
 func (s *Service) IngestSettlements(ctx context.Context, batch usageingestapi.UsageSettlementBatch) (usageingestapi.UsageBatchAck, error) {
-	if s == nil || s.Client == nil || s.Budget == nil || len(batch.Events) < 1 || len(batch.Events) > 200 {
+	if s == nil || s.Client == nil || len(batch.Events) < 1 || len(batch.Events) > 200 {
 		return usageingestapi.UsageBatchAck{}, ErrInvalidBatch
 	}
 	for i := range batch.Events {
+		if !statisticsOnly(batch.Events[i]) && s.Budget == nil {
+			return usageingestapi.UsageBatchAck{}, ErrInvalidBatch
+		}
 		if err := validateSettlement(batch.Events[i]); err != nil {
 			return usageingestapi.UsageBatchAck{}, fmt.Errorf("%w: event[%d]: %v", ErrInvalidBatch, i, err)
 		}
@@ -90,6 +93,19 @@ func (s *Service) IngestSettlements(ctx context.Context, batch usageingestapi.Us
 			return usageingestapi.UsageBatchAck{}, err
 		}
 
+		if statisticsOnly(event) {
+			if _, err = tx.UsageEvent.Create().SetRequestID(event.RequestId).SetRevision(int64(event.Revision)).SetEventHash(event.EventHash).SetSourceEventID(event.SourceEventId).SetPayloadJSON(payload).SetCreatedAt(now).Save(ctx); err != nil {
+				return usageingestapi.UsageBatchAck{}, err
+			}
+			if err = upsertRequestFact(ctx, tx, event, 0, now); err != nil {
+				return usageingestapi.UsageBatchAck{}, err
+			}
+			if err = observeDAVCredential(ctx, tx, event); err != nil {
+				return usageingestapi.UsageBatchAck{}, err
+			}
+			ack.AcceptedCount++
+			continue
+		}
 		admission, err := tx.BudgetRequest.Get(ctx, event.RequestId)
 		if ent.IsNotFound(err) {
 			return usageingestapi.UsageBatchAck{}, budget.ErrRequestNotFound
@@ -139,7 +155,7 @@ func (s *Service) IngestSettlements(ctx context.Context, batch usageingestapi.Us
 func validateSettlement(event usageingestapi.UsageSettlement) error {
 	if platformid.Validate(platformid.Request, event.RequestId) != nil || event.Revision < 1 ||
 		!validHash(event.EventHash) || strings.TrimSpace(event.SourceEventId) == "" || event.OccurredAt.IsZero() ||
-		!event.Completeness.Valid() || !event.State.Valid() || (event.Request.Forwarded && len(event.Meters) == 0) {
+		!event.Completeness.Valid() || !event.State.Valid() || (event.Request.Forwarded && len(event.Meters) == 0 && !statisticsOnly(event)) {
 		return ErrInvalidBatch
 	}
 	fact := event.Request
@@ -173,6 +189,18 @@ func validateSettlement(event usageingestapi.UsageSettlement) error {
 		return ErrInvalidBatch
 	}
 	if fact.UpstreamHttpStatus != nil && (*fact.UpstreamHttpStatus < 100 || *fact.UpstreamHttpStatus > 599) {
+		return ErrInvalidBatch
+	}
+	if statisticsOnly(event) {
+		if fact.ResourceKind != "WEBDAV" || fact.ClientProtocol != "WEBDAV" || event.Revision != 1 || event.Completeness != "EXACT" || event.State != "SETTLED" || len(event.Meters) != 0 || event.Details != nil || fact.HttpMethod == nil || len(*fact.HttpMethod) == 0 || len(*fact.HttpMethod) > 32 || fact.WorkspaceTarget == nil || fact.TargetVersion == nil || *fact.TargetVersion != 3 {
+			return ErrInvalidBatch
+		}
+		if ref := fact.DavSecretRef; ref != nil && (platformid.Validate(platformid.Secret, ref.SecretId) != nil || ref.SecretVersion < 1) {
+			return ErrInvalidBatch
+		}
+		return nil
+	}
+	if fact.ResourceKind == "WEBDAV" || fact.ClientProtocol == "WEBDAV" || fact.DavSecretRef != nil {
 		return ErrInvalidBatch
 	}
 	seen := map[usageingestapi.UsageMeter]bool{}
@@ -229,7 +257,7 @@ func upsertRequestFact(ctx context.Context, tx *ent.Tx, event usageingestapi.Usa
 		return ErrAttributionMismatch
 	}
 	applyCreate := func(create *ent.RequestUsageCreate) *ent.RequestUsageCreate {
-		return create.SetRequestID(event.RequestId).SetNillableInteractionID(fact.InteractionId).SetDeploymentID(fact.DeploymentId).
+		return create.SetHTTPMethod(valueOrEmpty(fact.HttpMethod)).SetStatisticsOnly(statisticsOnly(event)).SetRequestID(event.RequestId).SetNillableInteractionID(fact.InteractionId).SetDeploymentID(fact.DeploymentId).
 			SetUserID(fact.UserId).SetNillableDeviceID(fact.DeviceId).SetResourceID(fact.ResourceId).SetResourceKind(string(fact.ResourceKind)).
 			SetClientProtocol(string(fact.ClientProtocol)).SetRuntimeRouteID(fact.RuntimeRouteId).SetNillableUpstreamID(usagetarget.Upstream(fact.UpstreamId)).SetWorkspaceTargetJSON(usagetarget.JSON(fact.WorkspaceTarget)).
 			SetManagedGeneration(int64(fact.ManagedGeneration)).SetControlRevision(int64(fact.ControlRevision)).SetStartedAt(fact.StartedAt.UTC()).
@@ -389,7 +417,8 @@ func resourceKindMatches(kind platformid.Kind, declared usageingestapi.ResourceK
 		(kind == platformid.ImageGeneration && declared == usageingestapi.ResourceKindIMAGEGENERATION) ||
 		(kind == platformid.TTS && declared == usageingestapi.ResourceKindTTS) ||
 		(kind == platformid.ASR && declared == usageingestapi.ResourceKindASR) ||
-		(kind == platformid.MCP && declared == usageingestapi.ResourceKindMCP)
+		(kind == platformid.MCP && declared == usageingestapi.ResourceKindMCP) ||
+		(kind == platformid.WebDAV && declared == usageingestapi.ResourceKindWEBDAV)
 }
 
 func validHash(value string) bool {

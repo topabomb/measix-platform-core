@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n'
 import type { components } from '../api/generated'
 import { apiFetch } from '../api/client'
 import { costAmounts } from '../api/cost'
+import { workspaceBytes } from '../composables/workspaceFiles'
 import type { RequestUsageS02 } from '../api/usageBudget'
 import ProblemBanner from './ProblemBanner.vue'
 import DetailWorkspace from './DetailWorkspace.vue'
@@ -78,6 +79,7 @@ function kindOf(resourceId: string | undefined): string | undefined {
   if (resourceId.startsWith('tts_')) return 'TTS'
   if (resourceId.startsWith('asr_')) return 'ASR'
   if (resourceId.startsWith('mcp_')) return 'MCP'
+  if (resourceId.startsWith('dav_')) return 'WEBDAV'
   return undefined
 }
 
@@ -148,12 +150,12 @@ defineExpose({ refresh: reset })
             <q-item-label caption>
               {{ new Date(req.startedAt).toLocaleString() }}
               <template v-if="req.durationMs !== undefined"> · {{ req.durationMs }} ms</template>
-
+              <template v-if="req.statisticsOnly"> · {{ req.httpMethod }} · ↑ {{ workspaceBytes(req.requestBytes) }} · ↓ {{ workspaceBytes(req.responseBytes) }}</template>
             </q-item-label>
           </q-item-section>
           <q-item-section side>
             <div class="row items-center q-gutter-xs">
-              <span v-if="req.cost" class="text-caption text-grey-7">{{ costAmounts(req.cost) }} · {{ $t(`usage.cost${req.cost.status === 'KNOWN' ? 'Known' : req.cost.status === 'PARTIAL' ? 'Partial' : 'Unknown'}`) }}</span>
+              <span v-if="req.cost && !req.statisticsOnly" class="text-caption text-grey-7">{{ costAmounts(req.cost) }} · {{ $t(`usage.cost${req.cost.status === 'KNOWN' ? 'Known' : req.cost.status === 'PARTIAL' ? 'Partial' : 'Unknown'}`) }}</span>
               <q-chip v-if="!req.forwarded" dense color="orange-2">{{ $t('usage.blocked') }}</q-chip>
               <q-chip v-if="req.settlementState && req.settlementState !== 'NOT_REQUIRED' && req.settlementState !== 'SETTLED'" dense :color="req.settlementState === 'RECONCILIATION_REQUIRED' ? 'red-2' : 'orange-2'">{{ $t(`usage.settlement.${req.settlementState}`) }}</q-chip>
               <q-chip v-if="req.requestCompleteness && req.requestCompleteness !== 'EXACT' && req.settlementState !== 'RECONCILIATION_REQUIRED'" dense :color="req.requestCompleteness === 'PARTIAL' ? 'orange-2' : 'grey-3'">{{ $t(`status.${req.requestCompleteness}`) }}</q-chip>

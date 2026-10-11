@@ -6,6 +6,7 @@ describe('workspace preview boundary', () => {
   expect(previewKind('x.html')).toBe('download')
   expect(previewKind('x.svg')).toBe('download')
   expect(previewKind('x.pdf')).toBe('pdf')
+  expect(previewKind('video.MP4')).toBe('video')
  })
  it('blocks raw HTML, script links and external images', () => {
   const result = renderWorkspaceMarkdown('<script>alert(1)</script>\n[x](javascript:alert(1))\n![tracking](https://evil.invalid/a.png)\n![local](image.png)', 'docs/a.md')

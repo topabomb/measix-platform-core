@@ -4,10 +4,60 @@ import { createPinia } from 'pinia'
 import { Quasar, QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog, ClosePopup } from 'quasar'
 import WorkspacePanel from './WorkspacePanel.vue'
 import * as client from '../api/client'
+import { useSessionStore } from '../stores/session'
+import type { components } from '../api/generated'
 
 afterEach(() => vi.restoreAllMocks())
 
 describe('workspace file prerequisites', () => {
+  it.each(['already displayed', 'still pending'])('discards %s credentials when the independent DAV revision changes', async timing => {
+    const pinia = createPinia()
+    useSessionStore(pinia).session = { csrfToken: 'test-csrf' } as components['schemas']['AdminSession']
+    let revision = 2
+    let reveal!: (value: unknown) => void
+    const pendingReveal = new Promise(resolve => { reveal = resolve })
+    const credentials = { davUrl: 'http://dav.test/u/test/dav/', username: 'test', token: 'old-token' }
+    vi.spyOn(client, 'apiFetch').mockImplementation(async path => {
+      if (path.endsWith('/dav-connection')) return pendingReveal as never
+      return { schemaVersion: 1, state: 'CONNECTED', bindingRevision: 1, agentSpaceId: 'spc_test', mcpAvailable: true, filesAvailable: true,
+        webdav: { resourceId: 'dav_test', available: true, reason: 'available', accessMode: 'FULL', desiredAccessMode: 'FULL', bindingRevision: revision, desiredBindingRevision: revision } } as never
+    })
+    const wrapper = mount(WorkspacePanel, {
+      props: { userId: 'usr_test', serviceEnabled: true },
+      global: { plugins: [pinia, [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, WorkspaceFiles: true, ProblemBanner: true, QDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } } },
+    })
+    try {
+      await flushPromises()
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'WebDAV 连接信息')!.trigger('click')
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '查看当前连接信息')!.trigger('click')
+      if (timing === 'already displayed') {
+        reveal(credentials); await flushPromises()
+        expect(wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Token')?.props('modelValue')).toBe('old-token')
+      }
+      revision++
+      await wrapper.get('[aria-label="刷新工作区"]').trigger('click'); await flushPromises()
+      if (timing === 'still pending') { reveal(credentials); await flushPromises() }
+      expect(wrapper.findAllComponents(QInput).some(input => input.props('label') === 'Token')).toBe(false)
+      expect(wrapper.findAllComponents(QBtn).find(button => button.props('label') === '查看当前连接信息')?.props('loading')).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+  it('shows effective DAV permission separately from Files and the default exchange designation', async () => {
+    vi.spyOn(client, 'apiFetch').mockResolvedValue({
+      schemaVersion: 1, state: 'CONNECTED', bindingRevision: 1, agentSpaceId: 'spc_test',
+      mcpAvailable: true, filesAvailable: true, fileExchangeWebdavResourceId: 'dav_test',
+      webdav: { resourceId: 'dav_test', available: true, reason: 'available', accessMode: 'READ_ONLY', desiredAccessMode: 'READ_ONLY', bindingRevision: 2, desiredBindingRevision: 2 },
+    })
+    const wrapper = mount(WorkspacePanel, {
+      props: { userId: 'usr_test', serviceEnabled: true },
+      global: { plugins: [createPinia(), [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, WorkspaceFiles: true, ProblemBanner: true } },
+    })
+    try {
+      await flushPromises()
+      expect(wrapper.text()).toContain('默认文件交换空间')
+      expect(wrapper.text()).toContain('当前生效：只读')
+      expect(wrapper.text()).toContain('不改变 Console 文件管理权限')
+    } finally { wrapper.unmount() }
+  })
   it('clears a stale query error after a successful refresh', async () => {
     const failure = new Error('temporary query failure')
     vi.spyOn(client, 'apiFetch').mockRejectedValueOnce(failure).mockResolvedValue({

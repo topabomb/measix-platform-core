@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"measix/platform/ent/agentspace"
 	"measix/platform/ent/budgetallocation"
 	"measix/platform/ent/budgetaudit"
 	"measix/platform/ent/budgetbucket"
@@ -17,15 +18,40 @@ import (
 	"measix/platform/ent/device"
 	"measix/platform/ent/enterpriseupdate"
 	"measix/platform/ent/portalsession"
+	"measix/platform/ent/requestusage"
 	"measix/platform/ent/schema"
 	"measix/platform/ent/usageevent"
 	"measix/platform/ent/userbudget"
+	"measix/platform/ent/workspaceoperation"
+	"measix/platform/ent/workspaceservice"
 )
 
 // The init function reads all schema descriptors with runtime code
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	agentspaceFields := schema.AgentSpace{}.Fields()
+	_ = agentspaceFields
+	// agentspaceDescFileAccessIntent is the schema descriptor for file_access_intent field.
+	agentspaceDescFileAccessIntent := agentspaceFields[11].Descriptor()
+	// agentspace.DefaultFileAccessIntent holds the default value on creation for the file_access_intent field.
+	agentspace.DefaultFileAccessIntent = agentspaceDescFileAccessIntent.Default.(string)
+	// agentspaceDescDavAccessMode is the schema descriptor for dav_access_mode field.
+	agentspaceDescDavAccessMode := agentspaceFields[12].Descriptor()
+	// agentspace.DefaultDavAccessMode holds the default value on creation for the dav_access_mode field.
+	agentspace.DefaultDavAccessMode = agentspaceDescDavAccessMode.Default.(string)
+	// agentspaceDescDavBindingRevision is the schema descriptor for dav_binding_revision field.
+	agentspaceDescDavBindingRevision := agentspaceFields[13].Descriptor()
+	// agentspace.DefaultDavBindingRevision holds the default value on creation for the dav_binding_revision field.
+	agentspace.DefaultDavBindingRevision = agentspaceDescDavBindingRevision.Default.(int64)
+	// agentspaceDescDavAppliedAccessMode is the schema descriptor for dav_applied_access_mode field.
+	agentspaceDescDavAppliedAccessMode := agentspaceFields[14].Descriptor()
+	// agentspace.DefaultDavAppliedAccessMode holds the default value on creation for the dav_applied_access_mode field.
+	agentspace.DefaultDavAppliedAccessMode = agentspaceDescDavAppliedAccessMode.Default.(string)
+	// agentspaceDescDavAppliedRevision is the schema descriptor for dav_applied_revision field.
+	agentspaceDescDavAppliedRevision := agentspaceFields[15].Descriptor()
+	// agentspace.DefaultDavAppliedRevision holds the default value on creation for the dav_applied_revision field.
+	agentspace.DefaultDavAppliedRevision = agentspaceDescDavAppliedRevision.Default.(int64)
 	budgetallocationFields := schema.BudgetAllocation{}.Fields()
 	_ = budgetallocationFields
 	// budgetallocationDescReservedQuantity is the schema descriptor for reserved_quantity field.
@@ -188,6 +214,16 @@ func init() {
 	portalsessionDescRevoked := portalsessionFields[8].Descriptor()
 	// portalsession.DefaultRevoked holds the default value on creation for the revoked field.
 	portalsession.DefaultRevoked = portalsessionDescRevoked.Default.(bool)
+	requestusageFields := schema.RequestUsage{}.Fields()
+	_ = requestusageFields
+	// requestusageDescHTTPMethod is the schema descriptor for http_method field.
+	requestusageDescHTTPMethod := requestusageFields[9].Descriptor()
+	// requestusage.DefaultHTTPMethod holds the default value on creation for the http_method field.
+	requestusage.DefaultHTTPMethod = requestusageDescHTTPMethod.Default.(string)
+	// requestusageDescStatisticsOnly is the schema descriptor for statistics_only field.
+	requestusageDescStatisticsOnly := requestusageFields[10].Descriptor()
+	// requestusage.DefaultStatisticsOnly holds the default value on creation for the statistics_only field.
+	requestusage.DefaultStatisticsOnly = requestusageDescStatisticsOnly.Default.(bool)
 	usageeventFields := schema.UsageEvent{}.Fields()
 	_ = usageeventFields
 	// usageeventDescRevision is the schema descriptor for revision field.
@@ -200,4 +236,24 @@ func init() {
 	userbudgetDescRevision := userbudgetFields[5].Descriptor()
 	// userbudget.RevisionValidator is a validator for the "revision" field. It is called by the builders before save.
 	userbudget.RevisionValidator = userbudgetDescRevision.Validators[0].(func(int64) error)
+	workspaceoperationFields := schema.WorkspaceOperation{}.Fields()
+	_ = workspaceoperationFields
+	// workspaceoperationDescDavBindingRevision is the schema descriptor for dav_binding_revision field.
+	workspaceoperationDescDavBindingRevision := workspaceoperationFields[8].Descriptor()
+	// workspaceoperation.DefaultDavBindingRevision holds the default value on creation for the dav_binding_revision field.
+	workspaceoperation.DefaultDavBindingRevision = workspaceoperationDescDavBindingRevision.Default.(int64)
+	workspaceserviceFields := schema.WorkspaceService{}.Fields()
+	_ = workspaceserviceFields
+	// workspaceserviceDescDavResourceID is the schema descriptor for dav_resource_id field.
+	workspaceserviceDescDavResourceID := workspaceserviceFields[8].Descriptor()
+	// workspaceservice.DefaultDavResourceID holds the default value on creation for the dav_resource_id field.
+	workspaceservice.DefaultDavResourceID = workspaceserviceDescDavResourceID.Default.(string)
+	// workspaceserviceDescDavRuntimeRouteID is the schema descriptor for dav_runtime_route_id field.
+	workspaceserviceDescDavRuntimeRouteID := workspaceserviceFields[9].Descriptor()
+	// workspaceservice.DefaultDavRuntimeRouteID holds the default value on creation for the dav_runtime_route_id field.
+	workspaceservice.DefaultDavRuntimeRouteID = workspaceserviceDescDavRuntimeRouteID.Default.(string)
+	// workspaceserviceDescDavStaged is the schema descriptor for dav_staged field.
+	workspaceserviceDescDavStaged := workspaceserviceFields[10].Descriptor()
+	// workspaceservice.DefaultDavStaged holds the default value on creation for the dav_staged field.
+	workspaceservice.DefaultDavStaged = workspaceserviceDescDavStaged.Default.(bool)
 }

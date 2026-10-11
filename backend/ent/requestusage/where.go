@@ -94,6 +94,16 @@ func ClientProtocol(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldEQ(FieldClientProtocol, v))
 }
 
+// HTTPMethod applies equality check predicate on the "http_method" field. It's identical to HTTPMethodEQ.
+func HTTPMethod(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldHTTPMethod, v))
+}
+
+// StatisticsOnly applies equality check predicate on the "statistics_only" field. It's identical to StatisticsOnlyEQ.
+func StatisticsOnly(v bool) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldStatisticsOnly, v))
+}
+
 // RuntimeRouteID applies equality check predicate on the "runtime_route_id" field. It's identical to RuntimeRouteIDEQ.
 func RuntimeRouteID(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldEQ(FieldRuntimeRouteID, v))
@@ -727,6 +737,81 @@ func ClientProtocolEqualFold(v string) predicate.RequestUsage {
 // ClientProtocolContainsFold applies the ContainsFold predicate on the "client_protocol" field.
 func ClientProtocolContainsFold(v string) predicate.RequestUsage {
 	return predicate.RequestUsage(sql.FieldContainsFold(FieldClientProtocol, v))
+}
+
+// HTTPMethodEQ applies the EQ predicate on the "http_method" field.
+func HTTPMethodEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldHTTPMethod, v))
+}
+
+// HTTPMethodNEQ applies the NEQ predicate on the "http_method" field.
+func HTTPMethodNEQ(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNEQ(FieldHTTPMethod, v))
+}
+
+// HTTPMethodIn applies the In predicate on the "http_method" field.
+func HTTPMethodIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldIn(FieldHTTPMethod, vs...))
+}
+
+// HTTPMethodNotIn applies the NotIn predicate on the "http_method" field.
+func HTTPMethodNotIn(vs ...string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNotIn(FieldHTTPMethod, vs...))
+}
+
+// HTTPMethodGT applies the GT predicate on the "http_method" field.
+func HTTPMethodGT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGT(FieldHTTPMethod, v))
+}
+
+// HTTPMethodGTE applies the GTE predicate on the "http_method" field.
+func HTTPMethodGTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldGTE(FieldHTTPMethod, v))
+}
+
+// HTTPMethodLT applies the LT predicate on the "http_method" field.
+func HTTPMethodLT(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLT(FieldHTTPMethod, v))
+}
+
+// HTTPMethodLTE applies the LTE predicate on the "http_method" field.
+func HTTPMethodLTE(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldLTE(FieldHTTPMethod, v))
+}
+
+// HTTPMethodContains applies the Contains predicate on the "http_method" field.
+func HTTPMethodContains(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContains(FieldHTTPMethod, v))
+}
+
+// HTTPMethodHasPrefix applies the HasPrefix predicate on the "http_method" field.
+func HTTPMethodHasPrefix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasPrefix(FieldHTTPMethod, v))
+}
+
+// HTTPMethodHasSuffix applies the HasSuffix predicate on the "http_method" field.
+func HTTPMethodHasSuffix(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldHasSuffix(FieldHTTPMethod, v))
+}
+
+// HTTPMethodEqualFold applies the EqualFold predicate on the "http_method" field.
+func HTTPMethodEqualFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEqualFold(FieldHTTPMethod, v))
+}
+
+// HTTPMethodContainsFold applies the ContainsFold predicate on the "http_method" field.
+func HTTPMethodContainsFold(v string) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldContainsFold(FieldHTTPMethod, v))
+}
+
+// StatisticsOnlyEQ applies the EQ predicate on the "statistics_only" field.
+func StatisticsOnlyEQ(v bool) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldEQ(FieldStatisticsOnly, v))
+}
+
+// StatisticsOnlyNEQ applies the NEQ predicate on the "statistics_only" field.
+func StatisticsOnlyNEQ(v bool) predicate.RequestUsage {
+	return predicate.RequestUsage(sql.FieldNEQ(FieldStatisticsOnly, v))
 }
 
 // RuntimeRouteIDEQ applies the EQ predicate on the "runtime_route_id" field.

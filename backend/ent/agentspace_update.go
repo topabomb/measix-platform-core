@@ -191,6 +191,90 @@ func (_u *AgentSpaceUpdate) ClearDavSecretVersion() *AgentSpaceUpdate {
 	return _u
 }
 
+// SetFileAccessIntent sets the "file_access_intent" field.
+func (_u *AgentSpaceUpdate) SetFileAccessIntent(v string) *AgentSpaceUpdate {
+	_u.mutation.SetFileAccessIntent(v)
+	return _u
+}
+
+// SetNillableFileAccessIntent sets the "file_access_intent" field if the given value is not nil.
+func (_u *AgentSpaceUpdate) SetNillableFileAccessIntent(v *string) *AgentSpaceUpdate {
+	if v != nil {
+		_u.SetFileAccessIntent(*v)
+	}
+	return _u
+}
+
+// SetDavAccessMode sets the "dav_access_mode" field.
+func (_u *AgentSpaceUpdate) SetDavAccessMode(v string) *AgentSpaceUpdate {
+	_u.mutation.SetDavAccessMode(v)
+	return _u
+}
+
+// SetNillableDavAccessMode sets the "dav_access_mode" field if the given value is not nil.
+func (_u *AgentSpaceUpdate) SetNillableDavAccessMode(v *string) *AgentSpaceUpdate {
+	if v != nil {
+		_u.SetDavAccessMode(*v)
+	}
+	return _u
+}
+
+// SetDavBindingRevision sets the "dav_binding_revision" field.
+func (_u *AgentSpaceUpdate) SetDavBindingRevision(v int64) *AgentSpaceUpdate {
+	_u.mutation.ResetDavBindingRevision()
+	_u.mutation.SetDavBindingRevision(v)
+	return _u
+}
+
+// SetNillableDavBindingRevision sets the "dav_binding_revision" field if the given value is not nil.
+func (_u *AgentSpaceUpdate) SetNillableDavBindingRevision(v *int64) *AgentSpaceUpdate {
+	if v != nil {
+		_u.SetDavBindingRevision(*v)
+	}
+	return _u
+}
+
+// AddDavBindingRevision adds value to the "dav_binding_revision" field.
+func (_u *AgentSpaceUpdate) AddDavBindingRevision(v int64) *AgentSpaceUpdate {
+	_u.mutation.AddDavBindingRevision(v)
+	return _u
+}
+
+// SetDavAppliedAccessMode sets the "dav_applied_access_mode" field.
+func (_u *AgentSpaceUpdate) SetDavAppliedAccessMode(v string) *AgentSpaceUpdate {
+	_u.mutation.SetDavAppliedAccessMode(v)
+	return _u
+}
+
+// SetNillableDavAppliedAccessMode sets the "dav_applied_access_mode" field if the given value is not nil.
+func (_u *AgentSpaceUpdate) SetNillableDavAppliedAccessMode(v *string) *AgentSpaceUpdate {
+	if v != nil {
+		_u.SetDavAppliedAccessMode(*v)
+	}
+	return _u
+}
+
+// SetDavAppliedRevision sets the "dav_applied_revision" field.
+func (_u *AgentSpaceUpdate) SetDavAppliedRevision(v int64) *AgentSpaceUpdate {
+	_u.mutation.ResetDavAppliedRevision()
+	_u.mutation.SetDavAppliedRevision(v)
+	return _u
+}
+
+// SetNillableDavAppliedRevision sets the "dav_applied_revision" field if the given value is not nil.
+func (_u *AgentSpaceUpdate) SetNillableDavAppliedRevision(v *int64) *AgentSpaceUpdate {
+	if v != nil {
+		_u.SetDavAppliedRevision(*v)
+	}
+	return _u
+}
+
+// AddDavAppliedRevision adds value to the "dav_applied_revision" field.
+func (_u *AgentSpaceUpdate) AddDavAppliedRevision(v int64) *AgentSpaceUpdate {
+	_u.mutation.AddDavAppliedRevision(v)
+	return _u
+}
+
 // SetDavConfirmed sets the "dav_confirmed" field.
 func (_u *AgentSpaceUpdate) SetDavConfirmed(v bool) *AgentSpaceUpdate {
 	_u.mutation.SetDavConfirmed(v)
@@ -417,6 +501,27 @@ func (_u *AgentSpaceUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if _u.mutation.DavSecretVersionCleared() {
 		_spec.ClearField(agentspace.FieldDavSecretVersion, field.TypeInt64)
 	}
+	if value, ok := _u.mutation.FileAccessIntent(); ok {
+		_spec.SetField(agentspace.FieldFileAccessIntent, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DavAccessMode(); ok {
+		_spec.SetField(agentspace.FieldDavAccessMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DavBindingRevision(); ok {
+		_spec.SetField(agentspace.FieldDavBindingRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedDavBindingRevision(); ok {
+		_spec.AddField(agentspace.FieldDavBindingRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.DavAppliedAccessMode(); ok {
+		_spec.SetField(agentspace.FieldDavAppliedAccessMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DavAppliedRevision(); ok {
+		_spec.SetField(agentspace.FieldDavAppliedRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedDavAppliedRevision(); ok {
+		_spec.AddField(agentspace.FieldDavAppliedRevision, field.TypeInt64, value)
+	}
 	if value, ok := _u.mutation.DavConfirmed(); ok {
 		_spec.SetField(agentspace.FieldDavConfirmed, field.TypeBool, value)
 	}
@@ -633,6 +738,90 @@ func (_u *AgentSpaceUpdateOne) AddDavSecretVersion(v int64) *AgentSpaceUpdateOne
 // ClearDavSecretVersion clears the value of the "dav_secret_version" field.
 func (_u *AgentSpaceUpdateOne) ClearDavSecretVersion() *AgentSpaceUpdateOne {
 	_u.mutation.ClearDavSecretVersion()
+	return _u
+}
+
+// SetFileAccessIntent sets the "file_access_intent" field.
+func (_u *AgentSpaceUpdateOne) SetFileAccessIntent(v string) *AgentSpaceUpdateOne {
+	_u.mutation.SetFileAccessIntent(v)
+	return _u
+}
+
+// SetNillableFileAccessIntent sets the "file_access_intent" field if the given value is not nil.
+func (_u *AgentSpaceUpdateOne) SetNillableFileAccessIntent(v *string) *AgentSpaceUpdateOne {
+	if v != nil {
+		_u.SetFileAccessIntent(*v)
+	}
+	return _u
+}
+
+// SetDavAccessMode sets the "dav_access_mode" field.
+func (_u *AgentSpaceUpdateOne) SetDavAccessMode(v string) *AgentSpaceUpdateOne {
+	_u.mutation.SetDavAccessMode(v)
+	return _u
+}
+
+// SetNillableDavAccessMode sets the "dav_access_mode" field if the given value is not nil.
+func (_u *AgentSpaceUpdateOne) SetNillableDavAccessMode(v *string) *AgentSpaceUpdateOne {
+	if v != nil {
+		_u.SetDavAccessMode(*v)
+	}
+	return _u
+}
+
+// SetDavBindingRevision sets the "dav_binding_revision" field.
+func (_u *AgentSpaceUpdateOne) SetDavBindingRevision(v int64) *AgentSpaceUpdateOne {
+	_u.mutation.ResetDavBindingRevision()
+	_u.mutation.SetDavBindingRevision(v)
+	return _u
+}
+
+// SetNillableDavBindingRevision sets the "dav_binding_revision" field if the given value is not nil.
+func (_u *AgentSpaceUpdateOne) SetNillableDavBindingRevision(v *int64) *AgentSpaceUpdateOne {
+	if v != nil {
+		_u.SetDavBindingRevision(*v)
+	}
+	return _u
+}
+
+// AddDavBindingRevision adds value to the "dav_binding_revision" field.
+func (_u *AgentSpaceUpdateOne) AddDavBindingRevision(v int64) *AgentSpaceUpdateOne {
+	_u.mutation.AddDavBindingRevision(v)
+	return _u
+}
+
+// SetDavAppliedAccessMode sets the "dav_applied_access_mode" field.
+func (_u *AgentSpaceUpdateOne) SetDavAppliedAccessMode(v string) *AgentSpaceUpdateOne {
+	_u.mutation.SetDavAppliedAccessMode(v)
+	return _u
+}
+
+// SetNillableDavAppliedAccessMode sets the "dav_applied_access_mode" field if the given value is not nil.
+func (_u *AgentSpaceUpdateOne) SetNillableDavAppliedAccessMode(v *string) *AgentSpaceUpdateOne {
+	if v != nil {
+		_u.SetDavAppliedAccessMode(*v)
+	}
+	return _u
+}
+
+// SetDavAppliedRevision sets the "dav_applied_revision" field.
+func (_u *AgentSpaceUpdateOne) SetDavAppliedRevision(v int64) *AgentSpaceUpdateOne {
+	_u.mutation.ResetDavAppliedRevision()
+	_u.mutation.SetDavAppliedRevision(v)
+	return _u
+}
+
+// SetNillableDavAppliedRevision sets the "dav_applied_revision" field if the given value is not nil.
+func (_u *AgentSpaceUpdateOne) SetNillableDavAppliedRevision(v *int64) *AgentSpaceUpdateOne {
+	if v != nil {
+		_u.SetDavAppliedRevision(*v)
+	}
+	return _u
+}
+
+// AddDavAppliedRevision adds value to the "dav_applied_revision" field.
+func (_u *AgentSpaceUpdateOne) AddDavAppliedRevision(v int64) *AgentSpaceUpdateOne {
+	_u.mutation.AddDavAppliedRevision(v)
 	return _u
 }
 
@@ -891,6 +1080,27 @@ func (_u *AgentSpaceUpdateOne) sqlSave(ctx context.Context) (_node *AgentSpace, 
 	}
 	if _u.mutation.DavSecretVersionCleared() {
 		_spec.ClearField(agentspace.FieldDavSecretVersion, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.FileAccessIntent(); ok {
+		_spec.SetField(agentspace.FieldFileAccessIntent, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DavAccessMode(); ok {
+		_spec.SetField(agentspace.FieldDavAccessMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DavBindingRevision(); ok {
+		_spec.SetField(agentspace.FieldDavBindingRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedDavBindingRevision(); ok {
+		_spec.AddField(agentspace.FieldDavBindingRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.DavAppliedAccessMode(); ok {
+		_spec.SetField(agentspace.FieldDavAppliedAccessMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DavAppliedRevision(); ok {
+		_spec.SetField(agentspace.FieldDavAppliedRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedDavAppliedRevision(); ok {
+		_spec.AddField(agentspace.FieldDavAppliedRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.DavConfirmed(); ok {
 		_spec.SetField(agentspace.FieldDavConfirmed, field.TypeBool, value)

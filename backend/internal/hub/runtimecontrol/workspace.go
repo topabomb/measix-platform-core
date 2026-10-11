@@ -43,6 +43,12 @@ func (s *Service) ApplyWorkspace(ctx context.Context, actor, operationID string)
 		return "", false, err
 	}
 	state.BundleHash = digest
+	if s.testHooks.BeforeIntentCommit != nil {
+		if err := s.testHooks.BeforeIntentCommit(ctx); err != nil {
+			return "", false, err
+		}
+	}
+
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
 		return "", false, err
@@ -61,6 +67,9 @@ func (s *Service) ApplyWorkspace(ctx context.Context, actor, operationID string)
 	}
 	if current.DesiredControlRevision != managed.DesiredControlRevision {
 		return "", false, ErrActivationInProgress
+	}
+	if err := s.validateWorkspaceIntentTx(ctx, tx, descriptor); err != nil {
+		return "", false, err
 	}
 	id := platformid.New(platformid.Activation)
 	now := s.Now().UTC()
@@ -112,6 +121,9 @@ func (s *Service) finalizeWorkspace(ctx context.Context, id string) error {
 		return err
 	}
 	if _, err = tx.ManagedState.UpdateOneID("current").SetRuntimeStatus("READY").SetManagedStateRevision(managed.ManagedStateRevision + 1).SetUpdatedAt(now).Save(ctx); err != nil {
+		return err
+	}
+	if err = confirmDAVBindings(ctx, tx, row.TargetDescriptorJSON); err != nil {
 		return err
 	}
 	return tx.Commit()

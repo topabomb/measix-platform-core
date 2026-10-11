@@ -438,10 +438,10 @@ func newEnv(t *testing.T) *env {
 		AuthKeys:                []relaycontrolapi.PublicJwk{signer.publicJWK()},
 		PrincipalState:          relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{
-			{ResourceId: ids.model, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMODEL, ClientProtocol: relaycontrolapi.OPENAICHATCOMPLETIONS, RuntimeRouteId: modelRoute, LlmProfile: &relaycontrolapi.RuntimeLlmProfile{}},
-			{ResourceId: ids.tts, ResourceKind: relaycontrolapi.ResourceRouteResourceKindTTS, ClientProtocol: relaycontrolapi.OPENAIAUDIOSPEECH, RuntimeRouteId: ttsRoute},
-			{ResourceId: ids.asr, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.OPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: relaycontrolapi.RuntimeAudioProfileChannelsN1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
-			{ResourceId: ids.mcp, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMCP, ClientProtocol: relaycontrolapi.MCPSTREAMABLEHTTP, RuntimeRouteId: mcpRoute},
+			{ResourceId: ids.model, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMODEL, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolOPENAICHATCOMPLETIONS, RuntimeRouteId: modelRoute, LlmProfile: &relaycontrolapi.RuntimeLlmProfile{}},
+			{ResourceId: ids.tts, ResourceKind: relaycontrolapi.ResourceRouteResourceKindTTS, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolOPENAIAUDIOSPEECH, RuntimeRouteId: ttsRoute},
+			{ResourceId: ids.asr, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolOPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: relaycontrolapi.RuntimeAudioProfileChannelsN1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
+			{ResourceId: ids.mcp, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMCP, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolMCPSTREAMABLEHTTP, RuntimeRouteId: mcpRoute},
 		},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{
 			{RuntimeRouteId: modelRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},

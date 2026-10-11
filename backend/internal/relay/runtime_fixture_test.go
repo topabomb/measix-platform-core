@@ -259,8 +259,8 @@ func completeTestMeterProfiles(state *relaycontrolapi.RuntimeControlState) {
 
 func testLlmProfile(protocol relaycontrolapi.ResourceRouteClientProtocol) *relaycontrolapi.RuntimeLlmProfile {
 	return &relaycontrolapi.RuntimeLlmProfile{
-		GeminiThoughtsMayBeAbsent:       protocol == relaycontrolapi.GOOGLEGENERATECONTENT,
-		AnthropicCacheFieldsMayBeAbsent: protocol == relaycontrolapi.ANTHROPICMESSAGES,
+		GeminiThoughtsMayBeAbsent:       protocol == relaycontrolapi.ResourceRouteClientProtocolGOOGLEGENERATECONTENT,
+		AnthropicCacheFieldsMayBeAbsent: protocol == relaycontrolapi.ResourceRouteClientProtocolANTHROPICMESSAGES,
 	}
 }
 

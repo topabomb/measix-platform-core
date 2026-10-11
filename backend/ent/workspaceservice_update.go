@@ -118,6 +118,20 @@ func (_u *WorkspaceServiceUpdate) SetNillableState(v *string) *WorkspaceServiceU
 	return _u
 }
 
+// SetDavStaged sets the "dav_staged" field.
+func (_u *WorkspaceServiceUpdate) SetDavStaged(v bool) *WorkspaceServiceUpdate {
+	_u.mutation.SetDavStaged(v)
+	return _u
+}
+
+// SetNillableDavStaged sets the "dav_staged" field if the given value is not nil.
+func (_u *WorkspaceServiceUpdate) SetNillableDavStaged(v *bool) *WorkspaceServiceUpdate {
+	if v != nil {
+		_u.SetDavStaged(*v)
+	}
+	return _u
+}
+
 // SetDiagnosticCode sets the "diagnostic_code" field.
 func (_u *WorkspaceServiceUpdate) SetDiagnosticCode(v string) *WorkspaceServiceUpdate {
 	_u.mutation.SetDiagnosticCode(v)
@@ -230,6 +244,9 @@ func (_u *WorkspaceServiceUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if value, ok := _u.mutation.State(); ok {
 		_spec.SetField(workspaceservice.FieldState, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DavStaged(); ok {
+		_spec.SetField(workspaceservice.FieldDavStaged, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DiagnosticCode(); ok {
 		_spec.SetField(workspaceservice.FieldDiagnosticCode, field.TypeString, value)
@@ -349,6 +366,20 @@ func (_u *WorkspaceServiceUpdateOne) SetState(v string) *WorkspaceServiceUpdateO
 func (_u *WorkspaceServiceUpdateOne) SetNillableState(v *string) *WorkspaceServiceUpdateOne {
 	if v != nil {
 		_u.SetState(*v)
+	}
+	return _u
+}
+
+// SetDavStaged sets the "dav_staged" field.
+func (_u *WorkspaceServiceUpdateOne) SetDavStaged(v bool) *WorkspaceServiceUpdateOne {
+	_u.mutation.SetDavStaged(v)
+	return _u
+}
+
+// SetNillableDavStaged sets the "dav_staged" field if the given value is not nil.
+func (_u *WorkspaceServiceUpdateOne) SetNillableDavStaged(v *bool) *WorkspaceServiceUpdateOne {
+	if v != nil {
+		_u.SetDavStaged(*v)
 	}
 	return _u
 }
@@ -495,6 +526,9 @@ func (_u *WorkspaceServiceUpdateOne) sqlSave(ctx context.Context) (_node *Worksp
 	}
 	if value, ok := _u.mutation.State(); ok {
 		_spec.SetField(workspaceservice.FieldState, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DavStaged(); ok {
+		_spec.SetField(workspaceservice.FieldDavStaged, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DiagnosticCode(); ok {
 		_spec.SetField(workspaceservice.FieldDiagnosticCode, field.TypeString, value)

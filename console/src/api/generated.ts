@@ -1093,6 +1093,33 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        DAVResourceId: string;
+        /** @enum {string} */
+        DAVAccessMode: "READ_ONLY" | "FULL";
+        WebDAVDefinition: {
+            resourceId: components["schemas"]["DAVResourceId"];
+            displayName: string;
+            enabled: boolean;
+            /** @enum {string} */
+            purpose: "WORKSPACE_FILE_EXCHANGE";
+            /** @enum {string} */
+            clientProtocol: "WEBDAV";
+            /** @enum {string} */
+            authOwnership: "ENTERPRISE_MANAGED";
+            rootPathTemplate: string;
+        };
+        WorkspaceDAVProjection: {
+            resourceId: components["schemas"]["DAVResourceId"];
+            available: boolean;
+            reason: string;
+            accessMode?: components["schemas"]["DAVAccessMode"];
+            /** Format: int64 */
+            bindingRevision?: number;
+            desiredAccessMode?: components["schemas"]["DAVAccessMode"];
+            /** Format: int64 */
+            desiredBindingRevision?: number;
+            lastConfirmedAccessMode?: components["schemas"]["DAVAccessMode"];
+        };
         WorkspaceServiceId: string;
         AgentSpaceId: string;
         WorkspaceOperationId: string;
@@ -1203,6 +1230,8 @@ export interface components {
             disk: components["schemas"]["WorkspaceDiskObservation"];
         };
         WorkspaceProjection: {
+            fileExchangeWebdavResourceId?: components["schemas"]["DAVResourceId"];
+            webdav?: components["schemas"]["WorkspaceDAVProjection"];
             /** @enum {integer} */
             schemaVersion: 1;
             /** @enum {string} */
@@ -1224,6 +1253,9 @@ export interface components {
             serviceState: "NOT_CONFIGURED" | "DISABLED" | "ENABLED";
         };
         WorkspaceService: {
+            davResourceId?: components["schemas"]["DAVResourceId"];
+            davPublishedEnabled?: boolean;
+            davDraftEnabled?: boolean;
             workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
             /** @enum {string} */
             type: "AGENT_SPACE";
@@ -1258,9 +1290,12 @@ export interface components {
             diagnosticCode?: string;
         };
         WorkspaceCommand: {
+            davAccessMode?: components["schemas"]["DAVAccessMode"];
+            /** Format: int64 */
+            expectedDAVRevision?: number;
             managementSecret?: components["schemas"]["SecretRef"];
             /** @enum {string} */
-            action: "CREATE" | "DISCONNECT" | "RESTORE" | "DELETE" | "TAKEOVER" | "REQUERY" | "CONTINUE" | "RESET_MCP" | "SET_DAV" | "REVOKE_DAV";
+            action: "CREATE" | "DISCONNECT" | "RESTORE" | "DELETE" | "TAKEOVER" | "REQUERY" | "CONTINUE" | "RESET_MCP" | "SET_DAV" | "REVOKE_DAV" | "SET_DAV_ACCESS";
             expectedRevision: number;
             remoteUsername?: string;
             agentSpaceId?: components["schemas"]["AgentSpaceId"];
@@ -1347,7 +1382,7 @@ export interface components {
             path: string;
             message: string;
             /** @enum {string} */
-            resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP" | "POLICY" | "BINDING" | "ASSISTANT" | "STARTER";
+            resourceKind?: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP" | "WEBDAV" | "POLICY" | "BINDING" | "ASSISTANT" | "STARTER";
             resourceId?: string;
             field?: string;
         };
@@ -1438,7 +1473,7 @@ export interface components {
             idleMs: number;
             overallMs?: number;
         };
-        /** @description Exactly one target: legacy upstreamId (targetKind omitted or UPSTREAM), or targetKind REMOTE_WORKSPACE plus workspaceServiceId. WorkspaceService targets are MCP-only. */
+        /** @description Exactly one target: legacy upstreamId (targetKind omitted or UPSTREAM), or targetKind REMOTE_WORKSPACE plus workspaceServiceId. WorkspaceService targets are explicit MCP or WEBDAV resources. */
         RuntimeBindingDefinition: {
             runtimeRouteId: components["schemas"]["RuntimeRouteId"];
             resourceId: string;
@@ -1473,6 +1508,7 @@ export interface components {
             defaultAssistantId?: components["schemas"]["AssistantDefinitionId"];
         };
         ManagedDraftContent: {
+            webdav?: components["schemas"]["WebDAVDefinition"][];
             providers: components["schemas"]["ProviderDefinition"][];
             models: components["schemas"]["ModelDefinition"][];
             /** @description Additive Snapshot v4 field. Missing durable draft content normalizes to an empty list; new writers emit an explicit list. */
@@ -1772,6 +1808,7 @@ export interface components {
             tts: components["schemas"]["TtsDefinition"][];
             asr: components["schemas"]["AsrDefinition"][];
             mcp: components["schemas"]["McpDefinition"][];
+            webdav?: components["schemas"]["WebDAVDefinition"][];
             policy: components["schemas"]["ManagedPolicy"];
             assistants: components["schemas"]["ManagedAssistantDefinition"][];
             starters: components["schemas"]["AssistantStarterDefinition"][];
@@ -1780,7 +1817,7 @@ export interface components {
             diffSummary: components["schemas"]["DiffSummary"];
         };
         /** @enum {string} */
-        ReleaseDiffKind: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP" | "POLICY" | "ASSISTANT" | "STARTER" | "BINDING";
+        ReleaseDiffKind: "PROVIDER" | "MODEL" | "IMAGE_GENERATION" | "TTS" | "ASR" | "MCP" | "WEBDAV" | "POLICY" | "ASSISTANT" | "STARTER" | "BINDING";
         ResourceDiff: {
             kind: components["schemas"]["ReleaseDiffKind"];
             added: number;
@@ -1826,9 +1863,9 @@ export interface components {
             nextCursor?: string;
         };
         /** @enum {string} */
-        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION";
+        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION" | "WEBDAV";
         /** @enum {string} */
-        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "DASHSCOPE_MULTIMODAL_GENERATION" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
+        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "DASHSCOPE_MULTIMODAL_GENERATION" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP" | "WEBDAV";
         /** @enum {string} */
         UsageCompleteness: "EXACT" | "PARTIAL" | "UNKNOWN";
         /** @enum {string} */
@@ -2133,6 +2170,8 @@ export interface components {
             unknown: number;
         };
         RequestUsageView: {
+            httpMethod?: string;
+            statisticsOnly?: boolean;
             requestId: components["schemas"]["RequestId"];
             interactionId?: components["schemas"]["InteractionId"];
             deploymentId: components["schemas"]["DeploymentId"];
@@ -2171,7 +2210,7 @@ export interface components {
             budget?: components["schemas"]["BudgetContext"];
             workspaceTarget?: components["schemas"]["WorkspaceTarget"];
             /** @enum {integer} */
-            targetVersion?: 2;
+            targetVersion?: 2 | 3;
         };
         RequestUsagePage: {
             items: components["schemas"]["RequestUsageView"][];
@@ -5208,11 +5247,16 @@ export interface operations {
                 path?: string;
                 /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
                 agentSpaceId: components["schemas"]["AgentSpaceId"];
+                /** @description Native video preview; requires expectedEtag. Supported video types are served inline; default downloads remain attachments. */
+                preview?: "video";
+                /** @description Strong ETag forwarded as If-Match for a fixed-version media URL; conflicting If-Match is rejected. */
+                expectedEtag?: string;
             };
             header?: {
                 Range?: string;
                 "If-Match"?: string;
                 "If-None-Match"?: string;
+                "If-Range"?: string;
             };
             path: {
                 userId: components["schemas"]["UserId"];
@@ -5535,11 +5579,16 @@ export interface operations {
                 path?: string;
                 /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
                 agentSpaceId: components["schemas"]["AgentSpaceId"];
+                /** @description Native video preview; requires expectedEtag. Supported video types are served inline; default downloads remain attachments. */
+                preview?: "video";
+                /** @description Strong ETag forwarded as If-Match for a fixed-version media URL; conflicting If-Match is rejected. */
+                expectedEtag?: string;
             };
             header?: {
                 Range?: string;
                 "If-Match"?: string;
                 "If-None-Match"?: string;
+                "If-Range"?: string;
             };
             path: {
                 userId: components["schemas"]["UserId"];

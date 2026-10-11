@@ -173,6 +173,14 @@ HTTP 成功不代表所有写操作成功，必须检查 `WorkspaceFileResult.ou
 
 取消、网络断开或未知结果都不能证明写入未发生。重新读取可安全重试；覆盖、创建和删除不得自动重放。读取失败不能丢失尚未保存的编辑，成功保存后再关闭或以一次新 GET 开始下一轮编辑。Android 的后台传输、文件分享授权和本地缓存清理属于客户端 owner，本轮 Core/Admin 验证不等于这些设备能力已交付。
 
+### 标准 WebDAV 文件交换入口
+
+Snapshot v5 的可选 `webdav[]` 提供平台资源定义，缺省表示没有这类资源。读取本人 `WorkspaceProjection.fileExchangeWebdavResourceId` 获取唯一指定的交换入口，并以 `webdav.available` 和已生效 `accessMode`（`READ_ONLY` / `FULL`）决定操作。服务或已发布资源关闭后该指定字段缺省，清除已知默认入口，不搜索替代 DAV；暂不可用时保留指定身份并显示原因。响应未知字段递归容忍，已知字段类型和权限枚举仍严格校验。
+
+使用 Snapshot 中的平台根模板及本人 `agentSpaceId` 构造地址，标准 DAV 库注入现有平台 Bearer；不接收原始外部 key。新请求使用有效 access token，401 按既有会话流程刷新；已开始的流由签名会话上界和实时撤销约束，短 token 到期不打断长传输。未知写入不自动重放。服务端执行只读限制，客户端隐藏写按钮不能替代授权。
+
+Files API 保留，Console 继续使用它。标准 DAV 客户端不需要 Files query、JSON 文件命令或额外 generation 头。Android 的新 DAV 消费、缓存和同步尚须在自身仓库实现并用固定原包验证；Core 导出和标准 Node DAV 库通过不代表 Android 已支持。
+
 ## 合同回归入口
 
 `api/fixtures/client-integration/` 提供基础、四模型协议、两种文生图、四种 TTS、四种 ASR、策略拒绝、HTTP 时序及 Runtime 请求样例。接入资料、Portal Native Bridge 与 Feed 的正反例分别在 `api/fixtures/enrollment/` 和 `api/fixtures/portal/`。Android 应消费固定来源的 Core 导出，按上述响应扩展规则解析，并校验已知字段、引用及执行分派；导出包本身不包含真机运行结果。

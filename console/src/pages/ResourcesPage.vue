@@ -62,7 +62,7 @@ const workspaceVisible = computed(() => !reviewOpen.value && !previewOpen.value)
 const upstreams = ref<Upstream[]>([])
 const upstreamsLoading = ref(false)
 const upstreamError = ref<unknown>()
-const activeTab = ref<'overview' | 'models' | 'image-generation' | 'tts' | 'asr' | 'mcp' | 'assistants' | 'policy'>('overview')
+const activeTab = ref<'overview' | 'models' | 'image-generation' | 'tts' | 'asr' | 'mcp' | 'webdav' | 'assistants' | 'policy'>('overview')
 watch(activeTab, async () => {
   await nextTick()
   // Long MCP catalogs must not leave the next section's first controls under
@@ -115,6 +115,7 @@ const reviewResourceRows = computed(() => [
   { kind: 'TTS', diff: reviewDiffFor('TTS') },
   { kind: 'ASR', diff: reviewDiffFor('ASR') },
   { kind: 'MCP', diff: reviewDiffFor('MCP') },
+  { kind: 'WebDAV', diff: reviewDiffFor('WEBDAV') },
   { kind: $t('experience.tab'), diff: reviewDiffFor('ASSISTANT') },
   { kind: $t('experience.starters'), diff: reviewDiffFor('STARTER') },
 ].filter(row => row.diff.added + row.diff.changed + row.diff.removed > 0))
@@ -126,7 +127,7 @@ const policyChanged = computed(() => {
 const configurationSections = computed<ConfigurationSection[]>(() => {
   const content = draft.localContent
   const totalResources = (content?.models.length ?? 0) + (content?.imageGenerators?.length ?? 0) + (content?.tts.length ?? 0)
-    + (content?.asr.length ?? 0) + (content?.mcp.length ?? 0)
+    + (content?.asr.length ?? 0) + (content?.mcp.length ?? 0) + (content?.webdav?.length ?? 0)
   const enabledLocal = content?.policy
     ? [content.policy.allowLocalProviders, content.policy.allowLocalTts, content.policy.allowLocalAsr,
       content.policy.allowLocalMcp, content.policy.allowLocalAssistants].filter(Boolean).length
@@ -138,6 +139,7 @@ const configurationSections = computed<ConfigurationSection[]>(() => {
     { id: 'tts', label: $t('resources.tabs.tts'), description: $t('resources.navigation.ttsHint'), icon: 'record_voice_over', badge: content?.tts.length ?? 0 },
     { id: 'asr', label: $t('resources.tabs.asr'), description: $t('resources.navigation.asrHint'), icon: 'hearing', badge: content?.asr.length ?? 0 },
     { id: 'mcp', label: $t('resources.tabs.mcp'), description: $t('resources.navigation.mcpHint'), icon: 'hub', badge: content?.mcp.length ?? 0 },
+    { id: 'webdav', label: 'WebDAV', description: '远程工作区的默认文件交换空间', icon: 'folder_shared', badge: content?.webdav?.length ?? 0 },
     { id: 'assistants', label: $t('experience.tab'), description: $t('resources.navigation.assistantsHint'), icon: 'assistant', badge: content?.assistants.length ?? 0 },
     { id: 'policy', label: $t('resources.tabs.policy'), description: $t('resources.navigation.policyHint'), icon: 'policy', badge: $t('resources.navigation.localAllowedCount', { count: enabledLocal }) },
   ]
@@ -176,7 +178,7 @@ const OUTPUT_MODS = ['TEXT'] as const
 const MODEL_CAPS = ['TOOL', 'REASONING'] as const
 const AUTH_OWNERSHIPS = ['ENTERPRISE_MANAGED', 'NONE'] as const
 const IMAGE_SIZE_OPTIONS = ['auto', '256x256', '512x512', '1024x1024', '1024x1536', '1536x1024']
-const RELATIONSHIP_KINDS = ['Model', 'Image Generation', 'TTS', 'ASR', 'MCP'] as const
+const RELATIONSHIP_KINDS = ['Model', 'Image Generation', 'TTS', 'ASR', 'MCP', 'WebDAV'] as const
 const relationshipKindFilter = ref<string>('all')
 
 const up = (id?: string) => upstreams.value.find((u) => u.upstreamId === id)
@@ -317,6 +319,13 @@ const relationshipRows = computed(() => {
       transport: b?.transportPolicy,
       bindingState: !b ? 'missing' : !(b.upstreamId || b.workspaceServiceId) ? 'missing' : 'bound',
     })
+  }
+  for (const dav of c.webdav ?? []) {
+    const binding = draft.bindingFor(dav.resourceId)
+    rows.push({ resourceId: dav.resourceId, kind: 'WebDAV', displayName: dav.displayName,
+      upstreamName: '远程工作区 · 每用户独立空间', enabled: dav.enabled,
+      runtimePath: dav.rootPathTemplate, transport: binding?.transportPolicy,
+      bindingState: binding?.workspaceServiceId ? 'bound' : 'missing' })
   }
   return rows
 })
@@ -573,7 +582,8 @@ function toggleEnabled(kind: string, resourceId: string, enabled: boolean) {
     : kind === 'Image Generation' ? content.imageGenerators?.find(value => value.imageId === resourceId)
       : kind === 'TTS' ? content.tts.find(value => value.ttsId === resourceId)
         : kind === 'ASR' ? content.asr.find(value => value.asrId === resourceId)
-          : content.mcp.find(value => value.mcpServerId === resourceId)
+          : kind === 'WebDAV' ? content.webdav?.find(value => value.resourceId === resourceId)
+            : content.mcp.find(value => value.mcpServerId === resourceId)
   if (item) {
     item.enabled = enabled
     draft.markDirty()
@@ -583,7 +593,7 @@ function toggleEnabled(kind: string, resourceId: string, enabled: boolean) {
 /** Navigate to the editor for a specific resource. */
 function goToResource(kind: string, resourceId: string) {
   selectedResourceId.value = resourceId
-  const tab = ({ Model: 'models', 'Image Generation': 'image-generation', TTS: 'tts', ASR: 'asr', MCP: 'mcp' } as Record<string, string>)[kind]
+  const tab = ({ Model: 'models', 'Image Generation': 'image-generation', TTS: 'tts', ASR: 'asr', MCP: 'mcp', WebDAV: 'webdav' } as Record<string, string>)[kind]
   if (tab) activeTab.value = tab as typeof activeTab.value
 }
 
@@ -601,6 +611,7 @@ function managedKindForId(resourceId: string | undefined): ValidationIssue['reso
   if (draft.localContent.tts.some(item => item.ttsId === resourceId)) return 'TTS'
   if (draft.localContent.asr.some(item => item.asrId === resourceId)) return 'ASR'
   if (draft.localContent.mcp.some(item => item.mcpServerId === resourceId)) return 'MCP'
+  if (draft.localContent.webdav?.some(item => item.resourceId === resourceId)) return 'WEBDAV'
   return undefined
 }
 
@@ -617,6 +628,7 @@ function validationResourceName(issue: ValidationIssue): string {
   if (kind === 'TTS') return content.tts.find(item => item.ttsId === issue.resourceId)?.displayName || fallback
   if (kind === 'ASR') return content.asr.find(item => item.asrId === issue.resourceId)?.displayName || fallback
   if (kind === 'MCP') return content.mcp.find(item => item.mcpServerId === issue.resourceId)?.displayName || fallback
+  if (kind === 'WEBDAV') return content.webdav?.find(item => item.resourceId === issue.resourceId)?.displayName || fallback
   if (kind === 'ASSISTANT') return content.assistants.find(item => item.assistantDefinitionId === issue.resourceId)?.displayName || fallback
   if (kind === 'STARTER') return content.starters.find(item => item.starterId === issue.resourceId)?.title || fallback
   return fallback
@@ -630,7 +642,7 @@ function validationIssueTarget(issue: ValidationIssue): string {
 
 function validationIssueNavigable(issue: ValidationIssue): boolean {
   const kind = issue.resourceKind === 'BINDING' ? managedKindForId(issue.resourceId) : issue.resourceKind
-  return Boolean(kind && ['PROVIDER', 'MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP', 'ASSISTANT', 'STARTER', 'POLICY'].includes(kind))
+  return Boolean(kind && ['PROVIDER', 'MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP', 'WEBDAV', 'ASSISTANT', 'STARTER', 'POLICY'].includes(kind))
 }
 
 function beforeUnload(event: BeforeUnloadEvent) {
@@ -646,7 +658,7 @@ async function goToValidationIssue(issue: ValidationIssue) {
     : kind === 'IMAGE_GENERATION' ? 'image-generation'
       : kind === 'TTS' ? 'tts'
         : kind === 'ASR' ? 'asr'
-          : kind === 'MCP' ? 'mcp'
+          : kind === 'WEBDAV' ? 'webdav' : kind === 'MCP' ? 'mcp'
             : kind === 'ASSISTANT' || kind === 'STARTER' ? 'assistants'
               : kind === 'POLICY' ? 'policy'
                 : kind === 'PROVIDER' ? 'overview' : undefined
@@ -691,7 +703,7 @@ async function addWorkspaceMcp() {
 }
 onBeforeRouteLeave(() => confirmDiscard())
 onMounted(() => {
-  if (route.query.section === 'mcp') activeTab.value = 'mcp'
+  if (route.query.section === 'mcp' || route.query.section === 'webdav') activeTab.value = route.query.section
   window.addEventListener('beforeunload', beforeUnload)
   void refresh(true)
 })
@@ -1272,6 +1284,20 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </template>
 
       <!-- ===== MCP: Collection → Editor ===== -->
+      <section v-if="activeTab === 'webdav'" data-cy="webdav-editor">
+        <q-banner dense class="bg-blue-1 q-mb-md">此资源来自远程工作区，供客户端作为默认文件交换空间。关闭并发布后取消默认指定；Console 文件管理仍使用 Files 接口。</q-banner>
+        <q-banner v-if="!draft.localContent.webdav?.length" dense class="bg-grey-2">配置并启用远程工作区文件服务后，会自动加入默认启用的 DAV 草稿。<router-link to="/remote-workspaces">管理远程工作区</router-link></q-banner>
+        <q-card v-for="dav in draft.localContent.webdav ?? []" :key="dav.resourceId" flat bordered>
+          <q-card-section><div class="text-h6">WebDAV · 默认文件交换空间</div><p class="text-caption text-grey-7">来源：远程工作区 · 每用户独立空间。用户权限在工作区管理中设置。</p>
+            <q-toggle v-model="dav.enabled" label="启用客户端 WebDAV（发布后生效）" :disable="!canMutate || workspaceBusy" @update:model-value="draft.markDirty()" />
+            <q-input v-model="dav.displayName" outlined dense label="显示名称" data-field="displayName" :disable="!canMutate || workspaceBusy" @update:model-value="draft.markDirty()" />
+            <div class="text-caption q-mt-sm">当前发布：{{ remoteWorkspace.current?.davPublishedEnabled ? '已启用' : '未启用' }} · 草稿：{{ dav.enabled ? '启用' : '关闭' }}<span v-if="!remoteWorkspace.enabled"> · 远程工作区未启用，客户端当前无默认文件交换空间</span></div>
+            <router-link to="/remote-workspaces">管理来源工作区与用户权限</router-link>
+            <details class="text-caption q-mt-sm" style="overflow-wrap:anywhere"><summary>资源标识与协议</summary>{{ dav.resourceId }}<div>WEBDAV · {{ dav.rootPathTemplate }}</div></details>
+            <ValidationIssueItem v-for="issue in validationIssuesFor(dav.resourceId).errors" :key="issue.path + issue.code" :issue="issue" />
+          </q-card-section>
+        </q-card>
+      </section>
       <template v-if="activeTab === 'mcp'">
         <ProblemBanner :error="remoteWorkspace.error" />
         <q-banner v-if="remoteWorkspace.enabled && !hasWorkspaceMcp" class="bg-blue-1 q-mb-sm" data-cy="workspace-mcp-offer">
@@ -1650,6 +1676,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   </tr>
                 </tbody>
               </q-markup-table>
+            </q-expansion-item>
+
+            <q-expansion-item dense group="preview" :label="`WebDAV (${preview.webdav?.length ?? 0})`" icon="folder_shared">
+              <q-list><q-item v-for="dav in preview.webdav ?? []" :key="dav.resourceId"><q-item-section><q-item-label>{{ dav.displayName }}</q-item-label><q-item-label caption>远程工作区文件交换 · {{ dav.enabled ? $t('common.enabled') : $t('common.disabled') }}</q-item-label><details class="text-caption"><summary>{{ $t('resources.review.technicalDetails') }}</summary>{{ dav.resourceId }}</details></q-item-section></q-item></q-list>
             </q-expansion-item>
 
             <q-expansion-item dense group="preview" :label="`${$t('resources.preview.mcp')} (${preview.mcp.length})`" icon="link">

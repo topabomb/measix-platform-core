@@ -1007,7 +1007,7 @@ export default {
     requests: '请求',
     errors: '错误',
     blocked: '已阻止',
-    kind: { PROVIDER: '提供商', MODEL: '模型', IMAGE_GENERATION: '文生图', TTS: '语音朗读', ASR: '语音识别', MCP: '工具' },
+    kind: { PROVIDER: '提供商', MODEL: '模型', IMAGE_GENERATION: '文生图', TTS: '语音朗读', ASR: '语音识别', MCP: '工具', WEBDAV: '文件（WebDAV）' },
     errorReasons: {
       routePolicyDenied: '路由未允许该请求',
       invalidInteraction: '交互标识无效',

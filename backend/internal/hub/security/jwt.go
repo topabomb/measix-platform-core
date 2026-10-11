@@ -10,9 +10,10 @@ import (
 )
 
 type AccessClaims struct {
-	DeploymentID string `json:"deploymentId"`
-	DeviceID     string `json:"deviceId"`
-	SessionID    string `json:"sessionId"`
+	DeploymentID      string           `json:"deploymentId"`
+	DeviceID          string           `json:"deviceId"`
+	SessionID         string           `json:"sessionId"`
+	SessionValidUntil *jwt.NumericDate `json:"sessionValidUntil,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -41,8 +42,24 @@ func NewAccessSigner(privateKey ed25519.PrivateKey, deploymentID, keyID string, 
 }
 
 func (s *AccessSigner) Sign(userID, deviceID, sessionID string) (string, time.Time, error) {
+	return s.sign(userID, deviceID, sessionID, time.Time{})
+}
+
+// SignForSession captures the durable session deadline being committed by the
+// identity transaction. It does not extend the short access-token lifetime.
+func (s *AccessSigner) SignForSession(userID, deviceID, sessionID string, validUntil time.Time) (string, time.Time, error) {
+	if !validUntil.After(s.Now()) {
+		return "", time.Time{}, fmt.Errorf("session deadline must be in the future")
+	}
+	return s.sign(userID, deviceID, sessionID, validUntil)
+}
+
+func (s *AccessSigner) sign(userID, deviceID, sessionID string, validUntil time.Time) (string, time.Time, error) {
 	now := s.Now().UTC()
 	expiresAt := now.Add(s.TTL)
+	if !validUntil.IsZero() && validUntil.Before(expiresAt) {
+		expiresAt = validUntil
+	}
 	claims := AccessClaims{
 		DeploymentID: s.DeploymentID,
 		DeviceID:     deviceID,
@@ -54,6 +71,9 @@ func (s *AccessSigner) Sign(userID, deviceID, sessionID string) (string, time.Ti
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},
+	}
+	if !validUntil.IsZero() {
+		claims.SessionValidUntil = jwt.NewNumericDate(validUntil)
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
 	token.Header["kid"] = s.KeyID

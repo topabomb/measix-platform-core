@@ -99,6 +99,11 @@ func BindingRevision(v int64) predicate.WorkspaceOperation {
 	return predicate.WorkspaceOperation(sql.FieldEQ(FieldBindingRevision, v))
 }
 
+// DavBindingRevision applies equality check predicate on the "dav_binding_revision" field. It's identical to DavBindingRevisionEQ.
+func DavBindingRevision(v int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldEQ(FieldDavBindingRevision, v))
+}
+
 // TargetJSON applies equality check predicate on the "target_json" field. It's identical to TargetJSONEQ.
 func TargetJSON(v []byte) predicate.WorkspaceOperation {
 	return predicate.WorkspaceOperation(sql.FieldEQ(FieldTargetJSON, v))
@@ -572,6 +577,46 @@ func BindingRevisionLT(v int64) predicate.WorkspaceOperation {
 // BindingRevisionLTE applies the LTE predicate on the "binding_revision" field.
 func BindingRevisionLTE(v int64) predicate.WorkspaceOperation {
 	return predicate.WorkspaceOperation(sql.FieldLTE(FieldBindingRevision, v))
+}
+
+// DavBindingRevisionEQ applies the EQ predicate on the "dav_binding_revision" field.
+func DavBindingRevisionEQ(v int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldEQ(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionNEQ applies the NEQ predicate on the "dav_binding_revision" field.
+func DavBindingRevisionNEQ(v int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldNEQ(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionIn applies the In predicate on the "dav_binding_revision" field.
+func DavBindingRevisionIn(vs ...int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldIn(FieldDavBindingRevision, vs...))
+}
+
+// DavBindingRevisionNotIn applies the NotIn predicate on the "dav_binding_revision" field.
+func DavBindingRevisionNotIn(vs ...int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldNotIn(FieldDavBindingRevision, vs...))
+}
+
+// DavBindingRevisionGT applies the GT predicate on the "dav_binding_revision" field.
+func DavBindingRevisionGT(v int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldGT(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionGTE applies the GTE predicate on the "dav_binding_revision" field.
+func DavBindingRevisionGTE(v int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldGTE(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionLT applies the LT predicate on the "dav_binding_revision" field.
+func DavBindingRevisionLT(v int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldLT(FieldDavBindingRevision, v))
+}
+
+// DavBindingRevisionLTE applies the LTE predicate on the "dav_binding_revision" field.
+func DavBindingRevisionLTE(v int64) predicate.WorkspaceOperation {
+	return predicate.WorkspaceOperation(sql.FieldLTE(FieldDavBindingRevision, v))
 }
 
 // TargetJSONEQ applies the EQ predicate on the "target_json" field.

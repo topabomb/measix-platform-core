@@ -37,6 +37,7 @@ func TestUsageBudgetContractsFreezeTheSameProductionProtocols(t *testing.T) {
 		"GEMINI_GENERATE_CONTENT_TTS", "GOOGLE_GENERATE_CONTENT", "MCP_STREAMABLE_HTTP",
 		"MIMO_CHAT_COMPLETIONS_TTS", "OPENAI_AUDIO_SPEECH", "OPENAI_AUDIO_TRANSCRIPTIONS",
 		"OPENAI_CHAT_COMPLETIONS", "OPENAI_IMAGES_GENERATIONS", "OPENAI_REALTIME_TRANSCRIPTION", "OPENAI_RESPONSES",
+		"WEBDAV",
 	}
 	for _, file := range []string{
 		"api/admin/admin.openapi.yaml",
@@ -124,8 +125,7 @@ func TestS02BudgetAndSelfUsageSurfacesAreComplete(t *testing.T) {
 	}
 }
 
-func TestBudgetCapabilitiesAndResourceKindsAreFivePeerCategories(t *testing.T) {
-	want := []string{"ASR", "IMAGE_GENERATION", "MCP", "MODEL", "TTS"}
+func TestBudgetCapabilitiesRemainFiveAndDAVIsStatisticsOnlyResource(t *testing.T) {
 	for _, file := range []string{
 		"api/admin/admin.openapi.yaml",
 		"api/client/client-control.openapi.yaml",
@@ -133,6 +133,10 @@ func TestBudgetCapabilitiesAndResourceKindsAreFivePeerCategories(t *testing.T) {
 	} {
 		doc := loadContractDoc(t, file)
 		for _, schema := range []string{"ResourceKind", "BudgetCapability"} {
+			want := []string{"ASR", "IMAGE_GENERATION", "MCP", "MODEL", "TTS"}
+			if schema == "ResourceKind" {
+				want = append(want, "WEBDAV")
+			}
 			got := schemaEnums(t, doc, schema)
 			if len(got) != len(want) {
 				t.Fatalf("%s %s = %v, want %v", file, schema, got, want)

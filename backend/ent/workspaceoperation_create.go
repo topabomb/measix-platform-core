@@ -70,6 +70,20 @@ func (_c *WorkspaceOperationCreate) SetBindingRevision(v int64) *WorkspaceOperat
 	return _c
 }
 
+// SetDavBindingRevision sets the "dav_binding_revision" field.
+func (_c *WorkspaceOperationCreate) SetDavBindingRevision(v int64) *WorkspaceOperationCreate {
+	_c.mutation.SetDavBindingRevision(v)
+	return _c
+}
+
+// SetNillableDavBindingRevision sets the "dav_binding_revision" field if the given value is not nil.
+func (_c *WorkspaceOperationCreate) SetNillableDavBindingRevision(v *int64) *WorkspaceOperationCreate {
+	if v != nil {
+		_c.SetDavBindingRevision(*v)
+	}
+	return _c
+}
+
 // SetTargetJSON sets the "target_json" field.
 func (_c *WorkspaceOperationCreate) SetTargetJSON(v []byte) *WorkspaceOperationCreate {
 	_c.mutation.SetTargetJSON(v)
@@ -195,6 +209,7 @@ func (_c *WorkspaceOperationCreate) Mutation() *WorkspaceOperationMutation {
 
 // Save creates the WorkspaceOperation in the database.
 func (_c *WorkspaceOperationCreate) Save(ctx context.Context) (*WorkspaceOperation, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -220,6 +235,14 @@ func (_c *WorkspaceOperationCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *WorkspaceOperationCreate) defaults() {
+	if _, ok := _c.mutation.DavBindingRevision(); !ok {
+		v := workspaceoperation.DefaultDavBindingRevision
+		_c.mutation.SetDavBindingRevision(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *WorkspaceOperationCreate) check() error {
 	if _, ok := _c.mutation.WorkspaceServiceID(); !ok {
@@ -239,6 +262,9 @@ func (_c *WorkspaceOperationCreate) check() error {
 	}
 	if _, ok := _c.mutation.BindingRevision(); !ok {
 		return &ValidationError{Name: "binding_revision", err: errors.New(`ent: missing required field "WorkspaceOperation.binding_revision"`)}
+	}
+	if _, ok := _c.mutation.DavBindingRevision(); !ok {
+		return &ValidationError{Name: "dav_binding_revision", err: errors.New(`ent: missing required field "WorkspaceOperation.dav_binding_revision"`)}
 	}
 	if _, ok := _c.mutation.TargetJSON(); !ok {
 		return &ValidationError{Name: "target_json", err: errors.New(`ent: missing required field "WorkspaceOperation.target_json"`)}
@@ -321,6 +347,10 @@ func (_c *WorkspaceOperationCreate) createSpec() (*WorkspaceOperation, *sqlgraph
 		_spec.SetField(workspaceoperation.FieldBindingRevision, field.TypeInt64, value)
 		_node.BindingRevision = value
 	}
+	if value, ok := _c.mutation.DavBindingRevision(); ok {
+		_spec.SetField(workspaceoperation.FieldDavBindingRevision, field.TypeInt64, value)
+		_node.DavBindingRevision = value
+	}
 	if value, ok := _c.mutation.TargetJSON(); ok {
 		_spec.SetField(workspaceoperation.FieldTargetJSON, field.TypeBytes, value)
 		_node.TargetJSON = value
@@ -390,6 +420,7 @@ func (_c *WorkspaceOperationCreateBulk) Save(ctx context.Context) ([]*WorkspaceO
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*WorkspaceOperationMutation)
 				if !ok {

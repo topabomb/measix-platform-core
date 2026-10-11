@@ -174,6 +174,12 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 	}
 	pendingJSON, _ := json.Marshal(pendingOperation)
 
+	if s.testHooks.BeforeIntentCommit != nil {
+		if err := s.testHooks.BeforeIntentCommit(ctx); err != nil {
+			return ActivationResult{}, err
+		}
+	}
+
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
 		return ActivationResult{}, err
@@ -216,6 +222,13 @@ func (s *Service) securityChange(ctx context.Context, adminUserID, idempotencyKe
 	fresh, err := tx.ManagedState.Get(ctx, "current")
 	if err != nil || fresh.DesiredControlRevision+1 != int64(revision) {
 		return ActivationResult{}, ErrActivationInProgress
+	}
+	compiledDescriptor, err := relaystate.DescriptorJSON(state)
+	if err != nil {
+		return ActivationResult{}, err
+	}
+	if err := s.validateWorkspaceIntentTx(ctx, tx, compiledDescriptor); err != nil {
+		return ActivationResult{}, err
 	}
 	// deny-first: local Hub state changes before Relay network I/O. Enable is deliberately allow-last.
 	switch securitySubject(operation) {

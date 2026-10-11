@@ -64,6 +64,19 @@ func TestRelayAppFailsClosedUntilControlApply(t *testing.T) {
 	}
 }
 
+func TestDAVMethodsReachRuntimeThroughPublicRouter(t *testing.T) {
+	a := app.New("test", "test", nil, nil, nil)
+	for _, method := range []string{"PROPFIND", "PROPPATCH", "MKCOL", "COPY", "MOVE", "LOCK", "UNLOCK"} {
+		t.Run(method, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			a.Public.ServeHTTP(response, httptest.NewRequest(method, "/runtime/v1/resources/dav_test/spaces/spc_test/dav/", nil))
+			if response.Code != http.StatusServiceUnavailable || !bytes.Contains(response.Body.Bytes(), []byte(`"code":"runtime_control_unavailable"`)) {
+				t.Fatalf("DAV method did not reach runtime control guard: %d %s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
 func TestRelayInternalControlRequiresServiceCredential(t *testing.T) {
 	a := app.New("relay-service-token", "relay-test-build", nil, nil, nil)
 	request := httptest.NewRequest(http.MethodGet, "/internal/v1/control/status", nil)

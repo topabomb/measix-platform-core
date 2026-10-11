@@ -27,6 +27,7 @@ type upstreamDescriptor struct {
 type descriptor struct {
 	ProtocolVersion         *relaycontrolapi.RuntimeControlStateProtocolVersion `json:"protocolVersion,omitempty"`
 	UserBindings            []bindingDescriptor                                 `json:"userBindings,omitempty"`
+	DAVBindings             []davBindingDescriptor                              `json:"davBindings,omitempty"`
 	ControlRevision         int                                                 `json:"controlRevision"`
 	ActiveManagedGeneration int                                                 `json:"activeManagedGeneration"`
 	DeploymentID            string                                              `json:"deploymentId"`
@@ -44,6 +45,15 @@ type bindingDescriptor struct {
 	Target      relaycontrolapi.WorkspaceTarget `json:"target"`
 	Endpoint    string                          `json:"endpoint"`
 	SecretRef   relaycontrolapi.SecretRef       `json:"secretRef"`
+}
+
+type davBindingDescriptor struct {
+	UserId     string                          `json:"userId"`
+	ResourceId string                          `json:"resourceId"`
+	Target     relaycontrolapi.WorkspaceTarget `json:"target"`
+	Endpoint   string                          `json:"endpoint"`
+	SecretRef  relaycontrolapi.SecretRef       `json:"secretRef"`
+	AccessMode relaycontrolapi.DAVAccessMode   `json:"accessMode"`
 }
 
 func DescriptorJSON(input relaycontrolapi.RuntimeControlState) ([]byte, error) {
@@ -105,8 +115,20 @@ func DescriptorJSON(input relaycontrolapi.RuntimeControlState) ([]byte, error) {
 		}
 		return bindings[i].UserId < bindings[j].UserId
 	})
+	davBindings := []davBindingDescriptor{}
+	if input.DavBindings != nil {
+		for _, b := range *input.DavBindings {
+			davBindings = append(davBindings, davBindingDescriptor{b.UserId, b.ResourceId, b.Target, b.Endpoint, b.SecretRef, b.AccessMode})
+		}
+	}
+	sort.Slice(davBindings, func(i, j int) bool {
+		if davBindings[i].UserId == davBindings[j].UserId {
+			return davBindings[i].ResourceId < davBindings[j].ResourceId
+		}
+		return davBindings[i].UserId < davBindings[j].UserId
+	})
 	return json.Marshal(descriptor{
-		ProtocolVersion: input.ProtocolVersion, UserBindings: bindings,
+		ProtocolVersion: input.ProtocolVersion, UserBindings: bindings, DAVBindings: davBindings,
 		ControlRevision: input.ControlRevision, ActiveManagedGeneration: input.ActiveManagedGeneration,
 		DeploymentID: input.DeploymentId, AuthKeys: authKeys, PrincipalState: principal,
 		ResourceRoutes: resourceRoutes, Routes: routes, Upstreams: upstreams, OperationalLimits: input.OperationalLimits,

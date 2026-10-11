@@ -31,6 +31,16 @@ const (
 	FieldDavSecretID = "dav_secret_id"
 	// FieldDavSecretVersion holds the string denoting the dav_secret_version field in the database.
 	FieldDavSecretVersion = "dav_secret_version"
+	// FieldFileAccessIntent holds the string denoting the file_access_intent field in the database.
+	FieldFileAccessIntent = "file_access_intent"
+	// FieldDavAccessMode holds the string denoting the dav_access_mode field in the database.
+	FieldDavAccessMode = "dav_access_mode"
+	// FieldDavBindingRevision holds the string denoting the dav_binding_revision field in the database.
+	FieldDavBindingRevision = "dav_binding_revision"
+	// FieldDavAppliedAccessMode holds the string denoting the dav_applied_access_mode field in the database.
+	FieldDavAppliedAccessMode = "dav_applied_access_mode"
+	// FieldDavAppliedRevision holds the string denoting the dav_applied_revision field in the database.
+	FieldDavAppliedRevision = "dav_applied_revision"
 	// FieldDavConfirmed holds the string denoting the dav_confirmed field in the database.
 	FieldDavConfirmed = "dav_confirmed"
 	// FieldRemoteActive holds the string denoting the remote_active field in the database.
@@ -64,6 +74,11 @@ var Columns = []string{
 	FieldMcpSecretVersion,
 	FieldDavSecretID,
 	FieldDavSecretVersion,
+	FieldFileAccessIntent,
+	FieldDavAccessMode,
+	FieldDavBindingRevision,
+	FieldDavAppliedAccessMode,
+	FieldDavAppliedRevision,
 	FieldDavConfirmed,
 	FieldRemoteActive,
 	FieldStopPending,
@@ -83,6 +98,19 @@ func ValidColumn(column string) bool {
 	}
 	return false
 }
+
+var (
+	// DefaultFileAccessIntent holds the default value on creation for the "file_access_intent" field.
+	DefaultFileAccessIntent string
+	// DefaultDavAccessMode holds the default value on creation for the "dav_access_mode" field.
+	DefaultDavAccessMode string
+	// DefaultDavBindingRevision holds the default value on creation for the "dav_binding_revision" field.
+	DefaultDavBindingRevision int64
+	// DefaultDavAppliedAccessMode holds the default value on creation for the "dav_applied_access_mode" field.
+	DefaultDavAppliedAccessMode string
+	// DefaultDavAppliedRevision holds the default value on creation for the "dav_applied_revision" field.
+	DefaultDavAppliedRevision int64
+)
 
 // OrderOption defines the ordering options for the AgentSpace queries.
 type OrderOption func(*sql.Selector)
@@ -140,6 +168,31 @@ func ByDavSecretID(opts ...sql.OrderTermOption) OrderOption {
 // ByDavSecretVersion orders the results by the dav_secret_version field.
 func ByDavSecretVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDavSecretVersion, opts...).ToFunc()
+}
+
+// ByFileAccessIntent orders the results by the file_access_intent field.
+func ByFileAccessIntent(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFileAccessIntent, opts...).ToFunc()
+}
+
+// ByDavAccessMode orders the results by the dav_access_mode field.
+func ByDavAccessMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDavAccessMode, opts...).ToFunc()
+}
+
+// ByDavBindingRevision orders the results by the dav_binding_revision field.
+func ByDavBindingRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDavBindingRevision, opts...).ToFunc()
+}
+
+// ByDavAppliedAccessMode orders the results by the dav_applied_access_mode field.
+func ByDavAppliedAccessMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDavAppliedAccessMode, opts...).ToFunc()
+}
+
+// ByDavAppliedRevision orders the results by the dav_applied_revision field.
+func ByDavAppliedRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDavAppliedRevision, opts...).ToFunc()
 }
 
 // ByDavConfirmed orders the results by the dav_confirmed field.

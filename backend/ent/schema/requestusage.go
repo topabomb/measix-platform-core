@@ -19,6 +19,8 @@ func (RequestUsage) Fields() []ent.Field {
 		field.String("resource_id"),
 		field.String("resource_kind"),
 		field.String("client_protocol"),
+		field.String("http_method").Default(""),
+		field.Bool("statistics_only").Default(false),
 		field.String("runtime_route_id"),
 		field.String("upstream_id").Optional(),
 		field.Bytes("workspace_target_json").Optional(),

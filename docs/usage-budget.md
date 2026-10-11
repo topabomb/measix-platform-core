@@ -193,6 +193,8 @@ Portal 本人数据读取复用 source/session 的取消和用户隔离。打开
 
 ## 远程工作区归属
 
+平台 WebDAV 使用独立 v3 私有 DAV target 固定用户、资源、服务、空间、绑定及凭据版本。事实标记 `statisticsOnly`，复用持久 spool / ingest 去重，记录 method、HTTP status、实际请求与响应正文 bytes、时长和中断。DAV 不进入预算准入、费用或额度统计；Files 不新增用量。迟到 401 只使匹配版本不可用并撤除运行绑定，不自动改写上游 key；删除用户的迟到事实按既有规则 ACK 丢弃。
+
 MCP workspaceTarget 使用 v2 固定归属，贯穿准入、Relay spool、UsageFact 和历史详情；不从当前用户空间反查补写归属。旧 upstream 归属继续读取。源字段和恢复边界由远程工作区实现参考统一说明。
 
 详见[远程工作区实现参考](remote-workspace-implementation.md)；历史联调由[证据索引](s0-execution-progress.md)定位。

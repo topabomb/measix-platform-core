@@ -55,7 +55,7 @@ func TestSettlementLedgerIsAtomicIdempotentAndConvertsAudioOnce(t *testing.T) {
 		OccurredAt: now.Add(time.Second), Completeness: usageingestapi.EXACT, State: usageingestapi.SETTLED,
 		Request: usageingestapi.RequestUsageFact{
 			DeploymentId: deploymentID, UserId: userID, InteractionId: &interactionID, ResourceId: resourceID,
-			ResourceKind: usageingestapi.ResourceKindASR, ClientProtocol: usageingestapi.OPENAIAUDIOTRANSCRIPTIONS,
+			ResourceKind: usageingestapi.ResourceKindASR, ClientProtocol: usageingestapi.ClientProtocolOPENAIAUDIOTRANSCRIPTIONS,
 			RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: upstreamID, ManagedGeneration: 1, ControlRevision: 1,
 			StartedAt: now.Add(time.Millisecond), CompletedAt: now.Add(time.Second), Forwarded: true, HttpStatus: 200,
 			RequestBytes: 100, ResponseBytes: 20, DurationMs: 999,
@@ -167,7 +167,7 @@ func TestProvenUnforwardedDenialRequiresFullAttributionAndAppearsBlocked(t *test
 		OccurredAt: now, State: usageingestapi.SETTLED, Completeness: usageingestapi.EXACT, Meters: []usageingestapi.MeterValue{},
 		Request: usageingestapi.RequestUsageFact{
 			DeploymentId: deploymentID, UserId: userID, ResourceId: resourceID, ResourceKind: usageingestapi.ResourceKindMODEL,
-			ClientProtocol: usageingestapi.OPENAIRESPONSES, RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: upstreamID,
+			ClientProtocol: usageingestapi.ClientProtocolOPENAIRESPONSES, RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: upstreamID,
 			ManagedGeneration: 2, ControlRevision: 3, StartedAt: now, CompletedAt: now, Forwarded: false,
 			HttpStatus: 429, RequestBytes: 40, ResponseBytes: 0, DurationMs: 0,
 		},
@@ -244,7 +244,7 @@ func structurallyValidSettlement(now time.Time) usageingestapi.UsageSettlement {
 		Request: usageingestapi.RequestUsageFact{
 			DeploymentId: platformid.New(platformid.Deployment), UserId: platformid.New(platformid.User),
 			ResourceId: platformid.New(platformid.Model), ResourceKind: usageingestapi.ResourceKindMODEL,
-			ClientProtocol: usageingestapi.OPENAICHATCOMPLETIONS, RuntimeRouteId: platformid.New(platformid.Route),
+			ClientProtocol: usageingestapi.ClientProtocolOPENAICHATCOMPLETIONS, RuntimeRouteId: platformid.New(platformid.Route),
 			UpstreamId: platformid.New(platformid.Upstream), ManagedGeneration: 1, ControlRevision: 1,
 			StartedAt: now.Add(-time.Second), CompletedAt: now, Forwarded: true, HttpStatus: 200,
 			RequestBytes: 10, ResponseBytes: 20, DurationMs: 1000,

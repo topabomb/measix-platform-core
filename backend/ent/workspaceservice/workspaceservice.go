@@ -25,6 +25,12 @@ const (
 	FieldMcpServerID = "mcp_server_id"
 	// FieldRuntimeRouteID holds the string denoting the runtime_route_id field in the database.
 	FieldRuntimeRouteID = "runtime_route_id"
+	// FieldDavResourceID holds the string denoting the dav_resource_id field in the database.
+	FieldDavResourceID = "dav_resource_id"
+	// FieldDavRuntimeRouteID holds the string denoting the dav_runtime_route_id field in the database.
+	FieldDavRuntimeRouteID = "dav_runtime_route_id"
+	// FieldDavStaged holds the string denoting the dav_staged field in the database.
+	FieldDavStaged = "dav_staged"
 	// FieldDiagnosticCode holds the string denoting the diagnostic_code field in the database.
 	FieldDiagnosticCode = "diagnostic_code"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -45,6 +51,9 @@ var Columns = []string{
 	FieldState,
 	FieldMcpServerID,
 	FieldRuntimeRouteID,
+	FieldDavResourceID,
+	FieldDavRuntimeRouteID,
+	FieldDavStaged,
 	FieldDiagnosticCode,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -59,6 +68,15 @@ func ValidColumn(column string) bool {
 	}
 	return false
 }
+
+var (
+	// DefaultDavResourceID holds the default value on creation for the "dav_resource_id" field.
+	DefaultDavResourceID string
+	// DefaultDavRuntimeRouteID holds the default value on creation for the "dav_runtime_route_id" field.
+	DefaultDavRuntimeRouteID string
+	// DefaultDavStaged holds the default value on creation for the "dav_staged" field.
+	DefaultDavStaged bool
+)
 
 // OrderOption defines the ordering options for the WorkspaceService queries.
 type OrderOption func(*sql.Selector)
@@ -101,6 +119,21 @@ func ByMcpServerID(opts ...sql.OrderTermOption) OrderOption {
 // ByRuntimeRouteID orders the results by the runtime_route_id field.
 func ByRuntimeRouteID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRuntimeRouteID, opts...).ToFunc()
+}
+
+// ByDavResourceID orders the results by the dav_resource_id field.
+func ByDavResourceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDavResourceID, opts...).ToFunc()
+}
+
+// ByDavRuntimeRouteID orders the results by the dav_runtime_route_id field.
+func ByDavRuntimeRouteID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDavRuntimeRouteID, opts...).ToFunc()
+}
+
+// ByDavStaged orders the results by the dav_staged field.
+func ByDavStaged(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDavStaged, opts...).ToFunc()
 }
 
 // ByDiagnosticCode orders the results by the diagnostic_code field.

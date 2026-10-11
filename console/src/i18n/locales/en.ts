@@ -1007,7 +1007,7 @@ export default {
     requests: 'Requests',
     errors: 'Errors',
     blocked: 'Blocked',
-    kind: { PROVIDER: 'Provider', MODEL: 'Model', IMAGE_GENERATION: 'Image generation', TTS: 'Speech (TTS)', ASR: 'Transcription (ASR)', MCP: 'Tools (MCP)' },
+    kind: { PROVIDER: 'Provider', MODEL: 'Model', IMAGE_GENERATION: 'Image generation', TTS: 'Speech (TTS)', ASR: 'Transcription (ASR)', MCP: 'Tools (MCP)', WEBDAV: 'Files (WebDAV)' },
     errorReasons: {
       routePolicyDenied: 'Route does not allow this request',
       invalidInteraction: 'Invalid interaction ID',

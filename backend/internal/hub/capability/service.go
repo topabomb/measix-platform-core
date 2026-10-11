@@ -45,6 +45,7 @@ type DraftPreview struct {
 	TTS                   []adminapi.TtsDefinition
 	ASR                   []adminapi.AsrDefinition
 	MCP                   []adminapi.McpDefinition
+	WebDAV                []adminapi.WebDAVDefinition
 	Policy                adminapi.ManagedPolicy
 	Assistants            []adminapi.ManagedAssistantDefinition
 	Starters              []adminapi.AssistantStarterDefinition
@@ -107,6 +108,10 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 			prev[m.McpServerId] = mcpPublishedHash(m)
 			prevKinds[m.McpServerId] = adminapi.ReleaseDiffKindMCP
 		}
+		for _, d := range webdavDefinitions(*previous) {
+			prev[d.ResourceId] = defHash(d)
+			prevKinds[d.ResourceId] = adminapi.ReleaseDiffKindWEBDAV
+		}
 		for _, a := range previous.Assistants {
 			prev[string(a.AssistantDefinitionId)] = defHash(a)
 			prevKinds[string(a.AssistantDefinitionId)] = adminapi.ReleaseDiffKindASSISTANT
@@ -165,6 +170,9 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 	for _, m := range current.Mcp {
 		process(adminapi.ReleaseDiffKindMCP, m.McpServerId)
 	}
+	for _, d := range webdavDefinitions(*current) {
+		process(adminapi.ReleaseDiffKindWEBDAV, d.ResourceId)
+	}
 	for _, a := range current.Assistants {
 		process(adminapi.ReleaseDiffKindASSISTANT, string(a.AssistantDefinitionId))
 	}
@@ -190,6 +198,7 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 		adminapi.ReleaseDiffKindTTS,
 		adminapi.ReleaseDiffKindASR,
 		adminapi.ReleaseDiffKindMCP,
+		adminapi.ReleaseDiffKindWEBDAV,
 		adminapi.ReleaseDiffKindPOLICY,
 		adminapi.ReleaseDiffKindASSISTANT,
 		adminapi.ReleaseDiffKindSTARTER,
@@ -215,6 +224,11 @@ func releaseContentDiff(current, previous *adminapi.ManagedDraftContent) adminap
 // currentHash returns the canonical JSON hash of the definition with the given
 // ID within the current content, or "" if not present.
 func currentHash(content *adminapi.ManagedDraftContent, id string) string {
+	for _, d := range webdavDefinitions(*content) {
+		if d.ResourceId == id {
+			return defHash(d)
+		}
+	}
 	for _, p := range content.Providers {
 		if p.ProviderId == id {
 			return defHash(p)
@@ -449,6 +463,10 @@ func NewService(client *ent.Client) *Service {
 // Snapshot v4 image generators. Older rows may omit the field; every current
 // in-memory value and every new write uses an explicit empty list instead.
 func NormalizeManagedDraftContent(content adminapi.ManagedDraftContent) adminapi.ManagedDraftContent {
+	if content.Webdav == nil {
+		empty := []adminapi.WebDAVDefinition{}
+		content.Webdav = &empty
+	}
 	if content.ImageGenerators == nil {
 		empty := []adminapi.ImageGenerationDefinition{}
 		content.ImageGenerators = &empty
@@ -498,6 +516,9 @@ func (s *Service) PutDraft(ctx context.Context, updatedBy string, expectedRevisi
 		return DraftView{}, err
 	}
 	if err := s.validateMcpSave(ctx, previous, content); err != nil {
+		return DraftView{}, err
+	}
+	if err := s.validateDerivedDAVSave(ctx, content); err != nil {
 		return DraftView{}, err
 	}
 	contentJSON, err := json.Marshal(content)
@@ -603,6 +624,7 @@ func (s *Service) PreviewDraft(ctx context.Context, expectedRevision int) (Draft
 		TTS:                   projectionToAdminTts(snapshot.Tts),
 		ASR:                   projectionToAdminAsr(snapshot.Asr),
 		MCP:                   projectionToAdminMcp(snapshot.Mcp),
+		WebDAV:                webdavDefinitions(effectiveContent),
 		Policy: adminapi.ManagedPolicy{
 			PolicyId:                           snapshot.Policy.PolicyId,
 			AllowLocalProviders:                snapshot.Policy.AllowLocalProviders,
@@ -706,6 +728,7 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 	kindTTS := adminapi.ValidationIssueResourceKind("TTS")
 	kindASR := adminapi.ValidationIssueResourceKind("ASR")
 	kindMCP := adminapi.ValidationIssueResourceKind("MCP")
+	kindDAV := adminapi.ValidationIssueResourceKindWEBDAV
 	kindPolicy := adminapi.ValidationIssueResourceKind("POLICY")
 	kindBinding := adminapi.ValidationIssueResourceKind("BINDING")
 	kindAssistant := adminapi.ValidationIssueResourceKind("ASSISTANT")
@@ -907,6 +930,10 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 		}
 	}
 
+	for _, value := range webdavDefinitions(content) {
+		resources[value.ResourceId] = value.Enabled
+		resourceKinds[value.ResourceId] = kindDAV
+	}
 	// Validate assistants
 	enabledModels := map[string]bool{}
 	for _, m := range content.Models {
@@ -998,6 +1025,12 @@ func (s *Service) validateContent(ctx context.Context, content adminapi.ManagedD
 			addError("duplicate_binding", path+".resourceId", "resource has more than one runtime binding", &kindBinding, ptrStr(binding.ResourceId), ptrStr("resourceId"))
 		} else {
 			bound[binding.ResourceId] = true
+		}
+		if resourceKinds[binding.ResourceId] == kindDAV {
+			if err := s.validateDAVBinding(ctx, binding); err != nil {
+				addError("invalid_workspace_dav_binding", path, err.Error(), &kindDAV, ptrStr(binding.ResourceId), nil)
+			}
+			continue
 		}
 		if !binding.TransportPolicy.Valid() {
 			addError("invalid_transport_policy", path+".transportPolicy", "unsupported transport policy", &kindBinding, ptrStr(binding.ResourceId), ptrStr("transportPolicy"))
@@ -1195,6 +1228,17 @@ func validateCandidateIDs(content adminapi.ManagedDraftContent) error {
 	for i, value := range content.Mcp {
 		if err := check(platformid.MCP, value.McpServerId, fmt.Sprintf("mcp[%d]", i)); err != nil {
 			return err
+		}
+	}
+	if len(webdavDefinitions(content)) > 1 {
+		return fmt.Errorf("webdav has more than one workspace file exchange resource")
+	}
+	for i, value := range webdavDefinitions(content) {
+		if err := check(platformid.WebDAV, value.ResourceId, fmt.Sprintf("webdav[%d]", i)); err != nil {
+			return err
+		}
+		if strings.TrimSpace(value.DisplayName) == "" || value.ClientProtocol != "WEBDAV" || value.AuthOwnership != "ENTERPRISE_MANAGED" || value.Purpose != "WORKSPACE_FILE_EXCHANGE" || value.RootPathTemplate != DAVRootPathTemplate(value.ResourceId) {
+			return fmt.Errorf("webdav[%d] has invalid workspace definition", i)
 		}
 	}
 	if err := check(platformid.Policy, content.Policy.PolicyId, "policy"); err != nil {

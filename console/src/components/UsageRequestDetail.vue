@@ -71,13 +71,15 @@ function meterValue(item: MeterQuantity): string {
           <tr v-if="request.deviceId"><td class="text-grey-7">{{ $t('usage.detail.device') }}</td><td>{{ request.deviceName || '—' }}</td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.detail.resource') }}</td><td>{{ request.resourceDisplayName || request.resourceId || $t('usage.unnamedResource') }}</td></tr>
           <tr v-if="request.resourceKind"><td class="text-grey-7">{{ $t('usage.filters.resourceKind') }}</td><td>{{ kindLabel(request.resourceKind) }}</td></tr>
+          <tr v-if="request.httpMethod"><td class="text-grey-7">HTTP</td><td>{{ request.httpMethod }}</td></tr>
           <tr><td class="text-grey-7">{{ $t('common.status') }}</td><td>{{ request.forwarded ? $t('usage.detail.forwarded').toLowerCase() : $t('usage.blocked').toLowerCase() }} · HTTP {{ request.httpStatus }}<template v-if="request.upstreamHttpStatus"> · {{ $t('usage.detail.upstream') }} HTTP {{ request.upstreamHttpStatus }}</template></td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.detail.duration') }}</td><td>{{ request.durationMs }} ms</td></tr>
           <tr><td class="text-grey-7">{{ $t('usage.bytes') }}</td><td>{{ fmtBytes(request.requestBytes) }} in · {{ fmtBytes(request.responseBytes) }} out</td></tr>
-          <tr v-if="request.requestCompleteness"><td class="text-grey-7">{{ $t('usage.detail.usageCompleteness') }}</td><td>{{ $t(`status.${request.requestCompleteness}`) }}</td></tr>
-          <tr v-if="request.settlementState"><td class="text-grey-7">{{ $t('usage.detail.settlement') }}</td><td>{{ $t(`usage.settlement.${request.settlementState}`) }}</td></tr>
+          <tr v-if="request.requestCompleteness && !request.statisticsOnly"><td class="text-grey-7">{{ $t('usage.detail.usageCompleteness') }}</td><td>{{ $t(`status.${request.requestCompleteness}`) }}</td></tr>
+          <tr v-if="request.settlementState && !request.statisticsOnly"><td class="text-grey-7">{{ $t('usage.detail.settlement') }}</td><td>{{ $t(`usage.settlement.${request.settlementState}`) }}</td></tr>
           <tr v-if="request.errorClass"><td class="text-grey-7">{{ $t('usage.errorClass') }}</td><td>{{ errorLabel(request.errorClass) }} <span class="text-caption text-grey-7">({{ request.errorClass }})</span></td></tr>
       </tbody></q-markup-table>
+      <template v-if="!request.statisticsOnly">
       <div class="text-subtitle2 q-mt-sm">{{ $t('usage.detail.semanticMeters') }}</div>
       <div v-if="request.semanticMeters?.length" class="usage-detail-meters q-mt-xs">
         <div v-for="meter in request.semanticMeters" :key="meter.meter" class="usage-detail-meter">
@@ -87,7 +89,9 @@ function meterValue(item: MeterQuantity): string {
         </div>
       </div>
       <div v-else class="text-body2 text-grey-7 q-mt-xs">{{ $t('usage.noSemanticMeters') }}</div>
-      <template v-if="request.cost">
+      </template>
+      <div v-else class="text-caption q-mt-sm">WebDAV 仅记录请求及传输统计，不参与预算或计费。</div>
+      <template v-if="request.cost && !request.statisticsOnly">
         <div class="text-subtitle2 q-mt-sm">{{ $t('pricing.estimatedCost') }}</div>
         <div class="text-body2">{{ costAmounts(request.cost) }} · {{ $t(`usage.cost${request.cost.status === 'KNOWN' ? 'Known' : request.cost.status === 'PARTIAL' ? 'Partial' : 'Unknown'}`) }}</div>
         <div v-if="request.cost.missingPricingRequests" class="text-caption text-grey-7">{{ $t('pricing.missingPricing', { count: request.cost.missingPricingRequests }) }}</div>

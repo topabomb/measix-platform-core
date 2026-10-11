@@ -62,7 +62,7 @@ func TestRecordDeniedSpoolHubIngestAndBlockedSummary(t *testing.T) {
 	admission := usageingestapi.BudgetAdmissionRequest{
 		RequestId: requestID, RequestHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		DeploymentId: deploymentID, UserId: userID, ResourceId: resourceID, ResourceKind: usageingestapi.ResourceKindMODEL,
-		ClientProtocol: usageingestapi.OPENAIRESPONSES, UpstreamId: upstreamID, ManagedGeneration: 1, ControlRevision: 1,
+		ClientProtocol: usageingestapi.ClientProtocolOPENAIRESPONSES, UpstreamId: upstreamID, ManagedGeneration: 1, ControlRevision: 1,
 		AdmittedAt: now, KnownUsage: &knownUsage, SupportedMeters: []usageingestapi.UsageMeter{usageingestapi.REQUESTS},
 	}
 	settlement := usageingestapi.UsageSettlement{
@@ -70,7 +70,7 @@ func TestRecordDeniedSpoolHubIngestAndBlockedSummary(t *testing.T) {
 		SourceEventId: requestID + ":1", OccurredAt: now, State: usageingestapi.SETTLED, Completeness: usageingestapi.EXACT,
 		Meters: []usageingestapi.MeterValue{}, Request: usageingestapi.RequestUsageFact{
 			DeploymentId: deploymentID, UserId: userID, ResourceId: resourceID, ResourceKind: usageingestapi.ResourceKindMODEL,
-			ClientProtocol: usageingestapi.OPENAIRESPONSES, RuntimeRouteId: routeID, UpstreamId: upstreamID,
+			ClientProtocol: usageingestapi.ClientProtocolOPENAIRESPONSES, RuntimeRouteId: routeID, UpstreamId: upstreamID,
 			ManagedGeneration: 1, ControlRevision: 1, StartedAt: now, CompletedAt: now, Forwarded: false,
 			HttpStatus: 429, RequestBytes: 20, ResponseBytes: 0, DurationMs: 0,
 		},
@@ -252,7 +252,7 @@ func usageEvent(now time.Time) usageingestapi.UsageSettlement {
 		Request: usageingestapi.RequestUsageFact{
 			DeploymentId: platformid.New(platformid.Deployment), UserId: platformid.New(platformid.User),
 			ResourceId: platformid.New(platformid.Model), ResourceKind: usageingestapi.ResourceKindMODEL,
-			ClientProtocol: usageingestapi.OPENAIRESPONSES, RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: platformid.New(platformid.Upstream),
+			ClientProtocol: usageingestapi.ClientProtocolOPENAIRESPONSES, RuntimeRouteId: platformid.New(platformid.Route), UpstreamId: platformid.New(platformid.Upstream),
 			ManagedGeneration: 1, ControlRevision: 1, StartedAt: now, CompletedAt: now,
 			Forwarded: true, HttpStatus: 200, RequestBytes: 1, ResponseBytes: 1, DurationMs: 0,
 		},

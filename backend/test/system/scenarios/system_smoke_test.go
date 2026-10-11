@@ -270,11 +270,11 @@ func buildState(t *testing.T, upstreamURL string) (relaycontrolapi.RuntimeContro
 		AuthKeys:                []relaycontrolapi.PublicJwk{signer.publicJWK()},
 		PrincipalState:          relaycontrolapi.PrincipalState{DisabledUserIds: []string{}, RevokedDeviceIds: []string{}, RevokedSessionIds: []string{}},
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{
-			{ResourceId: modelID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMODEL, ClientProtocol: relaycontrolapi.OPENAICHATCOMPLETIONS, RuntimeRouteId: modelRoute, LlmProfile: &relaycontrolapi.RuntimeLlmProfile{}},
-			{ResourceId: imageID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION, ClientProtocol: relaycontrolapi.OPENAIIMAGESGENERATIONS, RuntimeRouteId: imageRoute, ImageProfile: &relaycontrolapi.RuntimeImageProfile{MaxImagesPerRequest: 4, AllowedSizes: []string{"auto", "1024x1024"}}},
-			{ResourceId: ttsID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindTTS, ClientProtocol: relaycontrolapi.OPENAIAUDIOSPEECH, RuntimeRouteId: ttsRoute},
-			{ResourceId: asrID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.OPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: 1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
-			{ResourceId: mcpID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMCP, ClientProtocol: relaycontrolapi.MCPSTREAMABLEHTTP, RuntimeRouteId: mcpRoute},
+			{ResourceId: modelID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMODEL, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolOPENAICHATCOMPLETIONS, RuntimeRouteId: modelRoute, LlmProfile: &relaycontrolapi.RuntimeLlmProfile{}},
+			{ResourceId: imageID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolOPENAIIMAGESGENERATIONS, RuntimeRouteId: imageRoute, ImageProfile: &relaycontrolapi.RuntimeImageProfile{MaxImagesPerRequest: 4, AllowedSizes: []string{"auto", "1024x1024"}}},
+			{ResourceId: ttsID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindTTS, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolOPENAIAUDIOSPEECH, RuntimeRouteId: ttsRoute},
+			{ResourceId: asrID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindASR, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolOPENAIAUDIOTRANSCRIPTIONS, RuntimeRouteId: asrRoute, AudioProfile: &relaycontrolapi.RuntimeAudioProfile{Channels: 1, Encoding: relaycontrolapi.WAVPCM16LE, SampleRates: []relaycontrolapi.RuntimeAudioProfileSampleRates{relaycontrolapi.N16000}}},
+			{ResourceId: mcpID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindMCP, ClientProtocol: relaycontrolapi.ResourceRouteClientProtocolMCPSTREAMABLEHTTP, RuntimeRouteId: mcpRoute},
 		},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{
 			{RuntimeRouteId: modelRoute, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{"/v1/chat/completions"}, TransportPolicy: relaycontrolapi.HTTPSTREAMINGSSE, TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: 30000}},

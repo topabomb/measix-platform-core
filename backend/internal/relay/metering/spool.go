@@ -243,6 +243,12 @@ func (s *Spool) SaveDenied(ctx context.Context, requestID string, admission, set
 	return nil
 }
 
+// Statistics enter only the final-delivery state. The explicit journal marker
+// is not an admission, and these rows never enter budget lifecycle recovery.
+func (s *Spool) SaveStatistics(ctx context.Context, requestID string, settlement json.RawMessage, occurredAt time.Time) error {
+	return s.SaveDenied(ctx, requestID, json.RawMessage(`{"kind":"WEBDAV_STATISTICS"}`), settlement, occurredAt)
+}
+
 func (s *Spool) Pending(ctx context.Context, limit int) ([]Row, error) {
 	return s.queryRows(ctx, `SELECT seq,request_id,settlement_json,attempt_count FROM runtime_request_spool WHERE state='SETTLEMENT_PENDING' ORDER BY seq LIMIT ?`, limit)
 }

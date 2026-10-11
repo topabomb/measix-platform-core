@@ -71,7 +71,9 @@ const status = ref<string>()
 const completeness = ref<string>()
 const clientProtocol = ref<string>()
 const budgetStatus = ref<string>()
-const resourceKinds = ['PROVIDER', 'MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP']
+const resourceKinds = ['PROVIDER', 'MODEL', 'IMAGE_GENERATION', 'TTS', 'ASR', 'MCP', 'WEBDAV']
+const davOnly = computed(() => resourceKind.value === 'WEBDAV' || clientProtocol.value === 'WEBDAV' || resourceId.value?.startsWith('dav_'))
+watch(davOnly, value => { if (value) budgetStatus.value = undefined })
 const statuses = ['SUCCESS', 'ERROR', 'BLOCKED']
 const completenesses = ['EXACT', 'PARTIAL', 'UNKNOWN']
 const budgetStatuses = ['EXHAUSTED', 'NEAR_LIMIT', 'PENDING_RECONCILIATION']
@@ -381,7 +383,7 @@ onBeforeUnmount(() => {
         <q-select v-model="resourceKind" outlined dense :label="$t('usage.filters.resourceKind')" :options="resourceKinds" clearable />
         <q-select v-model="status" outlined dense :label="$t('usage.filters.status')" :options="statuses" clearable />
         <q-select v-model="completeness" outlined dense :label="$t('usage.filters.completeness')" :options="completenesses" clearable />
-        <q-select v-model="clientProtocol" outlined dense :label="$t('usage.filters.protocol')" :options="clientProtocols" clearable data-cy="usage-protocol-filter" />
+        <q-select v-model="clientProtocol" outlined dense :label="$t('usage.filters.protocol')" :options="[...clientProtocols, 'WEBDAV']" clearable data-cy="usage-protocol-filter" />
         <q-input v-model="resourceId" outlined dense :label="$t('usage.filters.resource')" placeholder="mdl_..." />
       </div>
       <ProblemBanner :error="error" class="q-mb-xs" />
@@ -405,7 +407,7 @@ onBeforeUnmount(() => {
             </q-card-section>
           </q-card>
         </div>
-        <div class="usage-metric">
+        <div v-if="!davOnly" class="usage-metric">
           <q-card flat bordered>
             <q-card-section>
               <div class="text-caption text-grey-7">{{ $t('overview.costStatus') }}</div>
@@ -444,10 +446,10 @@ onBeforeUnmount(() => {
           <q-card-section class="q-pb-xs">
             <div class="text-subtitle2">{{ $t('usage.users.title') }}</div>
             <div class="text-caption text-grey-7">{{ $t('usage.analytics.usersHint') }}</div>
-            <q-select v-model="budgetStatus" class="q-mt-xs" outlined dense :label="$t('usage.filters.budgetStatus')" :options="budgetStatuses.map(value => ({ label: $t('budgets.status.' + value), value }))" emit-value map-options clearable data-cy="usage-budget-status-filter" />
+            <q-select v-if="!davOnly" v-model="budgetStatus" class="q-mt-xs" outlined dense :label="$t('usage.filters.budgetStatus')" :options="budgetStatuses.map(value => ({ label: $t('budgets.status.' + value), value }))" emit-value map-options clearable data-cy="usage-budget-status-filter" />
             <div v-if="userId" class="row q-gutter-xs q-mt-xs">
               <q-btn outline dense no-caps :label="$t('usage.requests')" @click="activeTab = 'requests'" />
-              <q-btn flat dense no-caps :label="$t('usage.analytics.manageBudget')" :to="{ name: 'Users', query: { userId, section: 'budgets' } }" />
+              <q-btn v-if="!davOnly" flat dense no-caps :label="$t('usage.analytics.manageBudget')" :to="{ name: 'Users', query: { userId, section: 'budgets' } }" />
               <q-btn flat dense no-caps :label="$t('usage.filters.anyUser')" @click="userId = undefined" />
             </div>
           </q-card-section>
@@ -457,8 +459,8 @@ onBeforeUnmount(() => {
               <q-item-section>
                 <q-item-label class="text-weight-medium">{{ item.userDisplayName }}</q-item-label>
                 <q-item-label caption>{{ $t('usage.users.requests', { count: item.requestCount }) }} · {{ $t('usage.analytics.httpErrors') }} {{ item.errorRequestCount ?? '—' }}</q-item-label>
-                <q-item-label class="text-primary">{{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost?.status ?? 'UNKNOWN') }}</q-item-label>
-                <q-item-label caption>{{ $t('usage.analytics.currentBudget') }}: {{ userBudgetStatus(item) }}</q-item-label>
+                <q-item-label v-if="!davOnly" class="text-primary">{{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost?.status ?? 'UNKNOWN') }}</q-item-label>
+                <q-item-label v-if="!davOnly" caption>{{ $t('usage.analytics.currentBudget') }}: {{ userBudgetStatus(item) }}</q-item-label>
                 <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
                   {{ compactMeters(item.semanticMeters) }}
                 </q-item-label>
@@ -490,7 +492,7 @@ onBeforeUnmount(() => {
                 <q-item-label v-if="point.semanticMeters.length" caption class="text-break">
                   {{ compactMeters(point.semanticMeters) }}
                 </q-item-label>
-                <q-item-label v-if="point.requestCount && point.cost" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(point.cost) }} · {{ costStatusLabel(point.cost.status) }}</q-item-label>
+                <q-item-label v-if="point.requestCount && point.cost && !davOnly" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(point.cost) }} · {{ costStatusLabel(point.cost.status) }}</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>
@@ -511,7 +513,7 @@ onBeforeUnmount(() => {
                 <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
                   {{ compactMeters(item.semanticMeters) }}
                 </q-item-label>
-                <q-item-label v-if="item.cost" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost.status) }}</q-item-label>
+                <q-item-label v-if="item.cost && item.resourceKind !== 'WEBDAV'" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost.status) }}</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>

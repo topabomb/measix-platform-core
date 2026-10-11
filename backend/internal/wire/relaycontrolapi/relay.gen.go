@@ -121,6 +121,7 @@ func (e BudgetLimitStatePeriod) Valid() bool {
 const (
 	ControlAckProtocolVersionN1 ControlAckProtocolVersion = 1
 	ControlAckProtocolVersionN2 ControlAckProtocolVersion = 2
+	ControlAckProtocolVersionN3 ControlAckProtocolVersion = 3
 )
 
 // Valid indicates whether the value is a known member of the ControlAckProtocolVersion enum.
@@ -129,6 +130,8 @@ func (e ControlAckProtocolVersion) Valid() bool {
 	case ControlAckProtocolVersionN1:
 		return true
 	case ControlAckProtocolVersionN2:
+		return true
+	case ControlAckProtocolVersionN3:
 		return true
 	default:
 		return false
@@ -139,6 +142,7 @@ func (e ControlAckProtocolVersion) Valid() bool {
 const (
 	ControlStatusProtocolVersionN1 ControlStatusProtocolVersion = 1
 	ControlStatusProtocolVersionN2 ControlStatusProtocolVersion = 2
+	ControlStatusProtocolVersionN3 ControlStatusProtocolVersion = 3
 )
 
 // Valid indicates whether the value is a known member of the ControlStatusProtocolVersion enum.
@@ -147,6 +151,8 @@ func (e ControlStatusProtocolVersion) Valid() bool {
 	case ControlStatusProtocolVersionN1:
 		return true
 	case ControlStatusProtocolVersionN2:
+		return true
+	case ControlStatusProtocolVersionN3:
 		return true
 	default:
 		return false
@@ -165,6 +171,24 @@ func (e ControlStatusSpoolState) Valid() bool {
 	case METERINGDEGRADED:
 		return true
 	case OK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DAVAccessMode.
+const (
+	FULL     DAVAccessMode = "FULL"
+	READONLY DAVAccessMode = "READ_ONLY"
+)
+
+// Valid indicates whether the value is a known member of the DAVAccessMode enum.
+func (e DAVAccessMode) Valid() bool {
+	switch e {
+	case FULL:
+		return true
+	case READONLY:
 		return true
 	default:
 		return false
@@ -233,52 +257,55 @@ func (e PublicJwkUse) Valid() bool {
 
 // Defines values for ResourceRouteClientProtocol.
 const (
-	ANTHROPICMESSAGES             ResourceRouteClientProtocol = "ANTHROPIC_MESSAGES"
-	DASHSCOPEHTTPASR              ResourceRouteClientProtocol = "DASHSCOPE_HTTP_ASR"
-	DASHSCOPEMULTIMODALGENERATION ResourceRouteClientProtocol = "DASHSCOPE_MULTIMODAL_GENERATION"
-	DASHSCOPEREALTIMEASR          ResourceRouteClientProtocol = "DASHSCOPE_REALTIME_ASR"
-	GEMINIGENERATECONTENTTTS      ResourceRouteClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
-	GOOGLEGENERATECONTENT         ResourceRouteClientProtocol = "GOOGLE_GENERATE_CONTENT"
-	MCPSTREAMABLEHTTP             ResourceRouteClientProtocol = "MCP_STREAMABLE_HTTP"
-	MIMOCHATCOMPLETIONSTTS        ResourceRouteClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
-	OPENAIAUDIOSPEECH             ResourceRouteClientProtocol = "OPENAI_AUDIO_SPEECH"
-	OPENAIAUDIOTRANSCRIPTIONS     ResourceRouteClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
-	OPENAICHATCOMPLETIONS         ResourceRouteClientProtocol = "OPENAI_CHAT_COMPLETIONS"
-	OPENAIIMAGESGENERATIONS       ResourceRouteClientProtocol = "OPENAI_IMAGES_GENERATIONS"
-	OPENAIREALTIMETRANSCRIPTION   ResourceRouteClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
-	OPENAIRESPONSES               ResourceRouteClientProtocol = "OPENAI_RESPONSES"
+	ResourceRouteClientProtocolANTHROPICMESSAGES             ResourceRouteClientProtocol = "ANTHROPIC_MESSAGES"
+	ResourceRouteClientProtocolDASHSCOPEHTTPASR              ResourceRouteClientProtocol = "DASHSCOPE_HTTP_ASR"
+	ResourceRouteClientProtocolDASHSCOPEMULTIMODALGENERATION ResourceRouteClientProtocol = "DASHSCOPE_MULTIMODAL_GENERATION"
+	ResourceRouteClientProtocolDASHSCOPEREALTIMEASR          ResourceRouteClientProtocol = "DASHSCOPE_REALTIME_ASR"
+	ResourceRouteClientProtocolGEMINIGENERATECONTENTTTS      ResourceRouteClientProtocol = "GEMINI_GENERATE_CONTENT_TTS"
+	ResourceRouteClientProtocolGOOGLEGENERATECONTENT         ResourceRouteClientProtocol = "GOOGLE_GENERATE_CONTENT"
+	ResourceRouteClientProtocolMCPSTREAMABLEHTTP             ResourceRouteClientProtocol = "MCP_STREAMABLE_HTTP"
+	ResourceRouteClientProtocolMIMOCHATCOMPLETIONSTTS        ResourceRouteClientProtocol = "MIMO_CHAT_COMPLETIONS_TTS"
+	ResourceRouteClientProtocolOPENAIAUDIOSPEECH             ResourceRouteClientProtocol = "OPENAI_AUDIO_SPEECH"
+	ResourceRouteClientProtocolOPENAIAUDIOTRANSCRIPTIONS     ResourceRouteClientProtocol = "OPENAI_AUDIO_TRANSCRIPTIONS"
+	ResourceRouteClientProtocolOPENAICHATCOMPLETIONS         ResourceRouteClientProtocol = "OPENAI_CHAT_COMPLETIONS"
+	ResourceRouteClientProtocolOPENAIIMAGESGENERATIONS       ResourceRouteClientProtocol = "OPENAI_IMAGES_GENERATIONS"
+	ResourceRouteClientProtocolOPENAIREALTIMETRANSCRIPTION   ResourceRouteClientProtocol = "OPENAI_REALTIME_TRANSCRIPTION"
+	ResourceRouteClientProtocolOPENAIRESPONSES               ResourceRouteClientProtocol = "OPENAI_RESPONSES"
+	ResourceRouteClientProtocolWEBDAV                        ResourceRouteClientProtocol = "WEBDAV"
 )
 
 // Valid indicates whether the value is a known member of the ResourceRouteClientProtocol enum.
 func (e ResourceRouteClientProtocol) Valid() bool {
 	switch e {
-	case ANTHROPICMESSAGES:
+	case ResourceRouteClientProtocolANTHROPICMESSAGES:
 		return true
-	case DASHSCOPEHTTPASR:
+	case ResourceRouteClientProtocolDASHSCOPEHTTPASR:
 		return true
-	case DASHSCOPEMULTIMODALGENERATION:
+	case ResourceRouteClientProtocolDASHSCOPEMULTIMODALGENERATION:
 		return true
-	case DASHSCOPEREALTIMEASR:
+	case ResourceRouteClientProtocolDASHSCOPEREALTIMEASR:
 		return true
-	case GEMINIGENERATECONTENTTTS:
+	case ResourceRouteClientProtocolGEMINIGENERATECONTENTTTS:
 		return true
-	case GOOGLEGENERATECONTENT:
+	case ResourceRouteClientProtocolGOOGLEGENERATECONTENT:
 		return true
-	case MCPSTREAMABLEHTTP:
+	case ResourceRouteClientProtocolMCPSTREAMABLEHTTP:
 		return true
-	case MIMOCHATCOMPLETIONSTTS:
+	case ResourceRouteClientProtocolMIMOCHATCOMPLETIONSTTS:
 		return true
-	case OPENAIAUDIOSPEECH:
+	case ResourceRouteClientProtocolOPENAIAUDIOSPEECH:
 		return true
-	case OPENAIAUDIOTRANSCRIPTIONS:
+	case ResourceRouteClientProtocolOPENAIAUDIOTRANSCRIPTIONS:
 		return true
-	case OPENAICHATCOMPLETIONS:
+	case ResourceRouteClientProtocolOPENAICHATCOMPLETIONS:
 		return true
-	case OPENAIIMAGESGENERATIONS:
+	case ResourceRouteClientProtocolOPENAIIMAGESGENERATIONS:
 		return true
-	case OPENAIREALTIMETRANSCRIPTION:
+	case ResourceRouteClientProtocolOPENAIREALTIMETRANSCRIPTION:
 		return true
-	case OPENAIRESPONSES:
+	case ResourceRouteClientProtocolOPENAIRESPONSES:
+		return true
+	case ResourceRouteClientProtocolWEBDAV:
 		return true
 	default:
 		return false
@@ -292,6 +319,7 @@ const (
 	ResourceRouteResourceKindMCP             ResourceRouteResourceKind = "MCP"
 	ResourceRouteResourceKindMODEL           ResourceRouteResourceKind = "MODEL"
 	ResourceRouteResourceKindTTS             ResourceRouteResourceKind = "TTS"
+	ResourceRouteResourceKindWEBDAV          ResourceRouteResourceKind = "WEBDAV"
 )
 
 // Valid indicates whether the value is a known member of the ResourceRouteResourceKind enum.
@@ -306,6 +334,8 @@ func (e ResourceRouteResourceKind) Valid() bool {
 	case ResourceRouteResourceKindMODEL:
 		return true
 	case ResourceRouteResourceKindTTS:
+		return true
+	case ResourceRouteResourceKindWEBDAV:
 		return true
 	default:
 		return false
@@ -370,6 +400,7 @@ func (e RuntimeAudioProfileSampleRates) Valid() bool {
 const (
 	RuntimeControlStateProtocolVersionN1 RuntimeControlStateProtocolVersion = 1
 	RuntimeControlStateProtocolVersionN2 RuntimeControlStateProtocolVersion = 2
+	RuntimeControlStateProtocolVersionN3 RuntimeControlStateProtocolVersion = 3
 )
 
 // Valid indicates whether the value is a known member of the RuntimeControlStateProtocolVersion enum.
@@ -378,6 +409,8 @@ func (e RuntimeControlStateProtocolVersion) Valid() bool {
 	case RuntimeControlStateProtocolVersionN1:
 		return true
 	case RuntimeControlStateProtocolVersionN2:
+		return true
+	case RuntimeControlStateProtocolVersionN3:
 		return true
 	default:
 		return false
@@ -529,6 +562,12 @@ type ControlStatusProtocolVersion int
 // ControlStatusSpoolState defines model for ControlStatus.SpoolState.
 type ControlStatusSpoolState string
 
+// DAVAccessMode defines model for DAVAccessMode.
+type DAVAccessMode string
+
+// DAVResourceId defines model for DAVResourceId.
+type DAVResourceId = string
+
 // DeploymentId defines model for DeploymentId.
 type DeploymentId = string
 
@@ -668,6 +707,7 @@ type RuntimeControlState struct {
 	AuthKeys                []PublicJwk                         `json:"authKeys"`
 	BundleHash              Sha256Hash                          `json:"bundleHash"`
 	ControlRevision         int                                 `json:"controlRevision"`
+	DavBindings             *[]UserDAVBinding                   `json:"davBindings,omitempty"`
 	DeploymentId            DeploymentId                        `json:"deploymentId"`
 	OperationalLimits       OperationalLimits                   `json:"operationalLimits"`
 	PrincipalState          PrincipalState                      `json:"principalState"`
@@ -796,6 +836,17 @@ type TtsId = string
 
 // UpstreamId defines model for UpstreamId.
 type UpstreamId = string
+
+// UserDAVBinding defines model for UserDAVBinding.
+type UserDAVBinding struct {
+	AccessMode DAVAccessMode   `json:"accessMode"`
+	Endpoint   string          `json:"endpoint"`
+	ResourceId DAVResourceId   `json:"resourceId"`
+	SecretRef  SecretRef       `json:"secretRef"`
+	Target     WorkspaceTarget `json:"target"`
+	Token      string          `json:"token"`
+	UserId     UserId          `json:"userId"`
+}
 
 // UserId defines model for UserId.
 type UserId = string

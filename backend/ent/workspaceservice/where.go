@@ -99,6 +99,21 @@ func RuntimeRouteID(v string) predicate.WorkspaceService {
 	return predicate.WorkspaceService(sql.FieldEQ(FieldRuntimeRouteID, v))
 }
 
+// DavResourceID applies equality check predicate on the "dav_resource_id" field. It's identical to DavResourceIDEQ.
+func DavResourceID(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldEQ(FieldDavResourceID, v))
+}
+
+// DavRuntimeRouteID applies equality check predicate on the "dav_runtime_route_id" field. It's identical to DavRuntimeRouteIDEQ.
+func DavRuntimeRouteID(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldEQ(FieldDavRuntimeRouteID, v))
+}
+
+// DavStaged applies equality check predicate on the "dav_staged" field. It's identical to DavStagedEQ.
+func DavStaged(v bool) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldEQ(FieldDavStaged, v))
+}
+
 // DiagnosticCode applies equality check predicate on the "diagnostic_code" field. It's identical to DiagnosticCodeEQ.
 func DiagnosticCode(v string) predicate.WorkspaceService {
 	return predicate.WorkspaceService(sql.FieldEQ(FieldDiagnosticCode, v))
@@ -472,6 +487,146 @@ func RuntimeRouteIDEqualFold(v string) predicate.WorkspaceService {
 // RuntimeRouteIDContainsFold applies the ContainsFold predicate on the "runtime_route_id" field.
 func RuntimeRouteIDContainsFold(v string) predicate.WorkspaceService {
 	return predicate.WorkspaceService(sql.FieldContainsFold(FieldRuntimeRouteID, v))
+}
+
+// DavResourceIDEQ applies the EQ predicate on the "dav_resource_id" field.
+func DavResourceIDEQ(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldEQ(FieldDavResourceID, v))
+}
+
+// DavResourceIDNEQ applies the NEQ predicate on the "dav_resource_id" field.
+func DavResourceIDNEQ(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldNEQ(FieldDavResourceID, v))
+}
+
+// DavResourceIDIn applies the In predicate on the "dav_resource_id" field.
+func DavResourceIDIn(vs ...string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldIn(FieldDavResourceID, vs...))
+}
+
+// DavResourceIDNotIn applies the NotIn predicate on the "dav_resource_id" field.
+func DavResourceIDNotIn(vs ...string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldNotIn(FieldDavResourceID, vs...))
+}
+
+// DavResourceIDGT applies the GT predicate on the "dav_resource_id" field.
+func DavResourceIDGT(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldGT(FieldDavResourceID, v))
+}
+
+// DavResourceIDGTE applies the GTE predicate on the "dav_resource_id" field.
+func DavResourceIDGTE(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldGTE(FieldDavResourceID, v))
+}
+
+// DavResourceIDLT applies the LT predicate on the "dav_resource_id" field.
+func DavResourceIDLT(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldLT(FieldDavResourceID, v))
+}
+
+// DavResourceIDLTE applies the LTE predicate on the "dav_resource_id" field.
+func DavResourceIDLTE(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldLTE(FieldDavResourceID, v))
+}
+
+// DavResourceIDContains applies the Contains predicate on the "dav_resource_id" field.
+func DavResourceIDContains(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldContains(FieldDavResourceID, v))
+}
+
+// DavResourceIDHasPrefix applies the HasPrefix predicate on the "dav_resource_id" field.
+func DavResourceIDHasPrefix(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldHasPrefix(FieldDavResourceID, v))
+}
+
+// DavResourceIDHasSuffix applies the HasSuffix predicate on the "dav_resource_id" field.
+func DavResourceIDHasSuffix(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldHasSuffix(FieldDavResourceID, v))
+}
+
+// DavResourceIDEqualFold applies the EqualFold predicate on the "dav_resource_id" field.
+func DavResourceIDEqualFold(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldEqualFold(FieldDavResourceID, v))
+}
+
+// DavResourceIDContainsFold applies the ContainsFold predicate on the "dav_resource_id" field.
+func DavResourceIDContainsFold(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldContainsFold(FieldDavResourceID, v))
+}
+
+// DavRuntimeRouteIDEQ applies the EQ predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDEQ(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldEQ(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDNEQ applies the NEQ predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDNEQ(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldNEQ(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDIn applies the In predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDIn(vs ...string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldIn(FieldDavRuntimeRouteID, vs...))
+}
+
+// DavRuntimeRouteIDNotIn applies the NotIn predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDNotIn(vs ...string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldNotIn(FieldDavRuntimeRouteID, vs...))
+}
+
+// DavRuntimeRouteIDGT applies the GT predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDGT(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldGT(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDGTE applies the GTE predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDGTE(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldGTE(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDLT applies the LT predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDLT(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldLT(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDLTE applies the LTE predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDLTE(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldLTE(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDContains applies the Contains predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDContains(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldContains(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDHasPrefix applies the HasPrefix predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDHasPrefix(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldHasPrefix(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDHasSuffix applies the HasSuffix predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDHasSuffix(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldHasSuffix(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDEqualFold applies the EqualFold predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDEqualFold(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldEqualFold(FieldDavRuntimeRouteID, v))
+}
+
+// DavRuntimeRouteIDContainsFold applies the ContainsFold predicate on the "dav_runtime_route_id" field.
+func DavRuntimeRouteIDContainsFold(v string) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldContainsFold(FieldDavRuntimeRouteID, v))
+}
+
+// DavStagedEQ applies the EQ predicate on the "dav_staged" field.
+func DavStagedEQ(v bool) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldEQ(FieldDavStaged, v))
+}
+
+// DavStagedNEQ applies the NEQ predicate on the "dav_staged" field.
+func DavStagedNEQ(v bool) predicate.WorkspaceService {
+	return predicate.WorkspaceService(sql.FieldNEQ(FieldDavStaged, v))
 }
 
 // DiagnosticCodeEQ applies the EQ predicate on the "diagnostic_code" field.

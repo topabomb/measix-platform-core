@@ -374,7 +374,7 @@ func (s *Service) ExchangeEnrollment(ctx context.Context, code, installationID, 
 	if _, err := tx.Enrollment.UpdateOneID(e.ID).SetConsumedAt(now).Save(ctx); err != nil {
 		return rollback(err)
 	}
-	accessToken, accessExpiresAt, err := s.Signer.Sign(e.UserID, deviceID, sessionID)
+	accessToken, accessExpiresAt, err := s.Signer.SignForSession(e.UserID, deviceID, sessionID, refreshExpiresAt)
 	if err != nil {
 		return rollback(err)
 	}

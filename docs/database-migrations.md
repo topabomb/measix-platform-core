@@ -48,4 +48,6 @@ SQLite connections remain owned by `internal/common/sqliteutil`. Relay spool sch
 
 000002 新增工作区控制数据；000003 为预算/用量增加互斥目标分支，保留已有归属和外键引用。带历史结算数据的升级及 foreign_key_check 由 `migrations/workspace_upgrade_test.go` 覆盖。不得编辑已部署迁移记录或以清库替代升级。
 
+000006 追加 DAV 资源身份、文件授权意图和独立权限/操作修订及请求统计字段。`migrations/webdav_upgrade_test.go` 验证回填、字节/引用保全和重复执行。`scripts/webdav-acceptance.mjs --previous-hub <原始旧二进制>` 另用实际旧程序创建数据，比较迁移前后每个原表原列，并将备份恢复为独立数据库交给旧程序检查和读取；不通过降级当前库实现回退。
+
 详见[远程工作区实现参考](remote-workspace-implementation.md)；历史联调只在[证据索引](s0-execution-progress.md)定位。

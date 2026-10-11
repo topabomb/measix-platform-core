@@ -75,6 +75,12 @@ func (s *Service) ApplyUpstream(ctx context.Context, adminUserID, idempotencyKey
 	activationID := platformid.New(platformid.Activation)
 	now := s.Now().UTC()
 
+	if s.testHooks.BeforeIntentCommit != nil {
+		if err := s.testHooks.BeforeIntentCommit(ctx); err != nil {
+			return ActivationResult{}, err
+		}
+	}
+
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
 		return ActivationResult{}, err
@@ -97,6 +103,9 @@ func (s *Service) ApplyUpstream(ctx context.Context, adminUserID, idempotencyKey
 	freshManaged, err := tx.ManagedState.Get(ctx, "current")
 	if err != nil || freshManaged.DesiredControlRevision+1 != int64(controlRevision) {
 		return rollback(ErrActivationInProgress)
+	}
+	if err := s.validateWorkspaceIntentTx(ctx, tx, descriptor); err != nil {
+		return rollback(err)
 	}
 	if _, err := tx.Activation.Create().
 		SetID(activationID).SetKind("RUNTIME_CONFIG").SetState("APPLYING").
@@ -258,6 +267,28 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 		return config, nil
 	}
 	for _, binding := range enabledBindings(content) {
+		if platformid.Validate(platformid.WebDAV, binding.ResourceId) == nil {
+			if binding.TargetKind == nil || *binding.TargetKind != "REMOTE_WORKSPACE" || binding.WorkspaceServiceId == nil || s.Workspace == nil {
+				return state, fmt.Errorf("DAV workspace control unavailable")
+			}
+			status, e := s.Relay.Status(ctx)
+			if e != nil || status.ProtocolVersion == nil || *status.ProtocolVersion < 3 {
+				return state, fmt.Errorf("relay requires workspace DAV control v3")
+			}
+			cfg, bindings, e := s.Workspace.DAVRuntimeBindings(ctx, *binding.WorkspaceServiceId, binding.ResourceId)
+			if e != nil {
+				return state, e
+			}
+			version := relaycontrolapi.RuntimeControlStateProtocolVersion(3)
+			state.ProtocolVersion = &version
+			if state.DavBindings == nil {
+				state.DavBindings = &[]relaycontrolapi.UserDAVBinding{}
+			}
+			*state.DavBindings = append(*state.DavBindings, bindings...)
+			state.ResourceRoutes = append(state.ResourceRoutes, relaycontrolapi.ResourceRoute{ResourceId: binding.ResourceId, RuntimeRouteId: binding.RuntimeRouteId, ResourceKind: "WEBDAV", ClientProtocol: "WEBDAV"})
+			state.Routes = append(state.Routes, relaycontrolapi.RuntimeRouteSpec{RuntimeRouteId: binding.RuntimeRouteId, WorkspaceServiceId: binding.WorkspaceServiceId, AllowedMethods: capability.DAVMethods(), AllowedPathPrefixes: []string{"/dav"}, TransportPolicy: "HTTP_REQUEST_RESPONSE", TimeoutPolicy: relaycontrolapi.TimeoutPolicy{ConnectMs: cfg.ConnectTimeoutMs, ResponseHeaderMs: cfg.ConnectTimeoutMs, IdleMs: cfg.IdleTimeoutMs}})
+			continue
+		}
 		if binding.TargetKind != nil && *binding.TargetKind == "REMOTE_WORKSPACE" {
 			if binding.WorkspaceServiceId == nil || s.Workspace == nil {
 				return state, fmt.Errorf("integration control unavailable")
@@ -271,7 +302,9 @@ func (s *Service) compileState(ctx context.Context, content adminapi.ManagedDraf
 				return state, e
 			}
 			version := relaycontrolapi.RuntimeControlStateProtocolVersion(2)
-			state.ProtocolVersion = &version
+			if state.ProtocolVersion == nil || *state.ProtocolVersion < version {
+				state.ProtocolVersion = &version
+			}
 			if state.UserBindings == nil {
 				empty := []relaycontrolapi.UserRuntimeBinding{}
 				state.UserBindings = &empty

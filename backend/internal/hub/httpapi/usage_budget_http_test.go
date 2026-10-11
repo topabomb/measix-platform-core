@@ -227,7 +227,7 @@ func seedUsageRequest(t *testing.T, ctx context.Context, identityService *identi
 		Meters: []usageingestapi.MeterValue{{Meter: usageingestapi.REQUESTS, Numerator: &one, Denominator: &one, Completeness: usageingestapi.EXACT}},
 		Request: usageingestapi.RequestUsageFact{
 			DeploymentId: identityService.Signer.DeploymentID, UserId: userID, DeviceId: deviceID,
-			ResourceId: resourceID, ResourceKind: usageingestapi.ResourceKindMODEL, ClientProtocol: usageingestapi.OPENAIRESPONSES,
+			ResourceId: resourceID, ResourceKind: usageingestapi.ResourceKindMODEL, ClientProtocol: usageingestapi.ClientProtocolOPENAIRESPONSES,
 			RuntimeRouteId: routeID, UpstreamId: upstreamID, ManagedGeneration: 1, ControlRevision: 1,
 			StartedAt: now, CompletedAt: now.Add(time.Second), Forwarded: true, HttpStatus: 200,
 			RequestBytes: 10, ResponseBytes: 20, DurationMs: 1000,

@@ -19,10 +19,13 @@ func HashDescriptor(input relaycontrolapi.RuntimeControlState) (relaycontrolapi.
 }
 
 func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*State, error) {
-	if input.ProtocolVersion != nil && *input.ProtocolVersion != 1 && *input.ProtocolVersion != 2 {
+	if input.ProtocolVersion != nil && *input.ProtocolVersion != 1 && *input.ProtocolVersion != 2 && *input.ProtocolVersion != 3 {
 		return nil, ErrInvalidControl
 	}
-	if input.UserBindings != nil && (input.ProtocolVersion == nil || *input.ProtocolVersion != 2) {
+	if input.UserBindings != nil && (input.ProtocolVersion == nil || *input.ProtocolVersion < 2) {
+		return nil, ErrInvalidControl
+	}
+	if input.DavBindings != nil && (input.ProtocolVersion == nil || *input.ProtocolVersion < 3) {
 		return nil, ErrInvalidControl
 	}
 	if input.ControlRevision < 1 || input.ActiveManagedGeneration < 0 || input.OperationalLimits.MaxRequestBytes < 1 {
@@ -44,6 +47,7 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		Resources: make(map[string]Resource), Routes: make(map[string]Route), Upstreams: make(map[string]Upstream),
 		OperationalLimits: input.OperationalLimits, AppliedAt: appliedAt,
 		UserBindings: make(map[string]relaycontrolapi.UserRuntimeBinding),
+		DAVBindings:  make(map[string]relaycontrolapi.UserDAVBinding),
 	}
 	if input.ProtocolVersion != nil {
 		state.ProtocolVersion = int(*input.ProtocolVersion)
@@ -111,13 +115,19 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		}
 	}
 
+	davRoutes := map[string]bool{}
+	for _, resource := range input.ResourceRoutes {
+		if resource.ResourceKind == "WEBDAV" {
+			davRoutes[resource.RuntimeRouteId] = true
+		}
+	}
 	for _, value := range input.Routes {
 		if err := platformid.Validate(platformid.Route, value.RuntimeRouteId); err != nil {
 			return nil, ErrInvalidControl
 		}
 		isWorkspaceService := value.WorkspaceServiceId != nil
 		if isWorkspaceService {
-			if value.UpstreamId != "" || platformid.Validate(platformid.WorkspaceService, *value.WorkspaceServiceId) != nil || input.ProtocolVersion == nil || *input.ProtocolVersion != 2 {
+			if value.UpstreamId != "" || platformid.Validate(platformid.WorkspaceService, *value.WorkspaceServiceId) != nil || input.ProtocolVersion == nil || *input.ProtocolVersion < 2 {
 				return nil, ErrInvalidControl
 			}
 		} else if platformid.Validate(platformid.Upstream, value.UpstreamId) != nil {
@@ -132,7 +142,7 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		methods := make(map[string]struct{}, len(value.AllowedMethods))
 		for _, method := range value.AllowedMethods {
 			method = strings.ToUpper(strings.TrimSpace(method))
-			if !validMethod(method) {
+			if !validMethod(method) && !(davRoutes[value.RuntimeRouteId] && davMethod(method)) {
 				return nil, ErrInvalidControl
 			}
 			methods[method] = struct{}{}
@@ -173,10 +183,19 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 		if !exists {
 			return nil, ErrInvalidControl
 		}
-		if route.WorkspaceServiceID != "" && (value.ResourceKind != "MCP" || len(route.AllowedPathPrefixes) != 1 || route.AllowedPathPrefixes[0] != "/mcp" || len(route.AllowedMethods) != 3) {
+		if value.ResourceKind == "WEBDAV" {
+			if state.ProtocolVersion < 3 || route.WorkspaceServiceID == "" || route.TransportPolicy != "HTTP_REQUEST_RESPONSE" || route.TimeoutPolicy.OverallMs != nil || len(route.AllowedPathPrefixes) != 1 || route.AllowedPathPrefixes[0] != "/dav" || len(route.AllowedMethods) != 12 {
+				return nil, ErrInvalidControl
+			}
+			for method := range route.AllowedMethods {
+				if !davMethod(method) {
+					return nil, ErrInvalidControl
+				}
+			}
+		} else if route.WorkspaceServiceID != "" && (value.ResourceKind != "MCP" || len(route.AllowedPathPrefixes) != 1 || route.AllowedPathPrefixes[0] != "/mcp" || len(route.AllowedMethods) != 3) {
 			return nil, ErrInvalidControl
 		}
-		if route.WorkspaceServiceID != "" {
+		if route.WorkspaceServiceID != "" && value.ResourceKind == "MCP" {
 			for _, method := range []string{"GET", "POST", "DELETE"} {
 				if _, ok := route.AllowedMethods[method]; !ok {
 					return nil, ErrInvalidControl
@@ -235,6 +254,21 @@ func build(input relaycontrolapi.RuntimeControlState, appliedAt time.Time) (*Sta
 			state.UserBindings[key] = binding
 		}
 	}
+	if input.DavBindings != nil {
+		for _, binding := range *input.DavBindings {
+			resource, ok := state.Resources[binding.ResourceId]
+			route := state.Routes[resource.RouteID]
+			endpoint, e := url.Parse(binding.Endpoint)
+			if !ok || resource.Kind != "WEBDAV" || route.WorkspaceServiceID != binding.Target.WorkspaceServiceId || !binding.AccessMode.Valid() || platformid.Validate(platformid.User, binding.UserId) != nil || platformid.Validate(platformid.AgentSpace, binding.Target.AgentSpaceId) != nil || binding.Target.BindingRevision < 1 || platformid.Validate(platformid.Secret, binding.SecretRef.SecretId) != nil || binding.SecretRef.SecretVersion < 1 || strings.TrimSpace(binding.Token) == "" || strings.ContainsAny(binding.Token, "\r\n") || e != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.RawPath != "" || !safeUsername(binding.Target.RemoteUsername) || endpoint.Path != "/u/"+binding.Target.RemoteUsername+"/dav/" {
+				return nil, ErrInvalidControl
+			}
+			key := binding.UserId + "/" + binding.ResourceId
+			if _, exists := state.DAVBindings[key]; exists {
+				return nil, ErrInvalidControl
+			}
+			state.DAVBindings[key] = binding
+		}
+	}
 	return state, nil
 }
 
@@ -260,9 +294,9 @@ func validModelMapping(resource relaycontrolapi.ResourceRoute, mapping relaycont
 		return false
 	}
 	switch resource.ClientProtocol {
-	case relaycontrolapi.GOOGLEGENERATECONTENT:
+	case relaycontrolapi.ResourceRouteClientProtocolGOOGLEGENERATECONTENT:
 		return strings.Contains(mapping.ClientRuntimePath, "/models/"+mapping.PublishedModelKey+":") && strings.Contains(mapping.UpstreamRuntimePath, "/models/"+mapping.UpstreamModelKey+":")
-	case relaycontrolapi.OPENAICHATCOMPLETIONS, relaycontrolapi.OPENAIRESPONSES, relaycontrolapi.ANTHROPICMESSAGES:
+	case relaycontrolapi.ResourceRouteClientProtocolOPENAICHATCOMPLETIONS, relaycontrolapi.ResourceRouteClientProtocolOPENAIRESPONSES, relaycontrolapi.ResourceRouteClientProtocolANTHROPICMESSAGES:
 		return mapping.ClientRuntimePath == mapping.UpstreamRuntimePath
 	default:
 		return false
@@ -285,6 +319,8 @@ func resourceProfileMatches(value relaycontrolapi.ResourceRoute) bool {
 	}
 	protocol := string(value.ClientProtocol)
 	switch value.ResourceKind {
+	case relaycontrolapi.ResourceRouteResourceKindWEBDAV:
+		return kind == platformid.WebDAV && protocol == "WEBDAV" && value.AudioProfile == nil && value.LlmProfile == nil && value.ModelMapping == nil && value.ImageProfile == nil
 	case relaycontrolapi.ResourceRouteResourceKindMODEL:
 		// modelMapping was added after the initial relay-control contract. A nil
 		// mapping keeps an already-applied legacy control state pass-through; all
@@ -409,7 +445,7 @@ func runtimeResourceID(value string) bool {
 		return false
 	}
 	switch kind {
-	case platformid.Model, platformid.ImageGeneration, platformid.TTS, platformid.ASR, platformid.MCP:
+	case platformid.Model, platformid.ImageGeneration, platformid.TTS, platformid.ASR, platformid.MCP, platformid.WebDAV:
 		return true
 	default:
 		return false
@@ -441,6 +477,14 @@ func validMethod(value string) bool {
 	default:
 		return false
 	}
+}
+
+func davMethod(method string) bool {
+	switch method {
+	case "OPTIONS", "GET", "HEAD", "PROPFIND", "PUT", "DELETE", "MKCOL", "COPY", "MOVE", "PROPPATCH", "LOCK", "UNLOCK":
+		return true
+	}
+	return false
 }
 
 func safePath(value string) bool {

@@ -47,13 +47,16 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 			_ = s.setRuntimeStatus(ctx, "DEGRADED")
 			return nil, ErrRelayDiverged
 		}
-		state, err := s.stateFromActivationDescriptor(ctx, pending)
+		// A matching ACK is historical evidence about the immutable intent;
+		// current credential health must not prevent closing that intent. Only
+		// a replay needs to materialize and revalidate current secret references.
+		state, err := persistedDescriptor(pending)
 		if err != nil {
 			_ = s.setRuntimeStatus(ctx, "DEGRADED")
 			return nil, err
 		}
 		generation := int64(state.ActiveManagedGeneration)
-		if relayMatches(status, pending.ControlRevision, pending.BundleHash, &generation) && (state.ProtocolVersion == nil || *state.ProtocolVersion < 2 || status.ProtocolVersion != nil && *status.ProtocolVersion >= 2) {
+		if relayMatches(status, pending.ControlRevision, pending.BundleHash, &generation) && (state.ProtocolVersion == nil || *state.ProtocolVersion < 2 || status.ProtocolVersion != nil && int(*status.ProtocolVersion) >= int(*state.ProtocolVersion)) {
 			return s.finalizePending(ctx, pending.ID)
 		}
 		if !status.Ready || status.AppliedControlRevision < int(pending.ControlRevision) {
@@ -76,13 +79,13 @@ func (s *Service) Reconcile(ctx context.Context) (*ActivationResult, error) {
 	if relayMatches(status, managed.DesiredControlRevision, stringPointer(managed.DesiredBundleHash), &managed.ActiveManagedGeneration) {
 		// An older Relay can echo the descriptor hash without understanding v2
 		// user bindings. Its protocol capability remains part of the ACK proof.
-		if status.ProtocolVersion == nil || *status.ProtocolVersion < 2 {
+		if status.ProtocolVersion == nil || *status.ProtocolVersion < 3 {
 			row, e := s.Client.Activation.Query().Where(activation.ControlRevisionEQ(managed.DesiredControlRevision), activation.BundleHashEQ(stringPointer(managed.DesiredBundleHash)), activation.StateEQ("COMPLETED")).Only(ctx)
 			if e != nil {
 				return nil, e
 			}
 			var descriptor relaycontrolapi.RuntimeControlState
-			if json.Unmarshal(row.TargetDescriptorJSON, &descriptor) != nil || descriptor.ProtocolVersion != nil && *descriptor.ProtocolVersion >= 2 {
+			if json.Unmarshal(row.TargetDescriptorJSON, &descriptor) != nil || descriptor.ProtocolVersion != nil && *descriptor.ProtocolVersion >= 2 && (status.ProtocolVersion == nil || int(*status.ProtocolVersion) < int(*descriptor.ProtocolVersion)) {
 				_ = s.setRuntimeStatus(ctx, "DEGRADED")
 				return nil, ErrRelayDiverged
 			}
@@ -187,7 +190,7 @@ func (s *Service) reapplyPending(ctx context.Context, activationID string) error
 	if err != nil {
 		return err
 	}
-	state, err := s.stateFromActivationDescriptor(ctx, row)
+	state, err := s.stateFromActivationDescriptor(ctx, row, true)
 	if err != nil {
 		return err
 	}
@@ -209,7 +212,7 @@ func (s *Service) reapplyPending(ctx context.Context, activationID string) error
 	return nil
 }
 
-func (s *Service) stateFromActivationDescriptor(ctx context.Context, row *ent.Activation) (relaycontrolapi.RuntimeControlState, error) {
+func persistedDescriptor(row *ent.Activation) (relaycontrolapi.RuntimeControlState, error) {
 	var state relaycontrolapi.RuntimeControlState
 	if len(row.TargetDescriptorJSON) == 0 || json.Unmarshal(row.TargetDescriptorJSON, &state) != nil {
 		return state, fmt.Errorf("invalid persisted activation descriptor")
@@ -217,6 +220,19 @@ func (s *Service) stateFromActivationDescriptor(ctx context.Context, row *ent.Ac
 	if state.ControlRevision != int(row.ControlRevision) {
 		return state, ErrRelayDiverged
 	}
+	digest, err := relaystate.HashDescriptor(state)
+	if err != nil || digest != row.BundleHash {
+		return state, ErrRelayDiverged
+	}
+	return state, nil
+}
+
+func (s *Service) stateFromActivationDescriptor(ctx context.Context, row *ent.Activation, pendingReplay ...bool) (relaycontrolapi.RuntimeControlState, error) {
+	state, err := persistedDescriptor(row)
+	if err != nil {
+		return state, err
+	}
+	replayRejectedDAV := len(pendingReplay) > 0 && pendingReplay[0] && (row.State == "APPLYING" || row.State == "UNKNOWN")
 	for i := range state.Upstreams {
 		value := &state.Upstreams[i]
 		if value.Auth.AdditionalProperties == nil {
@@ -251,6 +267,28 @@ func (s *Service) stateFromActivationDescriptor(ctx context.Context, row *ent.Ac
 					return state, fmt.Errorf("workspace runtime authority unavailable")
 				}
 				if e := s.Workspace.ValidateRuntimeBinding(ctx, *binding); e != nil {
+					return state, e
+				}
+			}
+			secret, e := s.Upstream.ResolveSecret(ctx, binding.SecretRef.SecretId, binding.SecretRef.SecretVersion)
+			if e != nil {
+				return state, e
+			}
+			binding.Token = string(secret)
+		}
+	}
+	if state.DavBindings != nil {
+		for i := range *state.DavBindings {
+			binding := &(*state.DavBindings)[i]
+			if !slices.Contains(state.PrincipalState.DisabledUserIds, binding.UserId) && !slices.Contains(state.PrincipalState.DeletedUserIds, binding.UserId) {
+				if s.Workspace == nil {
+					return state, fmt.Errorf("workspace DAV authority unavailable")
+				}
+				validate := s.Workspace.ValidateDAVRuntimeBinding
+				if replayRejectedDAV {
+					validate = s.Workspace.ValidateDAVReplayBinding
+				}
+				if e := validate(ctx, *binding); e != nil {
 					return state, e
 				}
 			}
@@ -348,5 +386,5 @@ func (s *Service) reconcileSessionDenies(ctx context.Context, revision int64) (*
 }
 
 func ackProtocolMatches(state relaycontrolapi.RuntimeControlState, ack relaycontrolapi.ControlAck) bool {
-	return state.ProtocolVersion == nil || *state.ProtocolVersion < 2 || ack.ProtocolVersion != nil && *ack.ProtocolVersion >= 2
+	return state.ProtocolVersion == nil || *state.ProtocolVersion < 2 || ack.ProtocolVersion != nil && int(*ack.ProtocolVersion) >= int(*state.ProtocolVersion)
 }

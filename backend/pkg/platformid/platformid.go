@@ -22,6 +22,7 @@ const (
 	TTS                Kind = "tts"
 	ASR                Kind = "asr"
 	MCP                Kind = "mcp"
+	WebDAV             Kind = "dav"
 	Policy             Kind = "pol"
 	Draft              Kind = "drf"
 	Release            Kind = "rel"
@@ -51,7 +52,7 @@ var known = map[Kind]struct{}{
 	Upstream: {}, Secret: {}, Route: {}, Activation: {}, Request: {}, Interaction: {},
 	Idempotency: {}, UsageEvent: {}, PricingRule: {},
 	Assistant: {}, Starter: {}, EntUpdate: {}, BudgetTemplate: {},
-	WorkspaceService: {}, WorkspaceOperation: {}, AgentSpace: {},
+	WorkspaceService: {}, WorkspaceOperation: {}, AgentSpace: {}, WebDAV: {},
 }
 
 func New(kind Kind) string {

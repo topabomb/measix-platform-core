@@ -28,7 +28,7 @@ func prepareModelRequest(resource control.Resource, request *http.Request, runti
 	if runtimePath != mapping.ClientRuntimePath {
 		return "", errInvalidModelSelector
 	}
-	if resource.ClientProtocol == relaycontrolapi.GOOGLEGENERATECONTENT {
+	if resource.ClientProtocol == relaycontrolapi.ResourceRouteClientProtocolGOOGLEGENERATECONTENT {
 		return mapping.UpstreamRuntimePath, nil
 	}
 	if request.Method != http.MethodPost {

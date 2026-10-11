@@ -17,7 +17,7 @@
 
 四份 HTTP 文档使用 OpenAPI 3.0.3，按认证和依赖边界分开。Admin/Android 不得生成或调用 Relay internal API。S0.3 的 `api/internal/gateway-control.openapi.yaml` 当前不存在。
 
-当前 Discovery API v1、Enrollment format v1、Bridge v3；Snapshot 新编制为 v5，保留已发布 v4。Relay 工作区控制与 usage target 为 v2，独立 ClientWorkspace 投影为 v1。协议身份、managedGeneration、数据库 migration 和 App 产品版本分别由各 owner 判断。Core 总合同身份唯一来自 `api/protocol-baseline.json`：主合同、明确支持集合和语义基准 Core；Client/Portal manifest 均生成同一身份及 `baselineHash`。具体版本、发行检查及 Android 待调整细则见[发布文档](release.md)。
+当前 Discovery API v1、Enrollment format v1、Bridge v3；Snapshot 新编制为 v5，保留已发布 v4。Relay 工作区控制为 v3，原 MCP usage target 保留 v2，DAV usage target 为 v3，独立 ClientWorkspace 投影为 v1。协议身份、managedGeneration、数据库 migration 和 App 产品版本分别由各 owner 判断。Core 总合同身份唯一来自 `api/protocol-baseline.json`：主合同、明确支持集合和语义基准 Core；Client/Portal manifest 均生成同一身份及 `baselineHash`。具体版本、发行检查及 Android 待调整细则见[发布文档](release.md)。
 
 `node scripts/verify-preview-contract.mjs --mode core` 校验 Core 基线及导出身份；联合和独立发行进一步校验固定消费者材料与证据，命令见[发布文档](release.md)。材料 hash 相同不能替代实际消费验证。
 
@@ -107,3 +107,7 @@ go test ./internal/contract -count=1
 6. 正式退役经架构规定的支持窗口和数据恢复验证，不因删除旧 decoder 而删除身份/历史或基本控制能力。变更后创建新候选和实际证据，旧报告不覆盖新 head。
 
 Android `0.0.20 / 20` 尚未正式发行，当前候选修订仍使用该目标；不能据历史 commit 或 Debug APK 把它叙述为“已发布旧版”，也不能因此提前升到 21。发行关联、Core 实施状态及 Android 待完成项仅在[发布文档](release.md)维护。
+
+### 工作区 WebDAV 扩展
+
+Snapshot v5 增加可选 `webdav[]`，本人工作区投影给出唯一文件交换指定及实际生效的 READ_ONLY/FULL。内部 Relay Control v3 显式交付用户 DAV binding，Usage v3 私有 DAV target 只统计、不预算。外部凭据只在 Hub → Relay 控制面流转；Admin/Client Snapshot 不包含外部 key。Files API 和历史 Release 字节保持。字段、控制恢复和客户端行为分别见[实现参考](remote-workspace-implementation.md)与[客户端接入](android-platform-integration.md#标准-webdav-文件交换入口)。

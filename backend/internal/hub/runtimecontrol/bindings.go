@@ -60,6 +60,11 @@ func enabledBindings(content adminapi.ManagedDraftContent) []adminapi.RuntimeBin
 	for _, mcp := range content.Mcp {
 		enabled[mcp.McpServerId] = mcp.Enabled
 	}
+	if content.Webdav != nil {
+		for _, dav := range *content.Webdav {
+			enabled[dav.ResourceId] = dav.Enabled
+		}
+	}
 	bindings := make([]adminapi.RuntimeBindingDefinition, 0, len(content.Bindings))
 	for _, binding := range content.Bindings {
 		if enabled[binding.ResourceId] {

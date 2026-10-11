@@ -49,6 +49,13 @@ func (s *Service) Command(ctx context.Context, actor, key, userID string, input 
 	if input.ManagementSecret != nil && input.Action != "CONTINUE" {
 		return adminapi.WorkspaceOperation{}, ErrInvalid
 	}
+	if input.Action == "SET_DAV_ACCESS" {
+		if input.DavAccessMode == nil || !input.DavAccessMode.Valid() || input.ExpectedDAVRevision == nil {
+			return adminapi.WorkspaceOperation{}, ErrInvalid
+		}
+	} else if input.DavAccessMode != nil || input.ExpectedDAVRevision != nil {
+		return adminapi.WorkspaceOperation{}, ErrInvalid
+	}
 	if input.Action == "REQUERY" || input.Action == "CONTINUE" {
 		return s.resume(ctx, actor, userID, input)
 	}
@@ -138,11 +145,11 @@ func (s *Service) Command(ctx context.Context, actor, key, userID string, input 
 		if target.SpaceID == "" || str(input.Confirmation) != target.SpaceID {
 			return adminapi.WorkspaceOperation{}, ErrInvalid
 		}
-	case "DISCONNECT", "RESET_MCP", "SET_DAV", "REVOKE_DAV":
+	case "DISCONNECT", "RESET_MCP", "SET_DAV", "REVOKE_DAV", "SET_DAV_ACCESS":
 	default:
 		return adminapi.WorkspaceOperation{}, ErrInvalid
 	}
-	if input.Action == "CREATE" || input.Action == "RESTORE" || input.Action == "TAKEOVER" || input.Action == "RESET_MCP" || input.Action == "SET_DAV" {
+	if input.Action == "CREATE" || input.Action == "RESTORE" || input.Action == "TAKEOVER" || input.Action == "RESET_MCP" || input.Action == "SET_DAV" || input.Action == "SET_DAV_ACCESS" {
 		user, e := s.Client.User.Get(ctx, userID)
 		if e != nil || user.Status != "ACTIVE" || !workspaceService.Enabled || workspaceService.State != "ACTIVE" {
 			return adminapi.WorkspaceOperation{}, ErrUnavailable
@@ -230,10 +237,12 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 	case "RESTORE", "TAKEOVER", "RESET_MCP":
 		state = "RESTORING"
 	}
+	davRevision := int64(0)
 	if userID != "" {
 		row, e := tx.AgentSpace.Get(ctx, userID)
 		if ent.IsNotFound(e) {
-			builder := tx.AgentSpace.Create().SetID(userID).SetWorkspaceServiceID(workspaceService).SetRemoteUsername(target.Username).SetBindingRevision(1).SetIntent(intent).SetState(state).SetRemoteActive(false).SetStopPending(false).SetDavConfirmed(false).SetCreatedAt(now).SetUpdatedAt(now)
+			davRevision = 1
+			builder := tx.AgentSpace.Create().SetID(userID).SetWorkspaceServiceID(workspaceService).SetRemoteUsername(target.Username).SetBindingRevision(1).SetIntent(intent).SetState(state).SetRemoteActive(false).SetStopPending(false).SetDavConfirmed(false).SetFileAccessIntent("AUTHORIZED").SetDavAccessMode("FULL").SetDavBindingRevision(davRevision).SetCreatedAt(now).SetUpdatedAt(now)
 			if target.SpaceID != "" {
 				builder.SetAgentSpaceID(target.SpaceID)
 			}
@@ -247,11 +256,24 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 			if row.BindingRevision != bindingRevision {
 				return adminapi.WorkspaceOperation{}, ErrConflict
 			}
+			davRevision = row.DavBindingRevision
 			update := tx.AgentSpace.UpdateOneID(userID).SetBindingRevision(bindingRevision + 1).SetUpdatedAt(now)
-			if action == "SET_DAV" || action == "REVOKE_DAV" {
+			if action == "SET_DAV_ACCESS" {
+				if input == nil || input.ExpectedDAVRevision == nil || *input.ExpectedDAVRevision != row.DavBindingRevision {
+					return adminapi.WorkspaceOperation{}, ErrConflict
+				}
+				davRevision++
+				update.SetBindingRevision(bindingRevision).SetDavBindingRevision(davRevision).SetDavAccessMode(string(*input.DavAccessMode))
+			} else if action == "SET_DAV" || action == "REVOKE_DAV" {
 				// DAV versions have their own immutable reference. Rotating DAV must
 				// not change the MCP runtime target or interrupt an MCP session.
-				update.SetDavConfirmed(false).SetBindingRevision(bindingRevision)
+				davRevision++
+				update.SetDavConfirmed(false).SetBindingRevision(bindingRevision).SetDavBindingRevision(davRevision)
+				if action == "SET_DAV" {
+					update.SetFileAccessIntent("AUTHORIZED")
+				} else {
+					update.SetFileAccessIntent("REVOKED")
+				}
 			} else {
 				update.SetIntent(intent).SetState(state).SetAppliedControlRevision(0)
 				if action == "TAKEOVER" {
@@ -262,7 +284,7 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 				return adminapi.WorkspaceOperation{}, err
 			}
 		}
-		if action != "SET_DAV" && action != "REVOKE_DAV" {
+		if action != "SET_DAV" && action != "REVOKE_DAV" && action != "SET_DAV_ACCESS" {
 			bindingRevision++
 		}
 	} else {
@@ -287,7 +309,7 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 	data, _ := json.Marshal(target)
 	builder := tx.WorkspaceOperation.Create().SetID(platformid.New(platformid.WorkspaceOperation)).SetWorkspaceServiceID(workspaceService).SetAction(action).SetIdempotencyKey(key).SetRequestHash(requestHash).SetConfigRevision(configRevision).SetBindingRevision(bindingRevision).SetTargetJSON(data).SetState("PENDING").SetStep("START").SetCreatedByUserID(actor).SetCreatedAt(now).SetUpdatedAt(now)
 	if userID != "" {
-		builder.SetUserID(userID)
+		builder.SetUserID(userID).SetDavBindingRevision(davRevision)
 	}
 	if input != nil && input.Evidence != nil {
 		builder.SetEvidence(*input.Evidence)
@@ -428,7 +450,7 @@ func (s *Service) resume(ctx context.Context, actor, userID string, input admina
 		if row.Action == "TAKEOVER" {
 			step = "TAKEOVER_WAIT"
 		}
-	case "START", "CONTROL", "CONTROL_DONE", "STOP_WAIT", "DELETE_WAIT", "TAKEOVER_WAIT", "MCP_READY", "DAV_READY", "DAV_PREPARE", "REMOTE_CREATED", "DONE":
+	case "START", "CONTROL", "CONTROL_DONE", "STOP_WAIT", "DELETE_WAIT", "TAKEOVER_WAIT", "MCP_READY", "DAV_READY", "DAV_PREPARE", "DAV_REVOKE_CONTROL", "DAV_REVOKE_READY", "DAV_APPLY", "REMOTE_CREATED", "DONE":
 	default:
 		return adminapi.WorkspaceOperation{}, ErrInvalid
 	}
@@ -488,6 +510,9 @@ func (s *Service) Reconcile(ctx context.Context) error {
 		return nil
 	}
 	defer s.mu.Unlock()
+	if err := s.stageExistingDAV(ctx); err != nil {
+		return err
+	}
 	if err := s.syncIdentity(ctx); err != nil {
 		return err
 	}
@@ -509,7 +534,7 @@ func (s *Service) Reconcile(ctx context.Context) error {
 			}
 			advanced, e := s.advance(ctx, current)
 			if e != nil {
-				if current.Step == "CONTROL" {
+				if current.Step == "CONTROL" || current.Step == "DAV_REVOKE_CONTROL" || current.Step == "DAV_APPLY" {
 					// Runtime Control owns the durable Activation and its ACK recovery.
 					// Keep the binding intent intact while retrying that same operation;
 					// NEEDS_ATTENTION here would invalidate its persisted descriptor.
@@ -545,7 +570,7 @@ func (s *Service) fail(ctx context.Context, row *ent.WorkspaceOperation, err err
 	_, e := s.Client.WorkspaceOperation.UpdateOneID(row.ID).SetState(state).SetDiagnosticCode(diagnostic(err)).SetUpdatedAt(s.Now().UTC()).Save(ctx)
 	if row.UserID != "" {
 		update := s.Client.AgentSpace.UpdateOneID(row.UserID).SetDiagnosticCode(diagnostic(err))
-		if row.Action != "SET_DAV" && row.Action != "REVOKE_DAV" && !strings.HasPrefix(row.Step, "DAV_") {
+		if row.Action != "SET_DAV" && row.Action != "REVOKE_DAV" && row.Action != "SET_DAV_ACCESS" && !strings.HasPrefix(row.Step, "DAV_") {
 			update.SetState("NEEDS_ATTENTION")
 		}
 		_, _ = update.Save(ctx)
@@ -596,7 +621,10 @@ func (s *Service) advance(ctx context.Context, op *ent.WorkspaceOperation) (bool
 	if space.BindingRevision != op.BindingRevision {
 		return false, ErrConflict
 	}
-	if op.Action == "CREATE" || op.Action == "RESTORE" || op.Action == "TAKEOVER" || op.Action == "RESET_MCP" || op.Action == "SET_DAV" {
+	if op.DavBindingRevision > 0 && space.DavBindingRevision != op.DavBindingRevision {
+		return false, ErrConflict
+	}
+	if op.Action == "CREATE" || op.Action == "RESTORE" || op.Action == "TAKEOVER" || op.Action == "RESET_MCP" || op.Action == "SET_DAV" || op.Action == "SET_DAV_ACCESS" {
 		user, e := s.Client.User.Get(ctx, space.ID)
 		if e != nil && !ent.IsNotFound(e) {
 			return false, e
@@ -654,16 +682,10 @@ func (s *Service) advance(ctx context.Context, op *ent.WorkspaceOperation) (bool
 				return false, err
 			}
 			return true, s.step(ctx, op, "TAKEOVER_WAIT")
-		case "SET_DAV":
-			return true, s.prepareDAV(ctx, op, space)
-		case "REVOKE_DAV":
-			if err = s.step(ctx, op, "DAV_REVOKE_SENT"); err != nil {
-				return false, err
-			}
-			if err = client.RevokeDAV(ctx, target.Username, target.SpaceID); err != nil {
-				return false, err
-			}
-			return true, s.clearDAV(ctx, op)
+		case "SET_DAV", "REVOKE_DAV":
+			return true, s.step(ctx, op, "DAV_REVOKE_CONTROL")
+		case "SET_DAV_ACCESS":
+			return true, s.step(ctx, op, "DAV_APPLY")
 		case "RESET_MCP":
 			return true, s.step(ctx, op, "MCP_READY")
 		default:
@@ -698,8 +720,34 @@ func (s *Service) advance(ctx context.Context, op *ent.WorkspaceOperation) (bool
 		return true, s.saveMCP(ctx, op, target.SpaceID, credential.Token, "CONTROL")
 	case "REMOTE_CREATED":
 		return true, s.step(ctx, op, "CONTROL")
+	case "DAV_REVOKE_CONTROL":
+		done, e := s.davControl(ctx, op, "DAV_REVOKE")
+		if e != nil || !done {
+			return false, e
+		}
+		if op.Action == "REVOKE_DAV" {
+			return true, s.step(ctx, op, "DAV_REVOKE_READY")
+		}
+		return true, s.step(ctx, op, "DAV_PREPARE")
+	case "DAV_REVOKE_READY":
+		if err = s.step(ctx, op, "DAV_REVOKE_SENT"); err != nil {
+			return false, err
+		}
+		if err = client.RevokeDAV(ctx, target.Username, target.SpaceID); err != nil {
+			return false, err
+		}
+		return true, s.clearDAV(ctx, op)
+	case "DAV_APPLY":
+		done, e := s.davControl(ctx, op, "DAV_APPLY")
+		if e != nil || !done {
+			return false, e
+		}
+		if _, e = s.Client.AgentSpace.Update().Where(agentspace.IDEQ(space.ID), agentspace.DavBindingRevisionEQ(space.DavBindingRevision)).SetDavAppliedAccessMode(space.DavAccessMode).SetDavAppliedRevision(space.DavBindingRevision).Save(ctx); e != nil {
+			return false, e
+		}
+		return true, s.step(ctx, op, "DONE")
 	case "DAV_PREPARE":
-		if str(target.Config.DavOrigin) == "" {
+		if str(target.Config.DavOrigin) == "" || space.FileAccessIntent != "AUTHORIZED" {
 			return true, s.step(ctx, op, "DONE")
 		}
 		return true, s.prepareDAV(ctx, op, space)
@@ -730,7 +778,7 @@ func (s *Service) advance(ctx context.Context, op *ent.WorkspaceOperation) (bool
 		if _, e = tx.AgentSpace.UpdateOneID(space.ID).SetDavSecretID(op.CandidateSecretID).SetDavSecretVersion(op.CandidateSecretVersion).SetDavConfirmed(true).Save(ctx); e != nil {
 			return false, e
 		}
-		next := "DONE"
+		next := "DAV_APPLY"
 		if _, e = tx.WorkspaceOperation.UpdateOneID(op.ID).SetStep(next).SetUpdatedAt(s.Now().UTC()).Save(ctx); e != nil {
 			return false, e
 		}
@@ -755,7 +803,7 @@ func (s *Service) advance(ctx context.Context, op *ent.WorkspaceOperation) (bool
 			}
 		}
 		if op.Action == "CREATE" || op.Action == "RESTORE" || op.Action == "TAKEOVER" || op.Action == "RESET_MCP" {
-			if op.Action == "CREATE" {
+			if (op.Action == "CREATE" || op.Action == "RESTORE" || op.Action == "TAKEOVER") && space.FileAccessIntent == "AUTHORIZED" {
 				revision := int64(0)
 				if id != "" {
 					activation, e := s.Client.Activation.Get(ctx, id)
@@ -889,7 +937,10 @@ func (s *Service) complete(ctx context.Context, op *ent.WorkspaceOperation) erro
 		if row.BindingRevision != op.BindingRevision {
 			return ErrConflict
 		}
-		update := tx.AgentSpace.UpdateOneID(row.ID).SetUpdatedAt(s.Now().UTC()).ClearDiagnosticCode()
+		update := tx.AgentSpace.UpdateOneID(row.ID).SetUpdatedAt(s.Now().UTC())
+		if row.DavConfirmed || row.DiagnosticCode != "dav_credential_unavailable" {
+			update.ClearDiagnosticCode()
+		}
 		switch op.Action {
 		case "DELETE":
 			ids := []string{row.McpSecretID, row.DavSecretID}
@@ -988,8 +1039,20 @@ func (s *Service) advanceWorkspaceService(ctx context.Context, op *ent.Workspace
 		} else {
 			update.SetState("DISABLED")
 		}
-		if _, err = update.Save(ctx); err != nil {
+		service, err := update.Save(ctx)
+		if err != nil {
 			return false, err
+		}
+		if op.Action == "APPLY" {
+			var target operationTarget
+			if err = json.Unmarshal(op.TargetJSON, &target); err != nil {
+				return false, err
+			}
+			if str(target.Config.DavOrigin) != "" {
+				if err = stageDAV(ctx, tx, service, op.CreatedByUserID); err != nil {
+					return false, err
+				}
+			}
 		}
 		if _, err = tx.WorkspaceOperation.UpdateOneID(op.ID).SetState("COMPLETED").SetStep("DONE").SetUpdatedAt(s.Now().UTC()).Save(ctx); err != nil {
 			return false, err

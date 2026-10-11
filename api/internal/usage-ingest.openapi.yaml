@@ -166,7 +166,7 @@ components:
       pattern: ^ups_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
     ResourceKind:
       type: string
-      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
+      enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION, WEBDAV]
     ClientProtocol:
       type: string
       enum:
@@ -184,6 +184,7 @@ components:
       - OPENAI_REALTIME_TRANSCRIPTION
       - DASHSCOPE_REALTIME_ASR
       - MCP_STREAMABLE_HTTP
+      - WEBDAV
     BudgetCapability:
       type: string
       enum: [MODEL, TTS, ASR, MCP, IMAGE_GENERATION]
@@ -411,6 +412,17 @@ components:
           type: string
           minLength: 1
           maxLength: 256
+    DAVSecretRef:
+      type: object
+      additionalProperties: false
+      required: [secretId, secretVersion]
+      properties:
+        secretId:
+          type: string
+          pattern: ^sec_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        secretVersion:
+          type: integer
+          minimum: 1
     RequestUsageFact:
       type: object
       description: Immutable, fully attributed request fact. Proven-unforwarded admission denials carry the same deployment,
@@ -434,6 +446,12 @@ components:
       - responseBytes
       - durationMs
       properties:
+        httpMethod:
+          type: string
+          minLength: 1
+          maxLength: 32
+        davSecretRef:
+          $ref: '#/components/schemas/DAVSecretRef'
         interactionId:
           $ref: '#/components/schemas/InteractionId'
         deploymentId:
@@ -495,6 +513,7 @@ components:
           type: integer
           enum:
           - 2
+          - 3
         workspaceTarget:
           $ref: '#/components/schemas/WorkspaceTarget'
       not:
@@ -513,9 +532,9 @@ components:
             - targetVersion
             properties:
               resourceKind:
-                enum: [MCP]
+                enum: [MCP, WEBDAV]
               clientProtocol:
-                enum: [MCP_STREAMABLE_HTTP]
+                enum: [MCP_STREAMABLE_HTTP, WEBDAV]
             not:
               required:
               - upstreamId
@@ -534,6 +553,9 @@ components:
       - meters
       - request
       properties:
+        statisticsOnly:
+          type: boolean
+          description: True only for WEBDAV request statistics. No admission, semantic meters, budget or cost effects.
         requestId:
           $ref: '#/components/schemas/RequestId'
         revision:

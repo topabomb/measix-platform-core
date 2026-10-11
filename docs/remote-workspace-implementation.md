@@ -9,7 +9,7 @@
 | Hub workspace | `backend/internal/hub/workspace/`：服务配置修订、用户连接意图、持久操作、文件租约与审计 |
 | Agent Space adapter | `backend/internal/hub/agentspace/`：固定管理 API、MCP/DAV origin 校验、条件文件操作、流式 IO；不读取远端状态目录或磁盘 |
 | Runtime Control | `backend/internal/hub/runtimecontrol/workspace.go`：复用原全局 Activation、revision/hash/ACK；工作区不另建运行状态写入者 |
-| Relay | `internal/relay/control/`、`runtime/`：按已验证用户及 MCP ID 选择 immutable binding，取消失效在途请求 |
+| Relay | `internal/relay/control/`、`runtime/`：按已验证用户及 MCP / DAV 资源选择固定空间绑定，取消失效在途请求；DAV 标准转发和基础统计独立于模型准入 |
 | Secret | `internal/hub/upstream/secret_transaction.go`：在业务事务中复用 SecretBox/SecretVersion；不建立派生密钥或第二份凭据表 |
 | Admin | `RemoteWorkspacesPage.vue`、`WorkspacePanel.vue`、`WorkspaceFiles.vue`、`WorkspacePreview.vue`、`WorkspaceTextEditor.vue`：全部通过同源 Admin API |
 | 第三方服务 | Agent Space 拥有账号、空间、VM、磁盘和文件；独立发布并以管理/MCP/DAV 合同接入 |
@@ -30,16 +30,16 @@ DAV 设置或撤销停在 `DAV_SENT` / `DAV_REVOKE_SENT` 且结果未知时，�
 
 `WorkspaceResources.vue` 由两个入口的 `WorkspacePanel` 共用：运行状态、工作卷已用/可用、客户机内存三张卡片，另列 CPU 核数和内存/工作卷配置及来源。当前/历史/暂无数据/采集失败逐项呈现，时间采用原 Unix 毫秒；客户机内存不表示宿主 RSS，配置容量不当作文件系统可用容量。未创建 VM 时明确标注创建默认值，不提供 CPU 使用率或利用率图表。
 
-打开面板加载摘要，可手动刷新；页面可见时每 15 秒串行请求，隐藏、切用户、空间或生命周期上下文变化时取消原请求并丢弃迟到响应。传输失败时保留的数值标为历史；身份/权限冲突清除旧摘要。资源错误独立显示，不覆盖文件编辑内容。容量格式与文件区共用，非零小容量不四舍五入为 0 MiB。没有资源数据库、后台采集器或第二套权限所有者；Snapshot v5、Client 投影和 Relay 协议没有变化。
+打开面板加载摘要，可手动刷新；页面可见时每 15 秒串行请求，隐藏、切用户、空间或生命周期上下文变化时取消原请求并丢弃迟到响应。传输失败时保留的数值标为历史；身份/权限冲突清除旧摘要。资源错误独立显示，不覆盖文件编辑内容。容量格式与文件区共用，非零小容量不四舍五入为 0 MiB。没有资源数据库、后台采集器或第二套权限所有者；资源摘要本身不扩展 Snapshot v5、Client 投影或 Relay 协议。
 
 ## 配置、发布和用户生命周期
 
 1. 在“远程工作区”（`/admin/remote-workspaces`）打开启用开关，填写管理服务地址、管理凭据和可选的独立 DAV 地址，点击“保存配置”。开关仅表达待保存意图，页面同时显示服务实际状态；检查已保存连接是单独的只读操作。
-2. 页面保存不可变配置修订，再提交启用操作并显示进度。服务 API 位于 `/api/admin/v1/remote-workspace/services`；配置保存本身不改能力草稿，也不发布 MCP。地址变更必须确认仍指向原服务，否则保存按钮不可用；应用时再逐一核对已有账号和原空间 ID。
+2. 页面保存不可变配置修订，再提交启用操作并显示进度。服务 API 位于 `/api/admin/v1/remote-workspace/services`；配置保存本身不发布能力。首次成功启用已配置 DAV 的服务后，自动将默认开启的 DAV 及固定来源绑定加入现有草稿，保留其他编辑；管理员仍按原流程发布。以后应用配置不覆盖显式关闭的 DAV。地址变更必须确认仍指向原服务，否则保存按钮不可用；应用时再逐一核对已有账号和原空间 ID。
 3. 服务启用后选择有效用户开通空间，也可在用户详情的“远程工作区”操作。开通和文件管理无需发布 MCP。首次配置 DAV 后，确认有效凭据才显示“浏览文件”；打开详情本身不启动 VM。
-4. 需要助手工具时，进入“企业配置 → MCP”，显式“添加远程工作区 MCP”，再按原流程审查、发布。草稿存在未保存修改时先保存或放弃，避免覆盖。共享 Snapshot 只有稳定 MCP 定义，不包含用户空间或凭据。已有空间在发布后获得工具入口，无需重新开通。
+4. 需要助手工具时，进入“企业配置 → MCP”，显式“添加远程工作区 MCP”，再按原流程审查、发布。草稿存在未保存修改时先保存或放弃，避免覆盖。共享 Snapshot 包含稳定资源定义，不包含用户空间或上游凭据。已有空间在发布后获得工具入口，无需重新开通。
 5. 关闭开关后仍需点击“保存配置”并确认关闭。关闭会撤销访问并停止工作区，保留文件。未开通用户隐藏工作区页签，已有空间保留核查和删除入口；MCP 页面隐藏新增入口，但保留现有定义和服务已关闭提示。
-6. 断开先撤销 Core/Relay 访问，再禁用原远端账号并等待 stopPending 收敛；文件保留。恢复只启用原空间、重新签发 MCP；DAV 必须另行显式签发。MCP 凭据维护与 WebDAV 连接信息分开呈现。
+6. 断开先撤销 Core/Relay 访问，再禁用原远端账号并等待 stopPending 收敛；文件保留。恢复启用原空间并重新签发 MCP；持久文件授权为 AUTHORIZED 时自动准备 DAV，REVOKED 保持撤销。正常重启复用已确认凭据，无人为有效期和定时轮换。MCP 凭据维护、客户端 DAV 权限和原始外部连接信息分别呈现。
 7. 停用用户或服务保留原连接意图；重新启用仅恢复此前 CONNECTED 意图，手动断开保持断开。删除用户在原用户清理事务中保留无用户外键的远端清理目标。远端删除 202 后仍需查询确认完成。
 
 打开工作区详情不读取文件、不启动 VM；点击“浏览文件”或实际执行工具才可能启动运行环境。MCP 和文件可用性分别投影。DAV 返回认证失败仅使该版本 DAV 不可用，不触发 Core 登出或清除 MCP 能力。
@@ -55,12 +55,16 @@ DAV 设置或撤销停在 `DAV_SENT` / `DAV_REVOKE_SENT` 且结果未知时，�
 - **未知创建后的清理**：已停用/删除用户可在“核实后继续”填写原账号、原空间及核实依据。Core 验证与原创建目标一致后仅继续停用/删除；仍有资格的用户走显式接管，不直接恢复未知凭据。
 - **管理凭据失效**：上述继续操作可填写新的管理凭据，先保存为 Secret 引用，再核对原目标。仅替换当前操作引用，不改服务地址或有效服务配置；操作收敛后再同步服务连接配置。
 - **启用和控制失败**：只读启用检查失败恢复操作前的启用状态，已关闭服务不会被误启用。Relay 控制失败保留原工作区操作及绑定意图，由原 Activation 持续对账；不重发已确认的远端创建或凭据写入。
-- **重启恢复**：恢复固定 descriptor 前复验当前 workspace 意图、目标、配置及 SecretVersion；已撤销意图不得复活。新工作区命令与全局待确认 Activation 互斥。控制 v2 要求 Relay status 和 ACK 明确支持 v2。
+- **重启恢复**：恢复固定 descriptor 前复验当前 workspace 意图、目标、配置及 SecretVersion；已撤销意图不得复活。新工作区命令与全局待确认 Activation 互斥。控制 v3 要求 Relay status 和 ACK 明确支持其 DAV 绑定版本；保留无 DAV 的既有协议恢复路径。
 - **远端已删除、同名重建或身份不匹配**：保留诊断及原目标，不能改绑新 `spc_*`。人工核实不是后台自动恢复的替代名词。
 
 管理 API 不提供远端请求幂等键或条件账号修订，因此未知创建/启用仍有明确的人工收敛边界。不要通过修改数据库跳过操作，或在旧请求未确认结束前宣告撤销完成。
 
 ## 文件、预览与审计
+
+远程工作区页面将服务连接收为可折叠区域，摘要保留实际状态；未配置时直接展开。用户选择和工作区详情使用页面全宽，文件入口前置，文件区位于权限和容量明细之前。连接维护、DAV 权限及资源摘要分别展开，避免日常浏览被配置表单和长标识挤占。详情内部不再并排堆放文件与管理卡片；用户详情入口沿用同一面板。
+
+`WorkspaceFiles.vue` 的“筛选当前目录”只按已加载条目的文件名在本地过滤，并保持目录优先排序，不递归查询远端、不代表全空间搜索。切目录清空筛选，显示筛选后的条目数量；操作仍携带所选条目的原路径和版本条件。
 
 Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/workspace` 下的 `files`、`content` 进入同一个应用服务。Client 用户来自已验证令牌，不接受请求提供的 userId；Admin 每次验证会话、角色及写请求 CSRF。
 
@@ -79,15 +83,36 @@ Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/worksp
 
 预览纯文本/Markdown 上限 2 MiB，PDF/图片上限 24 MiB；图片头在解码前限制 1600 万像素，PDF 每次渲染画布同样有像素上限。Markdown 禁用原始 HTML 执行、外部图片和危险链接，原文可切换，相对图片通过当前授权文件 API 加载（每张 4 MiB，最多 20 张）。PDF 使用 pdf.js 模块 worker 和 canvas，支持翻页/缩放；不执行文件作为网页。HTML/SVG 等只下载。关闭预览会取消读取、渲染并释放对象 URL。
 
+视频使用原生 `<video>`，不读入完整 Blob、不转码。MP4/M4V/WebM/OGV 通过同源 Files GET/HEAD 的 `preview=video&expectedEtag=<strong ETag>` 获取固定媒体类型、inline 和 nosniff；Hub 将版本转换为 If-Match，Range/If-Range 仍由上游判断。缺少强 ETag 不启动预览，版本变化返回 412；浏览器不支持的编解码可下载。关闭、切用户/空间或撤销访问时取消媒体读取；普通下载及 HTML/SVG 仍为 attachment。
+
+## 标准 WebDAV 资源
+
+服务持久拥有一个 `dav_*` 资源和 `rte_*` 路由。企业配置 WebDAV 分区只编辑名称和开关，不重复添加、删除或改来源；保存、校验、差异审查、快照预览及发布沿用原流程。旧编辑器漏传派生定义时拒绝保存，避免静默删除。HTTP/HTTPS、本机、局域网及 IPv4/IPv6 均受支持，不增加私网白名单。
+
+Snapshot v5 的可选 `webdav[]` 只包含稳定资源定义、`WORKSPACE_FILE_EXCHANGE` 用途及平台 endpoint 模板；来源服务由 Hub 的派生资源和私有 RuntimeBinding 关联，不在共享 Snapshot 中下发上游配置。当前用户的 `WorkspaceProjection.webdav` 返回实际可用性和生效 READ_ONLY/FULL；Admin 另有 desired/lastConfirmed 修订，Client 移除这些管理字段。唯一 `fileExchangeWebdavResourceId` 仅在服务启用且 DAV 已发布启用时指定；临时不可用保留指定身份但不得执行，服务或资源关闭则取消指定，客户端不另选 DAV。权限或控制结果尚未确认时不报告生效权限。
+
+平台路径为 `/runtime/v1/resources/{davId}/spaces/{agentSpaceId}/dav/`。客户端使用可注入平台 Bearer 的标准 DAV 库；仅新请求刷新短期 access token，不给第三方服务器发送平台 token。请求开始验证 JWT，活动传输的绝对上界为签名 sessionValidUntil；短 JWT 到期不截断已经准入的大文件，用户/会话/密钥/资源/绑定撤销仍即时取消。无 generation/interaction 私有头、模型 body 上限、预算或总传输时长限制。
+
+Relay 注册全部 RFC 4918 方法，双向流式转发、有界并发和缓冲、背压及双向空闲取消。READ_ONLY 只允许 OPTIONS/GET/HEAD/PROPFIND；FULL 允许约定的标准 DAV 方法，上游是否支持仍由其状态回答。仅映射受控根内 Destination、tagged If、Location/Content-Location 和协议资源 href；锁 token、dead property 与普通文件正文保持不透明。上游 401 转换为明确 502 工作区凭据不可用，不触发平台登出；普通 403、207、条件状态、Range、锁及覆盖语义透传。
+
+协议 XML 支持 UTF-8/UTF-16、gzip，逐 token 保留原命名空间/扩展正文，修改后清除旧长度和摘要。单 token 上限 1 MiB、层级 256、资源 href 16 KiB，读取阶段也限制缓冲；整份目录不套 Files 的 4 MiB/2000 项上限。中途非法 XML 终止流，不追加 JSON；普通文件下载不经过 XML 解码。
+
+DAV 有独立绑定修订和 SecretRef。签发/重设/撤销的撤除与恢复分别使用持久 Activation 阶段，匹配 revision/hash/ACK 后才完成；权限变更不轮换上游 key、不改变 MCP 修订，也不改变 Console Files 权限。当前版本上游 401 经原统计管道持久回报并撤除绑定，不能凭 401 自动覆盖可能的外部改钥；旧事件不影响新凭据，管理员核实后重设。首次缺少凭据及已确认禁用后的恢复自动处理，未知远端写不重放。
+
+仅 DAV 记录 method、状态、开始/结束、时长及请求/响应实际传输字节。事实标记 `statisticsOnly`，复用 spool、投递、删除屏障和去重；没有预算准入、语义 meter、费用或 DAV 配额。Console DAV 详情/筛选隐藏费用与额度。Files 保留原操作审计，不加入统一用量；管理员领取原始直连 key 不受平台 DAV 权限/开关/统计约束，界面明确提示。
+
 文本编辑复用 GET/PUT，不新增服务端编辑会话。正文与强 ETag 必须来自同一次 GET；新建/另存使用 `If-None-Match: *`，原文件保存使用该 GET 的 `If-Match`。Admin 编辑严格 UTF-8、最多 2 MiB，保留 BOM 和统一换行风格；二进制、非 UTF-8 或混合换行不自动转码覆盖。成功后关闭编辑器，下一次编辑重新 GET，避免把保存之后其他写入的版本错误地绑定到旧缓冲区。冲突/未知结果保留文字、禁止直接重放原写入；同名另存失败也需先核实或换新目标。关闭、重新读取和路由离开对未保存文字要求确认，页面刷新/关闭有浏览器原生保护。
 
 文件访问失效会取消 IO；同一空间编辑文字暂留页面供复制，恢复访问后覆盖仍需重新读取。预览直接下载，原生客户端分享复用下载文件副本，不新增公开链接或分享服务。完整 Client 传输状态、错误码和缓存边界见 [Android 对接说明](android-platform-integration.md#远程工作区与文件客户端)。
+
+未决 Activation 先用已存 descriptor/hash 匹配 ACK，不因之后的凭据健康观测丢失收敛入口。仅 APPLYING/UNKNOWN 的原控制重放可接受同一 key 的失效健康标记，授权、状态、空间、权限、修订和 SecretRef 仍精确匹配；COMPLETED 恢复和新编译不适用。完成旧操作后保留失效诊断，下一控制阶段撤除绑定。
 
 ## 数据与合同
 
 - `000002_remote_workspace.sql` 增加 WorkspaceService、WorkspaceServiceConfig、AgentSpace、WorkspaceOperation、WorkspaceAudit；`000003_workspace_usage_target.sql` 保留旧归属，增加互斥 workspaceTarget。既有 `000001` 不变。
 - 旧 upstream 归属保持原字段和序列化；新分支使用 `targetVersion: 2` 与 workspaceServiceId、agentSpaceId、remoteUsername、bindingRevision，仅用于 MCP。预算准入、spool、结算和 Admin 历史详情携带同一固定归属，不引用可变空间表补写历史。
 - migration 003 重建表时保留所有原列、索引和引用；结束前完整 foreign_key_check。测试覆盖已有请求、结算引用、原始字节/哈希的升级及重复执行。
+- `000006_workspace_webdav.sql` 仅追加 DAV 身份、文件授权意图、独立权限修订、操作修订和基础统计字段；根据已知旧操作/确认状态回填 AUTHORIZED/REVOKED/UNCONFIRMED，不默认重新授权不明旧 key。既有活动服务由 reconcile 补一次 DAV 草稿，不重写历史 Release、Snapshot、Secret 或自动发布管理员草稿。
 - `WorkspaceProjection` 的 `schemaVersion: 1` 是独立 Client 控制接口，必填 `serviceState: NOT_CONFIGURED | DISABLED | ENABLED` 区分企业配置意图；`state` 表示用户生命周期，`filesAvailable`/`mcpAvailable` 各自表示实际准入。ENABLED 不等于远端健康。Android generated 导出和 Client 投影样例已同步，不代表 Android 消费端 UI 或真实设备传输完成。未发布的工作区合同直接更新，不新增兼容探测/回退分支；Snapshot 保持 v5。
 - 共享历史 Snapshot v4/v5 的发布字节、hash、republish 保持原协议；不在旧实体中填造假的 Upstream。
 
@@ -97,6 +122,6 @@ Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/worksp
 
 ### 文件 HTTP 状态与 DAV 完成语义
 
-Core 文件接口保留标准条件/锁定状态：`file_version_conflict` 为 412，`file_locked` 为 423，普通文件冲突及空间不匹配仍为 409。业务 Problem code 与保留草稿、禁止自动重放的恢复语义不变；旧部署曾将前两项统一为 409，消费者按稳定 code 识别期间仍可保留编辑。416 仅输出经过校验的 `Content-Range: bytes */N`，缺失或非法的上游长度不猜测。DAV 401/403 仍映射工作区凭据不可用，不能冒充 Core 登录失效。
+Core 文件接口保留标准条件/锁定状态：`file_version_conflict` 为 412，`file_locked` 为 423，普通文件冲突及空间不匹配仍为 409。业务 Problem code 与保留草稿、禁止自动重放的恢复语义不变；旧部署曾将前两项统一为 409，消费者按稳定 code 识别期间仍可保留编辑。416 仅输出经过校验的 `Content-Range: bytes */N`，缺失或非法的上游长度不猜测。Hub Files adapter 的上游 DAV 401/403 仍映射工作区凭据不可用，不能冒充 Core 登录失效；平台标准 DAV 入口的普通 403 则原样透传。
 
 DAV adapter 按请求方法检查完成状态；202、非 GET 的 206 或写入的 304 等不能证明文件写入完成，沿已有 `workspace_result_unknown` 返回并要求核实。PUT 的 200/201/204、MKCOL 的 201、DELETE 的 200/204/207、COPY/MOVE 的 201/204/207 分别处理；207 继续解析逐项失败，不伪装为整个目录操作成功。

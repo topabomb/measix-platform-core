@@ -25,6 +25,8 @@ const (
 	FieldConfigRevision = "config_revision"
 	// FieldBindingRevision holds the string denoting the binding_revision field in the database.
 	FieldBindingRevision = "binding_revision"
+	// FieldDavBindingRevision holds the string denoting the dav_binding_revision field in the database.
+	FieldDavBindingRevision = "dav_binding_revision"
 	// FieldTargetJSON holds the string denoting the target_json field in the database.
 	FieldTargetJSON = "target_json"
 	// FieldState holds the string denoting the state field in the database.
@@ -63,6 +65,7 @@ var Columns = []string{
 	FieldRequestHash,
 	FieldConfigRevision,
 	FieldBindingRevision,
+	FieldDavBindingRevision,
 	FieldTargetJSON,
 	FieldState,
 	FieldStep,
@@ -86,6 +89,11 @@ func ValidColumn(column string) bool {
 	}
 	return false
 }
+
+var (
+	// DefaultDavBindingRevision holds the default value on creation for the "dav_binding_revision" field.
+	DefaultDavBindingRevision int64
+)
 
 // OrderOption defines the ordering options for the WorkspaceOperation queries.
 type OrderOption func(*sql.Selector)
@@ -128,6 +136,11 @@ func ByConfigRevision(opts ...sql.OrderTermOption) OrderOption {
 // ByBindingRevision orders the results by the binding_revision field.
 func ByBindingRevision(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBindingRevision, opts...).ToFunc()
+}
+
+// ByDavBindingRevision orders the results by the dav_binding_revision field.
+func ByDavBindingRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDavBindingRevision, opts...).ToFunc()
 }
 
 // ByState orders the results by the state field.

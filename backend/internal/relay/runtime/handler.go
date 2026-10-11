@@ -28,6 +28,7 @@ type Handler struct {
 	budget        relaybudget.Client
 	baseTransport *http.Transport
 	transports    sync.Map
+	davSlots      chan struct{}
 }
 
 const (
@@ -52,7 +53,7 @@ func NewHandler(store *control.Store, recorder UsageRecorder, budgetClient relay
 	if base.MaxIdleConnsPerHost < runtimeMaxIdleConnectionsPerHost {
 		base.MaxIdleConnsPerHost = runtimeMaxIdleConnectionsPerHost
 	}
-	return &Handler{store: store, recorder: recorder, budget: budgetClient, baseTransport: base}
+	return &Handler{store: store, recorder: recorder, budget: budgetClient, baseTransport: base, davSlots: make(chan struct{}, 64)}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -66,13 +67,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resourceID, runtimePath, ok := runtimeTarget(r.URL.Path)
-	validTarget := ok && isRuntimeResourceID(resourceID) && safeRuntimePath(runtimePath)
+	isDAV := platformid.Validate(platformid.WebDAV, resourceID) == nil
+	validTarget := ok && isRuntimeResourceID(resourceID) && (isDAV || safeRuntimePath(runtimePath))
 	if !isRuntimeResourceID(resourceID) {
 		resourceID = ""
 	}
 
 	claims, err := h.authenticate(state, bearer(r))
 	if err != nil {
+		if isDAV {
+			observer.Header().Set("WWW-Authenticate", `Bearer realm="measix"`)
+		}
 		writeProblem(observer, http.StatusUnauthorized, "invalid_session", "Unauthorized", requestID, nil, false)
 		return
 	}
@@ -82,6 +87,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		interactionID = &interactionValue
 	}
 	runtimeFailure := func(status int, code, title string, target *int) {
+		if isDAV && status == http.StatusUnauthorized {
+			observer.Header().Set("WWW-Authenticate", `Bearer realm="measix"`)
+		}
 		writeProblem(observer, status, code, title, requestID, target, false)
 	}
 
@@ -104,6 +112,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, revoked := state.RevokedSessions[claims.SessionID]; revoked {
 		runtimeFailure(http.StatusForbidden, "session_revoked", "Session revoked", nil)
+		return
+	}
+	if isDAV {
+		h.serveDAV(observer, r, state, claims, resourceID, requestID)
 		return
 	}
 

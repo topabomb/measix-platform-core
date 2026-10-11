@@ -54,7 +54,9 @@ type responseObserver struct {
 }
 
 func (w *responseObserver) WriteHeader(status int) {
-	if w.status == 0 {
+	// Interim responses do not determine the final request outcome. A 101
+	// switches protocols and is the terminal HTTP status for that connection.
+	if w.status == 0 && (status >= 200 || status == http.StatusSwitchingProtocols) {
 		w.status = status
 	}
 	w.ResponseWriter.WriteHeader(status)

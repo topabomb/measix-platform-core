@@ -29,3 +29,14 @@ func TestRejectsWrongPrefixAndNonV4UUID(t *testing.T) {
 		}
 	}
 }
+
+func TestDAVResourceHasIndependentStableNamespace(t *testing.T) {
+	id := "dav_550e8400-e29b-41d4-a716-446655440000"
+	kind, err := platformid.KindOf(id)
+	if err != nil || kind != platformid.Kind("dav") {
+		t.Fatalf("DAV resource namespace not recognized: %q %v", kind, err)
+	}
+	if platformid.Validate(platformid.MCP, id) == nil || platformid.Validate(platformid.WorkspaceService, id) == nil {
+		t.Fatal("DAV resource must not be a MCP resource or workspace service identity")
+	}
+}

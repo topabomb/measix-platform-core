@@ -77,6 +77,12 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	state.BundleHash = hash
 	snapshotJSON, _ := json.Marshal(snapshot)
 
+	if s.testHooks.BeforeIntentCommit != nil {
+		if err := s.testHooks.BeforeIntentCommit(ctx); err != nil {
+			return ActivationResult{}, err
+		}
+	}
+
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
 		return ActivationResult{}, err
@@ -92,6 +98,9 @@ func (s *Service) Republish(ctx context.Context, adminUserID, idempotencyKey, so
 	fresh, err := tx.ManagedState.Get(ctx, "current")
 	if err != nil || fresh.DesiredControlRevision+1 != int64(controlRevision) {
 		return ActivationResult{}, ErrActivationInProgress
+	}
+	if err := s.validateWorkspaceIntentTx(ctx, tx, descriptor); err != nil {
+		return ActivationResult{}, err
 	}
 	if _, err := tx.ManagedRelease.Create().
 		SetID(newReleaseID).SetManagedGeneration(int64(generation)).SetStatus("STAGED").

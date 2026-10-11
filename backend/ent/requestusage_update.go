@@ -152,6 +152,34 @@ func (_u *RequestUsageUpdate) SetNillableClientProtocol(v *string) *RequestUsage
 	return _u
 }
 
+// SetHTTPMethod sets the "http_method" field.
+func (_u *RequestUsageUpdate) SetHTTPMethod(v string) *RequestUsageUpdate {
+	_u.mutation.SetHTTPMethod(v)
+	return _u
+}
+
+// SetNillableHTTPMethod sets the "http_method" field if the given value is not nil.
+func (_u *RequestUsageUpdate) SetNillableHTTPMethod(v *string) *RequestUsageUpdate {
+	if v != nil {
+		_u.SetHTTPMethod(*v)
+	}
+	return _u
+}
+
+// SetStatisticsOnly sets the "statistics_only" field.
+func (_u *RequestUsageUpdate) SetStatisticsOnly(v bool) *RequestUsageUpdate {
+	_u.mutation.SetStatisticsOnly(v)
+	return _u
+}
+
+// SetNillableStatisticsOnly sets the "statistics_only" field if the given value is not nil.
+func (_u *RequestUsageUpdate) SetNillableStatisticsOnly(v *bool) *RequestUsageUpdate {
+	if v != nil {
+		_u.SetStatisticsOnly(*v)
+	}
+	return _u
+}
+
 // SetRuntimeRouteID sets the "runtime_route_id" field.
 func (_u *RequestUsageUpdate) SetRuntimeRouteID(v string) *RequestUsageUpdate {
 	_u.mutation.SetRuntimeRouteID(v)
@@ -568,6 +596,12 @@ func (_u *RequestUsageUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.ClientProtocol(); ok {
 		_spec.SetField(requestusage.FieldClientProtocol, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.HTTPMethod(); ok {
+		_spec.SetField(requestusage.FieldHTTPMethod, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.StatisticsOnly(); ok {
+		_spec.SetField(requestusage.FieldStatisticsOnly, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.RuntimeRouteID(); ok {
 		_spec.SetField(requestusage.FieldRuntimeRouteID, field.TypeString, value)
 	}
@@ -804,6 +838,34 @@ func (_u *RequestUsageUpdateOne) SetClientProtocol(v string) *RequestUsageUpdate
 func (_u *RequestUsageUpdateOne) SetNillableClientProtocol(v *string) *RequestUsageUpdateOne {
 	if v != nil {
 		_u.SetClientProtocol(*v)
+	}
+	return _u
+}
+
+// SetHTTPMethod sets the "http_method" field.
+func (_u *RequestUsageUpdateOne) SetHTTPMethod(v string) *RequestUsageUpdateOne {
+	_u.mutation.SetHTTPMethod(v)
+	return _u
+}
+
+// SetNillableHTTPMethod sets the "http_method" field if the given value is not nil.
+func (_u *RequestUsageUpdateOne) SetNillableHTTPMethod(v *string) *RequestUsageUpdateOne {
+	if v != nil {
+		_u.SetHTTPMethod(*v)
+	}
+	return _u
+}
+
+// SetStatisticsOnly sets the "statistics_only" field.
+func (_u *RequestUsageUpdateOne) SetStatisticsOnly(v bool) *RequestUsageUpdateOne {
+	_u.mutation.SetStatisticsOnly(v)
+	return _u
+}
+
+// SetNillableStatisticsOnly sets the "statistics_only" field if the given value is not nil.
+func (_u *RequestUsageUpdateOne) SetNillableStatisticsOnly(v *bool) *RequestUsageUpdateOne {
+	if v != nil {
+		_u.SetStatisticsOnly(*v)
 	}
 	return _u
 }
@@ -1253,6 +1315,12 @@ func (_u *RequestUsageUpdateOne) sqlSave(ctx context.Context) (_node *RequestUsa
 	}
 	if value, ok := _u.mutation.ClientProtocol(); ok {
 		_spec.SetField(requestusage.FieldClientProtocol, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.HTTPMethod(); ok {
+		_spec.SetField(requestusage.FieldHTTPMethod, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.StatisticsOnly(); ok {
+		_spec.SetField(requestusage.FieldStatisticsOnly, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RuntimeRouteID(); ok {
 		_spec.SetField(requestusage.FieldRuntimeRouteID, field.TypeString, value)

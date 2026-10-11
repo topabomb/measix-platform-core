@@ -47,6 +47,32 @@ paths:
           $ref: '#/components/responses/Problem'
 components:
   schemas:
+    DAVResourceId:
+      type: string
+      pattern: ^dav_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    DAVAccessMode:
+      type: string
+      enum: [READ_ONLY, FULL]
+    UserDAVBinding:
+      type: object
+      additionalProperties: false
+      required: [userId, resourceId, target, endpoint, secretRef, token, accessMode]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        resourceId:
+          $ref: '#/components/schemas/DAVResourceId'
+        target:
+          $ref: '#/components/schemas/WorkspaceTarget'
+        endpoint:
+          type: string
+          format: uri
+        secretRef:
+          $ref: '#/components/schemas/SecretRef'
+        token:
+          type: string
+        accessMode:
+          $ref: '#/components/schemas/DAVAccessMode'
     WorkspaceServiceId:
       type: string
       pattern: ^wss_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -350,6 +376,7 @@ components:
           - TTS
           - ASR
           - MCP
+          - WEBDAV
         clientProtocol:
           type: string
           enum:
@@ -367,6 +394,7 @@ components:
           - OPENAI_REALTIME_TRANSCRIPTION
           - DASHSCOPE_REALTIME_ASR
           - MCP_STREAMABLE_HTTP
+          - WEBDAV
         audioProfile:
           $ref: '#/components/schemas/RuntimeAudioProfile'
         llmProfile:
@@ -596,6 +624,10 @@ components:
       - upstreams
       - operationalLimits
       properties:
+        davBindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDAVBinding'
         controlRevision:
           type: integer
           minimum: 1
@@ -631,6 +663,7 @@ components:
           enum:
           - 1
           - 2
+          - 3
         userBindings:
           type: array
           items:
@@ -660,6 +693,7 @@ components:
           enum:
           - 1
           - 2
+          - 3
     ControlStatus:
       type: object
       additionalProperties: false
@@ -706,6 +740,7 @@ components:
           enum:
           - 1
           - 2
+          - 3
     TelemetryMetrics:
       type: object
       additionalProperties: false

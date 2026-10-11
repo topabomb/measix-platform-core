@@ -70,6 +70,48 @@ func (_c *WorkspaceServiceCreate) SetRuntimeRouteID(v string) *WorkspaceServiceC
 	return _c
 }
 
+// SetDavResourceID sets the "dav_resource_id" field.
+func (_c *WorkspaceServiceCreate) SetDavResourceID(v string) *WorkspaceServiceCreate {
+	_c.mutation.SetDavResourceID(v)
+	return _c
+}
+
+// SetNillableDavResourceID sets the "dav_resource_id" field if the given value is not nil.
+func (_c *WorkspaceServiceCreate) SetNillableDavResourceID(v *string) *WorkspaceServiceCreate {
+	if v != nil {
+		_c.SetDavResourceID(*v)
+	}
+	return _c
+}
+
+// SetDavRuntimeRouteID sets the "dav_runtime_route_id" field.
+func (_c *WorkspaceServiceCreate) SetDavRuntimeRouteID(v string) *WorkspaceServiceCreate {
+	_c.mutation.SetDavRuntimeRouteID(v)
+	return _c
+}
+
+// SetNillableDavRuntimeRouteID sets the "dav_runtime_route_id" field if the given value is not nil.
+func (_c *WorkspaceServiceCreate) SetNillableDavRuntimeRouteID(v *string) *WorkspaceServiceCreate {
+	if v != nil {
+		_c.SetDavRuntimeRouteID(*v)
+	}
+	return _c
+}
+
+// SetDavStaged sets the "dav_staged" field.
+func (_c *WorkspaceServiceCreate) SetDavStaged(v bool) *WorkspaceServiceCreate {
+	_c.mutation.SetDavStaged(v)
+	return _c
+}
+
+// SetNillableDavStaged sets the "dav_staged" field if the given value is not nil.
+func (_c *WorkspaceServiceCreate) SetNillableDavStaged(v *bool) *WorkspaceServiceCreate {
+	if v != nil {
+		_c.SetDavStaged(*v)
+	}
+	return _c
+}
+
 // SetDiagnosticCode sets the "diagnostic_code" field.
 func (_c *WorkspaceServiceCreate) SetDiagnosticCode(v string) *WorkspaceServiceCreate {
 	_c.mutation.SetDiagnosticCode(v)
@@ -109,6 +151,7 @@ func (_c *WorkspaceServiceCreate) Mutation() *WorkspaceServiceMutation {
 
 // Save creates the WorkspaceService in the database.
 func (_c *WorkspaceServiceCreate) Save(ctx context.Context) (*WorkspaceService, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -134,6 +177,22 @@ func (_c *WorkspaceServiceCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *WorkspaceServiceCreate) defaults() {
+	if _, ok := _c.mutation.DavResourceID(); !ok {
+		v := workspaceservice.DefaultDavResourceID
+		_c.mutation.SetDavResourceID(v)
+	}
+	if _, ok := _c.mutation.DavRuntimeRouteID(); !ok {
+		v := workspaceservice.DefaultDavRuntimeRouteID
+		_c.mutation.SetDavRuntimeRouteID(v)
+	}
+	if _, ok := _c.mutation.DavStaged(); !ok {
+		v := workspaceservice.DefaultDavStaged
+		_c.mutation.SetDavStaged(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *WorkspaceServiceCreate) check() error {
 	if _, ok := _c.mutation.Name(); !ok {
@@ -153,6 +212,15 @@ func (_c *WorkspaceServiceCreate) check() error {
 	}
 	if _, ok := _c.mutation.RuntimeRouteID(); !ok {
 		return &ValidationError{Name: "runtime_route_id", err: errors.New(`ent: missing required field "WorkspaceService.runtime_route_id"`)}
+	}
+	if _, ok := _c.mutation.DavResourceID(); !ok {
+		return &ValidationError{Name: "dav_resource_id", err: errors.New(`ent: missing required field "WorkspaceService.dav_resource_id"`)}
+	}
+	if _, ok := _c.mutation.DavRuntimeRouteID(); !ok {
+		return &ValidationError{Name: "dav_runtime_route_id", err: errors.New(`ent: missing required field "WorkspaceService.dav_runtime_route_id"`)}
+	}
+	if _, ok := _c.mutation.DavStaged(); !ok {
+		return &ValidationError{Name: "dav_staged", err: errors.New(`ent: missing required field "WorkspaceService.dav_staged"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "WorkspaceService.created_at"`)}
@@ -223,6 +291,18 @@ func (_c *WorkspaceServiceCreate) createSpec() (*WorkspaceService, *sqlgraph.Cre
 		_spec.SetField(workspaceservice.FieldRuntimeRouteID, field.TypeString, value)
 		_node.RuntimeRouteID = value
 	}
+	if value, ok := _c.mutation.DavResourceID(); ok {
+		_spec.SetField(workspaceservice.FieldDavResourceID, field.TypeString, value)
+		_node.DavResourceID = value
+	}
+	if value, ok := _c.mutation.DavRuntimeRouteID(); ok {
+		_spec.SetField(workspaceservice.FieldDavRuntimeRouteID, field.TypeString, value)
+		_node.DavRuntimeRouteID = value
+	}
+	if value, ok := _c.mutation.DavStaged(); ok {
+		_spec.SetField(workspaceservice.FieldDavStaged, field.TypeBool, value)
+		_node.DavStaged = value
+	}
 	if value, ok := _c.mutation.DiagnosticCode(); ok {
 		_spec.SetField(workspaceservice.FieldDiagnosticCode, field.TypeString, value)
 		_node.DiagnosticCode = value
@@ -256,6 +336,7 @@ func (_c *WorkspaceServiceCreateBulk) Save(ctx context.Context) ([]*WorkspaceSer
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*WorkspaceServiceMutation)
 				if !ok {

@@ -39,6 +39,7 @@ export const useDraftStore = defineStore('draft', () => {
   function accept(draft: Draft) {
     const content = structuredClone(draft.content)
     content.imageGenerators ??= []
+    content.webdav ??= []
     baselineRevision.value = draft.draftRevision
     baselineContent.value = structuredClone(content)
     localContent.value = content

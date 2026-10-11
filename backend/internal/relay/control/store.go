@@ -112,8 +112,9 @@ func IsRevisionStale(err error) bool { return errors.Is(err, ErrStaleRevision) }
 
 func ack(state *State) relaycontrolapi.ControlAck {
 	var protocol *relaycontrolapi.ControlAckProtocolVersion
-	if state.ProtocolVersion == 2 {
-		protocol = protocolAckVersion()
+	if state.ProtocolVersion >= 2 {
+		v := relaycontrolapi.ControlAckProtocolVersion(state.ProtocolVersion)
+		protocol = &v
 	}
 	return relaycontrolapi.ControlAck{
 		ProtocolVersion:         protocol,
@@ -125,7 +126,7 @@ func ack(state *State) relaycontrolapi.ControlAck {
 }
 
 func protocolStatusVersion() *relaycontrolapi.ControlStatusProtocolVersion {
-	v := relaycontrolapi.ControlStatusProtocolVersion(2)
+	v := relaycontrolapi.ControlStatusProtocolVersion(3)
 	return &v
 }
 func protocolAckVersion() *relaycontrolapi.ControlAckProtocolVersion {

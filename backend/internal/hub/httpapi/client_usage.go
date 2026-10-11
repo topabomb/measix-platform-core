@@ -165,6 +165,10 @@ func clientRequestUsageWire(row usage.RequestView) clientapi.RequestUsageView {
 		SettlementState:     clientapi.RequestUsageViewSettlementState(row.SettlementState),
 		SemanticMeters:      clientMeterQuantities(row.SemanticMeters),
 	}
+	if row.StatisticsOnly {
+		result.StatisticsOnly = &row.StatisticsOnly
+		result.HttpMethod = &row.HTTPMethod
+	}
 	if row.Budget != nil {
 		result.Budget = clientBudgetContext(*row.Budget)
 	}

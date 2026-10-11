@@ -382,6 +382,29 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        DAVResourceId: string;
+        /** @enum {string} */
+        DAVAccessMode: "READ_ONLY" | "FULL";
+        WebDAVDefinition: {
+            resourceId: components["schemas"]["DAVResourceId"];
+            displayName: string;
+            enabled: boolean;
+            /** @enum {string} */
+            purpose: "WORKSPACE_FILE_EXCHANGE";
+            /** @enum {string} */
+            clientProtocol: "WEBDAV";
+            /** @enum {string} */
+            authOwnership: "ENTERPRISE_MANAGED";
+            rootPathTemplate: string;
+        };
+        WorkspaceDAVProjection: {
+            resourceId: components["schemas"]["DAVResourceId"];
+            available: boolean;
+            reason: string;
+            accessMode?: components["schemas"]["DAVAccessMode"];
+            /** Format: int64 */
+            bindingRevision?: number;
+        };
         WorkspaceServiceId: string;
         AgentSpaceId: string;
         WorkspaceOperationId: string;
@@ -424,6 +447,8 @@ export interface components {
             truncated: boolean;
         };
         WorkspaceProjection: {
+            fileExchangeWebdavResourceId?: components["schemas"]["DAVResourceId"];
+            webdav?: components["schemas"]["WorkspaceDAVProjection"];
             /** @enum {integer} */
             schemaVersion: 1;
             /** @enum {string} */
@@ -508,9 +533,9 @@ export interface components {
         EnterpriseUpdateId: string;
         Sha256Hash: string;
         /** @enum {string} */
-        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION";
+        ResourceKind: "MODEL" | "TTS" | "ASR" | "MCP" | "IMAGE_GENERATION" | "WEBDAV";
         /** @enum {string} */
-        UsageClientProtocol: "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "DASHSCOPE_MULTIMODAL_GENERATION" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
+        UsageClientProtocol: "WEBDAV" | "OPENAI_CHAT_COMPLETIONS" | "OPENAI_RESPONSES" | "ANTHROPIC_MESSAGES" | "GOOGLE_GENERATE_CONTENT" | "OPENAI_IMAGES_GENERATIONS" | "DASHSCOPE_MULTIMODAL_GENERATION" | "OPENAI_AUDIO_SPEECH" | "GEMINI_GENERATE_CONTENT_TTS" | "MIMO_CHAT_COMPLETIONS_TTS" | "OPENAI_AUDIO_TRANSCRIPTIONS" | "DASHSCOPE_HTTP_ASR" | "OPENAI_REALTIME_TRANSCRIPTION" | "DASHSCOPE_REALTIME_ASR" | "MCP_STREAMABLE_HTTP";
         /** @enum {string} */
         UsageMeter: "REQUESTS" | "REQUESTED_IMAGES" | "INPUT_TOKENS" | "OUTPUT_TOKENS" | "CACHED_TOKENS" | "TOTAL_TOKENS" | "CHARACTERS" | "AUDIO_SECONDS";
         /** @enum {string} */
@@ -638,6 +663,8 @@ export interface components {
             items: components["schemas"]["UsageDistributionItem"][];
         };
         RequestUsageView: {
+            httpMethod?: string;
+            statisticsOnly?: boolean;
             requestId: components["schemas"]["RequestId"];
             interactionId?: components["schemas"]["InteractionId"];
             resourceId?: string;
@@ -856,6 +883,7 @@ export interface components {
             managedState: components["schemas"]["ManagedState"];
         };
         ManagedSnapshot: {
+            webdav?: components["schemas"]["WebDAVDefinition"][];
             deploymentId: components["schemas"]["DeploymentId"];
             /** @enum {integer} */
             schemaVersion: 5;
@@ -1851,11 +1879,16 @@ export interface operations {
                 path?: string;
                 /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
                 agentSpaceId: components["schemas"]["AgentSpaceId"];
+                /** @description Native video preview; requires expectedEtag. Supported video types are served inline; default downloads remain attachments. */
+                preview?: "video";
+                /** @description Strong ETag forwarded as If-Match for a fixed-version media URL; conflicting If-Match is rejected. */
+                expectedEtag?: string;
             };
             header?: {
                 Range?: string;
                 "If-Match"?: string;
                 "If-None-Match"?: string;
+                "If-Range"?: string;
             };
             path?: never;
             cookie?: never;
@@ -2173,11 +2206,16 @@ export interface operations {
                 path?: string;
                 /** @description Expected space from WorkspaceProjection; mismatch is 409. Never selects a user. */
                 agentSpaceId: components["schemas"]["AgentSpaceId"];
+                /** @description Native video preview; requires expectedEtag. Supported video types are served inline; default downloads remain attachments. */
+                preview?: "video";
+                /** @description Strong ETag forwarded as If-Match for a fixed-version media URL; conflicting If-Match is rejected. */
+                expectedEtag?: string;
             };
             header?: {
                 Range?: string;
                 "If-Match"?: string;
                 "If-None-Match"?: string;
+                "If-Range"?: string;
             };
             path?: never;
             cookie?: never;

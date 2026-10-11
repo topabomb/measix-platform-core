@@ -89,6 +89,8 @@ func NewService(client *ent.Client, capabilityService *capability.Service, upstr
 // The Hub DB state is left exactly as it was at that point in the pipeline,
 // allowing reconciliation tests to verify recovery.
 //
+// BeforeIntentCommit also brackets the compile-to-commit gap of Republish,
+// upstream, workspace and security control writers. Other hooks are Publish-only.
 // These hooks are never set in production code.
 type PublishBarrierHooks struct {
 	BeforeIntentCommit func(ctx context.Context) error // Crash point A
@@ -351,6 +353,9 @@ func (s *Service) persistPublishIntent(ctx context.Context, intent publishIntent
 		return rollback(ErrActivationInProgress)
 	}
 
+	if err := s.validateWorkspaceIntentTx(ctx, tx, intent.DescriptorJSON); err != nil {
+		return rollback(err)
+	}
 	if _, err := tx.ManagedRelease.Create().
 		SetID(intent.ReleaseID).
 		SetManagedGeneration(int64(intent.Generation)).
@@ -451,6 +456,9 @@ func (s *Service) finalizePublish(ctx context.Context, activationID, releaseID s
 		return rollback(err)
 	}
 	if _, err := tx.Activation.UpdateOneID(activationID).SetState("COMPLETED").SetCompletedAt(now).Save(ctx); err != nil {
+		return rollback(err)
+	}
+	if err := confirmDAVBindings(ctx, tx, row.TargetDescriptorJSON); err != nil {
 		return rollback(err)
 	}
 	return tx.Commit()

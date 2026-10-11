@@ -12,7 +12,8 @@ func Valid(upstream, kind string, version int, target *usageingestapi.WorkspaceT
 	if target == nil {
 		return version == 0 && platformid.Validate(platformid.Upstream, upstream) == nil
 	}
-	if upstream != "" || kind != "MCP" || version != 2 || platformid.Validate(platformid.WorkspaceService, target.WorkspaceServiceId) != nil || platformid.Validate(platformid.AgentSpace, target.AgentSpaceId) != nil || target.BindingRevision < 1 {
+	validKindVersion := (kind == "MCP" && version == 2) || (kind == "WEBDAV" && version == 3)
+	if upstream != "" || !validKindVersion || platformid.Validate(platformid.WorkspaceService, target.WorkspaceServiceId) != nil || platformid.Validate(platformid.AgentSpace, target.AgentSpaceId) != nil || target.BindingRevision < 1 {
 		return false
 	}
 	name := target.RemoteUsername

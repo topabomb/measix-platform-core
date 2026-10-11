@@ -70,7 +70,7 @@ try{
  let pre=await raw(base(users[0])+'/content?path=before-mcp.txt',{method:'PUT',headers:{'If-None-Match':'*'},body:'Files work before optional MCP publication'});assert.equal(pre.status,200);await pre.body.cancel()
  pre=await raw(base(users[0])+'/content?path=before-mcp.txt');assert.equal(await pre.text(),'Files work before optional MCP publication')
  const initialDraft=await api('/api/admin/v1/draft');assert.ok(!initialDraft.content.mcp.some(x=>x.mcpServerId===mcpId))
- proof('provision and file management before optional MCP publication; saving service leaves draft unchanged')
+ proof('provision and file management before optional MCP publication; MCP is not implicitly staged or published')
  const activeResources=await api(resourcePath(users[0],beforeMcp.agentSpaceId))
  assert.equal(activeResources.runtime.value,'running');assert.equal(activeResources.disk.status,'current');assert.ok(activeResources.disk.value.usedBytes>0);assert.equal(activeResources.allocation.cpuCores.source,'sandbox')
  assert.equal(activeResources.memory.status,'current');assert.ok(activeResources.memory.value>0)
@@ -92,7 +92,7 @@ try{
  let cr=await fetch(clientURL,{method:'PUT',headers:{...clientHeaders,'If-None-Match':'*'},body:initialText});assert.equal(cr.status,200);await cr.body.cancel()
  cr=await fetch(clientURL,{headers:clientHeaders});assert.equal(cr.status,200);const editETag=cr.headers.get('etag');assert.deepEqual(Buffer.from(await cr.arrayBuffer()),initialText)
  cr=await fetch(clientURL,{method:'PUT',headers:{...clientHeaders,'If-Match':editETag},body:Buffer.from('\uFEFFedited text\r\n')});assert.equal(cr.status,200);await cr.body.cancel()
- cr=await fetch(clientURL,{method:'PUT',headers:{...clientHeaders,'If-Match':editETag},body:'stale overwrite'});assert.equal(cr.status,409);assert.equal((await cr.json()).code,'file_version_conflict')
+ cr=await fetch(clientURL,{method:'PUT',headers:{...clientHeaders,'If-Match':editETag},body:'stale overwrite'});assert.equal(cr.status,412);assert.equal((await cr.json()).code,'file_version_conflict')
  const wrong=new URL(clientURL);wrong.searchParams.set('agentSpaceId','spc_'+randomUUID())
  cr=await fetch(wrong,{method:'PUT',headers:{...clientHeaders,'If-None-Match':'*'},body:'wrong space'});assert.equal(cr.status,409);assert.equal((await cr.json()).code,'workspace_space_mismatch')
  const missing=new URL(clientURL);missing.searchParams.delete('agentSpaceId');cr=await fetch(missing,{headers:clientHeaders});assert.equal(cr.status,400);await cr.body.cancel()
@@ -112,7 +112,7 @@ try{
  r=await raw(content,{method:'HEAD'});assert.equal(r.status,200);assert.equal(Number(r.headers.get('Content-Length')),64*1024*1024);const etag=r.headers.get('etag')
  r=await raw(content,{headers:{Range:'bytes=0-1023','If-Match':etag}});assert.equal(r.status,206);assert.equal((await r.arrayBuffer()).byteLength,1024)
  r=await raw(content);const actual=createHash('sha256');let total=0;for await(const chunk of r.body){actual.update(chunk);total+=chunk.length}assert.equal(total,64*1024*1024);assert.equal(actual.digest('hex'),expected.digest('hex'))
- for(const [headers,status]of [[{'If-Match':'"stale"'},409],[{'If-None-Match':etag},304],[{Range:'bytes=999999999-'},416]]){r=await raw(content,{headers});assert.equal(r.status,status);await r.body?.cancel()}
+ for(const [headers,status]of [[{'If-Match':'"stale"'},412],[{'If-None-Match':etag},304],[{Range:'bytes=999999999-'},416]]){r=await raw(content,{headers});assert.equal(r.status,status);await r.body?.cancel()}
  proof('64 MiB bounded streaming, digest, HEAD, Range, conditions and invalid Range')
  await new Promise(resolve=>setTimeout(resolve,5500))
  const grownResources=await api(resourcePath(a,beforeMcp.agentSpaceId))

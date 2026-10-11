@@ -59,6 +59,10 @@ func selectPricingRule(rules []*ent.PricingRule, meter, resourceID, upstreamID s
 
 func priceRequest(view RequestView, rules []*ent.PricingRule) (CostBreakdown, error) {
 	result := CostBreakdown{CostSummary: CostSummary{State: CostUnknown}}
+	if view.StatisticsOnly {
+		result.State = CostKnown
+		return result, nil
+	}
 	if !view.Forwarded {
 		result.State = CostKnown // Proven never forwarded: no upstream charge.
 		result.PricedRequests = 1

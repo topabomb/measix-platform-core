@@ -92,7 +92,7 @@ func recoveryAdmission(now time.Time) usageingestapi.BudgetAdmissionRequest {
 		DeploymentId: platformid.New(platformid.Deployment), UserId: platformid.New(platformid.User),
 		DeviceId: ptr(platformid.New(platformid.Device)), InteractionId: ptr(platformid.New(platformid.Interaction)),
 		ResourceId: platformid.New(platformid.Model), ResourceKind: usageingestapi.ResourceKindMODEL,
-		ClientProtocol: usageingestapi.OPENAIRESPONSES, UpstreamId: platformid.New(platformid.Upstream),
+		ClientProtocol: usageingestapi.ClientProtocolOPENAIRESPONSES, UpstreamId: platformid.New(platformid.Upstream),
 		ManagedGeneration: 1, ControlRevision: 1, AdmittedAt: now,
 		SupportedMeters: []usageingestapi.UsageMeter{usageingestapi.REQUESTS, usageingestapi.INPUTTOKENS},
 	}

@@ -137,7 +137,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken, requestKey string) 
 	if err != nil {
 		return RefreshResult{}, err
 	}
-	result.AccessToken, result.AccessTokenExpiresAt, err = s.Signer.Sign(u.ID, d.ID, se.ID)
+	result.AccessToken, result.AccessTokenExpiresAt, err = s.Signer.SignForSession(u.ID, d.ID, se.ID, result.SessionIdleExpiresAt)
 	if err != nil {
 		return RefreshResult{}, err
 	}

@@ -21,6 +21,12 @@ const (
 	FieldPublicOrigin = "public_origin"
 	// FieldFeedRevision holds the string denoting the feed_revision field in the database.
 	FieldFeedRevision = "feed_revision"
+	// FieldReleaseRetentionJSON holds the string denoting the release_retention_json field in the database.
+	FieldReleaseRetentionJSON = "release_retention_json"
+	// FieldReleaseRetentionRevision holds the string denoting the release_retention_revision field in the database.
+	FieldReleaseRetentionRevision = "release_retention_revision"
+	// FieldReleaseCleanupAt holds the string denoting the release_cleanup_at field in the database.
+	FieldReleaseCleanupAt = "release_cleanup_at"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -37,6 +43,9 @@ var Columns = []string{
 	FieldTimezone,
 	FieldPublicOrigin,
 	FieldFeedRevision,
+	FieldReleaseRetentionJSON,
+	FieldReleaseRetentionRevision,
+	FieldReleaseCleanupAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -58,6 +67,8 @@ var (
 	DefaultPublicOrigin string
 	// DefaultFeedRevision holds the default value on creation for the "feed_revision" field.
 	DefaultFeedRevision int64
+	// DefaultReleaseRetentionRevision holds the default value on creation for the "release_retention_revision" field.
+	DefaultReleaseRetentionRevision int64
 )
 
 // OrderOption defines the ordering options for the Deployment queries.
@@ -91,6 +102,16 @@ func ByPublicOrigin(opts ...sql.OrderTermOption) OrderOption {
 // ByFeedRevision orders the results by the feed_revision field.
 func ByFeedRevision(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFeedRevision, opts...).ToFunc()
+}
+
+// ByReleaseRetentionRevision orders the results by the release_retention_revision field.
+func ByReleaseRetentionRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReleaseRetentionRevision, opts...).ToFunc()
+}
+
+// ByReleaseCleanupAt orders the results by the release_cleanup_at field.
+func ByReleaseCleanupAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReleaseCleanupAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

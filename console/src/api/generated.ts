@@ -455,6 +455,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/releases/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getReleaseRetention"];
+        put: operations["updateReleaseRetention"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/releases/cleanup:preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewReleaseCleanup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/releases/cleanup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["executeReleaseCleanup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/releases/cleanup/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listReleaseHistoryAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/v1/upstreams/{upstreamId}/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUpstreamReferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/activations/{activationId}": {
         parameters: {
             query?: never;
@@ -1365,9 +1445,13 @@ export interface components {
             type: string;
             title: string;
             status: number;
-            /** @description Stable machine-readable reason. Authentication uses unauthenticated; destructive user lifecycle values include delete_confirmation_mismatch, cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight. */
+            /** @description Stable machine-readable reason. Authentication uses unauthenticated; destructive user lifecycle values include delete_confirmation_mismatch, cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight. MCP discovery uses mcp_discovery_version for an unsupported negotiated version, separately from mcp_discovery_protocol for an invalid response or catalog. */
             code: string;
             detail?: string;
+            /** @description Safe transient diagnostic for mcp_discovery_version. Never contains a remote body or credential. */
+            receivedMcpProtocolVersion?: string;
+            /** @description Protocol versions supported by this discovery implementation. */
+            supportedMcpProtocolVersions?: string[];
             requestId?: components["schemas"]["RequestId"];
             activationId?: components["schemas"]["ActivationId"];
             targetManagedGeneration?: number;
@@ -1531,6 +1615,7 @@ export interface components {
             /** @description Retained legacy draft references; explicit tool selection required before v5 publication. */
             mcpServerIds?: components["schemas"]["McpServerId"][];
             enabled: boolean;
+            /** @description Mandatory MCP servers for this assistant in unpublished Snapshot v5. Empty means no mandatory servers. Users may explicitly select other enabled enterprise servers from the same Snapshot; absence does not deny access. Missing or null is invalid in published Client snapshots and remains unauthored in Admin drafts. Mandatory bindings and their tool restrictions cannot be removed or bypassed by user preferences. */
             mcpBindings?: components["schemas"]["AssistantMcpBinding"][];
         };
         AssistantStarterDefinition: {
@@ -2373,6 +2458,78 @@ export interface components {
             items: components["schemas"]["SystemEvent"][];
             truncated: boolean;
         };
+        /** @description Keep union of latest N and within D days; disabled by default. */
+        ReleaseRetentionRule: {
+            enabled: boolean;
+            keepLast?: number;
+            keepDays?: number;
+        };
+        ReleaseRetention: {
+            revision: number;
+            rule: components["schemas"]["ReleaseRetentionRule"];
+            /** Format: date-time */
+            lastCleanupAt?: string;
+        };
+        UpdateReleaseRetentionRequest: {
+            expectedRevision: number;
+            rule: components["schemas"]["ReleaseRetentionRule"];
+        };
+        /** @description Exactly one mode: explicit IDs, half-open time window, or saved retention rule. Max 200 deletions per execution. */
+        ReleaseCleanupSelection: {
+            releaseIds?: string[];
+            /** Format: date-time */
+            publishedBefore?: string;
+            /** Format: date-time */
+            publishedAfter?: string;
+            useRetentionRule?: boolean;
+        };
+        ReleaseCleanupItem: {
+            releaseId: string;
+            managedGeneration: number;
+            status: string;
+            /** Format: int64 */
+            bytes: number;
+            reason: string;
+        };
+        ReleaseCleanupPreview: {
+            previewHash: string;
+            candidates: components["schemas"]["ReleaseCleanupItem"][];
+            protected: components["schemas"]["ReleaseCleanupItem"][];
+            /** Format: int64 */
+            reclaimableBytes: number;
+            hasMore: boolean;
+            activationBlocked: boolean;
+            releasedUpstreamIds: string[];
+        };
+        ExecuteReleaseCleanupRequest: {
+            selection: components["schemas"]["ReleaseCleanupSelection"];
+            previewHash: string;
+        };
+        ReleaseCleanupResult: {
+            deletedCount: number;
+            /** Format: int64 */
+            reclaimedBytes: number;
+            auditId: number;
+        };
+        ReleaseHistoryAudit: {
+            auditId: number;
+            actorUserId: string;
+            kind: string;
+            /** Format: date-time */
+            createdAt: string;
+            releaseGenerations: number[];
+            /** Format: int64 */
+            reclaimedBytes: number;
+            rule?: components["schemas"]["ReleaseRetentionRule"];
+        };
+        ReleaseHistoryAuditPage: {
+            items: components["schemas"]["ReleaseHistoryAudit"][];
+        };
+        UpstreamReferences: {
+            draftReferenced: boolean;
+            releases: components["schemas"]["ReleaseCleanupItem"][];
+            activationBlocked: boolean;
+        };
         DeploymentSettings: {
             deploymentId: components["schemas"]["DeploymentId"];
             /** @description Human-facing enterprise name shown to enrolled users and Portal sessions. */
@@ -2477,7 +2634,7 @@ export interface components {
         AssistantMcpBinding: {
             mcpServerId: components["schemas"]["McpServerId"];
             /**
-             * @description ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+             * @description ALL adds no assistant tool restriction for this mandatory server; ALLOWLIST requires a nonempty list within server permissions. Removing the binding removes the mandatory selection and its assistant tool restriction, but users may explicitly select the server while it remains enabled. Duplicate user selection cannot bypass a mandatory binding.
              * @enum {string}
              */
             toolSelection: "ALL" | "ALLOWLIST";
@@ -3616,6 +3773,171 @@ export interface operations {
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    getReleaseRetention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseRetention"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    updateReleaseRetention: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReleaseRetentionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseRetention"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    previewReleaseCleanup: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseCleanupSelection"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseCleanupPreview"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    executeReleaseCleanup: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecuteReleaseCleanupRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseCleanupResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listReleaseHistoryAudit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseHistoryAuditPage"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getUpstreamReferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upstreamId: components["schemas"]["UpstreamId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpstreamReferences"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
     getActivation: {
@@ -4826,6 +5148,8 @@ export interface operations {
     listWorkspaces: {
         parameters: {
             query?: {
+                /** @description Return only active users with a connected authenticated workspace in this active service. Independent of MCP publication; discovery revalidates the connection before use. */
+                discoveryEligible?: boolean;
                 cursor?: string;
                 search?: string;
             };

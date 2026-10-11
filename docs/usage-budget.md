@@ -134,6 +134,8 @@ WebSocket 生产观察器必须支持文本帧分片、continuation、控制帧�
 
 计量记录需要来源、完整度、协议归属及 settlement revision。同 requestId 同 revision 同内容幂等；相同 revision 不同内容拒绝并诊断；后续可靠修正只应用差额且留历史。避免 sourceEventId 每 meter 重复导致其他指标被丢弃。保留事实事件与修正轨迹，不用修改资源当前名称解释历史。
 
+准入事务将对应 generation Snapshot 的原资源显示名保存到 `BudgetRequest.resource_display_name`；用量查询优先读该准入上下文，旧记录缺名称时才从仍存在的原 Snapshot 回退，最终保留稳定 ID。历史 Release 清理前通过 migration 004 补齐旧准入（包括待核对请求）；新准入同样捕获名称，迟到结算不从当前草稿补名。migration 005 将账本 upstreamId 与 operational 上游行的存活解耦，保留原 ID 和用量/结算字节；具体 DDL、约束及恢复边界统一见[迁移说明](database-migrations.md#发布历史迁移)。
+
 清单查询保持时间窗和 keyset 分页；用户/协议/资源汇总和按日趋势采用数据库聚合，避免加载全量 rows 或每条请求 N+1 查询。额度读写走独立计数桶，不能每次扫描使用历史。明细保留策略不能清空累计预算；统计归档与预算权威分离。
 
 ## 5. 预算存储与事务
@@ -177,6 +179,8 @@ Runtime Problem 提供结构化 budget 上下文（能力、资源、阻断指�
 预算准入只位于企业 Runtime，不能阻断 Client/Portal 的空间、grant、查询或同步。客户端体验与设备证据由架构用量合同和 Android 仓库拥有；本文件只维护 Core 实现边界。
 
 ## 7. Admin 与 Portal 页面落地
+
+待核对分页支持勾选本页后批量确认，复用每条请求的既有 `:resolve` 命令和审计事务；不增加批量接口或跨请求事务。确认前展示所选请求并要求说明，逐条处理后分别显示成功、失败与未执行；网络/服务端结果未知时停止剩余命令并刷新，不自动重试。刷新或翻页清除选择，执行期间禁用重复确认和翻页。列表突出缺失的业务计量和已观测业务量，`REQUESTS=1` 留在请求详情解释调用事实，不再逐行重复。
 
 Admin 在 UsersPage 用户详情提供“用量与额度”：MODEL/TTS/ASR/MCP/IMAGE_GENERATION 五类能力先选择无限/有限，有限模式编辑自然周期及累计规则，显示已用/在途/剩余/恢复、阻断原因和变更历史。图片只提供 REQUESTS/REQUESTED_IMAGES。默认无限、限额模板与用户覆盖由服务端配置来源区分；无限仍展示用量，零为禁用该指标额度。历史图表时间筛选与当前额度卡分开，不提供资源级预算。
 

@@ -95,6 +95,11 @@ func ResourceID(v string) predicate.BudgetRequest {
 	return predicate.BudgetRequest(sql.FieldEQ(FieldResourceID, v))
 }
 
+// ResourceDisplayName applies equality check predicate on the "resource_display_name" field. It's identical to ResourceDisplayNameEQ.
+func ResourceDisplayName(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldEQ(FieldResourceDisplayName, v))
+}
+
 // ClientProtocol applies equality check predicate on the "client_protocol" field. It's identical to ClientProtocolEQ.
 func ClientProtocol(v string) predicate.BudgetRequest {
 	return predicate.BudgetRequest(sql.FieldEQ(FieldClientProtocol, v))
@@ -603,6 +608,71 @@ func ResourceIDEqualFold(v string) predicate.BudgetRequest {
 // ResourceIDContainsFold applies the ContainsFold predicate on the "resource_id" field.
 func ResourceIDContainsFold(v string) predicate.BudgetRequest {
 	return predicate.BudgetRequest(sql.FieldContainsFold(FieldResourceID, v))
+}
+
+// ResourceDisplayNameEQ applies the EQ predicate on the "resource_display_name" field.
+func ResourceDisplayNameEQ(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldEQ(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameNEQ applies the NEQ predicate on the "resource_display_name" field.
+func ResourceDisplayNameNEQ(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldNEQ(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameIn applies the In predicate on the "resource_display_name" field.
+func ResourceDisplayNameIn(vs ...string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldIn(FieldResourceDisplayName, vs...))
+}
+
+// ResourceDisplayNameNotIn applies the NotIn predicate on the "resource_display_name" field.
+func ResourceDisplayNameNotIn(vs ...string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldNotIn(FieldResourceDisplayName, vs...))
+}
+
+// ResourceDisplayNameGT applies the GT predicate on the "resource_display_name" field.
+func ResourceDisplayNameGT(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldGT(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameGTE applies the GTE predicate on the "resource_display_name" field.
+func ResourceDisplayNameGTE(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldGTE(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameLT applies the LT predicate on the "resource_display_name" field.
+func ResourceDisplayNameLT(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldLT(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameLTE applies the LTE predicate on the "resource_display_name" field.
+func ResourceDisplayNameLTE(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldLTE(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameContains applies the Contains predicate on the "resource_display_name" field.
+func ResourceDisplayNameContains(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldContains(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameHasPrefix applies the HasPrefix predicate on the "resource_display_name" field.
+func ResourceDisplayNameHasPrefix(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldHasPrefix(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameHasSuffix applies the HasSuffix predicate on the "resource_display_name" field.
+func ResourceDisplayNameHasSuffix(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldHasSuffix(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameEqualFold applies the EqualFold predicate on the "resource_display_name" field.
+func ResourceDisplayNameEqualFold(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldEqualFold(FieldResourceDisplayName, v))
+}
+
+// ResourceDisplayNameContainsFold applies the ContainsFold predicate on the "resource_display_name" field.
+func ResourceDisplayNameContainsFold(v string) predicate.BudgetRequest {
+	return predicate.BudgetRequest(sql.FieldContainsFold(FieldResourceDisplayName, v))
 }
 
 // ClientProtocolEQ applies the EQ predicate on the "client_protocol" field.

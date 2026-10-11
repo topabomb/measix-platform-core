@@ -29,6 +29,15 @@ func (h *fullAdminHandler) DiscoverMcpTools(w http.ResponseWriter, r *http.Reque
 	}
 	view, err := h.services.Capability.DiscoverMcpTools(r.Context(), admin.UserID, id, request)
 	if err != nil {
+		var version *capability.McpDiscoveryVersionError
+		if errors.As(err, &version) {
+			supported := capability.SupportedMcpProtocolVersions()
+			w.Header().Set("Content-Type", "application/problem+json")
+			w.Header().Set("Cache-Control", "no-store")
+			w.WriteHeader(http.StatusBadGateway)
+			_ = json.NewEncoder(w).Encode(adminapi.Problem{Type: "about:blank", Title: version.Error(), Status: http.StatusBadGateway, Code: "mcp_discovery_version", ReceivedMcpProtocolVersion: &version.Version, SupportedMcpProtocolVersions: &supported})
+			return
+		}
 		status, code, title := 500, "internal_error", "Discovery could not be completed"
 		switch {
 		case errors.Is(err, capability.ErrRevisionConflict):

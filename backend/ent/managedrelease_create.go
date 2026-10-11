@@ -50,6 +50,12 @@ func (_c *ManagedReleaseCreate) SetSnapshotHash(v string) *ManagedReleaseCreate 
 	return _c
 }
 
+// SetDiffSummaryJSON sets the "diff_summary_json" field.
+func (_c *ManagedReleaseCreate) SetDiffSummaryJSON(v []byte) *ManagedReleaseCreate {
+	_c.mutation.SetDiffSummaryJSON(v)
+	return _c
+}
+
 // SetSourceDraftRevision sets the "source_draft_revision" field.
 func (_c *ManagedReleaseCreate) SetSourceDraftRevision(v int64) *ManagedReleaseCreate {
 	_c.mutation.SetSourceDraftRevision(v)
@@ -186,6 +192,10 @@ func (_c *ManagedReleaseCreate) createSpec() (*ManagedRelease, *sqlgraph.CreateS
 	if value, ok := _c.mutation.SnapshotHash(); ok {
 		_spec.SetField(managedrelease.FieldSnapshotHash, field.TypeString, value)
 		_node.SnapshotHash = value
+	}
+	if value, ok := _c.mutation.DiffSummaryJSON(); ok {
+		_spec.SetField(managedrelease.FieldDiffSummaryJSON, field.TypeBytes, value)
+		_node.DiffSummaryJSON = value
 	}
 	if value, ok := _c.mutation.SourceDraftRevision(); ok {
 		_spec.SetField(managedrelease.FieldSourceDraftRevision, field.TypeInt64, value)

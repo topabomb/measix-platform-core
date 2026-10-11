@@ -2,6 +2,12 @@
 
 This describes the current Admin pricing implementation. Product semantics live in the sibling architecture Control Protocol §19; the Admin OpenAPI owns the wire. Historical Preview identity is maintained in the [status index](s0-execution-progress.md). Pricing uses existing usage facts and Admin configuration; currency conversion and cost-based admission budgets are outside this implementation.
 
+Deleting an unused operational upstream preserves its pricing rules and original
+upstream IDs in usage facts. Historical scope matching uses those IDs without
+requiring the connection row to exist; deletion does not change the pricing set
+or reinterpret old attribution. The persistence transition is documented in
+[database migrations](database-migrations.md#发布历史迁移), under Control Protocol §16.
+
 ## Calculation
 
 1. Read the current whole pricing set once per analysis. For each retained request,
@@ -24,6 +30,17 @@ This describes the current Admin pricing implementation. Product semantics live 
    currency. Empty analysis has UNKNOWN status.
 
 ## Read models and UI
+
+- Pricing updates validate the expected revision inside the SQLite write transaction;
+  the response is the set committed by that transaction, not a later concurrent edit.
+- The panel keeps the list readable and edits one rule in a dialog. Resource options
+  reuse the saved enterprise draft and existing paged picker; retained rules preserve
+  historical IDs even when their operational objects are gone. Scope, compatible
+  meters, unit price and local effective interval are reviewed before full-set PUT.
+  Local date editing preserves milliseconds and the exclusive end boundary; unit
+  sizes accept the existing `k`/`M` shorthand without converting prices to floats.
+  Failed writes require a refresh before another submission; an existing rule is
+  reloaded into the editor so a new revision cannot authorize an old form silently.
 
 - Use one bounded cursor scan over filtered request facts with a batch join to the
   current semantic revision. Reuse the same evaluator for global summary, daily

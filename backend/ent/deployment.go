@@ -27,6 +27,12 @@ type Deployment struct {
 	PublicOrigin string `json:"public_origin,omitempty"`
 	// FeedRevision holds the value of the "feed_revision" field.
 	FeedRevision int64 `json:"feed_revision,omitempty"`
+	// ReleaseRetentionJSON holds the value of the "release_retention_json" field.
+	ReleaseRetentionJSON []byte `json:"release_retention_json,omitempty"`
+	// ReleaseRetentionRevision holds the value of the "release_retention_revision" field.
+	ReleaseRetentionRevision int64 `json:"release_retention_revision,omitempty"`
+	// ReleaseCleanupAt holds the value of the "release_cleanup_at" field.
+	ReleaseCleanupAt *time.Time `json:"release_cleanup_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -39,11 +45,13 @@ func (*Deployment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case deployment.FieldFeedRevision:
+		case deployment.FieldReleaseRetentionJSON:
+			values[i] = new([]byte)
+		case deployment.FieldFeedRevision, deployment.FieldReleaseRetentionRevision:
 			values[i] = new(sql.NullInt64)
 		case deployment.FieldID, deployment.FieldName, deployment.FieldStatus, deployment.FieldTimezone, deployment.FieldPublicOrigin:
 			values[i] = new(sql.NullString)
-		case deployment.FieldCreatedAt, deployment.FieldUpdatedAt:
+		case deployment.FieldReleaseCleanupAt, deployment.FieldCreatedAt, deployment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -95,6 +103,25 @@ func (_m *Deployment) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field feed_revision", values[i])
 			} else if value.Valid {
 				_m.FeedRevision = value.Int64
+			}
+		case deployment.FieldReleaseRetentionJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field release_retention_json", values[i])
+			} else if value != nil {
+				_m.ReleaseRetentionJSON = *value
+			}
+		case deployment.FieldReleaseRetentionRevision:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field release_retention_revision", values[i])
+			} else if value.Valid {
+				_m.ReleaseRetentionRevision = value.Int64
+			}
+		case deployment.FieldReleaseCleanupAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field release_cleanup_at", values[i])
+			} else if value.Valid {
+				_m.ReleaseCleanupAt = new(time.Time)
+				*_m.ReleaseCleanupAt = value.Time
 			}
 		case deployment.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -158,6 +185,17 @@ func (_m *Deployment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("feed_revision=")
 	builder.WriteString(fmt.Sprintf("%v", _m.FeedRevision))
+	builder.WriteString(", ")
+	builder.WriteString("release_retention_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ReleaseRetentionJSON))
+	builder.WriteString(", ")
+	builder.WriteString("release_retention_revision=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ReleaseRetentionRevision))
+	builder.WriteString(", ")
+	if v := _m.ReleaseCleanupAt; v != nil {
+		builder.WriteString("release_cleanup_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

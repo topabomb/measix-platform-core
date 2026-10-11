@@ -8,10 +8,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"mime"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -21,6 +23,7 @@ import (
 )
 
 var (
+	ErrMcpDiscoveryVersion     = errors.New("MCP returned an unsupported protocol version")
 	ErrMcpDiscoveryProtocol    = errors.New("MCP returned an invalid or incomplete tool catalog")
 	ErrMcpDiscoveryUnavailable = errors.New("MCP discovery could not connect or authenticate; check the applied connection")
 	ErrMcpDiscoveryLimit       = errors.New("MCP discovery exceeded the page, tool or response limit")
@@ -29,6 +32,18 @@ var (
 	ErrMcpSourceChanged        = errors.New("MCP source changed during discovery; save and discover again")
 	ErrMcpToolEvidence         = errors.New("MCP approval must match server-owned discovery evidence")
 )
+
+var supportedMcpProtocolVersions = [...]string{"2025-11-25", "2025-06-18", "2025-03-26"}
+
+func SupportedMcpProtocolVersions() []string { return slices.Clone(supportedMcpProtocolVersions[:]) }
+
+// Version contains only a validated date, never arbitrary remote content.
+type McpDiscoveryVersionError struct{ Version string }
+
+func (e *McpDiscoveryVersionError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrMcpDiscoveryVersion, e.Version)
+}
+func (e *McpDiscoveryVersionError) Unwrap() error { return ErrMcpDiscoveryVersion }
 
 func McpToolContractHash(def adminapi.McpToolDefinition) (string, error) {
 	if !validMcpTool(def) {
@@ -95,7 +110,7 @@ func DiscoverMcpCatalog(ctx context.Context, endpoint string, headers http.Heade
 	defer transport.CloseIdleConnections()
 	d := &mcpDiscoveryClient{ctx: ctx, endpoint: endpoint, headers: headers.Clone(), client: &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 	defer d.close()
-	result, err := d.rpc("initialize", map[string]any{"protocolVersion": "2025-11-25", "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "MEASIX Admin discovery", "version": "1"}}, false)
+	result, err := d.rpc("initialize", map[string]any{"protocolVersion": supportedMcpProtocolVersions[0], "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "MEASIX Admin discovery", "version": "1"}}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -106,10 +121,11 @@ func DiscoverMcpCatalog(ctx context.Context, endpoint string, headers http.Heade
 	if json.Unmarshal(result, &init) != nil {
 		return nil, ErrMcpDiscoveryProtocol
 	}
-	switch init.ProtocolVersion {
-	case "2025-11-25", "2025-06-18", "2025-03-26":
-	default:
+	if _, err := time.Parse("2006-01-02", init.ProtocolVersion); err != nil {
 		return nil, ErrMcpDiscoveryProtocol
+	}
+	if !slices.Contains(supportedMcpProtocolVersions[:], init.ProtocolVersion) {
+		return nil, &McpDiscoveryVersionError{Version: init.ProtocolVersion}
 	}
 	if tools, ok := init.Capabilities["tools"]; !ok || len(tools) == 0 || tools[0] != '{' {
 		return nil, ErrMcpDiscoveryProtocol

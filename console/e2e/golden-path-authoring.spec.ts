@@ -709,10 +709,28 @@ test('CAP-C6-001-Authoring Login, Setup, Upstream Apply/Publish', async ({ page 
     await expect(page.locator('[data-cy="usage-page"]')).toBeVisible({ timeout: 10_000 })
     await page.click('text=/pricing|Pricing/i')
     await page.waitForTimeout(500)
+    await expect(page.locator('[data-cy="pricing-rule-row"]').first()).toContainText('0.001 CNY')
+    await page.locator('[data-cy="pricing-edit-rule"]').first().click()
     const savedPriceInput = page.locator('[data-cy="pricing-unit-price"]').first()
     await expect(savedPriceInput).toBeVisible({ timeout: 5_000 })
     const savedValue = await savedPriceInput.inputValue()
     expect(savedValue).toBe('0.001')
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    // Named resource selection and capability-specific prices are checked in
+    // the same production build and authoring environment.
+    await page.locator('[data-cy="pricing-add-rule-btn"]').click()
+    await page.getByLabel('Scope', { exact: true }).click()
+    await page.getByRole('option', { name: 'Resource', exact: true }).click()
+    await page.getByRole('button', { name: 'Choose a resource by name', exact: true }).click()
+    await page.locator('[data-cy="entity-picker-search"]').fill('E2E Test ASR')
+    await page.locator('[data-cy="entity-picker-option"]').filter({ hasText: 'E2E Test ASR' }).click()
+    await expect(page.locator('[data-cy="pricing-editor"]')).toContainText('E2E Test ASR')
+    await page.getByLabel('Meter', { exact: true }).click()
+    await expect(page.getByRole('option', { name: 'Audio (sec)', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: 'Characters', exact: true })).toHaveCount(0)
+    await page.getByRole('option', { name: 'Audio (sec)', exact: true }).click()
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
 
     // Navigate back to resources
     await page.goto('/admin/resources')

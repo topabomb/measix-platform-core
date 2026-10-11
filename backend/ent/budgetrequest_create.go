@@ -79,6 +79,20 @@ func (_c *BudgetRequestCreate) SetResourceID(v string) *BudgetRequestCreate {
 	return _c
 }
 
+// SetResourceDisplayName sets the "resource_display_name" field.
+func (_c *BudgetRequestCreate) SetResourceDisplayName(v string) *BudgetRequestCreate {
+	_c.mutation.SetResourceDisplayName(v)
+	return _c
+}
+
+// SetNillableResourceDisplayName sets the "resource_display_name" field if the given value is not nil.
+func (_c *BudgetRequestCreate) SetNillableResourceDisplayName(v *string) *BudgetRequestCreate {
+	if v != nil {
+		_c.SetResourceDisplayName(*v)
+	}
+	return _c
+}
+
 // SetClientProtocol sets the "client_protocol" field.
 func (_c *BudgetRequestCreate) SetClientProtocol(v string) *BudgetRequestCreate {
 	_c.mutation.SetClientProtocol(v)
@@ -325,6 +339,10 @@ func (_c *BudgetRequestCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *BudgetRequestCreate) defaults() {
+	if _, ok := _c.mutation.ResourceDisplayName(); !ok {
+		v := budgetrequest.DefaultResourceDisplayName
+		_c.mutation.SetResourceDisplayName(v)
+	}
 	if _, ok := _c.mutation.BudgetRevision(); !ok {
 		v := budgetrequest.DefaultBudgetRevision
 		_c.mutation.SetBudgetRevision(v)
@@ -360,6 +378,9 @@ func (_c *BudgetRequestCreate) check() error {
 	}
 	if _, ok := _c.mutation.ResourceID(); !ok {
 		return &ValidationError{Name: "resource_id", err: errors.New(`ent: missing required field "BudgetRequest.resource_id"`)}
+	}
+	if _, ok := _c.mutation.ResourceDisplayName(); !ok {
+		return &ValidationError{Name: "resource_display_name", err: errors.New(`ent: missing required field "BudgetRequest.resource_display_name"`)}
 	}
 	if _, ok := _c.mutation.ClientProtocol(); !ok {
 		return &ValidationError{Name: "client_protocol", err: errors.New(`ent: missing required field "BudgetRequest.client_protocol"`)}
@@ -494,6 +515,10 @@ func (_c *BudgetRequestCreate) createSpec() (*BudgetRequest, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.ResourceID(); ok {
 		_spec.SetField(budgetrequest.FieldResourceID, field.TypeString, value)
 		_node.ResourceID = value
+	}
+	if value, ok := _c.mutation.ResourceDisplayName(); ok {
+		_spec.SetField(budgetrequest.FieldResourceDisplayName, field.TypeString, value)
+		_node.ResourceDisplayName = value
 	}
 	if value, ok := _c.mutation.ClientProtocol(); ok {
 		_spec.SetField(budgetrequest.FieldClientProtocol, field.TypeString, value)

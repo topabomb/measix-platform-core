@@ -102,6 +102,17 @@ test('CAP-C6-001-Usage Usage/System verification after five-capability traffic',
     await expect(reconciliation).toBeVisible()
     await expect(reconciliation.locator('[data-cy="reconciliation-row"]').first()).toBeVisible({ timeout: 10_000 })
     await page.screenshot({ path: '../.artifacts/admin-usage-reconciliation.png', fullPage: true })
+    await expect(reconciliation.locator('[data-cy="reconciliation-row"]').first()).not.toContainText('Observed Requests: 1')
+    await reconciliation.locator('[data-cy="reconciliation-select-page"]').click()
+    await reconciliation.locator('[data-cy="reconciliation-batch-btn"]').click()
+    const review = page.locator('[data-cy="reconciliation-dialog"]')
+    await expect(review).toContainText('preserves known usage')
+    await page.locator('[data-cy="reconciliation-reason"]').fill('Reviewed deterministic incomplete responses; release uncertain reservations and retain unknown usage')
+    await page.locator('[data-cy="confirm-reconciliation"]').click()
+    await expect(review).toContainText(/succeeded · 0 failed · 0 not attempted/, { timeout: 15_000 })
+    await page.screenshot({ path: '../.artifacts/admin-usage-batch-result.png', fullPage: true })
+    await review.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(reconciliation.locator('[data-cy="reconciliation-row"]')).toHaveCount(0)
   })
 
   // ========================================================================

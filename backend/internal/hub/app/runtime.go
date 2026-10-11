@@ -291,6 +291,9 @@ func (r *Runtime) RunReconciler(ctx context.Context) error {
 				r.Telemetry.IncrementReconcileFailure()
 				slog.Error("runtime reconcile failed", "event", "runtime.reconcile_failed", "error", err)
 			}
+			if err := r.Services.Capability.SweepReleaseRetention(ctx); err != nil {
+				slog.Error("release retention cleanup failed", "event", "release_cleanup_failed", "error", err)
+			}
 			if err := r.Services.Identity.SweepRefreshRecovery(ctx); err != nil {
 				slog.Error("refresh recovery cleanup failed; will retry", "event", "refresh_cleanup_failed", "error", err)
 			}

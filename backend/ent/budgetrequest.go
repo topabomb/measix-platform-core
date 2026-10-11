@@ -32,6 +32,8 @@ type BudgetRequest struct {
 	Capability budgetrequest.Capability `json:"capability,omitempty"`
 	// ResourceID holds the value of the "resource_id" field.
 	ResourceID string `json:"resource_id,omitempty"`
+	// ResourceDisplayName holds the value of the "resource_display_name" field.
+	ResourceDisplayName string `json:"resource_display_name,omitempty"`
 	// ClientProtocol holds the value of the "client_protocol" field.
 	ClientProtocol string `json:"client_protocol,omitempty"`
 	// UpstreamID holds the value of the "upstream_id" field.
@@ -105,7 +107,7 @@ func (*BudgetRequest) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case budgetrequest.FieldManagedGeneration, budgetrequest.FieldControlRevision, budgetrequest.FieldUserBudgetID, budgetrequest.FieldBudgetRevision, budgetrequest.FieldLastSettlementRevision, budgetrequest.FieldLastLifecycleRevision:
 			values[i] = new(sql.NullInt64)
-		case budgetrequest.FieldID, budgetrequest.FieldRequestHash, budgetrequest.FieldDeploymentID, budgetrequest.FieldUserID, budgetrequest.FieldInteractionID, budgetrequest.FieldDeviceID, budgetrequest.FieldCapability, budgetrequest.FieldResourceID, budgetrequest.FieldClientProtocol, budgetrequest.FieldUpstreamID, budgetrequest.FieldMode, budgetrequest.FieldSource, budgetrequest.FieldState, budgetrequest.FieldLastLifecycleHash, budgetrequest.FieldTerminalReason:
+		case budgetrequest.FieldID, budgetrequest.FieldRequestHash, budgetrequest.FieldDeploymentID, budgetrequest.FieldUserID, budgetrequest.FieldInteractionID, budgetrequest.FieldDeviceID, budgetrequest.FieldCapability, budgetrequest.FieldResourceID, budgetrequest.FieldResourceDisplayName, budgetrequest.FieldClientProtocol, budgetrequest.FieldUpstreamID, budgetrequest.FieldMode, budgetrequest.FieldSource, budgetrequest.FieldState, budgetrequest.FieldLastLifecycleHash, budgetrequest.FieldTerminalReason:
 			values[i] = new(sql.NullString)
 		case budgetrequest.FieldAdmittedAt, budgetrequest.FieldStartedAt, budgetrequest.FieldCompletedAt, budgetrequest.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -173,6 +175,12 @@ func (_m *BudgetRequest) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field resource_id", values[i])
 			} else if value.Valid {
 				_m.ResourceID = value.String
+			}
+		case budgetrequest.FieldResourceDisplayName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field resource_display_name", values[i])
+			} else if value.Valid {
+				_m.ResourceDisplayName = value.String
 			}
 		case budgetrequest.FieldClientProtocol:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -358,6 +366,9 @@ func (_m *BudgetRequest) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("resource_id=")
 	builder.WriteString(_m.ResourceID)
+	builder.WriteString(", ")
+	builder.WriteString("resource_display_name=")
+	builder.WriteString(_m.ResourceDisplayName)
 	builder.WriteString(", ")
 	builder.WriteString("client_protocol=")
 	builder.WriteString(_m.ClientProtocol)

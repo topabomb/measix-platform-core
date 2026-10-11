@@ -988,6 +988,145 @@ paths:
       - *id007
       - *id001
       - *id003
+  /api/admin/v1/releases/retention:
+    get:
+      operationId: getReleaseRetention
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseRetention'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: updateReleaseRetention
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseRetention'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReleaseRetentionRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/releases/cleanup:preview:
+    post:
+      operationId: previewReleaseCleanup
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseCleanupPreview'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseCleanupSelection'
+      parameters:
+      - *id001
+  /api/admin/v1/releases/cleanup:
+    post:
+      operationId: executeReleaseCleanup
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseCleanupResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteReleaseCleanupRequest'
+      parameters:
+      - *id001
+  /api/admin/v1/releases/cleanup/audit:
+    get:
+      operationId: listReleaseHistoryAudit
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseHistoryAuditPage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/upstreams/{upstreamId}/references:
+    get:
+      operationId: getUpstreamReferences
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamReferences'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - name: upstreamId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/UpstreamId'
   /api/admin/v1/activations/{activationId}:
     get:
       operationId: getActivation
@@ -2017,6 +2156,12 @@ paths:
       operationId: listWorkspaces
       parameters:
       - *workspace_id001
+      - name: discoveryEligible
+        in: query
+        required: false
+        description: Return only active users with a connected authenticated workspace in this active service. Independent of MCP publication; discovery revalidates the connection before use.
+        schema:
+          type: boolean
       - name: cursor
         in: query
         required: false
@@ -3644,8 +3789,20 @@ components:
             Stable machine-readable reason. Authentication uses unauthenticated; destructive
             user lifecycle values include delete_confirmation_mismatch,
             cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight.
+            MCP discovery uses mcp_discovery_version for an unsupported negotiated version,
+            separately from mcp_discovery_protocol for an invalid response or catalog.
         detail:
           type: string
+        receivedMcpProtocolVersion:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Safe transient diagnostic for mcp_discovery_version. Never contains a remote body or credential.
+        supportedMcpProtocolVersions:
+          type: array
+          items:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Protocol versions supported by this discovery implementation.
         requestId:
           $ref: '#/components/schemas/RequestId'
         activationId:
@@ -4188,6 +4345,7 @@ components:
         enabled:
           type: boolean
         mcpBindings:
+          description: Mandatory MCP servers for this assistant in unpublished Snapshot v5. Empty means no mandatory servers. Users may explicitly select other enabled enterprise servers from the same Snapshot; absence does not deny access. Missing or null is invalid in published Client snapshots and remains unauthored in Admin drafts. Mandatory bindings and their tool restrictions cannot be removed or bypassed by user preferences.
           type: array
           x-uniqueProperty: mcpServerId
           items:
@@ -6253,6 +6411,174 @@ components:
           maxItems: 200
           items: { $ref: '#/components/schemas/SystemEvent' }
         truncated: { type: boolean }
+    ReleaseRetentionRule:
+      type: "object"
+      additionalProperties: false
+      required: ["enabled"]
+      properties:
+        enabled:
+          type: "boolean"
+        keepLast:
+          type: "integer"
+          minimum: 1
+          maximum: 1000
+        keepDays:
+          type: "integer"
+          minimum: 1
+          maximum: 36500
+      description: "Keep union of latest N and within D days; disabled by default."
+    ReleaseRetention:
+      type: "object"
+      additionalProperties: false
+      required: ["revision","rule"]
+      properties:
+        revision:
+          type: "integer"
+        rule:
+          $ref: "#/components/schemas/ReleaseRetentionRule"
+        lastCleanupAt:
+          type: "string"
+          format: "date-time"
+    UpdateReleaseRetentionRequest:
+      type: "object"
+      additionalProperties: false
+      required: ["expectedRevision","rule"]
+      properties:
+        expectedRevision:
+          type: "integer"
+        rule:
+          $ref: "#/components/schemas/ReleaseRetentionRule"
+    ReleaseCleanupSelection:
+      type: "object"
+      additionalProperties: false
+      required: []
+      properties:
+        releaseIds:
+          type: "array"
+          items:
+            type: "string"
+          maxItems: 200
+          minItems: 1
+          uniqueItems: true
+        publishedBefore:
+          type: "string"
+          format: "date-time"
+        publishedAfter:
+          type: "string"
+          format: "date-time"
+        useRetentionRule:
+          type: "boolean"
+      description: "Exactly one mode: explicit IDs, half-open time window, or saved retention rule. Max 200 deletions per execution."
+    ReleaseCleanupItem:
+      type: "object"
+      additionalProperties: false
+      required: ["releaseId","managedGeneration","status","bytes","reason"]
+      properties:
+        releaseId:
+          type: "string"
+        managedGeneration:
+          type: "integer"
+        status:
+          type: "string"
+        bytes:
+          type: "integer"
+          format: "int64"
+        reason:
+          type: "string"
+    ReleaseCleanupPreview:
+      type: "object"
+      additionalProperties: false
+      required: ["previewHash","candidates","protected","reclaimableBytes","hasMore","activationBlocked","releasedUpstreamIds"]
+      properties:
+        previewHash:
+          type: "string"
+        candidates:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ReleaseCleanupItem"
+          maxItems: 200
+        protected:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ReleaseCleanupItem"
+        reclaimableBytes:
+          type: "integer"
+          format: "int64"
+        hasMore:
+          type: "boolean"
+        activationBlocked:
+          type: "boolean"
+        releasedUpstreamIds:
+          type: "array"
+          items:
+            type: "string"
+    ExecuteReleaseCleanupRequest:
+      type: "object"
+      additionalProperties: false
+      required: ["selection","previewHash"]
+      properties:
+        selection:
+          $ref: "#/components/schemas/ReleaseCleanupSelection"
+        previewHash:
+          type: "string"
+    ReleaseCleanupResult:
+      type: "object"
+      additionalProperties: false
+      required: ["deletedCount","reclaimedBytes","auditId"]
+      properties:
+        deletedCount:
+          type: "integer"
+        reclaimedBytes:
+          type: "integer"
+          format: "int64"
+        auditId:
+          type: "integer"
+    ReleaseHistoryAudit:
+      type: "object"
+      additionalProperties: false
+      required: ["auditId","actorUserId","kind","createdAt","releaseGenerations","reclaimedBytes"]
+      properties:
+        auditId:
+          type: "integer"
+        actorUserId:
+          type: "string"
+        kind:
+          type: "string"
+        createdAt:
+          type: "string"
+          format: "date-time"
+        releaseGenerations:
+          type: "array"
+          items:
+            type: "integer"
+        reclaimedBytes:
+          type: "integer"
+          format: "int64"
+        rule:
+          $ref: "#/components/schemas/ReleaseRetentionRule"
+    ReleaseHistoryAuditPage:
+      type: "object"
+      additionalProperties: false
+      required: ["items"]
+      properties:
+        items:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ReleaseHistoryAudit"
+          maxItems: 200
+    UpstreamReferences:
+      type: "object"
+      additionalProperties: false
+      required: ["draftReferenced","releases","activationBlocked"]
+      properties:
+        draftReferenced:
+          type: "boolean"
+        releases:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ReleaseCleanupItem"
+        activationBlocked:
+          type: "boolean"
     DeploymentSettings:
       type: object
       additionalProperties: false
@@ -6502,7 +6828,7 @@ components:
         mcpServerId:
           $ref: '#/components/schemas/McpServerId'
         toolSelection:
-          description: ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+          description: ALL adds no assistant tool restriction for this mandatory server; ALLOWLIST requires a nonempty list within server permissions. Removing the binding removes the mandatory selection and its assistant tool restriction, but users may explicitly select the server while it remains enabled. Duplicate user selection cannot bypass a mandatory binding.
           type: string
           enum: [ALL, ALLOWLIST]
         toolNames:

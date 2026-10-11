@@ -308,6 +308,18 @@ func (f PricingRuleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value,
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PricingRuleMutation", m)
 }
 
+// The ReleaseHistoryAuditFunc type is an adapter to allow the use of ordinary
+// function as ReleaseHistoryAudit mutator.
+type ReleaseHistoryAuditFunc func(context.Context, *ent.ReleaseHistoryAuditMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ReleaseHistoryAuditFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ReleaseHistoryAuditMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ReleaseHistoryAuditMutation", m)
+}
+
 // The RequestUsageFunc type is an adapter to allow the use of ordinary
 // function as RequestUsage mutator.
 type RequestUsageFunc func(context.Context, *ent.RequestUsageMutation) (ent.Value, error)

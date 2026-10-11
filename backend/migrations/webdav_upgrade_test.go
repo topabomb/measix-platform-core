@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -10,13 +11,21 @@ import (
 )
 
 func TestDAVUpgradePreservesPreviousWorkspaceAuthorization(t *testing.T) {
+	for _, previous := range []int{3, 5} {
+		t.Run(fmt.Sprintf("from_migration_%d", previous), func(t *testing.T) {
+			testDAVUpgrade(t, previous)
+		})
+	}
+}
+
+func testDAVUpgrade(t *testing.T, previous int) {
 	ctx := context.Background()
 	db, err := sqliteutil.Open(filepath.Join(t.TempDir(), "previous.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err = applySet(ctx, db, List()[:3]); err != nil {
+	if _, err = applySet(ctx, db, List()[:previous]); err != nil {
 		t.Fatal(err)
 	}
 	for _, sql := range []string{

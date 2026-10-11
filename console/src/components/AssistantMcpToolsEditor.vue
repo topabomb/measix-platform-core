@@ -62,6 +62,8 @@ function unavailable(server: Mcp) {
       <q-card v-for="server in servers" :key="server.mcpServerId" flat bordered :data-mcp-id="server.mcpServerId">
         <q-card-section class="q-gutter-sm">
           <div class="row items-center justify-between"><div class="text-subtitle2">{{ server.displayName }}</div><q-checkbox :model-value="Boolean(binding(server.mcpServerId))" :label="t('mcpTools.useServer')" :disable="disabled" data-cy="assistant-mcp-use" @update:model-value="value => useServer(server.mcpServerId, Boolean(value))" /></div>
+          <div v-if="binding(server.mcpServerId)" class="text-caption text-grey-7" data-cy="assistant-mcp-required">{{ t('mcpTools.assistantRequired') }}</div>
+          <div v-else class="text-caption text-grey-7" data-cy="assistant-mcp-optional">{{ t('mcpTools.assistantOptional') }}</div>
           <template v-if="binding(server.mcpServerId)">
             <q-btn-toggle :model-value="binding(server.mcpServerId)!.toolSelection" no-caps unelevated spread toggle-color="primary" :options="[{ label: t('mcpTools.allTools'), value: 'ALL' }, { label: t('mcpTools.selectedTools'), value: 'ALLOWLIST' }]" :disable="disabled" data-cy="assistant-tool-mode" @update:model-value="value => mode(server.mcpServerId, value)" />
             <div v-if="binding(server.mcpServerId)!.toolSelection === 'ALL'" class="text-body2 text-grey-7" data-cy="assistant-tools-all">{{ t('mcpTools.assistantAll') }}</div>

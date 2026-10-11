@@ -27,6 +27,8 @@ type ManagedRelease struct {
 	SnapshotJSON []byte `json:"snapshot_json,omitempty"`
 	// SnapshotHash holds the value of the "snapshot_hash" field.
 	SnapshotHash string `json:"snapshot_hash,omitempty"`
+	// DiffSummaryJSON holds the value of the "diff_summary_json" field.
+	DiffSummaryJSON []byte `json:"diff_summary_json,omitempty"`
 	// SourceDraftRevision holds the value of the "source_draft_revision" field.
 	SourceDraftRevision int64 `json:"source_draft_revision,omitempty"`
 	// CreatedByUserID holds the value of the "created_by_user_id" field.
@@ -41,7 +43,7 @@ func (*ManagedRelease) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case managedrelease.FieldReleaseContentJSON, managedrelease.FieldSnapshotJSON:
+		case managedrelease.FieldReleaseContentJSON, managedrelease.FieldSnapshotJSON, managedrelease.FieldDiffSummaryJSON:
 			values[i] = new([]byte)
 		case managedrelease.FieldManagedGeneration, managedrelease.FieldSourceDraftRevision:
 			values[i] = new(sql.NullInt64)
@@ -99,6 +101,12 @@ func (_m *ManagedRelease) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field snapshot_hash", values[i])
 			} else if value.Valid {
 				_m.SnapshotHash = value.String
+			}
+		case managedrelease.FieldDiffSummaryJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field diff_summary_json", values[i])
+			} else if value != nil {
+				_m.DiffSummaryJSON = *value
 			}
 		case managedrelease.FieldSourceDraftRevision:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -168,6 +176,9 @@ func (_m *ManagedRelease) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("snapshot_hash=")
 	builder.WriteString(_m.SnapshotHash)
+	builder.WriteString(", ")
+	builder.WriteString("diff_summary_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DiffSummaryJSON))
 	builder.WriteString(", ")
 	builder.WriteString("source_draft_revision=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SourceDraftRevision))

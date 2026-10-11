@@ -81,6 +81,7 @@ describe('UpstreamsPage', () => {
     const stream = { upstreamId: 'ups_unknown', name: 'Unknown connection', configRevision: 3, status: 'INACTIVE' }
     let reads = 0
     const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (init?.method === 'DELETE') throw failure
       if (path.includes('/upstreams?')) return { items: [stream] }
       reads++
@@ -114,6 +115,7 @@ describe('UpstreamsPage', () => {
   it('reloads the selected revision before retrying a stale deletion', async () => {
     const stream = { upstreamId: 'ups_stale', name: 'Changed connection', configRevision: 3, status: 'INACTIVE' }
     const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (init?.method === 'DELETE') throw new client.ApiProblem(409, 'stale_upstream_config_revision', 'Changed')
       if (path.includes('/upstreams?')) return { items: [stream] }
       return { ...stream, configRevision: 4 }
@@ -140,6 +142,7 @@ describe('UpstreamsPage', () => {
   it('offers deletion of a connection and keeps the detail on a reference conflict', async () => {
     const stream = { upstreamId: 'ups_delete', name: 'Unused connection', configRevision: 3, status: 'ACTIVE' }
     const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (init?.method === 'DELETE') throw new client.ApiProblem(409, 'upstream_in_use', 'Referenced')
       if (path.includes('/upstreams?')) return { items: [stream] }
       return stream
@@ -185,6 +188,7 @@ describe('UpstreamsPage', () => {
 
   it('confirms a standalone secret was created and still needs an upstream', async () => {
     vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (path === '/api/admin/v1/secrets' && init?.method === 'POST') {
         return { secretId: 'sec_00000000-0000-4000-8000-000000000001', name: 'Demo key', secretVersion: 1 }
       }
@@ -208,6 +212,7 @@ describe('UpstreamsPage', () => {
   it('reuses a secret listed after page reload when creating an upstream', async () => {
     const secret = { secretId: 'sec_existing', name: 'Existing key', secretVersion: 3 }
     const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (path === '/api/admin/v1/secrets?limit=50') return { items: [secret] }
       if (path === '/api/admin/v1/upstreams' && init?.method === 'POST') {
         return { upstreamId: 'ups_created', name: 'Example', configRevision: 1, status: 'INACTIVE' }
@@ -253,6 +258,7 @@ describe('UpstreamsPage', () => {
       },
     }
     const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (path === '/api/admin/v1/secrets?limit=50') return { items: [secret] }
       if (path === '/api/admin/v1/upstreams?limit=50') return { items: [upstream] }
       if (path === '/api/admin/v1/secrets/sec_previous') return { secretId: 'sec_previous', name: 'Previous', secretVersion: 1 }
@@ -316,6 +322,7 @@ describe('UpstreamsPage', () => {
   it('can create a secret inline within the create-upstream dialog and auto-binds it', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (path === '/api/admin/v1/secrets' && init?.method === 'POST') {
         return { secretId: 'sec_created', name: 'My Key', secretVersion: 1 }
       }
@@ -382,6 +389,7 @@ describe('UpstreamsPage', () => {
   it('create upstream submits UpstreamConfig with all required fields, not providerKind', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (path === '/api/admin/v1/upstreams' && init?.method === 'POST') {
         const body = JSON.parse(init.body as string)
         expect(body.config.name).toBeDefined()
@@ -437,6 +445,7 @@ describe('UpstreamsPage', () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     const testResult = { reachable: true, httpStatus: 401, latencyMs: 45, warnings: [] }
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (path.startsWith('/api/admin/v1/upstreams') && !path.includes(':')) return { items: [{ upstreamId: 'ups_test', name: 'OpenAI', configRevision: 1, status: 'ACTIVE' }], nextCursor: undefined }
       if (path.includes(':test')) return testResult
       return {}
@@ -468,6 +477,7 @@ describe('UpstreamsPage', () => {
   it('applies an upstream with an Idempotency-Key and surfaces the activation', async () => {
     const fetchSpy = vi.spyOn(client, 'apiFetch')
     fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/references')) return { draftReferenced: false, releases: [], activationBlocked: false }
       if (path.startsWith('/api/admin/v1/upstreams') && !path.includes(':')) return { items: [{ upstreamId: 'ups_test', name: 'OpenAI', configRevision: 1, status: 'INACTIVE' }], nextCursor: undefined }
       if (path.includes(':apply')) {
         return { activationId: 'act_001', kind: 'RUNTIME_CONFIG', state: 'COMPLETED', desiredControlRevision: 2 }

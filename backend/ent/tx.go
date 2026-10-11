@@ -62,6 +62,8 @@ type Tx struct {
 	PortalSession *PortalSessionClient
 	// PricingRule is the client for interacting with the PricingRule builders.
 	PricingRule *PricingRuleClient
+	// ReleaseHistoryAudit is the client for interacting with the ReleaseHistoryAudit builders.
+	ReleaseHistoryAudit *ReleaseHistoryAuditClient
 	// RequestUsage is the client for interacting with the RequestUsage builders.
 	RequestUsage *RequestUsageClient
 	// Secret is the client for interacting with the Secret builders.
@@ -248,6 +250,7 @@ func (tx *Tx) init() {
 	tx.ManagedState = NewManagedStateClient(tx.config)
 	tx.PortalSession = NewPortalSessionClient(tx.config)
 	tx.PricingRule = NewPricingRuleClient(tx.config)
+	tx.ReleaseHistoryAudit = NewReleaseHistoryAuditClient(tx.config)
 	tx.RequestUsage = NewRequestUsageClient(tx.config)
 	tx.Secret = NewSecretClient(tx.config)
 	tx.SecretVersion = NewSecretVersionClient(tx.config)

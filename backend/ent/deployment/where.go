@@ -89,6 +89,21 @@ func FeedRevision(v int64) predicate.Deployment {
 	return predicate.Deployment(sql.FieldEQ(FieldFeedRevision, v))
 }
 
+// ReleaseRetentionJSON applies equality check predicate on the "release_retention_json" field. It's identical to ReleaseRetentionJSONEQ.
+func ReleaseRetentionJSON(v []byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEQ(FieldReleaseRetentionJSON, v))
+}
+
+// ReleaseRetentionRevision applies equality check predicate on the "release_retention_revision" field. It's identical to ReleaseRetentionRevisionEQ.
+func ReleaseRetentionRevision(v int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEQ(FieldReleaseRetentionRevision, v))
+}
+
+// ReleaseCleanupAt applies equality check predicate on the "release_cleanup_at" field. It's identical to ReleaseCleanupAtEQ.
+func ReleaseCleanupAt(v time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEQ(FieldReleaseCleanupAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Deployment {
 	return predicate.Deployment(sql.FieldEQ(FieldCreatedAt, v))
@@ -397,6 +412,146 @@ func FeedRevisionLT(v int64) predicate.Deployment {
 // FeedRevisionLTE applies the LTE predicate on the "feed_revision" field.
 func FeedRevisionLTE(v int64) predicate.Deployment {
 	return predicate.Deployment(sql.FieldLTE(FieldFeedRevision, v))
+}
+
+// ReleaseRetentionJSONEQ applies the EQ predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONEQ(v []byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEQ(FieldReleaseRetentionJSON, v))
+}
+
+// ReleaseRetentionJSONNEQ applies the NEQ predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONNEQ(v []byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldNEQ(FieldReleaseRetentionJSON, v))
+}
+
+// ReleaseRetentionJSONIn applies the In predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONIn(vs ...[]byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldIn(FieldReleaseRetentionJSON, vs...))
+}
+
+// ReleaseRetentionJSONNotIn applies the NotIn predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONNotIn(vs ...[]byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldNotIn(FieldReleaseRetentionJSON, vs...))
+}
+
+// ReleaseRetentionJSONGT applies the GT predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONGT(v []byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldGT(FieldReleaseRetentionJSON, v))
+}
+
+// ReleaseRetentionJSONGTE applies the GTE predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONGTE(v []byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldGTE(FieldReleaseRetentionJSON, v))
+}
+
+// ReleaseRetentionJSONLT applies the LT predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONLT(v []byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldLT(FieldReleaseRetentionJSON, v))
+}
+
+// ReleaseRetentionJSONLTE applies the LTE predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONLTE(v []byte) predicate.Deployment {
+	return predicate.Deployment(sql.FieldLTE(FieldReleaseRetentionJSON, v))
+}
+
+// ReleaseRetentionJSONIsNil applies the IsNil predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONIsNil() predicate.Deployment {
+	return predicate.Deployment(sql.FieldIsNull(FieldReleaseRetentionJSON))
+}
+
+// ReleaseRetentionJSONNotNil applies the NotNil predicate on the "release_retention_json" field.
+func ReleaseRetentionJSONNotNil() predicate.Deployment {
+	return predicate.Deployment(sql.FieldNotNull(FieldReleaseRetentionJSON))
+}
+
+// ReleaseRetentionRevisionEQ applies the EQ predicate on the "release_retention_revision" field.
+func ReleaseRetentionRevisionEQ(v int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEQ(FieldReleaseRetentionRevision, v))
+}
+
+// ReleaseRetentionRevisionNEQ applies the NEQ predicate on the "release_retention_revision" field.
+func ReleaseRetentionRevisionNEQ(v int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldNEQ(FieldReleaseRetentionRevision, v))
+}
+
+// ReleaseRetentionRevisionIn applies the In predicate on the "release_retention_revision" field.
+func ReleaseRetentionRevisionIn(vs ...int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldIn(FieldReleaseRetentionRevision, vs...))
+}
+
+// ReleaseRetentionRevisionNotIn applies the NotIn predicate on the "release_retention_revision" field.
+func ReleaseRetentionRevisionNotIn(vs ...int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldNotIn(FieldReleaseRetentionRevision, vs...))
+}
+
+// ReleaseRetentionRevisionGT applies the GT predicate on the "release_retention_revision" field.
+func ReleaseRetentionRevisionGT(v int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldGT(FieldReleaseRetentionRevision, v))
+}
+
+// ReleaseRetentionRevisionGTE applies the GTE predicate on the "release_retention_revision" field.
+func ReleaseRetentionRevisionGTE(v int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldGTE(FieldReleaseRetentionRevision, v))
+}
+
+// ReleaseRetentionRevisionLT applies the LT predicate on the "release_retention_revision" field.
+func ReleaseRetentionRevisionLT(v int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldLT(FieldReleaseRetentionRevision, v))
+}
+
+// ReleaseRetentionRevisionLTE applies the LTE predicate on the "release_retention_revision" field.
+func ReleaseRetentionRevisionLTE(v int64) predicate.Deployment {
+	return predicate.Deployment(sql.FieldLTE(FieldReleaseRetentionRevision, v))
+}
+
+// ReleaseCleanupAtEQ applies the EQ predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtEQ(v time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldEQ(FieldReleaseCleanupAt, v))
+}
+
+// ReleaseCleanupAtNEQ applies the NEQ predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtNEQ(v time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldNEQ(FieldReleaseCleanupAt, v))
+}
+
+// ReleaseCleanupAtIn applies the In predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtIn(vs ...time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldIn(FieldReleaseCleanupAt, vs...))
+}
+
+// ReleaseCleanupAtNotIn applies the NotIn predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtNotIn(vs ...time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldNotIn(FieldReleaseCleanupAt, vs...))
+}
+
+// ReleaseCleanupAtGT applies the GT predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtGT(v time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldGT(FieldReleaseCleanupAt, v))
+}
+
+// ReleaseCleanupAtGTE applies the GTE predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtGTE(v time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldGTE(FieldReleaseCleanupAt, v))
+}
+
+// ReleaseCleanupAtLT applies the LT predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtLT(v time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldLT(FieldReleaseCleanupAt, v))
+}
+
+// ReleaseCleanupAtLTE applies the LTE predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtLTE(v time.Time) predicate.Deployment {
+	return predicate.Deployment(sql.FieldLTE(FieldReleaseCleanupAt, v))
+}
+
+// ReleaseCleanupAtIsNil applies the IsNil predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtIsNil() predicate.Deployment {
+	return predicate.Deployment(sql.FieldIsNull(FieldReleaseCleanupAt))
+}
+
+// ReleaseCleanupAtNotNil applies the NotNil predicate on the "release_cleanup_at" field.
+func ReleaseCleanupAtNotNil() predicate.Deployment {
+	return predicate.Deployment(sql.FieldNotNull(FieldReleaseCleanupAt))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

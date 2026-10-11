@@ -43,6 +43,24 @@ it('enables ALL by default and retains an emptied allowlist until an explicit mo
   expect(assistant.mcpBindings).toEqual([])
 })
 
+it('makes bindings mandatory choices and leaves an unbound enabled server available on mobile', async () => {
+  const { assistant, draft, wrapper } = setup({}, false)
+  expect(wrapper.getComponent(QCheckbox).props('label')).toBe('Require this MCP')
+  expect(wrapper.get('[data-cy="assistant-mcp-optional"]').text()).toContain('Users can select')
+  expect(draft.localContent!.mcp[0]!.enabled).toBe(true)
+  expect(assistant.mcpBindings).toEqual([])
+  wrapper.getComponent(QCheckbox).vm.$emit('update:modelValue', true)
+  await flushPromises()
+  expect(assistant.mcpBindings).toEqual([{ mcpServerId: 'mcp_test', toolSelection: 'ALL', toolNames: [] }])
+  expect(wrapper.find('[data-cy="assistant-mcp-optional"]').exists()).toBe(false)
+  expect(wrapper.get('[data-cy="assistant-mcp-required"]').text()).toContain('cannot turn it off')
+  wrapper.getComponent(QCheckbox).vm.$emit('update:modelValue', false)
+  await flushPromises()
+  expect(assistant.mcpBindings).toEqual([])
+  expect(draft.localContent!.mcp[0]!.enabled).toBe(true)
+  expect(wrapper.get('[data-cy="assistant-mcp-optional"]').text()).toContain('assistant tool restriction')
+})
+
 it('distinguishes missing dynamic tools from permission violations and disabled servers', async () => {
   const { assistant, draft, wrapper } = setup({ toolDiscovery: { sourceHash: `sha256:${'2'.repeat(64)}`, discoveredAt: '2026-10-06T00:00:00Z', tools: [] } }, true, ['future_tool'])
   expect(wrapper.get('[data-cy="assistant-tools-unavailable"]').text()).toContain('keep the selection')

@@ -12,6 +12,7 @@ func (ManagedState) Fields() []ent.Field {
 		field.String("id").Immutable(),
 		field.String("active_release_id").Optional().Nillable(),
 		field.Int64("active_managed_generation"),
+		field.Int64("last_assigned_generation").Default(0),
 		field.Int64("desired_control_revision"),
 		field.String("desired_bundle_hash").Optional().Nillable(),
 		field.Int64("managed_state_revision"),

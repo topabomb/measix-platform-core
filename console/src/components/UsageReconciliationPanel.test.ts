@@ -3,7 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import {
   ClosePopup, QBanner, QBtn, QCard, QCardActions, QCardSection, QChip,
   QDialog, QIcon, QInput, QItem, QItemLabel, QItemSection, QList, QMarkupTable,
-  QSpinner, Quasar,
+  QSpinner, Quasar, QCheckbox,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
 import { i18n } from '../i18n'
@@ -30,7 +30,7 @@ function mountPanel() {
           components: {
             QBanner, QBtn, QCard, QCardActions, QCardSection, QChip,
             QDialog, QIcon, QInput, QItem, QItemLabel, QItemSection, QList, QMarkupTable,
-            QSpinner,
+            QSpinner, QCheckbox,
           },
           directives: { ClosePopup },
         }],
@@ -43,6 +43,89 @@ function mountPanel() {
 }
 
 describe('UsageReconciliationPanel', () => {
+  it('keeps the bulk result visible even when only one request was selected', async () => {
+    let done = false
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (_path, init) => {
+      if (init?.method === 'POST') { done = true; return { state: 'RESOLVED' } }
+      return { items: done ? [] : [{ requestId: 'req_1', userId: 'usr_1', resourceId: 'mdl_a', capability: 'MODEL', state: 'PENDING', observed: [], reservation: [], reconciliationReason: 'incomplete', admittedAt: '2026-10-08T00:00:00Z' }] }
+    })
+    const panel = mountPanel()
+    await flushPromises()
+    await panel.getComponent(QCheckbox).setValue(true)
+    await panel.get('[data-cy="reconciliation-batch-btn"]').trigger('click')
+    await flushPromises()
+    const reason = document.body.querySelector('textarea')!
+    reason.value = 'Reviewed interruption'
+    reason.dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+    ;(document.body.querySelector('[data-cy="confirm-reconciliation"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(document.body.querySelector('[data-cy="reconciliation-dialog"]')).toBeTruthy()
+    expect(document.body.textContent).toContain('1 succeeded · 0 failed · 0 not attempted')
+  })
+  it('focuses the list on business usage instead of repeating one request per row', async () => {
+    vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [{ requestId: 'req_1', userId: 'usr_1', resourceId: 'mdl_a', capability: 'MODEL', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', state: 'PENDING', forwarded: true, observed: [{ meter: 'REQUESTS', quantity: '1' }], reservation: [], reconciliationReason: 'incomplete', admittedAt: '2026-10-08T00:00:00Z' }] })
+    const panel = mountPanel()
+    await flushPromises()
+    const row = panel.get('[data-cy="reconciliation-row"]')
+    expect(row.text()).not.toContain('Observed Requests: 1')
+    expect(row.text()).toContain('No reliable business usage')
+    expect(row.text()).toContain('Input tokens')
+  })
+
+  it('reviews selected requests with one reason and reports a concurrent review conflict', async () => {
+    const pending = (requestId: string) => ({ requestId, userId: 'usr_1', resourceId: requestId, capability: 'MODEL', state: 'PENDING', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', observed: [], reservation: [], reconciliationReason: 'incomplete', admittedAt: '2026-10-08T00:00:00Z' })
+    let firstDone = false
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async (path, init) => {
+      if (init?.method === 'POST') {
+        if (path.includes('req_2')) throw new client.ApiProblem(409, 'reconciliation_not_pending', 'Reconciliation is no longer pending')
+        firstDone = true
+        return { ...pending('req_1'), state: 'RESOLVED' }
+      }
+      return { items: (firstDone ? ['req_2', 'req_3'] : ['req_1', 'req_2', 'req_3']).map(pending) }
+    })
+    const panel = mountPanel()
+    await flushPromises()
+    const checks = panel.findAllComponents(QCheckbox).filter(check => check.attributes('data-cy') === 'reconciliation-select')
+    await checks[0]!.trigger('click')
+    await checks[1]!.trigger('click')
+    await panel.get('[data-cy="reconciliation-batch-btn"]').trigger('click')
+    await flushPromises()
+    const reason = document.body.querySelector('textarea')!
+    reason.value = 'Reviewed provider interruption'
+    reason.dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+    ;(document.body.querySelector('[data-cy="confirm-reconciliation"]') as HTMLButtonElement).click()
+    await flushPromises()
+    const posts = fetch.mock.calls.filter(([, init]) => init?.method === 'POST')
+    expect(posts).toHaveLength(2)
+    expect(posts.every(([, init, csrf]) => JSON.parse(String(init?.body)).reason === reason.value && csrf === 'csrf')).toBe(true)
+    expect(document.body.textContent).toContain('1 succeeded · 1 failed · 0 not attempted')
+    expect(panel.text()).toContain('req_2')
+    expect(panel.text()).not.toContain('req_1')
+  })
+
+  it('stops after an uncertain command result instead of retrying or processing the rest', async () => {
+    const pending = (requestId: string) => ({ requestId, userId: 'usr_1', resourceId: requestId, capability: 'MODEL', state: 'PENDING', observed: [], reservation: [], reconciliationReason: 'incomplete', admittedAt: '2026-10-08T00:00:00Z' })
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async (_path, init) => {
+      if (init?.method === 'POST') throw new TypeError('network failed')
+      return { items: ['req_1', 'req_2'].map(pending) }
+    })
+    const panel = mountPanel()
+    await flushPromises()
+    await panel.getComponent(QCheckbox).setValue(true)
+    await panel.get('[data-cy="reconciliation-batch-btn"]').trigger('click')
+    await flushPromises()
+    const reason = document.body.querySelector('textarea')!
+    reason.value = 'Reviewed interruption'
+    reason.dispatchEvent(new Event('input', { bubbles: true }))
+    await flushPromises()
+    ;(document.body.querySelector('[data-cy="confirm-reconciliation"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+    expect(document.body.textContent).toContain('0 succeeded · 1 failed · 1 not attempted')
+    expect(document.body.textContent).toContain('Some results are uncertain')
+  })
   it('replaces a reconciliation page and supports returning to the previous page', async () => {
     vi.spyOn(client, 'apiFetch').mockImplementation(async path => ({
       items: [{ requestId: path.includes('cursor=') ? 'req_second' : 'req_first', userId: 'usr_a', resourceId: path.includes('cursor=') ? 'Second' : 'First', capability: 'MODEL', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', state: 'PENDING', reservation: [], observed: [], reconciliationReason: 'incomplete', admittedAt: '2026-09-20T00:00:00Z' }],
@@ -50,10 +133,13 @@ describe('UsageReconciliationPanel', () => {
     }))
     const panel = mountPanel()
     await flushPromises()
+    await panel.getComponent(QCheckbox).setValue(true)
+    expect(panel.text()).toContain('1 selected (this page only)')
     await panel.get('[aria-label="Next page"]').trigger('click')
     await flushPromises()
     expect(panel.text()).toContain('Second')
     expect(panel.text()).not.toContain('First')
+    expect(panel.text()).toContain('0 selected (this page only)')
     await panel.get('[aria-label="Previous page"]').trigger('click')
     await flushPromises()
     expect(panel.text()).toContain('First')

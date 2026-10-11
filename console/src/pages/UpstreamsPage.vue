@@ -40,6 +40,14 @@ const {
 } = useCursorPager<Upstream, UpstreamPage>(listPath, path => apiFetch<UpstreamPage>(path))
 
 const selected = ref<Upstream>()
+const references = ref<components['schemas']['UpstreamReferences']>()
+async function loadReferences(id: string) {
+  references.value = undefined
+  try {
+    const result = await apiFetch<components['schemas']['UpstreamReferences']>(`/api/admin/v1/upstreams/${encodeURIComponent(id)}/references`)
+    if (selected.value?.upstreamId === id && Array.isArray(result.releases)) references.value = result
+  } catch (cause) { if (selected.value?.upstreamId === id) error.value = cause }
+}
 const createOpen = ref(false)
 const testing = ref(false)
 const applyConfirmOpen = ref(false)
@@ -86,6 +94,7 @@ async function reloadDeleteTarget() {
     const current = await apiFetch<Upstream>(`/api/admin/v1/upstreams/${encodeURIComponent(id)}`)
     if (selected.value?.upstreamId !== id) return
     selected.value = current
+    await loadReferences(id)
     deleteNeedsReload.value = false
     deleteUncertain.value = false
     error.value = undefined
@@ -264,6 +273,7 @@ async function createSecret() {
 
 function openUpstream(upstream: Upstream) {
   selected.value = upstream
+  void loadReferences(upstream.upstreamId)
   testResult.value = undefined
   editMode.value = false
   conflictRevision.value = undefined
@@ -597,6 +607,19 @@ onBeforeUnmount(() => {
         </q-card-section>
         <q-separator />
 
+        <q-card-section data-cy="upstream-references">
+          <div class="text-subtitle2">{{ $t('upstreams.referencesTitle') }}</div>
+          <div v-if="!references" class="text-caption">{{ $t('common.loading') }}</div>
+          <template v-else>
+            <div class="text-caption">{{ $t(references.draftReferenced ? 'upstreams.draftReferenced' : 'upstreams.draftUnreferenced') }}</div>
+            <div class="text-caption">{{ $t('upstreams.releaseReferences', { count: references.releases.length }) }}</div>
+            <div v-if="references.releases.some(r => r.status === 'ACTIVE')" class="text-caption">{{ $t('upstreams.currentReferenced') }}</div>
+            <div class="text-caption">{{ references.releases.map(r => $t('releases.versionLabel', { generation: r.managedGeneration })).join('、') }}</div>
+            <div v-if="references.activationBlocked" class="text-warning">{{ $t('releaseHistory.busy') }}</div>
+            <q-btn v-if="references.draftReferenced" flat no-caps :to="{ name: 'Resources' }" :label="$t('nav.resources')" />
+            <q-btn v-if="references.releases.length" flat no-caps :to="{ name: 'Releases' }" :label="$t('upstreams.cleanReferences')" />
+          </template>
+        </q-card-section>
         <q-card-section>
           <!-- Candidate vs Active banner -->
           <q-banner v-if="candidateVsActive?.pending" class="bg-orange-1 q-mb-xs rounded-borders">

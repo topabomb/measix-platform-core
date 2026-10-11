@@ -105,6 +105,59 @@ func (_u *DeploymentUpdate) AddFeedRevision(v int64) *DeploymentUpdate {
 	return _u
 }
 
+// SetReleaseRetentionJSON sets the "release_retention_json" field.
+func (_u *DeploymentUpdate) SetReleaseRetentionJSON(v []byte) *DeploymentUpdate {
+	_u.mutation.SetReleaseRetentionJSON(v)
+	return _u
+}
+
+// ClearReleaseRetentionJSON clears the value of the "release_retention_json" field.
+func (_u *DeploymentUpdate) ClearReleaseRetentionJSON() *DeploymentUpdate {
+	_u.mutation.ClearReleaseRetentionJSON()
+	return _u
+}
+
+// SetReleaseRetentionRevision sets the "release_retention_revision" field.
+func (_u *DeploymentUpdate) SetReleaseRetentionRevision(v int64) *DeploymentUpdate {
+	_u.mutation.ResetReleaseRetentionRevision()
+	_u.mutation.SetReleaseRetentionRevision(v)
+	return _u
+}
+
+// SetNillableReleaseRetentionRevision sets the "release_retention_revision" field if the given value is not nil.
+func (_u *DeploymentUpdate) SetNillableReleaseRetentionRevision(v *int64) *DeploymentUpdate {
+	if v != nil {
+		_u.SetReleaseRetentionRevision(*v)
+	}
+	return _u
+}
+
+// AddReleaseRetentionRevision adds value to the "release_retention_revision" field.
+func (_u *DeploymentUpdate) AddReleaseRetentionRevision(v int64) *DeploymentUpdate {
+	_u.mutation.AddReleaseRetentionRevision(v)
+	return _u
+}
+
+// SetReleaseCleanupAt sets the "release_cleanup_at" field.
+func (_u *DeploymentUpdate) SetReleaseCleanupAt(v time.Time) *DeploymentUpdate {
+	_u.mutation.SetReleaseCleanupAt(v)
+	return _u
+}
+
+// SetNillableReleaseCleanupAt sets the "release_cleanup_at" field if the given value is not nil.
+func (_u *DeploymentUpdate) SetNillableReleaseCleanupAt(v *time.Time) *DeploymentUpdate {
+	if v != nil {
+		_u.SetReleaseCleanupAt(*v)
+	}
+	return _u
+}
+
+// ClearReleaseCleanupAt clears the value of the "release_cleanup_at" field.
+func (_u *DeploymentUpdate) ClearReleaseCleanupAt() *DeploymentUpdate {
+	_u.mutation.ClearReleaseCleanupAt()
+	return _u
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_u *DeploymentUpdate) SetCreatedAt(v time.Time) *DeploymentUpdate {
 	_u.mutation.SetCreatedAt(v)
@@ -191,6 +244,24 @@ func (_u *DeploymentUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.AddedFeedRevision(); ok {
 		_spec.AddField(deployment.FieldFeedRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.ReleaseRetentionJSON(); ok {
+		_spec.SetField(deployment.FieldReleaseRetentionJSON, field.TypeBytes, value)
+	}
+	if _u.mutation.ReleaseRetentionJSONCleared() {
+		_spec.ClearField(deployment.FieldReleaseRetentionJSON, field.TypeBytes)
+	}
+	if value, ok := _u.mutation.ReleaseRetentionRevision(); ok {
+		_spec.SetField(deployment.FieldReleaseRetentionRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedReleaseRetentionRevision(); ok {
+		_spec.AddField(deployment.FieldReleaseRetentionRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.ReleaseCleanupAt(); ok {
+		_spec.SetField(deployment.FieldReleaseCleanupAt, field.TypeTime, value)
+	}
+	if _u.mutation.ReleaseCleanupAtCleared() {
+		_spec.ClearField(deployment.FieldReleaseCleanupAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.CreatedAt(); ok {
 		_spec.SetField(deployment.FieldCreatedAt, field.TypeTime, value)
@@ -292,6 +363,59 @@ func (_u *DeploymentUpdateOne) SetNillableFeedRevision(v *int64) *DeploymentUpda
 // AddFeedRevision adds value to the "feed_revision" field.
 func (_u *DeploymentUpdateOne) AddFeedRevision(v int64) *DeploymentUpdateOne {
 	_u.mutation.AddFeedRevision(v)
+	return _u
+}
+
+// SetReleaseRetentionJSON sets the "release_retention_json" field.
+func (_u *DeploymentUpdateOne) SetReleaseRetentionJSON(v []byte) *DeploymentUpdateOne {
+	_u.mutation.SetReleaseRetentionJSON(v)
+	return _u
+}
+
+// ClearReleaseRetentionJSON clears the value of the "release_retention_json" field.
+func (_u *DeploymentUpdateOne) ClearReleaseRetentionJSON() *DeploymentUpdateOne {
+	_u.mutation.ClearReleaseRetentionJSON()
+	return _u
+}
+
+// SetReleaseRetentionRevision sets the "release_retention_revision" field.
+func (_u *DeploymentUpdateOne) SetReleaseRetentionRevision(v int64) *DeploymentUpdateOne {
+	_u.mutation.ResetReleaseRetentionRevision()
+	_u.mutation.SetReleaseRetentionRevision(v)
+	return _u
+}
+
+// SetNillableReleaseRetentionRevision sets the "release_retention_revision" field if the given value is not nil.
+func (_u *DeploymentUpdateOne) SetNillableReleaseRetentionRevision(v *int64) *DeploymentUpdateOne {
+	if v != nil {
+		_u.SetReleaseRetentionRevision(*v)
+	}
+	return _u
+}
+
+// AddReleaseRetentionRevision adds value to the "release_retention_revision" field.
+func (_u *DeploymentUpdateOne) AddReleaseRetentionRevision(v int64) *DeploymentUpdateOne {
+	_u.mutation.AddReleaseRetentionRevision(v)
+	return _u
+}
+
+// SetReleaseCleanupAt sets the "release_cleanup_at" field.
+func (_u *DeploymentUpdateOne) SetReleaseCleanupAt(v time.Time) *DeploymentUpdateOne {
+	_u.mutation.SetReleaseCleanupAt(v)
+	return _u
+}
+
+// SetNillableReleaseCleanupAt sets the "release_cleanup_at" field if the given value is not nil.
+func (_u *DeploymentUpdateOne) SetNillableReleaseCleanupAt(v *time.Time) *DeploymentUpdateOne {
+	if v != nil {
+		_u.SetReleaseCleanupAt(*v)
+	}
+	return _u
+}
+
+// ClearReleaseCleanupAt clears the value of the "release_cleanup_at" field.
+func (_u *DeploymentUpdateOne) ClearReleaseCleanupAt() *DeploymentUpdateOne {
+	_u.mutation.ClearReleaseCleanupAt()
 	return _u
 }
 
@@ -411,6 +535,24 @@ func (_u *DeploymentUpdateOne) sqlSave(ctx context.Context) (_node *Deployment, 
 	}
 	if value, ok := _u.mutation.AddedFeedRevision(); ok {
 		_spec.AddField(deployment.FieldFeedRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.ReleaseRetentionJSON(); ok {
+		_spec.SetField(deployment.FieldReleaseRetentionJSON, field.TypeBytes, value)
+	}
+	if _u.mutation.ReleaseRetentionJSONCleared() {
+		_spec.ClearField(deployment.FieldReleaseRetentionJSON, field.TypeBytes)
+	}
+	if value, ok := _u.mutation.ReleaseRetentionRevision(); ok {
+		_spec.SetField(deployment.FieldReleaseRetentionRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedReleaseRetentionRevision(); ok {
+		_spec.AddField(deployment.FieldReleaseRetentionRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.ReleaseCleanupAt(); ok {
+		_spec.SetField(deployment.FieldReleaseCleanupAt, field.TypeTime, value)
+	}
+	if _u.mutation.ReleaseCleanupAtCleared() {
+		_spec.ClearField(deployment.FieldReleaseCleanupAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.CreatedAt(); ok {
 		_spec.SetField(deployment.FieldCreatedAt, field.TypeTime, value)

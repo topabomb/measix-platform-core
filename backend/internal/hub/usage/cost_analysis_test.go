@@ -214,6 +214,24 @@ func TestCostAccumulatorRoundsOnlyAfterSumming(t *testing.T) {
 	}
 }
 
+func TestASRCostIgnoresGlobalCharacterRate(t *testing.T) {
+	now := time.Date(2026, 10, 8, 0, 0, 0, 0, time.UTC)
+	characters := &ent.PricingRule{ID: "characters", Meter: "CHARACTERS", UnitSize: "1000", UnitPriceDecimal: "0.1", Currency: "CNY", EffectiveFrom: now.Add(-time.Hour)}
+	requests := &ent.PricingRule{ID: "requests", Meter: "REQUESTS", UnitSize: "1", UnitPriceDecimal: "0.2", Currency: "CNY", EffectiveFrom: now.Add(-time.Hour)}
+	view := RequestView{ResourceKind: ResourceKindASR, CompletedAt: now, Forwarded: true, SemanticMeters: []MeterSummary{
+		{Meter: "REQUESTS", Quantity: "1", Confidence: CompletenessComplete},
+		{Meter: "AUDIO_SECONDS", Quantity: "12", Confidence: CompletenessComplete},
+	}}
+	got, err := priceRequest(view, []*ent.PricingRule{characters})
+	if err != nil || got.State != CostUnknown || !got.MissingPricing || got.UnknownMeter {
+		t.Fatalf("ASR without a compatible price = %+v, err=%v", got, err)
+	}
+	got, err = priceRequest(view, []*ent.PricingRule{characters, requests})
+	if err != nil || got.State != CostKnown || got.Amount != "0.2" || got.UnknownMeter {
+		t.Fatalf("ASR per-call price = %+v, err=%v", got, err)
+	}
+}
+
 func TestCostAnalysisUsesCurrentSettlementRevisionAndCombinedFilters(t *testing.T) {
 	store := testutil.OpenStore(t)
 	ctx := context.Background()

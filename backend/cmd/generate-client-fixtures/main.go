@@ -119,6 +119,12 @@ func main() {
 	must(err)
 	write("snapshot-v5.json", v5Snapshot)
 	references := []object{{"name": "complete-references", "expectedCode": "", "content": v5Content}}
+	optional := clone(v5Content)
+	for _, item := range optional["assistants"].([]any) {
+		item.(map[string]any)["mcpBindings"] = []any{}
+	}
+	optional["policy"].(map[string]any)["allowLocalMcp"] = false
+	references = append(references, object{"name": "enabled-enterprise-mcp-without-mandatory-bindings", "expectedCode": "", "content": optional})
 	for _, selection := range []string{"ALL", "ALLOWLIST"} {
 		value := clone(v5Content)
 		server := value["mcp"].([]any)[0].(map[string]any)

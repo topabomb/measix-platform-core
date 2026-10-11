@@ -38,7 +38,7 @@ Root repository 的 npm orchestration、实际开发命令与 system harness 生
 
 `UsersPage` 详情 actions menu 提供他人密码重设和管理员授予/撤销；打开时先 GET 当前用户，读取期间禁止重复打开；若角色已变化则刷新并提示核对，不将已选动作反转。`AdminAccountDialog` 使用具体动作作为提交按钮文案，只提交角色命令，不覆盖资料或启用状态。操作员密码与目标新密码只保留在对话框内存，取消、关闭、成功、失败和卸载均清理；角色冲突关闭后刷新目标并保留冲突提示，网络或 5xx 未知结果提示人工确认且不自动重放。创建 ADMIN 和无密码用户晋升要求初始化密码，已有密码晋升保留原值；`passwordConfigured` 仅为服务端派生展示字段。当前账号的危险动作禁用，自助修改仍走账号菜单。
 
-`UpstreamsPage` 详情提供删除确认，每次打开（含关闭后重开）先 GET 最新连接，再使用其 `configRevision` 做条件删除；读取失败时禁止提交。引用冲突保留详情并展示本地化错误和刷新入口；版本冲突、网络或 5xx 未知结果要求 GET 刷新后才能再次提交，GET 404 则关闭详情并刷新列表。服务端删除边界和保全范围见 [API 合同](api-contracts.md)。这些管理操作不增加配置项、数据库迁移或浏览器持久状态。
+`UpstreamsPage` 详情提供删除确认，每次打开（含关闭后重开）先 GET 最新连接，再使用其 `configRevision` 做条件删除；读取失败时禁止提交。引用冲突保留详情并展示本地化错误和刷新入口；版本冲突、网络或 5xx 未知结果要求 GET 刷新后才能再次提交，GET 404 则关闭详情并刷新列表。服务端删除边界和保全范围见 [API 合同](api-contracts.md)，历史外键转换见[数据库迁移](database-migrations.md#发布历史迁移)。表单不增加浏览器持久状态。
 
 ## 2. 当前源码组织
 
@@ -101,6 +101,8 @@ Usage 分析统一使用显式时间窗（快捷 24 小时、7/30/90 天，自�
 `Release.snapshotSchemaVersion` 由 `capability.buildReleaseView` 复用 `PublishedContent` 从该条不可变 `SnapshotJSON` 读取；`DraftPreviewResponse.snapshotSchemaVersion` 取同次 canonical compiler 的实际输出。`ReleasesPage` 在列表副标题与详情标题下显示“下发协议 vN”，`ResourcesPage` 在预览说明下显示相同标签，保持现有主从与窄屏布局，不增加筛选、选择器或第二个详情面。这里的版本与发布序号、设备应用状态不同；历史发布和重新发布均按实际 Snapshot 展示，不能使用当前默认常量替代。此只读 Admin 投影不修改 Client API、发布 bytes/hash 或数据库结构。
 
 ## 4. 实现范围与后续验证
+
+`ReleasesPage` 的选择框和详情入口复用 `ReleaseHistoryTools`，提供单条/批量、UTC 半开时间范围、已保存规则清理。先显示 Hub 返回的候选、受保护原因、移除字节和上游引用解除数量，再执行一次绑定预览的命令。冲突或响应未知时消耗预览并刷新列表，必须显式重新预览；不自动重试删除。保留规则在独立对话框配置，保存启用后自动清理，明确说明不可直接回滚；同处显示最近有界规则/清理操作。Upstreams 展示实际草稿及保留版本引用并链接对应编辑/发布页面，“配置已应用”只表示配置应用状态。
 
 具体“必须做什么”只引用 architecture；当前实现与验证结果见 [当前状态](s0-execution-progress.md)。已有 S0.1 编辑/预览/发布/恢复代码和浏览器场景，不再将旧 C1/C2 执行单当作当前待办。代码存在仍不等于当前 candidate C6/C7 Green。
 

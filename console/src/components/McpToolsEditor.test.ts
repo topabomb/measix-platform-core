@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { reactive, toRaw } from 'vue'
@@ -7,16 +7,87 @@ import type { components } from '../api/generated'
 import McpToolsEditor from './McpToolsEditor.vue'
 import { useDraftStore } from '../stores/draft'
 import * as client from '../api/client'
+import PagedEntityPicker from './PagedEntityPicker.vue'
 
 type Mcp = components['schemas']['McpDefinition']
 beforeEach(() => setActivePinia(createPinia()))
-function setup() {
+afterEach(() => vi.restoreAllMocks())
+function setup(workspace = false) {
   useDraftStore().localContent = { providers: [], models: [], imageGenerators: [], tts: [], asr: [], mcp: [], assistants: [], starters: [], bindings: [], policy: { policyId: 'pol_1', allowLocalProviders: true, allowLocalMcp: true, allowLocalTts: true, allowLocalAsr: true, allowLocalAssistants: true } }
   const tool = { name: 'read', contractHash: `sha256:${'1'.repeat(64)}`, definition: { name: 'read', inputSchema: { type: 'object' }, description: 'Read records' } }
   const mcp = reactive<Mcp>({ mcpServerId: 'mcp_1', displayName: 'Test', clientProtocol: 'MCP_STREAMABLE_HTTP', authOwnership: 'NONE', runtimePath: '/mcp', enabled: true, toolAccessMode: 'ALLOWLIST', allowedTools: [], toolDiscovery: { sourceHash: `sha256:${'2'.repeat(64)}`, discoveredAt: '2026-10-06T00:00:00Z', tools: [tool] } })
+  if (workspace) useDraftStore().localContent!.bindings.push({ resourceId: 'mcp_1', runtimeRouteId: 'rte_1', targetKind: 'REMOTE_WORKSPACE', workspaceServiceId: 'wss_1', allowedMethods: ['POST', 'GET', 'DELETE'], allowedPathPrefixes: ['/mcp'], transportPolicy: 'HTTP_STREAMING_SSE' })
   const wrapper = mount(McpToolsEditor, { props: { mcp }, global: { plugins: [[Quasar, { components: { QCardSection, QCard, QCheckbox, QBtn, QBtnToggle, QInput, QSelect, QBanner, QDialog, QSpace, QSeparator, QPagination }, directives: { ClosePopup } }]], stubs: { QDialog: true } } })
   return { wrapper, mcp }
 }
+it('fetches connected workspace identities only on request and automatically uses a unique connection', async () => {
+  const { wrapper } = setup(true)
+  const draft = useDraftStore()
+  const fetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [{ userId: 'usr_connected', displayName: 'Alice', remoteUsername: 'alice', workspace: {} }] })
+  const discover = vi.spyOn(draft, 'discoverMcpTools').mockResolvedValue(undefined)
+  expect(wrapper.findComponent(PagedEntityPicker).exists()).toBe(false)
+  expect(fetch).not.toHaveBeenCalled()
+  await wrapper.get('[data-cy="mcp-discover"]').trigger('click')
+  await flushPromises()
+  expect(fetch).toHaveBeenCalledWith('/api/admin/v1/remote-workspace/services/wss_1/workspaces?discoveryEligible=true')
+  expect(discover).toHaveBeenCalledWith('mcp_1', undefined, 'usr_connected')
+  expect(wrapper.get('[data-cy="mcp-discovery-connection"]').text()).toContain('Alice')
+  expect(wrapper.findComponent(PagedEntityPicker).exists()).toBe(false)
+  expect(draft.dirty).toBe(false)
+})
+
+it.each([undefined, 'usr_next'])('requires a choice when multiple connections or another page exist: %s', async nextCursor => {
+  const { wrapper } = setup(true)
+  const items = [{ userId: 'usr_1', displayName: 'Alice', remoteUsername: 'alice', workspace: {} }]
+  if (!nextCursor) items.push({ userId: 'usr_2', displayName: 'Bob', remoteUsername: 'bob', workspace: {} })
+  vi.spyOn(client, 'apiFetch').mockResolvedValue({ items, nextCursor })
+  const discover = vi.spyOn(useDraftStore(), 'discoverMcpTools').mockResolvedValue(undefined)
+  await wrapper.get('[data-cy="mcp-discover"]').trigger('click')
+  await flushPromises()
+  expect(discover).not.toHaveBeenCalled()
+  const picker = wrapper.getComponent(PagedEntityPicker)
+  picker.vm.$emit('update:modelValue', 'usr_1')
+  picker.vm.$emit('selected', { value: 'usr_1', label: 'Alice' })
+  await flushPromises()
+  await wrapper.get('[data-cy="mcp-discover-confirm"]').trigger('click')
+  await flushPromises()
+  expect(discover).toHaveBeenCalledWith('mcp_1', undefined, 'usr_1')
+})
+
+it('offers workspace management when there are no eligible connections without saving a draft', async () => {
+  const { wrapper } = setup(true)
+  vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [] })
+  const discover = vi.spyOn(useDraftStore(), 'discoverMcpTools').mockResolvedValue(undefined)
+  await wrapper.get('[data-cy="mcp-discover"]').trigger('click')
+  await flushPromises()
+  expect(wrapper.get('[data-cy="mcp-discovery-no-connections"]').text()).toContain('connected workspace')
+  expect(wrapper.get('[data-cy="mcp-manage-workspaces"]').attributes('href')).toBe('/admin/remote-workspaces')
+  expect(discover).not.toHaveBeenCalled()
+  expect(useDraftStore().dirty).toBe(false)
+})
+
+it('discards a late connection lookup after the selected source changes', async () => {
+  const { wrapper, mcp } = setup(true)
+  let resolve!: (value: unknown) => void
+  vi.spyOn(client, 'apiFetch').mockImplementation(() => new Promise(r => { resolve = r }))
+  const discover = vi.spyOn(useDraftStore(), 'discoverMcpTools').mockResolvedValue(undefined)
+  await wrapper.get('[data-cy="mcp-discover"]').trigger('click')
+  mcp.mcpServerId = 'mcp_other'
+  await flushPromises()
+  resolve({ items: [{ userId: 'usr_1', displayName: 'Alice' }] })
+  await flushPromises()
+  expect(discover).not.toHaveBeenCalled()
+})
+
+it.each([true, false])('describes retention only when a previous catalog exists: %s', async previous => {
+  const { wrapper, mcp } = setup()
+  if (!previous) delete mcp.toolDiscovery
+  vi.spyOn(useDraftStore(), 'discoverMcpTools').mockRejectedValue(new client.ApiProblem(502, 'mcp_discovery_protocol', 'private detail'))
+  await wrapper.get('[data-cy="mcp-discover"]').trigger('click')
+  await flushPromises()
+  expect(wrapper.find('[data-cy="mcp-previous-catalog-retained"]').exists()).toBe(previous)
+  expect(wrapper.get('[data-cy="problem-banner"]').text()).not.toContain('previous catalog')
+})
 it('selects a current definition without extra confirmation and preserves explicit confirmation after drift review', async () => {
   const { wrapper, mcp } = setup()
   wrapper.getComponent(QCheckbox).vm.$emit('update:modelValue', true)

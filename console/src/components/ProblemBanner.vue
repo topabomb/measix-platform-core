@@ -9,6 +9,9 @@ const visible = computed(() => props.error !== undefined && props.error !== null
 const title = computed(() => {
   if (props.error instanceof ApiProblem) {
     const key = `problem.${props.error.code}`
+    if (props.error.code === 'mcp_discovery_version' && props.error.receivedMcpProtocolVersion && props.error.supportedMcpProtocolVersions?.length) {
+      return t('problem.mcp_discovery_version_detail', { version: props.error.receivedMcpProtocolVersion, supported: props.error.supportedMcpProtocolVersions.join(', ') })
+    }
     return te(key) ? t(key) : props.error.code
   }
   return t('problem.default')

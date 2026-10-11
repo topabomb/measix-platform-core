@@ -15,7 +15,9 @@ import (
 	"measix/platform/ent/budgetlimit"
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/deletedprincipal"
+	"measix/platform/ent/managedrelease"
 	"measix/platform/ent/userbudget"
+	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/wire/usageingestapi"
 	"measix/platform/internal/wire/usagetarget"
 	"measix/platform/pkg/platformid"
@@ -172,6 +174,18 @@ func (s *Service) Admit(ctx context.Context, input AdmitInput) (AdmissionDecisio
 	if decision.Allowed {
 		state = RequestAdmitted
 	}
+	resourceName := ""
+	release, err := tx.ManagedRelease.Query().Where(managedrelease.ManagedGenerationEQ(normalized.ManagedGeneration)).Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return AdmissionDecision{}, err
+	}
+	if release != nil {
+		names, err := capability.SnapshotResourceNames(release.SnapshotJSON)
+		if err != nil {
+			return AdmissionDecision{}, err
+		}
+		resourceName = names[normalized.ResourceID]
+	}
 	if _, err := tx.BudgetRequest.Create().
 		SetID(normalized.RequestID).
 		SetRequestHash(requestHash).
@@ -181,6 +195,7 @@ func (s *Service) Admit(ctx context.Context, input AdmitInput) (AdmissionDecisio
 		SetNillableDeviceID(normalized.DeviceID).
 		SetCapability(budgetrequest.Capability(normalized.Capability)).
 		SetResourceID(normalized.ResourceID).
+		SetResourceDisplayName(resourceName).
 		SetClientProtocol(string(normalized.ClientProtocol)).
 		SetNillableUpstreamID(usagetarget.Upstream(normalized.UpstreamID)).
 		SetWorkspaceTargetJSON(usagetarget.JSON(normalized.WorkspaceTarget)).

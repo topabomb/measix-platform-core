@@ -34,6 +34,14 @@ export async function resolveUserPickerOption(userId: string): Promise<EntityPic
   return userOption(user)
 }
 
+export async function fetchWorkspaceDiscoveryPage(serviceId: string, query: string, cursor?: string): Promise<EntityPickerPage> {
+  const params = new URLSearchParams({ discoveryEligible: 'true' })
+  if (query) params.set('search', query)
+  const path = `/api/admin/v1/remote-workspace/services/${encodeURIComponent(serviceId)}/workspaces?${params}`
+  const page = await apiFetch<components['schemas']['WorkspaceList']>(cursor ? cursorPath(path, cursor) : path)
+  return { items: page.items.map(item => ({ value: item.userId, label: item.displayName, caption: item.remoteUsername })), nextCursor: page.nextCursor }
+}
+
 function upstreamOption(upstream: Upstream): EntityPickerOption {
   return {
     value: upstream.upstreamId,

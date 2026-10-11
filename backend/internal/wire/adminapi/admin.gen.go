@@ -2394,11 +2394,11 @@ type AssistantMcpBinding struct {
 	McpServerId McpServerId `json:"mcpServerId"`
 	ToolNames   []string    `json:"toolNames"`
 
-	// ToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+	// ToolSelection ALL adds no assistant tool restriction for this mandatory server; ALLOWLIST requires a nonempty list within server permissions. Removing the binding removes the mandatory selection and its assistant tool restriction, but users may explicitly select the server while it remains enabled. Duplicate user selection cannot bypass a mandatory binding.
 	ToolSelection AssistantMcpBindingToolSelection `json:"toolSelection"`
 }
 
-// AssistantMcpBindingToolSelection ALL adds no tool restriction for this bound server; ALLOWLIST requires a nonempty list. Removing the binding disables this server for the assistant.
+// AssistantMcpBindingToolSelection ALL adds no assistant tool restriction for this mandatory server; ALLOWLIST requires a nonempty list within server permissions. Removing the binding removes the mandatory selection and its assistant tool restriction, but users may explicitly select the server while it remains enabled. Duplicate user selection cannot bypass a mandatory binding.
 type AssistantMcpBindingToolSelection string
 
 // AssistantStarterDefinition defines model for AssistantStarterDefinition.
@@ -2851,6 +2851,14 @@ type EnterpriseUpdateSeverity string
 // EnterpriseUpdateStatus defines model for EnterpriseUpdateStatus.
 type EnterpriseUpdateStatus string
 
+// ExecuteReleaseCleanupRequest defines model for ExecuteReleaseCleanupRequest.
+type ExecuteReleaseCleanupRequest struct {
+	PreviewHash string `json:"previewHash"`
+
+	// Selection Exactly one mode: explicit IDs, half-open time window, or saved retention rule. Max 200 deletions per execution.
+	Selection ReleaseCleanupSelection `json:"selection"`
+}
+
 // Health defines model for Health.
 type Health struct {
 	Live  bool `json:"live"`
@@ -2895,11 +2903,13 @@ type LoginRequest struct {
 
 // ManagedAssistantDefinition defines model for ManagedAssistantDefinition.
 type ManagedAssistantDefinition struct {
-	AssistantDefinitionId AssistantDefinitionId  `json:"assistantDefinitionId"`
-	Description           *string                `json:"description,omitempty"`
-	DisplayName           string                 `json:"displayName"`
-	Enabled               bool                   `json:"enabled"`
-	McpBindings           *[]AssistantMcpBinding `json:"mcpBindings,omitempty"`
+	AssistantDefinitionId AssistantDefinitionId `json:"assistantDefinitionId"`
+	Description           *string               `json:"description,omitempty"`
+	DisplayName           string                `json:"displayName"`
+	Enabled               bool                  `json:"enabled"`
+
+	// McpBindings Mandatory MCP servers for this assistant in unpublished Snapshot v5. Empty means no mandatory servers. Users may explicitly select other enabled enterprise servers from the same Snapshot; absence does not deny access. Missing or null is invalid in published Client snapshots and remains unauthored in Admin drafts. Mandatory bindings and their tool restrictions cannot be removed or bypassed by user preferences.
+	McpBindings *[]AssistantMcpBinding `json:"mcpBindings,omitempty"`
 
 	// McpServerIds Retained legacy draft references; explicit tool selection required before v5 publication.
 	McpServerIds []McpServerId `json:"mcpServerIds,omitempty"`
@@ -3109,16 +3119,22 @@ type Problem struct {
 	ActivationId *ActivationId  `json:"activationId,omitempty"`
 	Budget       *BudgetContext `json:"budget,omitempty"`
 
-	// Code Stable machine-readable reason. Authentication uses unauthenticated; destructive user lifecycle values include delete_confirmation_mismatch, cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight.
-	Code                    string     `json:"code"`
-	CurrentDraftRevision    *int       `json:"currentDraftRevision,omitempty"`
-	Detail                  *string    `json:"detail,omitempty"`
-	Forwarded               *bool      `json:"forwarded,omitempty"`
-	RequestId               *RequestId `json:"requestId,omitempty"`
-	Status                  int        `json:"status"`
-	TargetManagedGeneration *int       `json:"targetManagedGeneration,omitempty"`
-	Title                   string     `json:"title"`
-	Type                    string     `json:"type"`
+	// Code Stable machine-readable reason. Authentication uses unauthenticated; destructive user lifecycle values include delete_confirmation_mismatch, cannot_delete_current_admin, cannot_delete_last_admin and user_deletion_in_flight. MCP discovery uses mcp_discovery_version for an unsupported negotiated version, separately from mcp_discovery_protocol for an invalid response or catalog.
+	Code                 string  `json:"code"`
+	CurrentDraftRevision *int    `json:"currentDraftRevision,omitempty"`
+	Detail               *string `json:"detail,omitempty"`
+	Forwarded            *bool   `json:"forwarded,omitempty"`
+
+	// ReceivedMcpProtocolVersion Safe transient diagnostic for mcp_discovery_version. Never contains a remote body or credential.
+	ReceivedMcpProtocolVersion *string    `json:"receivedMcpProtocolVersion,omitempty"`
+	RequestId                  *RequestId `json:"requestId,omitempty"`
+	Status                     int        `json:"status"`
+
+	// SupportedMcpProtocolVersions Protocol versions supported by this discovery implementation.
+	SupportedMcpProtocolVersions *[]string `json:"supportedMcpProtocolVersions,omitempty"`
+	TargetManagedGeneration      *int      `json:"targetManagedGeneration,omitempty"`
+	Title                        string    `json:"title"`
+	Type                         string    `json:"type"`
 }
 
 // ProcessTelemetry defines model for ProcessTelemetry.
@@ -3226,8 +3242,61 @@ type Release struct {
 // ReleaseStatus defines model for Release.Status.
 type ReleaseStatus string
 
+// ReleaseCleanupItem defines model for ReleaseCleanupItem.
+type ReleaseCleanupItem struct {
+	Bytes             int64  `json:"bytes"`
+	ManagedGeneration int    `json:"managedGeneration"`
+	Reason            string `json:"reason"`
+	ReleaseId         string `json:"releaseId"`
+	Status            string `json:"status"`
+}
+
+// ReleaseCleanupPreview defines model for ReleaseCleanupPreview.
+type ReleaseCleanupPreview struct {
+	ActivationBlocked   bool                 `json:"activationBlocked"`
+	Candidates          []ReleaseCleanupItem `json:"candidates"`
+	HasMore             bool                 `json:"hasMore"`
+	PreviewHash         string               `json:"previewHash"`
+	Protected           []ReleaseCleanupItem `json:"protected"`
+	ReclaimableBytes    int64                `json:"reclaimableBytes"`
+	ReleasedUpstreamIds []string             `json:"releasedUpstreamIds"`
+}
+
+// ReleaseCleanupResult defines model for ReleaseCleanupResult.
+type ReleaseCleanupResult struct {
+	AuditId        int   `json:"auditId"`
+	DeletedCount   int   `json:"deletedCount"`
+	ReclaimedBytes int64 `json:"reclaimedBytes"`
+}
+
+// ReleaseCleanupSelection Exactly one mode: explicit IDs, half-open time window, or saved retention rule. Max 200 deletions per execution.
+type ReleaseCleanupSelection struct {
+	PublishedAfter   *time.Time `json:"publishedAfter,omitempty"`
+	PublishedBefore  *time.Time `json:"publishedBefore,omitempty"`
+	ReleaseIds       *[]string  `json:"releaseIds,omitempty"`
+	UseRetentionRule *bool      `json:"useRetentionRule,omitempty"`
+}
+
 // ReleaseDiffKind defines model for ReleaseDiffKind.
 type ReleaseDiffKind string
+
+// ReleaseHistoryAudit defines model for ReleaseHistoryAudit.
+type ReleaseHistoryAudit struct {
+	ActorUserId        string    `json:"actorUserId"`
+	AuditId            int       `json:"auditId"`
+	CreatedAt          time.Time `json:"createdAt"`
+	Kind               string    `json:"kind"`
+	ReclaimedBytes     int64     `json:"reclaimedBytes"`
+	ReleaseGenerations []int     `json:"releaseGenerations"`
+
+	// Rule Keep union of latest N and within D days; disabled by default.
+	Rule *ReleaseRetentionRule `json:"rule,omitempty"`
+}
+
+// ReleaseHistoryAuditPage defines model for ReleaseHistoryAuditPage.
+type ReleaseHistoryAuditPage struct {
+	Items []ReleaseHistoryAudit `json:"items"`
+}
 
 // ReleaseId defines model for ReleaseId.
 type ReleaseId = string
@@ -3236,6 +3305,22 @@ type ReleaseId = string
 type ReleasePage struct {
 	Items      []Release `json:"items"`
 	NextCursor *string   `json:"nextCursor,omitempty"`
+}
+
+// ReleaseRetention defines model for ReleaseRetention.
+type ReleaseRetention struct {
+	LastCleanupAt *time.Time `json:"lastCleanupAt,omitempty"`
+	Revision      int        `json:"revision"`
+
+	// Rule Keep union of latest N and within D days; disabled by default.
+	Rule ReleaseRetentionRule `json:"rule"`
+}
+
+// ReleaseRetentionRule Keep union of latest N and within D days; disabled by default.
+type ReleaseRetentionRule struct {
+	Enabled  bool `json:"enabled"`
+	KeepDays *int `json:"keepDays,omitempty"`
+	KeepLast *int `json:"keepLast,omitempty"`
 }
 
 // ReplaceSecretRequest defines model for ReplaceSecretRequest.
@@ -3630,6 +3715,14 @@ type UpdateEnterpriseUpdateRequest struct {
 	Title         string                        `json:"title"`
 }
 
+// UpdateReleaseRetentionRequest defines model for UpdateReleaseRetentionRequest.
+type UpdateReleaseRetentionRequest struct {
+	ExpectedRevision int `json:"expectedRevision"`
+
+	// Rule Keep union of latest N and within D days; disabled by default.
+	Rule ReleaseRetentionRule `json:"rule"`
+}
+
 // UpdateUpstreamRequest defines model for UpdateUpstreamRequest.
 type UpdateUpstreamRequest struct {
 	Config                 UpstreamConfig `json:"config"`
@@ -3711,6 +3804,13 @@ type UpstreamId = string
 type UpstreamPage struct {
 	Items      []Upstream `json:"items"`
 	NextCursor *string    `json:"nextCursor,omitempty"`
+}
+
+// UpstreamReferences defines model for UpstreamReferences.
+type UpstreamReferences struct {
+	ActivationBlocked bool                 `json:"activationBlocked"`
+	DraftReferenced   bool                 `json:"draftReferenced"`
+	Releases          []ReleaseCleanupItem `json:"releases"`
 }
 
 // UpstreamTestResult defines model for UpstreamTestResult.
@@ -4272,6 +4372,21 @@ type ListReleasesParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// ExecuteReleaseCleanupParams defines parameters for ExecuteReleaseCleanup.
+type ExecuteReleaseCleanupParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// PreviewReleaseCleanupParams defines parameters for PreviewReleaseCleanup.
+type PreviewReleaseCleanupParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
+// UpdateReleaseRetentionParams defines parameters for UpdateReleaseRetention.
+type UpdateReleaseRetentionParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // RepublishReleaseParams defines parameters for RepublishRelease.
 type RepublishReleaseParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
@@ -4315,8 +4430,10 @@ type StageWorkspaceMCPParams struct {
 
 // ListWorkspacesParams defines parameters for ListWorkspaces.
 type ListWorkspacesParams struct {
-	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Search *string `form:"search,omitempty" json:"search,omitempty"`
+	// DiscoveryEligible Return only active users with a connected authenticated workspace in this active service. Independent of MCP publication; discovery revalidates the connection before use.
+	DiscoveryEligible *bool   `form:"discoveryEligible,omitempty" json:"discoveryEligible,omitempty"`
+	Cursor            *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Search            *string `form:"search,omitempty" json:"search,omitempty"`
 }
 
 // ListSecretsParams defines parameters for ListSecrets.
@@ -4739,6 +4856,15 @@ type UpdateEnterpriseUpdateJSONRequestBody = UpdateEnterpriseUpdateRequest
 // PutPricingJSONRequestBody defines body for PutPricing for application/json ContentType.
 type PutPricingJSONRequestBody = PutPricingRequest
 
+// ExecuteReleaseCleanupJSONRequestBody defines body for ExecuteReleaseCleanup for application/json ContentType.
+type ExecuteReleaseCleanupJSONRequestBody = ExecuteReleaseCleanupRequest
+
+// PreviewReleaseCleanupJSONRequestBody defines body for PreviewReleaseCleanup for application/json ContentType.
+type PreviewReleaseCleanupJSONRequestBody = ReleaseCleanupSelection
+
+// UpdateReleaseRetentionJSONRequestBody defines body for UpdateReleaseRetention for application/json ContentType.
+type UpdateReleaseRetentionJSONRequestBody = UpdateReleaseRetentionRequest
+
 // CreateWorkspaceServiceJSONRequestBody defines body for CreateWorkspaceService for application/json ContentType.
 type CreateWorkspaceServiceJSONRequestBody = SaveWorkspaceServiceRequest
 
@@ -4886,6 +5012,21 @@ type ServerInterface interface {
 	// (GET /api/admin/v1/releases)
 	ListReleases(w http.ResponseWriter, r *http.Request, params ListReleasesParams)
 
+	// (POST /api/admin/v1/releases/cleanup)
+	ExecuteReleaseCleanup(w http.ResponseWriter, r *http.Request, params ExecuteReleaseCleanupParams)
+
+	// (GET /api/admin/v1/releases/cleanup/audit)
+	ListReleaseHistoryAudit(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/admin/v1/releases/cleanup:preview)
+	PreviewReleaseCleanup(w http.ResponseWriter, r *http.Request, params PreviewReleaseCleanupParams)
+
+	// (GET /api/admin/v1/releases/retention)
+	GetReleaseRetention(w http.ResponseWriter, r *http.Request)
+
+	// (PUT /api/admin/v1/releases/retention)
+	UpdateReleaseRetention(w http.ResponseWriter, r *http.Request, params UpdateReleaseRetentionParams)
+
 	// (GET /api/admin/v1/releases/{releaseId})
 	GetRelease(w http.ResponseWriter, r *http.Request, releaseId ReleaseId)
 
@@ -4969,6 +5110,9 @@ type ServerInterface interface {
 
 	// (PUT /api/admin/v1/upstreams/{upstreamId})
 	UpdateUpstream(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId, params UpdateUpstreamParams)
+
+	// (GET /api/admin/v1/upstreams/{upstreamId}/references)
+	GetUpstreamReferences(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId)
 
 	// (POST /api/admin/v1/upstreams/{upstreamId}:apply)
 	ApplyUpstream(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId, params ApplyUpstreamParams)
@@ -5221,6 +5365,31 @@ func (_ Unimplemented) ListReleases(w http.ResponseWriter, r *http.Request, para
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (POST /api/admin/v1/releases/cleanup)
+func (_ Unimplemented) ExecuteReleaseCleanup(w http.ResponseWriter, r *http.Request, params ExecuteReleaseCleanupParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/releases/cleanup/audit)
+func (_ Unimplemented) ListReleaseHistoryAudit(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/releases/cleanup:preview)
+func (_ Unimplemented) PreviewReleaseCleanup(w http.ResponseWriter, r *http.Request, params PreviewReleaseCleanupParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/releases/retention)
+func (_ Unimplemented) GetReleaseRetention(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/admin/v1/releases/retention)
+func (_ Unimplemented) UpdateReleaseRetention(w http.ResponseWriter, r *http.Request, params UpdateReleaseRetentionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/admin/v1/releases/{releaseId})
 func (_ Unimplemented) GetRelease(w http.ResponseWriter, r *http.Request, releaseId ReleaseId) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -5358,6 +5527,11 @@ func (_ Unimplemented) GetUpstream(w http.ResponseWriter, r *http.Request, upstr
 
 // (PUT /api/admin/v1/upstreams/{upstreamId})
 func (_ Unimplemented) UpdateUpstream(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId, params UpdateUpstreamParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/upstreams/{upstreamId}/references)
+func (_ Unimplemented) GetUpstreamReferences(w http.ResponseWriter, r *http.Request, upstreamId UpstreamId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -6839,6 +7013,169 @@ func (siw *ServerInterfaceWrapper) ListReleases(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ExecuteReleaseCleanup operation middleware
+func (siw *ServerInterfaceWrapper) ExecuteReleaseCleanup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExecuteReleaseCleanupParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExecuteReleaseCleanup(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReleaseHistoryAudit operation middleware
+func (siw *ServerInterfaceWrapper) ListReleaseHistoryAudit(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReleaseHistoryAudit(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PreviewReleaseCleanup operation middleware
+func (siw *ServerInterfaceWrapper) PreviewReleaseCleanup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PreviewReleaseCleanupParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PreviewReleaseCleanup(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetReleaseRetention operation middleware
+func (siw *ServerInterfaceWrapper) GetReleaseRetention(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetReleaseRetention(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateReleaseRetention operation middleware
+func (siw *ServerInterfaceWrapper) UpdateReleaseRetention(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateReleaseRetentionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateReleaseRetention(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetRelease operation middleware
 func (siw *ServerInterfaceWrapper) GetRelease(w http.ResponseWriter, r *http.Request) {
 
@@ -7429,6 +7766,19 @@ func (siw *ServerInterfaceWrapper) ListWorkspaces(w http.ResponseWriter, r *http
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListWorkspacesParams
+
+	// ------------- Optional query parameter "discoveryEligible" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "discoveryEligible", r.URL.Query(), &params.DiscoveryEligible, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "discoveryEligible"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "discoveryEligible", Err: err})
+		}
+		return
+	}
 
 	// ------------- Optional query parameter "cursor" -------------
 
@@ -8144,6 +8494,32 @@ func (siw *ServerInterfaceWrapper) UpdateUpstream(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateUpstream(w, r, upstreamId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUpstreamReferences operation middleware
+func (siw *ServerInterfaceWrapper) GetUpstreamReferences(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "upstreamId" -------------
+	var upstreamId UpstreamId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "upstreamId", chi.URLParam(r, "upstreamId"), &upstreamId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "upstreamId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUpstreamReferences(w, r, upstreamId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11177,6 +11553,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/releases/{releaseId}:republish", wrapper.RepublishRelease)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/releases/retention", wrapper.GetReleaseRetention)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/admin/v1/releases/retention", wrapper.UpdateReleaseRetention)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/releases/cleanup:preview", wrapper.PreviewReleaseCleanup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/releases/cleanup", wrapper.ExecuteReleaseCleanup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/releases/cleanup/audit", wrapper.ListReleaseHistoryAudit)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/upstreams/{upstreamId}/references", wrapper.GetUpstreamReferences)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/activations/{activationId}", wrapper.GetActivation)

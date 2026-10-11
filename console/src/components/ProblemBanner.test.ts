@@ -17,6 +17,21 @@ afterEach(() => {
 })
 
 describe('ProblemBanner', () => {
+  it('explains a protocol version mismatch with safe transient fields in both languages', () => {
+    const error = new ApiProblem(502, 'mcp_discovery_version', 'private server body', undefined, undefined, { receivedMcpProtocolVersion: '2024-11-05', supportedMcpProtocolVersions: ['2025-11-25', '2025-06-18', '2025-03-26'] })
+    for (const locale of ['en', 'zh'] as const) {
+      i18n.global.locale.value = locale
+      const text = mountBanner(error).text()
+      expect(text).toContain('2024-11-05')
+      expect(text).toContain('2025-11-25, 2025-06-18, 2025-03-26')
+      expect(text).not.toContain('private server body')
+    }
+  })
+
+  it('does not render arbitrary remote content supplied as a protocol version', () => {
+    const error = new ApiProblem(502, 'mcp_discovery_version', 'secret raw body', undefined, undefined, { receivedMcpProtocolVersion: 'secret-token', supportedMcpProtocolVersions: ['secret-url'] })
+    expect(mountBanner(error).text()).not.toContain('secret')
+  })
   it('uses bilingual copy for a known Admin API problem and hides raw server detail', () => {
     const error = new ApiProblem(400, 'invalid_request', 'raw server detail')
 

@@ -69,6 +69,27 @@ func (_u *ManagedStateUpdate) AddActiveManagedGeneration(v int64) *ManagedStateU
 	return _u
 }
 
+// SetLastAssignedGeneration sets the "last_assigned_generation" field.
+func (_u *ManagedStateUpdate) SetLastAssignedGeneration(v int64) *ManagedStateUpdate {
+	_u.mutation.ResetLastAssignedGeneration()
+	_u.mutation.SetLastAssignedGeneration(v)
+	return _u
+}
+
+// SetNillableLastAssignedGeneration sets the "last_assigned_generation" field if the given value is not nil.
+func (_u *ManagedStateUpdate) SetNillableLastAssignedGeneration(v *int64) *ManagedStateUpdate {
+	if v != nil {
+		_u.SetLastAssignedGeneration(*v)
+	}
+	return _u
+}
+
+// AddLastAssignedGeneration adds value to the "last_assigned_generation" field.
+func (_u *ManagedStateUpdate) AddLastAssignedGeneration(v int64) *ManagedStateUpdate {
+	_u.mutation.AddLastAssignedGeneration(v)
+	return _u
+}
+
 // SetDesiredControlRevision sets the "desired_control_revision" field.
 func (_u *ManagedStateUpdate) SetDesiredControlRevision(v int64) *ManagedStateUpdate {
 	_u.mutation.ResetDesiredControlRevision()
@@ -212,6 +233,12 @@ func (_u *ManagedStateUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.AddedActiveManagedGeneration(); ok {
 		_spec.AddField(managedstate.FieldActiveManagedGeneration, field.TypeInt64, value)
 	}
+	if value, ok := _u.mutation.LastAssignedGeneration(); ok {
+		_spec.SetField(managedstate.FieldLastAssignedGeneration, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedLastAssignedGeneration(); ok {
+		_spec.AddField(managedstate.FieldLastAssignedGeneration, field.TypeInt64, value)
+	}
 	if value, ok := _u.mutation.DesiredControlRevision(); ok {
 		_spec.SetField(managedstate.FieldDesiredControlRevision, field.TypeInt64, value)
 	}
@@ -294,6 +321,27 @@ func (_u *ManagedStateUpdateOne) SetNillableActiveManagedGeneration(v *int64) *M
 // AddActiveManagedGeneration adds value to the "active_managed_generation" field.
 func (_u *ManagedStateUpdateOne) AddActiveManagedGeneration(v int64) *ManagedStateUpdateOne {
 	_u.mutation.AddActiveManagedGeneration(v)
+	return _u
+}
+
+// SetLastAssignedGeneration sets the "last_assigned_generation" field.
+func (_u *ManagedStateUpdateOne) SetLastAssignedGeneration(v int64) *ManagedStateUpdateOne {
+	_u.mutation.ResetLastAssignedGeneration()
+	_u.mutation.SetLastAssignedGeneration(v)
+	return _u
+}
+
+// SetNillableLastAssignedGeneration sets the "last_assigned_generation" field if the given value is not nil.
+func (_u *ManagedStateUpdateOne) SetNillableLastAssignedGeneration(v *int64) *ManagedStateUpdateOne {
+	if v != nil {
+		_u.SetLastAssignedGeneration(*v)
+	}
+	return _u
+}
+
+// AddLastAssignedGeneration adds value to the "last_assigned_generation" field.
+func (_u *ManagedStateUpdateOne) AddLastAssignedGeneration(v int64) *ManagedStateUpdateOne {
+	_u.mutation.AddLastAssignedGeneration(v)
 	return _u
 }
 
@@ -469,6 +517,12 @@ func (_u *ManagedStateUpdateOne) sqlSave(ctx context.Context) (_node *ManagedSta
 	}
 	if value, ok := _u.mutation.AddedActiveManagedGeneration(); ok {
 		_spec.AddField(managedstate.FieldActiveManagedGeneration, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.LastAssignedGeneration(); ok {
+		_spec.SetField(managedstate.FieldLastAssignedGeneration, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedLastAssignedGeneration(); ok {
+		_spec.AddField(managedstate.FieldLastAssignedGeneration, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.DesiredControlRevision(); ok {
 		_spec.SetField(managedstate.FieldDesiredControlRevision, field.TypeInt64, value)

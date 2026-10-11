@@ -74,6 +74,40 @@ func (_c *DeploymentCreate) SetNillableFeedRevision(v *int64) *DeploymentCreate 
 	return _c
 }
 
+// SetReleaseRetentionJSON sets the "release_retention_json" field.
+func (_c *DeploymentCreate) SetReleaseRetentionJSON(v []byte) *DeploymentCreate {
+	_c.mutation.SetReleaseRetentionJSON(v)
+	return _c
+}
+
+// SetReleaseRetentionRevision sets the "release_retention_revision" field.
+func (_c *DeploymentCreate) SetReleaseRetentionRevision(v int64) *DeploymentCreate {
+	_c.mutation.SetReleaseRetentionRevision(v)
+	return _c
+}
+
+// SetNillableReleaseRetentionRevision sets the "release_retention_revision" field if the given value is not nil.
+func (_c *DeploymentCreate) SetNillableReleaseRetentionRevision(v *int64) *DeploymentCreate {
+	if v != nil {
+		_c.SetReleaseRetentionRevision(*v)
+	}
+	return _c
+}
+
+// SetReleaseCleanupAt sets the "release_cleanup_at" field.
+func (_c *DeploymentCreate) SetReleaseCleanupAt(v time.Time) *DeploymentCreate {
+	_c.mutation.SetReleaseCleanupAt(v)
+	return _c
+}
+
+// SetNillableReleaseCleanupAt sets the "release_cleanup_at" field if the given value is not nil.
+func (_c *DeploymentCreate) SetNillableReleaseCleanupAt(v *time.Time) *DeploymentCreate {
+	if v != nil {
+		_c.SetReleaseCleanupAt(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *DeploymentCreate) SetCreatedAt(v time.Time) *DeploymentCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -139,6 +173,10 @@ func (_c *DeploymentCreate) defaults() {
 		v := deployment.DefaultFeedRevision
 		_c.mutation.SetFeedRevision(v)
 	}
+	if _, ok := _c.mutation.ReleaseRetentionRevision(); !ok {
+		v := deployment.DefaultReleaseRetentionRevision
+		_c.mutation.SetReleaseRetentionRevision(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -157,6 +195,9 @@ func (_c *DeploymentCreate) check() error {
 	}
 	if _, ok := _c.mutation.FeedRevision(); !ok {
 		return &ValidationError{Name: "feed_revision", err: errors.New(`ent: missing required field "Deployment.feed_revision"`)}
+	}
+	if _, ok := _c.mutation.ReleaseRetentionRevision(); !ok {
+		return &ValidationError{Name: "release_retention_revision", err: errors.New(`ent: missing required field "Deployment.release_retention_revision"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Deployment.created_at"`)}
@@ -218,6 +259,18 @@ func (_c *DeploymentCreate) createSpec() (*Deployment, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.FeedRevision(); ok {
 		_spec.SetField(deployment.FieldFeedRevision, field.TypeInt64, value)
 		_node.FeedRevision = value
+	}
+	if value, ok := _c.mutation.ReleaseRetentionJSON(); ok {
+		_spec.SetField(deployment.FieldReleaseRetentionJSON, field.TypeBytes, value)
+		_node.ReleaseRetentionJSON = value
+	}
+	if value, ok := _c.mutation.ReleaseRetentionRevision(); ok {
+		_spec.SetField(deployment.FieldReleaseRetentionRevision, field.TypeInt64, value)
+		_node.ReleaseRetentionRevision = value
+	}
+	if value, ok := _c.mutation.ReleaseCleanupAt(); ok {
+		_spec.SetField(deployment.FieldReleaseCleanupAt, field.TypeTime, value)
+		_node.ReleaseCleanupAt = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(deployment.FieldCreatedAt, field.TypeTime, value)

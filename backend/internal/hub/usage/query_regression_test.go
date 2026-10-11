@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"measix/platform/ent"
+	"measix/platform/ent/budgetrequest"
 	"measix/platform/internal/hub/testutil"
 	"measix/platform/pkg/platformid"
 )
@@ -196,6 +197,29 @@ func TestUsageNamesResolveEveryManagedResourceKind(t *testing.T) {
 		}
 		if !foundRequest || !foundDistribution {
 			t.Errorf("%s absent: request=%v distribution=%v", resource.kind, foundRequest, foundDistribution)
+		}
+	}
+	// Admission context survives release deletion, including unresolved requests.
+	for _, r := range resources {
+		store.Client.BudgetRequest.Create().SetID(requestIDs[r.kind]).SetRequestHash("original").SetDeploymentID(deploymentID).SetUserID(userID).SetCapability(budgetrequest.CapabilityMODEL).SetResourceID(r.id).SetResourceDisplayName(r.name).SetClientProtocol("OPENAI_CHAT_COMPLETIONS").SetUpstreamID(upstreamID).SetManagedGeneration(1).SetControlRevision(1).SetMode(budgetrequest.ModeUNLIMITED).SetSource(budgetrequest.SourceDEFAULT).SetDecisionJSON([]byte(`{}`)).SetState(budgetrequest.StateRECONCILIATION).SetAdmittedAt(now).SetUpdatedAt(now).SaveX(ctx)
+	}
+	store.Client.ManagedRelease.DeleteOneID(releaseID).ExecX(ctx)
+	requests, err = service.ListRequests(ctx, Filter{}, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range resources {
+		found := false
+		for _, v := range requests {
+			if v.ResourceID == r.id {
+				found = true
+				if v.ResourceDisplayName != r.name {
+					t.Errorf("purged %s lost name %q", r.kind, v.ResourceDisplayName)
+				}
+			}
+		}
+		if !found {
+			t.Fatal("history cleanup erased usage")
 		}
 	}
 }

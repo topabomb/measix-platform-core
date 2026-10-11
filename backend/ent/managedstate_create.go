@@ -40,6 +40,20 @@ func (_c *ManagedStateCreate) SetActiveManagedGeneration(v int64) *ManagedStateC
 	return _c
 }
 
+// SetLastAssignedGeneration sets the "last_assigned_generation" field.
+func (_c *ManagedStateCreate) SetLastAssignedGeneration(v int64) *ManagedStateCreate {
+	_c.mutation.SetLastAssignedGeneration(v)
+	return _c
+}
+
+// SetNillableLastAssignedGeneration sets the "last_assigned_generation" field if the given value is not nil.
+func (_c *ManagedStateCreate) SetNillableLastAssignedGeneration(v *int64) *ManagedStateCreate {
+	if v != nil {
+		_c.SetLastAssignedGeneration(*v)
+	}
+	return _c
+}
+
 // SetDesiredControlRevision sets the "desired_control_revision" field.
 func (_c *ManagedStateCreate) SetDesiredControlRevision(v int64) *ManagedStateCreate {
 	_c.mutation.SetDesiredControlRevision(v)
@@ -91,6 +105,7 @@ func (_c *ManagedStateCreate) Mutation() *ManagedStateMutation {
 
 // Save creates the ManagedState in the database.
 func (_c *ManagedStateCreate) Save(ctx context.Context) (*ManagedState, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -116,10 +131,21 @@ func (_c *ManagedStateCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *ManagedStateCreate) defaults() {
+	if _, ok := _c.mutation.LastAssignedGeneration(); !ok {
+		v := managedstate.DefaultLastAssignedGeneration
+		_c.mutation.SetLastAssignedGeneration(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *ManagedStateCreate) check() error {
 	if _, ok := _c.mutation.ActiveManagedGeneration(); !ok {
 		return &ValidationError{Name: "active_managed_generation", err: errors.New(`ent: missing required field "ManagedState.active_managed_generation"`)}
+	}
+	if _, ok := _c.mutation.LastAssignedGeneration(); !ok {
+		return &ValidationError{Name: "last_assigned_generation", err: errors.New(`ent: missing required field "ManagedState.last_assigned_generation"`)}
 	}
 	if _, ok := _c.mutation.DesiredControlRevision(); !ok {
 		return &ValidationError{Name: "desired_control_revision", err: errors.New(`ent: missing required field "ManagedState.desired_control_revision"`)}
@@ -176,6 +202,10 @@ func (_c *ManagedStateCreate) createSpec() (*ManagedState, *sqlgraph.CreateSpec)
 		_spec.SetField(managedstate.FieldActiveManagedGeneration, field.TypeInt64, value)
 		_node.ActiveManagedGeneration = value
 	}
+	if value, ok := _c.mutation.LastAssignedGeneration(); ok {
+		_spec.SetField(managedstate.FieldLastAssignedGeneration, field.TypeInt64, value)
+		_node.LastAssignedGeneration = value
+	}
 	if value, ok := _c.mutation.DesiredControlRevision(); ok {
 		_spec.SetField(managedstate.FieldDesiredControlRevision, field.TypeInt64, value)
 		_node.DesiredControlRevision = value
@@ -217,6 +247,7 @@ func (_c *ManagedStateCreateBulk) Save(ctx context.Context) ([]*ManagedState, er
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*ManagedStateMutation)
 				if !ok {

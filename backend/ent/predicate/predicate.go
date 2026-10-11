@@ -81,6 +81,9 @@ type PortalSession func(*sql.Selector)
 // PricingRule is the predicate function for pricingrule builders.
 type PricingRule func(*sql.Selector)
 
+// ReleaseHistoryAudit is the predicate function for releasehistoryaudit builders.
+type ReleaseHistoryAudit func(*sql.Selector)
+
 // RequestUsage is the predicate function for requestusage builders.
 type RequestUsage func(*sql.Selector)
 

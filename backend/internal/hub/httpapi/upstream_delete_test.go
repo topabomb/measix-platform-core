@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"measix/platform/ent/upstreamconfigrevision"
+	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/httpapi"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/hub/upstream"
@@ -46,6 +47,43 @@ func TestUpstreamDeletionHTTP(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCleanupReleasesUpstreamReferenceBeforeIndependentDeletion(t *testing.T) {
+	_, id, _, ctx, actor := setupFullHandler(t)
+	box, _ := security.NewSecretBox(make([]byte, 32), 1)
+	svc := upstream.NewService(id.Client, box)
+	view, err := svc.CreateUpstream(ctx, actor, adminapi.UpstreamConfig{Name: "History only", BaseUrl: "https://adapter.example", Auth: adminapi.UpstreamAuth{Type: adminapi.UpstreamAuthTypeNONE}, TransportCapabilities: []adminapi.UpstreamConfigTransportCapabilities{adminapi.UpstreamConfigTransportCapabilitiesHTTPREQUESTRESPONSE}, CorrelationMode: adminapi.UpstreamConfigCorrelationModeHEADERECHO, UsageCapabilityLevel: adminapi.LEVEL0, TimeoutDefaults: adminapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 1000, IdleMs: 1000}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseID := platformid.New(platformid.Release)
+	raw, _ := json.Marshal(map[string]any{"bindings": []map[string]string{{"upstreamId": view.UpstreamID}}})
+	id.Client.ManagedRelease.Create().SetID(releaseID).SetManagedGeneration(1).SetStatus("SUPERSEDED").SetReleaseContentJSON(raw).SetSnapshotJSON([]byte(`{"original":true}`)).SetSnapshotHash("original-hash").SetSourceDraftRevision(1).SetCreatedByUserID(actor).SetCreatedAt(id.Now()).SaveX(ctx)
+	id.Client.ManagedState.UpdateOneID("current").SetRuntimeStatus("READY").SetLastAssignedGeneration(1).SaveX(ctx)
+	h := httpapi.NewFull(httpapi.Services{Identity: id, Upstream: svc, Capability: capability.NewService(id.Client)})
+	cookie, csrf := loginAdmin(t, h)
+	headers := map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf}
+	path := "/api/admin/v1/upstreams/" + view.UpstreamID
+	refs := doJSON(t, h, "GET", path+"/references", headers, nil)
+	var diag adminapi.UpstreamReferences
+	decodeJSON(t, refs, &diag)
+	if refs.Code != 200 || diag.DraftReferenced || len(diag.Releases) != 1 {
+		t.Fatalf("diagnostic=%+v status=%d", diag, refs.Code)
+	}
+	accountRequest(t, h, "DELETE", path, headers, map[string]int{"expectedConfigRevision": 1}, 409, "upstream_in_use")
+	sel := map[string]any{"releaseIds": []string{releaseID}}
+	response := doJSON(t, h, "POST", "/api/admin/v1/releases/cleanup:preview", headers, sel)
+	var p adminapi.ReleaseCleanupPreview
+	decodeJSON(t, response, &p)
+	if response.Code != 200 || len(p.Candidates) != 1 || len(p.ReleasedUpstreamIds) != 1 {
+		t.Fatalf("preview=%+v response=%s", p, response.Body.String())
+	}
+	accountRequest(t, h, "POST", "/api/admin/v1/releases/cleanup", headers, map[string]any{"selection": sel, "previewHash": p.PreviewHash}, 200, "")
+	if _, err = svc.GetUpstream(ctx, view.UpstreamID); err != nil {
+		t.Fatal("cleanup unexpectedly deleted upstream")
+	}
+	accountRequest(t, h, "DELETE", path, headers, map[string]int{"expectedConfigRevision": 1}, 204, "")
 }
 
 func TestUpstreamDeletionRetainsReferencedConnection(t *testing.T) {

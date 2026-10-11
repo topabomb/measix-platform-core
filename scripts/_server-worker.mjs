@@ -8,11 +8,13 @@ import { join } from 'node:path'
 import { resolveWithin } from './lib/harness.mjs'
 import { existsSync } from 'node:fs'
 import http from 'node:http'
+import { randomUUID } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 
 const { spaPort, spaDir, adapterPort, hubPort, relayPort, captureStarterRequests = false } = workerData
 let starterCapture = null
 let mcpMode = 'initial'
+const workspaceUsers = new Map()
 
 // --- MIME types ---
 const MIME_TYPES = {
@@ -49,9 +51,27 @@ const adapterServer = http.createServer((req, res) => {
     } catch {}
 
     const path = url.pathname
+    // Agent Space contract fixture for Core discovery UI; no VM or production state.
+    if (path.startsWith('/admin/v1/')) {
+      if (req.headers.authorization !== 'Bearer workspace-management-test') { res.writeHead(401); res.end(); return }
+      const send = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)) }
+      if (path === '/admin/v1/status') { send(200, { ready: true }); return }
+      if (path === '/admin/v1/users' && req.method === 'POST') {
+        const username = bodyJSON.username
+        const user = { username, agentSpaceId: `spc_${randomUUID()}`, mcpUrl: `http://127.0.0.1:${adapterPort}/u/${username}/mcp`, status: 'active', stopPending: false, token: randomUUID() }
+        workspaceUsers.set(username, user)
+        send(200, user); return
+      }
+      const user = workspaceUsers.get(decodeURIComponent(path.slice('/admin/v1/users/'.length)))
+      if (!user) { send(404, { error: 'not_found' }); return }
+      if (req.method === 'DELETE') { workspaceUsers.delete(user.username); send(202, {}); return }
+      if (req.method === 'PATCH') user.status = bodyJSON.enabled ? 'active' : 'disabled'
+      const { token, ...view } = user
+      send(200, view); return
+    }
     // Isolated deterministic adapter control; never mounted by production Hub.
     if (path === '/__mcp_mode' && req.method === 'POST') {
-      if (!['initial', 'added', 'drift', 'deleted', 'failure', 'large', 'dense'].includes(bodyJSON?.mode)) { res.writeHead(400); res.end(); return }
+      if (!['initial', 'added', 'drift', 'deleted', 'failure', 'large', 'dense', 'old-version'].includes(bodyJSON?.mode)) { res.writeHead(400); res.end(); return }
       mcpMode = bodyJSON.mode
       res.writeHead(204); res.end(); return
     }
@@ -117,7 +137,11 @@ const adapterServer = http.createServer((req, res) => {
       res.end(JSON.stringify({ output: { choices: [{ message: { content: [{ image: 'https://images.example/generated.png' }] } }] } }))
       return
     }
-    if (path === '/mcp') {
+    if (path === '/mcp' || /^\/u\/[^/]+\/mcp$/.test(path)) {
+      if (path !== '/mcp') {
+        const user = workspaceUsers.get(path.split('/')[2])
+        if (!user || user.status !== 'active' || req.headers.authorization !== `Bearer ${user.token}`) { res.writeHead(401); res.end(); return }
+      }
       if (mcpMode === 'failure') { res.writeHead(503); res.end('private adapter error'); return }
       if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
       if (bodyJSON?.jsonrpc !== '2.0' || typeof bodyJSON.method !== 'string') {
@@ -127,7 +151,7 @@ const adapterServer = http.createServer((req, res) => {
       }
       if (!Object.hasOwn(bodyJSON, 'id')) { res.writeHead(202); res.end(); return }
       const result = bodyJSON.method === 'initialize'
-        ? { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'measix-test-adapter', version: '1.0.0' } }
+        ? { protocolVersion: mcpMode === 'old-version' ? '2024-11-05' : '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'measix-test-adapter', version: '1.0.0' } }
         : bodyJSON.method === 'tools/list'
           ? { tools: mcpMode === 'dense' ? Array.from({ length: 27 }, (_, index) => ({
             name: index === 0 ? 'firecrawl_agent' : index === 26 ? `research_${'very_long_tool_name_'.repeat(12)}26` : `research_${String(index).padStart(2, '0')}`,

@@ -16,6 +16,7 @@ func (ManagedRelease) Fields() []ent.Field {
 		field.Bytes("release_content_json"),
 		field.Bytes("snapshot_json"),
 		field.String("snapshot_hash"),
+		field.Bytes("diff_summary_json").Optional(),
 		field.Int64("source_draft_revision"),
 		field.String("created_by_user_id"),
 		field.Time("created_at"),

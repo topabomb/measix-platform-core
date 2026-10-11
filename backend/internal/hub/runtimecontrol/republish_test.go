@@ -6,6 +6,7 @@ import (
 
 	"measix/platform/ent/managedrelease"
 	"measix/platform/internal/hub/runtimecontrol"
+	"measix/platform/internal/wire/adminapi"
 	"measix/platform/pkg/platformid"
 )
 
@@ -81,3 +82,35 @@ func TestHUBRPBL002RepublishUnknownRelease(t *testing.T) {
 }
 
 var _ = runtimecontrol.IsIdempotencyConflict
+
+func TestRepublishReplaySurvivesPurgedSourceAndNewCommandFails(t *testing.T) {
+	ctx := context.Background()
+	st, svc, _, relayServer, _, adminID, _, draftRevision := newRuntimeControlEnv(t)
+	defer relayServer.Close()
+	first := publishAndFinalize(t, svc, adminID, draftRevision)
+	key := platformid.New(platformid.Idempotency)
+	second, err := svc.Republish(ctx, adminID, key, first.ReleaseID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{first.ReleaseID}
+	sel := adminapi.ReleaseCleanupSelection{ReleaseIds: &ids}
+	p, err := svc.Capability.PreviewReleaseCleanup(ctx, sel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.Capability.ExecuteReleaseCleanup(ctx, adminID, adminapi.ExecuteReleaseCleanupRequest{Selection: sel, PreviewHash: p.PreviewHash}); err != nil {
+		t.Fatal(err)
+	}
+	again, err := svc.Republish(ctx, adminID, key, first.ReleaseID)
+	if err != nil || again.ActivationID != second.ActivationID {
+		t.Fatalf("replay lost facts: %+v %v", again, err)
+	}
+	if _, err = svc.Republish(ctx, adminID, platformid.New(platformid.Idempotency), first.ReleaseID); err == nil {
+		t.Fatal("new republish accepted a purged source")
+	}
+	state := st.Client.ManagedState.GetX(ctx, "current")
+	if state.ActiveManagedGeneration != 2 || state.LastAssignedGeneration != 2 {
+		t.Fatal("cleanup/replay changed generation")
+	}
+}

@@ -10,6 +10,8 @@ export class ApiProblem extends Error {
   readonly currentSecretVersion?: number
   readonly currentPricingRevision?: number
   readonly retryAfterSeconds?: number
+  readonly receivedMcpProtocolVersion?: string
+  readonly supportedMcpProtocolVersions?: string[]
 
   constructor(
     readonly status: number,
@@ -26,6 +28,9 @@ export class ApiProblem extends Error {
       if (typeof extra.currentSecretVersion === 'number') this.currentSecretVersion = extra.currentSecretVersion
       if (typeof extra.currentPricingRevision === 'number') this.currentPricingRevision = extra.currentPricingRevision
       if (typeof extra.retryAfterSeconds === 'number') this.retryAfterSeconds = extra.retryAfterSeconds
+      const isVersion = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      if (isVersion(extra.receivedMcpProtocolVersion)) this.receivedMcpProtocolVersion = extra.receivedMcpProtocolVersion
+      if (Array.isArray(extra.supportedMcpProtocolVersions) && extra.supportedMcpProtocolVersions.length <= 16 && extra.supportedMcpProtocolVersions.every(isVersion)) this.supportedMcpProtocolVersions = [...extra.supportedMcpProtocolVersions]
     }
   }
 }

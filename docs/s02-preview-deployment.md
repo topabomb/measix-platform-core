@@ -2,7 +2,7 @@
 
 本手册对应单机 NVIDIA DGX Spark 的内部 Preview。Spark 只运行 MEASIX Hub/Relay，由现有的 root PM2 管理；Spark 不安装 Caddy。另一台已经加入同一 Tailscale 网络的入口服务器负责 TLS、子域名和反向代理，并由入口维护者独立配置和验收。
 
-S0.2 固定的 Preview 组合为 `0.2.0-preview.22`；其源码和归档摘要见[固定组合](s0-execution-progress.md#固定-s02-preview-组合)。本手册可用于该组合的部署和恢复。构建包存在不代表某台机器已安装此版本，现场须核对运行进程及私有部署记录。
+S0.2 固定的 Preview 组合为 `0.2.0-preview.22`；其源码和归档摘要见[固定组合](s0-execution-progress.md#固定-s02-preview-组合)。后续 `preview.23` 内部候选仍按本手册部署和恢复，固定构建与实际验证见[状态页](s0-execution-progress.md#preview23-固定候选与验证)。构建包存在不代表某台机器已安装此版本，现场须核对运行进程及私有部署记录。
 
 ## 1. 当前目标环境
 
@@ -228,12 +228,22 @@ sudo "$MEASIX_ROOT/current/deploy/verify-backup.sh" "$backup" "$MEASIX_ROOT/curr
 
 备份包含 Hub/Relay 一致性 SQLite 镜像、config、secrets 和逐文件 hash manifest。验证后必须另存一份到 Spark 之外的受保护存储。
 
+### 10.1 发布历史清理与连接删除
+
+先创建、验证并离机保存备份，再在 Admin“发布记录”选定历史版本或时间范围，执行“清理发布记录”的预览并核对候选、保护原因、回收字节和上游引用解除数量；管理员确认后执行。预览过期或结果未知时刷新并重新预览，不直接重复删除。
+
+“保留规则”默认关闭；启用后按最近版本数/天数的保留并集清理，复用 Hub reconciler，间隔至少一小时、每批最多 200 条。规则清理和手动清理使用相同保护条件；规则不会自动删除上游连接。具体参数和保护边界见 [API 参考](api-contracts.md)，配置冲突需刷新规则修订再保存。
+
+需要删除连接时，清理完成后到“上游连接”刷新实际引用，处理剩余草稿/保留发布引用或等待在途激活结束，再独立删除。删除后核对连接及配置修订已移除、保留发布 bytes/hash 和差异摘要、历史用量/预算/定价、当前 Hub/Relay readiness 及审计。schema 升级与历史归属解耦见[迁移说明](database-migrations.md#发布历史迁移)。
+
+清理真正移除旧发布的下载与直接重发能力；回收数字是逻辑正文/快照字节，SQLite 空闲页会复用，在线流程不执行 VACUUM。备份恢复是整站恢复，不能把恢复旧库当作单条发布撤销而丢弃清理后的新请求、发布或凭据轮换。
+
 ## 11. 升级
 
 1. 解压新 release 并校验 SHA256；同版本修订使用独立的 `releases/<version>-<commit>` 目录，保留原包与原 release，不能原地覆盖运行文件；
-2. 使用旧 release 创建并验证备份；
+2. 使用旧 release 创建并验证备份；先将副本放入独立 staging，用新 binary 执行 `migrate` 和 `check`，核对历史数据、约束和恢复链；
 3. `sudo pm2 stop measix-hub measix-relay`，不得停止其他 PM2 app；
-4. 用新 binary 执行 `migrate` 和 `check`；
+4. 创建并验证停服后的最终完整备份，再用新 binary 对正式库执行 `migrate` 和 `check`；
 5. 从新 release 安装新的 `$MEASIX_ROOT/run.sh` 与 `$MEASIX_ROOT/ecosystem.config.cjs`；
 6. 原子切换 `current`；
 7. 依次 `sudo pm2 startOrReload "$MEASIX_ROOT/ecosystem.config.cjs" --only measix-hub` 和 `--only measix-relay`，然后 `sudo pm2 save`；

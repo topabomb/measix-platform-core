@@ -44,8 +44,10 @@ func TestUpstreamDeletionAfterPopulatedHistoryUpgrade(t *testing.T) {
 	}
 	tables := []string{"budget_requests", "request_usages", "pricing_rules", "budget_settlements", "budget_reconciliations"}
 	before := map[string]string{}
+	columns := map[string]string{}
 	for _, table := range tables {
-		before[table] = historyTableBytes(t, db, table)
+		columns[table] = historyTableColumns(t, db, table)
+		before[table] = historyTableBytes(t, db, table, columns[table])
 	}
 	if _, err = Apply(ctx, db); err != nil {
 		t.Fatal(err)
@@ -55,9 +57,15 @@ func TestUpstreamDeletionAfterPopulatedHistoryUpgrade(t *testing.T) {
 		t.Fatalf("historical attribution must not prevent deleting an unused connection: %v", err)
 	}
 	for _, table := range tables {
-		if got := historyTableBytes(t, db, table); got != before[table] {
+		if got := historyTableBytes(t, db, table, columns[table]); got != before[table] {
 			t.Fatalf("%s historical bytes changed", table)
 		}
+	}
+	// Later additive DAV columns must not reclassify historical metered requests.
+	var method string
+	var statisticsOnly bool
+	if err = db.QueryRow(`SELECT http_method,statistics_only FROM request_usages WHERE id=90`).Scan(&method, &statisticsOnly); err != nil || method != "" || statisticsOnly {
+		t.Fatalf("historical usage DAV defaults: %q %v %v", method, statisticsOnly, err)
 	}
 	var count, seq int
 	if err = db.QueryRow(`SELECT COUNT(*) FROM upstream_config_revisions`).Scan(&count); err != nil || count != 0 {
@@ -98,7 +106,7 @@ func TestUpstreamDeletionAfterPopulatedHistoryUpgrade(t *testing.T) {
 	}
 }
 
-func historyTableBytes(t *testing.T, db *sql.DB, table string) string {
+func historyTableColumns(t *testing.T, db *sql.DB, table string) string {
 	t.Helper()
 	// Column ordering is canonical because rebuilding a table can change physical order.
 	rows, err := db.Query(`SELECT name FROM pragma_table_info(?) ORDER BY name`, table)
@@ -117,7 +125,13 @@ func historyTableBytes(t *testing.T, db *sql.DB, table string) string {
 		columns += `"` + col + `"`
 	}
 	rows.Close()
-	rows, err = db.Query("SELECT " + columns + " FROM " + table + " ORDER BY id")
+	return columns
+}
+
+func historyTableBytes(t *testing.T, db *sql.DB, table, columns string) string {
+	t.Helper()
+	// Compare every original column even when later migrations append fields.
+	rows, err := db.Query("SELECT " + columns + " FROM " + table + " ORDER BY id")
 	if err != nil {
 		t.Fatal(err)
 	}

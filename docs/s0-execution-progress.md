@@ -119,6 +119,17 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 
 仍未验证：Android/手机的新 DAV 消费、真实 IPv6 部署、真实上游 >4 GiB、同环境直连吞吐基准与全量 CPU/连接数、全部远端崩溃故障组合。真实上游镜像摘要未独立取得。LAN 最初超容量 PUT 返回 502（约 925 MiB），失败文件随后 HEAD 404；用户同意改用 512 MiB。该结果不证明历史间歇大文件问题根因已修复，也不表示 S0/S1 阶段完成。
 
+### 提交前全量审查与界面复核
+
+2026-10-11 再开后端、Console、合同/文档三个独立子代理审查全部 Git 改动，并合入远端 Core `e5e17c9` 与架构 `8da4d4c` 的历史清理、MCP 和计价优化；DAV 迁移顺延为 `000006`，保留既有 `000004/000005` 原字节。已完成方案内容归并到工作区实现、API、测试及用量文档，移除临时 plan。
+
+- 新增测试先复现并修复：五个控制意图入口编译后权限变化导致未决 Activation 无法恢复、100/103 被误记为最终 HTTP 状态、独立 DAV 修订变化后旧 Token/迟到查询未失效、旧目录请求失败/取消污染当前文件列表。合并时补齐公共资源名称解析的 DAV 分支；历史迁移回归按全部原列逐字比较，并额外确认新增 DAV 统计列不会重新分类旧用量。
+- Go 全量 `go test ./... -count=1` 与 `go vet ./...`、Console 46 文件 316 tests/typecheck/build、81 项 tooling 通过。最后工具栏样式调整后另跑受影响 15 tests/typecheck/build 通过。生成材料已在合并后重新生成；提交后执行生成漂移与合同基线校验，结果保留于下述证据目录。
+- `.artifacts/webdav-console-review-20261011/run-001/`：用远端 `e5e17c9` 的真实旧可执行文件建库，重复迁移后 41 张原表原列保全；恢复旧备份由旧可执行文件读取 Files/Snapshot。标准 webdav@5.11.0 客户端及资源开关、签发、撤销、断开恢复的 Activation 生命周期通过。此轮上游为独立标准 DAV + 管理替身。
+- `ui-review.json` 与 `console-{desktop,390}-final.png` 固定最终 SPA `6b53bd9ac56befed1dc2cc78777cae209d6cb4fd8d76e43b83c2d89c33b0e2c2`。实际浏览器核对全宽文件区、折叠配置/维护/权限/容量、新建中文 Markdown、当前目录筛选/清除、键盘预览及 390px 无横向溢出；Console 仍只使用 Files。`console-preview.png` 为最后工具栏压紧前的预览证据。
+
+本次提交前复核未重跑真实 LAN 大文件、Android 或手机；前节 512 MiB LAN 与 >4 GiB 独立 DAV 证据仍对应各自固定构建，不能改称最终提交的大文件验收。
+
 ## 保留的失败边界
 
 - 隔离工作区大文件 PUT 曾在约 50 MiB/64 MiB 传输中返回 502/503 与 UNKNOWN，记录在 `.artifacts/workspace-files-final/`、`.artifacts/resources-review/`。新空间重跑通过不证明间歇传输根因已修复；不得自动重放未知写入，生产验收前继续核查。

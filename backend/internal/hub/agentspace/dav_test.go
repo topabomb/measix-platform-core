@@ -3,6 +3,7 @@ package agentspace
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"measix/platform/internal/wire/adminapi"
 	"net/http"
@@ -11,6 +12,98 @@ import (
 	"testing"
 	"time"
 )
+
+func TestFilesListHidesOnlyRootAgentSpace(t *testing.T) {
+	for _, tc := range []struct {
+		name, path  string
+		paths, want []string
+	}{
+		{"first", "", []string{".agent-space", "", ".agent-space-backup", "xu-tang"}, []string{".agent-space-backup", "xu-tang"}},
+		{"middle", "", []string{"", ".agent-space-backup", ".agent-space", "xu-tang"}, []string{".agent-space-backup", "xu-tang"}},
+		{"last", "", []string{"", ".agent-space-backup", "xu-tang", ".agent-space"}, []string{".agent-space-backup", "xu-tang"}},
+		{"nested", "xu-tang", []string{"xu-tang", "xu-tang/.agent-space", "xu-tang/.agent-space-backup"}, []string{"xu-tang/.agent-space", "xu-tang/.agent-space-backup"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(207)
+				io.WriteString(w, `<multistatus xmlns="DAV:">`)
+				for _, path := range tc.paths {
+					fmt.Fprintf(w, `<response><href>/u/alice/dav/%s</href><propstat><prop><resourcetype><collection/></resourcetype><quota-used-bytes>100</quota-used-bytes><quota-available-bytes>200</quota-available-bytes></prop><status>HTTP/1.1 200 OK</status></propstat></response>`, path)
+				}
+				io.WriteString(w, `</multistatus>`)
+			}))
+			defer server.Close()
+			c, _ := New(server.URL, server.URL, server.URL, "admin")
+			out, err := c.List(context.Background(), "alice", "dav", tc.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(out.Entries) != len(tc.want) || out.UsedBytes == nil || *out.UsedBytes != 100 || out.AvailableBytes == nil || *out.AvailableBytes != 200 {
+				t.Fatalf("unexpected list or root quota: %+v", out)
+			}
+			for i, want := range tc.want {
+				if out.Entries[i].Path != want {
+					t.Fatalf("entry %d = %q, want %q", i, out.Entries[i].Path, want)
+				}
+			}
+		})
+	}
+}
+
+func TestFilesProtectedPathRequestsNeverReachUpstream(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.WriteHeader(201) }))
+	defer server.Close()
+	c, _ := New(server.URL, server.URL, server.URL, "admin")
+	check := func(err error) {
+		t.Helper()
+		var remote *Error
+		if !errors.As(err, &remote) || remote.Code != "invalid_file_path" || calls != 0 {
+			t.Fatalf("protected request err=%v upstreamCalls=%d", err, calls)
+		}
+	}
+	for _, p := range []string{".agent-space", ".agent-space/private"} {
+		_, err := c.List(context.Background(), "alice", "dav", p)
+		check(err)
+		_, err = c.Stat(context.Background(), "alice", "dav", p)
+		check(err)
+		for _, method := range []string{"GET", "HEAD", "PUT"} {
+			_, err = c.Content(context.Background(), "alice", "dav", p, method, strings.NewReader("body"), http.Header{"If-None-Match": {"*"}})
+			check(err)
+		}
+		_, err = c.Mutate(context.Background(), "alice", "dav", adminapi.WorkspaceFileMutation{Action: "MKCOL", Path: p})
+		check(err)
+		for _, method := range []adminapi.WorkspaceFileMutationAction{"COPY", "MOVE"} {
+			_, err = c.Mutate(context.Background(), "alice", "dav", adminapi.WorkspaceFileMutation{Action: method, Path: "ordinary", Destination: &p})
+			check(err)
+		}
+	}
+	for _, p := range []string{".agent-space-backup", "ordinary/.agent-space"} {
+		out, err := c.Mutate(context.Background(), "alice", "dav", adminapi.WorkspaceFileMutation{Action: "MKCOL", Path: p})
+		if err != nil || out.Outcome != "SUCCEEDED" {
+			t.Fatalf("ordinary path %q rejected: %v", p, err)
+		}
+	}
+	if calls != 2 {
+		t.Fatalf("ordinary paths did not reach upstream: %d", calls)
+	}
+}
+
+func TestFilesDoesNotHideInvalidProtectedHref(t *testing.T) {
+	for _, href := range []string{"https://evil.invalid/u/alice/dav/.agent-space", "/u/bob/dav/.agent-space", "/u/alice/dav/%2e%2e/.agent-space", "/u/alice/dav/.agent-space/private"} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(207)
+			fmt.Fprintf(w, `<multistatus xmlns="DAV:"><response><href>%s</href></response></multistatus>`, href)
+		}))
+		c, _ := New(server.URL, server.URL, server.URL, "admin")
+		_, err := c.List(context.Background(), "alice", "dav", "")
+		var remote *Error
+		if !errors.As(err, &remote) || remote.Code != "invalid_dav_href" {
+			t.Errorf("href %q must fail as upstream data: %v", href, err)
+		}
+		server.Close()
+	}
+}
 
 func TestDAVRejectsNonFinalOrWrongMethodSuccess(t *testing.T) {
 	for _, method := range []string{"PUT", "MKCOL", "DELETE", "COPY", "MOVE"} {

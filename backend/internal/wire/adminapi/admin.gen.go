@@ -2354,6 +2354,12 @@ type AgentSpaceConfig struct {
 // AgentSpaceId defines model for AgentSpaceId.
 type AgentSpaceId = string
 
+// ApplyWorkspaceServiceRequest defines model for ApplyWorkspaceServiceRequest.
+type ApplyWorkspaceServiceRequest struct {
+	// ExpectedConfigRevision Apply only this administrator-confirmed saved configuration. Missing or changed revisions are rejected.
+	ExpectedConfigRevision int `json:"expectedConfigRevision"`
+}
+
 // AsrDefinition defines model for AsrDefinition.
 type AsrDefinition struct {
 	AsrId             AsrId                       `json:"asrId"`
@@ -3329,6 +3335,15 @@ type ReplaceSecretRequest struct {
 	Value                 string `json:"value"`
 }
 
+// ReplaceWorkspaceDeploymentRequest defines model for ReplaceWorkspaceDeploymentRequest.
+type ReplaceWorkspaceDeploymentRequest struct {
+	Bindings []WorkspaceReplacementBinding `json:"bindings"`
+
+	// ConfirmedDestroyedDeployment Confirms old deployment/data are gone and all old management requests have ended; fresh spaces will be empty.
+	ConfirmedDestroyedDeployment bool `json:"confirmedDestroyedDeployment"`
+	ExpectedConfigRevision       int  `json:"expectedConfigRevision"`
+}
+
 // RequestCompletenessCounts Counts of whole requests within the same summary filter; sum equals requestCount.
 type RequestCompletenessCounts struct {
 	Exact   int `json:"exact"`
@@ -3447,10 +3462,13 @@ type RuntimeRouteId = string
 
 // SaveWorkspaceServiceRequest defines model for SaveWorkspaceServiceRequest.
 type SaveWorkspaceServiceRequest struct {
-	Config                AgentSpaceConfig `json:"config"`
-	ConfirmSameDeployment *bool            `json:"confirmSameDeployment,omitempty"`
-	ExpectedRevision      int              `json:"expectedRevision"`
-	Name                  string           `json:"name"`
+	Config AgentSpaceConfig `json:"config"`
+
+	// ConfirmSameDeployment Legacy UI hint; identity is verified when applying the saved configuration.
+	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	ConfirmSameDeployment *bool  `json:"confirmSameDeployment,omitempty"`
+	ExpectedRevision      int    `json:"expectedRevision"`
+	Name                  string `json:"name"`
 }
 
 // Secret defines model for Secret.
@@ -4064,14 +4082,14 @@ type WorkspaceFileFailure struct {
 	Status int    `json:"status"`
 }
 
-// WorkspaceFileList defines model for WorkspaceFileList.
+// WorkspaceFileList Files hides the workspace-root .agent-space entry and rejects direct access to it and its descendants. Similar names and nested same-name paths remain ordinary entries. Standard WebDAV does not apply this policy.
 type WorkspaceFileList struct {
 	AvailableBytes *int64               `json:"availableBytes,omitempty"`
 	Entries        []WorkspaceFileEntry `json:"entries"`
 	UsedBytes      *int64               `json:"usedBytes,omitempty"`
 }
 
-// WorkspaceFileMutation defines model for WorkspaceFileMutation.
+// WorkspaceFileMutation Files source and destination paths must not address the workspace-root .agent-space entry or its descendants.
 type WorkspaceFileMutation struct {
 	Action             WorkspaceFileMutationAction `json:"action"`
 	Destination        *string                     `json:"destination,omitempty"`
@@ -4122,15 +4140,16 @@ type WorkspaceObservationStatus string
 
 // WorkspaceOperation defines model for WorkspaceOperation.
 type WorkspaceOperation struct {
-	Action             string                  `json:"action"`
-	CreatedAt          time.Time               `json:"createdAt"`
-	DiagnosticCode     *string                 `json:"diagnosticCode,omitempty"`
-	OperationId        WorkspaceOperationId    `json:"operationId"`
-	State              WorkspaceOperationState `json:"state"`
-	Step               string                  `json:"step"`
-	UpdatedAt          time.Time               `json:"updatedAt"`
-	UserId             *UserId                 `json:"userId,omitempty"`
-	WorkspaceServiceId WorkspaceServiceId      `json:"workspaceServiceId"`
+	Action              string                        `json:"action"`
+	CreatedAt           time.Time                     `json:"createdAt"`
+	DiagnosticCode      *string                       `json:"diagnosticCode,omitempty"`
+	OperationId         WorkspaceOperationId          `json:"operationId"`
+	ReplacementProgress *WorkspaceReplacementProgress `json:"replacementProgress,omitempty"`
+	State               WorkspaceOperationState       `json:"state"`
+	Step                string                        `json:"step"`
+	UpdatedAt           time.Time                     `json:"updatedAt"`
+	UserId              *UserId                       `json:"userId,omitempty"`
+	WorkspaceServiceId  WorkspaceServiceId            `json:"workspaceServiceId"`
 }
 
 // WorkspaceOperationState defines model for WorkspaceOperation.State.
@@ -4167,6 +4186,22 @@ type WorkspaceProjectionServiceState string
 
 // WorkspaceProjectionState defines model for WorkspaceProjection.State.
 type WorkspaceProjectionState string
+
+// WorkspaceReplacementBinding defines model for WorkspaceReplacementBinding.
+type WorkspaceReplacementBinding struct {
+	AgentSpaceId       AgentSpaceId `json:"agentSpaceId"`
+	BindingRevision    int64        `json:"bindingRevision"`
+	DavBindingRevision int64        `json:"davBindingRevision"`
+	DisplayName        *string      `json:"displayName,omitempty"`
+	UserId             UserId       `json:"userId"`
+}
+
+// WorkspaceReplacementProgress defines model for WorkspaceReplacementProgress.
+type WorkspaceReplacementProgress struct {
+	Completed      int `json:"completed"`
+	NeedsAttention int `json:"needsAttention"`
+	Total          int `json:"total"`
+}
 
 // WorkspaceResourceAllocation defines model for WorkspaceResourceAllocation.
 type WorkspaceResourceAllocation struct {
@@ -4228,9 +4263,12 @@ type WorkspaceServiceType string
 
 // WorkspaceServiceCheck defines model for WorkspaceServiceCheck.
 type WorkspaceServiceCheck struct {
-	DiagnosticCode  *string                          `json:"diagnosticCode,omitempty"`
-	FilesStatus     WorkspaceServiceCheckFilesStatus `json:"filesStatus"`
-	ManagementReady bool                             `json:"managementReady"`
+	ConfigRevision       *int                             `json:"configRevision,omitempty"`
+	DiagnosticCode       *string                          `json:"diagnosticCode,omitempty"`
+	FilesStatus          WorkspaceServiceCheckFilesStatus `json:"filesStatus"`
+	ManagementReady      bool                             `json:"managementReady"`
+	MissingWorkspaces    *[]WorkspaceReplacementBinding   `json:"missingWorkspaces,omitempty"`
+	ReplacementAvailable *bool                            `json:"replacementAvailable,omitempty"`
 }
 
 // WorkspaceServiceCheckFilesStatus defines model for WorkspaceServiceCheck.FilesStatus.
@@ -4424,6 +4462,12 @@ type DisableWorkspaceServiceParams struct {
 
 // StageWorkspaceMCPParams defines parameters for StageWorkspaceMCP.
 type StageWorkspaceMCPParams struct {
+	XCSRFToken     string         `json:"X-CSRF-Token"`
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ReplaceWorkspaceDeploymentParams defines parameters for ReplaceWorkspaceDeployment.
+type ReplaceWorkspaceDeploymentParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
@@ -4871,8 +4915,14 @@ type CreateWorkspaceServiceJSONRequestBody = SaveWorkspaceServiceRequest
 // UpdateWorkspaceServiceJSONRequestBody defines body for UpdateWorkspaceService for application/json ContentType.
 type UpdateWorkspaceServiceJSONRequestBody = SaveWorkspaceServiceRequest
 
+// ApplyWorkspaceServiceJSONRequestBody defines body for ApplyWorkspaceService for application/json ContentType.
+type ApplyWorkspaceServiceJSONRequestBody = ApplyWorkspaceServiceRequest
+
 // StageWorkspaceMCPJSONRequestBody defines body for StageWorkspaceMCP for application/json ContentType.
 type StageWorkspaceMCPJSONRequestBody = StageWorkspaceMCPRequest
+
+// ReplaceWorkspaceDeploymentJSONRequestBody defines body for ReplaceWorkspaceDeployment for application/json ContentType.
+type ReplaceWorkspaceDeploymentJSONRequestBody = ReplaceWorkspaceDeploymentRequest
 
 // CreateSecretJSONRequestBody defines body for CreateSecret for application/json ContentType.
 type CreateSecretJSONRequestBody = CreateSecretRequest
@@ -5056,6 +5106,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/mcp-draft)
 	StageWorkspaceMCP(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params StageWorkspaceMCPParams)
+
+	// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/replace)
+	ReplaceWorkspaceDeployment(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params ReplaceWorkspaceDeploymentParams)
 
 	// (GET /api/admin/v1/remote-workspace/services/{workspaceServiceId}/workspaces)
 	ListWorkspaces(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params ListWorkspacesParams)
@@ -5437,6 +5490,11 @@ func (_ Unimplemented) DisableWorkspaceService(w http.ResponseWriter, r *http.Re
 
 // (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/mcp-draft)
 func (_ Unimplemented) StageWorkspaceMCP(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params StageWorkspaceMCPParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/remote-workspace/services/{workspaceServiceId}/replace)
+func (_ Unimplemented) ReplaceWorkspaceDeployment(w http.ResponseWriter, r *http.Request, workspaceServiceId WorkspaceServiceId, params ReplaceWorkspaceDeploymentParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -7740,6 +7798,83 @@ func (siw *ServerInterfaceWrapper) StageWorkspaceMCP(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StageWorkspaceMCP(w, r, workspaceServiceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReplaceWorkspaceDeployment operation middleware
+func (siw *ServerInterfaceWrapper) ReplaceWorkspaceDeployment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "workspaceServiceId" -------------
+	var workspaceServiceId WorkspaceServiceId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "workspaceServiceId", chi.URLParam(r, "workspaceServiceId"), &workspaceServiceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "workspaceServiceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReplaceWorkspaceDeploymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplaceWorkspaceDeployment(w, r, workspaceServiceId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11691,6 +11826,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}/check", wrapper.CheckWorkspaceService)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}/replace", wrapper.ReplaceWorkspaceDeployment)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply", wrapper.ApplyWorkspaceService)

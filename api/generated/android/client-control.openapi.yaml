@@ -1339,6 +1339,7 @@ components:
           type: string
     WorkspaceFileList:
       type: object
+      description: Files hides the workspace-root .agent-space entry and rejects direct access to it and its descendants. Similar names and nested same-name paths remain ordinary entries. Standard WebDAV does not apply this policy.
       required:
       - entries
       properties:
@@ -1356,6 +1357,7 @@ components:
           minimum: 0
     WorkspaceFileMutation:
       type: object
+      description: Files source and destination paths must not address the workspace-root .agent-space entry or its descendants.
       additionalProperties: false
       required:
       - action

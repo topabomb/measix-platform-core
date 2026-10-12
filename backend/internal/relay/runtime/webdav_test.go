@@ -26,6 +26,101 @@ type davRecorder struct {
 	events []usageingestapi.UsageSettlement
 }
 
+func TestDAVProtectsRootAndUnsafePathsBeforeForwarding(t *testing.T) {
+	forwarded := 0
+	h, token, root, _, _ := davFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		forwarded++
+		w.WriteHeader(204)
+	}), "FULL")
+	for _, tc := range []struct{ method, path, destination string }{
+		{"DELETE", "", ""}, {"DELETE", "/", ""},
+		{"MOVE", "", "child"}, {"PUT", "", ""}, {"MKCOL", "", ""},
+		{"COPY", "child", ""}, {"MOVE", "child", ""},
+		{"GET", "../private", ""},
+		{"PUT", "%2e%2e/private", ""},
+		{"COPY", "child", "../private"},
+		{"MOVE", "child", "/"},
+	} {
+		t.Run(tc.method+"/"+tc.path+"/"+tc.destination, func(t *testing.T) {
+			r := httptest.NewRequest(tc.method, root+tc.path, strings.NewReader("body"))
+			r.Header.Set("Authorization", "Bearer "+token)
+			if tc.method == "COPY" || tc.method == "MOVE" {
+				r.Header.Set("Destination", "http://example.com"+root+tc.destination)
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != 403 || forwarded != 0 {
+				t.Fatalf("protected request status=%d forwarded=%d", w.Code, forwarded)
+			}
+		})
+	}
+	for _, method := range []string{"OPTIONS", "GET", "HEAD", "PROPFIND", "LOCK", "UNLOCK", "PROPPATCH"} {
+		r := httptest.NewRequest(method, root, nil)
+		r.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != 204 {
+			t.Fatalf("root %s should retain DAV semantics: %d", method, w.Code)
+		}
+	}
+}
+
+func TestDAVForwardsFilesProtectedNames(t *testing.T) {
+	for _, tc := range []struct{ method, path, destination string }{
+		{"GET", ".agent-space/private", ""},
+		{"PUT", "%2eagent-space/private", ""},
+		{"MKCOL", ".agent-space-backup", ""},
+		{"COPY", "ordinary", ".agent-space/private"},
+		{"MOVE", "ordinary/.agent-space", ".agent-space-backup"},
+	} {
+		t.Run(tc.method+"/"+tc.path, func(t *testing.T) {
+			calls := 0
+			h, token, root, _, _ := davFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.WriteHeader(204)
+			}), "FULL")
+			r := httptest.NewRequest(tc.method, root+tc.path, strings.NewReader("body"))
+			r.Header.Set("Authorization", "Bearer "+token)
+			if tc.destination != "" {
+				r.Header.Set("Destination", "http://example.com"+root+tc.destination)
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != 204 || calls != 1 {
+				t.Fatalf("root-owned DAV target rejected: status=%d calls=%d", w.Code, calls)
+			}
+		})
+	}
+}
+
+func TestDAVRootListingPreservesAgentSpaceAndCompleteXML(t *testing.T) {
+	h, token, root, _, _ := davFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(207)
+		io.WriteString(w, `<D:multistatus xmlns:D="DAV:"><D:response><D:href>/u/alice/dav/ordinary/</D:href></D:response><D:response><D:href>/u/alice/dav/.agent-space/</D:href><D:status>HTTP/1.1 403 Forbidden</D:status></D:response><D:response><D:href>/u/alice/dav/xu-tang/</D:href></D:response></D:multistatus>`)
+	}), "FULL")
+	server := httptest.NewServer(h)
+	defer server.Close()
+	for _, method := range []string{"PROPFIND", "DELETE"} {
+		path := root
+		if method == "DELETE" {
+			path += "ordinary"
+		}
+		r, _ := http.NewRequest(method, server.URL+path, nil)
+		r.Header.Set("Authorization", "Bearer "+token)
+		r.Header.Set("Depth", "1")
+		res, err := server.Client().Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil || res.StatusCode != 207 || !strings.HasSuffix(string(body), "</D:multistatus>") || !strings.Contains(string(body), root+".agent-space/") || !strings.Contains(string(body), "403 Forbidden") {
+			t.Fatalf("%s lost DAV response: status=%d bodyError=%v body=%s", method, res.StatusCode, err, body)
+		}
+	}
+}
+
 func TestDAVXMLBoundsTokensDepthAndHrefButNotListingSize(t *testing.T) {
 	base, _ := url.Parse("http://upstream/u/alice/dav/")
 	mapper := davMapper{upstream: base, publicRoot: "/dav/", publicHost: "public", publicScheme: "http"}

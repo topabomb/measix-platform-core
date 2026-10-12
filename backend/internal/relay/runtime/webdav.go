@@ -114,6 +114,13 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 		fail(403, "dav_target_outside_workspace")
 		return
 	}
+	if target.Path == upstream.Path || target.Path == strings.TrimSuffix(upstream.Path, "/") {
+		switch r.Method {
+		case "PUT", "DELETE", "MKCOL", "MOVE":
+			fail(403, "dav_target_outside_workspace")
+			return
+		}
+	}
 	destination := ""
 	if raw := r.Header.Get("Destination"); raw != "" {
 		u, e := url.Parse(raw)
@@ -122,7 +129,7 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 			return
 		}
 		u, e = mapper.toUpstream(u)
-		if e != nil {
+		if e != nil || u.Path == upstream.Path || u.Path == strings.TrimSuffix(upstream.Path, "/") {
 			fail(403, "dav_target_outside_workspace")
 			return
 		}
@@ -276,9 +283,10 @@ func davRelative(escaped, root string) (string, error) {
 		return "", errors.New("outside DAV root")
 	}
 	tail := strings.TrimPrefix(escaped, root)
-	for _, segment := range strings.Split(tail, "/") {
+	segments := strings.Split(tail, "/")
+	for i, segment := range segments {
 		decoded, err := url.PathUnescape(segment)
-		if err != nil || decoded == "." || decoded == ".." || strings.ContainsAny(decoded, "/\\\x00") {
+		if err != nil || (decoded == "" && i < len(segments)-1) || decoded == "." || decoded == ".." || strings.ContainsAny(decoded, "/\\\x00\r\n") {
 			return "", errors.New("invalid DAV path")
 		}
 	}

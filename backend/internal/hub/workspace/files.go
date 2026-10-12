@@ -29,7 +29,7 @@ func (s *Service) OpenFiles(ctx context.Context, actor, userID, expectedSpaceID,
 	if platformid.Validate(platformid.AgentSpace, expectedSpaceID) != nil {
 		return nil, ErrInvalid
 	}
-	if _, err := remoteapi.RelativePath(path, false); err != nil {
+	if _, err := remoteapi.FilePath(path, false); err != nil {
 		return nil, err
 	}
 	s.fileMu.Lock()

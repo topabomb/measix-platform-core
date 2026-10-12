@@ -4,6 +4,8 @@
 }
 
 body { background: #f5f4f8; color: #241d2e; }
+/* Native details slots interrupt Quasar's inherited box-sizing reset. */
+details > * { box-sizing: border-box; }
 .orchelm-header { background: rgba(255, 255, 255, .97); box-shadow: 0 1px 0 rgba(74, 52, 105, .08); }
 .orchelm-toolbar { min-height: 48px; }
 .admin-shell .q-drawer { background: #fbfaff; }

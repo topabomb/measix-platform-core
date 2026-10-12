@@ -418,6 +418,7 @@ export interface components {
             modifiedAt?: string;
             etag?: string;
         };
+        /** @description Files hides the workspace-root .agent-space entry and rejects direct access to it and its descendants. Similar names and nested same-name paths remain ordinary entries. Standard WebDAV does not apply this policy. */
         WorkspaceFileList: {
             entries: components["schemas"]["WorkspaceFileEntry"][];
             /** Format: int64 */
@@ -425,6 +426,7 @@ export interface components {
             /** Format: int64 */
             availableBytes?: number;
         };
+        /** @description Files source and destination paths must not address the workspace-root .agent-space entry or its descendants. */
         WorkspaceFileMutation: {
             /** @enum {string} */
             action: "MKCOL" | "MOVE" | "COPY" | "DELETE";

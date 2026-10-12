@@ -109,6 +109,10 @@ pnpm -C console test --run src/components/ReleaseHistoryTools.test.ts src/pages/
 
 工作区机制见[实现参考](remote-workspace-implementation.md)。Go 检查响应丢失/UNKNOWN 恢复、身份/绑定/config、租约、XML/路径/条件、历史迁移及预算；生产 Console 检查配置、生命周期、文本字节往返/冲突和资源查询在途切换。
 
+部署更换回归包含并发相同幂等请求返回原操作、Activation 争用后继续同一队列、排队前用户删除保留原清理且不重建、缺失/过期应用修订被拒绝，以及服务缓存不可用时仍能以冻结请求核实未知操作。
+
+Files 保护目录回归覆盖根下 `.agent-space` 在混合列表首/中/尾时隐藏、根容量保留、直接读写及复制/移动目标在上游请求前拒绝、相似名称与嵌套同名路径正常处理；非法或跨空间的保护项 href 仍报 DAV 响应错误。标准 DAV 列举保留该目录并输出完整 207 XML，写操作多状态失败项保留，根修改、穿越、空间隔离及 READ_ONLY 保护继续回归。
+
 从 Core 根目录运行真实隔离服务 lane：
 
 ```text

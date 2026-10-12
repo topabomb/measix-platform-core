@@ -95,11 +95,14 @@ func (s *Service) validateConfig(ctx context.Context, cfg adminapi.AgentSpaceCon
 	return err
 }
 func (s *Service) published(ctx context.Context, workspaceService, mcp string) bool {
-	managed, err := s.Client.ManagedState.Get(ctx, "current")
+	return publishedOn(ctx, s.Client, workspaceService, mcp)
+}
+func publishedOn(ctx context.Context, client *ent.Client, workspaceService, mcp string) bool {
+	managed, err := client.ManagedState.Get(ctx, "current")
 	if err != nil || managed.ActiveReleaseID == nil {
 		return false
 	}
-	release, err := s.Client.ManagedRelease.Get(ctx, *managed.ActiveReleaseID)
+	release, err := client.ManagedRelease.Get(ctx, *managed.ActiveReleaseID)
 	if err != nil {
 		return false
 	}
@@ -233,21 +236,8 @@ func (s *Service) Save(ctx context.Context, actor, key, id string, input adminap
 		if pending {
 			return adminapi.WorkspaceService{}, ErrPending
 		}
-		old, e := tx.WorkspaceServiceConfig.Query().Where(workspaceserviceconfig.WorkspaceServiceIDEQ(id), workspaceserviceconfig.RevisionEQ(row.ConfigRevision)).Only(ctx)
-		if e != nil {
-			return adminapi.WorkspaceService{}, e
-		}
-		var oldCfg adminapi.AgentSpaceConfig
-		if json.Unmarshal(old.ConfigJSON, &oldCfg) != nil {
-			return adminapi.WorkspaceService{}, ErrInvalid
-		}
-		bound, e := tx.AgentSpace.Query().Where(agentspace.WorkspaceServiceIDEQ(id)).Exist(ctx)
-		if e != nil {
-			return adminapi.WorkspaceService{}, e
-		}
-		if bound && (oldCfg.AdminOrigin != input.Config.AdminOrigin || oldCfg.McpOrigin != input.Config.McpOrigin || str(oldCfg.DavOrigin) != str(input.Config.DavOrigin)) && (input.ConfirmSameDeployment == nil || !*input.ConfirmSameDeployment) {
-			return adminapi.WorkspaceService{}, ErrInvalid
-		}
+		// Saving prepares immutable configuration. Applying still verifies every
+		// original identity; replacing missing identities is an explicit command.
 		revision = row.ConfigRevision + 1
 		row, err = tx.WorkspaceService.UpdateOneID(id).SetName(strings.TrimSpace(input.Name)).SetConfigRevision(revision).SetUpdatedAt(now).Save(ctx)
 	}
@@ -259,6 +249,9 @@ func (s *Service) Save(ctx context.Context, actor, key, id string, input adminap
 		return adminapi.WorkspaceService{}, err
 	}
 	out := adminapi.WorkspaceService{WorkspaceServiceId: id, Type: "AGENT_SPACE", Name: row.Name, ConfigRevision: int(revision), Enabled: row.Enabled, State: adminapi.WorkspaceServiceState(row.State), Config: input.Config, McpServerId: row.McpServerID}
+	out.McpPublished = publishedOn(ctx, tx.Client(), id, row.McpServerID)
+	out.DavResourceId = ptr(row.DavResourceID)
+	out.DavPublishedEnabled = ptr(publishedOn(ctx, tx.Client(), id, row.DavResourceID))
 	if row.ActiveConfigRevision != nil {
 		out.ActiveConfigRevision = ptr(int(*row.ActiveConfigRevision))
 	}
@@ -282,7 +275,7 @@ func (s *Service) Check(ctx context.Context, id string) (adminapi.WorkspaceServi
 	if err != nil {
 		return adminapi.WorkspaceServiceCheck{}, err
 	}
-	out := adminapi.WorkspaceServiceCheck{FilesStatus: "NOT_CONFIGURED"}
+	out := adminapi.WorkspaceServiceCheck{FilesStatus: "NOT_CONFIGURED", ConfigRevision: ptr(int(row.ConfigRevision)), ReplacementAvailable: ptr(false)}
 	if str(cfg.DavOrigin) != "" {
 		out.FilesStatus = "UNVERIFIED"
 	}
@@ -294,16 +287,43 @@ func (s *Service) Check(ctx context.Context, id string) (adminapi.WorkspaceServi
 	if err != nil {
 		return out, err
 	}
+	missing := []adminapi.WorkspaceReplacementBinding{}
 	for _, space := range rows {
 		if space.AgentSpaceID == "" {
 			out.DiagnosticCode = ptr("workspace_target_unconfirmed")
 			return out, nil
 		}
 		remote, e := client.Get(ctx, space.RemoteUsername)
-		if e != nil || remote.AgentSpaceID != space.AgentSpaceID {
+		if remoteapi.IsNotFound(e) {
+			user, userErr := s.Client.User.Get(ctx, space.ID)
+			if userErr != nil {
+				return out, userErr
+			}
+			missing = append(missing, replacementBindingView(space, user.DisplayName))
+			continue
+		}
+		if e != nil {
+			out.DiagnosticCode = ptr(diagnostic(e))
+			return out, nil
+		}
+		if remote.AgentSpaceID != space.AgentSpaceID {
 			out.DiagnosticCode = ptr("workspace_target_mismatch")
 			return out, nil
 		}
+	}
+	if len(missing) > 0 {
+		out.MissingWorkspaces = &missing
+		out.DiagnosticCode = ptr("workspace_targets_missing")
+		pending, e := s.Client.WorkspaceOperation.Query().Where(workspaceoperation.WorkspaceServiceIDEQ(id), workspaceoperation.StateNEQ("COMPLETED")).Exist(ctx)
+		if e != nil {
+			return out, e
+		}
+		deleting := false
+		for _, space := range rows {
+			deleting = deleting || space.Intent == "DELETED"
+		}
+		out.ReplacementAvailable = ptr(len(missing) == len(rows) && !pending && !deleting)
+		return out, nil
 	}
 	out.ManagementReady = true
 	return out, nil
@@ -419,5 +439,17 @@ func (s *Service) Operation(ctx context.Context, id string) (adminapi.WorkspaceO
 	if err != nil {
 		return adminapi.WorkspaceOperation{}, err
 	}
-	return operationView(row), nil
+	out := operationView(row)
+	if row.Action == "REPLACE" && (row.Step == "RECREATING" || row.Step == "DONE") {
+		var target operationTarget
+		if err = json.Unmarshal(row.TargetJSON, &target); err != nil {
+			return out, err
+		}
+		progress, e := s.replacementProgress(ctx, target)
+		if e != nil {
+			return out, e
+		}
+		out.ReplacementProgress = &progress
+	}
+	return out, nil
 }

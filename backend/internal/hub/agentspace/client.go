@@ -270,7 +270,7 @@ func RelativePath(p string, mutation bool) (string, error) {
 		return "", &Error{Code: "invalid_file_path"}
 	}
 	for _, part := range strings.Split(p, "/") {
-		if part == "" || part == "." || part == ".." || strings.HasPrefix(part, ".agent-space") {
+		if part == "" || part == "." || part == ".." {
 			return "", &Error{Code: "invalid_file_path"}
 		}
 		lower := strings.ToLower(part)
@@ -282,6 +282,23 @@ func RelativePath(p string, mutation bool) (string, error) {
 	}
 	return p, nil
 }
+
+func protectedFilePath(p string) bool {
+	return p == ".agent-space" || strings.HasPrefix(p, ".agent-space/")
+}
+
+// FilePath adds the Files-only protected-directory policy to path validation.
+func FilePath(p string, mutation bool) (string, error) {
+	path, err := RelativePath(p, mutation)
+	if err != nil {
+		return "", err
+	}
+	if protectedFilePath(path) {
+		return "", &Error{Code: "invalid_file_path"}
+	}
+	return path, nil
+}
+
 func (c *Client) DAVURL(name, path string) (string, error) {
 	if c.dav == nil {
 		return "", &Error{Code: "dav_unavailable"}

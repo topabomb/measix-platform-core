@@ -22,7 +22,7 @@ const connectionOpen=ref(false),connection=ref<components['schemas']['WorkspaceD
 const showFiles=ref(false),showToken=ref(false)
 const recoveryBearer=ref(''),recoverySecret=ref<components['schemas']['SecretRef']>()
 const url=computed(()=>`/api/admin/v1/users/${encodeURIComponent(props.userId)}/workspace`)
-const labels:Record<string,string>={UNPROVISIONED:'未开通',CONNECTING:'开通中',CONNECTED:'已连接',DISCONNECTING:'断开中',DISCONNECTED:'已断开',RESTORING:'恢复中',DELETING:'删除中',DELETED:'已删除',NEEDS_ATTENTION:'需要处理'}
+const labels:Record<string,string>={UNPROVISIONED:'未开通',CONNECTING:'开通中',CONNECTED:'已开通',DISCONNECTING:'断开中',DISCONNECTED:'已断开',RESTORING:'恢复中',DELETING:'删除中',DELETED:'已删除',NEEDS_ATTENTION:'需要处理'}
 const actionLabels:Record<string,string>={CREATE:'开通远程工作区',DISCONNECT:'断开工作区',RESTORE:'恢复连接',DELETE:'删除远程工作区',TAKEOVER:'显式接管',RESET_MCP:'重新签发 MCP 凭据',SET_DAV:'签发 / 重设 WebDAV Token',SET_DAV_ACCESS:'应用 WebDAV 权限',REVOKE_DAV:'撤销 WebDAV Token',CONTINUE:'核实后继续'}
 const pendingOperation=computed(()=>operation.value&&operation.value.state!=='COMPLETED')
 const davPending=computed(()=>!!operation.value&&['UNKNOWN','NEEDS_ATTENTION'].includes(operation.value.state)&&operation.value.step==='DAV_SENT')
@@ -73,14 +73,14 @@ onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();docum
 </script>
 <template>
  <q-card flat bordered data-cy="workspace-panel">
-  <q-card-section class="q-pa-sm"><div class="row items-center justify-between"><div><div class="text-h6">远程工作区<span v-if="displayName"> · {{displayName}}</span></div><div class="row items-center q-gutter-xs"><span class="text-caption text-grey-7">{{view?labels[view.state]:'正在加载'}}</span><template v-if="view"><q-chip dense size="sm" :color="view.mcpAvailable?'green-1':'grey-2'">{{view.mcpAvailable?'MCP 可用':view.mcpReason==='mcp_not_published'?'MCP 未发布（可选）':'MCP 不可用'}}</q-chip><q-chip dense size="sm" :color="view.filesAvailable?'green-1':'grey-2'">文件 {{view.filesAvailable?'可用':'不可用'}}</q-chip></template></div></div><q-btn flat round icon="refresh" aria-label="刷新工作区" :disable="busy" @click="error=undefined;refresh()"/></div></q-card-section>
+  <q-card-section class="q-pa-sm"><div class="row items-center justify-between"><div><div class="text-h6">远程工作区<span v-if="displayName"> · {{displayName}}</span></div><span class="text-caption text-grey-7">{{view?labels[view.state]:'正在加载'}}</span></div><q-btn flat round icon="refresh" aria-label="刷新工作区" :disable="busy" @click="error=undefined;refresh()"/></div></q-card-section>
   <q-card-section class="q-pa-sm q-pt-none"><ProblemBanner :error="error ?? refreshError"/>
    <template v-if="view"><q-banner v-if="view.serviceState==='NOT_CONFIGURED'" dense class="bg-grey-2 q-mb-sm">企业尚未配置远程工作区服务。</q-banner><q-banner v-else-if="view.serviceState==='DISABLED'" dense class="bg-grey-2 q-mb-sm">远程工作区服务未启用，不能开通或恢复连接。已有空间仍可核查和删除。</q-banner>
     <div v-if="(!view.mcpAvailable && view.mcpReason!=='mcp_not_published')||!view.filesAvailable" class="text-caption text-grey-7 q-mb-sm">MCP：{{workspaceLabel(view.mcpReason)}} · 文件：{{davPending?'凭据签发待核实，请先处理下方操作':workspaceLabel(view.filesReason)}}</div>
     <q-banner v-if="serviceEnabled && view.state==='CONNECTED' && view.filesReason==='dav_not_configured'" dense class="bg-grey-2 q-mb-sm">请先在远程工作区服务配置中填写文件服务地址，再签发 WebDAV Token。</q-banner>
     <q-banner v-if="serviceEnabled && view.state==='CONNECTED' && view.filesReason==='dav_credential_unavailable' && !pendingOperation" dense class="bg-orange-1 q-mb-sm">文件凭据不可用，请核实上游配置及原请求结果后重新签发。<template #action><q-btn flat label="签发文件凭据" :disable="busy" @click="ask('SET_DAV')"/></template></q-banner>
 
-    <div class="row q-gutter-xs">
+    <div class="row items-start q-gutter-xs">
      <q-btn v-if="serviceEnabled && view.state==='UNPROVISIONED' && view.mcpReason!=='user_unavailable'" color="primary" label="开通工作区" :disable="busy" @click="ask('CREATE')"/>
      <q-btn v-if="serviceEnabled && (view.state==='UNPROVISIONED'||operation?.step==='CREATE_SENT'&&operation.state==='UNKNOWN') && view.mcpReason!=='user_unavailable'" outline label="接管已有空间" :disable="busy" @click="ask('TAKEOVER')"/>
      <q-btn v-if="serviceEnabled && view.filesAvailable" color="primary" :label="showFiles?'收起文件':'浏览文件'" @click="showFiles=!showFiles"/>

@@ -36,6 +36,7 @@ export function workspaceFileError(error:unknown): string {
   workspace_result_unknown:'操作结果未知，请重新读取远端文件核实；不要直接重复保存或上传。',
   file_not_found:'文件已不存在，请刷新目录。',file_locked:'文件被锁定，请稍后核实。',
   file_transport_unavailable:'文件服务连接中断，请稍后重新读取。',
+  file_service_unavailable:'服务暂时无法提供文件访问，请稍后刷新目录；持续失败时检查远程服务运行状态。',
  }
  return messages[code]??(error instanceof Error?error.message:'文件操作失败，请刷新核实。')
 }

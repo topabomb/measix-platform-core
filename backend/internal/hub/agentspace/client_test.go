@@ -82,7 +82,7 @@ func TestDAVRequiresExactSubmittedCredentialAndIdentity(t *testing.T) {
 }
 
 func TestPathRejectsTraversalAndProtectsRoot(t *testing.T) {
-	for _, p := range []string{"../a", "a/../b", "/a", "a//b", "a\\b", "%2e%2e/a", "a/%252f/b", ".agent-space/a", "a\x00b"} {
+	for _, p := range []string{"../a", "a/../b", "/a", "a//b", "a\\b", "%2e%2e/a", "a/%252f/b", "a\x00b"} {
 		if _, err := RelativePath(p, false); err == nil {
 			t.Errorf("accepted %q", p)
 		}
@@ -94,5 +94,10 @@ func TestPathRejectsTraversalAndProtectsRoot(t *testing.T) {
 	}
 	if got, err := RelativePath("中文 空格/#%.txt", false); err != nil || got != "中文 空格/#%.txt" {
 		t.Fatalf("%q %v", got, err)
+	}
+	for _, p := range []string{".agent-space", ".agent-space/private", ".agent-space-backup", "ordinary/.agent-space"} {
+		if got, err := RelativePath(p, false); err != nil || got != p {
+			t.Errorf("generic path validation rejected %q: %v", p, err)
+		}
 	}
 }

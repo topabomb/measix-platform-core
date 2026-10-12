@@ -273,7 +273,7 @@ test('Workspace discovery separates directory identity from enterprise permissio
   const secret = await api('/api/admin/v1/secrets', 'POST', { name: 'Discovery fixture management', value: 'workspace-management-test' })
   const service = await api('/api/admin/v1/remote-workspace/services', 'POST', { name: 'Discovery workspace', expectedRevision: 0, config: { adminOrigin: adapter, mcpOrigin: adapter, managementSecret: { secretId: secret.secretId, secretVersion: secret.secretVersion }, connectTimeoutMs: 1000, idleTimeoutMs: 1000 } })
   const servicePath = `/api/admin/v1/remote-workspace/services/${service.workspaceServiceId}`
-  await complete(await api(`${servicePath}/apply`, 'POST'))
+  await complete(await api(`${servicePath}/apply`, 'POST', { expectedConfigRevision: service.configRevision }))
   const originalDraft = await api('/api/admin/v1/draft')
   await api(`${servicePath}/mcp-draft`, 'POST', { expectedDraftRevision: originalDraft.draftRevision })
   const staged = await api('/api/admin/v1/draft')

@@ -6,6 +6,17 @@ import WorkspaceFiles from './WorkspaceFiles.vue'
 import * as client from '../api/client'
 
 describe('workspace file confirmation', () => {
+  it('shows a temporary service failure without treating the directory as empty or replaying a request', async () => {
+    const fetch = vi.spyOn(client, 'apiFetch').mockRejectedValue(new client.ApiProblem(503, 'file_service_unavailable', 'Remote workspace operation could not be completed'))
+    const wrapper = mount(WorkspaceFiles, { props: { baseUrl: '/workspace', spaceId: 'spc_test' }, global: { plugins: [createPinia(), [Quasar, { components: { QFile, QCheckbox, QBtn, QSeparator, QCardSection, QBanner, QLinearProgress, QList, QItem, QItemSection, QItemLabel, QIcon, QMenu, QDialog, QCard, QCardActions, QInput }, directives: { ClosePopup } }]] } })
+    try {
+      await flushPromises()
+      expect(wrapper.get('[role="alert"]').text()).toContain('服务暂时无法提供文件访问')
+      expect(wrapper.text()).not.toContain('目录为空')
+      expect(wrapper.text()).not.toContain('重新签发')
+      expect(fetch).toHaveBeenCalledTimes(1)
+    } finally { wrapper.unmount(); vi.restoreAllMocks() }
+  })
   it('ignores an older directory failure after a newer directory succeeds', async () => {
     let rejectOld!: (error: Error) => void
     const oldRequest = new Promise((_, reject) => { rejectOld = reject })

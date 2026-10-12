@@ -1816,14 +1816,14 @@ type WorkspaceFileFailure struct {
 	Status int    `json:"status"`
 }
 
-// WorkspaceFileList defines model for WorkspaceFileList.
+// WorkspaceFileList Files hides the workspace-root .agent-space entry and rejects direct access to it and its descendants. Similar names and nested same-name paths remain ordinary entries. Standard WebDAV does not apply this policy.
 type WorkspaceFileList struct {
 	AvailableBytes *int64               `json:"availableBytes,omitempty"`
 	Entries        []WorkspaceFileEntry `json:"entries"`
 	UsedBytes      *int64               `json:"usedBytes,omitempty"`
 }
 
-// WorkspaceFileMutation defines model for WorkspaceFileMutation.
+// WorkspaceFileMutation Files source and destination paths must not address the workspace-root .agent-space entry or its descendants.
 type WorkspaceFileMutation struct {
 	Action             WorkspaceFileMutationAction `json:"action"`
 	Destination        *string                     `json:"destination,omitempty"`

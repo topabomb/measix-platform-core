@@ -87,3 +87,24 @@ func TestPersistedRuntimeBindingCannotOutliveCurrentIntent(t *testing.T) {
 	}
 	_ = actor
 }
+
+func TestFileLeaseProtectsOnlyRootAgentSpace(t *testing.T) {
+	s, _, actor, user := lifecycleFixture(t)
+	ctx := context.Background()
+	runCommand(t, s, actor, user, "CREATE")
+	space := s.Client.AgentSpace.GetX(ctx, user).AgentSpaceID
+	for _, p := range []string{".agent-space", ".agent-space/private", ".agent-space-backup", "ordinary/.agent-space"} {
+		access, err := s.OpenFiles(ctx, actor, user, space, "LIST", p, func(context.Context) error { return nil })
+		if p == ".agent-space" || p == ".agent-space/private" {
+			var remote *remoteapi.Error
+			if !errors.As(err, &remote) || remote.Code != "invalid_file_path" || access != nil {
+				t.Fatalf("protected path %q acquired a lease: %v", p, err)
+			}
+		} else {
+			if err != nil {
+				t.Fatalf("ordinary path %q rejected: %v", p, err)
+			}
+			s.CloseFiles(access, "SUCCEEDED", 0)
+		}
+	}
+}

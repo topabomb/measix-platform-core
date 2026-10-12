@@ -130,6 +130,43 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 
 本次提交前复核未重跑真实 LAN 大文件、Android 或手机；前节 512 MiB LAN 与 >4 GiB 独立 DAV 证据仍对应各自固定构建，不能改称最终提交的大文件验收。
 
+### 同步后正确性复核与真实本机联调
+
+2026-10-11 本机 Core 从 `e5e17c9` 快进到 `2d1e350`，架构从 `8da4d4c` 快进到 `4e1d270` 后再次复核。继续遵循独立 DAV 资源、按用户授权与确切 Activation ACK、Files 独立管理、可选 MCP 和仅统计的边界；未修改合同、生成材料或迁移，也未创建正式发行。
+
+- Relay 先于转发拒绝根目录删除/移动/覆盖、根目录 Destination、重复斜线别名和 `.agent-space*` 保留路径，保留根目录读取、属性和锁的标准行为。Console 降权须确认；网络或服务端失败后锁定原权限操作，以原请求正文及幂等键核实，轮询修订变化不会制造新操作。两项行为修复均先复现失败测试再修复；部署手册同步为 control v3、迁移至 006 和持久授权意图的恢复规则。
+- 当前 Go 全量 tests/vet、Console 46 文件 316 tests/typecheck/build、81 项 tooling、生成漂移和 Core 合同材料校验通过。真实浏览器验证文本预览、降权确认及 390px 无横向溢出。
+- 隔离本机实例连接用户提供的真实 Agent Space；原 `local` 账号仅作管理查询、MCP 握手/目录及 DAV 只读探测。另建两名专用测试用户/空间，验证发布 DAV 与可选 MCP、字节往返/Range、跨用户隔离、只读与完整切换、Files 独立、MCP 读取及无预算/定价的请求统计。标准 webdav@5.11.0 客户端与关闭发布、凭据重设、显式撤销、断开恢复生命周期均通过；实例和测试空间保留以供继续验证。
+- 真实 MP4 的 4,400,476,038 字节及容量内 540,079,753 字节上传均返回 502。前者还超过该测试空间的 1 GiB 容量；直连同一 Agent Space、绕过 Hub/Relay 的上传也返回 502，随后 HEAD 503，日志为 `guest tcp connect: agent client error: client closed`。不能声明大文件验收或上游故障已修复；未自动重放未知写入，也未修改独立 Agent Space 源码或重启其容器。
+
+本轮证据为 `.data/workspace-review-20261011/review-result.json`、`compiled-changes.diff`、生命周期/标准客户端/失败传输报告及浏览器截图，记录当前二进制、SPA 和上游镜像摘要。该目录也含私有环境与凭据，不可整目录公开分发。未验证物理第二台 LAN 设备、Android/手机新 DAV 消费、IPv6 部署或生产发布；本轮结果不覆盖上节历史大文件证据或 S0/S1 阶段门禁。
+
+## 服务重建后的连接修复与本机更新（2026-10-12）
+
+Core `2d1e350`、Architecture `4e1d270` 均与本轮最新 fetch 一致；其上为尚未提交的修复。机制统一见[工作区实现参考](remote-workspace-implementation.md#独立服务已重建后的修复)，不将全新空间描述成文件恢复。保留既有按钮对齐和原生 details 的 box-sizing 修正；服务表单、连接诊断、权限及容量仍按需展开，不增加常驻信息面板。
+
+Go 全量 tests/vet、相关工作区/HTTP/控制包的最新回归、Console 全量测试/typecheck/生产构建及 81 项 tooling 通过。观察到地址保存、修订 CAS、ACK 前禁止创建、未知创建不重发、批次内显式接管、前端未知请求固定正文/幂等键和恢复入口等 Red，再修复到 Green。Admin 新合同、fixtures、Go/TS 及基线身份导出同步；重复生成一致，core 材料校验通过。相对 HEAD 的 drift 因预期生成改动未提交返回 1，不能记为通过。
+
+隔离验证使用生产 SPA、真实 Hub/Relay 和独立确定性管理/DAV 替身：页面确认空空间边界后一次重新开通三个空间，原 Activation ACK 完成，原用户、草稿、发布字节和旧 SecretVersion 逐行保全；完整权限 PUT/GET 往返、只读 PROPFIND 207/PUT 403、显式撤销保持撤销。桌面及 390px 确认框、键盘复选和真实文件页检查通过。未知远端写入故障组合由 Go 回归覆盖，不将替身结果写成真实 Agent Space 的崩溃验收。
+
+本轮连接修复最初部署为 `workspace-repair-20261012-2d1e350`；后续目录保护调整的当前构建见下文。迁移 6→6、应用 0 项。在线备份并保留旧二进制、SPA、冷态库和 spool；4 个用户、1 份草稿、12 个已有发布及全部旧用量事实逐行校验保留，运行中的新增用量允许追加。三个现有空间 ID 不变；管理检查、实际 104 字节旧验证文件读取通过，提供的 LAN 地址由本机浏览器实际访问，服务端 SPA 与构建字节一致。独立 Agent Space 的容器 ID、镜像和启动时间不变，未修改容量或重启。
+
+证据根 `.data/workspace-review-20261011/connection-repair-20261012-1028/` 保存 `isolated-runtime-result.json`、`isolated-data-preserved.json`、`local-runtime-result.json`、`local-data-preserved.json`、Console 报告、浏览器图及更新备份。该目录含私有测试身份、凭据和数据库，不能整体公开。未重跑大文件、Android/手机、物理第二台 LAN 设备或正式发行验证。
+
+## Files 保护目录与标准 DAV 边界修订（2026-10-12）
+
+按更新后的 S1 合同及 Control Protocol §10.7.2，Files 只保护根下精确名称 `.agent-space`，标准 DAV 保持上游目录项和访问语义；机制见[实现参考](remote-workspace-implementation.md)。观察到混合列表拒绝、相似/嵌套名称误拒绝及 Relay 207 截断的 Red，再修复到 Green。全量 Go tests/vet、Console 类型检查、428 项生成材料的重复生成一致性及 core 合同材料校验通过。Admin/Client OpenAPI 只同步说明及文件摘要，字段、版本与数据库 schema 不变；生成改动仍未提交，不宣称相对 HEAD 的 drift 通过。
+
+此次目录保护部署使用 `files-policy-20261012-2d1e350`，监听所有接口，Hub/Relay 版本及部署二进制摘要均核对一致；迁移 6→6、应用 0 项。真实管理员与 Client Files 根列表 200 且隐藏保护项，普通子目录及已有 README 读取 200；平台 DAV 根列表完整 207 并保留 `.agent-space`，该目录元信息与直连均 207，跨空间 403。验证所用临时设备已撤销。三个原空间 ID/绑定修订及全部前端资源字节保持不变，独立 Agent Space 容器、镜像与启动时间不变。
+
+在线备份及冷态库/spool/旧程序保留于 `.data/workspace-review-20261011/files-policy-20261012/`；`runtime-verification.json`、`deployment-identity.json`、`data-preserved.json` 记录实际结果。4 个用户、1 份草稿、12 个发布、23 个 SecretVersion 及全部旧用量行逐行保全，数据库与外键检查通过，正常请求只追加新用量。此次未新增前端交互或重跑浏览器、Android、大文件及正式发行验收。
+
+### 提交前完整审查（2026-10-12）
+
+审查覆盖 Core 与架构仓库全部未提交变更。新增 Red/Green 确认并修复五处问题：应用请求缺少确认修订仍被接受、服务缓存不可用时冻结操作无法核实、Activation 争用导致更换永久失败、并发用户删除阻塞更换，以及并发相同幂等请求误报修订冲突。接口、fixtures、生成材料、测试脚本和文档同步；SQL schema 和产品/协议版本不变，既有前端布局调整保留。
+
+全量 Go tests/vet、327 项 Console 测试、类型检查/E2E 类型检查/生产构建、81 项 tooling、重复生成一致及 core 材料校验通过。审查与本机后续交付证据位于 `.data/workspace-review-20261011/review-20261012/`；该目录含运行备份，不整体分发。未新增 Android、Agent Space 崩溃或正式发行验收声明。
+
 ## 保留的失败边界
 
 - 隔离工作区大文件 PUT 曾在约 50 MiB/64 MiB 传输中返回 502/503 与 UNKNOWN，记录在 `.artifacts/workspace-files-final/`、`.artifacts/resources-review/`。新空间重跑通过不证明间歇传输根因已修复；不得自动重放未知写入，生产验收前继续核查。

@@ -24,8 +24,39 @@ type operationTarget struct {
 	SpaceID  string                    `json:"agentSpaceId"`
 	// Capture the prior availability in the same transaction as APPLY intent.
 	// A failed read-only check must not enable a previously disabled service.
-	PreviousEnabled bool   `json:"previousEnabled,omitempty"`
-	PreviousState   string `json:"previousState,omitempty"`
+	PreviousEnabled    bool               `json:"previousEnabled,omitempty"`
+	PreviousState      string             `json:"previousState,omitempty"`
+	Replacement        []*ent.AgentSpace  `json:"replacement,omitempty"`
+	Recreated          []replacementChild `json:"recreated,omitempty"`
+	InitialDAVRevision int64              `json:"initialDavRevision,omitempty"`
+}
+
+func (s *Service) ApplyAtRevision(ctx context.Context, actor, key, id string, expected int) (adminapi.WorkspaceOperation, error) {
+	if expected < 1 {
+		return adminapi.WorkspaceOperation{}, ErrInvalid
+	}
+	prior, err := s.Client.WorkspaceOperation.Query().Where(workspaceoperation.CreatedByUserIDEQ(actor), workspaceoperation.IdempotencyKeyEQ(key)).Only(ctx)
+	if err == nil {
+		if prior.Action != "APPLY" || prior.WorkspaceServiceID != id || prior.ConfigRevision != int64(expected) {
+			return adminapi.WorkspaceOperation{}, ErrConflict
+		}
+		return operationView(prior), nil
+	}
+	if !ent.IsNotFound(err) {
+		return adminapi.WorkspaceOperation{}, err
+	}
+	row, err := s.Client.WorkspaceService.Get(ctx, id)
+	if err != nil {
+		return adminapi.WorkspaceOperation{}, err
+	}
+	if row.ConfigRevision != int64(expected) {
+		return adminapi.WorkspaceOperation{}, ErrConflict
+	}
+	cfg, err := s.config(ctx, id, row.ConfigRevision)
+	if err != nil {
+		return adminapi.WorkspaceOperation{}, err
+	}
+	return s.begin(ctx, actor, key, id, "", "APPLY", row.ConfigRevision, 0, operationTarget{Config: cfg}, nil)
 }
 
 func (s *Service) WorkspaceServiceCommand(ctx context.Context, actor, key, id, action string) (adminapi.WorkspaceOperation, error) {
@@ -159,8 +190,24 @@ func (s *Service) Command(ctx context.Context, actor, key, userID string, input 
 }
 
 func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userID, action string, configRevision, bindingRevision int64, target operationTarget, input *adminapi.WorkspaceCommand) (adminapi.WorkspaceOperation, error) {
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return adminapi.WorkspaceOperation{}, err
+	}
+	defer tx.Rollback()
+	row, err := s.beginTx(ctx, tx, actor, key, workspaceService, userID, action, configRevision, bindingRevision, target, input, "")
+	if err != nil {
+		return adminapi.WorkspaceOperation{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return adminapi.WorkspaceOperation{}, err
+	}
+	return operationView(row), nil
+}
+
+func (s *Service) beginTx(ctx context.Context, tx *ent.Tx, actor, key, workspaceService, userID, action string, configRevision, bindingRevision int64, target operationTarget, input *adminapi.WorkspaceCommand, parentOperation string) (*ent.WorkspaceOperation, error) {
 	if platformid.Validate(platformid.User, actor) != nil || platformid.Validate(platformid.Idempotency, key) != nil {
-		return adminapi.WorkspaceOperation{}, ErrInvalid
+		return nil, ErrInvalid
 	}
 	requestHash := hash(struct {
 		ID, Action string
@@ -169,42 +216,66 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 	if input != nil {
 		requestHash = hash(*input)
 	}
-	tx, err := s.Client.Tx(ctx)
-	if err != nil {
-		return adminapi.WorkspaceOperation{}, err
-	}
-	defer tx.Rollback()
+	var err error
 	prior, err := tx.WorkspaceOperation.Query().Where(workspaceoperation.CreatedByUserIDEQ(actor), workspaceoperation.IdempotencyKeyEQ(key)).Only(ctx)
 	if err == nil {
 		if prior.RequestHash != requestHash {
-			return adminapi.WorkspaceOperation{}, ErrConflict
+			return nil, ErrConflict
 		}
-		return operationView(prior), nil
+		return prior, nil
 	}
 	if !ent.IsNotFound(err) {
-		return adminapi.WorkspaceOperation{}, err
+		return nil, err
 	}
 	controlPending, err := tx.Activation.Query().Where(activation.StateIn("APPLYING", "UNKNOWN")).Exist(ctx)
 	if err != nil {
-		return adminapi.WorkspaceOperation{}, err
+		return nil, err
 	}
 	if controlPending {
-		return adminapi.WorkspaceOperation{}, ErrPending
+		return nil, ErrPending
+	}
+	var replacementOwner *ent.WorkspaceOperation
+	var replacementTarget operationTarget
+	if parentOperation == "" && userID != "" && action == "TAKEOVER" && input != nil && strings.TrimSpace(str(input.Evidence)) != "" {
+		owner, e := tx.WorkspaceOperation.Query().Where(workspaceoperation.WorkspaceServiceIDEQ(workspaceService), workspaceoperation.UserIDIsNil(), workspaceoperation.ActionEQ("REPLACE"), workspaceoperation.StateEQ("RUNNING"), workspaceoperation.StepEQ("RECREATING")).Only(ctx)
+		if e == nil {
+			if e = json.Unmarshal(owner.TargetJSON, &replacementTarget); e != nil {
+				return nil, e
+			}
+			for _, child := range replacementTarget.Recreated {
+				if child.UserID != userID {
+					continue
+				}
+				original, e := tx.WorkspaceOperation.Get(ctx, child.OperationID)
+				if e != nil {
+					return nil, e
+				}
+				if original.UserID == userID && original.Action == "CREATE" && original.State == "UNKNOWN" && original.Step == "CREATE_SENT" {
+					replacementOwner = owner
+					parentOperation = owner.ID
+				}
+			}
+		} else if !ent.IsNotFound(e) {
+			return nil, e
+		}
 	}
 	pending := tx.WorkspaceOperation.Query().Where(workspaceoperation.WorkspaceServiceIDEQ(workspaceService), workspaceoperation.StateNEQ("COMPLETED"))
 	if userID != "" {
 		pending = pending.Where(workspaceoperation.Or(workspaceoperation.UserIDEQ(userID), workspaceoperation.UserIDIsNil()))
 	}
+	if parentOperation != "" {
+		pending = pending.Where(workspaceoperation.IDNEQ(parentOperation))
+	}
 	busy, err := pending.Clone().Exist(ctx)
 	if err != nil {
-		return adminapi.WorkspaceOperation{}, err
+		return nil, err
 	}
 	if busy {
 		// A lost create response cannot be replayed. Explicit takeover of the
 		// observed original account is the only permitted replacement operation.
 		prior, e := pending.Only(ctx)
 		if e != nil {
-			return adminapi.WorkspaceOperation{}, ErrPending
+			return nil, ErrPending
 		}
 		retiredStep := "SUPERSEDED_BY_VERIFIED_TAKEOVER"
 		if action == "DISCONNECT" && input != nil && strings.TrimSpace(str(input.Evidence)) != "" &&
@@ -215,16 +286,16 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 				prior.BindingRevision != bindingRevision || target.SpaceID == "" ||
 				pinned.Username != target.Username || (pinned.SpaceID != "" && pinned.SpaceID != target.SpaceID) ||
 				hash(pinned.Config) != hash(target.Config) {
-				return adminapi.WorkspaceOperation{}, ErrConflict
+				return nil, ErrConflict
 			}
 			// Evidence establishes that the old DAV write ended. Retire it without
 			// replay, then use the normal disconnect flow to revoke both credentials.
 			retiredStep = "SUPERSEDED_BY_VERIFIED_DISCONNECT"
 		} else if action != "TAKEOVER" || prior.Action != "CREATE" || prior.State != "UNKNOWN" || prior.Step != "CREATE_SENT" {
-			return adminapi.WorkspaceOperation{}, ErrPending
+			return nil, ErrPending
 		}
 		if _, e = tx.WorkspaceOperation.UpdateOneID(prior.ID).SetState("COMPLETED").SetStep(retiredStep).SetEvidence(actor + ": " + str(input.Evidence)).Save(ctx); e != nil {
-			return adminapi.WorkspaceOperation{}, e
+			return nil, e
 		}
 	}
 	now := s.Now().UTC()
@@ -242,25 +313,28 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 		row, e := tx.AgentSpace.Get(ctx, userID)
 		if ent.IsNotFound(e) {
 			davRevision = 1
-			builder := tx.AgentSpace.Create().SetID(userID).SetWorkspaceServiceID(workspaceService).SetRemoteUsername(target.Username).SetBindingRevision(1).SetIntent(intent).SetState(state).SetRemoteActive(false).SetStopPending(false).SetDavConfirmed(false).SetFileAccessIntent("AUTHORIZED").SetDavAccessMode("FULL").SetDavBindingRevision(davRevision).SetCreatedAt(now).SetUpdatedAt(now)
+			if target.InitialDAVRevision > 0 {
+				davRevision = target.InitialDAVRevision
+			}
+			builder := tx.AgentSpace.Create().SetID(userID).SetWorkspaceServiceID(workspaceService).SetRemoteUsername(target.Username).SetBindingRevision(bindingRevision + 1).SetIntent(intent).SetState(state).SetRemoteActive(false).SetStopPending(false).SetDavConfirmed(false).SetFileAccessIntent("AUTHORIZED").SetDavAccessMode("FULL").SetDavBindingRevision(davRevision).SetCreatedAt(now).SetUpdatedAt(now)
 			if target.SpaceID != "" {
 				builder.SetAgentSpaceID(target.SpaceID)
 			}
 			if _, err = builder.Save(ctx); err != nil {
-				return adminapi.WorkspaceOperation{}, err
+				return nil, err
 			}
 		} else {
 			if e != nil {
-				return adminapi.WorkspaceOperation{}, e
+				return nil, e
 			}
 			if row.BindingRevision != bindingRevision {
-				return adminapi.WorkspaceOperation{}, ErrConflict
+				return nil, ErrConflict
 			}
 			davRevision = row.DavBindingRevision
 			update := tx.AgentSpace.UpdateOneID(userID).SetBindingRevision(bindingRevision + 1).SetUpdatedAt(now)
 			if action == "SET_DAV_ACCESS" {
 				if input == nil || input.ExpectedDAVRevision == nil || *input.ExpectedDAVRevision != row.DavBindingRevision {
-					return adminapi.WorkspaceOperation{}, ErrConflict
+					return nil, ErrConflict
 				}
 				davRevision++
 				update.SetBindingRevision(bindingRevision).SetDavBindingRevision(davRevision).SetDavAccessMode(string(*input.DavAccessMode))
@@ -281,7 +355,7 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 				}
 			}
 			if _, err = update.Save(ctx); err != nil {
-				return adminapi.WorkspaceOperation{}, err
+				return nil, err
 			}
 		}
 		if action != "SET_DAV" && action != "REVOKE_DAV" && action != "SET_DAV_ACCESS" {
@@ -290,10 +364,10 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 	} else {
 		prior, e := tx.WorkspaceService.Get(ctx, workspaceService)
 		if e != nil {
-			return adminapi.WorkspaceOperation{}, e
+			return nil, e
 		}
 		if prior.ConfigRevision != configRevision {
-			return adminapi.WorkspaceOperation{}, ErrConflict
+			return nil, ErrConflict
 		}
 		target.PreviousEnabled, target.PreviousState = prior.Enabled, prior.State
 		update := tx.WorkspaceService.UpdateOneID(workspaceService).SetUpdatedAt(now)
@@ -303,7 +377,7 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 			update.SetEnabled(false).SetState("DISABLING")
 		}
 		if _, err = update.Save(ctx); err != nil {
-			return adminapi.WorkspaceOperation{}, err
+			return nil, err
 		}
 	}
 	data, _ := json.Marshal(target)
@@ -316,12 +390,23 @@ func (s *Service) begin(ctx context.Context, actor, key, workspaceService, userI
 	}
 	row, err := builder.Save(ctx)
 	if err != nil {
-		return adminapi.WorkspaceOperation{}, err
+		return nil, err
 	}
-	if err = tx.Commit(); err != nil {
-		return adminapi.WorkspaceOperation{}, err
+	if replacementOwner != nil {
+		for i := range replacementTarget.Recreated {
+			if replacementTarget.Recreated[i].UserID == userID {
+				replacementTarget.Recreated[i].OperationID = row.ID
+			}
+		}
+		data, err := json.Marshal(replacementTarget)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = tx.WorkspaceOperation.UpdateOneID(replacementOwner.ID).SetTargetJSON(data).ClearDiagnosticCode().SetUpdatedAt(now).Save(ctx); err != nil {
+			return nil, err
+		}
 	}
-	return operationView(row), nil
+	return row, nil
 }
 
 func (s *Service) resume(ctx context.Context, actor, userID string, input adminapi.WorkspaceCommand) (adminapi.WorkspaceOperation, error) {
@@ -612,7 +697,7 @@ func (s *Service) advance(ctx context.Context, op *ent.WorkspaceOperation) (bool
 		return false, &remoteapi.Error{Code: "management_result_unknown", Unknown: true}
 	}
 	if op.UserID == "" {
-		return s.advanceWorkspaceService(ctx, op, client)
+		return s.advanceWorkspaceService(ctx, op, client, target)
 	}
 	space, err := s.Client.AgentSpace.Get(ctx, op.UserID)
 	if err != nil {
@@ -993,7 +1078,7 @@ func (s *Service) complete(ctx context.Context, op *ent.WorkspaceOperation) erro
 	return tx.Commit()
 }
 
-func (s *Service) advanceWorkspaceService(ctx context.Context, op *ent.WorkspaceOperation, client *remoteapi.Client) (bool, error) {
+func (s *Service) advanceWorkspaceService(ctx context.Context, op *ent.WorkspaceOperation, client *remoteapi.Client, target operationTarget) (bool, error) {
 	switch op.Step {
 	case "START":
 		if op.Action == "APPLY" {
@@ -1002,7 +1087,11 @@ func (s *Service) advanceWorkspaceService(ctx context.Context, op *ent.Workspace
 				return false, err
 			}
 			if !check.ManagementReady {
-				return false, ErrUnavailable
+				code := str(check.DiagnosticCode)
+				if code == "" {
+					code = "workspace_unavailable"
+				}
+				return false, &remoteapi.Error{Code: code, Status: 503}
 			}
 		}
 		return true, s.step(ctx, op, "CONTROL")
@@ -1019,6 +1108,13 @@ func (s *Service) advanceWorkspaceService(ctx context.Context, op *ent.Workspace
 		}
 		return true, s.step(ctx, op, "REMOTE")
 	case "REMOTE":
+		if op.Action == "REPLACE" {
+			err := s.queueReplacement(ctx, op, target)
+			if errors.Is(err, ErrPending) {
+				return false, nil
+			}
+			return true, err
+		}
 		if op.Action == "DISABLE" {
 			rows, err := s.Client.AgentSpace.Query().Where(agentspace.WorkspaceServiceIDEQ(op.WorkspaceServiceID), agentspace.RemoteActiveEQ(true)).All(ctx)
 			if err != nil {
@@ -1058,6 +1154,23 @@ func (s *Service) advanceWorkspaceService(ctx context.Context, op *ent.Workspace
 			return false, err
 		}
 		return false, tx.Commit()
+	case "RECREATING":
+		progress, err := s.replacementProgress(ctx, target)
+		if err != nil {
+			return false, err
+		}
+		if progress.Completed != progress.Total {
+			update := s.Client.WorkspaceOperation.UpdateOneID(op.ID).SetUpdatedAt(s.Now())
+			if progress.NeedsAttention > 0 {
+				update.SetDiagnosticCode("workspace_recreation_needs_attention")
+			} else {
+				update.ClearDiagnosticCode()
+			}
+			_, err = update.Save(ctx)
+			return false, err
+		}
+		_, err = s.Client.WorkspaceOperation.UpdateOneID(op.ID).SetState("COMPLETED").SetStep("DONE").ClearDiagnosticCode().SetUpdatedAt(s.Now()).Save(ctx)
+		return false, err
 	}
 	return false, ErrInvalid
 }

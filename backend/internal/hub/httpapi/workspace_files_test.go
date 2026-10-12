@@ -80,7 +80,7 @@ func TestFilesNativeVideoUsesVersionedRangeAndSafeContentType(t *testing.T) {
 }
 
 func TestWorkspaceFileErrorsHaveActionableStatus(t *testing.T) {
-	for code, want := range map[string]int{"invalid_file_destination": 400, "workspace_space_mismatch": 409, "file_listing_limit": 422, "file_version_conflict": 412, "file_locked": 423, "file_range_invalid": 416, "file_conflict": 409, "dav_credential_unavailable": 503, "file_storage_full": 507, "file_transfer_limit": 429} {
+	for code, want := range map[string]int{"invalid_file_path": 400, "invalid_file_destination": 400, "invalid_dav_href": 503, "invalid_dav_xml": 503, "workspace_space_mismatch": 409, "file_listing_limit": 422, "file_version_conflict": 412, "file_locked": 423, "file_range_invalid": 416, "file_conflict": 409, "dav_credential_unavailable": 503, "file_storage_full": 507, "file_transfer_limit": 429} {
 		w := httptest.NewRecorder()
 		writeWorkspaceError(w, &remoteapi.Error{Code: code})
 		if w.Code != want {

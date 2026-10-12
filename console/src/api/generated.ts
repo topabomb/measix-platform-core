@@ -1003,6 +1003,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/remote-workspace/services/{workspaceServiceId}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Explicitly replace a destroyed deployment after all original accounts are confirmed missing. Revokes old platform bindings before queuing fresh spaces; never deletes remote files. */
+        post: operations["replaceWorkspaceDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply": {
         parameters: {
             query?: never;
@@ -1219,6 +1236,7 @@ export interface components {
             modifiedAt?: string;
             etag?: string;
         };
+        /** @description Files hides the workspace-root .agent-space entry and rejects direct access to it and its descendants. Similar names and nested same-name paths remain ordinary entries. Standard WebDAV does not apply this policy. */
         WorkspaceFileList: {
             entries: components["schemas"]["WorkspaceFileEntry"][];
             /** Format: int64 */
@@ -1226,6 +1244,7 @@ export interface components {
             /** Format: int64 */
             availableBytes?: number;
         };
+        /** @description Files source and destination paths must not address the workspace-root .agent-space entry or its descendants. */
         WorkspaceFileMutation: {
             /** @enum {string} */
             action: "MKCOL" | "MOVE" | "COPY" | "DELETE";
@@ -1361,6 +1380,10 @@ export interface components {
             expectedRevision: number;
             name: string;
             config: components["schemas"]["AgentSpaceConfig"];
+            /**
+             * @deprecated
+             * @description Legacy UI hint; identity is verified when applying the saved configuration.
+             */
             confirmSameDeployment?: boolean;
         };
         WorkspaceServiceCheck: {
@@ -1368,6 +1391,33 @@ export interface components {
             /** @enum {string} */
             filesStatus: "NOT_CONFIGURED" | "UNVERIFIED" | "VERIFIED";
             diagnosticCode?: string;
+            configRevision?: number;
+            replacementAvailable?: boolean;
+            missingWorkspaces?: components["schemas"]["WorkspaceReplacementBinding"][];
+        };
+        WorkspaceReplacementBinding: {
+            userId: components["schemas"]["UserId"];
+            displayName?: string;
+            agentSpaceId: components["schemas"]["AgentSpaceId"];
+            /** Format: int64 */
+            bindingRevision: number;
+            /** Format: int64 */
+            davBindingRevision: number;
+        };
+        ApplyWorkspaceServiceRequest: {
+            /** @description Apply only this administrator-confirmed saved configuration. Missing or changed revisions are rejected. */
+            expectedConfigRevision: number;
+        };
+        ReplaceWorkspaceDeploymentRequest: {
+            expectedConfigRevision: number;
+            /** @description Confirms old deployment/data are gone and all old management requests have ended; fresh spaces will be empty. */
+            confirmedDestroyedDeployment: boolean;
+            bindings: components["schemas"]["WorkspaceReplacementBinding"][];
+        };
+        WorkspaceReplacementProgress: {
+            total: number;
+            completed: number;
+            needsAttention: number;
         };
         WorkspaceCommand: {
             davAccessMode?: components["schemas"]["DAVAccessMode"];
@@ -1391,6 +1441,7 @@ export interface components {
             state: "PENDING" | "RUNNING" | "UNKNOWN" | "NEEDS_ATTENTION" | "COMPLETED";
             step: string;
             diagnosticCode?: string;
+            replacementProgress?: components["schemas"]["WorkspaceReplacementProgress"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -5065,6 +5116,36 @@ export interface operations {
             default: components["responses"]["Problem"];
         };
     };
+    replaceWorkspaceDeployment: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                "Idempotency-Key": components["schemas"]["IdempotencyKey"];
+            };
+            path: {
+                workspaceServiceId: components["schemas"]["WorkspaceServiceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceWorkspaceDeploymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted durable replacement and recreation intent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOperation"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
     applyWorkspaceService: {
         parameters: {
             query?: never;
@@ -5077,7 +5158,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyWorkspaceServiceRequest"];
+            };
+        };
         responses: {
             /** @description Accepted durable intent */
             202: {

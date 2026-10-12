@@ -94,7 +94,10 @@ func (c *Client) href(name, raw string) (string, error) {
 		return "", &Error{Code: "invalid_dav_href"}
 	}
 	p := strings.TrimSuffix(strings.TrimPrefix(resolved.Path, root.Path), "/")
-	return RelativePath(p, false)
+	if _, err := RelativePath(p, false); err != nil {
+		return "", &Error{Code: "invalid_dav_href"}
+	}
+	return p, nil
 }
 func (c *Client) davRequest(ctx context.Context, name, token, p, method string, body io.Reader, headers http.Header) (*http.Response, error) {
 	raw, err := c.DAVURL(name, p)
@@ -188,6 +191,9 @@ func (c *Client) davRequest(ctx context.Context, name, token, p, method string, 
 }
 func (c *Client) list(ctx context.Context, name, token, p, depth string) (adminapi.WorkspaceFileList, error) {
 	out := adminapi.WorkspaceFileList{Entries: []adminapi.WorkspaceFileEntry{}}
+	if _, err := FilePath(p, false); err != nil {
+		return out, err
+	}
 	response, err := c.davRequest(ctx, name, token, p, "PROPFIND", strings.NewReader(properties), http.Header{"Depth": []string{depth}, "Content-Type": []string{"application/xml"}})
 	if err != nil {
 		return out, err
@@ -213,6 +219,9 @@ func (c *Client) list(ctx context.Context, name, token, p, depth string) (admina
 			if depth == "0" || !strings.HasPrefix(path, prefix) || strings.Contains(strings.TrimPrefix(path, prefix), "/") {
 				return out, &Error{Code: "invalid_dav_href"}
 			}
+		}
+		if protectedFilePath(path) {
+			continue
 		}
 		if r.Status != "" && (statusCode(r.Status) < 200 || statusCode(r.Status) >= 300) {
 			return out, &Error{Code: "file_listing_partial"}
@@ -293,7 +302,7 @@ func (c *Client) Content(ctx context.Context, name, token, p, method string, bod
 	if method != "GET" && method != "HEAD" && method != "PUT" {
 		return nil, &Error{Code: "invalid_file_request"}
 	}
-	if _, err := RelativePath(p, true); err != nil {
+	if _, err := FilePath(p, true); err != nil {
 		return nil, err
 	}
 	if headers.Get("If-Match") != "" && !validETag(headers.Get("If-Match")) {
@@ -322,7 +331,7 @@ func (c *Client) Content(ctx context.Context, name, token, p, method string, bod
 }
 func (c *Client) Mutate(ctx context.Context, name, token string, input adminapi.WorkspaceFileMutation) (adminapi.WorkspaceFileResult, error) {
 	out := adminapi.WorkspaceFileResult{Outcome: "SUCCEEDED", Failures: []adminapi.WorkspaceFileFailure{}, Truncated: false}
-	if _, err := RelativePath(input.Path, true); err != nil {
+	if _, err := FilePath(input.Path, true); err != nil {
 		return out, err
 	}
 	method := string(input.Action)
@@ -351,7 +360,7 @@ func (c *Client) Mutate(ctx context.Context, name, token string, input adminapi.
 		if input.Destination == nil {
 			return out, &Error{Code: "invalid_file_destination"}
 		}
-		if _, err := RelativePath(*input.Destination, true); err != nil {
+		if _, err := FilePath(*input.Destination, true); err != nil {
 			return out, err
 		}
 		dest, err := c.DAVURL(name, *input.Destination)

@@ -132,7 +132,39 @@ func (h *fullAdminHandler) CheckWorkspaceService(w http.ResponseWriter, r *http.
 	writeJSON(w, 200, out)
 }
 func (h *fullAdminHandler) ApplyWorkspaceService(w http.ResponseWriter, r *http.Request, id adminapi.WorkspaceServiceId, p adminapi.ApplyWorkspaceServiceParams) {
-	h.workspaceServiceCommand(w, r, id, p.XCSRFToken, p.IdempotencyKey, "APPLY")
+	actor, ok := h.workspaceAuth(w, r, p.XCSRFToken, true)
+	if !ok {
+		return
+	}
+	var input adminapi.ApplyWorkspaceServiceRequest
+	if decodeStrictJSON(r, &input) != nil {
+		writeWorkspaceError(w, workspace.ErrInvalid)
+		return
+	}
+	out, err := h.services.Workspace.ApplyAtRevision(r.Context(), actor, p.IdempotencyKey, id, input.ExpectedConfigRevision)
+	if err != nil {
+		writeWorkspaceError(w, err)
+		return
+	}
+	writeJSON(w, 202, out)
+}
+func (h *fullAdminHandler) ReplaceWorkspaceDeployment(w http.ResponseWriter, r *http.Request, id adminapi.WorkspaceServiceId, p adminapi.ReplaceWorkspaceDeploymentParams) {
+	actor, ok := h.workspaceAuth(w, r, p.XCSRFToken, true)
+	if !ok {
+		return
+	}
+	var input adminapi.ReplaceWorkspaceDeploymentRequest
+	if decodeStrictJSON(r, &input) != nil {
+		writeWorkspaceError(w, workspace.ErrInvalid)
+		return
+	}
+	out, err := h.services.Workspace.ReplaceDeployment(r.Context(), actor, p.IdempotencyKey, id, input)
+	if err != nil {
+		writeWorkspaceError(w, err)
+		return
+	}
+	h.services.Workspace.CancelInvalidFiles(r.Context())
+	writeJSON(w, 202, out)
 }
 func (h *fullAdminHandler) DisableWorkspaceService(w http.ResponseWriter, r *http.Request, id adminapi.WorkspaceServiceId, p adminapi.DisableWorkspaceServiceParams) {
 	h.workspaceServiceCommand(w, r, id, p.XCSRFToken, p.IdempotencyKey, "DISABLE")

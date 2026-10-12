@@ -54,6 +54,10 @@ describe('workspace file prerequisites', () => {
     try {
       await flushPromises()
       expect(wrapper.text()).toContain('默认文件交换空间')
+      expect(wrapper.text()).toContain('已开通')
+      expect(wrapper.text()).not.toContain('MCP 可用')
+      expect(wrapper.text()).not.toContain('文件 可用')
+      expect(vi.mocked(client.apiFetch).mock.calls.some(([path]) => path.includes('/files'))).toBe(false)
       expect(wrapper.text()).toContain('当前生效：只读')
       expect(wrapper.text()).toContain('不改变 Console 文件管理权限')
     } finally { wrapper.unmount() }

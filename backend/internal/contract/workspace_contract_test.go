@@ -36,6 +36,37 @@ func TestWorkspaceResourceFixtureIsAdminOnly(t *testing.T) {
 	}
 }
 
+func TestDeploymentReplacementFixturesAreAdminOnly(t *testing.T) {
+	doc := loadContractDoc(t, "api/admin/admin.openapi.yaml")
+	for schema, name := range map[string]string{"WorkspaceServiceCheck": "replacement-check.json", "ReplaceWorkspaceDeploymentRequest": "replacement-request.json", "ApplyWorkspaceServiceRequest": "apply-request.json"} {
+		raw, err := os.ReadFile(filepath.Join("../../../api/fixtures/workspace", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var value map[string]any
+		if err = json.Unmarshal(raw, &value); err != nil {
+			t.Fatal(err)
+		}
+		if err = doc.Components.Schemas[schema].Value.VisitJSON(value); err != nil {
+			t.Fatal(schema, err)
+		}
+	}
+	if loadContractDoc(t, "api/client/client-control.openapi.yaml").Components.Schemas["ReplaceWorkspaceDeploymentRequest"] != nil {
+		t.Fatal("deployment replacement exposed to clients")
+	}
+	path := doc.Paths.Find("/api/admin/v1/remote-workspace/services/{workspaceServiceId}/replace")
+	if path == nil || path.Post == nil {
+		t.Fatal("missing replacement endpoint")
+	}
+	if len(path.Post.Parameters) != 3 || path.Post.RequestBody == nil || !path.Post.RequestBody.Value.Required {
+		t.Fatal("replacement must require CSRF, idempotency and explicit request")
+	}
+	apply := doc.Paths.Find("/api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply")
+	if apply == nil || apply.Post.RequestBody == nil || !apply.Post.RequestBody.Value.Required {
+		t.Fatal("apply must require the administrator-confirmed revision")
+	}
+}
+
 func TestWorkspaceClientProjectionFixtures(t *testing.T) {
 	for _, contract := range []string{"api/client/client-control.openapi.yaml", "api/admin/admin.openapi.yaml"} {
 		doc := loadContractDoc(t, contract)

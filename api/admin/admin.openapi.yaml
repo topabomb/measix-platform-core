@@ -2101,6 +2101,29 @@ paths:
                 $ref: '#/components/schemas/WorkspaceServiceCheck'
         default:
           $ref: '#/components/responses/Problem'
+  /api/admin/v1/remote-workspace/services/{workspaceServiceId}/replace:
+    post:
+      operationId: replaceWorkspaceDeployment
+      description: Explicitly replace a destroyed deployment after all original accounts are confirmed missing. Revokes old platform bindings before queuing fresh spaces; never deletes remote files.
+      parameters:
+      - *workspace_id001
+      - *workspace_id002
+      - *workspace_id003
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceWorkspaceDeploymentRequest'
+      responses:
+        '202':
+          description: Accepted durable replacement and recreation intent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceOperation'
+        default:
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/remote-workspace/services/{workspaceServiceId}/apply:
     post:
       operationId: applyWorkspaceService
@@ -2108,6 +2131,12 @@ paths:
       - *workspace_id001
       - *workspace_id002
       - *workspace_id003
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyWorkspaceServiceRequest'
       responses:
         '202':
           description: Accepted durable intent
@@ -3142,6 +3171,7 @@ components:
           type: string
     WorkspaceFileList:
       type: object
+      description: Files hides the workspace-root .agent-space entry and rejects direct access to it and its descendants. Similar names and nested same-name paths remain ordinary entries. Standard WebDAV does not apply this policy.
       additionalProperties: false
       required:
       - entries
@@ -3160,6 +3190,7 @@ components:
           minimum: 0
     WorkspaceFileMutation:
       type: object
+      description: Files source and destination paths must not address the workspace-root .agent-space entry or its descendants.
       additionalProperties: false
       required:
       - action
@@ -3540,6 +3571,8 @@ components:
           $ref: '#/components/schemas/AgentSpaceConfig'
         confirmSameDeployment:
           type: boolean
+          deprecated: true
+          description: Legacy UI hint; identity is verified when applying the saved configuration.
     WorkspaceServiceCheck:
       type: object
       additionalProperties: false
@@ -3557,6 +3590,70 @@ components:
           - VERIFIED
         diagnosticCode:
           type: string
+        configRevision:
+          type: integer
+          minimum: 1
+        replacementAvailable:
+          type: boolean
+        missingWorkspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceReplacementBinding'
+    WorkspaceReplacementBinding:
+      type: object
+      additionalProperties: false
+      required: [userId, agentSpaceId, bindingRevision, davBindingRevision]
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        displayName:
+          type: string
+        agentSpaceId:
+          $ref: '#/components/schemas/AgentSpaceId'
+        bindingRevision:
+          type: integer
+          format: int64
+          minimum: 1
+        davBindingRevision:
+          type: integer
+          format: int64
+          minimum: 1
+    ApplyWorkspaceServiceRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedConfigRevision]
+      properties:
+        expectedConfigRevision:
+          type: integer
+          minimum: 1
+          description: Apply only this administrator-confirmed saved configuration. Missing or changed revisions are rejected.
+    ReplaceWorkspaceDeploymentRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedConfigRevision, bindings, confirmedDestroyedDeployment]
+      properties:
+        expectedConfigRevision:
+          type: integer
+          minimum: 1
+        confirmedDestroyedDeployment:
+          type: boolean
+          description: Confirms old deployment/data are gone and all old management requests have ended; fresh spaces will be empty.
+        bindings:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/WorkspaceReplacementBinding'
+    WorkspaceReplacementProgress:
+      type: object
+      additionalProperties: false
+      required: [total, completed, needsAttention]
+      properties:
+        total:
+          type: integer
+        completed:
+          type: integer
+        needsAttention:
+          type: integer
     WorkspaceCommand:
       type: object
       additionalProperties: false
@@ -3631,6 +3728,8 @@ components:
           type: string
         diagnosticCode:
           type: string
+        replacementProgress:
+          $ref: '#/components/schemas/WorkspaceReplacementProgress'
         createdAt:
           type: string
           format: date-time

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { apiFetch, createIdempotencyKey } from '../api/client'
+import { apiFetch, commandResultUncertain, createIdempotencyKey } from '../api/client'
 import type { components } from '../api/generated'
 import { useSessionStore } from '../stores/session'
 import { useRemoteWorkspaceStore, type WorkspaceService } from '../stores/remoteWorkspace'
@@ -16,22 +16,37 @@ const session = useSessionStore(), remoteWorkspace = useRemoteWorkspaceStore(), 
 const current = computed(() => remoteWorkspace.current)
 const desiredEnabled = ref(false), saving = ref(false), error = ref<unknown>(), notice = ref('')
 const name = ref('远程工作区'), adminOrigin = ref(''), mcpOrigin = ref(''), davOrigin = ref(''), bearer = ref('')
-const sameDeployment = ref(false), confirmDisable = ref(false)
+const mcpUsesAdmin = ref(true), confirmDisable = ref(false), confirmReplacement = ref(false), replacementConfirmed = ref(false)
 const selectedUser = ref<string>(), userLabel = ref('')
 const workspaces = ref<components['schemas']['WorkspaceList']>({ items: [] })
 const savedSecret = ref<components['schemas']['SecretRef']>()
 const operation = ref<Operation>(), check = ref<components['schemas']['WorkspaceServiceCheck']>()
+const pendingCommand = ref<{ path: string; body?: string; key: string }>()
 let alive = true, timer: ReturnType<typeof setTimeout> | undefined
 let pending: { payload: string; key: string } | undefined
 const running = computed(() => !!operation.value && ['PENDING', 'RUNNING'].includes(operation.value.state))
 const blocked = computed(() => !!operation.value && ['UNKNOWN', 'NEEDS_ATTENTION'].includes(operation.value.state))
 const busy = computed(() => saving.value || running.value || remoteWorkspace.loading)
-const originChanged = computed(() => !!current.value && (adminOrigin.value.trim() !== current.value.config.adminOrigin || (mcpOrigin.value.trim() || adminOrigin.value.trim()) !== current.value.config.mcpOrigin || davOrigin.value.trim() !== (current.value.config.davOrigin ?? '')))
-const hasChanges = computed(() => desiredEnabled.value !== !!current.value?.enabled || name.value.trim() !== current.value?.name || originChanged.value || !!bearer.value || !!savedSecret.value || current.value?.activeConfigRevision !== current.value?.configRevision)
-const canSave = computed(() => !busy.value && !blocked.value && (desiredEnabled.value
-  ? !!adminOrigin.value.trim() && (!originChanged.value || sameDeployment.value) && (!!current.value || !!bearer.value || !!savedSecret.value) && (hasChanges.value || !remoteWorkspace.enabled)
-  : !!current.value?.enabled))
-const status = computed(() => !current.value ? '尚未配置' : current.value.state === 'ACTIVE' ? '已启用' : current.value.state === 'SAVED' ? '配置已保存，未启用' : workspaceLabel(current.value.state))
+const resolvedMcpOrigin = computed(() => mcpUsesAdmin.value ? adminOrigin.value.trim() : mcpOrigin.value.trim())
+const originChanged = computed(() => !!current.value && (adminOrigin.value.trim() !== current.value.config.adminOrigin || resolvedMcpOrigin.value !== current.value.config.mcpOrigin || davOrigin.value.trim() !== (current.value.config.davOrigin ?? '')))
+const connectionChanged = computed(() => name.value.trim() !== current.value?.name || originChanged.value || !!bearer.value || !!savedSecret.value)
+const formChanged = computed(() => desiredEnabled.value !== !!current.value?.enabled || connectionChanged.value)
+const notApplied = computed(() => !!current.value && current.value.activeConfigRevision !== current.value.configRevision)
+const canSave = computed(() => !busy.value && !blocked.value && (!!pendingCommand.value || (desiredEnabled.value
+  ? !!adminOrigin.value.trim() && !!resolvedMcpOrigin.value && (!!current.value || !!bearer.value || !!savedSecret.value) && (formChanged.value || notApplied.value || !remoteWorkspace.enabled)
+  : !!current.value?.enabled)))
+const status = computed(() => !current.value ? '尚未配置' : running.value && operation.value?.action === 'REPLACE' ? '修复中' : notApplied.value ? '新配置未生效' : current.value.state === 'ACTIVE' ? '已启用' : current.value.state === 'SAVED' ? '未启用' : workspaceLabel(current.value.state))
+const canRepair = computed(() => !!current.value && desiredEnabled.value && !connectionChanged.value && !blocked.value && !running.value && check.value?.configRevision === current.value.configRevision && !check.value.managementReady && !!check.value.replacementAvailable && !!check.value.missingWorkspaces?.length)
+const feedback = computed(() => {
+  if (saving.value) return notice.value || '正在处理连接，请稍候。'
+  if (pendingCommand.value) return '请求结果未确认。请核实原操作；将使用原请求，不会重复开通。'
+  if (running.value) {
+    const progress = operation.value?.replacementProgress
+    return progress ? `正在重新开通：${progress.completed}/${progress.total}${progress.needsAttention ? `。请在用户工作区核实 ${progress.needsAttention} 个原操作。` : ''}` : notice.value || '正在处理连接，请稍候。'
+  }
+  if (check.value) return check.value.managementReady ? '连接检查通过。' : canRepair.value ? '原有空间在此服务中均不存在。确认旧部署已清理后，可重新开通。' : workspaceLabel(check.value.diagnosticCode) || '连接检查未通过，请检查地址和管理凭据。'
+  return notice.value || (blocked.value ? '操作结果待核实，请查看诊断。' : notApplied.value ? '新配置已保存，连接生效后才会用于用户空间。' : '')
+})
 
 function keyFor(payload: string) {
   if (pending?.payload !== payload) pending = { payload, key: createIdempotencyKey() }
@@ -43,14 +58,14 @@ function fillForm() {
   if (!value) return
   name.value = value.name; adminOrigin.value = value.config.adminOrigin
   mcpOrigin.value = value.config.mcpOrigin; davOrigin.value = value.config.davOrigin ?? ''
-  sameDeployment.value = false
+  mcpUsesAdmin.value = value.config.mcpOrigin === value.config.adminOrigin
 }
 async function loadSpaces(cursor?: string) {
   if (!current.value) return
   try {
     const result = await apiFetch<components['schemas']['WorkspaceList']>(`/api/admin/v1/remote-workspace/services/${current.value.workspaceServiceId}/workspaces${cursor ? '?cursor=' + encodeURIComponent(cursor) : ''}`)
     if (alive) workspaces.value = result
-  } catch (cause) { if (alive) error.value = cause }
+  } catch (cause) { if (alive) { error.value = cause; notice.value = '' } }
 }
 async function refresh() {
   await remoteWorkspace.load()
@@ -63,6 +78,7 @@ async function refresh() {
   }
 }
 function requestSave() {
+  if (pendingCommand.value) { void save(); return }
   if (!desiredEnabled.value && current.value?.enabled) confirmDisable.value = true
   else void save()
 }
@@ -70,6 +86,8 @@ async function save() {
   if (!session.csrfToken) return
   saving.value = true; error.value = undefined; notice.value = ''; confirmDisable.value = false
   try {
+    if (pendingCommand.value) { await sendOperation(); return }
+    check.value = undefined
     let value = current.value
     if (desiredEnabled.value) {
       let secret = savedSecret.value ?? value?.config.managementSecret
@@ -81,29 +99,56 @@ async function save() {
       if (!secret) throw new Error('请输入工作区服务的管理凭据。')
       const config: components['schemas']['AgentSpaceConfig'] = {
         adminOrigin: adminOrigin.value.trim().replace(/\/$/, ''),
-        mcpOrigin: (mcpOrigin.value.trim() || adminOrigin.value.trim()).replace(/\/$/, ''),
+        mcpOrigin: resolvedMcpOrigin.value.replace(/\/$/, ''),
         ...(davOrigin.value.trim() ? { davOrigin: davOrigin.value.trim().replace(/\/$/, '') } : {}),
         managementSecret: secret,
         connectTimeoutMs: value?.config.connectTimeoutMs ?? 90000, idleTimeoutMs: value?.config.idleTimeoutMs ?? 120000,
       }
       if (!value || name.value.trim() !== value.name || originChanged.value || secret.secretId !== value.config.managementSecret.secretId || secret.secretVersion !== value.config.managementSecret.secretVersion) {
-        const body = { expectedRevision: value?.configRevision ?? 0, name: name.value.trim() || '远程工作区', confirmSameDeployment: sameDeployment.value, config }
+        const body = { expectedRevision: value?.configRevision ?? 0, name: name.value.trim() || '远程工作区', config }
         const payload = JSON.stringify(body)
-        value = await apiFetch<WorkspaceService>('/api/admin/v1/remote-workspace/services' + (value ? '/' + value.workspaceServiceId : ''), {
+        const saved = await apiFetch<WorkspaceService>('/api/admin/v1/remote-workspace/services' + (value ? '/' + value.workspaceServiceId : ''), {
           method: value ? 'PUT' : 'POST', headers: { 'Idempotency-Key': keyFor(payload) }, body: payload,
         }, session.csrfToken)
+        value = { ...value, ...saved }
         remoteWorkspace.current = value; savedSecret.value = undefined; pending = undefined
+        fillForm(); desiredEnabled.value = true
       }
     }
     if (!value) return
+    if (desiredEnabled.value) {
+      check.value = await apiFetch(`/api/admin/v1/remote-workspace/services/${value.workspaceServiceId}/check`, { method: 'POST' }, session.csrfToken)
+      if (!check.value?.managementReady) return
+    }
     const action = desiredEnabled.value ? 'apply' : 'disable'
     const path = `/api/admin/v1/remote-workspace/services/${value.workspaceServiceId}/${action}`
-    operation.value = await apiFetch<Operation>(path, { method: 'POST', headers: { 'Idempotency-Key': keyFor(path + '/' + value.configRevision) } }, session.csrfToken)
-    pending = undefined; check.value = undefined
-    notice.value = desiredEnabled.value ? '配置已保存，正在启用服务并核对已有空间。' : '正在关闭访问并停止工作区，文件会保留。'
+    notice.value = desiredEnabled.value ? '正在启用连接。' : '正在关闭访问并停止工作区，文件会保留。'
+    await sendOperation(path, desiredEnabled.value ? JSON.stringify({ expectedConfigRevision: value.configRevision }) : undefined)
+  } catch (cause) { if (alive) error.value = cause }
+  finally { saving.value = false }
+}
+async function sendOperation(path?: string, body?: string) {
+  if (!session.csrfToken) return
+  if (!pendingCommand.value && path) pendingCommand.value = { path, body, key: createIdempotencyKey() }
+  const command = pendingCommand.value
+  if (!command) return
+  try {
+    operation.value = await apiFetch<Operation>(command.path, { method: 'POST', headers: { 'Idempotency-Key': command.key }, ...(command.body ? { body: command.body } : {}) }, session.csrfToken)
+    pendingCommand.value = undefined; check.value = undefined; confirmReplacement.value = false
     await remoteWorkspace.load()
     if (alive) poll()
-  } catch (cause) { if (alive) error.value = cause }
+  } catch (cause) {
+    if (!commandResultUncertain(cause)) { pendingCommand.value = undefined; check.value = undefined; confirmReplacement.value = false }
+    throw cause
+  }
+}
+async function replaceDeployment() {
+  if (!pendingCommand.value && (!canRepair.value || !replacementConfirmed.value || !check.value?.missingWorkspaces)) return
+  saving.value = true; error.value = undefined; notice.value = '正在重新开通用户空间。'
+  try {
+    if (pendingCommand.value) await sendOperation()
+    else await sendOperation(`/api/admin/v1/remote-workspace/services/${current.value!.workspaceServiceId}/replace`, JSON.stringify({ expectedConfigRevision: check.value?.configRevision, bindings: check.value?.missingWorkspaces, confirmedDestroyedDeployment: true }))
+  } catch (cause) { error.value = cause; notice.value = '' }
   finally { saving.value = false }
 }
 function poll() {
@@ -115,18 +160,25 @@ async function refreshOperation() {
   try {
     const result = await apiFetch<Operation>('/api/admin/v1/workspace-operations/' + operation.value.operationId)
     if (!alive) return
+    const previousStep = operation.value.step
     operation.value = result
-    if (running.value) { poll(); return }
+    if (running.value) {
+      if (result.action === 'REPLACE' && result.step === 'RECREATING' && (previousStep !== result.step || !remoteWorkspace.enabled)) {
+        await remoteWorkspace.load(); await loadSpaces()
+      }
+      poll(); return
+    }
     await remoteWorkspace.load(); await loadSpaces()
     if (result.state === 'COMPLETED' && result.step !== 'CHECK_FAILED') {
       fillForm()
-      notice.value = remoteWorkspace.enabled ? '已启用。现在可以开通用户工作区；MCP 工具入口可稍后配置。' : '已关闭。已有空间和文件保留，重新启用后可恢复连接。'
+      check.value = undefined
+      notice.value = remoteWorkspace.enabled ? '连接已生效。' : '已关闭。已有空间和文件保留，重新启用后可恢复连接。'
     } else notice.value = result.step === 'CHECK_FAILED' ? '配置已保存，但启用检查未通过。请修正连接配置后再次保存。' : '操作尚未确认完成，请查看诊断并核实远端状态。'
   } catch (cause) { if (alive) error.value = cause }
 }
 async function checkConnection() {
   if (!current.value || !session.csrfToken) return
-  saving.value = true; error.value = undefined
+  saving.value = true; error.value = undefined; notice.value = ''
   try { check.value = await apiFetch(`/api/admin/v1/remote-workspace/services/${current.value.workspaceServiceId}/check`, { method: 'POST' }, session.csrfToken) }
   catch (cause) { error.value = cause }
   finally { saving.value = false }
@@ -143,39 +195,36 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
 <template>
   <q-page padding>
     <PageHeader title="远程工作区" subtitle="连接工作区服务，为用户提供独立空间、文件管理和可选的助手工具。" />
-    <ProblemBanner :error="error || remoteWorkspace.error" />
-    <q-banner v-if="notice" class="bg-blue-1 q-mb-md" data-cy="workspace-save-notice">{{ notice }}</q-banner>
+    <ProblemBanner :error="pendingCommand ? undefined : error || remoteWorkspace.error" />
     <div class="remote-workspace-grid">
-      <details class="workspace-service" :open="!current">
-        <summary><span class="text-weight-medium">服务连接</span><q-badge :color="remoteWorkspace.enabled ? 'positive' : 'grey-7'">{{ status }}</q-badge><span class="text-caption text-grey-7 ellipsis">{{ current?.name ?? '配置服务地址与凭据' }}</span><span class="text-caption text-primary">配置</span></summary>
+      <details class="workspace-service" :open="!current || notApplied || running || blocked || !!pendingCommand || !!check">
+        <summary><span class="text-weight-medium">服务连接</span><q-badge :color="notApplied ? 'orange-8' : remoteWorkspace.enabled ? 'positive' : 'grey-7'">{{ status }}</q-badge><span class="text-caption text-grey-7 ellipsis">{{ current?.name ?? '配置服务地址与凭据' }}</span><span class="text-caption text-primary">配置</span></summary>
       <q-card flat>
         <q-card-section>
-          <div class="row items-center justify-between q-gutter-sm"><div class="text-h6">服务连接</div><q-badge :color="remoteWorkspace.enabled ? 'positive' : 'grey-7'">{{ status }}</q-badge></div>
-          <q-toggle v-model="desiredEnabled" label="启用远程工作区" :disable="busy || blocked" class="q-mt-sm" />
+          <q-toggle v-model="desiredEnabled" label="启用远程工作区" :disable="busy || blocked || !!pendingCommand" />
           <p class="text-caption text-grey-7 q-mb-none">开关在保存后生效。关闭会停止工作区并撤销工具和文件访问，保留空间及文件。</p>
         </q-card-section>
         <template v-if="desiredEnabled || current">
           <q-separator />
           <q-card-section class="workspace-connection-fields">
-            <q-input v-model="name" outlined dense label="连接名称" :disable="busy || !desiredEnabled" />
-            <q-input v-model="adminOrigin" outlined dense label="管理服务地址" placeholder="https://space.example.com" :disable="busy || !desiredEnabled" />
-            <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="支持 HTTP / HTTPS、本机和局域网地址。须与 Agent Space 的 WebDAV 对外地址一致；留空只使用工具能力。" :disable="busy || !desiredEnabled" />
-            <q-input v-model="bearer" outlined dense type="password" autocomplete="new-password" :label="current ? '管理凭据（留空保留原值）' : '管理凭据'" :disable="busy || !desiredEnabled" />
+            <q-input v-model="name" outlined dense label="连接名称" :disable="busy || !!pendingCommand || !desiredEnabled" />
+            <q-input v-model="adminOrigin" outlined dense label="管理服务地址" placeholder="https://space.example.com" :disable="busy || !!pendingCommand || !desiredEnabled" />
+            <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="填写 Agent Space 的 WebDAV 对外地址；留空仅提供工具。" :disable="busy || !!pendingCommand || !desiredEnabled" />
+            <q-input v-model="bearer" outlined dense type="password" autocomplete="new-password" :label="current ? '管理凭据（留空保留原值）' : '管理凭据'" :disable="busy || !!pendingCommand || !desiredEnabled" />
             <details>
               <summary class="cursor-pointer text-primary">工具服务地址（可选）</summary>
-              <q-input v-model="mcpOrigin" outlined dense label="MCP 服务地址" hint="留空使用管理服务地址。填写地址不等于发布 MCP 工具。" class="q-mt-sm" :disable="busy || !desiredEnabled" />
+              <q-checkbox v-model="mcpUsesAdmin" dense label="随管理服务地址" class="q-mt-sm" :disable="busy || !!pendingCommand || !desiredEnabled" />
+              <q-input v-if="!mcpUsesAdmin" v-model="mcpOrigin" outlined dense label="MCP 服务地址" class="q-mt-sm" :disable="busy || !!pendingCommand || !desiredEnabled" />
             </details>
-            <q-checkbox v-if="originChanged" v-model="sameDeployment" dense label="新地址仍指向原服务和原有空间" :disable="busy || !desiredEnabled" />
           </q-card-section>
         </template>
         <q-card-actions class="q-pa-sm q-pt-none">
-          <q-btn color="primary" label="保存配置" :loading="saving || running" :disable="!canSave" @click="requestSave" />
-          <q-btn v-if="current" flat label="检查已保存连接" :disable="busy || hasChanges" @click="checkConnection" />
+          <q-btn color="primary" :label="saving ? '正在提交' : running ? '处理中' : pendingCommand ? '核实原操作' : desiredEnabled || !current ? '保存并连接' : '保存并关闭'" :loading="saving || running" :disable="!canSave" @click="requestSave" />
+          <q-btn v-if="current" flat label="检查连接" :disable="busy || connectionChanged || !!pendingCommand" @click="checkConnection" />
         </q-card-actions>
-        <q-card-section v-if="operation || check" class="q-pt-none">
-          <q-banner v-if="check" dense :class="check.managementReady ? 'bg-green-1' : 'bg-orange-1'">管理连接：{{ check.managementReady ? '可用' : '未确认' }}<div v-if="check.diagnosticCode">{{ workspaceLabel(check.diagnosticCode) }}</div></q-banner>
-          <q-banner v-if="operation && (running || blocked || operation.step === 'CHECK_FAILED')" dense class="bg-blue-1">{{ workspaceLabel(operation.state) }}<div>{{ workspaceLabel(operation.diagnosticCode) }}</div><q-btn flat dense label="刷新进度" @click="refreshOperation" /></q-banner>
-          <details v-if="current" class="text-caption q-mt-sm"><summary>连接诊断</summary>配置版本 {{ current.configRevision }} · 生效版本 {{ current.activeConfigRevision ?? '无' }}<div v-if="operation">{{ operation.operationId }} · {{ operation.step }}</div></details>
+        <q-card-section v-if="feedback || operation || check" class="q-pt-none">
+          <q-banner v-if="feedback" dense :class="canRepair || blocked || pendingCommand ? 'bg-orange-1' : 'bg-blue-1'" data-cy="workspace-save-notice">{{ feedback }}<template #action><q-btn v-if="canRepair && !pendingCommand" flat dense label="修复连接" :disable="busy" @click="replacementConfirmed = false; confirmReplacement = true" /><q-btn v-if="running || blocked" flat dense label="刷新进度" @click="refreshOperation" /></template></q-banner>
+          <details v-if="current" class="text-caption q-mt-sm"><summary>连接诊断</summary>配置版本 {{ current.configRevision }} · 生效版本 {{ current.activeConfigRevision ?? '无' }}<div v-if="check?.diagnosticCode">{{ check.diagnosticCode }}</div><div v-if="operation">{{ operation.operationId }} · {{ operation.step }}<span v-if="operation.diagnosticCode"> · {{ operation.diagnosticCode }}</span></div></details>
         </q-card-section>
       </q-card>
       </details>
@@ -202,7 +251,8 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
         </q-card></div>
       </div>
     </div>
-    <q-dialog v-model="confirmDisable"><q-card style="max-width:480px"><q-card-section class="text-h6">保存并关闭远程工作区</q-card-section><q-card-section>将停止用户工作区，撤销 MCP 和 WebDAV 访问。连接配置、空间和文件保留；远端不可达时会继续显示待处理进度。</q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup /><q-btn color="negative" label="保存并关闭" @click="save" /></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="confirmDisable"><q-card style="max-width:480px"><q-card-section class="text-h6">关闭远程工作区</q-card-section><q-card-section>将停止用户工作区，撤销 MCP 和 WebDAV 访问。连接配置、空间和文件保留；远端不可达时会继续显示待处理进度。</q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup /><q-btn color="negative" label="确认关闭" @click="save" /></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="confirmReplacement" :persistent="saving || !!pendingCommand"><q-card style="width:480px;max-width:95vw"><q-card-section class="text-h6">修复服务连接</q-card-section><q-card-section class="q-pt-none">为原先连接中的有效用户重新开通；新空间为空，旧文件不会恢复。Core 用户、配置、发布和用量保留。<details class="q-my-sm"><summary>受影响用户（{{ check?.missingWorkspaces?.length ?? 0 }}）</summary><div v-for="binding in check?.missingWorkspaces" :key="binding.userId">{{ binding.displayName || binding.userId }}</div></details><q-checkbox v-model="replacementConfirmed" dense label="旧部署和旧数据已清理，原管理请求已结束" :disable="saving || !!pendingCommand" /></q-card-section><q-card-actions align="right"><q-btn flat label="取消" :disable="saving || !!pendingCommand" v-close-popup /><q-btn color="primary" :label="pendingCommand ? '核实原操作' : '确认重新开通'" :loading="saving" :disable="!pendingCommand && (!canRepair || !replacementConfirmed)" @click="replaceDeployment" /></q-card-actions></q-card></q-dialog>
   </q-page>
 </template>
 

@@ -25,6 +25,7 @@ type lifecycleRemote struct {
 	creates, rotates, davWrites          int
 	resources                            any
 	onGet                                func()
+	onMissingGet                         func()
 }
 
 func (f *lifecycleRemote) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +64,9 @@ func (f *lifecycleRemote) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !f.exists {
+		if f.onMissingGet != nil {
+			f.onMissingGet()
+		}
 		w.WriteHeader(404)
 		w.Write([]byte(`{"error":"not_found"}`))
 		return

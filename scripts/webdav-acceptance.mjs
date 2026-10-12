@@ -124,7 +124,7 @@ try {
   await startCore(previousCopy); await waitFor(publicOrigin + '/live', 'Caddy'); await login()
   const secret = await api('/api/admin/v1/secrets', 'POST', { name: 'Acceptance management', value: management })
   const service = await api('/api/admin/v1/remote-workspace/services', 'POST', { name: 'Workspace acceptance', expectedRevision: 0, config: { adminOrigin: adapterOrigin, mcpOrigin: upstreamConfig?.mcpOrigin ?? adapterOrigin, davOrigin: upstreamConfig?.davOrigin ?? adapterOrigin, managementSecret: { secretId: secret.secretId, secretVersion: secret.secretVersion }, connectTimeoutMs: 90000, idleTimeoutMs: 120000 } }, { 'Idempotency-Key': id('idem') })
-  await complete(await api(`/api/admin/v1/remote-workspace/services/${service.workspaceServiceId}/apply`, 'POST', undefined, { 'Idempotency-Key': id('idem') }))
+  await complete(await api(`/api/admin/v1/remote-workspace/services/${service.workspaceServiceId}/apply`, 'POST', { expectedConfigRevision: service.configRevision }, { 'Idempotency-Key': id('idem') }))
   const users = []
   for (const name of ['authorized', 'revoked']) { const user = await api('/api/admin/v1/users', 'POST', { username: 'dav_' + name, displayName: name === 'authorized' ? 'DAV 验收用户' : '已撤销文件授权用户', role: 'MEMBER' }); users.push(user); await command(user, 'CREATE'); await enroll(user) }
   const [user, revoked] = users

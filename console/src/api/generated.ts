@@ -1149,6 +1149,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/users/{userId}/workspace/mcp-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Reveal only the confirmed MCP credential for this workspace. Does not issue or rotate credentials, require MCP publication or DAV access, or return management credentials. Response is no-store. */
+        post: operations["revealWorkspaceMCP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/users/{userId}/workspace/files": {
         parameters: {
             query?: never;
@@ -1461,6 +1478,13 @@ export interface components {
             /** Format: uri */
             davUrl: string;
             username: string;
+            token: string;
+        };
+        WorkspaceMCPConnection: {
+            /** Format: uri */
+            mcpUrl: string;
+            username: string;
+            /** @description Complete MCP Bearer Token, also used to log in to supported desktop consoles. Never persist in browser storage. */
             token: string;
         };
         DeploymentId: string;
@@ -5388,6 +5412,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceDAVConnection"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    revealWorkspaceMCP: {
+        parameters: {
+            query: {
+                /** @description Expected space from WorkspaceProjection; never selects a user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
+                expectedRevision: number;
+            };
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current MCP connection; its Token also authenticates supported Agent Space desktop consoles. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceMCPConnection"];
                 };
             };
             default: components["responses"]["Problem"];

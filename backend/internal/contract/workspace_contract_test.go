@@ -36,6 +36,28 @@ func TestWorkspaceResourceFixtureIsAdminOnly(t *testing.T) {
 	}
 }
 
+func TestWorkspaceMCPCredentialFixtureIsAdminOnly(t *testing.T) {
+	doc := loadContractDoc(t, "api/admin/admin.openapi.yaml")
+	raw, err := os.ReadFile("../../../api/fixtures/workspace/mcp-connection.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value map[string]any
+	if err = json.Unmarshal(raw, &value); err != nil {
+		t.Fatal(err)
+	}
+	if err = doc.Components.Schemas["WorkspaceMCPConnection"].Value.VisitJSON(value); err != nil {
+		t.Fatal(err)
+	}
+	client := loadContractDoc(t, "api/client/client-control.openapi.yaml")
+	if client.Components.Schemas["WorkspaceMCPConnection"] != nil {
+		t.Fatal("MCP credential leaked to client contract")
+	}
+	if doc.Paths.Find("/api/admin/v1/users/{userId}/workspace/mcp-connection").Get != nil {
+		t.Fatal("credential reveal is not an explicit POST")
+	}
+}
+
 func TestDeploymentReplacementFixturesAreAdminOnly(t *testing.T) {
 	doc := loadContractDoc(t, "api/admin/admin.openapi.yaml")
 	for schema, name := range map[string]string{"WorkspaceServiceCheck": "replacement-check.json", "ReplaceWorkspaceDeploymentRequest": "replacement-request.json", "ApplyWorkspaceServiceRequest": "apply-request.json"} {

@@ -2310,6 +2310,34 @@ paths:
                 $ref: '#/components/schemas/WorkspaceDAVConnection'
         default:
           $ref: '#/components/responses/Problem'
+  /api/admin/v1/users/{userId}/workspace/mcp-connection:
+    post:
+      operationId: revealWorkspaceMCP
+      description: Reveal only the confirmed MCP credential for this workspace. Does not issue or rotate credentials, require MCP publication or DAV access, or return management credentials. Response is no-store.
+      parameters:
+      - *workspace_id004
+      - *workspace_id002
+      - name: agentSpaceId
+        in: query
+        required: true
+        description: Expected space from WorkspaceProjection; never selects a user.
+        schema:
+          $ref: '#/components/schemas/AgentSpaceId'
+      - name: expectedRevision
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Current MCP connection; its Token also authenticates supported Agent Space desktop consoles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMCPConnection'
+        default:
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/users/{userId}/workspace/files:
     get:
       operationId: listAdminWorkspaceFiles
@@ -3780,6 +3808,22 @@ components:
           type: string
         token:
           type: string
+    WorkspaceMCPConnection:
+      type: object
+      additionalProperties: false
+      required:
+      - mcpUrl
+      - username
+      - token
+      properties:
+        mcpUrl:
+          type: string
+          format: uri
+        username:
+          type: string
+        token:
+          type: string
+          description: Complete MCP Bearer Token, also used to log in to supported desktop consoles. Never persist in browser storage.
     DeploymentId:
       type: string
       pattern: ^dep_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$

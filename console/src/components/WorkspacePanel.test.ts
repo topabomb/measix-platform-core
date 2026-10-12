@@ -9,6 +9,61 @@ import type { components } from '../api/generated'
 
 afterEach(() => vi.restoreAllMocks())
 
+describe('workspace MCP and desktop credentials', () => {
+  function mountPanel() {
+    const pinia = createPinia()
+    useSessionStore(pinia).session = { csrfToken: 'test-csrf' } as components['schemas']['AdminSession']
+    return mount(WorkspacePanel, {
+      props: { userId: 'usr_test', serviceEnabled: true },
+      global: { plugins: [pinia, [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, WorkspaceFiles: true, ProblemBanner: true, QDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } } },
+    })
+  }
+  const projection = { schemaVersion: 1, state: 'CONNECTED', serviceState: 'ENABLED', bindingRevision: 1, agentSpaceId: 'spc_test', mcpAvailable: false, mcpReason: 'mcp_not_published', filesAvailable: false }
+  const credentials = { mcpUrl: 'https://space.test/u/test/mcp', username: 'test', token: 'key_fixture.secret' }
+  it('reveals a masked current Token on demand without published MCP or DAV access', async () => {
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async path => path.includes('/mcp-connection') ? credentials as never : projection as never)
+    const wrapper = mountPanel()
+    try {
+      await flushPromises()
+      expect(fetch.mock.calls.some(([path]) => path.includes('/mcp-connection'))).toBe(false)
+      const button = wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'MCP / 云桌面凭据')
+      expect(button).toBeDefined()
+      await button!.trigger('click')
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '查看当前 MCP 凭据')!.trigger('click')
+      await flushPromises()
+      expect(fetch).toHaveBeenCalledWith('/api/admin/v1/users/usr_test/workspace/mcp-connection?agentSpaceId=spc_test&expectedRevision=1', expect.objectContaining({ method: 'POST' }), 'test-csrf')
+      const token = wrapper.findAllComponents(QInput).find(input => input.props('label') === 'MCP Token')!
+      expect(token.props('modelValue')).toBe(credentials.token)
+      expect(token.props('type')).toBe('password')
+      expect(wrapper.text()).toContain('云桌面')
+      await wrapper.get('[aria-label="显示 MCP Token"]').trigger('click')
+      expect(token.props('type')).toBe('text')
+      expect(wrapper.find('[aria-label="复制完整 MCP Token"]').exists()).toBe(true)
+    } finally { wrapper.unmount() }
+  })
+  it.each(['close', 'hidden', 'user', 'revision', 'unavailable', 'unmount'])('discards pending credentials on %s', async change => {
+    let reveal!: (value: unknown) => void
+    let next = { ...projection }
+    vi.spyOn(client, 'apiFetch').mockImplementation(async path => path.includes('/mcp-connection') ? new Promise(resolve => { reveal = resolve }) as never : next as never)
+    const wrapper = mountPanel()
+    try {
+      await flushPromises()
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'MCP / 云桌面凭据')!.trigger('click')
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '查看当前 MCP 凭据')!.trigger('click')
+      if (change === 'close') wrapper.findAllComponents(QDialog).at(-1)!.vm.$emit('update:modelValue', false)
+      if (change === 'hidden') { vi.spyOn(document, 'hidden', 'get').mockReturnValue(true); document.dispatchEvent(new Event('visibilitychange')) }
+      if (change === 'user') await wrapper.setProps({ userId: 'usr_other' })
+      if (change === 'revision' || change === 'unavailable') {
+        next = { ...projection, ...(change === 'revision' ? { bindingRevision: 2 } : { serviceState: 'DISABLED', mcpReason: 'workspace_service_unavailable' }) }
+        await wrapper.get('[aria-label="刷新工作区"]').trigger('click')
+      }
+      if (change === 'unmount') wrapper.unmount()
+      await flushPromises(); reveal(credentials); await flushPromises()
+      expect(wrapper.findAllComponents(QInput).some(input => input.props('label') === 'MCP Token')).toBe(false)
+    } finally { if (change !== 'unmount') wrapper.unmount() }
+  })
+})
+
 describe('workspace file prerequisites', () => {
   it.each(['already displayed', 'still pending'])('discards %s credentials when the independent DAV revision changes', async timing => {
     const pinia = createPinia()

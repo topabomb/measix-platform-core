@@ -4127,6 +4127,15 @@ type WorkspaceListItem struct {
 	Workspace      WorkspaceProjection `json:"workspace"`
 }
 
+// WorkspaceMCPConnection defines model for WorkspaceMCPConnection.
+type WorkspaceMCPConnection struct {
+	McpUrl string `json:"mcpUrl"`
+
+	// Token Complete MCP Bearer Token, also used to log in to supported desktop consoles. Never persist in browser storage.
+	Token    string `json:"token"`
+	Username string `json:"username"`
+}
+
 // WorkspaceMemoryObservation defines model for WorkspaceMemoryObservation.
 type WorkspaceMemoryObservation struct {
 	ObservedAt *int64                     `json:"observedAt"`
@@ -4840,6 +4849,14 @@ type MutateAdminWorkspaceFileParams struct {
 	XCSRFToken   string       `json:"X-CSRF-Token"`
 }
 
+// RevealWorkspaceMCPParams defines parameters for RevealWorkspaceMCP.
+type RevealWorkspaceMCPParams struct {
+	// AgentSpaceId Expected space from WorkspaceProjection; never selects a user.
+	AgentSpaceId     AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	ExpectedRevision int          `form:"expectedRevision" json:"expectedRevision"`
+	XCSRFToken       string       `json:"X-CSRF-Token"`
+}
+
 // GetAdminWorkspaceResourcesParams defines parameters for GetAdminWorkspaceResources.
 type GetAdminWorkspaceResourcesParams struct {
 	AgentSpaceId string `form:"agentSpaceId" json:"agentSpaceId"`
@@ -5259,6 +5276,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/users/{userId}/workspace/files)
 	MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params MutateAdminWorkspaceFileParams)
+
+	// (POST /api/admin/v1/users/{userId}/workspace/mcp-connection)
+	RevealWorkspaceMCP(w http.ResponseWriter, r *http.Request, userId UserId, params RevealWorkspaceMCPParams)
 
 	// (GET /api/admin/v1/users/{userId}/workspace/resources)
 	GetAdminWorkspaceResources(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceResourcesParams)
@@ -5745,6 +5765,11 @@ func (_ Unimplemented) ListAdminWorkspaceFiles(w http.ResponseWriter, r *http.Re
 
 // (POST /api/admin/v1/users/{userId}/workspace/files)
 func (_ Unimplemented) MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params MutateAdminWorkspaceFileParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/users/{userId}/workspace/mcp-connection)
+func (_ Unimplemented) RevealWorkspaceMCP(w http.ResponseWriter, r *http.Request, userId UserId, params RevealWorkspaceMCPParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -11132,6 +11157,86 @@ func (siw *ServerInterfaceWrapper) MutateAdminWorkspaceFile(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// RevealWorkspaceMCP operation middleware
+func (siw *ServerInterfaceWrapper) RevealWorkspaceMCP(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevealWorkspaceMCPParams
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "expectedRevision" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedRevision", r.URL.Query(), &params.ExpectedRevision, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedRevision"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedRevision", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevealWorkspaceMCP(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAdminWorkspaceResources operation middleware
 func (siw *ServerInterfaceWrapper) GetAdminWorkspaceResources(w http.ResponseWriter, r *http.Request) {
 
@@ -11856,6 +11961,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/dav-connection", wrapper.RevealWorkspaceDAV)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/mcp-connection", wrapper.RevealWorkspaceMCP)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/files", wrapper.ListAdminWorkspaceFiles)

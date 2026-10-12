@@ -138,25 +138,6 @@ func (s *Service) CancelInvalidFiles(ctx context.Context) {
 		}
 	}
 }
-func (s *Service) RevealDAV(ctx context.Context, actor, userID string, authorize func(context.Context) error) (adminapi.WorkspaceDAVConnection, error) {
-	view, err := s.Projection(ctx, userID)
-	if err != nil {
-		return adminapi.WorkspaceDAVConnection{}, err
-	}
-	access, err := s.OpenFiles(ctx, actor, userID, str(view.AgentSpaceId), "REVEAL_DAV", "", authorize)
-	if err != nil {
-		return adminapi.WorkspaceDAVConnection{}, err
-	}
-	defer s.CloseFiles(access, "SUCCEEDED", 0)
-	raw, err := access.Remote.DAVURL(access.Username, "")
-	if err != nil {
-		return adminapi.WorkspaceDAVConnection{}, err
-	}
-	if !access.valid(ctx) {
-		return adminapi.WorkspaceDAVConnection{}, ErrUnavailable
-	}
-	return adminapi.WorkspaceDAVConnection{DavUrl: raw, Username: access.Username, Token: access.Token}, nil
-}
 func (s *Service) ListWorkspaces(ctx context.Context, id, search, cursor string, discoveryEligible bool) (adminapi.WorkspaceList, error) {
 	out := adminapi.WorkspaceList{Items: []adminapi.WorkspaceListItem{}}
 	query := s.Client.AgentSpace.Query().Where(agentspace.WorkspaceServiceIDEQ(id), agentspace.IDGT(cursor))

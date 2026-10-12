@@ -90,6 +90,7 @@ Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/worksp
 - PROPFIND 裸 opaque ETag 规范化为 HTTP 引号形式，随后仍由远端条件请求验证。404 必须通过已认证根目录探测区分文件不存在和文件服务失效。
 - 并发文件请求最多 8；连接/响应头与传输无进展超时受服务配置控制，目录及多状态 XML 响应正文同样受空闲超时约束。请求取消、会话撤销、用户/服务停用、绑定或凭据修订变化均取消原租约。旧请求失败不能撤销新 Token。
 - 审计保存 actor、用户、原空间、路径、实际操作、字节数和结束结果；外部 DAV 直连不冒充 Core 审计。连接信息领取是显式 POST/no-store；列表不返回明文，查看不轮换。
+- `connections.go` 提供工作区限定的 DAV/MCP 连接查看。MCP 使用 `POST workspace/mcp-connection?agentSpaceId=...&expectedRevision=...`，要求 Admin Cookie/CSRF，解密当前 `McpSecretID/Version` 并复验资格、空间、绑定和有效配置；不调用远端、不依赖 MCP 发布或 DAV。审计为 `REVEAL_MCP`，不记录 Token。两个工作区入口共用遮蔽/显示/复制对话框，关闭、页面隐藏、切用户及绑定失效清除明文和在途响应。支持云桌面的空间使用同一 MCP Token 登录；MCP 重签确认同时说明旧桌面会话失效及外部客户端更新，不从服务地址推断桌面能力。
 - 未知文件写入产生 `workspace.file_write_unknown` 结构化诊断，仅记录动作、远端错误分类/状态、字节数及请求/租约是否取消；不记录路径、URL、正文、原始错误或凭据。结合审计区分取消和远端失败，不据日志自动重放。
 - 网页下载通过原生浏览器下载，不把整个大文件读入 JavaScript。上传显示进度并可取消；断流提示刷新核实，不自动重试写入。
 - 文件服务地址未配置时不提供 Token 签发入口，后端在持久化操作前拒绝该请求。上传更换文件、目录或刷新发现目标版本变化时，必须重新确认覆盖。

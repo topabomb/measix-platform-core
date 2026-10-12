@@ -79,7 +79,7 @@ describe('workspace file confirmation', () => {
     else {
       fetch.mockResolvedValue({ entries: [{ path: change === 'directory' ? 'folder/a.txt' : 'a.txt', kind: 'FILE', etag: '"new-version"' }] })
       if (change === 'directory') await wrapper.find('[aria-label="打开目录 folder"]').trigger('click')
-      else await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '刷新')!.trigger('click')
+      else await wrapper.get('[aria-label="刷新文件列表"]').trigger('click')
       await flushPromises()
     }
     expect(wrapper.findComponent(QCheckbox).props('modelValue')).toBe(false)

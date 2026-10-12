@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { copyToClipboard } from 'quasar'
+import { copyToClipboard, useQuasar } from 'quasar'
 import { apiFetch, createIdempotencyKey } from '../api/client'
 import type { components } from '../api/generated'
 import { useSessionStore } from '../stores/session'
 import ProblemBanner from './ProblemBanner.vue'
+import LoadingState from './LoadingState.vue'
 import WorkspaceFiles from './WorkspaceFiles.vue'
 import WorkspaceResources from './WorkspaceResources.vue'
 import WorkspaceDAVAccess from './WorkspaceDAVAccess.vue'
@@ -12,6 +13,7 @@ import { workspaceLabel } from '../composables/workspaceLabels'
 
 const props=withDefaults(defineProps<{userId:string;displayName?:string;serviceEnabled?:boolean}>(),{serviceEnabled:false})
 const session=useSessionStore()
+const quasar=useQuasar()
 type Projection=components['schemas']['WorkspaceProjection']
 type Command=components['schemas']['WorkspaceCommand']
 const view=ref<Projection>(),error=ref<unknown>(),busy=ref(false)
@@ -23,7 +25,7 @@ const connectionKind=ref<ConnectionKind>('dav')
 const connectionOpen=ref(false),connection=ref<components['schemas']['WorkspaceDAVConnection']|components['schemas']['WorkspaceMCPConnection']>(),revealing=ref(false)
 const davConnection=computed(()=>connection.value&&'davUrl' in connection.value?connection.value:undefined)
 const mcpConnection=computed(()=>connection.value&&'mcpUrl' in connection.value?connection.value:undefined)
-const showFiles=ref(false),showToken=ref(false)
+const showFiles=ref(false),showToken=ref(false),showResources=ref(false)
 const recoveryBearer=ref(''),recoverySecret=ref<components['schemas']['SecretRef']>()
 const url=computed(()=>`/api/admin/v1/users/${encodeURIComponent(props.userId)}/workspace`)
 const labels:Record<string,string>={UNPROVISIONED:'未开通',CONNECTING:'开通中',CONNECTED:'已开通',DISCONNECTING:'断开中',DISCONNECTED:'已断开',RESTORING:'恢复中',DELETING:'删除中',DELETED:'已删除',NEEDS_ATTENTION:'需要处理'}
@@ -37,7 +39,7 @@ let pending:{payload:string;key:string}|undefined
 let revealEpoch=0,revealController:AbortController|undefined
 function invalidateConnection(){revealEpoch++;revealController?.abort();revealController=undefined;revealing.value=false;connection.value=undefined;showToken.value=false}
 function canRevealMCP(value:Projection|undefined){return props.serviceEnabled&&value?.state==='CONNECTED'&&value.serviceState!=='DISABLED'&&['available','mcp_not_published'].includes(value.mcpReason??'')}
-function openConnection(kind:ConnectionKind){invalidateConnection();error.value=undefined;connectionKind.value=kind;connectionOpen.value=true}
+function openConnection(kind:ConnectionKind){invalidateConnection();error.value=undefined;connectionKind.value=kind;connectionOpen.value=true;void reveal()}
 async function refresh(){
  const epoch=++refreshEpoch,signal=controller.signal
  try{const next=await apiFetch<Projection>(url.value,{signal});if(!alive||signal.aborted||epoch!==refreshEpoch)return
@@ -72,16 +74,16 @@ async function reveal(){
  const path=connectionKind.value==='dav'?url.value+'/dav-connection':url.value+`/mcp-connection?agentSpaceId=${encodeURIComponent(view.value.agentSpaceId??'')}&expectedRevision=${view.value.bindingRevision}`
  try{const value=await apiFetch<NonNullable<typeof connection.value>>(path,{method:'POST',signal,cache:'no-store'},session.csrfToken);if(alive&&!signal.aborted&&epoch===revealEpoch&&connectionOpen.value&&!document.hidden)connection.value=value}catch(e){if(alive&&!signal.aborted&&epoch===revealEpoch)error.value=e}finally{if(epoch===revealEpoch){revealing.value=false;revealController=undefined}}
 }
-async function copy(value:string){try{await copyToClipboard(value)}catch(e){error.value=e}}
+async function copy(value:string){try{await copyToClipboard(value);quasar.notify({type:'positive',message:'已复制',timeout:1200})}catch(e){error.value=e}}
 watch(connectionOpen,open=>{if(!open)invalidateConnection()},{flush:'sync'})
 watch(()=>props.serviceEnabled,enabled=>{if(!enabled){connectionOpen.value=false;invalidateConnection()}})
-watch(()=>props.userId,async()=>{controller.abort();controller=new AbortController();refreshEpoch++;invalidateConnection();view.value=undefined;operation.value=undefined;connectionOpen.value=false;showFiles.value=false;confirm.value=undefined;recoveryBearer.value='';recoverySecret.value=undefined;pending=undefined;busy.value=false;error.value=undefined;refreshError.value=undefined;await refresh();if(alive)schedule()})
+watch(()=>props.userId,async()=>{controller.abort();controller=new AbortController();refreshEpoch++;invalidateConnection();view.value=undefined;operation.value=undefined;connectionOpen.value=false;showFiles.value=false;showResources.value=false;confirm.value=undefined;recoveryBearer.value='';recoverySecret.value=undefined;pending=undefined;busy.value=false;error.value=undefined;refreshError.value=undefined;await refresh();if(alive)schedule()})
 onMounted(async()=>{document.addEventListener('visibilitychange',visibility);await refresh();if(alive)schedule()})
 onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();document.removeEventListener('visibilitychange',visibility);if(timer)clearTimeout(timer);recoveryBearer.value='';recoverySecret.value=undefined})
 </script>
 <template>
  <q-card flat bordered data-cy="workspace-panel">
-  <q-card-section class="q-pa-sm"><div class="row items-center justify-between"><div><div class="text-h6">远程工作区<span v-if="displayName"> · {{displayName}}</span></div><span class="text-caption text-grey-7">{{view?labels[view.state]:'正在加载'}}</span></div><q-btn flat round icon="refresh" aria-label="刷新工作区" :disable="busy" @click="error=undefined;refresh()"/></div></q-card-section>
+  <q-card-section><div class="workspace-panel-heading"><div><div class="text-subtitle1 text-weight-medium">{{displayName || '远程工作区'}}</div><span class="text-caption text-grey-7">{{view?labels[view.state]:'正在加载'}}</span></div><q-btn flat round dense icon="refresh" aria-label="刷新工作区" :disable="busy" @click="error=undefined;refresh()"/></div></q-card-section>
   <q-card-section class="q-pa-sm q-pt-none"><ProblemBanner :error="error ?? refreshError"/>
    <template v-if="view"><q-banner v-if="view.serviceState==='NOT_CONFIGURED'" dense class="bg-grey-2 q-mb-sm">企业尚未配置远程工作区服务。</q-banner><q-banner v-else-if="view.serviceState==='DISABLED'" dense class="bg-grey-2 q-mb-sm">远程工作区服务未启用，不能开通或恢复连接。已有空间仍可核查和删除。</q-banner>
     <div v-if="(!view.mcpAvailable && view.mcpReason!=='mcp_not_published')||!view.filesAvailable" class="text-caption text-grey-7 q-mb-sm">MCP：{{workspaceLabel(view.mcpReason)}} · 文件：{{davPending?'凭据签发待核实，请先处理下方操作':workspaceLabel(view.filesReason)}}</div>
@@ -91,16 +93,16 @@ onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();docum
     <div class="row items-start q-gutter-xs">
      <q-btn v-if="serviceEnabled && view.state==='UNPROVISIONED' && view.mcpReason!=='user_unavailable'" color="primary" label="开通工作区" :disable="busy" @click="ask('CREATE')"/>
      <q-btn v-if="serviceEnabled && (view.state==='UNPROVISIONED'||operation?.step==='CREATE_SENT'&&operation.state==='UNKNOWN') && view.mcpReason!=='user_unavailable'" outline label="接管已有空间" :disable="busy" @click="ask('TAKEOVER')"/>
-     <q-btn v-if="serviceEnabled && view.filesAvailable" color="primary" :label="showFiles?'收起文件':'浏览文件'" @click="showFiles=!showFiles"/>
+     <q-btn v-if="serviceEnabled && view.filesAvailable" dense color="primary" :label="showFiles?'收起文件':'浏览文件'" @click="showFiles=!showFiles"/>
      <details class="workspace-maintenance"><summary class="text-primary">连接维护</summary><div class="row q-gutter-xs q-mt-sm"><q-btn v-if="view.state==='CONNECTED'" outline label="断开" :disable="busy||!!pendingOperation&&!canVerifyDisconnect" @click="ask('DISCONNECT')"/>
      <q-btn v-if="serviceEnabled && view.state==='DISCONNECTED' && view.mcpReason!=='user_unavailable'" color="primary" label="恢复连接" :disable="busy||!!pendingOperation" @click="ask('RESTORE')"/>
      <q-btn v-if="serviceEnabled && view.state==='CONNECTED' && view.filesAvailable" outline label="WebDAV 连接信息" :disable="busy" @click="openConnection('dav')"/>
      <q-btn v-if="canRevealMCP(view)" outline label="MCP / 云桌面凭据" :disable="busy" @click="openConnection('mcp')"/>
+     <q-btn v-else-if="serviceEnabled && view.state==='CONNECTED'" outline label="重新签发 MCP 凭据" :disable="busy||!!pendingOperation" @click="ask('RESET_MCP')"/>
      <q-btn v-if="view.agentSpaceId&&['CONNECTED','DISCONNECTED'].includes(view.state)" flat color="negative" label="删除空间" :disable="busy||!!pendingOperation" @click="ask('DELETE')"/></div></details>
     </div>
     <details v-if="operation?.state==='COMPLETED'" class="text-caption text-grey-7 q-mt-sm"><summary>最近操作：{{actionLabels[operation.action]}} · 已完成</summary>{{operation.operationId}} · {{operation.step}}</details>
     <q-banner v-if="operation && operation.state!=='COMPLETED'" dense :class="['UNKNOWN','NEEDS_ATTENTION'].includes(operation.state)?'bg-orange-1 q-mt-sm':'bg-blue-1 q-mt-sm'" data-cy="workspace-operation"><div class="text-weight-medium">{{davPending?'文件凭据签发结果待核实':`${actionLabels[operation.action]??'工作区操作'} · ${workspaceLabel(operation.state)}`}}</div><div v-if="davPending" class="q-mt-xs">{{view.mcpAvailable?'MCP 可继续使用；':''}}文件访问暂不可用。原签发请求可能已在远端执行，不能直接重复签发。</div><div v-if="operation.diagnosticCode">{{workspaceLabel(operation.diagnosticCode)}}</div><details class="text-caption"><summary>操作详情</summary>{{operation.operationId}} · {{operation.step}}</details><div v-if="['UNKNOWN','NEEDS_ATTENTION'].includes(operation.state)" class="q-mt-xs"><div>{{davPending?'先查询远端状态，再确认原请求已经结束及账号、空间匹配。查询不会自动恢复文件访问。':'请先核实远端目标及此前在途写入。'}}</div><q-btn flat dense label="重新查询" :disable="busy" @click="command('REQUERY')"/><q-btn v-if="operation.step!=='CREATE_SENT'||!serviceEnabled||view.mcpReason==='user_unavailable'" flat dense label="核实后继续" :disable="busy" @click="ask('CONTINUE')"/></div></q-banner>
-    <details v-if="serviceEnabled && view.state==='CONNECTED'" class="text-caption q-mt-sm"><summary>MCP / 云桌面连接维护</summary><p>MCP 与云桌面登录使用同一 Token。重新签发会使旧 Token 和原云桌面会话失效，不改变文件授权。</p><q-btn flat label="重新签发 MCP 凭据" :disable="busy||!!pendingOperation" @click="ask('RESET_MCP')"/></details>
     <details v-if="view.agentSpaceId" class="text-caption text-grey-7 q-mt-sm"><summary>空间标识与最近观测</summary><div class="text-break">{{view.agentSpaceId}}</div><div>{{view.observedAt?new Date(view.observedAt).toLocaleString():'未观测'}} · 绑定版本 {{view.bindingRevision}}</div></details>
    </template>
   </q-card-section>
@@ -108,8 +110,8 @@ onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();docum
   <details v-if="view?.webdav" class="workspace-details"><summary>客户端 WebDAV <span class="text-grey-7">{{view.webdav.available ? (view.webdav.accessMode==='READ_ONLY'?'只读':'完整') : workspaceLabel(view.webdav.reason)}}</span><q-chip v-if="view.fileExchangeWebdavResourceId" dense size="sm" color="blue-1">默认文件交换空间</q-chip></summary>
     <WorkspaceDAVAccess :key="userId" :workspace="view" :base-url="url" :disabled="busy || !!pendingOperation || !serviceEnabled || view.state !== 'CONNECTED'" @changed="refresh" />
   </details>
-  <details v-if="view?.agentSpaceId" class="workspace-details"><summary>资源摘要与容量</summary><WorkspaceResources :key="view.agentSpaceId" :base-url="url" :space-id="view.agentSpaceId" :revision="`${view.bindingRevision}:${view.state}:${view.serviceState}`"/></details>
-  <q-dialog :model-value="!!confirm" :persistent="busy" @update:model-value="v=>{if(!v){confirm=undefined;recoveryBearer='';recoverySecret=undefined}}"><q-card style="width:520px;max-width:95vw"><q-card-section class="text-h6">{{actionLabels[confirm??'']}}</q-card-section><q-card-section class="q-gutter-sm"><ProblemBanner :error="error"/>
+  <details v-if="view?.agentSpaceId" :open="showResources" class="workspace-details" data-cy="workspace-resource-details" @toggle="showResources=($event.target as HTMLDetailsElement).open"><summary>资源摘要与容量</summary><WorkspaceResources v-if="showResources" :key="view.agentSpaceId" :base-url="url" :space-id="view.agentSpaceId" :revision="`${view.bindingRevision}:${view.state}:${view.serviceState}`"/></details>
+  <q-dialog :model-value="!!confirm" :persistent="busy" @update:model-value="v=>{if(!v){confirm=undefined;recoveryBearer='';recoverySecret=undefined}}"><q-card class="app-dialog app-dialog--sm"><q-card-section class="text-subtitle1 text-weight-medium">{{actionLabels[confirm??'']}}</q-card-section><q-card-section class="app-dialog__body workspace-form-fields"><ProblemBanner :error="error"/>
    <div v-if="confirm==='CREATE'">为此用户创建独立空间。首次工具或文件访问时启动运行环境。</div>
    <div v-if="confirm==='DISCONNECT'">停止工作区并撤销 MCP 和 WebDAV 访问。账号和文件保留。</div>
    <div v-if="confirm==='RESTORE'">恢复原空间与 MCP 访问。此前已授权的文件访问会自动恢复；明确撤销的文件授权保持撤销。</div>
@@ -123,18 +125,39 @@ onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();docum
    <p v-if="confirm==='DISCONNECT'&&canVerifyDisconnect">请先核实原 DAV 请求已经结束及原账号、空间身份。断开将结束该待处理操作并撤销访问，保留空间和文件；之后可以修正连接配置再恢复。</p>
    <q-input v-if="needsEvidence" v-model="evidence" type="textarea" outlined label="核实依据（必填）"/>
   </q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup :disable="busy"/><q-btn :color="confirm==='DELETE'?'negative':'primary'" label="确认" :loading="busy" :disable="confirm==='DELETE'&&confirmation!==view?.agentSpaceId||needsEvidence&&!evidence.trim()" @click="confirm&&command(confirm)"/></q-card-actions></q-card></q-dialog>
-  <q-dialog v-model="connectionOpen"><q-card style="width:600px;max-width:95vw"><q-card-section class="text-h6">{{connectionKind==='dav'?'WebDAV 连接信息':'MCP / 云桌面凭据'}}</q-card-section><q-card-section>
-   <ProblemBanner :error="error"/><p v-if="connectionKind==='dav'">这是直接连接外部文件服务的原始凭据，具有完整文件权限，不受平台 WebDAV 的只读设置、资源开关和统计约束。普通客户端应使用快照下发的平台 WebDAV 配置。外部客户端使用用户名和完整 Token，不使用企业登录密码。</p>
-   <p v-else>外部 MCP 客户端使用完整 Token 进行 Bearer 认证；支持云桌面的空间也使用同一 Token 登录控制台。原始直连不受 Core 的发布、预算和用量统计约束。查看不会重新签发；重签 MCP Token 后，旧客户端凭据和原云桌面会话失效。</p>
-   <q-btn v-if="!connection" outline :label="connectionKind==='dav'?'查看当前连接信息':'查看当前 MCP 凭据'" :loading="revealing" :disable="connectionKind==='dav'?!view?.filesAvailable:!canRevealMCP(view)" @click="reveal"/>
-   <div v-if="davConnection" class="q-gutter-sm"><q-input :model-value="davConnection.davUrl" readonly outlined label="DAV 地址"><template #append><q-btn flat round icon="content_copy" aria-label="复制 DAV 地址" @click="copy(davConnection.davUrl)"/></template></q-input><q-input :model-value="davConnection.username" readonly outlined label="用户名"/><q-input :model-value="davConnection.token" :type="showToken?'text':'password'" readonly outlined label="Token"><template #append><q-btn flat round :icon="showToken?'visibility_off':'visibility'" :aria-label="showToken?'隐藏 Token':'显示 Token'" @click="showToken=!showToken"/><q-btn flat round icon="content_copy" aria-label="复制完整 Token" @click="copy(davConnection.token)"/></template></q-input></div>
-   <div v-if="mcpConnection" class="q-gutter-sm"><q-input :model-value="mcpConnection.mcpUrl" readonly outlined label="MCP 地址"><template #append><q-btn flat round icon="content_copy" aria-label="复制 MCP 地址" @click="copy(mcpConnection.mcpUrl)"/></template></q-input><q-input :model-value="mcpConnection.username" readonly outlined label="用户名"/><q-input :model-value="mcpConnection.token" :type="showToken?'text':'password'" readonly outlined label="MCP Token"><template #append><q-btn flat round :icon="showToken?'visibility_off':'visibility'" :aria-label="showToken?'隐藏 MCP Token':'显示 MCP Token'" @click="showToken=!showToken"/><q-btn flat round icon="content_copy" aria-label="复制完整 MCP Token" @click="copy(mcpConnection.token)"/></template></q-input></div>
-   <div v-if="connectionKind==='dav'" class="row q-gutter-xs q-mt-md"><q-btn outline label="签发 / 重设 Token" :disable="busy||!!pendingOperation" @click="connectionOpen=false;ask('SET_DAV')"/><q-btn flat color="negative" label="撤销 Token" :disable="busy||!!pendingOperation||!view?.filesAvailable" @click="connectionOpen=false;ask('REVOKE_DAV')"/></div>
-   <q-btn v-else class="q-mt-md" outline label="重新签发 MCP 凭据" :disable="busy||!!pendingOperation" @click="connectionOpen=false;ask('RESET_MCP')"/>
-  </q-card-section><q-card-actions align="right"><q-btn flat label="关闭" v-close-popup/></q-card-actions></q-card></q-dialog>
+  <q-dialog v-model="connectionOpen">
+   <q-card class="app-dialog workspace-connection-dialog" data-cy="workspace-connection-dialog">
+    <q-card-section class="text-subtitle1 text-weight-medium">{{connectionKind==='dav'?'WebDAV 连接信息':'MCP / 云桌面凭据'}}</q-card-section>
+    <q-card-section class="app-dialog__body">
+     <p class="text-caption text-grey-7 q-mb-sm">{{connectionKind==='dav'?'原始直连具有完整文件权限，不受平台只读限制。':'完整 Token 用于 MCP Bearer 认证，也用于云桌面登录。'}}</p>
+     <ProblemBanner :error="error"/>
+     <LoadingState v-if="revealing" label="正在读取当前凭据…"/>
+     <div v-else-if="!connection" class="q-mb-sm"><q-btn outline dense label="重新读取" :disable="connectionKind==='dav'?!view?.filesAvailable:!canRevealMCP(view)" @click="reveal"/></div>
+     <div v-if="davConnection" class="workspace-form-fields">
+      <q-input :model-value="davConnection.davUrl" readonly outlined dense label="DAV 地址"><template #append><q-btn flat round dense icon="content_copy" aria-label="复制 DAV 地址" @click="copy(davConnection.davUrl)"/></template></q-input>
+      <q-input :model-value="davConnection.username" readonly outlined dense label="用户名"/>
+      <q-input :model-value="davConnection.token" :type="showToken?'text':'password'" readonly outlined dense label="Token"><template #append><q-btn flat round dense :icon="showToken?'visibility_off':'visibility'" :aria-label="showToken?'隐藏 Token':'显示 Token'" @click="showToken=!showToken"/><q-btn flat round dense icon="content_copy" aria-label="复制完整 Token" @click="copy(davConnection.token)"/></template></q-input>
+     </div>
+     <div v-if="mcpConnection" class="workspace-form-fields">
+      <q-input :model-value="mcpConnection.mcpUrl" readonly outlined dense label="MCP 地址"><template #append><q-btn flat round dense icon="content_copy" aria-label="复制 MCP 地址" @click="copy(mcpConnection.mcpUrl)"/></template></q-input>
+      <q-input :model-value="mcpConnection.username" readonly outlined dense label="用户名"/>
+      <q-input :model-value="mcpConnection.token" :type="showToken?'text':'password'" readonly outlined dense label="MCP Token"><template #append><q-btn flat round dense :icon="showToken?'visibility_off':'visibility'" :aria-label="showToken?'隐藏 MCP Token':'显示 MCP Token'" @click="showToken=!showToken"/><q-btn flat round dense icon="content_copy" aria-label="复制完整 MCP Token" @click="copy(mcpConnection.token)"/></template></q-input>
+     </div>
+     <details class="text-caption text-grey-7 q-mt-sm"><summary>直连说明</summary><p class="q-mt-xs q-mb-none">直连不受 Core 发布、预算和用量统计约束。{{connectionKind==='dav'?'普通客户端请使用平台下发的 WebDAV 配置，外部客户端使用此处用户名和完整 Token。':'查看不更换凭据。云桌面是否可用取决于空间配置。'}}</p></details>
+    </q-card-section>
+    <q-card-actions align="between" class="workspace-connection-actions">
+     <div v-if="connectionKind==='dav'" class="row q-gutter-xs"><q-btn flat dense label="签发 / 重设 Token" :disable="revealing||busy||!!pendingOperation" @click="connectionOpen=false;ask('SET_DAV')"/><q-btn flat dense color="negative" label="撤销 Token" :disable="revealing||busy||!!pendingOperation||!view?.filesAvailable" @click="connectionOpen=false;ask('REVOKE_DAV')"/></div>
+     <q-btn v-else flat dense label="重新签发 MCP 凭据" :disable="revealing||busy||!!pendingOperation||!canRevealMCP(view)" @click="connectionOpen=false;ask('RESET_MCP')"/>
+     <q-btn flat dense color="primary" label="关闭" v-close-popup/>
+    </q-card-actions>
+   </q-card>
+  </q-dialog>
  </q-card>
 </template>
 
 <style scoped>
 .workspace-details{border-top:1px solid #e0e4eb;padding:8px 12px}.workspace-details>summary{cursor:pointer;display:list-item;font-size:13px}.workspace-details>summary span{margin-left:8px}.workspace-maintenance{align-self:center;padding:6px 4px}.workspace-maintenance>summary{cursor:pointer;font-size:13px}.workspace-details :deep(.workspace-resources){border:0;margin:8px 0 0;padding:0}
+.workspace-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.workspace-panel-heading>:first-child{min-width:0;overflow-wrap:anywhere}.workspace-panel-heading>:last-child{flex-shrink:0}
+.workspace-form-fields{display:grid;gap:8px;min-width:0}.workspace-connection-dialog{overflow-wrap:anywhere}.workspace-connection-dialog :deep(.q-field){min-width:0}.workspace-connection-actions{border-top:1px solid #e1ddea}
+.workspace-connection-dialog :deep(.q-btn--dense){min-height:36px}.workspace-connection-actions>div{max-width:100%}
 </style>

@@ -54,9 +54,9 @@ onBeforeUnmount(() => controller.abort())
       <div class="col-12 col-sm"><QSelect :model-value="selected" :options="options" emit-value map-options outlined dense label="WebDAV 访问权限" :disable="disabled || saving || !!pending" @update:model-value="mode => { selected = mode; edited = true }" /></div>
       <div class="col-auto"><q-btn outline color="primary" :label="pending && error ? '核实原操作' : '应用权限'" :loading="saving" :disable="!canSave" @click="askSave" /></div>
     </div>
-    <p class="text-caption text-grey-7 q-mt-sm q-mb-none">不改变 Console 文件管理权限。只读允许浏览和下载；降权会中止旧连接，已转发的写入可能已生效。</p>
+    <p class="text-caption text-grey-7 q-mt-sm q-mb-none">仅限客户端 WebDAV，不改变 Console 文件管理权限。</p>
     <ProblemBanner :error="error" />
     <p v-if="pending && error" class="text-caption">请求结果尚未确认；核实将重用原操作，不提交新的权限变更。</p>
-    <QDialog v-model="confirming"><q-card style="width:480px;max-width:95vw"><q-card-section class="text-h6">将 WebDAV 权限降为只读</q-card-section><q-card-section>这会中止旧 WebDAV 连接；已转发的写入可能已经生效，不能回滚。Console 文件管理权限保持独立。</q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup/><q-btn color="primary" label="确认降权" data-cy="confirm-dav-downgrade" :disable="!canSave" @click="save"/></q-card-actions></q-card></QDialog>
+    <QDialog v-model="confirming"><q-card class="app-dialog app-dialog--sm"><q-card-section class="text-subtitle1 text-weight-medium">将 WebDAV 权限降为只读</q-card-section><q-card-section class="app-dialog__body">将中止旧 WebDAV 连接；已转发的写入可能已生效，不能回滚。Console 文件管理权限不变。</q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup/><q-btn color="primary" label="确认降权" data-cy="confirm-dav-downgrade" :disable="!canSave" @click="save"/></q-card-actions></q-card></QDialog>
   </section>
 </template>

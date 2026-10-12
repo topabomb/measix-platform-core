@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { Quasar, QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog, ClosePopup } from 'quasar'
+import { Quasar, QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog, QSpinner, ClosePopup } from 'quasar'
 import WorkspacePanel from './WorkspacePanel.vue'
 import * as client from '../api/client'
 import { useSessionStore } from '../stores/session'
@@ -15,11 +15,58 @@ describe('workspace MCP and desktop credentials', () => {
     useSessionStore(pinia).session = { csrfToken: 'test-csrf' } as components['schemas']['AdminSession']
     return mount(WorkspacePanel, {
       props: { userId: 'usr_test', serviceEnabled: true },
-      global: { plugins: [pinia, [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, WorkspaceFiles: true, ProblemBanner: true, QDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } } },
+      global: { plugins: [pinia, [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog, QSpinner }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, WorkspaceFiles: true, ProblemBanner: true, QDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } } },
     })
   }
   const projection = { schemaVersion: 1, state: 'CONNECTED', serviceState: 'ENABLED', bindingRevision: 1, agentSpaceId: 'spc_test', mcpAvailable: false, mcpReason: 'mcp_not_published', filesAvailable: false }
   const credentials = { mcpUrl: 'https://space.test/u/test/mcp', username: 'test', token: 'key_fixture.secret' }
+  it('keeps MCP credential repair reachable when the current credential cannot be viewed', async () => {
+    const fetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ ...projection, mcpReason: 'workspace_mcp_credential_unavailable' })
+    const wrapper = mountPanel()
+    try {
+      await flushPromises()
+      expect(wrapper.findAllComponents(QBtn).some(button => button.props('label') === 'MCP / 云桌面凭据')).toBe(false)
+      const reset = wrapper.findAllComponents(QBtn).find(button => button.props('label') === '重新签发 MCP 凭据')
+      expect(reset).toBeDefined()
+      expect(reset!.props('disable')).toBe(false)
+      expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+  it('retries a failed credential read without issuing a workspace command', async () => {
+    let attempts = 0
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async path => {
+      if (!path.includes('/mcp-connection')) return projection as never
+      if (++attempts === 1) throw new Error('temporary credential read failure')
+      return credentials as never
+    })
+    const wrapper = mountPanel()
+    try {
+      await flushPromises()
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'MCP / 云桌面凭据')!.trigger('click')
+      await flushPromises()
+      expect(wrapper.findComponent({ name: 'ProblemBanner' }).props('error')).toBeDefined()
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '重新读取')!.trigger('click')
+      await flushPromises()
+      expect(attempts).toBe(2)
+      expect(wrapper.findAllComponents(QInput).find(input => input.props('label') === 'MCP Token')?.props('type')).toBe('password')
+      expect(fetch.mock.calls.filter(([, init]) => init?.method === 'POST').every(([path]) => path.includes('/mcp-connection'))).toBe(true)
+    } finally { wrapper.unmount() }
+  })
+  it('mounts resource observations only while their section is expanded', async () => {
+    vi.spyOn(client, 'apiFetch').mockResolvedValue(projection)
+    const wrapper = mountPanel()
+    try {
+      await flushPromises()
+      expect(wrapper.findComponent({ name: 'WorkspaceResources' }).exists()).toBe(false)
+      const details = wrapper.get('[data-cy="workspace-resource-details"]')
+      ;(details.element as HTMLDetailsElement).open = true
+      await details.trigger('toggle')
+      expect(wrapper.findComponent({ name: 'WorkspaceResources' }).exists()).toBe(true)
+      ;(details.element as HTMLDetailsElement).open = false
+      await details.trigger('toggle')
+      expect(wrapper.findComponent({ name: 'WorkspaceResources' }).exists()).toBe(false)
+    } finally { wrapper.unmount() }
+  })
   it('reveals a masked current Token on demand without published MCP or DAV access', async () => {
     const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async path => path.includes('/mcp-connection') ? credentials as never : projection as never)
     const wrapper = mountPanel()
@@ -29,7 +76,6 @@ describe('workspace MCP and desktop credentials', () => {
       const button = wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'MCP / 云桌面凭据')
       expect(button).toBeDefined()
       await button!.trigger('click')
-      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '查看当前 MCP 凭据')!.trigger('click')
       await flushPromises()
       expect(fetch).toHaveBeenCalledWith('/api/admin/v1/users/usr_test/workspace/mcp-connection?agentSpaceId=spc_test&expectedRevision=1', expect.objectContaining({ method: 'POST' }), 'test-csrf')
       const token = wrapper.findAllComponents(QInput).find(input => input.props('label') === 'MCP Token')!
@@ -49,7 +95,6 @@ describe('workspace MCP and desktop credentials', () => {
     try {
       await flushPromises()
       await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'MCP / 云桌面凭据')!.trigger('click')
-      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '查看当前 MCP 凭据')!.trigger('click')
       if (change === 'close') wrapper.findAllComponents(QDialog).at(-1)!.vm.$emit('update:modelValue', false)
       if (change === 'hidden') { vi.spyOn(document, 'hidden', 'get').mockReturnValue(true); document.dispatchEvent(new Event('visibilitychange')) }
       if (change === 'user') await wrapper.setProps({ userId: 'usr_other' })
@@ -84,7 +129,6 @@ describe('workspace file prerequisites', () => {
     try {
       await flushPromises()
       await wrapper.findAllComponents(QBtn).find(button => button.props('label') === 'WebDAV 连接信息')!.trigger('click')
-      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '查看当前连接信息')!.trigger('click')
       if (timing === 'already displayed') {
         reveal(credentials); await flushPromises()
         expect(wrapper.findAllComponents(QInput).find(input => input.props('label') === 'Token')?.props('modelValue')).toBe('old-token')
@@ -93,7 +137,7 @@ describe('workspace file prerequisites', () => {
       await wrapper.get('[aria-label="刷新工作区"]').trigger('click'); await flushPromises()
       if (timing === 'still pending') { reveal(credentials); await flushPromises() }
       expect(wrapper.findAllComponents(QInput).some(input => input.props('label') === 'Token')).toBe(false)
-      expect(wrapper.findAllComponents(QBtn).find(button => button.props('label') === '查看当前连接信息')?.props('loading')).toBe(false)
+      expect(wrapper.findAllComponents(QInput).some(input => input.props('label') === 'Token')).toBe(false)
     } finally { wrapper.unmount() }
   })
   it('shows effective DAV permission separately from Files and the default exchange designation', async () => {

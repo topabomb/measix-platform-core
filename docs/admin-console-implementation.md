@@ -164,7 +164,7 @@ Browser E2E 必须使用 production `dist/spa` + real Control Hub + real Runtime
 
 ## 远程工作区页面
 
-远程工作区配置、用户空间、文件操作及四类安全预览的源码所有者和交互边界统一记录于远程工作区实现参考。新增 pdf.js worker 必须以 JavaScript MIME 提供；文件预览按需加载，查看工作区详情不触发 DAV/VM。
+远程工作区配置、用户空间、文件操作及四类安全预览的源码所有者和交互边界统一记录于远程工作区实现参考。用户列表与空间详情分别展示，日常浏览文件与连接维护分层，客户端接入和发布状态默认折叠。管理员打开原始连接信息即读取当前凭据，加载与失败重试就地显示，Token 默认遮蔽；关闭、隐藏及绑定变化仍清除明文。资源摘要仅在展开时挂载，收起即停止刷新；弹窗复用 `.app-dialog` 的尺寸和内部滚动。新增 pdf.js worker 必须以 JavaScript MIME 提供；文件预览按需加载，查看工作区详情不触发 DAV/VM。
 
 详见[远程工作区实现参考](remote-workspace-implementation.md)，验证入口统一见[测试说明](testing.md#远程工作区专项验证)。
 

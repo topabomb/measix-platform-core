@@ -193,8 +193,8 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
 </script>
 
 <template>
-  <q-page padding>
-    <PageHeader title="远程工作区" subtitle="连接工作区服务，为用户提供独立空间、文件管理和可选的助手工具。" />
+  <q-page class="admin-page">
+    <PageHeader title="远程工作区" subtitle="管理服务连接与用户空间。" />
     <ProblemBanner :error="pendingCommand ? undefined : error || remoteWorkspace.error" />
     <div class="remote-workspace-grid">
       <details class="workspace-service" :open="!current || notApplied || running || blocked || !!pendingCommand || !!check">
@@ -202,14 +202,14 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
       <q-card flat>
         <q-card-section>
           <q-toggle v-model="desiredEnabled" label="启用远程工作区" :disable="busy || blocked || !!pendingCommand" />
-          <p class="text-caption text-grey-7 q-mb-none">开关在保存后生效。关闭会停止工作区并撤销工具和文件访问，保留空间及文件。</p>
+          <p class="text-caption text-grey-7 q-mb-none">保存后生效；关闭访问会保留空间和文件。</p>
         </q-card-section>
         <template v-if="desiredEnabled || current">
           <q-separator />
           <q-card-section class="workspace-connection-fields">
             <q-input v-model="name" outlined dense label="连接名称" :disable="busy || !!pendingCommand || !desiredEnabled" />
             <q-input v-model="adminOrigin" outlined dense label="管理服务地址" placeholder="https://space.example.com" :disable="busy || !!pendingCommand || !desiredEnabled" />
-            <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="填写 Agent Space 的 WebDAV 对外地址；留空仅提供工具。" :disable="busy || !!pendingCommand || !desiredEnabled" />
+            <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="WebDAV 对外地址；留空不提供文件访问。" :disable="busy || !!pendingCommand || !desiredEnabled" />
             <q-input v-model="bearer" outlined dense type="password" autocomplete="new-password" :label="current ? '管理凭据（留空保留原值）' : '管理凭据'" :disable="busy || !!pendingCommand || !desiredEnabled" />
             <details>
               <summary class="cursor-pointer text-primary">工具服务地址（可选）</summary>
@@ -229,10 +229,10 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
       </q-card>
       </details>
       <div>
-        <q-card flat bordered class="q-mb-sm">
+        <q-card v-if="!selectedUser" flat bordered class="q-mb-sm">
           <q-card-section class="q-pa-sm">
             <div class="row items-center justify-between q-mb-sm"><div class="text-h6">用户工作区</div><q-btn flat round dense icon="refresh" aria-label="刷新空间列表" :disable="busy" @click="loadSpaces()" /></div>
-            <p v-if="!remoteWorkspace.enabled" class="text-grey-7">先展开服务连接并启用保存，再为用户开通空间。已有空间会保留在此，便于检查进度和清理。</p>
+            <p v-if="!remoteWorkspace.enabled" class="text-caption text-grey-7">启用服务后可开通空间。已有空间可继续查看和清理。</p>
             <div v-else class="workspace-user-picker"><PagedEntityPicker v-model="selectedUser" label="选择企业用户" empty-label="选择用户查看或开通" :fetch-page="users" :selected-option="selectedUser && userLabel ? { value: selectedUser, label: userLabel } : undefined" @selected="option => userLabel = option?.label ?? ''" /><q-btn flat dense color="primary" label="管理用户" @click="router.push('/users')" /></div>
             <q-list v-if="!selectedUser || !remoteWorkspace.enabled" separator>
               <q-item v-for="row in workspaces.items" :key="row.userId" clickable @click="selectedUser = row.userId; userLabel = row.displayName"><q-item-section>{{ row.displayName }}<q-item-label caption>{{ workspaceLabel(row.workspace.state) }}</q-item-label></q-item-section><q-item-section side><q-icon name="chevron_right" /></q-item-section></q-item>
@@ -243,16 +243,18 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
         </q-card>
         <q-btn v-if="selectedUser" flat dense icon="arrow_back" label="返回空间列表" class="q-mb-sm" @click="selectedUser = undefined; userLabel = ''; loadSpaces()" />
         <WorkspacePanel v-if="selectedUser" :key="selectedUser" :user-id="selectedUser" :display-name="userLabel" :service-enabled="remoteWorkspace.enabled" class="q-mb-md" />
-        <div class="workspace-resource-links"><q-card v-if="current?.davResourceId" flat bordered data-cy="workspace-dav-resource">
-          <q-card-section><div class="text-subtitle1">客户端文件交换 · WebDAV</div><p class="text-caption text-grey-7 q-mb-xs">发布后作为客户端唯一文件交换入口，关闭后取消指定。</p><div class="text-caption q-mb-sm">草稿：{{ current.davDraftEnabled ? '启用' : '未启用' }} · 当前发布：{{ current.davPublishedEnabled ? '启用' : '未启用' }}<span v-if="!remoteWorkspace.enabled"> · 服务已关闭，当前无默认指定</span></div><q-btn flat color="primary" label="前往 WebDAV 配置" @click="router.push('/resources?section=webdav')" /></q-card-section>
+        <details v-if="current?.davResourceId || remoteWorkspace.enabled || current?.mcpPublished" class="workspace-publication">
+         <summary>客户端接入与发布</summary>
+         <div class="workspace-resource-links"><q-card v-if="current?.davResourceId" flat bordered data-cy="workspace-dav-resource">
+          <q-card-section><div class="text-subtitle2">文件交换 · WebDAV</div><div class="text-caption q-mb-xs">草稿：{{ current.davDraftEnabled ? '启用' : '未启用' }} · 当前发布：{{ current.davPublishedEnabled ? '启用' : '未启用' }}<span v-if="!remoteWorkspace.enabled"> · 服务已关闭，当前无默认指定</span></div><q-btn flat dense color="primary" label="前往 WebDAV 配置" @click="router.push('/resources?section=webdav')" /></q-card-section>
         </q-card>
         <q-card v-if="remoteWorkspace.enabled || current?.mcpPublished" flat bordered>
-          <q-card-section><div class="text-subtitle1">助手工具（可选）</div><p class="text-caption text-grey-7 q-mb-xs">按需发布助手工具，不影响文件管理。</p><div class="text-caption q-mb-sm">{{ current?.mcpPublished ? 'MCP 定义已发布' : '尚未发布 MCP 工具入口' }}<span v-if="!remoteWorkspace.enabled"> · 服务已关闭，工具暂不可用</span></div><q-btn flat color="primary" label="前往 MCP 配置" @click="router.push('/resources?section=mcp')" /></q-card-section>
-        </q-card></div>
+          <q-card-section><div class="text-subtitle2">助手工具 · MCP</div><div class="text-caption q-mb-xs">{{ current?.mcpPublished ? 'MCP 定义已发布' : '尚未发布 MCP 工具入口' }}<span v-if="!remoteWorkspace.enabled"> · 服务已关闭，工具暂不可用</span></div><q-btn flat dense color="primary" label="前往 MCP 配置" @click="router.push('/resources?section=mcp')" /></q-card-section>
+        </q-card></div></details>
       </div>
     </div>
-    <q-dialog v-model="confirmDisable"><q-card style="max-width:480px"><q-card-section class="text-h6">关闭远程工作区</q-card-section><q-card-section>将停止用户工作区，撤销 MCP 和 WebDAV 访问。连接配置、空间和文件保留；远端不可达时会继续显示待处理进度。</q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup /><q-btn color="negative" label="确认关闭" @click="save" /></q-card-actions></q-card></q-dialog>
-    <q-dialog v-model="confirmReplacement" :persistent="saving || !!pendingCommand"><q-card style="width:480px;max-width:95vw"><q-card-section class="text-h6">修复服务连接</q-card-section><q-card-section class="q-pt-none">为原先连接中的有效用户重新开通；新空间为空，旧文件不会恢复。Core 用户、配置、发布和用量保留。<details class="q-my-sm"><summary>受影响用户（{{ check?.missingWorkspaces?.length ?? 0 }}）</summary><div v-for="binding in check?.missingWorkspaces" :key="binding.userId">{{ binding.displayName || binding.userId }}</div></details><q-checkbox v-model="replacementConfirmed" dense label="旧部署和旧数据已清理，原管理请求已结束" :disable="saving || !!pendingCommand" /></q-card-section><q-card-actions align="right"><q-btn flat label="取消" :disable="saving || !!pendingCommand" v-close-popup /><q-btn color="primary" :label="pendingCommand ? '核实原操作' : '确认重新开通'" :loading="saving" :disable="!pendingCommand && (!canRepair || !replacementConfirmed)" @click="replaceDeployment" /></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="confirmDisable"><q-card class="app-dialog app-dialog--sm"><q-card-section class="text-subtitle1 text-weight-medium">关闭远程工作区</q-card-section><q-card-section class="app-dialog__body">将停止用户工作区并撤销 MCP、WebDAV 访问，保留连接配置、空间和文件。远端不可达时，操作会保持待处理。</q-card-section><q-card-actions align="right"><q-btn flat label="取消" v-close-popup /><q-btn color="negative" label="确认关闭" @click="save" /></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="confirmReplacement" :persistent="saving || !!pendingCommand"><q-card class="app-dialog app-dialog--sm"><q-card-section class="text-subtitle1 text-weight-medium">修复服务连接</q-card-section><q-card-section class="app-dialog__body">为原用户重新开通；新空间为空，旧文件不会恢复。Core 用户、配置、发布和用量保留。<details class="q-my-sm"><summary>受影响用户（{{ check?.missingWorkspaces?.length ?? 0 }}）</summary><div v-for="binding in check?.missingWorkspaces" :key="binding.userId">{{ binding.displayName || binding.userId }}</div></details><q-checkbox v-model="replacementConfirmed" dense label="旧部署和旧数据已清理，原管理请求已结束" :disable="saving || !!pendingCommand" /></q-card-section><q-card-actions align="right"><q-btn flat label="取消" :disable="saving || !!pendingCommand" v-close-popup /><q-btn color="primary" :label="pendingCommand ? '核实原操作' : '确认重新开通'" :loading="saving" :disable="!pendingCommand && (!canRepair || !replacementConfirmed)" @click="replaceDeployment" /></q-card-actions></q-card></q-dialog>
   </q-page>
 </template>
 
@@ -262,5 +264,6 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
 .workspace-service{border:1px solid #ddd;border-radius:6px;overflow:hidden}.workspace-service>summary{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer}.workspace-service>summary::before{content:'▸'}.workspace-service[open]>summary::before{content:'▾'}.workspace-service>summary .ellipsis{flex:1;min-width:0}
 .workspace-resource-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.workspace-resource-links :deep(.q-card__section){padding:12px}
 .workspace-user-picker{display:flex;align-items:center;gap:8px}.workspace-user-picker>:first-child{flex:1;min-width:0}
+.workspace-publication>summary{cursor:pointer;font-size:13px;color:#666;padding:8px 0}.workspace-resource-links :deep(.q-card__section){padding:8px 12px}
 @media(max-width:600px){.workspace-connection-fields,.workspace-resource-links{grid-template-columns:minmax(0,1fr)}}
 </style>

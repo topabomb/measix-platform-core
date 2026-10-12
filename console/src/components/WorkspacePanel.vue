@@ -4,6 +4,7 @@ import { copyToClipboard, useQuasar } from 'quasar'
 import { apiFetch, createIdempotencyKey } from '../api/client'
 import type { components } from '../api/generated'
 import { useSessionStore } from '../stores/session'
+import { useRemoteWorkspaceStore } from '../stores/remoteWorkspace'
 import ProblemBanner from './ProblemBanner.vue'
 import LoadingState from './LoadingState.vue'
 import WorkspaceFiles from './WorkspaceFiles.vue'
@@ -13,6 +14,8 @@ import { workspaceLabel } from '../composables/workspaceLabels'
 
 const props=withDefaults(defineProps<{userId:string;displayName?:string;serviceEnabled?:boolean}>(),{serviceEnabled:false})
 const session=useSessionStore()
+const remoteWorkspace=useRemoteWorkspaceStore()
+const desktopUrl=ref<string>(),desktopError=ref<unknown>(),desktopRefresh=ref(0)
 const quasar=useQuasar()
 type Projection=components['schemas']['WorkspaceProjection']
 type Command=components['schemas']['WorkspaceCommand']
@@ -39,6 +42,33 @@ let pending:{payload:string;key:string}|undefined
 let revealEpoch=0,revealController:AbortController|undefined
 function invalidateConnection(){revealEpoch++;revealController?.abort();revealController=undefined;revealing.value=false;connection.value=undefined;showToken.value=false}
 function canRevealMCP(value:Projection|undefined){return props.serviceEnabled&&value?.state==='CONNECTED'&&value.serviceState!=='DISABLED'&&['available','mcp_not_published'].includes(value.mcpReason??'')}
+// Resolve the persisted remote account independently of the parent list's page.
+// Watch identity/config changes, not each projection poll; never read credentials.
+watch(()=>[props.userId,view.value?.agentSpaceId,view.value?.bindingRevision,canRevealMCP(view.value),remoteWorkspace.current?.workspaceServiceId,remoteWorkspace.current?.configRevision,remoteWorkspace.current?.activeConfigRevision,desktopRefresh.value] as const,async(_,__,onCleanup)=>{
+ desktopUrl.value=undefined;desktopError.value=undefined
+ const service=remoteWorkspace.current,projection=view.value,userId=props.userId
+ if(!service||service.activeConfigRevision!==service.configRevision||!canRevealMCP(projection)||!projection?.agentSpaceId)return
+ const request=new AbortController();onCleanup(()=>request.abort())
+ try{
+  let cursor:string|undefined
+  do{
+   const page=await apiFetch<components['schemas']['WorkspaceList']>(`/api/admin/v1/remote-workspace/services/${encodeURIComponent(service.workspaceServiceId)}/workspaces${cursor?`?cursor=${encodeURIComponent(cursor)}`:''}`,{signal:request.signal})
+   if(request.signal.aborted)return
+   const row=page.items.find(item=>item.userId===userId)
+   if(row){
+    if(!row.remoteUsername||row.workspace.state!=='CONNECTED'||row.workspace.agentSpaceId!==projection.agentSpaceId||row.workspace.bindingRevision!==projection.bindingRevision)return
+    const address=new URL(service.config.mcpOrigin)
+    if(!['http:','https:'].includes(address.protocol))return
+    if(['127.0.0.1','localhost','[::1]'].includes(address.hostname))address.hostname=window.location.hostname
+    address.pathname=`/u/${encodeURIComponent(row.remoteUsername)}/desktop/`
+    address.search='';address.hash='';address.username='';address.password=''
+    desktopUrl.value=address.href
+    return
+   }
+   cursor=page.nextCursor
+  }while(cursor)
+ }catch(cause){if(!request.signal.aborted)desktopError.value=cause}
+})
 function openConnection(kind:ConnectionKind){invalidateConnection();error.value=undefined;connectionKind.value=kind;connectionOpen.value=true;void reveal()}
 async function refresh(){
  const epoch=++refreshEpoch,signal=controller.signal
@@ -83,8 +113,8 @@ onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();docum
 </script>
 <template>
  <q-card flat bordered data-cy="workspace-panel">
-  <q-card-section><div class="workspace-panel-heading"><div><div class="text-subtitle1 text-weight-medium">{{displayName || '远程工作区'}}</div><span class="text-caption text-grey-7">{{view?labels[view.state]:'正在加载'}}</span></div><q-btn flat round dense icon="refresh" aria-label="刷新工作区" :disable="busy" @click="error=undefined;refresh()"/></div></q-card-section>
-  <q-card-section class="q-pa-sm q-pt-none"><ProblemBanner :error="error ?? refreshError"/>
+  <q-card-section><div class="workspace-panel-heading"><div><div class="text-subtitle1 text-weight-medium">{{displayName || '远程工作区'}}</div><span class="text-caption text-grey-7">{{view?labels[view.state]:'正在加载'}}</span></div><q-btn flat round dense icon="refresh" aria-label="刷新工作区" :disable="busy" @click="error=undefined;desktopRefresh++;refresh()"/></div></q-card-section>
+  <q-card-section class="q-pa-sm q-pt-none"><ProblemBanner :error="error ?? refreshError ?? desktopError"/>
    <template v-if="view"><q-banner v-if="view.serviceState==='NOT_CONFIGURED'" dense class="bg-grey-2 q-mb-sm">企业尚未配置远程工作区服务。</q-banner><q-banner v-else-if="view.serviceState==='DISABLED'" dense class="bg-grey-2 q-mb-sm">远程工作区服务未启用，不能开通或恢复连接。已有空间仍可核查和删除。</q-banner>
     <div v-if="(!view.mcpAvailable && view.mcpReason!=='mcp_not_published')||!view.filesAvailable" class="text-caption text-grey-7 q-mb-sm">MCP：{{workspaceLabel(view.mcpReason)}} · 文件：{{davPending?'凭据签发待核实，请先处理下方操作':workspaceLabel(view.filesReason)}}</div>
     <q-banner v-if="serviceEnabled && view.state==='CONNECTED' && view.filesReason==='dav_not_configured'" dense class="bg-grey-2 q-mb-sm">请先在远程工作区服务配置中填写文件服务地址，再签发 WebDAV Token。</q-banner>
@@ -94,6 +124,7 @@ onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();docum
      <q-btn v-if="serviceEnabled && view.state==='UNPROVISIONED' && view.mcpReason!=='user_unavailable'" color="primary" label="开通工作区" :disable="busy" @click="ask('CREATE')"/>
      <q-btn v-if="serviceEnabled && (view.state==='UNPROVISIONED'||operation?.step==='CREATE_SENT'&&operation.state==='UNKNOWN') && view.mcpReason!=='user_unavailable'" outline label="接管已有空间" :disable="busy" @click="ask('TAKEOVER')"/>
      <q-btn v-if="serviceEnabled && view.filesAvailable" dense color="primary" :label="showFiles?'收起文件':'浏览文件'" @click="showFiles=!showFiles"/>
+     <q-btn v-if="desktopUrl && canRevealMCP(view)" flat dense color="primary" label="云桌面" icon-right="open_in_new" :href="desktopUrl" target="_blank" rel="noopener noreferrer" title="新标签页打开，使用 MCP Token 登录"/>
      <details class="workspace-maintenance"><summary class="text-primary">连接维护</summary><div class="row q-gutter-xs q-mt-sm"><q-btn v-if="view.state==='CONNECTED'" outline label="断开" :disable="busy||!!pendingOperation&&!canVerifyDisconnect" @click="ask('DISCONNECT')"/>
      <q-btn v-if="serviceEnabled && view.state==='DISCONNECTED' && view.mcpReason!=='user_unavailable'" color="primary" label="恢复连接" :disable="busy||!!pendingOperation" @click="ask('RESTORE')"/>
      <q-btn v-if="serviceEnabled && view.state==='CONNECTED' && view.filesAvailable" outline label="WebDAV 连接信息" :disable="busy" @click="openConnection('dav')"/>

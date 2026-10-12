@@ -5,13 +5,15 @@ import { Quasar, QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip
 import WorkspacePanel from './WorkspacePanel.vue'
 import * as client from '../api/client'
 import { useSessionStore } from '../stores/session'
+import { useRemoteWorkspaceStore, type WorkspaceService } from '../stores/remoteWorkspace'
 import type { components } from '../api/generated'
 
 afterEach(() => vi.restoreAllMocks())
 
 describe('workspace MCP and desktop credentials', () => {
-  function mountPanel() {
+  function mountPanel(service?: WorkspaceService) {
     const pinia = createPinia()
+    useRemoteWorkspaceStore(pinia).current = service
     useSessionStore(pinia).session = { csrfToken: 'test-csrf' } as components['schemas']['AdminSession']
     return mount(WorkspacePanel, {
       props: { userId: 'usr_test', serviceEnabled: true },
@@ -20,6 +22,65 @@ describe('workspace MCP and desktop credentials', () => {
   }
   const projection = { schemaVersion: 1, state: 'CONNECTED', serviceState: 'ENABLED', bindingRevision: 1, agentSpaceId: 'spc_test', mcpAvailable: false, mcpReason: 'mcp_not_published', filesAvailable: false }
   const credentials = { mcpUrl: 'https://space.test/u/test/mcp', username: 'test', token: 'key_fixture.secret' }
+  const desktopService = (origin: string): WorkspaceService => ({ workspaceServiceId: 'wss_test', type: 'AGENT_SPACE', name: 'Space', configRevision: 1, activeConfigRevision: 1, enabled: true, state: 'ACTIVE', mcpServerId: 'mcp_test', mcpPublished: false, config: { adminOrigin: origin, mcpOrigin: origin, managementSecret: { secretId: 'sec_test', secretVersion: 1 }, connectTimeoutMs: 90000, idleTimeoutMs: 120000 } })
+  it.each(['https://space.example:8443', 'http://127.0.0.1:18932'])('opens the actual remote account from any panel entry and list page for %s', async origin => {
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async path => {
+      if (path.includes('/workspaces')) return (path.includes('cursor=next')
+        ? { items: [{ userId: 'usr_test', remoteUsername: 'adopted-alice', workspace: projection }] }
+        : { items: [{ userId: 'usr_other', remoteUsername: 'wrong', workspace: projection }], nextCursor: 'next' }) as never
+      return projection as never
+    })
+    const wrapper = mountPanel(desktopService(origin))
+    try {
+      await flushPromises()
+      const button = wrapper.findAllComponents(QBtn).find(button => button.props('label') === '云桌面')
+      expect(button).toBeDefined()
+      const link = button!.get('a')
+      const address = new URL(link.attributes('href')!)
+      expect(address.hostname).toBe(origin.includes('127.0.0.1') ? window.location.hostname : 'space.example')
+      expect(address.port).toBe(origin.includes('127.0.0.1') ? '18932' : '8443')
+      expect(address.pathname).toBe('/u/adopted-alice/desktop/')
+      expect(address.search + address.hash).toBe('')
+      expect(link.attributes('target')).toBe('_blank')
+      expect(link.attributes('rel')).toBe('noopener noreferrer')
+      expect(fetch.mock.calls.some(([path, init]) => path.includes('connection') || init?.method === 'POST')).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+  it.each(['user', 'binding', 'config', 'unmount'])('discards a pending desktop lookup after %s changes', async change => {
+    let resolve!: (value: unknown) => void
+    let next = { ...projection }
+    vi.spyOn(client, 'apiFetch').mockImplementation(async path => path.includes('/workspaces')
+      ? new Promise(done => { resolve = done }) as never : next as never)
+    const wrapper = mountPanel(desktopService('https://space.example'))
+    try {
+      await flushPromises()
+      const stale = resolve
+      if (change === 'user') await wrapper.setProps({ userId: 'usr_other' })
+      if (change === 'binding') { next = { ...projection, bindingRevision: 2 }; await wrapper.get('[aria-label="刷新工作区"]').trigger('click') }
+      if (change === 'config') useRemoteWorkspaceStore().current!.configRevision++
+      if (change === 'unmount') wrapper.unmount()
+      await flushPromises()
+      stale({ items: [{ userId: 'usr_test', remoteUsername: 'stale', workspace: projection }] })
+      await flushPromises()
+      expect(wrapper.findAllComponents(QBtn).some(button => button.props('label') === '云桌面')).toBe(false)
+    } finally { if (change !== 'unmount') wrapper.unmount() }
+  })
+  it('retries desktop lookup on refresh and rejects a mismatched remote binding', async () => {
+    let attempts = 0
+    vi.spyOn(client, 'apiFetch').mockImplementation(async path => {
+      if (!path.includes('/workspaces')) return projection as never
+      if (++attempts === 1) throw new Error('temporary list failure')
+      return { items: [{ userId: 'usr_test', remoteUsername: 'wrong', workspace: { ...projection, agentSpaceId: 'spc_other' } }] } as never
+    })
+    const wrapper = mountPanel(desktopService('https://space.example'))
+    try {
+      await flushPromises()
+      expect(wrapper.findComponent({ name: 'ProblemBanner' }).props('error')).toBeDefined()
+      await wrapper.get('[aria-label="刷新工作区"]').trigger('click'); await flushPromises()
+      expect(attempts).toBe(2)
+      expect(wrapper.findAllComponents(QBtn).some(button => button.props('label') === '云桌面')).toBe(false)
+    } finally { wrapper.unmount() }
+  })
   it('keeps MCP credential repair reachable when the current credential cannot be viewed', async () => {
     const fetch = vi.spyOn(client, 'apiFetch').mockResolvedValue({ ...projection, mcpReason: 'workspace_mcp_credential_unavailable' })
     const wrapper = mountPanel()

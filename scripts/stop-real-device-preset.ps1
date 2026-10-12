@@ -14,6 +14,18 @@ if (-not [int]::TryParse([string]$state.pid, [ref]$recordedPid) -or $recordedPid
 $expectedExecutable = Join-Path $dataRoot 'bin\measix-device-demo.exe'
 # A failed query is not evidence that the process has exited.
 $process = Get-CimInstance Win32_Process -Filter "ProcessId=$recordedPid" -ErrorAction Stop
+# A later process proves this PID was reused, even for the same executable.
+# Never signal that process; only discard the confirmed obsolete record.
+$recordedStart = [DateTimeOffset]::MinValue
+if ($null -ne $process -and $state.executable -eq $expectedExecutable -and
+    -not [string]::IsNullOrWhiteSpace($process.ExecutablePath) -and
+    $null -ne $process.CreationDate -and
+    [DateTimeOffset]::TryParse([string]$state.startedAt, [ref]$recordedStart) -and
+    ([datetime]$process.CreationDate).ToUniversalTime() -gt $recordedStart.UtcDateTime.AddSeconds(5)) {
+    Remove-Item -LiteralPath $pidPath -Force
+    Write-Output "Real-device preset PID $recordedPid was reused; obsolete record cleared without stopping the current process."
+    exit 0
+}
 foreach ($forceStop in @($false, $true)) {
     if ($null -eq $process) { break }
     if ($state.executable -ne $expectedExecutable -or $process.ExecutablePath -ne $expectedExecutable) {

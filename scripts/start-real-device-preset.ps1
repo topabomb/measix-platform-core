@@ -60,6 +60,16 @@ function Get-DeviceIPv4 {
     return $address.IPAddress
 }
 
+# An existing database must retain its original credentials. Validate before
+# stopping the running instance or creating any files, including during reset.
+if (Test-Path -LiteralPath $dbPath) {
+    foreach ($credentialPath in @($passwordPath, $masterKeyPath, $jwtKeyPath, $relayTokenPath)) {
+        if (-not (Test-Path -LiteralPath $credentialPath -PathType Leaf)) {
+            throw "Missing retained credential: $credentialPath. Restore the original file; existing data and running service were preserved."
+        }
+    }
+}
+
 if ($Reset) {
     & (Join-Path $PSScriptRoot 'stop-real-device-preset.ps1')
     if (Test-Path -LiteralPath $dataRoot) {
@@ -113,7 +123,7 @@ try {
     $relayInternalListen = $env:MEASIX_REAL_DEVICE_RELAY_INTERNAL_LISTEN
     if ([string]::IsNullOrWhiteSpace($relayInternalListen)) { $relayInternalListen = Get-AvailableLoopbackAddress 9103 @([int]($hubInternalListen.Split(':')[-1])) }
     $args = @(
-        '--listen', "$($uri.Host):$($uri.Port)", '--hub-internal-listen', $hubInternalListen, '--relay-internal-listen', $relayInternalListen,
+        '--listen', "0.0.0.0:$($uri.Port)", '--hub-internal-listen', $hubInternalListen, '--relay-internal-listen', $relayInternalListen,
         '--public-origin', $origin, '--db', $dbPath, '--master-key-file', $masterKeyPath, '--jwt-private-key-file', $jwtKeyPath,
         '--relay-service-token-file', $relayTokenPath, '--spool', $spoolPath,
         '--admin-assets-dir', (Join-Path $repoRoot 'console\dist\spa'), '--portal-assets-dir', (Join-Path $portalRoot 'dist')

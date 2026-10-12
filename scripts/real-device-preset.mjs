@@ -101,6 +101,16 @@ async function applyPreset() {
     if (!matched) throw new Error('Device-demo Relay did not report this build within 10 seconds; refusing preset mutations.')
   }
 
+  // The launch flag seeds a new deployment only. Keep the persisted enterprise
+  // address in sync on ordinary restarts after a network change.
+  const settings = await api('GET', '/deployment/settings')
+  const publicOrigin = new URL(origin).origin
+  if (settings.publicOrigin !== publicOrigin) {
+    await api('PUT', '/deployment/settings', {
+      expectedUpdatedAt: settings.updatedAt, name: settings.name, publicOrigin,
+    })
+  }
+
   async function getOrCreateUpstream(kind, config, secretName, secretValue) {
     const known = state.upstreams[kind]
     if (known?.upstreamId) {
@@ -196,6 +206,11 @@ async function applyPreset() {
   // Discovery is server-owned evidence. Whole-draft replacement must echo it
   // unchanged for the same ID, even when the preset selects unrestricted ALL.
   const discovery = draft.content.mcp?.find(server => server.mcpServerId === id.firecrawl)?.toolDiscovery
+  // Workspace DAV resources and routes are derived by Core and cannot be
+  // removed by replacing the preset's authored resources.
+  const webdav = draft.content.webdav || []
+  const davResourceIds = new Set(webdav.map(resource => resource.resourceId))
+  const davBindings = (draft.content.bindings || []).filter(binding => davResourceIds.has(binding.resourceId))
   const policy = {
     ...draft.content.policy,
     allowLocalProviders: true, allowLocalTts: true, allowLocalAsr: true, allowLocalMcp: true, allowLocalAssistants: true,
@@ -204,6 +219,7 @@ async function applyPreset() {
     defaultImageGenerationId: id.wanImage, defaultTtsId: id.mimoTts, defaultAsrId: id.dashscopeAsr, defaultAssistantId: id.workAssistant,
   }
   const content = {
+    webdav,
     providers: [
       { providerId: id.deepseekProvider, displayName: 'DeepSeek', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', enabled: true },
       { providerId: id.qwenProvider, displayName: '百炼 Qwen（本机实验）', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', enabled: true },
@@ -250,6 +266,7 @@ async function applyPreset() {
       { runtimeRouteId: id.mimoRoute, resourceId: id.mimoTts, upstreamId: upstreams.mimo.upstreamId, allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/chat/completions'], transportPolicy: 'HTTP_STREAMING_SSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 } },
       { runtimeRouteId: id.asrRoute, resourceId: id.dashscopeAsr, upstreamId: upstreams.alibaba.upstreamId, allowedMethods: ['POST'], allowedPathPrefixes: ['/api/v1/services/aigc/multimodal-generation/generation'], transportPolicy: 'HTTP_REQUEST_RESPONSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 } },
       { runtimeRouteId: id.mcpRoute, resourceId: id.firecrawl, upstreamId: upstreams.firecrawl.upstreamId, allowedMethods: ['POST', 'GET', 'DELETE'], allowedPathPrefixes: ['/mcp'], transportPolicy: 'HTTP_STREAMING_SSE', timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 } },
+      ...davBindings,
     ],
     policy,
   }

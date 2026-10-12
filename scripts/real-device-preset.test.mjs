@@ -8,6 +8,31 @@ import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 
+test('Windows preset refuses missing retained credentials before stopping an existing instance', { skip: process.platform !== 'win32' }, async t => {
+  const names = ['device-real-admin-password.txt', 'device-real-master.key', 'device-real-jwt-ed25519.seed', 'device-real-relay-service.token']
+  for (const missing of names) {
+    await t.test(missing, t => {
+      const directory = mkdtempSync(join(tmpdir(), 'measix retained credentials '))
+      t.after(() => rmSync(directory, { recursive: true, force: true }))
+      mkdirSync(join(directory, 'scripts'))
+      mkdirSync(join(directory, '.data/device-real'), { recursive: true })
+      mkdirSync(join(directory, '.secrets'))
+      writeFileSync(join(directory, '.data/device-real/hub.db'), 'retained database')
+      writeFileSync(join(directory, '.data/device-real/process.json'), '{}')
+      for (const name of names.filter(name => name !== missing)) writeFileSync(join(directory, '.secrets', name), 'retained credential')
+      copyFileSync(join(root, 'scripts/start-real-device-preset.ps1'), join(directory, 'scripts/start-real-device-preset.ps1'))
+      writeFileSync(join(directory, 'scripts/stop-real-device-preset.ps1'), "throw 'Unexpected stop before credential validation'")
+      const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(directory, 'scripts/start-real-device-preset.ps1')], { encoding: 'utf8', timeout: 15000 })
+      assert.ifError(result.error)
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, /Missing retained credential/)
+      assert.ok(result.stderr.includes(missing))
+      assert.equal(existsSync(join(directory, '.secrets', missing)), false)
+      assert.equal(readFileSync(join(directory, '.data/device-real/hub.db'), 'utf8'), 'retained database')
+    })
+  }
+})
+
 test('Windows preset launches native process with spaces and quotes intact', { skip: process.platform !== 'win32' }, t => {
   const directory = mkdtempSync(join(tmpdir(), 'measix launch test '))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
@@ -59,6 +84,7 @@ test('Windows preset accepts internal listen overrides without changing the publ
   assert.equal(args[args.indexOf('--hub-internal-listen') + 1], '127.0.0.1:19101')
   assert.equal(args[args.indexOf('--relay-internal-listen') + 1], '127.0.0.1:19103')
   assert.equal(args[args.indexOf('--public-origin') + 1], 'http://192.0.2.20:9100')
+  assert.equal(args[args.indexOf('--listen') + 1], '0.0.0.0:9100')
 })
 
 test('Windows preset selects a bindable loopback port when its default is occupied', { skip: process.platform !== 'win32' }, t => {
@@ -103,7 +129,7 @@ test('Windows preset selects a bindable loopback port when its default is occupi
 })
 
 test('Windows preset stop preserves ownership and only clears confirmed stopped records', { skip: process.platform !== 'win32' }, async t => {
-  for (const scenario of ['stale', 'record-mismatch', 'actual-mismatch', 'normal', 'forced', 'failure', 'query-failure']) {
+  for (const scenario of ['stale', 'reused', 'reused-same-executable', 'record-mismatch', 'actual-mismatch', 'normal', 'forced', 'failure', 'query-failure']) {
     await t.test(scenario, t => {
       const directory = mkdtempSync(join(tmpdir(), 'measix-stop-test-'))
       t.after(() => rmSync(directory, { recursive: true, force: true }))
@@ -113,18 +139,18 @@ test('Windows preset stop preserves ownership and only clears confirmed stopped 
       copyFileSync(join(root, 'scripts/stop-real-device-preset.ps1'), join(directory, 'scripts/stop-real-device-preset.ps1'))
       const expected = join(data, 'bin', 'measix-device-demo.exe')
       const statePath = join(data, 'process.json')
-      const original = JSON.stringify({ pid: 12345, executable: ['stale', 'record-mismatch'].includes(scenario) ? `${expected}.temporary` : expected })
+      const original = JSON.stringify({ pid: 12345, executable: ['stale', 'record-mismatch'].includes(scenario) ? `${expected}.temporary` : expected, startedAt: '2026-10-04T12:00:00Z' })
       writeFileSync(statePath, original)
       writeFileSync(join(directory, 'harness.ps1'), `
 $ErrorActionPreference = 'Stop'
 $global:presetTestAlive = '${scenario}' -ne 'stale'
 $global:presetTestStops = 0
 $global:presetTestActual = Join-Path $PSScriptRoot '.data\\device-real\\bin\\measix-device-demo.exe'
-if ('${scenario}' -eq 'actual-mismatch') { $global:presetTestActual += '.unrelated' }
+if ('${scenario}' -in @('actual-mismatch','reused')) { $global:presetTestActual += '.unrelated' }
 function Get-CimInstance {
     param($ClassName, $Filter, $ErrorAction)
     if ('${scenario}' -eq 'query-failure') { throw 'Synthetic query failure' }
-    if ($global:presetTestAlive) { [pscustomobject]@{ ExecutablePath = $global:presetTestActual } }
+    if ($global:presetTestAlive) { [pscustomobject]@{ ExecutablePath = $global:presetTestActual; CreationDate = $(if ('${scenario}' -in @('reused','reused-same-executable')) { [datetime]'2026-10-11T12:00:00Z' } else { $null }) } }
 }
 function Stop-Process {
     param($Id, [switch]$Force, $ErrorAction)
@@ -156,7 +182,8 @@ finally { Write-Output ('STOPS=' + $global:presetTestStops) }
 })
 
 async function runPreset(t, { validationErrors = [], changed = true, existingMcp = [], saveFailure = false,
-  servingBuild = 'device-real-test', relayBuild = servingBuild, missingRelayReads = 0 } = {}) {
+  servingBuild = 'device-real-test', relayBuild = servingBuild, missingRelayReads = 0, originMatches = false,
+  existingWebdav = [], existingBindings = [] } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'measix-preset-test-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   const password = join(directory, 'password.txt')
@@ -185,16 +212,25 @@ async function runPreset(t, { validationErrors = [], changed = true, existingMcp
       result = { csrfToken: 'synthetic-csrf' }
     } else if (path === '/system/status') {
       result = { buildVersion: servingBuild, ...(statusReads++ < missingRelayReads ? {} : { relayBuildVersion: relayBuild }) }
+    } else if (path === '/deployment/settings' && request.method === 'GET') {
+      result = { name: 'Retained deployment', publicOrigin: originMatches ? `http://127.0.0.1:${server.address().port}` : 'http://192.0.2.1:9100', updatedAt: '2026-10-04T12:00:00Z' }
+    } else if (path === '/deployment/settings' && request.method === 'PUT') {
+      result = { ...body, updatedAt: '2026-10-12T12:00:00Z' }
     } else if (path.startsWith('/upstreams/') && request.method === 'GET') {
       result = { upstreamId: path.split('/').at(-1), status: 'ACTIVE' }
     } else if (path === '/draft' && request.method === 'GET') {
-      result = { draftRevision: 41, content: { policy: { retainedPolicy: true }, mcp: existingMcp } }
+      result = { draftRevision: 41, content: { policy: { retainedPolicy: true }, mcp: existingMcp, webdav: existingWebdav, bindings: existingBindings } }
     } else if (path === '/draft' && request.method === 'PUT') {
       content = body.content
       const changedEvidence = content.mcp.some(server => JSON.stringify(server.toolDiscovery) !== JSON.stringify(
         existingMcp.find(previous => previous.mcpServerId === server.mcpServerId)?.toolDiscovery,
       ))
-      if (changedEvidence || saveFailure) {
+      if (existingWebdav.some(resource => !content.webdav?.some(item => JSON.stringify(item) === JSON.stringify(resource))) ||
+        existingBindings.filter(binding => existingWebdav.some(resource => resource.resourceId === binding.resourceId))
+          .some(binding => !content.bindings.some(item => JSON.stringify(item) === JSON.stringify(binding)))) {
+        response.statusCode = 422
+        result = { code: 'invalid_draft' }
+      } else if (changedEvidence || saveFailure) {
         response.statusCode = 422
         result = { code: 'mcp_tool_evidence_required', message: 'Private diagnostic: synthetic-key' }
       } else result = { draftRevision: 42 }
@@ -295,6 +331,17 @@ test('rerunning the preset preserves server-owned discovery by MCP ID after Admi
   assert.ok(!result.requests.some(item => item.path.endsWith(':discover')), 'ALL must not require a new discovery')
 })
 
+test('rerunning preserves the derived workspace DAV resource and its server-owned route', async t => {
+  const resource = { resourceId: 'dav_workspace', displayName: 'Workspace files', enabled: false, clientProtocol: 'WEBDAV', authOwnership: 'ENTERPRISE_MANAGED', purpose: 'WORKSPACE_FILE_EXCHANGE', rootPathTemplate: '/runtime/v1/resources/dav_workspace/spaces/{agentSpaceId}/dav/' }
+  const binding = { runtimeRouteId: 'rte_workspace', resourceId: resource.resourceId, targetKind: 'REMOTE_WORKSPACE', workspaceServiceId: 'wss_retained', allowedMethods: ['GET', 'PROPFIND'], allowedPathPrefixes: ['/dav'], transportPolicy: 'HTTP_REQUEST_RESPONSE' }
+  const result = await runPreset(t, { existingWebdav: [resource], existingBindings: [binding, { resourceId: 'mdl_old', runtimeRouteId: 'rte_old' }], changed: false })
+  assert.equal(result.code, 0, result.output)
+  assert.deepEqual(result.content.webdav, [resource])
+  assert.deepEqual(result.content.bindings.find(item => item.resourceId === resource.resourceId), binding)
+  assert.ok(!result.content.bindings.some(item => item.runtimeRouteId === 'rte_old'))
+  assert.ok(!result.requests.some(item => item.path === '/draft:publish'))
+})
+
 test('preset persists a safe failure diagnostic with the authoritative endpoint and code', async t => {
   const result = await runPreset(t, { saveFailure: true })
   assert.notEqual(result.code, 0)
@@ -328,6 +375,23 @@ test('preset waits for a starting Relay to report its build before mutating', as
   const statuses = result.requests.map((item, i) => item.path === '/system/status' ? i : -1).filter(i => i >= 0)
   assert.equal(statuses.length, 2)
   assert.ok(result.requests.findIndex(item => item.path.startsWith('/upstreams/')) > statuses.at(-1))
+})
+
+test('preset updates the persisted public origin through Admin settings after verifying its build', async t => {
+  const result = await runPreset(t)
+  assert.equal(result.code, 0, result.output)
+  const update = result.requests.find(item => item.path === '/deployment/settings' && item.method === 'PUT')
+  assert.ok(update, 'network changes must update persisted settings, not only the seed flag')
+  assert.equal(update.body.name, 'Retained deployment')
+  assert.equal(update.body.expectedUpdatedAt, '2026-10-04T12:00:00Z')
+  assert.match(update.body.publicOrigin, /^http:\/\/127\.0\.0\.1:\d+$/)
+  assert.ok(result.requests.indexOf(update) > result.requests.findIndex(item => item.path === '/system/status'))
+})
+
+test('restarting at the same origin leaves deployment settings unchanged', async t => {
+  const result = await runPreset(t, { originMatches: true })
+  assert.equal(result.code, 0, result.output)
+  assert.ok(!result.requests.some(item => item.path === '/deployment/settings' && item.method === 'PUT'))
 })
 
 test('validation failure reports authoritative field path and prevents preview/publish', async t => {

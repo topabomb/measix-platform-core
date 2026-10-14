@@ -1,6 +1,6 @@
 # 实现状态与历史证据索引
 
-文档核对日期：2026-10-11。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
+文档核对日期：2026-10-14。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
 
 ## 固定 S0.2 Preview 组合
 
@@ -166,6 +166,18 @@ Go 全量 tests/vet、相关工作区/HTTP/控制包的最新回归、Console �
 审查覆盖 Core 与架构仓库全部未提交变更。新增 Red/Green 确认并修复五处问题：应用请求缺少确认修订仍被接受、服务缓存不可用时冻结操作无法核实、Activation 争用导致更换永久失败、并发用户删除阻塞更换，以及并发相同幂等请求误报修订冲突。接口、fixtures、生成材料、测试脚本和文档同步；SQL schema 和产品/协议版本不变，既有前端布局调整保留。
 
 全量 Go tests/vet、327 项 Console 测试、类型检查/E2E 类型检查/生产构建、81 项 tooling、重复生成一致及 core 材料校验通过。审查与本机后续交付证据位于 `.data/workspace-review-20261011/review-20261012/`；该目录含运行备份，不整体分发。未新增 Android、Agent Space 崩溃或正式发行验收声明。
+
+## Spark 同版本更新（2026-10-14）
+
+生产从 Core `0bd2cf8` 更新为固定 `431368a9b6b8bd739da9cee53165e081792a3fb0`，Architecture `6d251c218d0b3ca0672628735ebca2b03a2ab6ce`、Portal `425af0b6f8cd5056bff53db89c74a34cd51fdbc8`。产品版本仍为 `0.2.0-preview.23`；归档 SHA-256 为 `1393357b9518971053222fccd3bac0e29edaf8f04e6f596996a08382cb996fdf`，build hash 为 `sha256:e9f1ac77212726851a7628c48c45a59f559904c72ef0d915a9b1dab3203527bc`。包保持 Core candidate 身份，没有新增固定 Android APK 兼容声明。
+
+更新包含近期工作区恢复、Files 保护、独立 WebDAV、凭据查看和用户云桌面链接。打包发现 Portal 尚未同步 Client 合同，修复其 WebDAV 用量识别、筛选及仅统计标记；观察两项回归测试 Red 后修复到 Green，不新增额度能力或价格结算。Core 本地启动修复确保普通重启保留管理员配置，仅新库/显式 reset 初始化 preset。
+
+当前固定源码的全量 Go tests/vet、smoke、格式及生成漂移检查，Console 类型/E2E 类型检查与 344 项测试，94 项 tooling、103 项 Portal 测试、生产构建均通过。真实隔离 Hub/Relay 的 Admin 浏览器流程和 Portal 同源生命周期及宽窄屏用量检查通过；证据见 `.artifacts/production-20261014-*.log`。
+
+ARM64 原包校验通过；生产备份副本及正式库均从 schema 5→6，只应用 `000006`。按原列逐表核对 42 张表，除追加迁移历史外原行与原值保持一致，integrity/foreign-key 检查通过；迁移前备份另由旧程序恢复检查。在线及停服最终备份均验证并离机保存，原程序和原包保留。
+
+仅切换 Hub/Relay，两者实际执行新包并 ready；9 个其他 PM2 进程 PID/状态不变，7 个发布、1 份草稿、8 条定价及 11 个 SecretVersion 保全，config/secrets 摘要不变。公网 Discovery/live/ready/Admin/Portal 为 200，内部入口为 404；实际返回的 Admin/Portal index 和 JS/CSS 与包内原字节一致，生产登录页渲染正常。未执行生产管理员登录、生产 DAV 大文件写入、新 Android/手机消费或外部供应商资格验证；历史失败边界继续保留。现场、备份及 cutover 证据见私有 `.artifacts/production-20261014/` 和既有私有部署记录，不能整体公开。
 
 ## 保留的失败边界
 

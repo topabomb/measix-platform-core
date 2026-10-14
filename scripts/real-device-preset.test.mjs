@@ -8,6 +8,24 @@ import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 
+test('Windows launcher seeds only a new database or an explicit reset', { skip: process.platform !== 'win32' }, async t => {
+  const source = readFileSync(join(root, 'scripts/start-real-device-preset.ps1'), 'utf8')
+  const decision = source.split(/\r?\n/).find(line => line.startsWith('$initializePreset ='))
+  assert.ok(decision, 'launcher must decide initialization before migrations create the database')
+  const selection = source.slice(source.indexOf('    $presetMode ='), source.indexOf('    $publishExitCode =')).replace('& node scripts/real-device-preset.mjs', '& node $probe')
+  for (const [exists, reset, expected] of [[false, false, []], [true, false, ['--preserve']], [true, true, []]]) {
+    const directory = mkdtempSync(join(tmpdir(), 'measix-start-mode-'))
+    t.after(() => rmSync(directory, { recursive: true, force: true }))
+    writeFileSync(join(directory, 'probe.cjs'), 'console.log(JSON.stringify(process.argv.slice(2)))')
+    if (exists) writeFileSync(join(directory, 'hub.db'), 'existing deployment')
+    const script = ['$ErrorActionPreference = \'Stop\'', '$dbPath = Join-Path $PSScriptRoot \'hub.db\'', `$Reset = $${reset}`, '$probe = Join-Path $PSScriptRoot \'probe.cjs\'', decision, selection].join('\n')
+    writeFileSync(join(directory, 'mode.ps1'), script)
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-File', join(directory, 'mode.ps1')], { encoding: 'utf8', timeout: 10000 })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(JSON.parse(result.stdout), expected)
+  }
+})
+
 test('Windows preset refuses missing retained credentials before stopping an existing instance', { skip: process.platform !== 'win32' }, async t => {
   const names = ['device-real-admin-password.txt', 'device-real-master.key', 'device-real-jwt-ed25519.seed', 'device-real-relay-service.token']
   for (const missing of names) {
@@ -183,7 +201,7 @@ finally { Write-Output ('STOPS=' + $global:presetTestStops) }
 
 async function runPreset(t, { validationErrors = [], changed = true, existingMcp = [], saveFailure = false,
   servingBuild = 'device-real-test', relayBuild = servingBuild, missingRelayReads = 0, originMatches = false,
-  existingWebdav = [], existingBindings = [] } = {}) {
+  existingWebdav = [], existingBindings = [], preserve = false, missingKeys = false } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'measix-preset-test-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   const password = join(directory, 'password.txt')
@@ -193,6 +211,7 @@ async function runPreset(t, { validationErrors = [], changed = true, existingMcp
   writeFileSync(password, 'synthetic-password')
   writeFileSync(keys, ['DEEPSEEK_API_KEY', 'MIMO_API_KEY', 'FIRECRAWL_API_KEY', 'DASHSCOPE_API_KEY']
     .map(key => `${key}=synthetic-key`).concat('ALIBABA_TOKEN_PLAN_BASE_URL=https://example.invalid/compatible-mode/v1').join('\n'))
+  if (missingKeys) rmSync(keys)
   const originalState = JSON.stringify({ upstreams: Object.fromEntries(
     ['deepseek', 'mimo', 'firecrawl', 'alibaba'].map(kind => [kind, { upstreamId: `up_${kind}` }]),
   ) })
@@ -255,7 +274,7 @@ async function runPreset(t, { validationErrors = [], changed = true, existingMcp
   })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   t.after(() => new Promise(resolve => server.close(resolve)))
-  const child = spawn(process.execPath, [join(root, 'scripts/real-device-preset.mjs')], {
+  const child = spawn(process.execPath, [join(root, 'scripts/real-device-preset.mjs'), ...(preserve ? ['--preserve'] : [])], {
     env: { ...process.env, MEASIX_REAL_DEVICE_ORIGIN: `http://127.0.0.1:${server.address().port}`,
       MEASIX_REAL_DEVICE_ADMIN_PASSWORD_FILE: password, MEASIX_REAL_DEVICE_SUPPLIER_KEYS: keys,
       MEASIX_REAL_DEVICE_STATE: state, MEASIX_REAL_DEVICE_RESULT: resultPath,
@@ -272,6 +291,21 @@ async function runPreset(t, { validationErrors = [], changed = true, existingMcp
   const summary = existsSync(resultPath) ? JSON.parse(readFileSync(resultPath, 'utf8')) : undefined
   return { code, output, content, requests, summary }
 }
+
+test('ordinary restart preserves all authored configuration and only updates a changed origin', async t => {
+  const result = await runPreset(t, { preserve: true })
+  assert.equal(result.code, 0, result.output)
+  assert.equal(result.summary.activationState, 'preserved')
+  assert.deepEqual(result.requests.filter(r => r.method !== 'GET').map(r => r.path), ['/session/login', '/deployment/settings'])
+  assert.equal(result.content, undefined, 'restart must never replace the existing draft or publish a preset')
+})
+
+test('ordinary restart does not require supplier keys or touch configuration at the same origin', async t => {
+  const result = await runPreset(t, { preserve: true, missingKeys: true, originMatches: true })
+  assert.equal(result.code, 0, result.output)
+  assert.equal(result.summary.activationState, 'preserved')
+  assert.deepEqual(result.requests.filter(r => r.method !== 'GET').map(r => r.path), ['/session/login'])
+})
 
 test('real-device preset publishes complete authored v5 openings with existing upstreams', async t => {
   const result = await runPreset(t)

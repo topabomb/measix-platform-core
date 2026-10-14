@@ -4,9 +4,8 @@
  * device-demo Hub.  Credentials are read only from the ignored supplier-keys
  * file; the published Snapshot contains resource IDs and never API keys.
  *
- * This is intentionally a whole-draft preset.  It owns the isolated
- * `.data/device-real` database and must not be pointed at an administrator's
- * shared deployment database.
+ * Seed a new isolated `.data/device-real` deployment. Existing deployments
+ * use --preserve: verify the build and update only the advertised origin.
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
@@ -23,7 +22,6 @@ const expectedBuildVersion = process.env.MEASIX_REAL_DEVICE_BUILD_VERSION
 async function applyPreset() {
   if (!origin) throw new Error('MEASIX_REAL_DEVICE_ORIGIN is required (for example http://192.0.2.20:9100; replace the documentation address)')
   if (!existsSync(passwordPath)) throw new Error(`Admin password file is missing: ${passwordPath}`)
-  if (!existsSync(keyPath)) throw new Error(`Supplier key file is missing: ${keyPath}`)
 
   function readEnv(path) {
     const rows = readFileSync(path, 'utf8').split(/\r?\n/)
@@ -47,17 +45,8 @@ async function applyPreset() {
     return value
   }
 
-  const keys = readEnv(keyPath)
-  for (const name of ['DEEPSEEK_API_KEY', 'MIMO_API_KEY', 'FIRECRAWL_API_KEY', 'DASHSCOPE_API_KEY', 'ALIBABA_TOKEN_PLAN_BASE_URL']) {
-    if (!keys[name]) throw new Error(`Missing ${name} in ${keyPath}`)
-  }
   const password = readFileSync(passwordPath, 'utf8').trim()
   if (!password) throw new Error(`Admin password is empty: ${passwordPath}`)
-  const state = loadState()
-  const saveState = () => {
-    mkdirSync(dirname(statePath), { recursive: true })
-    writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 })
-  }
 
   const login = await fetch(`${origin}/api/admin/v1/session/login`, {
     method: 'POST',
@@ -109,6 +98,23 @@ async function applyPreset() {
     await api('PUT', '/deployment/settings', {
       expectedUpdatedAt: settings.updatedAt, name: settings.name, publicOrigin,
     })
+  }
+
+  // Restarting a service must not replace administrator-authored resources,
+  // save the draft, discover tools or publish another release.
+  if (process.argv.includes('--preserve')) {
+    return { origin, ...(expectedBuildVersion ? { buildVersion: expectedBuildVersion } : {}), activationState: 'preserved' }
+  }
+
+  if (!existsSync(keyPath)) throw new Error(`Supplier key file is missing: ${keyPath}`)
+  const keys = readEnv(keyPath)
+  for (const name of ['DEEPSEEK_API_KEY', 'MIMO_API_KEY', 'FIRECRAWL_API_KEY', 'DASHSCOPE_API_KEY', 'ALIBABA_TOKEN_PLAN_BASE_URL']) {
+    if (!keys[name]) throw new Error(`Missing ${name} in ${keyPath}`)
+  }
+  const state = loadState()
+  const saveState = () => {
+    mkdirSync(dirname(statePath), { recursive: true })
+    writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 })
   }
 
   async function getOrCreateUpstream(kind, config, secretName, secretValue) {

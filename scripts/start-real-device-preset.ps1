@@ -18,6 +18,7 @@ $binaryPath = Join-Path $dataRoot 'bin\measix-device-demo.exe'
 $buildVersion = 'device-real-' + [Guid]::NewGuid().ToString('N')
 $pidPath = Join-Path $dataRoot 'process.json'
 $logRoot = Join-Path $dataRoot 'logs'
+$initializePreset = $Reset -or -not (Test-Path -LiteralPath $dbPath)
 
 function New-RandomFile([string]$Path, [int]$Length, [switch]$Text) {
     if (Test-Path -LiteralPath $Path) { return }
@@ -98,7 +99,7 @@ if (-not (Test-Path -LiteralPath $passwordPath)) {
     try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
     [System.IO.File]::WriteAllText($passwordPath, "measix-device-$([BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant())" + [Environment]::NewLine)
 }
-if (-not (Test-Path -LiteralPath (Join-Path $secretRoot 'supplier-keys.env'))) {
+if ($initializePreset -and -not (Test-Path -LiteralPath (Join-Path $secretRoot 'supplier-keys.env'))) {
     throw "Missing ignored supplier key file: $(Join-Path $secretRoot 'supplier-keys.env')"
 }
 
@@ -155,7 +156,9 @@ try {
     $env:MEASIX_REAL_DEVICE_RESULT = $resultPath
     # A failed invocation must never report a previous attempt's result.
     if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath -Force }
-    & node scripts/real-device-preset.mjs
+    $presetMode = @()
+    if (-not $initializePreset) { $presetMode = @('--preserve') }
+    & node scripts/real-device-preset.mjs @presetMode
     $publishExitCode = $LASTEXITCODE
     if ($publishExitCode -ne 0) {
         $diagnostic = "Publisher exited with exit code $publishExitCode; inspect the output above."

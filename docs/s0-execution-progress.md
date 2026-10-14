@@ -179,6 +179,16 @@ ARM64 原包校验通过；生产备份副本及正式库均从 schema 5→6，�
 
 仅切换 Hub/Relay，两者实际执行新包并 ready；9 个其他 PM2 进程 PID/状态不变，7 个发布、1 份草稿、8 条定价及 11 个 SecretVersion 保全，config/secrets 摘要不变。公网 Discovery/live/ready/Admin/Portal 为 200，内部入口为 404；实际返回的 Admin/Portal index 和 JS/CSS 与包内原字节一致，生产登录页渲染正常。未执行生产管理员登录、生产 DAV 大文件写入、新 Android/手机消费或外部供应商资格验证；历史失败边界继续保留。现场、备份及 cutover 证据见私有 `.artifacts/production-20261014/` 和既有私有部署记录，不能整体公开。
 
+## 已观测用量与 Spark 查询修订（2026-10-14）
+
+Core 固定源码 `cc805be8ccd4520030980fa70f15820823017400`，Architecture `6a00798c6b7edbb86dcb8b6c40c644955995ab66`，Portal `19a39b838270e551cdd059e714e4976a7554447d`。版本仍为 `0.2.0-preview.23`；归档 SHA-256 `8769ad2dc8ec074828462f2b4cd76075a0fbd5d3693a15fdd9300f373bfcabd3`，build hash `sha256:ee1e0c5a7a4da9a8069554bf88026631d7bb04a461e3e0afa65a58c7ed634c1e`。本轮只改读取聚合及 Admin 展示，机制和通用协议核对见[用量参考](usage-budget.md#通用协议核对与验证边界)；持久化、Ent、迁移、spool、准入和结算代码不变。
+
+已观察五能力混合计量及 HTTP 200 后异常的 Red，再修复到 Green；受影响 Go/HTTP/协议/合同测试与 vet、Console 345 项测试及类型/生产构建、Portal 103 项回归及构建、431 个生成文件重复生成一致均通过。11 项真实 Hub/Relay/生产 SPA 浏览器流程通过，覆盖末尾 usage 透明转发、已知与未知聚合、桌面/390px、刷新和定价入口。固定材料摘要同步后，生成 drift、core 材料核验、17 项发布工具测试及合同/导出测试通过。
+
+Spark 从 `431368a` 切换到新包，仅重启 Hub/Relay。新旧程序读取同一备份均通过 schema 6 检查；正式库不执行 migrate，schema/migration identity 不变。停服状态全部 42 表原数据一致；恢复运行后 8 个发布、1 份草稿、8 条定价、9 个 SecretVersion 和配置/密钥摘要保持不变，integrity=ok、外键错误为零，9 个其他 PM2 进程 PID/状态不变。在线及最终完整备份均校验、离机保存；新旧包和恢复链保留。
+
+公网 Discovery/live/ready/Admin/Portal 为 200、内部路径为 404；Admin/Portal index 及 JS/CSS 与原包逐字节一致。生产已登录浏览器刷新原时间范围后实际显示已观测 6082.3 万 Token（PARTIAL）、79 条传输异常/取消；工作区 718 条、未定价模型 154 条缺适用价格，价格和原 UNKNOWN/PARTIAL 事实未改写。证据在私有 `.artifacts/usage-production-20261014/`、`usage-*.log` 和既有私有现场记录，不能整体公开。本轮不新增外部供应商、Android/手机或大文件验收声明。
+
 ## 保留的失败边界
 
 - 隔离工作区大文件 PUT 曾在约 50 MiB/64 MiB 传输中返回 502/503 与 UNKNOWN，记录在 `.artifacts/workspace-files-final/`、`.artifacts/resources-review/`。新空间重跑通过不证明间歇传输根因已修复；不得自动重放未知写入，生产验收前继续核查。

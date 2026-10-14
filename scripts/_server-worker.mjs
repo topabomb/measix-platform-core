@@ -94,6 +94,9 @@ const adapterServer = http.createServer((req, res) => {
           `data: {"id":"1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
           `data: [DONE]`,
         ]
+        if (bodyJSON.stream_options?.include_usage === true) {
+          chunks.splice(chunks.length - 1, 0, `data: {"id":"1","object":"chat.completion.chunk","choices":[],"usage":{"prompt_tokens":100,"completion_tokens":20,"total_tokens":120}}`)
+        }
         for (const c of chunks) res.write(c + '\n\n')
         res.end()
       } else {

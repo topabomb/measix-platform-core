@@ -349,6 +349,17 @@ async function runFiveCapabilityTraffic() {
   if (!modelResp.ok) throw new Error(`model request failed: ${modelResp.status}`)
   await modelResp.text()
 
+  // Same protocol, one missing-usage request and one final usage chunk after
+  // finish_reason. Exercise real Relay/Hub aggregation without writing rows.
+  const measuredModel = await fetch(runtimeURL(modelId, snapJson.models[0].runtimePath), {
+    method: 'POST',
+    headers: { ...baseHeaders, 'X-Measix-Interaction-Id': `int_${randomUUID()}` },
+    body: JSON.stringify({ model: snapJson.models[0].upstreamModelKey, stream: true, stream_options: { include_usage: true }, messages: [{ role: 'user', content: 'Say hello' }] }),
+  })
+  if (!measuredModel.ok) throw new Error(`measured model request failed: ${measuredModel.status}`)
+  const measuredBody = await measuredModel.text()
+  if (!measuredBody.includes('"choices":[],"usage"') || !measuredBody.endsWith('data: [DONE]\n\n')) throw new Error('final usage chunk was not transparently forwarded')
+
   // 2. Image Generation
   const imageDefinition = snapJson.imageGenerators[0]
   const imageRequest = imageDefinition.clientProtocol === 'DASHSCOPE_MULTIMODAL_GENERATION'

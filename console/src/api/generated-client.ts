@@ -552,6 +552,7 @@ export interface components {
         BudgetPeriod: "DAY" | "WEEK" | "MONTH" | "LIFETIME";
         /** @enum {string} */
         BudgetStatus: "AVAILABLE" | "EXHAUSTED" | "PENDING_RECONCILIATION";
+        /** @description Request meters retain their recorded completeness. Aggregates sum only reliable EXACT/PARTIAL quantities; mixed reliable and incomplete contributions are PARTIAL, and no reliable contribution is UNKNOWN. A PARTIAL zero is an observed subtotal, not a complete total. */
         MeterQuantity: {
             meter: components["schemas"]["UsageMeter"];
             quantity: string;

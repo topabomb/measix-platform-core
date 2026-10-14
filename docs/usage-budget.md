@@ -138,6 +138,8 @@ WebSocket 生产观察器必须支持文本帧分片、continuation、控制帧�
 
 清单查询保持时间窗和 keyset 分页；用户/协议/资源汇总和按日趋势采用数据库聚合，避免加载全量 rows 或每条请求 N+1 查询。额度读写走独立计数桶，不能每次扫描使用历史。明细保留策略不能清空累计预算；统计归档与预算权威分离。
 
+查询层的同一 meter 聚合只累加当前结算 revision 的 EXACT/PARTIAL 数量，另统计可靠、部分和未知贡献数。混合可靠与未知时返回 PARTIAL 的已观测小计；没有可靠贡献时返回 UNKNOWN，占位数量不作为零使用。Summary、Trend、Distribution、用户分页和五能力累计用量复用相同 SQL 聚合与状态判断，包含零数量和毫秒到秒的转换；逐请求完整度、价格计算及预算结算仍读取原事实。ERROR/SUCCESS 查询与用户异常数同时检查 HTTP 状态和非空 errorClass，避免把 HTTP 200 后的中断列为传输成功；取消计入异常，该指标不等于 MCP 工具任务失败次数。
+
 ## 5. 预算存储与事务
 
 Hub SQLite/Ent 使用三类逻辑数据：
@@ -189,6 +191,16 @@ Admin 在 UsersPage 用户详情提供“用量与额度”：MODEL/TTS/ASR/MCP/
 同一详情提供正式“删除用户”操作：操作者必须逐字输入当前用户名并填写原因，服务端再次核验；删除状态机先 deny 新的 Client/Runtime/refresh 请求，等待或拒绝活动请求，再以单一可恢复事务清除用户、设备、Session、配置、预算、用量、Feed/Portal 与审计外的用户私有事实。审计记录使用不可反查的主体摘要；旧 access/runtime credential 及 refresh credential 以不可逆摘要 tombstone 识别并稳定返回 `enterprise_identity_deleted`。删除失败不得呈现成功，重试保持幂等，Admin 显示最终 COMPLETED/FAILED 与可操作诊断。
 
 UsagePage 提供用户搜索/汇总、协议及资源分布、按日趋势；请求清单与待核对清单以资源显示名、用户、设备、本地时间和结果为摘要，并复用 `UsageRequestDetail`，不另造两套详情逻辑。详情含 correlation、协议、转发/上游结果、耗时、流量、token 等语义、完整度、结算、预算周期和失败原因；待核对详情在同一上下文中追加已观测量、未确认占用和处理入口。常用数值本地化为万 token、字符、分钟；精确值在详情可查。
+
+摘要直接展示总 Token/字符/音频/图片的关键小计，PARTIAL 加“已观测”提示；详细区、趋势、资源和用户行使用同一格式，UNKNOWN 隐藏数值占位。额度模式与当前额度/账目健康分别展示。成本保留已计算的各币种金额，在资源行分别显示缺价格、缺可靠计量的请求数；没有可计算金额且缺价格时显示“未定价”，提供既有定价页入口。定价仍是独立的全历史配置界面，入口不保存价格。请求详情只根据已有完整度与传输事实说明缺口，没有证据时要求核对协议与上游返回，不猜具体供应商原因。
+
+### 通用协议核对与验证边界
+
+解析按已发布的协议/profile 选择，不按品牌、模型名、主机名或响应长度猜计量。Chat Completions 的最后 usage chunk 可在 finish_reason 之后且 choices 为空；中断可能取不到它（[官方流式字段](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)）。Responses 使用终态 response.usage，不累计文本 delta（[官方事件](https://developers.openai.com/api/reference/resources/responses/streaming-events)）。Anthropic message_delta 报累计 usage，不能再加一遍（[官方流式规则](https://platform.claude.com/docs/en/build-with-claude/streaming)）；Gemini 按 metadata 字段合并，思考量属于输出，缓存属于输入细分（[官方字段](https://ai.google.dev/api/generate-content#UsageMetadata)）。不同兼容实现的缺省规则不能互相套用，例如 [DeepSeek 的最终 chunk](https://api-docs.deepseek.com/api/create-chat-completion/)与 OpenAI 的 include_usage 约定并非完全相同。
+
+图片计请求数量、TTS 计约定文本字符、ASR 计可靠音频样本/已验证 duration，均不转成 Token。MCP REQUESTS 是开始转发的 HTTP 调用事实，包含初始化、通知和监听；202 通知及 GET 监听/405 有各自传输含义（[MCP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)），不能把请求数、计量完整度或 HTTP 结果解释为工具完成次数。WebDAV 保持 statisticsOnly，不加入费用或额度。
+
+`known_usage_test.go` 在隔离数据库验证各能力的混合/全部未知、最新结算读取、各查询投影与 HTTP 200 后异常。协议解析与真实 Relay streaming 测试分别验证末尾 usage、字段合并、重复事件、中断、观察上界及传输保全。浏览器使用生产 SPA 验证宽/窄屏、刷新和筛选；确定性验证不能追溯证明生产缺失请求的具体原因，也不补写历史用量。本轮查询优化不改 Ent、迁移、spool、ingest、准入或结算持久化。
 
 Portal 提供首页额度摘要及“我的用量与额度”，与 Admin 同源服务计算但为不同权限 DTO。本人可以查看额度、个人趋势、资源分布和分页调用明细。无预算仍显示使用量；累计显示不自动恢复；额度恢复时间来自 Hub，页面不推算自己的时区边界。
 

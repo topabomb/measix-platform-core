@@ -208,7 +208,7 @@ watch([filterQuery, budgetStatus, pageSize, activeTab], () => {
 
 function compactMeters(items: MeterQuantity[]): string {
   return items.filter(item => ['TOTAL_TOKENS', 'CHARACTERS', 'AUDIO_SECONDS', 'REQUESTED_IMAGES'].includes(item.meter))
-    .map(item => `${meterLabel(item.meter)} ${item.confidence === 'UNKNOWN' ? '—' : meterValue(item)}${item.confidence === 'EXACT' ? '' : ` (${$t(`status.${item.confidence}`)})`}`).join(' · ')
+    .map(item => `${meterLabel(item.meter)} ${meterValue(item)}${item.confidence === 'EXACT' ? '' : ` (${$t(`status.${item.confidence}`)})`}`).join(' · ')
 }
 
 const semanticMeters = computed(() => summary.value?.semanticMeters ?? [])
@@ -239,10 +239,19 @@ function meterLabel(meter: PricingMeter): string {
 }
 
 function meterValue(item: MeterQuantity, compact = true): string {
-  return formatMeter(item.quantity, item.meter, locale.value, unitLabels.value, compact)
+  if (item.confidence === 'UNKNOWN') return '—'
+  const value = formatMeter(item.quantity, item.meter, locale.value, unitLabels.value, compact)
+  return item.confidence === 'PARTIAL' ? $t('usage.analytics.observed', { value }) : value
+}
+
+function userBudgetMode(page: UserUsagePage['items'][number]): string {
+  const modes = [...new Set(page.budget.items.map(item => item.mode))]
+  if (!modes.length) return '—'
+  return modes.length === 1 ? $t(`budgets.mode.${modes[0]}`) : $t('usage.analytics.mixedBudget')
 }
 
 function userBudgetStatus(page: UserUsagePage['items'][number]): string {
+  if (!page.budget.items.length) return '—'
   const pending = page.budget.items.find(item => item.status === 'PENDING_RECONCILIATION')
   if (pending) return $t('budgets.status.PENDING_RECONCILIATION')
   const exhausted = page.budget.items.find(item => item.status === 'EXHAUSTED')
@@ -265,12 +274,16 @@ function fmtBytes(n: number | undefined): string {
 
 const costLabel = computed(() => {
   if (!summary.value) return '—'
-  const cost = summary.value.cost
-  if (cost.status === 'KNOWN' || cost.status === 'PARTIAL') {
-    return costAmounts(cost)
-  }
-  return '—'
+  return costValue(summary.value.cost)
 })
+
+function costValue(cost: UserUsagePage['items'][number]['cost']): string {
+  const amount = costAmounts(cost)
+  if (amount !== '—') return amount
+  if (cost?.missingPricingRequests) return $t('usage.analytics.unpriced')
+  if (cost?.unknownMeterRequests) return $t('usage.analytics.noReliablePricedUsage')
+  return amount
+}
 
 const costStatus = computed(() => summary.value?.cost.status ?? 'UNKNOWN')
 
@@ -404,6 +417,7 @@ onBeforeUnmount(() => {
               <div class="text-caption text-grey-7">{{ $t('usage.requests') }}</div>
               <div class="text-h6" data-cy="usage-request-count">{{ summary.requestCount }}</div>
               <div class="text-caption">{{ $t('usage.detail.forwarded') }} {{ summary.forwardedRequestCount }}</div>
+              <div v-if="compactMeters(semanticMeters)" class="text-caption text-primary q-mt-xs" data-cy="usage-observed-meters">{{ compactMeters(semanticMeters) }}</div>
             </q-card-section>
           </q-card>
         </div>
@@ -415,6 +429,7 @@ onBeforeUnmount(() => {
               <q-chip dense :color="costStatusColor(costStatus)" :label="costStatusLabel(costStatus)" text-color="white" />
               <div v-if="summary.cost.missingPricingRequests" class="text-caption text-grey-7">{{ $t('pricing.missingPricing', { count: summary.cost.missingPricingRequests }) }}</div>
               <div v-if="summary.cost.unknownMeterRequests" class="text-caption text-grey-7">{{ $t('pricing.unknownMeters', { count: summary.cost.unknownMeterRequests }) }}</div>
+              <q-btn v-if="summary.cost.missingPricingRequests" flat dense no-caps :label="$t('usage.analytics.reviewPricing')" data-cy="usage-review-pricing" @click="activeTab = 'pricing'" />
             </q-card-section>
           </q-card>
         </div>
@@ -458,9 +473,9 @@ onBeforeUnmount(() => {
             <q-item v-for="item in usageUserItems" :key="item.userId" clickable data-cy="usage-user-row" @click="userId = item.userId">
               <q-item-section>
                 <q-item-label class="text-weight-medium">{{ item.userDisplayName }}</q-item-label>
-                <q-item-label caption>{{ $t('usage.users.requests', { count: item.requestCount }) }} · {{ $t('usage.analytics.httpErrors') }} {{ item.errorRequestCount ?? '—' }}</q-item-label>
-                <q-item-label v-if="!davOnly" class="text-primary">{{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost?.status ?? 'UNKNOWN') }}</q-item-label>
-                <q-item-label v-if="!davOnly" caption>{{ $t('usage.analytics.currentBudget') }}: {{ userBudgetStatus(item) }}</q-item-label>
+                <q-item-label caption>{{ $t('usage.users.requests', { count: item.requestCount }) }} · {{ $t('usage.analytics.transportErrors') }} {{ item.errorRequestCount ?? '—' }}</q-item-label>
+                <q-item-label v-if="!davOnly" class="text-primary">{{ costValue(item.cost) }} · {{ costStatusLabel(item.cost?.status ?? 'UNKNOWN') }}</q-item-label>
+                <q-item-label v-if="!davOnly" caption>{{ $t('usage.analytics.currentBudget') }}: {{ userBudgetMode(item) }} · {{ $t('usage.analytics.accountingHealth') }}: {{ userBudgetStatus(item) }}</q-item-label>
                 <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
                   {{ compactMeters(item.semanticMeters) }}
                 </q-item-label>
@@ -492,7 +507,7 @@ onBeforeUnmount(() => {
                 <q-item-label v-if="point.semanticMeters.length" caption class="text-break">
                   {{ compactMeters(point.semanticMeters) }}
                 </q-item-label>
-                <q-item-label v-if="point.requestCount && point.cost && !davOnly" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(point.cost) }} · {{ costStatusLabel(point.cost.status) }}</q-item-label>
+                <q-item-label v-if="point.requestCount && point.cost && !davOnly" caption>{{ $t('pricing.estimatedCost') }}: {{ costValue(point.cost) }} · {{ costStatusLabel(point.cost.status) }}</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>
@@ -513,7 +528,9 @@ onBeforeUnmount(() => {
                 <q-item-label v-if="item.semanticMeters.length" caption class="text-break">
                   {{ compactMeters(item.semanticMeters) }}
                 </q-item-label>
-                <q-item-label v-if="item.cost && item.resourceKind !== 'WEBDAV'" caption>{{ $t('pricing.estimatedCost') }}: {{ costAmounts(item.cost) }} · {{ costStatusLabel(item.cost.status) }}</q-item-label>
+                <q-item-label v-if="item.cost && item.resourceKind !== 'WEBDAV'" caption>{{ $t('pricing.estimatedCost') }}: {{ costValue(item.cost) }} · {{ costStatusLabel(item.cost.status) }}</q-item-label>
+                <q-item-label v-if="item.cost?.missingPricingRequests" caption>{{ $t('pricing.missingPricing', { count: item.cost.missingPricingRequests }) }}</q-item-label>
+                <q-item-label v-if="item.cost?.unknownMeterRequests" caption>{{ $t('pricing.unknownMeters', { count: item.cost.unknownMeterRequests }) }}</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>

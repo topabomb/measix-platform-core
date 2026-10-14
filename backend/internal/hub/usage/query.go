@@ -416,7 +416,7 @@ func requestStatusPred(status RequestStatus) predicate.RequestUsage {
 	case RequestStatusError:
 		return requestusage.And(
 			requestusage.ForwardedEQ(true),
-			requestusage.HTTPStatusGTE(400),
+			requestusage.Or(requestusage.HTTPStatusGTE(400), requestusage.ErrorClassNEQ("")),
 		)
 	case RequestStatusBlocked:
 		return requestusage.ForwardedEQ(false)
@@ -424,6 +424,7 @@ func requestStatusPred(status RequestStatus) predicate.RequestUsage {
 		return requestusage.And(
 			requestusage.ForwardedEQ(true),
 			requestusage.HTTPStatusLT(400),
+			requestusage.Or(requestusage.ErrorClassIsNil(), requestusage.ErrorClassEQ("")),
 		)
 	}
 }
@@ -567,38 +568,22 @@ func (s *Service) Summary(ctx context.Context, filter Filter) (Summary, error) {
 	type semanticAggregate struct {
 		Meter         string `json:"meter"`
 		QuantityUnits int64  `json:"quantity_units"`
+		KnownCount    int    `json:"known_count"`
 		PartialCount  int    `json:"partial_count"`
 		UnknownCount  int    `json:"unknown_count"`
 	}
 	var semantic []semanticAggregate
 	if err := semanticQ.GroupBy(semanticusage.FieldMeter).Aggregate(
-		func(selector *sql.Selector) string {
-			return sql.As(sql.Sum(selector.C(semanticusage.FieldQuantityUnits)), "quantity_units")
-		},
-		func(selector *sql.Selector) string {
-			column := selector.C(semanticusage.FieldCompleteness)
-			return sql.As("SUM(CASE WHEN "+column+" = 'PARTIAL' THEN 1 ELSE 0 END)", "partial_count")
-		},
-		func(selector *sql.Selector) string {
-			column := selector.C(semanticusage.FieldCompleteness)
-			return sql.As("SUM(CASE WHEN "+column+" = 'UNKNOWN' THEN 1 ELSE 0 END)", "unknown_count")
-		},
+		quantityUnitsAggregate,
+		knownCountAggregate,
+		partialCountAggregate,
+		unknownCountAggregate,
 	).Scan(ctx, &semantic); err != nil {
 		return Summary{}, err
 	}
 	sort.Slice(semantic, func(i, j int) bool { return semantic[i].Meter < semantic[j].Meter })
 	for _, row := range semantic {
-		confidence := CompletenessComplete
-		if row.UnknownCount > 0 {
-			confidence = CompletenessUnknown
-		} else if row.PartialCount > 0 {
-			confidence = CompletenessPartial
-		}
-		quantity := fmt.Sprintf("%d", row.QuantityUnits)
-		if row.Meter == "AUDIO_SECONDS" {
-			quantity = millisecondsAsSeconds(row.QuantityUnits)
-		}
-		result.Meters = append(result.Meters, MeterSummary{Meter: row.Meter, Quantity: quantity, Confidence: confidence})
+		result.Meters = append(result.Meters, meterSummary(row.Meter, row.QuantityUnits, row.KnownCount, row.PartialCount, row.UnknownCount))
 	}
 	costFilter := filter
 	costFilter.From, costFilter.To = &from, &to

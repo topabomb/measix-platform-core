@@ -113,7 +113,7 @@ func TestUsageFiltersCursorSummaryEnrichmentAndUnknownRegression(t *testing.T) {
 
 	summary, err := service.Summary(ctx, Filter{UserID: userA})
 	if err != nil || summary.RequestCount != 4 || summary.ForwardedRequestCount != 3 || summary.RequestBytes != 48 || summary.ResponseBytes != 65 ||
-		summary.RequestCompleteness.Exact != 3 || summary.RequestCompleteness.Unknown != 1 || len(summary.Meters) != 1 || summary.Meters[0].Quantity != "15" || summary.Meters[0].Confidence != CompletenessUnknown {
+		summary.RequestCompleteness.Exact != 3 || summary.RequestCompleteness.Unknown != 1 || len(summary.Meters) != 1 || summary.Meters[0].Quantity != "10" || summary.Meters[0].Confidence != CompletenessPartial {
 		t.Fatalf("user summary = %+v err=%v", summary, err)
 	}
 	unknown, err := service.UnknownRequestCount(ctx)

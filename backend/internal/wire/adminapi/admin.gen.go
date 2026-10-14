@@ -3026,7 +3026,7 @@ type McpToolGrant struct {
 // McpToolGrantApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, contract review, save and publish. Required explicitly; no decoder default.
 type McpToolGrantApprovalPolicy string
 
-// MeterQuantity defines model for MeterQuantity.
+// MeterQuantity Request meters retain their recorded confidence. Aggregates sum only reliable EXACT/PARTIAL quantities; mixed reliable and incomplete contributions are PARTIAL, and no reliable contribution is UNKNOWN. A PARTIAL zero is an observed subtotal, not a complete total.
 type MeterQuantity struct {
 	Confidence MeterQuantityConfidence `json:"confidence"`
 
@@ -3953,7 +3953,7 @@ type UserUsageView struct {
 	// Cost Current pricing-set estimate. Amounts in distinct currencies are never converted or added together.
 	Cost *CostAnalysis `json:"cost,omitempty"`
 
-	// ErrorRequestCount Forwarded requests with HTTP status at least 400, using the existing ERROR filter semantics.
+	// ErrorRequestCount Forwarded requests with HTTP status at least 400 or a nonempty transport errorClass, including cancellation after HTTP 200. Uses the ERROR filter semantics; does not determine MCP tool-task success.
 	ErrorRequestCount     *int            `json:"errorRequestCount,omitempty"`
 	ForwardedRequestCount *int            `json:"forwardedRequestCount,omitempty"`
 	RequestCount          int             `json:"requestCount"`

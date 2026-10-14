@@ -1672,6 +1672,7 @@ components:
       enum: [AVAILABLE, EXHAUSTED, PENDING_RECONCILIATION]
     MeterQuantity:
       type: object
+      description: Request meters retain their recorded completeness. Aggregates sum only reliable EXACT/PARTIAL quantities; mixed reliable and incomplete contributions are PARTIAL, and no reliable contribution is UNKNOWN. A PARTIAL zero is an observed subtotal, not a complete total.
       required: [meter, quantity, completeness]
       properties:
         meter:

@@ -81,6 +81,10 @@ function meterValue(item: MeterQuantity): string {
       </tbody></q-markup-table>
       <template v-if="!request.statisticsOnly">
       <div class="text-subtitle2 q-mt-sm">{{ $t('usage.detail.semanticMeters') }}</div>
+      <div v-if="request.requestCompleteness && request.requestCompleteness !== 'EXACT'" class="text-caption text-grey-7 q-mt-xs" data-cy="usage-metering-reason">
+        {{ $t('usage.analytics.incompleteMetering') }}
+        {{ request.errorClass ? $t('usage.analytics.incompleteTransport', { error: errorLabel(request.errorClass) }) : $t('usage.analytics.incompleteProtocol') }}
+      </div>
       <div v-if="request.semanticMeters?.length" class="usage-detail-meters q-mt-xs">
         <div v-for="meter in request.semanticMeters" :key="meter.meter" class="usage-detail-meter">
           <div>{{ meterLabel(meter.meter) }}</div>

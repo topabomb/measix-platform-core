@@ -149,6 +149,7 @@ func (s *Service) Trend(ctx context.Context, filter Filter, location *time.Locat
 		Bucket        int    `json:"bucket"`
 		Meter         string `json:"meter"`
 		QuantityUnits int64  `json:"quantity_units"`
+		KnownCount    int    `json:"known_count"`
 		PartialCount  int    `json:"partial_count"`
 		UnknownCount  int    `json:"unknown_count"`
 	}
@@ -168,6 +169,7 @@ func (s *Service) Trend(ctx context.Context, filter Filter, location *time.Locat
 			return sql.As(bucketExpression(requests.C(requestusage.FieldCompletedAt)), "bucket")
 		},
 		quantityUnitsAggregate,
+		knownCountAggregate,
 		partialCountAggregate,
 		unknownCountAggregate,
 	).Scan(ctx, &semanticRows); err != nil {
@@ -175,7 +177,7 @@ func (s *Service) Trend(ctx context.Context, filter Filter, location *time.Locat
 	}
 	for _, row := range semanticRows {
 		if row.Bucket >= 0 && row.Bucket < len(result.Points) {
-			result.Points[row.Bucket].Meters = append(result.Points[row.Bucket].Meters, meterSummary(row.Meter, row.QuantityUnits, row.PartialCount, row.UnknownCount))
+			result.Points[row.Bucket].Meters = append(result.Points[row.Bucket].Meters, meterSummary(row.Meter, row.QuantityUnits, row.KnownCount, row.PartialCount, row.UnknownCount))
 		}
 	}
 	for index := range result.Points {
@@ -237,6 +239,7 @@ func (s *Service) Distribution(ctx context.Context, filter Filter) (Distribution
 		ResourceID     string `json:"resource_id"`
 		Meter          string `json:"meter"`
 		QuantityUnits  int64  `json:"quantity_units"`
+		KnownCount     int    `json:"known_count"`
 		PartialCount   int    `json:"partial_count"`
 		UnknownCount   int    `json:"unknown_count"`
 	}
@@ -258,6 +261,7 @@ func (s *Service) Distribution(ctx context.Context, filter Filter) (Distribution
 		},
 		func(*sql.Selector) string { return sql.As(requests.C(requestusage.FieldResourceID), "resource_id") },
 		quantityUnitsAggregate,
+		knownCountAggregate,
 		partialCountAggregate,
 		unknownCountAggregate,
 	).Scan(ctx, &semanticRows); err != nil {
@@ -267,7 +271,7 @@ func (s *Service) Distribution(ctx context.Context, filter Filter) (Distribution
 	metersByGroup := make(map[distributionKey][]MeterSummary, len(groups))
 	for _, row := range semanticRows {
 		key := distributionKey{row.ResourceKind, row.ClientProtocol, row.ResourceID}
-		metersByGroup[key] = append(metersByGroup[key], meterSummary(row.Meter, row.QuantityUnits, row.PartialCount, row.UnknownCount))
+		metersByGroup[key] = append(metersByGroup[key], meterSummary(row.Meter, row.QuantityUnits, row.KnownCount, row.PartialCount, row.UnknownCount))
 	}
 	views := make([]RequestView, len(groups))
 	for index, current := range groups {
@@ -413,7 +417,7 @@ func (s *Service) ListUsers(ctx context.Context, filter Filter, budgetService *b
 			}
 			if view.Forwarded {
 				forwarded[view.UserID]++
-				if view.HTTPStatus >= 400 {
+				if view.HTTPStatus >= 400 || view.ErrorClass != nil && *view.ErrorClass != "" {
 					failed[view.UserID]++
 				}
 			}
@@ -497,6 +501,7 @@ func (s *Service) metersByUsers(ctx context.Context, filter Filter, userIDs []st
 		UserID        string `json:"user_id"`
 		Meter         string `json:"meter"`
 		QuantityUnits int64  `json:"quantity_units"`
+		KnownCount    int    `json:"known_count"`
 		PartialCount  int    `json:"partial_count"`
 		UnknownCount  int    `json:"unknown_count"`
 	}
@@ -520,13 +525,14 @@ func (s *Service) metersByUsers(ctx context.Context, filter Filter, userIDs []st
 			return sql.As(requests.C(requestusage.FieldUserID), "user_id")
 		},
 		quantityUnitsAggregate,
+		knownCountAggregate,
 		partialCountAggregate,
 		unknownCountAggregate,
 	).Scan(ctx, &rows); err != nil {
 		return nil, err
 	}
 	for _, row := range rows {
-		result[row.UserID] = append(result[row.UserID], meterSummary(row.Meter, row.QuantityUnits, row.PartialCount, row.UnknownCount))
+		result[row.UserID] = append(result[row.UserID], meterSummary(row.Meter, row.QuantityUnits, row.KnownCount, row.PartialCount, row.UnknownCount))
 	}
 	for userID := range result {
 		sort.Slice(result[userID], func(i, j int) bool { return result[userID][i].Meter < result[userID][j].Meter })
@@ -563,6 +569,7 @@ func (s *Service) usageMetersByUsers(ctx context.Context, userIDs []string) (map
 		ResourceKind  string `json:"resource_kind"`
 		Meter         string `json:"meter"`
 		QuantityUnits int64  `json:"quantity_units"`
+		KnownCount    int    `json:"known_count"`
 		PartialCount  int    `json:"partial_count"`
 		UnknownCount  int    `json:"unknown_count"`
 	}
@@ -577,6 +584,7 @@ func (s *Service) usageMetersByUsers(ctx context.Context, userIDs []string) (map
 		func(*sql.Selector) string { return sql.As(requests.C(requestusage.FieldUserID), "user_id") },
 		func(*sql.Selector) string { return sql.As(requests.C(requestusage.FieldResourceKind), "resource_kind") },
 		quantityUnitsAggregate,
+		knownCountAggregate,
 		partialCountAggregate,
 		unknownCountAggregate,
 	).Scan(ctx, &rows); err != nil {
@@ -584,13 +592,13 @@ func (s *Service) usageMetersByUsers(ctx context.Context, userIDs []string) (map
 	}
 	for _, row := range rows {
 		capability := budget.Capability(row.ResourceKind)
-		if capability != budget.CapabilityModel && capability != budget.CapabilityTTS && capability != budget.CapabilityASR && capability != budget.CapabilityMCP {
+		if capability != budget.CapabilityModel && capability != budget.CapabilityTTS && capability != budget.CapabilityASR && capability != budget.CapabilityMCP && capability != budget.CapabilityImageGeneration {
 			continue
 		}
 		if result[row.UserID] == nil {
 			result[row.UserID] = CapabilityMeters{}
 		}
-		result[row.UserID][capability] = append(result[row.UserID][capability], meterSummary(row.Meter, row.QuantityUnits, row.PartialCount, row.UnknownCount))
+		result[row.UserID][capability] = append(result[row.UserID][capability], meterSummary(row.Meter, row.QuantityUnits, row.KnownCount, row.PartialCount, row.UnknownCount))
 	}
 	for _, capabilities := range result {
 		for capability := range capabilities {
@@ -601,7 +609,13 @@ func (s *Service) usageMetersByUsers(ctx context.Context, userIDs []string) (map
 }
 
 func quantityUnitsAggregate(selector *sql.Selector) string {
-	return sql.As(sql.Sum(selector.C(semanticusage.FieldQuantityUnits)), "quantity_units")
+	column := selector.C(semanticusage.FieldCompleteness)
+	return sql.As("SUM(CASE WHEN "+column+" IN ('EXACT', 'PARTIAL') THEN "+selector.C(semanticusage.FieldQuantityUnits)+" ELSE 0 END)", "quantity_units")
+}
+
+func knownCountAggregate(selector *sql.Selector) string {
+	column := selector.C(semanticusage.FieldCompleteness)
+	return sql.As("SUM(CASE WHEN "+column+" IN ('EXACT', 'PARTIAL') THEN 1 ELSE 0 END)", "known_count")
 }
 
 func partialCountAggregate(selector *sql.Selector) string {
@@ -614,11 +628,11 @@ func unknownCountAggregate(selector *sql.Selector) string {
 	return sql.As("SUM(CASE WHEN "+column+" = 'UNKNOWN' THEN 1 ELSE 0 END)", "unknown_count")
 }
 
-func meterSummary(meter string, quantityUnits int64, partialCount, unknownCount int) MeterSummary {
+func meterSummary(meter string, quantityUnits int64, knownCount, partialCount, unknownCount int) MeterSummary {
 	confidence := CompletenessComplete
-	if unknownCount > 0 {
+	if knownCount == 0 {
 		confidence = CompletenessUnknown
-	} else if partialCount > 0 {
+	} else if unknownCount > 0 || partialCount > 0 {
 		confidence = CompletenessPartial
 	}
 	quantity := fmt.Sprintf("%d", quantityUnits)

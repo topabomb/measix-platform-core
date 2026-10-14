@@ -1043,7 +1043,17 @@ export default {
   },
   usage: {
     range90d: 'Last 90 days',
-    analytics: { rangeError: 'Choose a complete period, with the end after the start and at most 92 days.', customRange: 'Custom period', httpErrors: 'HTTP errors', currentBudget: 'Current budget', usersHint: 'Users with requests in this period, paged by user; budgets reflect current state. Select a user to drill down.', manageBudget: 'Manage user budget', meterDetails: 'Detailed meters and transfer usage' },
+    analytics: {
+      rangeError: 'Choose a complete period, with the end after the start and at most 92 days.', customRange: 'Custom period',
+      transportErrors: 'Transport errors / cancellations', currentBudget: 'Budget mode', accountingHealth: 'Budget / accounting health',
+      mixedBudget: 'Mixed (by capability)', observed: 'Observed {value}', unpriced: 'Unpriced',
+      noReliablePricedUsage: 'No reliable priced usage', reviewPricing: 'Review pricing',
+      incompleteMetering: 'Metering is incomplete.',
+      incompleteTransport: 'Transport result: {error}. Observed usage is retained; missing usage is not zero.',
+      incompleteProtocol: 'Required protocol usage was not fully obtained. Check the upstream usage response and protocol match; missing usage is not zero.',
+      usersHint: 'Users with requests in this period, paged by user; budgets reflect current state. Transport errors include HTTP errors and interruptions or cancellations after headers; they do not determine tool-task success. Select a user to drill down.',
+      manageBudget: 'Manage user budget', meterDetails: 'Detailed meters and transfer usage',
+    },
     unnamedResource: 'Resource name unavailable',
     filterThisResource: 'View requests for this resource',
     title: 'Usage',

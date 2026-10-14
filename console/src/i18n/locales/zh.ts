@@ -1043,7 +1043,17 @@ export default {
   },
   usage: {
     range90d: '最近 90 天',
-    analytics: { rangeError: '请选择完整的起止时间，结束时间须晚于开始时间，且范围不超过 92 天。', customRange: '自定义时间', httpErrors: 'HTTP 错误', currentBudget: '当前额度', usersHint: '所选范围内有请求的用户，按用户分页；额度状态为当前值。点击用户查看其分析。', manageBudget: '管理用户额度', meterDetails: '详细计量与传输用量' },
+    analytics: {
+      rangeError: '请选择完整的起止时间，结束时间须晚于开始时间，且范围不超过 92 天。', customRange: '自定义时间',
+      transportErrors: '传输异常/取消', currentBudget: '额度模式', accountingHealth: '额度与账目健康',
+      mixedBudget: '按能力设置', observed: '已观测 {value}', unpriced: '未定价',
+      noReliablePricedUsage: '暂无可靠的可计费量', reviewPricing: '核对定价',
+      incompleteMetering: '计量不完整。',
+      incompleteTransport: '传输结果：{error}。已观测量保留，缺失量不计为零。',
+      incompleteProtocol: '未取得协议所需的完整计量。请核对上游计量返回与协议匹配，缺失量不计为零。',
+      usersHint: '所选范围内有请求的用户，按用户分页；额度状态为当前值。传输异常包含 HTTP 错误及响应头后的中断或取消，不代表工具任务失败。点击用户查看其分析。',
+      manageBudget: '管理用户额度', meterDetails: '详细计量与传输用量',
+    },
     unnamedResource: '资源名称不可用',
     filterThisResource: '查看此资源的请求',
     title: '用量与额度',

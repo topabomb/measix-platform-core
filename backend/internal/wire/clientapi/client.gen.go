@@ -1467,7 +1467,7 @@ type McpToolGrant struct {
 // McpToolGrantApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. Independent of tool selection and does not bypass existing runtime or system permissions. Required explicitly; no decoder default.
 type McpToolGrantApprovalPolicy string
 
-// MeterQuantity defines model for MeterQuantity.
+// MeterQuantity Request meters retain their recorded completeness. Aggregates sum only reliable EXACT/PARTIAL quantities; mixed reliable and incomplete contributions are PARTIAL, and no reliable contribution is UNKNOWN. A PARTIAL zero is an observed subtotal, not a complete total.
 type MeterQuantity struct {
 	Completeness UsageCompleteness `json:"completeness"`
 	Meter        UsageMeter        `json:"meter"`

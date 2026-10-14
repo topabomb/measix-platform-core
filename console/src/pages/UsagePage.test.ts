@@ -59,6 +59,26 @@ async function openRequests(wrapper: ReturnType<typeof mountUsagePage>['wrapper'
 }
 
 describe('UsagePage', () => {
+  it('shows observed aggregates, missing-price causes and budget mode separately from accounting health', async () => {
+    const original = vi.mocked(client.apiFetch).getMockImplementation()!
+    const meter = { meter: 'TOTAL_TOKENS', quantity: '60822503', confidence: 'PARTIAL' }
+    const cost = { status: 'PARTIAL', missingPricingRequests: 154, unknownMeterRequests: 0 }
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path.includes('/usage/users')) return { items: [{ userId: 'usr_ada', userDisplayName: 'Ada', requestCount: 157, errorRequestCount: 4, semanticMeters: [meter], cost, budget: { items: [{ capability: 'MODEL', mode: 'UNLIMITED', status: 'PENDING_RECONCILIATION', limits: [] }] } }] }
+      if (path.includes('/usage/distribution')) return { items: [{ resourceId: 'mdl_noetral', resourceDisplayName: 'Noetral', resourceKind: 'MODEL', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', requestCount: 157, semanticMeters: [meter], cost }] }
+      return original(path)
+    })
+    const { wrapper } = mountUsagePage()
+    await flushPromises()
+    const row = wrapper.get('[data-cy="usage-user-row"]')
+    expect(row.text()).toContain('Observed')
+    expect(row.text()).toContain('Unlimited')
+    expect(row.text()).toContain('Budget / accounting health')
+    expect(row.text()).toContain('Transport errors / cancellations')
+    expect(wrapper.text()).toContain('Unpriced')
+    expect(wrapper.text()).toContain('154 requests have no applicable price')
+    wrapper.unmount()
+  })
   it('rejects an incomplete custom period without querying mismatched analytics', async () => {
     const { wrapper } = mountUsagePage()
     await flushPromises()
@@ -443,6 +463,7 @@ describe('UsagePage', () => {
           completedAt: '2026-08-01T00:00:01Z', forwarded: true, httpStatus: 200,
           upstreamHttpStatus: 200, requestBytes: 100, responseBytes: 200, durationMs: 45,
           requestCompleteness: 'PARTIAL', settlementState: 'RECONCILIATION_REQUIRED',
+          errorClass: 'CLIENT_CANCELLED',
           semanticMeters: [{ meter: 'TOTAL_TOKENS', quantity: '10000', confidence: 'PARTIAL' }],
           budget: { capability: 'MODEL', mode: 'LIMITED', revision: 7, asOf: '2026-08-01T00:00:01Z', blockers: [{ period: 'DAY', meter: 'TOTAL_TOKENS', limit: '10000', used: '9000', reserved: '1000', remaining: '0', overage: '0', scopeStart: '2026-08-01T00:00:00Z', resetAt: '2026-08-02T00:00:00Z' }] },
         }],
@@ -460,6 +481,8 @@ describe('UsagePage', () => {
 
     const text = wrapper.get('[data-cy="usage-detail"]').text()
     expect(text).toContain('req_abc')
+    expect(text).toContain('Metering is incomplete')
+    expect(text).toContain('Observed usage is retained')
     expect(text).toContain('usr_x')
     expect(text).toContain('dev_1')
     expect(text).toContain('Generation 2')

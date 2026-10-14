@@ -2175,6 +2175,7 @@ export interface components {
             items: components["schemas"]["BudgetAuditItem"][];
             nextCursor?: string;
         };
+        /** @description Request meters retain their recorded confidence. Aggregates sum only reliable EXACT/PARTIAL quantities; mixed reliable and incomplete contributions are PARTIAL, and no reliable contribution is UNKNOWN. A PARTIAL zero is an observed subtotal, not a complete total. */
         MeterQuantity: {
             meter: components["schemas"]["PricingMeter"];
             quantity: string;
@@ -2228,7 +2229,7 @@ export interface components {
             userDisplayName: string;
             requestCount: number;
             forwardedRequestCount?: number;
-            /** @description Forwarded requests with HTTP status at least 400, using the existing ERROR filter semantics. */
+            /** @description Forwarded requests with HTTP status at least 400 or a nonempty transport errorClass, including cancellation after HTTP 200. Uses the ERROR filter semantics; does not determine MCP tool-task success. */
             errorRequestCount?: number;
             cost?: components["schemas"]["CostAnalysis"];
             semanticMeters: components["schemas"]["MeterQuantity"][];

@@ -61,7 +61,7 @@ Chat Completions 的企业 Android 请求在 stream=true 时必须发送 `stream
 
 ### 3.2 Image Generation：同步 text-to-image
 
-`OPENAI_IMAGES_GENERATIONS` 只接受已发布 `img_*` route 的同步 `POST /images/generations`。Relay 从受信 JSON 请求有界读取 `n` 与 `size`：`n` 缺失规范化为 1，必须位于 1..资源 `maxImagesPerRequest`（平台上限 6），`size` 必须属于资源 `allowedSizes`。`DASHSCOPE_MULTIMODAL_GENERATION` 只接受精确原生 generation path 与固定 `model/input.messages/parameters` 结构，要求显式整数 `parameters.n`、`parameters.size=宽*高` 和 `watermark=false`；Relay 仅把 `*` 映射为 canonical `x` 做 allowlist 比较。两种合法请求都保持 body 字节与供应商响应透明，不解析 prompt，不下载或持久化图片，不在协议间转换结果。
+`OPENAI_IMAGES_GENERATIONS` 只接受已发布 `img_*` route 的同步 `POST /images/generations`。Relay 从受信 JSON 请求有界读取 `n` 与 `size`：`n` 缺失规范化为 1，必须位于 1..资源 `maxImagesPerRequest`（平台上限 6）；`size` 缺失时仅在准入校验中按 `auto` 处理，原始请求不补字段，资源 `allowedSizes` 不含 `auto` 时仍拒绝。显式尺寸继续匹配允许集合，`null`、空字符串和错型不视为缺省。`DASHSCOPE_MULTIMODAL_GENERATION` 只接受精确原生 generation path 与固定 `model/input.messages/parameters` 结构，要求显式整数 `parameters.n`、`parameters.size=宽*高` 和 `watermark=false`；Relay 仅把 `*` 映射为 canonical `x` 做 allowlist 比较。两种合法请求都保持 body 字节与供应商响应透明，不解析 prompt，不下载或持久化图片，不在协议间转换结果。
 
 每次实际开始的上游调用计 `REQUESTS=1`，`REQUESTED_IMAGES=n`；它表示请求图片数，不冒充返回或保存成功数。明确未转发才释放两者。有限图片预算无法可靠解析合法 `n` 时按 UNKNOWN 留待核对，但不能因计量能力不足阻断合法请求；资源单次上限与 size 等业务准入仍照常执行。edit、图片输入、reference、mask、multipart、stream、async 不在当前 profile 内，不能由通用代理路径绕开。
 

@@ -125,13 +125,26 @@ func TestSystemSmokeRealRelayFourTransports(t *testing.T) {
 		t.Fatalf("stream chunks=%d", chunks)
 	}
 
-	// Image generation request/response and body transparency.
-	imageBody, imageContentType, err := c.ImageGeneration(ctx, imageID, "/v1/images/generations", `{"model":"image-test","prompt":"draw a blue square","n":1,"size":"1024x1024"}`)
-	if err != nil {
-		t.Fatalf("image generation: %v", err)
-	}
-	if !bytes.HasPrefix([]byte(imageContentType), []byte("application/json")) || !bytes.Contains(imageBody, []byte(`"b64_json":"iVBORw0KGgo="`)) {
-		t.Fatalf("bad image generation: ct=%q body=%s", imageContentType, imageBody)
+	// RLY-TRN-018: Explicit and omitted size survive the real Relay process.
+	for _, test := range []struct{ body, size string }{
+		{body: `{"model":"image-test","prompt":"draw a blue square","n":1,"size":"1024x1024"}`, size: "1024x1024"},
+		{body: `{"model":"image-test","prompt":"draw a blue square","n":1}`},
+	} {
+		imageBody, imageContentType, err := c.ImageGeneration(ctx, imageID, "/v1/images/generations", test.body)
+		if err != nil {
+			t.Fatalf("image generation (size=%q): %v", test.size, err)
+		}
+		if !bytes.HasPrefix([]byte(imageContentType), []byte("application/json")) || !bytes.Contains(imageBody, []byte(`"b64_json":"iVBORw0KGgo="`)) {
+			t.Fatalf("bad image generation: ct=%q body=%s", imageContentType, imageBody)
+		}
+		fact := ad.LastRequest("/v1/images/generations")
+		if fact == nil {
+			t.Fatal("image generation did not reach the adapter")
+		}
+		value, hasSize := fact.BodyJSON["size"]
+		if hasSize != (test.size != "") || hasSize && value != test.size {
+			t.Fatalf("forwarded size=%v present=%t, want %q", value, hasSize, test.size)
+		}
 	}
 
 	// TTS binary (CAP-C4-010/011)

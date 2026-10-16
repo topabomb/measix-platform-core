@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -107,6 +108,76 @@ func TestImageGenerationIsValidatedMeteredAndForwardedTransparently(t *testing.T
 	assertSettlementMeter(t, settlements[0], usageingestapi.REQUESTEDIMAGES, 2)
 }
 
+// RLY-TRN-018: Size defaults affect admission only, never the forwarded bytes.
+func TestImageGenerationOptionalSizeAdmissionAndTransparentForwarding(t *testing.T) {
+	tests := []struct {
+		name           string
+		body           string
+		allowedSizes   []string
+		upstreamStatus int
+		wantStatus     int
+		wantImages     int64
+	}{
+		{name: "omitted size", body: `{"model":"image-test", "prompt":"opaque", "n":2}`, allowedSizes: []string{"auto"}, upstreamStatus: 200, wantStatus: 200, wantImages: 2},
+		{name: "omitted size and count", body: "{\n  \"model\":\"image-test\", \"prompt\":\"opaque\"\n}", allowedSizes: []string{"auto"}, upstreamStatus: 200, wantStatus: 200, wantImages: 1},
+		{name: "explicit auto", body: `{"model":"image-test","prompt":"opaque","n":1,"size":"auto"}`, allowedSizes: []string{"auto"}, upstreamStatus: 200, wantStatus: 200, wantImages: 1},
+		{name: "explicit allowed size", body: `{"model":"image-test","prompt":"opaque","n":1,"size":"1024x1024"}`, allowedSizes: []string{"1024x1024"}, upstreamStatus: 200, wantStatus: 200, wantImages: 1},
+		{name: "omitted size without auto permission", body: `{"model":"image-test","prompt":"opaque","n":1}`, allowedSizes: []string{"1024x1024"}, upstreamStatus: 200, wantStatus: 400},
+		{name: "omitted size keeps count limit", body: `{"model":"image-test","prompt":"opaque","n":4}`, allowedSizes: []string{"auto"}, upstreamStatus: 200, wantStatus: 400},
+		{name: "omitted size preserves provider error", body: `{"model":"image-test","prompt":"opaque","n":1}`, allowedSizes: []string{"auto"}, upstreamStatus: 400, wantStatus: 400},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			responseBody := []byte(`{"data":[{"b64_json":"AA=="}]}`)
+			if test.upstreamStatus >= 400 {
+				responseBody = []byte(`{"error":{"code":"provider_invalid_request","message":"Provider rejected fixture request"}}`)
+			}
+			var forwarded int
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				forwarded++
+				got, _ := io.ReadAll(r.Body)
+				if r.Method != http.MethodPost || r.URL.Path != "/v1/images/generations" || string(got) != test.body {
+					t.Errorf("request changed: method=%s path=%s body=%s", r.Method, r.URL.Path, got)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(test.upstreamStatus)
+				_, _ = w.Write(responseBody)
+			}))
+			defer upstream.Close()
+			fixture, imageID := imageRuntimeFixtureForProtocol(t, upstream.URL, platformid.New(platformid.Deployment), relaycontrolapi.ResourceRouteClientProtocolOPENAIIMAGESGENERATIONS, "/v1/images/generations", test.allowedSizes...)
+			defer fixture.close()
+			request := fixture.request(t, nil, http.MethodPost, imageID, "/v1/images/generations", strings.NewReader(test.body), "application/json")
+			response, err := http.DefaultClient.Do(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, _ := io.ReadAll(response.Body)
+			_ = response.Body.Close()
+			if response.StatusCode != test.wantStatus {
+				t.Fatalf("status=%d body=%s, want %d", response.StatusCode, got, test.wantStatus)
+			}
+			if test.wantImages == 0 && test.upstreamStatus < 400 {
+				var problem relaycontrolapi.Problem
+				if err := json.Unmarshal(got, &problem); err != nil {
+					t.Fatal(err)
+				}
+				if forwarded != 0 || problem.Code != "invalid_request" || problem.Forwarded == nil || *problem.Forwarded {
+					t.Fatalf("request was not rejected before forwarding: count=%d problem=%+v", forwarded, problem)
+				}
+				return
+			}
+			if forwarded != 1 || !bytes.Equal(got, responseBody) {
+				t.Fatalf("response changed: body=%s forwarded=%d", got, forwarded)
+			}
+			if test.wantImages > 0 {
+				settlements := fixture.recorder.waitForSettlements(t, 1)
+				assertSettlementMeter(t, settlements[0], usageingestapi.REQUESTS, 1)
+				assertSettlementMeter(t, settlements[0], usageingestapi.REQUESTEDIMAGES, test.wantImages)
+			}
+		})
+	}
+}
+
 func TestDashScopeImageGenerationIsValidatedMeteredAndForwardedTransparently(t *testing.T) {
 	path := "/api/v1/services/aigc/multimodal-generation/generation"
 	wantBody := []byte(`{"model":"wan2.7-image","input":{"messages":[{"role":"user","content":[{"text":"opaque text"}]}]},"parameters":{"size":"1024*1024","n":2,"watermark":false}}`)
@@ -199,7 +270,7 @@ func TestImageGenerationExhaustedRequestAndImageMetersNeverReachUpstream(t *test
 			if err != nil {
 				t.Fatal(err)
 			}
-			fixture, imageID := imageRuntimeFixtureForDeployment(t, upstream.URL, identityService.Signer.DeploymentID)
+			fixture, imageID := imageRuntimeFixtureForProtocol(t, upstream.URL, identityService.Signer.DeploymentID, relaycontrolapi.ResourceRouteClientProtocolOPENAIIMAGESGENERATIONS, "/v1/images/generations", "auto")
 			defer fixture.close()
 			member, err := identityService.CreateUser(context.Background(), "image-member", "Image Member", "MEMBER")
 			if err != nil {
@@ -231,7 +302,7 @@ func TestImageGenerationExhaustedRequestAndImageMetersNeverReachUpstream(t *test
 			budgetClient := &hubImageBudgetClient{service: service}
 			fixture.server = httptest.NewServer(relayruntime.NewHandler(fixture.store, fixture.recorder, budgetClient))
 
-			body := `{"model":"image-test","prompt":"opaque","n":2,"size":"1024x1024"}`
+			body := `{"model":"image-test","prompt":"opaque","n":2}`
 			response, err := http.DefaultClient.Do(fixture.request(t, nil, http.MethodPost, imageID, "/v1/images/generations", strings.NewReader(body), "application/json"))
 			if err != nil {
 				t.Fatal(err)
@@ -253,8 +324,11 @@ func imageRuntimeFixtureForDeployment(t *testing.T, upstreamURL, deploymentID st
 	return imageRuntimeFixtureForProtocol(t, upstreamURL, deploymentID, relaycontrolapi.ResourceRouteClientProtocolOPENAIIMAGESGENERATIONS, "/v1/images/generations")
 }
 
-func imageRuntimeFixtureForProtocol(t *testing.T, upstreamURL, deploymentID string, protocol relaycontrolapi.ResourceRouteClientProtocol, runtimePath string) (*runtimeFixture, string) {
+func imageRuntimeFixtureForProtocol(t *testing.T, upstreamURL, deploymentID string, protocol relaycontrolapi.ResourceRouteClientProtocol, runtimePath string, allowedSizes ...string) (*runtimeFixture, string) {
 	t.Helper()
+	if len(allowedSizes) == 0 {
+		allowedSizes = []string{"1024x1024", "1536x1024"}
+	}
 	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -268,7 +342,7 @@ func imageRuntimeFixtureForProtocol(t *testing.T, upstreamURL, deploymentID stri
 		ResourceRoutes: []relaycontrolapi.ResourceRoute{{
 			ResourceId: imageID, RuntimeRouteId: routeID, ResourceKind: relaycontrolapi.ResourceRouteResourceKindIMAGEGENERATION,
 			ClientProtocol: protocol,
-			ImageProfile:   &relaycontrolapi.RuntimeImageProfile{MaxImagesPerRequest: 3, AllowedSizes: []string{"1024x1024", "1536x1024"}},
+			ImageProfile:   &relaycontrolapi.RuntimeImageProfile{MaxImagesPerRequest: 3, AllowedSizes: allowedSizes},
 		}},
 		Routes: []relaycontrolapi.RuntimeRouteSpec{{
 			RuntimeRouteId: routeID, UpstreamId: upstreamID, AllowedMethods: []string{"POST"}, AllowedPathPrefixes: []string{runtimePath},

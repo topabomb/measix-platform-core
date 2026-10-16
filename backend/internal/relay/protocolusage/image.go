@@ -72,13 +72,14 @@ func observeOpenAIImageGenerationRequest(body []byte, maxImages int, allowedSize
 	if n < 1 || n > int64(maxImages) {
 		return Result{}, fmt.Errorf("image count must be between 1 and %d", maxImages)
 	}
-	rawSize, exists := request["size"]
-	if !exists {
-		return Result{}, fmt.Errorf("image size is required")
-	}
 	var size string
-	if err := json.Unmarshal(rawSize, &size); err != nil {
-		return Result{}, fmt.Errorf("image size must be a string")
+	if rawSize, exists := request["size"]; exists {
+		if err := json.Unmarshal(rawSize, &size); err != nil {
+			return Result{}, fmt.Errorf("image size must be a string")
+		}
+	} else {
+		// Default only for admission; the original payload remains unchanged.
+		size = "auto"
 	}
 	allowed := false
 	for _, candidate := range allowedSizes {

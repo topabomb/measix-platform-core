@@ -189,6 +189,14 @@ Spark 从 `431368a` 切换到新包，仅重启 Hub/Relay。新旧程序读取�
 
 公网 Discovery/live/ready/Admin/Portal 为 200、内部路径为 404；Admin/Portal index 及 JS/CSS 与原包逐字节一致。生产已登录浏览器刷新原时间范围后实际显示已观测 6082.3 万 Token（PARTIAL）、79 条传输异常/取消；工作区 718 条、未定价模型 154 条缺适用价格，价格和原 UNKNOWN/PARTIAL 事实未改写。证据在私有 `.artifacts/usage-production-20261014/`、`usage-*.log` 和既有私有现场记录，不能整体公开。本轮不新增外部供应商、Android/手机或大文件验收声明。
 
+## OpenAI 生图缺省尺寸与 Spark Relay 更新（2026-10-16）
+
+修复源码为 Core `192ea05522d28925eab1269eb946e7d063e33e38`，对应 Architecture `22c46dd2e61421c2c4932bfc14e96473511d1df8`。OpenAI 请求省略 `size` 时仅在准入校验中按 `auto` 处理，资源仍须允许 `auto`；原始请求不补字段，显式尺寸与张数限制继续有效。配置、OpenAPI、生成材料、持久化与 SQL 迁移不变，当前 Android 请求和 DashScope 分支不改。规则见[用量参考](usage-budget.md#32-image-generation同步-text-to-image)。
+
+修复前已复现缺省尺寸请求被拒绝，修复后定向测试、全量 Go tests/vet、真实 Relay 子进程的系统冒烟测试与差异检查通过，覆盖缺省尺寸原样转发、默认张数、禁止 `auto` 时 no-forward、显式非法尺寸、张数额度及供应商错误 status/body 保真。
+
+Spark 仅更新并重启 Relay，ARM64 程序 SHA-256 为 `27f26f770d6215e3be7f8505a0b89cbf2d3aaa8cfd50493272be62c7b9c58ea4`，运行中可执行文件与其匹配。Hub、Admin、Portal 复用原 `cc805be` 部署，`release.json` 明确记录 Relay 组件覆盖及新 payload hash。Hub 与其他 PM2 进程 PID/状态、config/secrets 摘要不变；Hub/Relay ready，公网 ready 为 200，匿名 Runtime 请求为 401。按用户明确要求未执行备份，不运行数据库迁移；未发起真实供应商生图调用。现场记录与证据保存在私有 `.artifacts/deployment-local-spark.md`、`.artifacts/relay-size-auto-192ea05/`，不能整体公开。
+
 ## 保留的失败边界
 
 - 隔离工作区大文件 PUT 曾在约 50 MiB/64 MiB 传输中返回 502/503 与 UNKNOWN，记录在 `.artifacts/workspace-files-final/`、`.artifacts/resources-review/`。新空间重跑通过不证明间歇传输根因已修复；不得自动重放未知写入，生产验收前继续核查。

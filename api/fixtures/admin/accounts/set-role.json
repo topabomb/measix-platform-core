@@ -1,0 +1,7 @@
+{
+  "role": "ADMIN",
+  "expectedRole": "MEMBER",
+  "currentPassword": "synthetic actor password",
+  "newPassword": "synthetic target password",
+  "confirmPassword": "synthetic target password"
+}

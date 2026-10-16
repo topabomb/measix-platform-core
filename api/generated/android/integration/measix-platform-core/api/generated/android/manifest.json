@@ -1,0 +1,12 @@
+{
+  "platformContractVersion": 2,
+  "supportedPlatformContractVersions": [
+    2
+  ],
+  "coreBaselineVersion": "0.2.0-preview.23",
+  "baselineHash": "sha256:61beacc741bc1035e00fb819cd1f3c029e4a14d058917d95fda19809c052c052",
+  "generated": true,
+  "source": "../api/client/client-control.openapi.yaml",
+  "sourceHash": "sha256:1625b555deb306142c55c31f6d316121b3c7f3b325481d1a53b9021e601dc206",
+  "format": "openapi-3.0.3-client-schema-only"
+}

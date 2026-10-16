@@ -1,0 +1,14 @@
+{
+  "userId": "usr_550e8400-e29b-41d4-a716-446655440000",
+  "resourceId": "dav_550e8400-e29b-41d4-a716-446655440000",
+  "target": {
+    "workspaceServiceId": "wss_550e8400-e29b-41d4-a716-446655440000",
+    "agentSpaceId": "spc_550e8400-e29b-41d4-a716-446655440000",
+    "remoteUsername": "measix_550e8400-e29b-41d4-a716-446655440000",
+    "bindingRevision": 1
+  },
+  "endpoint": "https://space.example/u/measix_550e8400-e29b-41d4-a716-446655440000/dav/",
+  "secretRef": { "secretId": "sec_550e8400-e29b-41d4-a716-446655440000", "secretVersion": 1 },
+  "token": "synthetic-fixture-dav-token-not-a-secret",
+  "accessMode": "READ_ONLY"
+}

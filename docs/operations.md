@@ -62,6 +62,8 @@ Logout revokes the durable Android session and clears rotation recovery. The exi
 
 ### Runtime Relay
 
+`MODEL` HTTP 请求体上限为 **100 MiB（104,857,600 字节）**，与 Tuck 的 100 MB 请求预算使用同一字节值；计算整个编码后正文，包含 Base64 图片和历史消息。Relay 在转发前对已声明长度及 chunked 正文执行有界检查，超限保持 `413 / request_too_large / forwarded=false`；模型 selector 替换导致的长度变化不占用客户端正文预算。MCP、其他能力 HTTP 及 WebSocket 仍使用 Hub 下发的 `operationalLimits.maxRequestBytes`（当前默认 10 MiB）；DAV 保持独立传输策略。此上限只放宽 Relay 的本地门槛，实际供应商仍可按自身请求、图片和上下文限制拒绝请求。
+
 | Flag | Environment | Default / requirement |
 | --- | --- | --- |
 | `--public-listen` | `RELAY_PUBLIC_LISTEN_ADDR` | `:8090` |

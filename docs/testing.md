@@ -31,6 +31,8 @@ go test -tags=smoke ./test/system/scenarios/ -count=1 -timeout 5m
 go test ./test/system/adapter/ ./test/system/client/ -count=1 -timeout 2m
 ```
 
+模型 HTTP 正文上限的回归入口为 `go test ./internal/relay -run 'TestModelHTTP|TestLegacyModelHTTP|TestMCPHTTPBodyLimitUnchanged' -count=1 -v`（在 `backend/` 执行），覆盖大小边界、chunked、四种协议的图片历史完整性和准入拒绝。上限和适用范围只在[运行说明](operations.md#runtime-relay)维护；上传取消测试使用实际 ASR 资源。完整 Relay 回归继续覆盖 MCP、DAV 与 WebSocket。
+
 从 Core 根目录执行：
 
 ```text

@@ -328,11 +328,11 @@ func TestRLYTRN010LargeUploadStreaming(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer upstream.Close()
-	fixture, resourceID := singleRouteFixture(t, upstream.URL, "runtime-secret")
+	fixture, ids := multiTransportFixture(t, upstream.URL)
 	defer fixture.close()
 	// 100KB upload.
 	uploadData := bytes.Repeat([]byte("X"), 100*1024)
-	req := fixture.request(t, nil, http.MethodPost, resourceID, "/v1/chat/completions", bytes.NewReader(uploadData), "application/octet-stream")
+	req := fixture.request(t, nil, http.MethodPost, ids.asr, "/v1/audio/transcriptions", bytes.NewReader(uploadData), "application/octet-stream")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -367,11 +367,13 @@ func TestRLYTRN011UploadCancelTerminatesUpstreamRead(t *testing.T) {
 		}
 	}))
 	defer upstream.Close()
-	fixture, resourceID := singleRouteFixture(t, upstream.URL, "runtime-secret")
+	// File uploads remain streaming; model JSON is bounded before forwarding.
+	fixture, ids := multiTransportFixture(t, upstream.URL)
 	defer fixture.close()
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Slow upload that will be cancelled.
-	req := fixture.request(t, ctx, http.MethodPost, resourceID, "/v1/chat/completions", &slowReader{delay: 100 * time.Millisecond}, "application/octet-stream")
+	req := fixture.request(t, ctx, http.MethodPost, ids.asr, "/v1/audio/transcriptions", &slowReader{delay: 100 * time.Millisecond}, "application/octet-stream")
 	go func() {
 		resp, _ := http.DefaultClient.Do(req)
 		if resp != nil {

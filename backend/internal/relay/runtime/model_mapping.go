@@ -22,33 +22,47 @@ var (
 
 func prepareModelRequest(resource control.Resource, request *http.Request, runtimePath string, maxBytes int64) (string, error) {
 	mapping := resource.ModelMapping
-	if resource.Kind != relaycontrolapi.ResourceRouteResourceKindMODEL || mapping == nil {
+	if resource.Kind != relaycontrolapi.ResourceRouteResourceKindMODEL {
 		return runtimePath, nil
 	}
-	if runtimePath != mapping.ClientRuntimePath {
+	if mapping != nil && runtimePath != mapping.ClientRuntimePath {
 		return "", errInvalidModelSelector
 	}
-	if resource.ClientProtocol == relaycontrolapi.ResourceRouteClientProtocolGOOGLEGENERATECONTENT {
+	mapsJSON := mapping != nil && resource.ClientProtocol != relaycontrolapi.ResourceRouteClientProtocolGOOGLEGENERATECONTENT
+	if mapsJSON {
+		if request.Method != http.MethodPost {
+			return "", errInvalidModelRequest
+		}
+		encoding := strings.TrimSpace(request.Header.Get("Content-Encoding"))
+		if encoding != "" && !strings.EqualFold(encoding, "identity") {
+			return "", errUnsupportedContentEncoding
+		}
+		mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
+		if err != nil || mediaType != "application/json" || request.Body == nil {
+			return "", errInvalidModelRequest
+		}
+	}
+	// Bound every model HTTP body before forwarding, including Google and
+	// legacy pass-through requests without a declared Content-Length.
+	var body []byte
+	if request.Body != nil {
+		var err error
+		body, err = io.ReadAll(io.LimitReader(request.Body, maxBytes+1))
+		_ = request.Body.Close()
+		if err != nil {
+			return "", errInvalidModelRequest
+		}
+		if int64(len(body)) > maxBytes {
+			return "", errObservedRequestTooLarge
+		}
+		request.Body = io.NopCloser(bytes.NewReader(body))
+		request.ContentLength = int64(len(body))
+	}
+	if mapping == nil {
+		return runtimePath, nil
+	}
+	if !mapsJSON {
 		return mapping.UpstreamRuntimePath, nil
-	}
-	if request.Method != http.MethodPost {
-		return "", errInvalidModelRequest
-	}
-	encoding := strings.TrimSpace(request.Header.Get("Content-Encoding"))
-	if encoding != "" && !strings.EqualFold(encoding, "identity") {
-		return "", errUnsupportedContentEncoding
-	}
-	mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
-	if err != nil || mediaType != "application/json" || request.Body == nil {
-		return "", errInvalidModelRequest
-	}
-	body, err := io.ReadAll(io.LimitReader(request.Body, maxBytes+1))
-	if err != nil {
-		return "", errInvalidModelRequest
-	}
-	_ = request.Body.Close()
-	if int64(len(body)) > maxBytes {
-		return "", errObservedRequestTooLarge
 	}
 	rewritten, err := rewriteTopLevelModel(body, mapping.PublishedModelKey, mapping.UpstreamModelKey)
 	if err != nil {

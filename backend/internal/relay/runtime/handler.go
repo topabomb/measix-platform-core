@@ -34,6 +34,7 @@ type Handler struct {
 const (
 	runtimeMaxIdleConnections        = 256
 	runtimeMaxIdleConnectionsPerHost = 128
+	maxModelHTTPRequestBytes         = 100 << 20
 )
 
 func NewHandler(store *control.Store, recorder UsageRecorder, budgetClient relaybudget.Client) http.Handler {
@@ -237,6 +238,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	maxRequestBytes := int64(state.OperationalLimits.MaxRequestBytes)
+	isModelHTTP := resource.Kind == relaycontrolapi.ResourceRouteResourceKindMODEL && route.TransportPolicy != relaycontrolapi.WEBSOCKET
+	if isModelHTTP {
+		maxRequestBytes = maxModelHTTPRequestBytes
+	}
 	if r.ContentLength > maxRequestBytes {
 		writeProblem(observer, http.StatusRequestEntityTooLarge, "request_too_large", "Request too large", requestID, nil, false)
 		return
@@ -273,7 +278,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	observer.observation = observation
 	var body *countingBody
 	if r.Body != nil {
-		body = &countingBody{ReadCloser: http.MaxBytesReader(observer, r.Body, maxRequestBytes), observation: observation}
+		requestBody := r.Body
+		if !isModelHTTP {
+			requestBody = http.MaxBytesReader(observer, requestBody, maxRequestBytes)
+		}
+		// Model HTTP bodies were bounded before selector mapping. The mapped
+		// selector may be longer; do not reapply the incoming limit to it.
+		body = &countingBody{ReadCloser: requestBody, observation: observation}
 		r.Body = body
 	}
 	if h.budget == nil || h.recorder == nil {

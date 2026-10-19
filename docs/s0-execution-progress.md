@@ -197,6 +197,12 @@ Spark 从 `431368a` 切换到新包，仅重启 Hub/Relay。新旧程序读取�
 
 Spark 仅更新并重启 Relay，ARM64 程序 SHA-256 为 `27f26f770d6215e3be7f8505a0b89cbf2d3aaa8cfd50493272be62c7b9c58ea4`，运行中可执行文件与其匹配。Hub、Admin、Portal 复用原 `cc805be` 部署，`release.json` 明确记录 Relay 组件覆盖及新 payload hash。Hub 与其他 PM2 进程 PID/状态、config/secrets 摘要不变；Hub/Relay ready，公网 ready 为 200，匿名 Runtime 请求为 401。按用户明确要求未执行备份，不运行数据库迁移；未发起真实供应商生图调用。现场记录与证据保存在私有 `.artifacts/deployment-local-spark.md`、`.artifacts/relay-size-auto-192ea05/`，不能整体公开。
 
+## 模型 HTTP 正文上限与 Spark Relay 更新（2026-10-19）
+
+本次修复只调整模型 HTTP 正文策略，具体字节值与适用范围见[运行说明](operations.md#runtime-relay)，对应 Architecture `d04d7995947b6564a1416342bc54e347eb9c9095`。旧代码已复现四种模型协议的图片历史被 413 拒绝；修复后大小上限前后 1 字节、声明长度和 chunked、Google 与旧控制状态透传、selector 长度增长、认证及预算拒绝均通过。四种协议的 11,195,473–11,195,563 字节 PNG 历史在本地 HTTP 上游完整接收并通过 SHA-256 校验。完整 Go 回归、`go vet ./...`、真实 Relay 子进程系统冒烟、格式和差异检查通过；MCP、DAV、WebSocket 与 ASR 上传取消回归通过。
+
+Spark 仅替换并重启 Relay，ARM64 程序 SHA-256 为 `6acf7da8ecb63ac24b73c6b26ef3faa9b8a9301dbd9bb72a8dc3475a275adf10`，运行中可执行文件匹配。Hub、其他 PM2 服务 PID/状态和其他 release payload、config/secrets 摘要不变；数据文件路径、inode 和归属保留。Hub/Relay ready，公网 health、Discovery、Admin、Portal 为 200，私有路径为 404，匿名 Runtime 为 `401 invalid_session / forwarded=false`。按用户明确要求不执行备份或迁移；OpenAPI、生成材料、平台合同、产品版本和 SQL schema 不变。现场记录与摘要保存在私有 `.artifacts/relay-model-body-100m-20261019/`；本轮未调用真实供应商，也不新增 Android 兼容或阶段完成声明。
+
 ## 保留的失败边界
 
 - 隔离工作区大文件 PUT 曾在约 50 MiB/64 MiB 传输中返回 502/503 与 UNKNOWN，记录在 `.artifacts/workspace-files-final/`、`.artifacts/resources-review/`。新空间重跑通过不证明间歇传输根因已修复；不得自动重放未知写入，生产验收前继续核查。

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -94,17 +95,19 @@ func (*allowBudgetClient) Release(context.Context, string, usageingestapi.Budget
 var _ relaybudget.Client = (*allowBudgetClient)(nil)
 
 type testAccessClaims struct {
-	DeploymentID string `json:"deploymentId"`
-	DeviceID     string `json:"deviceId"`
-	SessionID    string `json:"sessionId"`
+	DeploymentID      string           `json:"deploymentId"`
+	DeviceID          string           `json:"deviceId"`
+	SessionID         string           `json:"sessionId"`
+	SessionValidUntil *jwt.NumericDate `json:"sessionValidUntil,omitempty"`
 	jwt.RegisteredClaims
 }
 
 type testAccessSigner struct {
-	privateKey   ed25519.PrivateKey
-	deploymentID string
-	kid          string
-	now          time.Time
+	privateKey        ed25519.PrivateKey
+	deploymentID      string
+	kid               string
+	now               time.Time
+	sessionValidUntil *time.Time
 }
 
 func (s *testAccessSigner) sign(t *testing.T, userID, deviceID, sessionID string) string {
@@ -120,6 +123,9 @@ func (s *testAccessSigner) sign(t *testing.T, userID, deviceID, sessionID string
 			IssuedAt:  jwt.NewNumericDate(s.now),
 			ExpiresAt: jwt.NewNumericDate(s.now.Add(10 * time.Minute)),
 		},
+	}
+	if s.sessionValidUntil != nil {
+		claims.SessionValidUntil = jwt.NewNumericDate(*s.sessionValidUntil)
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
 	token.Header["kid"] = s.kid
@@ -143,6 +149,8 @@ func (s *testAccessSigner) publicJWK() relaycontrolapi.PublicJwk {
 }
 
 type runtimeFixture struct {
+	controlState  relaycontrolapi.RuntimeControlState
+	advanceClock  func(time.Duration)
 	store         *control.Store
 	server        *httptest.Server
 	recorder      *captureUsageRecorder
@@ -164,12 +172,15 @@ func newRuntimeFixture(t *testing.T, state relaycontrolapi.RuntimeControlState, 
 		t.Fatal(err)
 	}
 	state.BundleHash = hash
-	store := control.NewStore(func() time.Time { return now })
+	var clockOffset atomic.Int64
+	store := control.NewStore(func() time.Time { return now.Add(time.Duration(clockOffset.Load())) })
 	if _, err := store.Apply(state); err != nil {
 		t.Fatal(err)
 	}
 	recorder := &captureUsageRecorder{}
 	return &runtimeFixture{
+		controlState:  state,
+		advanceClock:  func(delta time.Duration) { clockOffset.Add(int64(delta)) },
 		store:         store,
 		server:        httptest.NewServer(relayruntime.NewHandler(store, recorder, &allowBudgetClient{})),
 		recorder:      recorder,

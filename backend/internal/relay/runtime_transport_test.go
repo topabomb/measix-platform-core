@@ -119,8 +119,8 @@ func TestRuntimeProxyIdleTimeoutAllowsActiveLongStream(t *testing.T) {
 	}
 }
 
-// Audit the existing access-token lifetime cap separately from upstream timeouts.
-func TestModelAndMCPActiveStreamsStopAtAccessTokenExpiry(t *testing.T) {
+// Tokens without a signed session deadline retain their old bounded lifetime.
+func TestLegacyModelAndMCPStreamsStopAtAccessTokenExpiry(t *testing.T) {
 	for _, kind := range []platformid.Kind{platformid.Model, platformid.MCP} {
 		t.Run(string(kind), func(t *testing.T) {
 			cancelled := make(chan struct{})

@@ -68,7 +68,7 @@ Logout revokes the durable Android session and clears rotation recovery. The exi
 
 绑定的 `timeoutPolicy` 整组覆盖上游 `timeoutDefaults`，不会逐字段合并。修改现有配置时须检查当前草稿与已发布绑定，应用上游候选，并保存、验证和发布需要变更的路由；只改上游无法覆盖 DeepSeek、MiMo、Firecrawl 已保存的路由策略。不可改写历史 Release。以 Relay ACK 的 control revision / bundle hash 对照该次 Activation 的投影确认实际下发。响应头超时约束首个响应头之前，`idleMs` 从收到响应头后限制连续无响应数据的时间，活动流会续期；这些调整避免提前取消，不缩短模型计算或首答时间。
 
-MODEL/MCP 当前还受 Access Token 剩余有效期限制：`runtime/handler.go` 将请求上下文的 deadline 绑定到 JWT `exp`，默认令牌有效十分钟；即使响应持续有数据、未设置 `overallMs`，到期仍会取消上游。在途请求不会因为客户端刷新获得新令牌而延长。DAV 已有独立生命周期处理。长请求生命周期需单独处理请求准入与后续撤销边界，不能仅增加上游超时或延长令牌 TTL；本次只核查该行为，不修改认证生命周期。
+Runtime 新请求继续校验短期 JWT `exp`（默认十分钟），有 `sessionValidUntil` 时同时校验签名会话上界。`runtime/handler.go` 让已准入请求固定受该会话上界、客户端取消及传输 idle/overall 超时约束，短 `exp` 自然到期不再取消在途 MODEL/MCP 等公共链请求；控制更新复验原签名密钥、身份与资源收紧事实，不重复用旧 `exp` 误撤销。之后刷新不延长已有请求租约；缺少会话上界的旧 token 暂时保留原 `exp` 上界，等待自然刷新换新。DAV 保留自身租约／绑定处理。无需延长令牌 TTL、修改会话 idle 或增加逐请求 Hub introspection。
 
 | Flag | Environment | Default / requirement |
 | --- | --- | --- |

@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -75,7 +76,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	claims, err := h.authenticate(state, bearer(r))
-	if err != nil {
+	expiredSession := err == nil && !isDAV && claims.SessionValidUntil != nil && !claims.SessionValidUntil.After(h.store.Now())
+	if err != nil || expiredSession {
 		if isDAV {
 			observer.Header().Set("WWW-Authenticate", `Bearer realm="measix"`)
 		}
@@ -189,8 +191,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	leaseCtx, releaseLease, err := h.store.Register(r.Context(), func(current *control.State) bool {
-		fresh, e := h.authenticate(current, bearer(r))
-		if e != nil || fresh.Subject != claims.Subject {
+		// The token was authenticated at admission. A control sweep checks current
+		// authority without treating natural short-token expiry as a revocation.
+		if current.DeploymentID != state.DeploymentID ||
+			!bytes.Equal(current.AuthKeys[claims.SigningKeyID], state.AuthKeys[claims.SigningKeyID]) {
 			return false
 		}
 		if _, deny := current.DisabledUsers[claims.Subject]; deny {
@@ -221,9 +225,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer releaseLease()
-	if claims.ExpiresAt != nil {
+	validUntil := claims.SessionValidUntil
+	if validUntil == nil {
+		// Legacy tokens keep their original bounded lifetime until refreshed.
+		validUntil = claims.ExpiresAt
+	}
+	if validUntil != nil {
 		var cancel context.CancelFunc
-		leaseCtx, cancel = context.WithTimeout(leaseCtx, claims.ExpiresAt.Time.Sub(h.store.Now()))
+		leaseCtx, cancel = context.WithTimeout(leaseCtx, validUntil.Time.Sub(h.store.Now()))
 		defer cancel()
 	}
 	r = r.WithContext(leaseCtx)

@@ -573,9 +573,9 @@ onBeforeUnmount(() => {
           <details data-cy="upstream-create-advanced">
             <summary class="text-primary cursor-pointer q-mb-xs">{{ $t('upstreams.advancedSettings') }}</summary>
             <div class="q-gutter-xs">
-              <q-select v-model="createForm.transportCapabilities" outlined emit-value map-options :label="$t('upstreams.transportCapabilities')" multiple :options="transportOptions" />
-              <q-select v-model="createForm.correlationMode" outlined emit-value map-options :label="$t('upstreams.correlationMode')" :options="correlationOptions" />
-              <q-select v-model="createForm.usageCapabilityLevel" outlined emit-value map-options :label="$t('upstreams.usageCapabilityLevel')" :options="usageOptions" />
+              <q-select v-model="createForm.transportCapabilities" outlined emit-value map-options :label="$t('upstreams.transportCapabilities')" :hint="$t('upstreams.transportCapabilitiesHint')" multiple :options="transportOptions" />
+              <q-select v-model="createForm.correlationMode" outlined emit-value map-options :label="$t('upstreams.correlationMode')" :hint="$t('upstreams.correlationModeHint')" :options="correlationOptions" />
+              <q-select v-model="createForm.usageCapabilityLevel" outlined emit-value map-options :label="$t('upstreams.usageCapabilityLevel')" :hint="$t('upstreams.usageCapabilityLevelHint')" :options="usageOptions" />
               <div class="text-subtitle2">{{ $t('upstreams.timeoutDefaults') }} (ms)</div>
               <div class="row q-gutter-xs">
                 <q-input v-model.number="createForm.timeoutDefaults.connectMs" type="number" outlined :label="$t('upstreams.connect')" class="col" />
@@ -664,9 +664,9 @@ onBeforeUnmount(() => {
               <tbody>
                 <tr><td class="text-grey-7">{{ $t('upstreams.candidateRevision') }}</td><td>{{ selected.configRevision }}</td></tr>
                 <tr><td class="text-grey-7">{{ $t('upstreams.activeRevision') }}</td><td>{{ selected.activeConfigRevision ?? '—' }}</td></tr>
-                <tr v-if="selected.config"><td class="text-grey-7">{{ $t('upstreams.correlationMode') }}</td><td>{{ selected.config.correlationMode ? correlationLabel(selected.config.correlationMode) : '—' }}</td></tr>
-                <tr v-if="selected.config"><td class="text-grey-7">{{ $t('upstreams.usageCapabilityLevel') }}</td><td>{{ selected.config.usageCapabilityLevel ? usageLabel(selected.config.usageCapabilityLevel) : '—' }}</td></tr>
-                <tr v-if="selected.config"><td class="text-grey-7">{{ $t('upstreams.transport') }}</td><td>{{ selected.config.transportCapabilities?.map(transportLabel).join(', ') ?? '—' }}</td></tr>
+                <tr v-if="selected.config"><td class="text-grey-7">{{ $t('upstreams.correlationMode') }}</td><td>{{ selected.config.correlationMode ? correlationLabel(selected.config.correlationMode) : '—' }}<div class="upstream-capability-hint text-caption text-grey-7">{{ $t('upstreams.correlationModeHint') }}</div></td></tr>
+                <tr v-if="selected.config"><td class="text-grey-7">{{ $t('upstreams.usageCapabilityLevel') }}</td><td>{{ selected.config.usageCapabilityLevel ? usageLabel(selected.config.usageCapabilityLevel) : '—' }}<div class="upstream-capability-hint text-caption text-grey-7">{{ $t('upstreams.usageCapabilityLevelHint') }}</div></td></tr>
+                <tr v-if="selected.config"><td class="text-grey-7">{{ $t('upstreams.transport') }}</td><td>{{ selected.config.transportCapabilities?.map(transportLabel).join(', ') ?? '—' }}<div class="upstream-capability-hint text-caption text-grey-7">{{ $t('upstreams.transportCapabilitiesHint') }}</div></td></tr>
                 <tr v-if="selected.config?.timeoutDefaults"><td class="text-grey-7">{{ $t('upstreams.timeoutDefaults') }}</td><td>{{ $t('upstreams.connect') }} {{ selected.config.timeoutDefaults.connectMs }}ms · {{ $t('upstreams.responseHeader') }} {{ selected.config.timeoutDefaults.responseHeaderMs }}ms · {{ $t('upstreams.idle') }} {{ selected.config.timeoutDefaults.idleMs }}ms</td></tr>
               </tbody>
             </q-markup-table>
@@ -710,9 +710,9 @@ onBeforeUnmount(() => {
               <details data-cy="upstream-edit-advanced">
                 <summary class="text-primary cursor-pointer q-mb-xs">{{ $t('upstreams.advancedSettings') }}</summary>
                 <div class="q-gutter-xs">
-                  <q-select v-model="editForm.transportCapabilities" outlined emit-value map-options :label="$t('upstreams.transportCapabilities')" multiple :options="transportOptions" @update:model-value="markEditDirty" />
-                  <q-select v-model="editForm.correlationMode" outlined emit-value map-options :label="$t('upstreams.correlationMode')" :options="correlationOptions" @update:model-value="markEditDirty" />
-                  <q-select v-model="editForm.usageCapabilityLevel" outlined emit-value map-options :label="$t('upstreams.usageCapabilityLevel')" :options="usageOptions" @update:model-value="markEditDirty" />
+                  <q-select v-model="editForm.transportCapabilities" outlined emit-value map-options :label="$t('upstreams.transportCapabilities')" :hint="$t('upstreams.transportCapabilitiesHint')" multiple :options="transportOptions" @update:model-value="markEditDirty" />
+                  <q-select v-model="editForm.correlationMode" outlined emit-value map-options :label="$t('upstreams.correlationMode')" :hint="$t('upstreams.correlationModeHint')" :options="correlationOptions" @update:model-value="markEditDirty" />
+                  <q-select v-model="editForm.usageCapabilityLevel" outlined emit-value map-options :label="$t('upstreams.usageCapabilityLevel')" :hint="$t('upstreams.usageCapabilityLevelHint')" :options="usageOptions" @update:model-value="markEditDirty" />
                   <div class="text-subtitle2">{{ $t('upstreams.timeoutDefaults') }} (ms)</div>
                   <div class="row q-gutter-xs">
                     <q-input v-model.number="editForm.timeoutDefaults.connectMs" type="number" outlined :label="$t('upstreams.connect')" class="col" @update:model-value="markEditDirty" />
@@ -801,3 +801,10 @@ onBeforeUnmount(() => {
     </q-dialog>
   </q-page>
 </template>
+
+<style scoped>
+.upstream-capability-hint {
+  max-width: 40rem;
+  white-space: normal;
+}
+</style>

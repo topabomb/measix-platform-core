@@ -17,6 +17,7 @@ import StatusChip from '../components/StatusChip.vue'
 import ConfigurationSectionNav, { type ConfigurationSection } from '../components/ConfigurationSectionNav.vue'
 import { useResourceDiff } from '../composables/useResourceDiff'
 import PagedEntityPicker from '../components/PagedEntityPicker.vue'
+import RouteTimeoutEditor from '../components/RouteTimeoutEditor.vue'
 import ValidationIssueItem from '../components/ValidationIssueItem.vue'
 import { fetchUpstreamPickerPage, resolveUpstreamPickerOption } from '../api/entityPickerSources'
 
@@ -182,6 +183,13 @@ const RELATIONSHIP_KINDS = ['Model', 'Image Generation', 'TTS', 'ASR', 'MCP', 'W
 const relationshipKindFilter = ref<string>('all')
 
 const up = (id?: string) => upstreams.value.find((u) => u.upstreamId === id)
+function setRouteTimeout(resourceId: string, policy: RuntimeBindingDefinition['timeoutPolicy']) {
+  const binding = draft.bindingFor(resourceId)
+  if (!binding || binding.workspaceServiceId || binding.targetKind === 'REMOTE_WORKSPACE') return
+  if (policy) binding.timeoutPolicy = policy
+  else delete binding.timeoutPolicy
+  draft.markDirty()
+}
 const upstreamLabel = (id?: string) => (id ? up(id)?.name ?? id : '—')
 const upstreamStatus = (id?: string) => up(id)?.status
 
@@ -960,6 +968,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <PagedEntityPicker :model-value="draft.bindingFor(selectedModel.modelId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="model-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedModel!.modelId, v, 'HTTP_STREAMING_SSE')" />
                   <q-input :model-value="selectedModel.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="model-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedModel!.modelId, String(v ?? ''))" />
                 </div>
+                <RouteTimeoutEditor :binding="draft.bindingFor(selectedModel.modelId)" :upstream-defaults="up(draft.bindingFor(selectedModel.modelId)?.upstreamId)?.config?.timeoutDefaults" :disabled="workspaceBusy || !canMutate" @change="policy => setRouteTimeout(selectedModel!.modelId, policy)" />
                 <div v-if="draft.localContent.providers.find(provider => provider.providerId === selectedModel!.providerId)?.clientProtocol === 'GOOGLE_GENERATE_CONTENT'" class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.model.geminiPathHint') }}</div>
                 <div class="text-caption text-grey-7 q-mt-xs">
                   {{ $t('resources.model.transportSummary') }}
@@ -1050,6 +1059,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <PagedEntityPicker :model-value="draft.bindingFor(selectedImageGeneration.imageId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="image-generation-upstream-select" data-field="upstreamId" @update:model-value="value => value && draft.setBinding(selectedImageGeneration!.imageId, value, 'HTTP_REQUEST_RESPONSE')" />
                   <q-input :model-value="selectedImageGeneration.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" class="col" data-cy="image-generation-runtime-path" data-field="runtimePath" @update:model-value="value => draft.setRuntimePath(selectedImageGeneration!.imageId, String(value ?? ''))" />
                 </div>
+                <RouteTimeoutEditor :binding="draft.bindingFor(selectedImageGeneration.imageId)" :upstream-defaults="up(draft.bindingFor(selectedImageGeneration.imageId)?.upstreamId)?.config?.timeoutDefaults" :disabled="workspaceBusy || !canMutate" @change="policy => setRouteTimeout(selectedImageGeneration!.imageId, policy)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ imageGenerationTransportHint }}</div>
               </q-card-section>
               <q-separator />
@@ -1152,6 +1162,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <PagedEntityPicker :model-value="draft.bindingFor(selectedTts.ttsId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="tts-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedTts!.ttsId, v, ttsTransport(selectedTts!.clientProtocol))" />
                   <q-input :model-value="selectedTts.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="tts-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedTts!.ttsId, String(v ?? ''))" />
                 </div>
+                <RouteTimeoutEditor :binding="draft.bindingFor(selectedTts.ttsId)" :upstream-defaults="up(draft.bindingFor(selectedTts.ttsId)?.upstreamId)?.config?.timeoutDefaults" :disabled="workspaceBusy || !canMutate" @change="policy => setRouteTimeout(selectedTts!.ttsId, policy)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.tts.cloudHint') }}</div>
               </q-card-section>
               <q-separator />
@@ -1258,6 +1269,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <PagedEntityPicker :model-value="draft.bindingFor(selectedAsr.asrId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="asr-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedAsr!.asrId, v, asrTransport(selectedAsr!.clientProtocol))" />
                   <q-input :model-value="selectedAsr.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="$t('resources.model.runtimePathHint')" class="col" data-cy="asr-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedAsr!.asrId, String(v ?? ''))" />
                 </div>
+                <RouteTimeoutEditor :binding="draft.bindingFor(selectedAsr.asrId)" :upstream-defaults="up(draft.bindingFor(selectedAsr.asrId)?.upstreamId)?.config?.timeoutDefaults" :disabled="workspaceBusy || !canMutate" @change="policy => setRouteTimeout(selectedAsr!.asrId, policy)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.asr.bindingHint') }}</div>
               </q-card-section>
               <q-separator />
@@ -1374,6 +1386,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <PagedEntityPicker v-else :model-value="draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId" :label="$t('resources.model.upstream')" :empty-label="$t('resources.overview.noBinding')" :fetch-page="fetchUpstreamPickerPage" :resolve-option="resolveUpstreamPickerOption" :disabled="upstreamsLoading || !!upstreamError" :clearable="false" class="col" data-cy="mcp-upstream-select" data-field="upstreamId" @update:model-value="(v) => v && draft.setBinding(selectedMcp!.mcpServerId, v, 'HTTP_REQUEST_RESPONSE')" />
                   <q-input :readonly="!!draft.bindingFor(selectedMcp.mcpServerId)?.workspaceServiceId" :model-value="selectedMcp.runtimePath" dense outlined :label="$t('resources.model.runtimePath')" :hint="draft.bindingFor(selectedMcp.mcpServerId)?.workspaceServiceId ? '公开工具入口；服务端按已登录用户选择独立空间。' : $t('resources.model.runtimePathHint')" class="col" data-cy="mcp-runtime-path" data-field="runtimePath" @update:model-value="v => draft.setRuntimePath(selectedMcp!.mcpServerId, String(v ?? ''))" />
                 </div>
+                <RouteTimeoutEditor :binding="draft.bindingFor(selectedMcp.mcpServerId)" :upstream-defaults="up(draft.bindingFor(selectedMcp.mcpServerId)?.upstreamId)?.config?.timeoutDefaults" :disabled="workspaceBusy || !canMutate" @change="policy => setRouteTimeout(selectedMcp!.mcpServerId, policy)" />
                 <div class="text-caption text-grey-7 q-mt-xs">{{ $t('resources.mcp.transportSummary') }}</div>
               </q-card-section>
               <q-separator />

@@ -436,6 +436,13 @@ export default {
     auditAfter: 'After',
     auditDefault: 'Deployment default',
   },
+  routeTimeouts: {
+    title: 'Route timeouts', overridden: 'Overrides upstream', inherited: 'Inherits upstream defaults',
+    override: 'Override all upstream timeouts',
+    hint: 'An override replaces the entire upstream policy. Turn it off to inherit upstream defaults. Save and publish to apply.',
+    connectMs: 'Connect (ms)', responseHeaderMs: 'Response headers (ms)', idleMs: 'Response idle (ms)', overallMs: 'Overall (ms, optional)',
+    overallHint: 'Leave blank for no overall time limit.', positiveInteger: 'Enter a positive integer in milliseconds.',
+  },
   resources: {
     backToList: 'Back to list',
     title: 'Resources',

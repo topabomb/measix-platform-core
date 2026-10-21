@@ -119,6 +119,55 @@ func TestRuntimeProxyIdleTimeoutAllowsActiveLongStream(t *testing.T) {
 	}
 }
 
+// Audit the existing access-token lifetime cap separately from upstream timeouts.
+func TestModelAndMCPActiveStreamsStopAtAccessTokenExpiry(t *testing.T) {
+	for _, kind := range []platformid.Kind{platformid.Model, platformid.MCP} {
+		t.Run(string(kind), func(t *testing.T) {
+			cancelled := make(chan struct{})
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(cancelled)
+				w.Header().Set("Content-Type", "text/event-stream")
+				ticker := time.NewTicker(20 * time.Millisecond)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-r.Context().Done():
+						return
+					case <-ticker.C:
+						_, _ = io.WriteString(w, ": keepalive\n\n")
+						w.(http.Flusher).Flush()
+					}
+				}
+			}))
+			defer upstream.Close()
+			fixture, resourceID := singleRouteFixtureForKind(t, upstream.URL, "runtime-secret", 120000, kind)
+			defer fixture.close()
+			// Default tokens live ten minutes; emulate starting with only one second left.
+			fixture.signer.now = fixture.signer.now.Add(-10*time.Minute + time.Second)
+			path := "/v1/chat/completions"
+			if kind == platformid.MCP {
+				path = "/mcp"
+			}
+			request := fixture.request(t, nil, http.MethodPost, resourceID, path, strings.NewReader(`{"model":"test","stream":true}`), "application/json")
+			started := time.Now()
+			response, err := (&http.Client{Timeout: 3 * time.Second}).Do(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, readErr := io.ReadAll(response.Body)
+			_ = response.Body.Close()
+			if readErr == nil || len(body) == 0 || time.Since(started) >= 2*time.Second {
+				t.Fatalf("expiry did not interrupt an active stream: bytes=%d error=%v elapsed=%v", len(body), readErr, time.Since(started))
+			}
+			select {
+			case <-cancelled:
+			case <-time.After(time.Second):
+				t.Fatal("token expiry did not cancel the upstream request")
+			}
+		})
+	}
+}
+
 func TestRuntimeRelayReusesUpstreamConnectionsAcrossHundredUserBursts(t *testing.T) {
 	const concurrency = 100
 	type barrier struct {

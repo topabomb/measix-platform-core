@@ -289,12 +289,20 @@ func singleRouteFixture(t *testing.T, upstreamURL, token string) (*runtimeFixtur
 }
 
 func singleRouteFixtureWithIdle(t *testing.T, upstreamURL, token string, idleMs int) (*runtimeFixture, string) {
+	return singleRouteFixtureForKind(t, upstreamURL, token, idleMs, platformid.Model)
+}
+
+func singleRouteFixtureForKind(t *testing.T, upstreamURL, token string, idleMs int, kind platformid.Kind) (*runtimeFixture, string) {
 	t.Helper()
 	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resourceID := platformid.New(platformid.Model)
+	resourceID := platformid.New(kind)
+	path := "/v1/chat/completions"
+	if kind == platformid.MCP {
+		path = "/mcp"
+	}
 	routeID := platformid.New(platformid.Route)
 	upstreamID := platformid.New(platformid.Upstream)
 	state := relaycontrolapi.RuntimeControlState{
@@ -312,7 +320,7 @@ func singleRouteFixtureWithIdle(t *testing.T, upstreamURL, token string, idleMs 
 			RuntimeRouteId:      routeID,
 			UpstreamId:          upstreamID,
 			AllowedMethods:      []string{"POST"},
-			AllowedPathPrefixes: []string{"/v1/chat/completions"},
+			AllowedPathPrefixes: []string{path},
 			TransportPolicy:     relaycontrolapi.HTTPSTREAMINGSSE,
 			TimeoutPolicy:       relaycontrolapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 5000, IdleMs: idleMs},
 		}},

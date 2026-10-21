@@ -337,6 +337,20 @@ test('unchanged preset does not publish another release', async t => {
   assert.ok(!result.requests.some(item => item.path === '/draft:publish'))
 })
 
+test('preset routes apply the general timeouts and complete MiMo/Firecrawl overrides', async t => {
+  const result = await runPreset(t)
+  assert.equal(result.code, 0, result.output)
+  for (const binding of result.content.bindings) {
+    const mimo = result.content.tts.some(item => item.ttsId === binding.resourceId)
+    const firecrawl = result.content.mcp.some(item => item.mcpServerId === binding.resourceId)
+    assert.deepEqual(binding.timeoutPolicy, {
+      connectMs: 5000,
+      responseHeaderMs: mimo || firecrawl ? 60000 : 300000,
+      idleMs: mimo ? 60000 : 120000,
+    })
+  }
+})
+
 test('real-device preset explicitly authors v5 MCP access and assistant bindings', async t => {
   const result = await runPreset(t)
   assert.equal(result.code, 0, result.output)

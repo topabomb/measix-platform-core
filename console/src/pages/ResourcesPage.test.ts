@@ -743,6 +743,34 @@ describe('ResourcesPage', () => {
     expect(selector.attributes('modelvalue')).toBeUndefined()
   })
 
+  it('edits a complete route timeout override, clears overall and restores inheritance', async () => {
+    const { wrapper, pinia } = mountResourcesPage()
+    setupSession(pinia)
+    await flushPromises()
+    await switchTab(wrapper, 'image-generation')
+    await wrapper.get('[data-cy="add-image-generation-btn"]').trigger('click')
+    const draft = useDraftStore(pinia)
+    const id = draft.localContent!.imageGenerators![0]!.imageId
+    draft.setBinding(id, 'ups_test', 'HTTP_REQUEST_RESPONSE')
+    await flushPromises()
+    const original = structuredClone(JSON.parse(JSON.stringify(draft.bindingFor(id))))
+    draft.dirty = false
+    const toggle = () => wrapper.findAllComponents(QToggle).find(item => item.attributes('data-cy') === 'route-timeout-override')!
+    expect(toggle()).toBeDefined()
+    await toggle().setValue(true)
+    expect(draft.bindingFor(id)?.timeoutPolicy).toEqual({ connectMs: 5000, responseHeaderMs: 300000, idleMs: 120000 })
+    await wrapper.get('[data-cy="route-timeout-responseHeaderMs"]').setValue('600000')
+    await wrapper.get('[data-cy="route-timeout-overallMs"]').setValue('900000')
+    expect(draft.bindingFor(id)?.timeoutPolicy).toEqual({ connectMs: 5000, responseHeaderMs: 600000, idleMs: 120000, overallMs: 900000 })
+    await wrapper.get('[data-cy="route-timeout-overallMs"]').setValue('')
+    expect(draft.bindingFor(id)?.timeoutPolicy).not.toHaveProperty('overallMs')
+    expect(draft.dirty).toBe(true)
+    await toggle().setValue(false)
+    expect(draft.bindingFor(id)).toEqual(original)
+    expect(draft.bindingFor(id)).not.toHaveProperty('timeoutPolicy')
+    wrapper.unmount()
+  })
+
   it('normalizes a draft with the additive image collection missing and writes only the current shape', async () => {
     const stored = structuredClone(EMPTY_DRAFT)
     delete stored.content.imageGenerators

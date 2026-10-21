@@ -64,6 +64,12 @@ Logout revokes the durable Android session and clears rotation recovery. The exi
 
 `MODEL` HTTP 请求体上限为 **100 MiB（104,857,600 字节）**，与 Tuck 的 100 MB 请求预算使用同一字节值；计算整个编码后正文，包含 Base64 图片和历史消息。Relay 在转发前对已声明长度及 chunked 正文执行有界检查，超限保持 `413 / request_too_large / forwarded=false`；模型 selector 替换导致的长度变化不占用客户端正文预算。MCP、其他能力 HTTP 及 WebSocket 仍使用 Hub 下发的 `operationalLimits.maxRequestBytes`（当前默认 10 MiB）；DAV 保持独立传输策略。此上限只放宽 Relay 的本地门槛，实际供应商仍可按自身请求、图片和上下文限制拒绝请求。
 
+新建上游和真机预置采用毫秒超时 `connectMs=5000`、`responseHeaderMs=300000`、`idleMs=120000`，不设置 `overallMs`。本机 Noetral 保留 `connectMs=1000`；Weero 文本使用通用值，生图路由整组覆盖为 `5000 / 600000 / 120000`；MiMo TTS 为 `5000 / 60000 / 60000`，Firecrawl MCP 为 `5000 / 60000 / 120000`。Agent Space MCP/DAV 继续使用远程工作区服务自身配置。
+
+绑定的 `timeoutPolicy` 整组覆盖上游 `timeoutDefaults`，不会逐字段合并。修改现有配置时须检查当前草稿与已发布绑定，应用上游候选，并保存、验证和发布需要变更的路由；只改上游无法覆盖 DeepSeek、MiMo、Firecrawl 已保存的路由策略。不可改写历史 Release。以 Relay ACK 的 control revision / bundle hash 对照该次 Activation 的投影确认实际下发。响应头超时约束首个响应头之前，`idleMs` 从收到响应头后限制连续无响应数据的时间，活动流会续期；这些调整避免提前取消，不缩短模型计算或首答时间。
+
+MODEL/MCP 当前还受 Access Token 剩余有效期限制：`runtime/handler.go` 将请求上下文的 deadline 绑定到 JWT `exp`，默认令牌有效十分钟；即使响应持续有数据、未设置 `overallMs`，到期仍会取消上游。在途请求不会因为客户端刷新获得新令牌而延长。DAV 已有独立生命周期处理。长请求生命周期需单独处理请求准入与后续撤销边界，不能仅增加上游超时或延长令牌 TTL；本次只核查该行为，不修改认证生命周期。
+
 | Flag | Environment | Default / requirement |
 | --- | --- | --- |
 | `--public-listen` | `RELAY_PUBLIC_LISTEN_ADDR` | `:8090` |

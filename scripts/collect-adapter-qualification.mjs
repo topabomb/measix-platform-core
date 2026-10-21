@@ -521,6 +521,12 @@ async function main() {
   // different endpoints/credentials can be used per capability.
   const upstreams = {}  // profile -> { upstreamId, configRevision }
 
+  function timeoutForProfile(kind) {
+    const mimo = kind === 'tts' && profileConfig.tts.protocol === 'MIMO_CHAT_COMPLETIONS_TTS'
+    const firecrawl = kind === 'mcp' && new URL(profileConfig.mcp.endpoint).hostname === 'mcp.firecrawl.dev'
+    return { connectMs: 5000, responseHeaderMs: mimo || firecrawl ? 60000 : 300000, idleMs: mimo ? 60000 : 120000 }
+  }
+
   async function createSecretAndUpstream(profileName, endpoint, apiKey, transportCapabilities, authHeaderName = null) {
     const safeName = profileName.charAt(0).toUpperCase() + profileName.slice(1)
     console.log(`Creating secret for ${profileName}...`)
@@ -548,7 +554,7 @@ async function main() {
         },
         correlationMode: 'NONE',
         usageCapabilityLevel: 'LEVEL_0',
-        timeoutDefaults: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
+        timeoutDefaults: timeoutForProfile(profileName),
       },
     })
     if (!upstreamResp.ok) {
@@ -669,7 +675,7 @@ async function main() {
       runtimeRouteId: routeModel, resourceId: modelId, upstreamId: upstreams.model.upstreamId,
       allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/chat/completions'],
       transportPolicy: 'HTTP_STREAMING_SSE',
-      timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
+      timeoutPolicy: timeoutForProfile('model'),
     }],
     policy: {
       policyId: policyId, allowLocalProviders: false, allowLocalTts: false,
@@ -691,7 +697,7 @@ async function main() {
       runtimeRouteId: routeTTS, resourceId: ttsId, upstreamId: upstreams.tts.upstreamId,
       allowedMethods: ['POST'], allowedPathPrefixes: [ttsPath],
       transportPolicy: mimoTts ? 'HTTP_STREAMING_SSE' : 'HTTP_BINARY_STREAM',
-      timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
+      timeoutPolicy: timeoutForProfile('tts'),
     })
     draftContent.policy.defaultTtsId = ttsId
   }
@@ -707,7 +713,7 @@ async function main() {
       runtimeRouteId: routeASR, resourceId: asrId, upstreamId: upstreams.asr.upstreamId,
       allowedMethods: ['POST'], allowedPathPrefixes: ['/v1/audio/transcriptions'],
       transportPolicy: 'HTTP_MULTIPART',
-      timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
+      timeoutPolicy: timeoutForProfile('asr'),
     })
     draftContent.policy.defaultAsrId = asrId
   }
@@ -722,7 +728,7 @@ async function main() {
       runtimeRouteId: routeMCP, resourceId: mcpId, upstreamId: upstreams.mcp.upstreamId,
       allowedMethods: ['POST'], allowedPathPrefixes: ['/mcp'],
       transportPolicy: 'HTTP_REQUEST_RESPONSE',
-      timeoutPolicy: { connectMs: 5000, responseHeaderMs: 30000, idleMs: 60000 },
+      timeoutPolicy: timeoutForProfile('mcp'),
     })
   }
 

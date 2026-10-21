@@ -436,6 +436,13 @@ export default {
     auditAfter: '变更后',
     auditDefault: '部署默认',
   },
+  routeTimeouts: {
+    title: '路由超时', overridden: '已覆盖上游', inherited: '继承上游默认值',
+    override: '整组覆盖上游默认值',
+    hint: '开启后完整替换上游超时；关闭后继承上游默认值。保存并发布后生效。',
+    connectMs: '连接 (ms)', responseHeaderMs: '响应头 (ms)', idleMs: '响应断流 (ms)', overallMs: '总时长 (ms，可选)',
+    overallHint: '留空不设总时长限制。', positiveInteger: '请输入正整数毫秒值。',
+  },
   resources: {
     backToList: '返回列表',
     title: '企业配置',

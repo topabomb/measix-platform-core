@@ -2,6 +2,7 @@ package runtimecontrol_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"measix/platform/internal/wire/adminapi"
@@ -74,6 +75,54 @@ func TestDisabledResourcesStayUnroutableAcrossActivations(t *testing.T) {
 				t.Fatal(err)
 			}
 			assertClosed("republish")
+		})
+	}
+}
+
+func TestPublishTimeoutPolicyOverridesWholeUpstreamDefault(t *testing.T) {
+	ctx := context.Background()
+	_, svc, relay, server, _, adminID, upstreamID, _ := newRuntimeControlEnv(t)
+	defer server.Close()
+	up, err := svc.Upstream.GetUpstream(ctx, upstreamID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	general := adminapi.TimeoutPolicy{ConnectMs: 5000, ResponseHeaderMs: 300000, IdleMs: 120000}
+	up.Config.TimeoutDefaults = general
+	up, err = svc.Upstream.UpdateUpstream(ctx, adminID, upstreamID, up.ConfigRevision, up.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The fixture owns the active revision; publishing still crosses the real Hub -> Relay HTTP boundary.
+	if err := svc.Client.Upstream.UpdateOneID(upstreamID).SetActiveConfigRevision(int64(up.ConfigRevision)).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name     string
+		override *adminapi.TimeoutPolicy
+		want     adminapi.TimeoutPolicy
+	}{
+		{"inherit", nil, general},
+		{"local", &adminapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 300000, IdleMs: 120000}, adminapi.TimeoutPolicy{ConnectMs: 1000, ResponseHeaderMs: 300000, IdleMs: 120000}},
+		{"images", &adminapi.TimeoutPolicy{ConnectMs: 5000, ResponseHeaderMs: 600000, IdleMs: 120000}, adminapi.TimeoutPolicy{ConnectMs: 5000, ResponseHeaderMs: 600000, IdleMs: 120000}},
+		{"mimo", &adminapi.TimeoutPolicy{ConnectMs: 5000, ResponseHeaderMs: 60000, IdleMs: 60000}, adminapi.TimeoutPolicy{ConnectMs: 5000, ResponseHeaderMs: 60000, IdleMs: 60000}},
+		{"firecrawl", &adminapi.TimeoutPolicy{ConnectMs: 5000, ResponseHeaderMs: 60000, IdleMs: 120000}, adminapi.TimeoutPolicy{ConnectMs: 5000, ResponseHeaderMs: 60000, IdleMs: 120000}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			draft, err := svc.Capability.GetDraft(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			draft.Content.Bindings[0].TimeoutPolicy = tc.override
+			draft, err = svc.Capability.PutDraft(ctx, adminID, draft.DraftRevision, draft.Content)
+			if err != nil {
+				t.Fatal(err)
+			}
+			publishAndFinalize(t, svc, adminID, draft.DraftRevision)
+			got := relay.Current().Routes[draft.Content.Bindings[0].RuntimeRouteId].TimeoutPolicy
+			if got.ConnectMs != tc.want.ConnectMs || got.ResponseHeaderMs != tc.want.ResponseHeaderMs || got.IdleMs != tc.want.IdleMs || !reflect.DeepEqual(got.OverallMs, tc.want.OverallMs) {
+				t.Fatalf("applied timeout = %+v, want %+v", got, tc.want)
+			}
 		})
 	}
 }

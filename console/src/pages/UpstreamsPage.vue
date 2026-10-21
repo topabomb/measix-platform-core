@@ -174,7 +174,7 @@ function emptyConfig(): UpstreamConfig {
     auth: { type: 'NONE' },
     correlationMode: 'NONE',
     usageCapabilityLevel: 'LEVEL_0',
-    timeoutDefaults: { connectMs: 1000, responseHeaderMs: 60000, idleMs: 30000 },
+    timeoutDefaults: { connectMs: 5000, responseHeaderMs: 300000, idleMs: 120000 },
   }
 }
 

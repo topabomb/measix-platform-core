@@ -1,7 +1,10 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,19 +29,41 @@ func TestRevealMCPHTTPRequiresAdminCSRFAndCurrentTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	origin := "http://127.0.0.1:1"
+	space := platformid.New(platformid.AgentSpace)
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer management-fixture" || r.Method != "GET" || r.URL.Path != "/admin/v1/users/fixture_user" {
+			t.Error("unexpected management request")
+			w.WriteHeader(403)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"username": "fixture_user", "agentSpaceId": space, "status": "active", "mcpUrl": "https://space.example/u/fixture_user/mcp", "davUrl": "https://files.example/u/fixture_user/dav/"})
+	}))
+	defer remote.Close()
+	origin := remote.URL
 	service, err := svc.Save(ctx, actor, platformid.New(platformid.Idempotency), "", adminapi.SaveWorkspaceServiceRequest{Name: "Fixture", Config: adminapi.AgentSpaceConfig{AdminOrigin: origin, McpOrigin: origin, ManagementSecret: adminapi.SecretRef{SecretId: management.SecretID, SecretVersion: management.SecretVersion}, ConnectTimeoutMs: 1000, IdleTimeoutMs: 1000}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	identity.Client.WorkspaceService.UpdateOneID(service.WorkspaceServiceId).SetState("ACTIVE").SetEnabled(true).SetActiveConfigRevision(1).SaveX(ctx)
-	space := platformid.New(platformid.AgentSpace)
 	now := time.Now().UTC()
 	identity.Client.AgentSpace.Create().SetID(actor).SetWorkspaceServiceID(service.WorkspaceServiceId).SetRemoteUsername("fixture_user").SetAgentSpaceID(space).SetBindingRevision(3).SetIntent("CONNECTED").SetState("CONNECTED").SetRemoteActive(true).SetStopPending(false).SetDavConfirmed(false).SetMcpSecretID(key.SecretID).SetMcpSecretVersion(int64(key.SecretVersion)).SetCreatedAt(now).SetUpdatedAt(now).SaveX(ctx)
 	h := httpapi.NewFull(httpapi.Services{Identity: identity, Workspace: svc})
 	cookie, csrf := loginAdmin(t, h)
 	path := "/api/admin/v1/users/" + actor + "/workspace/mcp-connection"
 	query := "?agentSpaceId=" + space + "&expectedRevision=3"
+	linksPath := "/api/admin/v1/users/" + actor + "/workspace/links"
+	for _, tc := range []struct {
+		cookie, query string
+		status        int
+	}{{"", query, 401}, {cookie, "", 400}, {cookie, "?agentSpaceId=" + space + "&expectedRevision=2", 409}, {cookie, query, 200}} {
+		response := doJSON(t, h, "GET", linksPath+tc.query, map[string]string{"Cookie": tc.cookie}, nil)
+		if response.Code != tc.status {
+			t.Fatalf("links status=%d want=%d", response.Code, tc.status)
+		}
+		if response.Code == 200 && (strings.Contains(response.Body.String(), "token") || !strings.Contains(response.Body.String(), "https://space.example/") || response.Header().Get("Cache-Control") != "no-store") {
+			t.Fatal("links exposed a secret, backend address or cacheable response")
+		}
+	}
 	for _, tc := range []struct {
 		method, query, cookie, csrf string
 		status                      int
@@ -64,7 +89,7 @@ func TestRevealMCPHTTPRequiresAdminCSRFAndCurrentTarget(t *testing.T) {
 		}
 		var info adminapi.WorkspaceMCPConnection
 		decodeJSON(t, response, &info)
-		if info.Token != "key_fixture.secret-fixture" || info.Username != "fixture_user" || info.McpUrl != origin+"/u/fixture_user/mcp" {
+		if info.Token != "key_fixture.secret-fixture" || info.Username != "fixture_user" || info.McpUrl != "https://space.example/u/fixture_user/mcp" {
 			t.Fatal("wrong credential or target returned")
 		}
 	}

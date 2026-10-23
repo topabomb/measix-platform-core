@@ -20,6 +20,7 @@ import (
 type lifecycleRemote struct {
 	managementToken                      string
 	url, name, space, token, dav         string
+	publicMCPOrigin, publicDAVOrigin     string
 	exists, enabled, failDAV, failCreate bool
 	failCheck                            bool
 	creates, rotates, davWrites          int
@@ -90,7 +91,6 @@ func (f *lifecycleRemote) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		out := f.identity(false)
 		out["token"] = f.dav
-		out["davUrl"] = f.url + "/u/" + f.name + "/dav/"
 		json.NewEncoder(w).Encode(out)
 	case strings.HasSuffix(r.URL.Path, "/token"):
 		f.rotates++
@@ -126,7 +126,14 @@ func (f *lifecycleRemote) identity(credential bool) map[string]any {
 	if f.enabled {
 		status = "active"
 	}
-	out := map[string]any{"username": f.name, "agentSpaceId": f.space, "mcpUrl": f.url + "/u/" + f.name + "/mcp", "status": status, "stopPending": false}
+	mcpOrigin, davOrigin := f.url, f.url
+	if f.publicMCPOrigin != "" {
+		mcpOrigin = f.publicMCPOrigin
+	}
+	if f.publicDAVOrigin != "" {
+		davOrigin = f.publicDAVOrigin
+	}
+	out := map[string]any{"username": f.name, "agentSpaceId": f.space, "mcpUrl": mcpOrigin + "/u/" + f.name + "/mcp", "davUrl": davOrigin + "/u/" + f.name + "/dav/", "status": status, "stopPending": false}
 	if credential {
 		out["token"] = f.token
 	}

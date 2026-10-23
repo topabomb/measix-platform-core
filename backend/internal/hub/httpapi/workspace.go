@@ -273,6 +273,18 @@ func optionalString(v *string) string {
 	return *v
 }
 
+func (h *fullAdminHandler) GetWorkspaceLinks(w http.ResponseWriter, r *http.Request, id adminapi.UserId, p adminapi.GetWorkspaceLinksParams) {
+	if _, ok := h.workspaceAuth(w, r, "", false); !ok {
+		return
+	}
+	out, err := h.services.Workspace.Links(r.Context(), id, p.AgentSpaceId, p.ExpectedRevision, h.adminFileAuth(r))
+	if err != nil {
+		writeWorkspaceError(w, err)
+		return
+	}
+	writeJSON(w, 200, out)
+}
+
 func (h *fullAdminHandler) RevealWorkspaceMCP(w http.ResponseWriter, r *http.Request, id adminapi.UserId, p adminapi.RevealWorkspaceMCPParams) {
 	actor, ok := h.workspaceAuth(w, r, p.XCSRFToken, true)
 	if !ok {

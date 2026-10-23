@@ -7,7 +7,79 @@ import (
 	"testing"
 
 	"measix/platform/ent/workspaceaudit"
+	"measix/platform/pkg/platformid"
 )
+
+func TestPublicConnectionsKeepPrivateRuntimeTargets(t *testing.T) {
+	s, remote, actor, user := lifecycleFixture(t)
+	remote.publicMCPOrigin, remote.publicDAVOrigin = "https://space.example.com", "https://files.example.com"
+	runCommand(t, s, actor, user, "CREATE")
+	ctx := context.Background()
+	row := s.Client.AgentSpace.GetX(ctx, user)
+	service := s.Client.WorkspaceService.GetX(ctx, row.WorkspaceServiceID)
+	davID := service.DavResourceID
+	beforeRotates, beforeDAV := remote.rotates, remote.davWrites
+	authorize := func(context.Context) error { return nil }
+	links, err := s.Links(ctx, user, row.AgentSpaceID, int(row.BindingRevision), authorize)
+	if err != nil || links.McpUrl != remote.publicMCPOrigin+"/u/"+row.RemoteUsername+"/mcp" || str(links.DavUrl) != remote.publicDAVOrigin+"/u/"+row.RemoteUsername+"/dav/" {
+		t.Fatalf("wrong public links: %+v %v", links, err)
+	}
+	mcp, err := s.RevealMCP(ctx, actor, user, row.AgentSpaceID, int(row.BindingRevision), authorize)
+	if err != nil || mcp.McpUrl != links.McpUrl || mcp.Token != remote.token {
+		t.Fatalf("wrong MCP delivery: %v", err)
+	}
+	dav, err := s.RevealDAV(ctx, actor, user, authorize)
+	if err != nil || dav.DavUrl != str(links.DavUrl) || dav.Token != remote.dav {
+		t.Fatalf("wrong DAV delivery: %v", err)
+	}
+	_, bindings, err := s.RuntimeBindings(ctx, service.ID, service.McpServerID)
+	if err != nil || len(bindings) != 1 || bindings[0].Endpoint != remote.url+"/u/"+row.RemoteUsername+"/mcp" {
+		t.Fatalf("public origin replaced MCP target: %+v %v", bindings, err)
+	}
+	_, davBindings, err := s.DAVRuntimeBindings(ctx, service.ID, davID)
+	if err != nil || len(davBindings) != 1 || davBindings[0].Endpoint != remote.url+"/u/"+row.RemoteUsername+"/dav/" {
+		t.Fatalf("public origin replaced DAV target: %+v %v", davBindings, err)
+	}
+	if remote.rotates != beforeRotates || remote.davWrites != beforeDAV {
+		t.Fatal("connection reads changed credentials")
+	}
+}
+
+func TestLinksRejectChangedAuthorityAndRemoteIdentity(t *testing.T) {
+	for _, change := range []string{"binding", "config", "admin", "remote-space", "remote-disabled"} {
+		t.Run(change, func(t *testing.T) {
+			s, remote, actor, user := lifecycleFixture(t)
+			runCommand(t, s, actor, user, "CREATE")
+			ctx := context.Background()
+			row := s.Client.AgentSpace.GetX(ctx, user)
+			if change == "remote-space" {
+				remote.space = platformid.New(platformid.AgentSpace)
+			}
+			if change == "remote-disabled" {
+				remote.enabled = false
+			}
+			remote.onGet = func() {
+				if change == "binding" {
+					s.Client.AgentSpace.UpdateOneID(user).AddBindingRevision(1).SaveX(ctx)
+				}
+				if change == "config" {
+					s.Client.WorkspaceService.UpdateOneID(row.WorkspaceServiceID).SetActiveConfigRevision(2).SaveX(ctx)
+				}
+			}
+			calls := 0
+			links, err := s.Links(ctx, user, row.AgentSpaceID, int(row.BindingRevision), func(context.Context) error {
+				calls++
+				if calls > 1 && change == "admin" {
+					return errors.New("admin revoked")
+				}
+				return nil
+			})
+			if err == nil || links.McpUrl != "" || links.DavUrl != nil {
+				t.Fatal("returned links after authority changed")
+			}
+		})
+	}
+}
 
 func TestRevealMCPUsesConfirmedVersionWithoutPublicationDAVOrRotation(t *testing.T) {
 	s, remote, actor, user := lifecycleFixture(t)

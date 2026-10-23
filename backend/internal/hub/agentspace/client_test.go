@@ -21,6 +21,57 @@ func TestUsernameKeepsFullIdentity(t *testing.T) {
 	}
 }
 
+func TestManagementPublicLinksAreIndependentOfConnectionOrigins(t *testing.T) {
+	const space = "spc_550e8400-e29b-41d4-a716-446655440000"
+	const publicMCP = "https://space.example.com/u/alice/mcp"
+	const publicDAV = "https://files.example.com/u/alice/dav/"
+	token := strings.Repeat("x", 43)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer admin-test" {
+			t.Error("missing management authentication")
+		}
+		out := map[string]string{"username": "alice", "agentSpaceId": space, "mcpUrl": publicMCP, "davUrl": publicDAV}
+		if r.Method == "POST" {
+			out["token"] = token
+		}
+		json.NewEncoder(w).Encode(out)
+	}))
+	defer server.Close()
+	c, err := New(server.URL, server.URL, server.URL, "admin-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := c.Get(context.Background(), "alice")
+	if err != nil || u.MCPURL != publicMCP || u.DAVURL != publicDAV {
+		t.Fatalf("public links rejected or changed: %+v %v", u, err)
+	}
+	if _, err = c.Create(context.Background(), "alice"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = c.SetDAV(context.Background(), "alice", space, token); err != nil {
+		t.Fatal(err)
+	}
+	backendDAV, err := c.DAVURL("alice", "file.txt")
+	if err != nil || backendDAV != server.URL+"/u/alice/dav/file.txt" {
+		t.Fatalf("public link replaced backend target: %s %v", backendDAV, err)
+	}
+}
+
+func TestManagementRejectsUnsafePublicLinks(t *testing.T) {
+	for _, raw := range []string{"/u/alice/mcp", "//space.example/u/alice/mcp", "javascript:alert(1)", "ftp://space.example/u/alice/mcp", "https://user:secret@space.example/u/alice/mcp", "https://space.example/u/bob/mcp", "https://space.example/u/alice/mcp?token=secret", "https://space.example/u/alice/mcp?", "https://space.example/u/alice/mcp#fragment", "https://space.example/u/%61lice/mcp"} {
+		t.Run(raw, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				json.NewEncoder(w).Encode(map[string]string{"username": "alice", "agentSpaceId": "spc_550e8400-e29b-41d4-a716-446655440000", "mcpUrl": raw})
+			}))
+			defer server.Close()
+			c, _ := New(server.URL, server.URL, "", "admin-test")
+			if _, err := c.Get(context.Background(), "alice"); err == nil {
+				t.Fatal("accepted unsafe public link")
+			}
+		})
+	}
+}
+
 func TestManagementNeverFollowsRedirectOrLeaksCredential(t *testing.T) {
 	reached := false
 	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { reached = true }))
@@ -47,7 +98,7 @@ func TestManagementNeverFollowsRedirectOrLeaksCredential(t *testing.T) {
 func TestDAVRequiresExactSubmittedCredentialAndIdentity(t *testing.T) {
 	const spc = "spc_550e8400-e29b-41d4-a716-446655440000"
 	token := strings.Repeat("x", 43)
-	for _, mismatch := range []string{"", "token", "space", "origin"} {
+	for _, mismatch := range []string{"", "token", "space", "path"} {
 		t.Run(mismatch, func(t *testing.T) {
 			var origin string
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,8 +113,8 @@ func TestDAVRequiresExactSubmittedCredentialAndIdentity(t *testing.T) {
 				if mismatch == "space" {
 					out["agentSpaceId"] = "spc_other"
 				}
-				if mismatch == "origin" {
-					out["davUrl"] = "https://evil.invalid/u/alice/dav/"
+				if mismatch == "path" {
+					out["davUrl"] = "https://files.example/u/bob/dav/"
 				}
 				_ = json.NewEncoder(w).Encode(out)
 			}))

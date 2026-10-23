@@ -42,31 +42,20 @@ let pending:{payload:string;key:string}|undefined
 let revealEpoch=0,revealController:AbortController|undefined
 function invalidateConnection(){revealEpoch++;revealController?.abort();revealController=undefined;revealing.value=false;connection.value=undefined;showToken.value=false}
 function canRevealMCP(value:Projection|undefined){return props.serviceEnabled&&value?.state==='CONNECTED'&&value.serviceState!=='DISABLED'&&['available','mcp_not_published'].includes(value.mcpReason??'')}
-// Resolve the persisted remote account independently of the parent list's page.
-// Watch identity/config changes, not each projection poll; never read credentials.
-watch(()=>[props.userId,view.value?.agentSpaceId,view.value?.bindingRevision,canRevealMCP(view.value),remoteWorkspace.current?.workspaceServiceId,remoteWorkspace.current?.configRevision,remoteWorkspace.current?.activeConfigRevision,desktopRefresh.value] as const,async(_,__,onCleanup)=>{
+// Resolve client-facing links through Hub without reading credentials or using
+// the server-side connection origin in a browser.
+watch([()=>props.userId,()=>view.value?.agentSpaceId,()=>view.value?.bindingRevision,()=>canRevealMCP(view.value),()=>remoteWorkspace.current?.workspaceServiceId,()=>remoteWorkspace.current?.configRevision,()=>remoteWorkspace.current?.activeConfigRevision,()=>desktopRefresh.value],async(_,__,onCleanup)=>{
  desktopUrl.value=undefined;desktopError.value=undefined
  const service=remoteWorkspace.current,projection=view.value,userId=props.userId
  if(!service||service.activeConfigRevision!==service.configRevision||!canRevealMCP(projection)||!projection?.agentSpaceId)return
  const request=new AbortController();onCleanup(()=>request.abort())
  try{
-  let cursor:string|undefined
-  do{
-   const page=await apiFetch<components['schemas']['WorkspaceList']>(`/api/admin/v1/remote-workspace/services/${encodeURIComponent(service.workspaceServiceId)}/workspaces${cursor?`?cursor=${encodeURIComponent(cursor)}`:''}`,{signal:request.signal})
-   if(request.signal.aborted)return
-   const row=page.items.find(item=>item.userId===userId)
-   if(row){
-    if(!row.remoteUsername||row.workspace.state!=='CONNECTED'||row.workspace.agentSpaceId!==projection.agentSpaceId||row.workspace.bindingRevision!==projection.bindingRevision)return
-    const address=new URL(service.config.mcpOrigin)
-    if(!['http:','https:'].includes(address.protocol))return
-    if(['127.0.0.1','localhost','[::1]'].includes(address.hostname))address.hostname=window.location.hostname
-    address.pathname=`/u/${encodeURIComponent(row.remoteUsername)}/desktop/`
-    address.search='';address.hash='';address.username='';address.password=''
-    desktopUrl.value=address.href
-    return
-   }
-   cursor=page.nextCursor
-  }while(cursor)
+  const links=await apiFetch<components['schemas']['WorkspaceLinks']>(`/api/admin/v1/users/${encodeURIComponent(userId)}/workspace/links?agentSpaceId=${encodeURIComponent(projection.agentSpaceId)}&expectedRevision=${projection.bindingRevision}`,{signal:request.signal})
+  if(request.signal.aborted)return
+  const address=new URL(links.mcpUrl)
+  if(!['http:','https:'].includes(address.protocol)||address.username||address.password||address.search||address.hash||!address.pathname.endsWith('/mcp'))throw new Error('工作区返回了无效的客户端链接')
+  address.pathname=address.pathname.slice(0,-4)+'/desktop/'
+  desktopUrl.value=address.href
  }catch(cause){if(!request.signal.aborted)desktopError.value=cause}
 })
 function openConnection(kind:ConnectionKind){invalidateConnection();error.value=undefined;connectionKind.value=kind;connectionOpen.value=true;void reveal()}

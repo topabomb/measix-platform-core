@@ -2310,6 +2310,32 @@ paths:
                 $ref: '#/components/schemas/WorkspaceDAVConnection'
         default:
           $ref: '#/components/responses/Problem'
+  /api/admin/v1/users/{userId}/workspace/links:
+    get:
+      operationId: getWorkspaceLinks
+      description: Read validated client-facing links from the authenticated Agent Space management API. No credentials are returned or rotated. Backend connection origins remain unchanged. Response is no-store.
+      parameters:
+      - *workspace_id004
+      - name: agentSpaceId
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/AgentSpaceId'
+      - name: expectedRevision
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Client-facing links for the current workspace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceLinks'
+        default:
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/users/{userId}/workspace/mcp-connection:
     post:
       operationId: revealWorkspaceMCP
@@ -3793,6 +3819,18 @@ components:
             $ref: '#/components/schemas/WorkspaceListItem'
         nextCursor:
           type: string
+    WorkspaceLinks:
+      type: object
+      additionalProperties: false
+      required:
+      - mcpUrl
+      properties:
+        mcpUrl:
+          type: string
+          format: uri
+        davUrl:
+          type: string
+          format: uri
     WorkspaceDAVConnection:
       type: object
       additionalProperties: false

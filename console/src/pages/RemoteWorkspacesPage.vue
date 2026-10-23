@@ -208,8 +208,8 @@ onBeforeUnmount(() => { alive = false; bearer.value = ''; if (timer) clearTimeou
           <q-separator />
           <q-card-section class="workspace-connection-fields">
             <q-input v-model="name" outlined dense label="连接名称" :disable="busy || !!pendingCommand || !desiredEnabled" />
-            <q-input v-model="adminOrigin" outlined dense label="管理服务地址" placeholder="https://space.example.com" :disable="busy || !!pendingCommand || !desiredEnabled" />
-            <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="WebDAV 对外地址；留空不提供文件访问。" :disable="busy || !!pendingCommand || !desiredEnabled" />
+            <q-input v-model="adminOrigin" outlined dense label="管理服务地址" placeholder="http://192.168.1.20:8932" hint="Core 后台连接地址，可使用内网；对外链接由 Agent Space 提供。" :disable="busy || !!pendingCommand || !desiredEnabled" />
+            <q-input v-model="davOrigin" outlined dense label="文件服务地址（可选）" hint="Hub、Relay 连接 WebDAV 的后台地址，可使用内网；留空不提供文件访问。" :disable="busy || !!pendingCommand || !desiredEnabled" />
             <q-input v-model="bearer" outlined dense type="password" autocomplete="new-password" :label="current ? '管理凭据（留空保留原值）' : '管理凭据'" :disable="busy || !!pendingCommand || !desiredEnabled" />
             <details>
               <summary class="cursor-pointer text-primary">工具服务地址（可选）</summary>

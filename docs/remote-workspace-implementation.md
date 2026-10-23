@@ -18,7 +18,9 @@
 
 新绑定把 `usr_<uuid>` 映射为远端 `measix_<uuid>`，Hub 持久保存实际 remoteUsername 与 agentSpaceId。用户显示名/本地 username 修改不重命名远端；历史账号只能经明确核实/接管关联原空间，不从同名账号推断身份。普通配置迁移继续核对已绑定原目标，不能重建空间替代恢复；旧部署已清理后的显式更换见下方修复流程，新空间不代表旧文件恢复。
 
-共用工作区详情面板在“浏览文件”旁提供普通“云桌面”链接。面板通过现有空间列表接口按用户核对当前绑定（必要时翻页），以持久保存的远端用户名和已生效 MCP origin 生成 `/u/{username}/desktop/`，不依赖父页面当前列表；切用户、绑定或配置失效时丢弃迟到响应。链接新标签页打开，不读取或传递 Token，管理员沿用“MCP / 云桌面凭据”手动登录。对于同机部署的回环 origin，浏览器链接使用当前管理页面主机名并保留远端端口，避免把本机回环地址发给局域网客户端；独立服务地址保持配置值。桌面是否支持仍由 Agent Space 决定。
+管理、工具和文件三个地址只用于 Hub/Relay 后台连接，可填写内网入口；工具地址仍可随管理地址，不增加公网地址输入框。Agent Space 自身现有公共基址决定管理响应中的 `mcpUrl`、`davUrl`。adapter 校验这些链接的 HTTP(S)、无内嵌凭据/query/fragment 和精确账号路径，workspace 服务复验原空间；允许其 origin 与连接目标不同。运行绑定和 Hub Files 始终使用保存的后台地址，不向返回的对外链接发送后台身份。
+
+共用工作区详情面板在“浏览文件”旁提供普通“云桌面”链接。`GET /api/admin/v1/users/{userId}/workspace/links?agentSpaceId=...&expectedRevision=...` 通过已生效管理连接读取无凭据的对外链接，前后复验管理员、用户、空间、绑定及有效配置，不新增持久化或后台探测循环。前端由返回的 MCP 路径生成同账号 `/desktop/`，不再拼接后台 origin 或替换回环主机。读取失败显示诊断，手动刷新可重试；切用户、绑定、配置及卸载取消原请求并丢弃迟到响应。链接新标签页打开，不读取或传递 Token，管理员沿用“MCP / 云桌面凭据”手动登录；桌面是否支持仍由 Agent Space 决定。
 
 ## DAV 未知操作的断开恢复
 
@@ -92,7 +94,7 @@ Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/worksp
 - PROPFIND 裸 opaque ETag 规范化为 HTTP 引号形式，随后仍由远端条件请求验证。404 必须通过已认证根目录探测区分文件不存在和文件服务失效。
 - 并发文件请求最多 8；连接/响应头与传输无进展超时受服务配置控制，目录及多状态 XML 响应正文同样受空闲超时约束。请求取消、会话撤销、用户/服务停用、绑定或凭据修订变化均取消原租约。旧请求失败不能撤销新 Token。
 - 审计保存 actor、用户、原空间、路径、实际操作、字节数和结束结果；外部 DAV 直连不冒充 Core 审计。连接信息领取是显式 POST/no-store；列表不返回明文，查看不轮换。
-- `connections.go` 提供工作区限定的 DAV/MCP 连接查看。MCP 使用 `POST workspace/mcp-connection?agentSpaceId=...&expectedRevision=...`，要求 Admin Cookie/CSRF，解密当前 `McpSecretID/Version` 并复验资格、空间、绑定和有效配置；不调用远端、不依赖 MCP 发布或 DAV。审计为 `REVEAL_MCP`，不记录 Token。两个工作区入口共用遮蔽/显示/复制对话框，关闭、页面隐藏、切用户及绑定失效清除明文和在途响应。支持云桌面的空间使用同一 MCP Token 登录；MCP 重签确认同时说明旧桌面会话失效及外部客户端更新，不从服务地址推断桌面能力。
+- `connections.go` 集中管理链接读取和 DAV/MCP 连接查看。MCP 使用 `POST workspace/mcp-connection?agentSpaceId=...&expectedRevision=...`，要求 Admin Cookie/CSRF，读取远端管理响应中的 MCP 链接，解密当前 `McpSecretID/Version` 并再次复验资格、空间、绑定和有效配置；不签发/轮换，不依赖 MCP 发布或 DAV。DAV 沿原 Files 授权和租约读取远端 DAV 链接，凭据继续使用已确认版本。管理读取失败明确报错，不交付后台地址作为公网链接。MCP 审计为 `REVEAL_MCP`，不记录 Token。两个工作区入口共用遮蔽/显示/复制对话框，关闭、页面隐藏、切用户及绑定失效清除明文和在途响应。支持云桌面的空间使用同一 MCP Token 登录；MCP 重签确认同时说明旧桌面会话失效及外部客户端更新，不从服务地址推断桌面能力。
 - 未知文件写入产生 `workspace.file_write_unknown` 结构化诊断，仅记录动作、远端错误分类/状态、字节数及请求/租约是否取消；不记录路径、URL、正文、原始错误或凭据。结合审计区分取消和远端失败，不据日志自动重放。
 - 网页下载通过原生浏览器下载，不把整个大文件读入 JavaScript。上传显示进度并可取消；断流提示刷新核实，不自动重试写入。
 - 文件服务地址未配置时不提供 Token 签发入口，后端在持久化操作前拒绝该请求。上传更换文件、目录或刷新发现目标版本变化时，必须重新确认覆盖。

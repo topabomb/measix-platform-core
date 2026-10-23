@@ -1149,6 +1149,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/users/{userId}/workspace/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read validated client-facing links from the authenticated Agent Space management API. No credentials are returned or rotated. Backend connection origins remain unchanged. Response is no-store. */
+        get: operations["getWorkspaceLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/users/{userId}/workspace/mcp-connection": {
         parameters: {
             query?: never;
@@ -1473,6 +1490,12 @@ export interface components {
         WorkspaceList: {
             items: components["schemas"]["WorkspaceListItem"][];
             nextCursor?: string;
+        };
+        WorkspaceLinks: {
+            /** Format: uri */
+            mcpUrl: string;
+            /** Format: uri */
+            davUrl?: string;
         };
         WorkspaceDAVConnection: {
             /** Format: uri */
@@ -5413,6 +5436,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceDAVConnection"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getWorkspaceLinks: {
+        parameters: {
+            query: {
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
+                expectedRevision: number;
+            };
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Client-facing links for the current workspace. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceLinks"];
                 };
             };
             default: components["responses"]["Problem"];

@@ -34,10 +34,10 @@ func (e *Error) Error() string  { return "agent space: " + e.Code }
 func IsNotFound(err error) bool { var e *Error; return errors.As(err, &e) && e.Status == 404 }
 
 type Client struct {
-	admin, mcp, dav *url.URL
-	credential      string
-	HTTP            *http.Client
-	DAVIdleTimeout  time.Duration
+	admin, dav     *url.URL
+	credential     string
+	HTTP           *http.Client
+	DAVIdleTimeout time.Duration
 }
 
 // User is an adapter-private representation of the external service response,
@@ -76,7 +76,7 @@ func New(admin, mcp, dav, credential string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	m, err := origin(mcp)
+	_, err = origin(mcp)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func New(admin, mcp, dav, credential string) (*Client, error) {
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = 90 * time.Second
-	return &Client{admin: a, mcp: m, dav: d, credential: credential, HTTP: &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{admin: a, dav: d, credential: credential, HTTP: &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func Username(userID string) (string, error) {
 	if platformid.Validate(platformid.User, userID) != nil {
@@ -178,7 +178,7 @@ func (c *Client) Get(ctx context.Context, name string) (User, error) {
 	}
 	var u User
 	_, err = c.call(ctx, "GET", p, nil, &u)
-	if err == nil && (u.Username != name || !validSpace(u.AgentSpaceID) || !c.matches(c.mcp, u.MCPURL, "/u/"+name+"/mcp")) {
+	if err == nil && (u.Username != name || !validSpace(u.AgentSpaceID) || !publicLink(u.MCPURL, "/u/"+name+"/mcp") || (u.DAVURL != "" && !publicLink(u.DAVURL, "/u/"+name+"/dav/"))) {
 		err = &Error{Code: "remote_identity_mismatch"}
 	}
 	return u, err
@@ -189,7 +189,7 @@ func (c *Client) Create(ctx context.Context, name string) (Credential, error) {
 	}
 	var out Credential
 	_, err := c.call(ctx, "POST", "/admin/v1/users", map[string]string{"username": name}, &out)
-	if err == nil && (out.Username != name || !validSpace(out.AgentSpaceID) || out.Token == "" || !c.matches(c.mcp, out.MCPURL, "/u/"+name+"/mcp")) {
+	if err == nil && (out.Username != name || !validSpace(out.AgentSpaceID) || out.Token == "" || !publicLink(out.MCPURL, "/u/"+name+"/mcp")) {
 		err = &Error{Code: "remote_identity_mismatch", Unknown: true}
 	}
 	return out, err
@@ -239,7 +239,7 @@ func (c *Client) SetDAV(ctx context.Context, name, spc, token string) (Credentia
 	}
 	var out Credential
 	_, err = c.call(ctx, "POST", p+"/dav-token", map[string]string{"agentSpaceId": spc, "token": token}, &out)
-	if err == nil && (out.Username != name || out.AgentSpaceID != spc || out.Token != token || !c.matches(c.dav, out.DAVURL, "/u/"+name+"/dav/")) {
+	if err == nil && (out.Username != name || out.AgentSpaceID != spc || out.Token != token || !publicLink(out.DAVURL, "/u/"+name+"/dav/")) {
 		err = &Error{Code: "dav_confirmation_mismatch", Unknown: true}
 	}
 	return out, err
@@ -255,12 +255,12 @@ func (c *Client) RevokeDAV(ctx context.Context, name, spc string) error {
 	_, err = c.call(ctx, "DELETE", p+"/dav-token?agentSpaceId="+url.QueryEscape(spc), nil, nil)
 	return err
 }
-func (c *Client) matches(base *url.URL, raw, path string) bool {
-	if base == nil {
-		return false
-	}
+
+// Management advertises client-facing links. They never choose a backend
+// connection target; backend origins remain explicitly configured by Core.
+func publicLink(raw, path string) bool {
 	u, err := url.Parse(raw)
-	return err == nil && u.Scheme == base.Scheme && u.Host == base.Host && u.Path == path && u.RawQuery == "" && u.Fragment == "" && u.User == nil && u.RawPath == ""
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.Opaque == "" && u.Path == path && !strings.ContainsAny(raw, "?#") && u.User == nil && u.RawPath == ""
 }
 func RelativePath(p string, mutation bool) (string, error) {
 	if p == "" && !mutation {

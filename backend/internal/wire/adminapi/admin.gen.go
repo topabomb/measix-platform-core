@@ -4113,6 +4113,12 @@ type WorkspaceFileResult struct {
 // WorkspaceFileResultOutcome defines model for WorkspaceFileResult.Outcome.
 type WorkspaceFileResultOutcome string
 
+// WorkspaceLinks defines model for WorkspaceLinks.
+type WorkspaceLinks struct {
+	DavUrl *string `json:"davUrl,omitempty"`
+	McpUrl string  `json:"mcpUrl"`
+}
+
 // WorkspaceList defines model for WorkspaceList.
 type WorkspaceList struct {
 	Items      []WorkspaceListItem `json:"items"`
@@ -4849,6 +4855,12 @@ type MutateAdminWorkspaceFileParams struct {
 	XCSRFToken   string       `json:"X-CSRF-Token"`
 }
 
+// GetWorkspaceLinksParams defines parameters for GetWorkspaceLinks.
+type GetWorkspaceLinksParams struct {
+	AgentSpaceId     AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+	ExpectedRevision int          `form:"expectedRevision" json:"expectedRevision"`
+}
+
 // RevealWorkspaceMCPParams defines parameters for RevealWorkspaceMCP.
 type RevealWorkspaceMCPParams struct {
 	// AgentSpaceId Expected space from WorkspaceProjection; never selects a user.
@@ -5276,6 +5288,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/users/{userId}/workspace/files)
 	MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params MutateAdminWorkspaceFileParams)
+
+	// (GET /api/admin/v1/users/{userId}/workspace/links)
+	GetWorkspaceLinks(w http.ResponseWriter, r *http.Request, userId UserId, params GetWorkspaceLinksParams)
 
 	// (POST /api/admin/v1/users/{userId}/workspace/mcp-connection)
 	RevealWorkspaceMCP(w http.ResponseWriter, r *http.Request, userId UserId, params RevealWorkspaceMCPParams)
@@ -5765,6 +5780,11 @@ func (_ Unimplemented) ListAdminWorkspaceFiles(w http.ResponseWriter, r *http.Re
 
 // (POST /api/admin/v1/users/{userId}/workspace/files)
 func (_ Unimplemented) MutateAdminWorkspaceFile(w http.ResponseWriter, r *http.Request, userId UserId, params MutateAdminWorkspaceFileParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/users/{userId}/workspace/links)
+func (_ Unimplemented) GetWorkspaceLinks(w http.ResponseWriter, r *http.Request, userId UserId, params GetWorkspaceLinksParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -11157,6 +11177,61 @@ func (siw *ServerInterfaceWrapper) MutateAdminWorkspaceFile(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// GetWorkspaceLinks operation middleware
+func (siw *ServerInterfaceWrapper) GetWorkspaceLinks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetWorkspaceLinksParams
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "expectedRevision" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedRevision", r.URL.Query(), &params.ExpectedRevision, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedRevision"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedRevision", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWorkspaceLinks(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RevealWorkspaceMCP operation middleware
 func (siw *ServerInterfaceWrapper) RevealWorkspaceMCP(w http.ResponseWriter, r *http.Request) {
 
@@ -11961,6 +12036,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/dav-connection", wrapper.RevealWorkspaceDAV)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/links", wrapper.GetWorkspaceLinks)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/mcp-connection", wrapper.RevealWorkspaceMCP)

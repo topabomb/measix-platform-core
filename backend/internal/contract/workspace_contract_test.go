@@ -58,6 +58,29 @@ func TestWorkspaceMCPCredentialFixtureIsAdminOnly(t *testing.T) {
 	}
 }
 
+func TestWorkspaceLinksAreAdminOnlyAndNeverContainCredentials(t *testing.T) {
+	doc := loadContractDoc(t, "api/admin/admin.openapi.yaml")
+	raw, err := os.ReadFile("../../../api/fixtures/workspace/links.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value map[string]any
+	if err = json.Unmarshal(raw, &value); err != nil {
+		t.Fatal(err)
+	}
+	schema := doc.Components.Schemas["WorkspaceLinks"].Value
+	if err = schema.VisitJSON(value); err != nil {
+		t.Fatal(err)
+	}
+	value["token"] = "must-not-be-exposed"
+	if schema.VisitJSON(value) == nil {
+		t.Fatal("links allow credentials")
+	}
+	if loadContractDoc(t, "api/client/client-control.openapi.yaml").Components.Schemas["WorkspaceLinks"] != nil {
+		t.Fatal("raw links leaked to client contract")
+	}
+}
+
 func TestDeploymentReplacementFixturesAreAdminOnly(t *testing.T) {
 	doc := loadContractDoc(t, "api/admin/admin.openapi.yaml")
 	for schema, name := range map[string]string{"WorkspaceServiceCheck": "replacement-check.json", "ReplaceWorkspaceDeploymentRequest": "replacement-request.json", "ApplyWorkspaceServiceRequest": "apply-request.json"} {

@@ -18,7 +18,17 @@
 
 新绑定把 `usr_<uuid>` 映射为远端 `measix_<uuid>`，Hub 持久保存实际 remoteUsername 与 agentSpaceId。用户显示名/本地 username 修改不重命名远端；历史账号只能经明确核实/接管关联原空间，不从同名账号推断身份。普通配置迁移继续核对已绑定原目标，不能重建空间替代恢复；旧部署已清理后的显式更换见下方修复流程，新空间不代表旧文件恢复。
 
-管理、工具和文件三个地址只用于 Hub/Relay 后台连接，可填写内网入口；工具地址仍可随管理地址，不增加公网地址输入框。Agent Space 自身现有公共基址决定管理响应中的 `mcpUrl`、`davUrl`。adapter 校验这些链接的 HTTP(S)、无内嵌凭据/query/fragment 和精确账号路径，workspace 服务复验原空间；允许其 origin 与连接目标不同。运行绑定和 Hub Files 始终使用保存的后台地址，不向返回的对外链接发送后台身份。
+现有三个地址只用于 Hub/Relay 后台连接，可填写它们能够访问的内网入口；不增加公网地址输入框：
+
+| 输入框 / 配置 | 实际调用方与用途 |
+|---|---|
+| 管理服务地址 / `adminOrigin` | Hub 调用 Agent Space 管理 API，核查账号和空间、执行生命周期及凭据操作 |
+| 工具服务地址 / `mcpOrigin` | Relay 连接每用户 MCP；默认随管理服务地址，也可指定独立入口 |
+| 文件服务地址 / `davOrigin` | Hub Files 和 Relay 标准 DAV 连接 WebDAV；留空不提供文件访问 |
+
+Agent Space 现有 `server.public_base_url`、`webdav.public_base_url` 决定管理响应中的 `mcpUrl`、`davUrl`。公网基址缺失时，远端可能返回请求入口对应的内网链接；Core 不猜测或改写为公网地址，部署者须先确认远端返回的地址可由目标客户端访问。adapter 校验 HTTP(S)、无内嵌凭据/query/fragment 和精确账号路径，workspace 服务复验原空间；允许链接 origin 与连接目标不同。运行绑定和 Hub Files 始终使用保存的后台地址，不向返回的对外链接发送后台身份。
+
+平台客户端的文件 API 走 Client → Hub Files → 后台 DAV；已发布 MCP/DAV 的平台 Runtime 走 Client → Relay → 后台 MCP/DAV，Snapshot 不下发个人后台地址或远端 key。管理员交付的原始 MCP/DAV 链接和云桌面则使用远端返回的公共基址；桌面 HTTPS/WebSocket 直接进入 Agent Space，不经过 Core/Relay。客户端选择的 Core 企业入口与上述三个后台地址独立，内网部署方式见[部署手册](s02-preview-deployment.md#91-远程工作区与内网企业入口)。
 
 共用工作区详情面板在“浏览文件”旁提供普通“云桌面”链接。`GET /api/admin/v1/users/{userId}/workspace/links?agentSpaceId=...&expectedRevision=...` 通过已生效管理连接读取无凭据的对外链接，前后复验管理员、用户、空间、绑定及有效配置，不新增持久化或后台探测循环。前端由返回的 MCP 路径生成同账号 `/desktop/`，不再拼接后台 origin 或替换回环主机。读取失败显示诊断，手动刷新可重试；切用户、绑定、配置及卸载取消原请求并丢弃迟到响应。链接新标签页打开，不读取或传递 Token，管理员沿用“MCP / 云桌面凭据”手动登录；桌面是否支持仍由 Agent Space 决定。
 

@@ -1,6 +1,6 @@
 # 实现状态与历史证据索引
 
-文档核对日期：2026-10-14。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
+最近维护日期：2026-10-23。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
 
 ## 固定 S0.2 Preview 组合
 
@@ -26,7 +26,7 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 - Snapshot v5 的 Starter 固化开场与 published v4 读取/Republish 保全；规则见 [API 参考](api-contracts.md#snapshot-编译与历史数据)。
 - 发布历史预览/手动/规则清理、上游实际引用诊断、独立编号与历史名称保全；见 [API 参考](api-contracts.md)和[迁移](database-migrations.md#发布历史迁移)。
 - v5 Direct MCP 发现、ALL/ALLOWLIST、助手 binding 和 AUTO/REQUIRE_CONFIRMATION；见[工具治理](direct-mcp-tool-governance.md)。
-- Agent Space 服务/用户生命周期、MCP binding、DAV 文件/文本编辑/预览与管理员资源摘要；见[工作区参考](remote-workspace-implementation.md)。
+- Agent Space 服务/用户生命周期、MCP binding、DAV 文件/文本编辑/预览、管理员资源摘要，以及后台连接地址与客户端公共链接分离；见[工作区参考](remote-workspace-implementation.md)。
 - append-only migrations、数据库保全启动、固定 build identity 的真机开发预设，以及 supported-version 响应扩展校验；见[迁移](database-migrations.md)、[开发](development.md)、[API](api-contracts.md)。
 
 当前合同身份读取 `api/protocol-baseline.json`，真实支持读取实现和固定消费者构建；不由状态页赋值。源码存在不等于某现场已部署，运行版本须核对进程、active release 和私有部署记录。
@@ -96,6 +96,7 @@ Core 提供 Hub/Relay、Admin、同源 STANDARD/CUSTOM Portal 分发、身份/�
 | 2026-10-02 v5 跨端专项 | `%USERPROFILE%\Documents\MeasixValidation\2026-10-02-v5` | `core/v5-protocol`、`core/starter-e2e`、`android/v5-protocol` 与 `binaries` 保存源码/build/APK/设备与失败；候选为 Architecture 07fdf4e、Core 34decd0、Portal 6b96d10、Android 3d47418de |
 | 2026-10-04 DAV 未知操作恢复 | `.data/device-real/recovery-dav-20261004/` | 在线备份后经正式 API 核实断开、改配置、恢复原空间和显式 DAV；本机开发恢复，非生产或手机直连 DAV |
 | 2026-10-08 发布历史/上游删除 | `.artifacts/release-cleanup-20261008/deployment-final.json`、`postconditions.json` 及浏览器截图 | 上述 preview.23 固定包的真实迁移、指定清理/删除、历史数据与其他服务保全；原始站点材料私有，不代替完整跨端门禁 |
+| 2026-10-23 工作区内外网分离 | `.artifacts/workspace-network-20261023/` 下 `source-d95ad2d.json`、`deployment-final.json`、`live-acceptance-final.json`、`preservation.json`、`tuck-browser-trace.json`、`desktop-browser-trace.jsonl` 及截图 | Core `d95ad2d` / Architecture `21f7bcf`，preview.23 Hub/Admin 更新；完整 Go tests/vet、Console 347 项测试/typecheck/build、smoke 及提交后的生成 drift 通过。真实 Hub Files、Relay MCP/DAV 的内网连接、原始公网 MCP/DAV 和已登录桌面 WebSocket 通过；Tuck 文件读取与 Hub 审计、内网连接匹配，其后端到 Core 仍走公网。Relay 程序及进程、原空间/凭据、草稿和发布原始 bytes/hash 保全；Agent Space 未修改，未新增 Android 原包或完整 S1 验收 |
 
 10-02 专项包含未来版本拒绝时身份/历史/个人/退出、v4 覆盖安装、v4/v5/历史 v4切换、Starter 首发和实际工作区文件消费。分模块通过结果不等于一条全模块设备命令全部通过；系统 TTS/ADB 环境中断保留，真实麦克风、PRoot 镜像、OEM/正式签名安装未覆盖。之后工具许可或响应扩展修订仍须验证实际采用其材料的消费者，不能沿用此前整包结论。
 

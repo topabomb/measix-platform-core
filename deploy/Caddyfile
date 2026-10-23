@@ -1,0 +1,23 @@
+{
+	admin off
+}
+
+# Development defaults stay on loopback. Set the public HTTP/HTTPS address and
+# bind interface explicitly for a device-reachable deployment.
+{$MEASIX_PUBLIC_ADDRESS:http://127.0.0.1:9000} {
+	bind {$MEASIX_BIND:127.0.0.1}
+
+	@private path /internal /internal/*
+	handle @private {
+		respond 404
+	}
+
+	@runtime path /runtime/v1 /runtime/v1/*
+	handle @runtime {
+		reverse_proxy {$MEASIX_RELAY_UPSTREAM:127.0.0.1:9002}
+	}
+
+	handle {
+		reverse_proxy {$MEASIX_HUB_UPSTREAM:127.0.0.1:9004}
+	}
+}

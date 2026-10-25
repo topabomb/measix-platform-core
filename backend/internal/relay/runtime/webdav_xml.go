@@ -16,18 +16,25 @@ import (
 	"strings"
 )
 
+var davResourceHrefPaths = [...][]string{
+	{"multistatus", "response", "href"},
+	{"multistatus", "response", "location", "href"},
+	{"prop", "lockdiscovery", "activelock", "lockroot", "href"},
+	{"multistatus", "response", "propstat", "prop", "lockdiscovery", "activelock", "lockroot", "href"},
+	{"error", "lock-token-submitted", "href"},
+	{"error", "no-conflicting-lock", "href"},
+	{"multistatus", "response", "error", "lock-token-submitted", "href"},
+	{"multistatus", "response", "error", "no-conflicting-lock", "href"},
+}
+
 // Only protocol-owned resource hrefs are mapped. Lock tokens, owner content and
 // arbitrary dead-property payloads are opaque. Original XML bytes, namespace
 // prefixes and extension attributes are copied around the changed URI text.
 func davResourceHref(stack []xml.Name) bool {
-	for _, route := range []string{
-		"multistatus/response/href", "multistatus/response/location/href",
-		"prop/lockdiscovery/activelock/lockroot/href",
-		"multistatus/response/propstat/prop/lockdiscovery/activelock/lockroot/href",
-		"error/lock-token-submitted/href", "error/no-conflicting-lock/href",
-		"multistatus/response/error/lock-token-submitted/href", "multistatus/response/error/no-conflicting-lock/href",
-	} {
-		parts := strings.Split(route, "/")
+	if len(stack) == 0 || stack[len(stack)-1] != (xml.Name{Space: "DAV:", Local: "href"}) {
+		return false
+	}
+	for _, parts := range davResourceHrefPaths {
 		if len(parts) != len(stack) {
 			continue
 		}
@@ -199,7 +206,13 @@ func rewriteDAVXML(response *http.Response, mapper davMapper, base *url.URL) err
 		if compressed != nil {
 			defer compressed.Close()
 		}
-		err := mapDAVXML(writer, source, mapper, base, converted)
+		// Aggregate token-sized writes before the unbuffered pipe: unknown
+		// response lengths make ReverseProxy flush after every body write.
+		output := bufio.NewWriterSize(writer, 32<<10)
+		err := mapDAVXML(output, source, mapper, base, converted)
+		if err == nil {
+			err = output.Flush()
+		}
 		_ = writer.CloseWithError(err)
 	}()
 	response.Body = &davXMLBody{PipeReader: reader, upstream: original}

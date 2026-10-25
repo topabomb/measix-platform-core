@@ -1,6 +1,6 @@
 # 实现状态与历史证据索引
 
-最近维护日期：2026-10-23。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
+最近维护日期：2026-10-26。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
 
 ## 固定 S0.2 Preview 组合
 
@@ -203,6 +203,16 @@ Spark 仅更新并重启 Relay，ARM64 程序 SHA-256 为 `27f26f770d6215e3be7f8
 本次修复只调整模型 HTTP 正文策略，具体字节值与适用范围见[运行说明](operations.md#runtime-relay)，对应 Architecture `d04d7995947b6564a1416342bc54e347eb9c9095`。旧代码已复现四种模型协议的图片历史被 413 拒绝；修复后大小上限前后 1 字节、声明长度和 chunked、Google 与旧控制状态透传、selector 长度增长、认证及预算拒绝均通过。四种协议的 11,195,473–11,195,563 字节 PNG 历史在本地 HTTP 上游完整接收并通过 SHA-256 校验。完整 Go 回归、`go vet ./...`、真实 Relay 子进程系统冒烟、格式和差异检查通过；MCP、DAV、WebSocket 与 ASR 上传取消回归通过。
 
 Spark 仅替换并重启 Relay，ARM64 程序 SHA-256 为 `6acf7da8ecb63ac24b73c6b26ef3faa9b8a9301dbd9bb72a8dc3475a275adf10`，运行中可执行文件匹配。Hub、其他 PM2 服务 PID/状态和其他 release payload、config/secrets 摘要不变；数据文件路径、inode 和归属保留。Hub/Relay ready，公网 health、Discovery、Admin、Portal 为 200，私有路径为 404，匿名 Runtime 为 `401 invalid_session / forwarded=false`。按用户明确要求不执行备份或迁移；OpenAPI、生成材料、平台合同、产品版本和 SQL schema 不变。现场记录与摘要保存在私有 `.artifacts/relay-model-body-100m-20261019/`；本轮未调用真实供应商，也不新增 Android 兼容或阶段完成声明。
+
+## Relay DAV XML 效率修订（2026-10-26）
+
+以 Core `9cb59da` 为修复前基线，先复现逐 token 写出放大，再加入固定 32 KiB 输出聚合。两个独立子代理审查后，按分配 profile 消除固定 href 路径的重复拆分，并补齐部分输出后的错误及最终 Flush 关闭测试；最终复审未发现仍需修改的问题。机制与可重复运行入口见[工作区参考](remote-workspace-implementation.md#标准-webdav-资源)和[测试说明](testing.md#远程工作区专项验证)。
+
+Go 1.26.5、Windows amd64、本机合成目录的实际 Relay handler 对照中，10/200/2000 项正文 Write 从 263/5203/52003 降为 1/3/27，输出逐字节相同。200 ms、三轮转换基准的 2000 项中位数由 62.37 ms 降为 11.11 ms，每次分配约 16.55 MB 降为 6.12 MB。这里的 Write 是逻辑调用，计时不含生产网络和 Android 前后状态请求，不代表线上同等比例加速。
+
+全量 Go 测试、vet、build、格式与差异检查通过；DAV 连续 20 轮、Linux amd64 的 runtime/control race 检查 5 轮通过。真实 HTTP/1.1、HTTP/2 目录改写、GET/HEAD 保真、客户端取消、编码、错误、背压及上游释放均有行为验证。原始基准、profile 和结果保存在本地 `.artifacts/dav-xml-20261026/`。
+
+本轮没有部署、修改 Hub/Runcove/Android、改变协议合同或迁移持久化；没有新增 APK 兼容、生产收益或阶段完成声明。Android 无需协议适配，普通 DAV 操作的两次状态查询仍保留。
 
 ## 保留的失败边界
 

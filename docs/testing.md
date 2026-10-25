@@ -117,6 +117,8 @@ pnpm -C console test --run src/components/ReleaseHistoryTools.test.ts src/pages/
 
 Files 保护目录回归覆盖根下 `.agent-space` 在混合列表首/中/尾时隐藏、根容量保留、直接读写及复制/移动目标在上游请求前拒绝、相似名称与嵌套同名路径正常处理；非法或跨空间的保护项 href 仍报 DAV 响应错误。标准 DAV 列举保留该目录并输出完整 207 XML，写操作多状态失败项保留，根修改、穿越、空间隔离及 READ_ONLY 保护继续回归。
 
+Relay DAV XML 的输出聚合和路径匹配回归位于 `internal/relay/runtime/webdav_xml_test.go`：10/200/2000 项目录经过实际 Relay handler 后逐字节核对，并限制正文 Write/Flush 随字节块数增长；真实 HTTP/1.1、HTTP/2 验证目录改写及 GET/HEAD 保真，覆盖编码、尾块、部分输出后的错误、背压、请求取消和输入/输出阻塞时关闭后的转换清理。`go test ./internal/relay/runtime -run '^TestDAV' -count=1` 执行 DAV 行为回归，`go test ./internal/relay/runtime -run '^$' -bench '^BenchmarkDAVXMLRewrite$' -benchmem -count=3` 比较转换耗时、分配及正文读取次数。该本机基准不代表生产或 Android 端到端时延，原生客户端无协议适配要求；生产收益须固定部署版本另行对照。
+
 从 Core 根目录运行真实隔离服务 lane：
 
 ```text

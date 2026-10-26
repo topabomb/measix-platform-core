@@ -212,7 +212,9 @@ Go 1.26.5、Windows amd64、本机合成目录的实际 Relay handler 对照中�
 
 全量 Go 测试、vet、build、格式与差异检查通过；DAV 连续 20 轮、Linux amd64 的 runtime/control race 检查 5 轮通过。真实 HTTP/1.1、HTTP/2 目录改写、GET/HEAD 保真、客户端取消、编码、错误、背压及上游释放均有行为验证。原始基准、profile 和结果保存在本地 `.artifacts/dav-xml-20261026/`。
 
-本轮没有部署、修改 Hub/Runcove/Android、改变协议合同或迁移持久化；没有新增 APK 兼容、生产收益或阶段完成声明。Android 无需协议适配，普通 DAV 操作的两次状态查询仍保留。
+源码修订没有修改 Hub/Runcove/Android、改变协议合同或迁移持久化。Android 无需协议适配，普通 DAV 操作的两次状态查询仍保留；不新增 APK 兼容或阶段完成声明。
+
+随后通过已核对主机密钥的内网 SSH 部署固定 `d46f699904309f4ea3c3279002dd48dc36a78697` 的 Linux ARM64 Relay。程序 SHA-256 为 `5f6ce410e0a72f6b1c7f5f0778e53a80128c12731bc7f469d53ef9653b4df418`，运行中 `/proc` 可执行文件与其一致。只重启 Relay，Hub 及其他 PM2 进程 PID/状态、其他 release payload、配置/密钥摘要和数据库/spool 的路径、inode、归属保持不变；没有运行迁移。在线完整备份已验证并离机保存，ARM64 候选对备份的 spool 读取检查通过；原程序目录保留。内网 Hub/Relay 与公网 readiness 为 200，公网内部路径为 404，匿名 DAV 为 `401 invalid_session / forwarded=false`。源码、程序和校验结果保存在私有 `.artifacts/relay-dav-xml-20261026/` 及现场记录；本次部署未执行已认证 DAV 或 Android 端到端性能对照，不将本机基准写成生产收益。
 
 ## 保留的失败边界
 

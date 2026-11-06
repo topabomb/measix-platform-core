@@ -1,0 +1,9 @@
+{
+  "resourceId": "dav_550e8400-e29b-41d4-a716-446655440000",
+  "displayName": "远程工作区文件",
+  "enabled": true,
+  "purpose": "WORKSPACE_FILE_EXCHANGE",
+  "clientProtocol": "WEBDAV",
+  "authOwnership": "ENTERPRISE_MANAGED",
+  "rootPathTemplate": "/runtime/v1/resources/dav_550e8400-e29b-41d4-a716-446655440000/spaces/{agentSpaceId}/dav/"
+}

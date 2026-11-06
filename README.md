@@ -1,85 +1,25 @@
 # MEASIX Platform Core
 
-`measix-platform-core` is the implementation repository for the MEASIX S0 server-side platform. It contains the executable contracts and source for **Control Hub**, **Runtime Relay**, and **Admin Console**, plus their shared test infrastructure.
+MEASIX Control Hub、Runtime Relay 与 Admin Console 的实现仓库。Enterprise Tool Gateway 是 S0.3 目标，当前没有对应 daemon 或 Gateway Control OpenAPI。
 
-## Architecture authority
+当前源码与固定的 `0.2.0-preview.22` 包需要分别判断，具体身份和证据边界见[实现与封版状态](docs/s0-execution-progress.md)。Android `0.0.20 / versionCode 20` 尚未正式发布，候选提交不等于正式发行。
 
-Product semantics, platform terminology, S0 scope, cross-component behavior, component architecture, and required S0 test scenarios are **not redefined in this repository**.
+## 阅读入口
 
-The authoritative architecture repository is:
+先读[本地架构与文档治理](ARCHITECTURE.md)，再按同级架构仓库的[阶段阅读清单](../measix-architecture/docs/measix-stage-document-index.md)查找语义权威。产品、wire、状态、安全与阶段验收要求归架构仓库；本仓库维护源码、可执行合同、持久化、测试和操作事实。
 
-- `topabomb/measix-architecture`
-- S0: `docs/10-runtime-foundation/s0/`
+## 文档导航
 
-Start with `ARCHITECTURE.md` and `docs/documentation-governance.md` before making implementation changes.
+所有维护文档平铺在 `docs/`，按用途查阅；不另建计划、归档或重复索引目录。
 
-## Repository responsibilities
+| 用途 | 文档 |
+| --- | --- |
+| 开发与贡献 | [开发环境、启动与真机预设](docs/development.md) · [贡献流程](CONTRIBUTING.md) |
+| 合同与消费 | [API、Snapshot、兼容与生成](docs/api-contracts.md) · [Android 消费参考](docs/android-platform-integration.md) |
+| 功能实现 | [Admin Console](docs/admin-console-implementation.md) · [Direct MCP 工具治理](docs/direct-mcp-tool-governance.md) · [远程工作区](docs/remote-workspace-implementation.md) |
+| 用量与成本 | [计量、额度和结算](docs/usage-budget.md) · [定价与费用分析](docs/pricing-cost.md) |
+| 数据与运行 | [数据库迁移](docs/database-migrations.md) · [运行配置、健康与排障](docs/operations.md) |
+| 验证与交付 | [测试、CI 与专项验证](docs/testing.md) · [发布与候选证据](docs/release.md) · [Spark Preview 部署、备份和恢复](docs/s02-preview-deployment.md) |
+| 状态与历史证据 | [固定组合、源码增量与证据索引](docs/s0-execution-progress.md) |
 
-This repository owns implementation facts and executable artifacts, including:
-
-- OpenAPI contracts and canonical wire fixtures;
-- generated Go / TypeScript artifacts;
-- Control Hub and Runtime Relay source;
-- Admin Console source and production build;
-- Ent schema and Atlas versioned migrations;
-- component integration tests;
-- Upstream Adapter qualification harness;
-- S0 cross-component/system test harness and reports;
-- CI workflows, build, local-development and operational procedures.
-
-## Target structure
-
-```text
-measix-platform-core/
-├── api/
-│   ├── admin/
-│   ├── client/
-│   ├── internal/
-│   └── fixtures/
-├── backend/
-│   ├── cmd/control-hub/
-│   ├── cmd/runtime-relay/
-│   ├── pkg/platformid/
-│   ├── internal/hub/
-│   ├── internal/relay/
-│   ├── ent/
-│   └── migrations/
-├── console/
-├── test/
-│   ├── qualification/
-│   └── system/
-├── docs/
-└── .github/
-```
-
-The structure above is the S0 implementation target. Concrete directories are created only when their implementation lands; documentation must not pretend an unimplemented command or artifact already exists.
-
-## Documentation
-
-| Document | Purpose |
-|---|---|
-| `ARCHITECTURE.md` | implementation architecture boundaries and dependency rules |
-| `AGENTS.md` | repository rules for AI/coding agents |
-| `CONTRIBUTING.md` | contribution, PR and change-classification workflow |
-| `docs/documentation-governance.md` | documentation authority and synchronization with `measix-architecture` |
-| `docs/development.md` | local and GitHub-only development workflow |
-| `docs/api-contracts.md` | OpenAPI, fixtures and code-generation ownership |
-| `docs/testing.md` | executable testing conventions, CI layers and evidence |
-| `docs/tdd.md` | mandatory TDD workflow, including GitHub-only Red/Green verification |
-| `docs/database-migrations.md` | Ent / Atlas / SQLite migration workflow |
-| `docs/operations.md` | runtime configuration, health, backup, restore and upgrade procedures |
-| `docs/release.md` | release-candidate composition and reproducible S0 verification |
-
-## Development principle
-
-For behavior changes, development is test-driven:
-
-```text
-architecture requirement
-  → failing executable test (Red)
-  → minimum implementation (Green)
-  → refactor while Green
-  → required CI / system evidence
-```
-
-A change that alters platform semantics must first update the authoritative document in `measix-architecture`; a pure implementation change remains in this repository.
+实现完成后的方案将可持续参考的内容归入上述文档，过程记录由 Git 和原始验证产物保存。生成资料位于 `api/generated/`，只通过原生成入口更新。

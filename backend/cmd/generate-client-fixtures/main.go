@@ -209,6 +209,15 @@ func main() {
 		cases = append(cases, wireCase{name, schema, valid, value})
 	}
 	add("v5-full", "ManagedSnapshot", true, v5Snapshot)
+	for _, hash := range []string{"", "sha256:" + strings.Repeat("0", 64)} {
+		value := clone(v5Snapshot)
+		value["mcp"].([]any)[0].(map[string]any)["allowedTools"].([]any)[0].(map[string]any)["contractHash"] = hash
+		name := "v5-empty-tool-contract-hash"
+		if hash != "" {
+			name = "v5-legacy-tool-contract-hash"
+		}
+		add(name, "ManagedSnapshot", true, value)
+	}
 	for _, field := range []string{"allowedTools", "toolAccessMode", "mcpBindings"} {
 		resource := "mcp"
 		if field == "mcpBindings" {

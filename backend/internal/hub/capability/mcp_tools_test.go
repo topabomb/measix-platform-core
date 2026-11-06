@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/getkin/kin-openapi/openapi3"
 	"measix/platform/internal/hub/capability"
 	"measix/platform/internal/hub/security"
 	"measix/platform/internal/hub/upstream"
@@ -13,6 +14,7 @@ import (
 	"measix/platform/pkg/platformid"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -158,7 +160,12 @@ func TestDirectMcpDraftDiscoveryApprovalDriftAndConcurrency(t *testing.T) {
 			if mode == "drift" {
 				description = "changed read"
 			}
-			tools := []any{map[string]any{"name": "read", "description": description, "inputSchema": map[string]any{"type": "object"}}}
+			schema := map[string]any{"type": "object"}
+			if mode == "drift" {
+				schema["properties"] = map[string]any{"url": map[string]any{"type": "string", "description": "New parameter description"}}
+				schema["required"] = []string{"url"}
+			}
+			tools := []any{map[string]any{"name": "read", "description": description, "inputSchema": schema}}
 			if mode == "drift" {
 				tools = append(tools, map[string]any{"name": "new_tool", "inputSchema": map[string]any{"type": "object"}})
 			}
@@ -226,6 +233,27 @@ func TestDirectMcpDraftDiscoveryApprovalDriftAndConcurrency(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	adminSchema, err := openapi3.NewLoader().LoadFromFile(filepath.Join("..", "..", "..", "..", "api", "admin", "admin.openapi.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	previewRaw, err := json.Marshal(preview.MCP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var previewJSON any
+	if err := json.Unmarshal(previewRaw, &previewJSON); err != nil {
+		t.Fatal(err)
+	}
+	if err := adminSchema.Components.Schemas["DraftPreviewResponse"].Value.Properties["mcp"].Value.VisitJSON(previewJSON); err != nil {
+		t.Fatalf("preview violates Admin response schema: %v", err)
+	}
+	// Empty hashes belong to public projections, never forged Admin evidence.
+	(*draft.Content.Mcp[0].AllowedTools)[0].ContractHash = ""
+	if _, err := svc.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, draft.Content); !errors.Is(err, capability.ErrMcpToolEvidence) {
+		t.Fatalf("empty Admin evidence accepted: %v", err)
+	}
+	(*draft.Content.Mcp[0].AllowedTools)[0].ContractHash = tool.ContractHash
 	initialHash := preview.ProjectionHash
 	draft, err = discover()
 	if err != nil {
@@ -244,11 +272,61 @@ func TestDirectMcpDraftDiscoveryApprovalDriftAndConcurrency(t *testing.T) {
 		t.Fatal("drift automatically approved")
 	}
 	valid, _ = svc.ValidateDraft(ctx, draft.DraftRevision)
-	if valid.Valid {
-		t.Fatal("changed contract can publish")
+	if !valid.Valid {
+		t.Fatalf("same-name definition drift blocked publication: %+v", valid)
 	}
-	if _, err = svc.PreviewDraft(ctx, draft.DraftRevision); !errors.Is(err, capability.ErrInvalidDraft) {
-		t.Fatal("preview bypassed review")
+	preview, err = svc.PreviewDraft(ctx, draft.DraftRevision)
+	if err != nil || preview.ProjectionHash != initialHash {
+		t.Fatalf("definition drift changed published authorization: %v", err)
+	}
+	snapshot, _, err := svc.CompileSnapshot(capability.SnapshotInput{DeploymentID: boot.DeploymentID, ReleaseID: platformid.New(platformid.Release), ManagedGeneration: 1, PublishedAt: time.Now(), Content: draft.Content})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Mcp[0].AllowedTools) != 1 || snapshot.Mcp[0].AllowedTools[0].Name != "read" || snapshot.Mcp[0].AllowedTools[0].ContractHash != "" || snapshot.Mcp[0].AllowedTools[0].ApprovalPolicy != "REQUIRE_CONFIRMATION" {
+		t.Fatalf("unexpected name-only grants: %+v", snapshot.Mcp[0].AllowedTools)
+	}
+	// A historical nonempty compatibility value must survive decoding and hashing.
+	snapshot.Mcp[0].AllowedTools[0].ContractHash = tool.ContractHash
+	historicalHash, err := capability.HashSnapshot(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawSnapshot, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored capability.Snapshot
+	if err := json.Unmarshal(rawSnapshot, &restored); err != nil {
+		t.Fatal(err)
+	}
+	restoredHash, err := capability.HashSnapshot(restored)
+	if err != nil || restoredHash != historicalHash || restored.Mcp[0].AllowedTools[0].ContractHash != tool.ContractHash {
+		t.Fatal("historical snapshot hash/value was rewritten")
+	}
+	// Confirmation policy is editable without reapproving a changed definition.
+	(*draft.Content.Mcp[0].AllowedTools)[0].ApprovalPolicy = "AUTO"
+	draft, err = svc.PutDraft(ctx, boot.AdminUserID, draft.DraftRevision, draft.Content)
+	if err != nil {
+		t.Fatalf("policy edit after drift rejected: %v", err)
+	}
+	valid, err = svc.ValidateDraft(ctx, draft.DraftRevision)
+	if err != nil || !valid.Valid {
+		t.Fatalf("policy edit after drift invalid: %+v %v", valid, err)
+	}
+	mode = "deleted"
+	draft, err = discover()
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid, err = svc.ValidateDraft(ctx, draft.DraftRevision)
+	if err != nil || valid.Valid {
+		t.Fatal("missing tool allowed publication")
+	}
+	mode = "drift"
+	draft, err = discover()
+	if err != nil {
+		t.Fatal(err)
 	}
 	drifted := draft.Content.Mcp[0].ToolDiscovery.Tools[1]
 	if drifted.Name != "read" {

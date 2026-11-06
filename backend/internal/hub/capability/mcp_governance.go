@@ -234,7 +234,7 @@ func (s *Service) validateMcpSave(ctx context.Context, old, next adminapi.Manage
 			unchanged := false
 			if prior.AllowedTools != nil {
 				for _, previous := range *prior.AllowedTools {
-					if defHash(previous) == defHash(grant) {
+					if previous.Name == grant.Name && previous.ContractHash == grant.ContractHash && defHash(previous.Definition) == defHash(grant.Definition) {
 						unchanged = true
 					}
 				}
@@ -337,7 +337,7 @@ func (s *Service) mcpSourceIssues(ctx context.Context, content adminapi.ManagedD
 			for _, grant := range *m.AllowedTools {
 				found := false
 				for _, tool := range m.ToolDiscovery.Tools {
-					if grant.Name == tool.Name && grant.ContractHash == tool.ContractHash {
+					if grant.Name == tool.Name {
 						found = true
 					}
 				}
@@ -348,7 +348,7 @@ func (s *Service) mcpSourceIssues(ctx context.Context, content adminapi.ManagedD
 			k := adminapi.ValidationIssueResourceKind("MCP")
 			field := "allowedTools"
 			id := m.McpServerId
-			out = append(out, adminapi.ValidationIssue{Code: "mcp_tool_review_required", Path: fmt.Sprintf("mcp[%d].allowedTools", i), Message: "Discover the current source and explicitly review changed or removed tools", Severity: "ERROR", ResourceKind: &k, ResourceId: &id, Field: &field})
+			out = append(out, adminapi.ValidationIssue{Code: "mcp_tool_review_required", Path: fmt.Sprintf("mcp[%d].allowedTools", i), Message: "Discover the current source and remove missing tool names from the allowlist", Severity: "ERROR", ResourceKind: &k, ResourceId: &id, Field: &field})
 		}
 	}
 	return out

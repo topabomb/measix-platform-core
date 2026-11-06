@@ -2722,9 +2722,10 @@ export interface components {
         };
         McpToolGrant: {
             name: string;
-            contractHash: components["schemas"]["Sha256Hash"];
+            /** @description Preview projections emit an empty compatibility value. Draft writes require a valid full Tool discovery-evidence digest; this digest does not lock execution authorization. */
+            contractHash: string;
             /**
-             * @description AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, contract review, save and publish. Required explicitly; no decoder default.
+             * @description AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, save and publish. Required explicitly; no decoder default.
              * @enum {string}
              */
             approvalPolicy: "AUTO" | "REQUIRE_CONFIRMATION";

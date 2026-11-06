@@ -50,7 +50,7 @@ Admin 交互见[Console 实现](admin-console-implementation.md)，工具许可�
 
 Core 先选择生成的 v4/v5 DTO，再进入对应 adapter。PublishedContent 的下载校验与 Admin 草稿命令校验分开，共享已知约束。未来版本在 DTO 解析前明确拒绝，不套用当前类型或静默回退。未知错误 code 保持失败，不能推断身份已撤销。
 
-忽略配置扩展不改变现有 v4/v5 descriptor、ETag/body hash 或历史 bytes/hash；接收方不另造原始 JSON hash。新增输出经 compiler 生成新 bytes/hash，须验证实际旧消费者。`MCP Tool contractHash` 覆盖完整原始 Tool JSON 的 JCS，包括 annotations、`_meta` 和扩展，不适用配置 DTO 的丢弃规则。
+忽略配置扩展不改变现有 v4/v5 descriptor、ETag/body hash 或历史 bytes/hash；接收方不另造原始 JSON hash。新增输出经 compiler 生成新 bytes/hash，须验证实际旧消费者。Admin 发现证据的 MCP Tool 摘要覆盖完整原始 Tool JSON 的 JCS，包括 annotations、`_meta` 和扩展，不适用配置 DTO 的丢弃规则；Client `contractHash` 空字符串及历史值的兼容语义见 [Direct MCP](direct-mcp-tool-governance.md#下发兼容与部署顺序)。
 
 生产非泄漏必须由 Hub 编译和预算投影独立验证，不能依赖客户端拒绝未知字段。生成 Go DTO 的 unmarshal 不自动证明全部 OpenAPI required/format/enum 约束；contract tests、HTTP decode 与领域校验共同负责。
 

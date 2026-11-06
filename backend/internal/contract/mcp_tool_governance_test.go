@@ -33,6 +33,11 @@ func TestDirectMcpV5ExplicitToolGrantsAndV4Isolation(t *testing.T) {
 	if getSchema(t, doc, "McpDefinitionV4").Properties["allowedTools"] != nil {
 		t.Fatal("v4 changed")
 	}
+	for _, hash := range []string{"", "sha256:0000000000000000000000000000000000000000000000000000000000000000"} {
+		if err := grant.VisitJSON(map[string]any{"name": "read", "contractHash": hash, "approvalPolicy": "AUTO"}); err != nil {
+			t.Fatalf("name grant hash %q rejected: %v", hash, err)
+		}
+	}
 	for _, value := range []map[string]any{
 		{"name": "read", "contractHash": "sha256:bad", "approvalPolicy": "AUTO"},
 		{"name": "read", "contractHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "approvalPolicy": "AUTO_ALL"},

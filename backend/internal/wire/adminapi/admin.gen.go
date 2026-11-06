@@ -3014,16 +3014,18 @@ type McpToolDiscovery struct {
 
 // McpToolGrant defines model for McpToolGrant.
 type McpToolGrant struct {
-	// ApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, contract review, save and publish. Required explicitly; no decoder default.
+	// ApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, save and publish. Required explicitly; no decoder default.
 	ApprovalPolicy McpToolGrantApprovalPolicy `json:"approvalPolicy"`
-	ContractHash   Sha256Hash                 `json:"contractHash"`
+
+	// ContractHash Preview projections emit an empty compatibility value. Draft writes require a valid full Tool discovery-evidence digest; this digest does not lock execution authorization.
+	ContractHash string `json:"contractHash"`
 
 	// Definition Complete raw MCP Tool object including extension fields; checked by discovery and RFC 8785 hashing.
 	Definition McpToolDefinition `json:"definition"`
 	Name       string            `json:"name"`
 }
 
-// McpToolGrantApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, contract review, save and publish. Required explicitly; no decoder default.
+// McpToolGrantApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. New approvals default to AUTO in the editor; existing explicit policies survive discovery, save and publish. Required explicitly; no decoder default.
 type McpToolGrantApprovalPolicy string
 
 // MeterQuantity Request meters retain their recorded confidence. Aggregates sum only reliable EXACT/PARTIAL quantities; mixed reliable and incomplete contributions are PARTIAL, and no reliable contribution is UNKNOWN. A PARTIAL zero is an observed subtotal, not a complete total.

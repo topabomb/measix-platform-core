@@ -11,7 +11,7 @@ func clientMcpGrants(src *[]adminapi.McpToolGrant) []clientapi.McpToolGrant {
 	dst := []clientapi.McpToolGrant{}
 	if src != nil {
 		for _, v := range *src {
-			dst = append(dst, clientapi.McpToolGrant{Name: v.Name, ContractHash: v.ContractHash, ApprovalPolicy: clientapi.McpToolGrantApprovalPolicy(v.ApprovalPolicy)})
+			dst = append(dst, clientapi.McpToolGrant{Name: v.Name, ContractHash: "", ApprovalPolicy: clientapi.McpToolGrantApprovalPolicy(v.ApprovalPolicy)})
 		}
 	}
 	sort.Slice(dst, func(i, j int) bool { return dst[i].Name < dst[j].Name })
@@ -45,12 +45,13 @@ func v4Mcp(src []clientapi.McpDefinition) []clientapi.McpDefinitionV4 {
 }
 func mcpPublishedHash(m adminapi.McpDefinition) string {
 	m.ToolDiscovery = nil
-	// Definitions are review evidence; the approved hash is the published fact.
+	// Definitions and hashes are discovery evidence; only names and policies are published permissions.
 	if m.AllowedTools != nil {
 		grants := append([]adminapi.McpToolGrant{}, (*m.AllowedTools)...)
 		sort.Slice(grants, func(i, j int) bool { return grants[i].Name < grants[j].Name })
 		for i := range grants {
 			grants[i].Definition = nil
+			grants[i].ContractHash = ""
 		}
 		m.AllowedTools = &grants
 	}

@@ -1016,7 +1016,8 @@ export interface components {
         };
         McpToolGrant: {
             name: string;
-            contractHash: components["schemas"]["Sha256Hash"];
+            /** @description Compatibility field, not an authorization condition. New publications emit an empty string; historical SHA-256 values remain accepted. Authorization uses server identity and exact tool name. */
+            contractHash: string;
             /**
              * @description AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. Independent of tool selection and does not bypass existing runtime or system permissions. Required explicitly; no decoder default.
              * @enum {string}

@@ -1460,8 +1460,10 @@ type McpServerId = string
 type McpToolGrant struct {
 	// ApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. Independent of tool selection and does not bypass existing runtime or system permissions. Required explicitly; no decoder default.
 	ApprovalPolicy McpToolGrantApprovalPolicy `json:"approvalPolicy"`
-	ContractHash   Sha256Hash                 `json:"contractHash"`
-	Name           string                     `json:"name"`
+
+	// ContractHash Compatibility field, not an authorization condition. New publications emit an empty string; historical SHA-256 values remain accepted. Authorization uses server identity and exact tool name.
+	ContractHash string `json:"contractHash"`
+	Name         string `json:"name"`
 }
 
 // McpToolGrantApprovalPolicy AUTO adds no enterprise confirmation; REQUIRE_CONFIRMATION requires user approval before each invocation. Independent of tool selection and does not bypass existing runtime or system permissions. Required explicitly; no decoder default.

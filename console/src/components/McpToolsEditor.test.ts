@@ -88,24 +88,28 @@ it.each([true, false])('describes retention only when a previous catalog exists:
   expect(wrapper.find('[data-cy="mcp-previous-catalog-retained"]').exists()).toBe(previous)
   expect(wrapper.get('[data-cy="problem-banner"]').text()).not.toContain('previous catalog')
 })
-it('selects a current definition without extra confirmation and preserves explicit confirmation after drift review', async () => {
+it.each(['AUTO', 'REQUIRE_CONFIRMATION'] as const)('keeps name authorization and %s policy editable after definition updates', async approvalPolicy => {
   const { wrapper, mcp } = setup()
-  wrapper.getComponent(QCheckbox).vm.$emit('update:modelValue', true)
+  const tool = structuredClone(toRaw(mcp.toolDiscovery!.tools[0]!))
+  mcp.allowedTools = [{ ...tool, approvalPolicy }]
+  mcp.toolDiscovery!.tools = [
+    { ...tool, contractHash: `sha256:${'3'.repeat(64)}`, definition: { name: 'read', description: 'Updated reader', inputSchema: { type: 'object', properties: { url: { type: 'string', description: 'New required URL' } }, required: ['url'] } } },
+    { ...tool, name: 'write', definition: { ...tool.definition, name: 'write' } },
+  ]
   await flushPromises()
-  expect(mcp.allowedTools).toHaveLength(1)
-  expect(mcp.allowedTools![0]!.approvalPolicy).toBe('AUTO')
-  wrapper.getComponent(QSelect).vm.$emit('update:modelValue', 'REQUIRE_CONFIRMATION')
-  await flushPromises()
-  mcp.toolDiscovery!.tools[0]!.contractHash = `sha256:${'3'.repeat(64)}`
-  await flushPromises()
-  expect(wrapper.find('[data-cy="mcp-tool-reapprove"]').exists()).toBe(true)
-  expect(mcp.allowedTools![0]!.contractHash).toBe(`sha256:${'1'.repeat(64)}`)
-  await wrapper.get('[data-cy="mcp-tool-reapprove"]').trigger('click')
-  expect(mcp.allowedTools![0]!.contractHash).toBe(`sha256:${'3'.repeat(64)}`)
-  expect(mcp.allowedTools![0]!.approvalPolicy).toBe('REQUIRE_CONFIRMATION')
   expect(wrapper.find('[data-cy="mcp-tool-reapprove"]').exists()).toBe(false)
+  expect(wrapper.getComponent(QSelect).props('disable')).toBe(false)
+  expect(wrapper.get('[data-tool-name="read"]').text()).toContain('Updated reader')
+  expect(wrapper.get('[data-tool-name="read"] [role="checkbox"]').attributes('aria-checked')).toBe('true')
+  expect(wrapper.get('[data-tool-name="write"] [role="checkbox"]').attributes('aria-checked')).toBe('false')
+  expect(mcp.allowedTools).toEqual([{ ...tool, approvalPolicy }])
+  expect(useDraftStore().dirty).toBe(false)
+  wrapper.getComponent(QSelect).vm.$emit('update:modelValue', approvalPolicy === 'AUTO' ? 'REQUIRE_CONFIRMATION' : 'AUTO')
+  await flushPromises()
+  expect(mcp.allowedTools![0]!.approvalPolicy).not.toBe(approvalPolicy)
+  expect(useDraftStore().dirty).toBe(true)
 })
-it('does not use select-all to silently reapprove changed tools', async () => {
+it('select-all preserves existing approval policies and historical evidence', async () => {
   const { wrapper, mcp } = setup()
   await wrapper.get('[data-cy="mcp-tools-select-all"]').trigger('click')
   expect(mcp.allowedTools![0]!.approvalPolicy).toBe('AUTO')
@@ -116,16 +120,6 @@ it('does not use select-all to silently reapprove changed tools', async () => {
   await wrapper.get('[data-cy="mcp-tools-select-all"]').trigger('click')
   expect(mcp.allowedTools![0]!.contractHash).toBe(`sha256:${'1'.repeat(64)}`)
   expect(mcp.allowedTools!.map(tool => tool.approvalPolicy)).toEqual(['REQUIRE_CONFIRMATION', 'AUTO'])
-})
-it('preserves an explicit AUTO policy when reviewing a changed contract', async () => {
-  const { wrapper, mcp } = setup()
-  const tool = structuredClone(toRaw(mcp.toolDiscovery!.tools[0]!))
-  mcp.allowedTools = [{ ...tool, approvalPolicy: 'AUTO' }]
-  mcp.toolDiscovery!.tools[0]!.contractHash = `sha256:${'3'.repeat(64)}`
-  await flushPromises()
-  await wrapper.get('[data-cy="mcp-tool-reapprove"]').trigger('click')
-  expect(mcp.allowedTools![0]!.approvalPolicy).toBe('AUTO')
-  expect(mcp.allowedTools![0]!.contractHash).toBe(`sha256:${'3'.repeat(64)}`)
 })
 it('clearing the search restores the catalog', async () => {
   const { wrapper } = setup()

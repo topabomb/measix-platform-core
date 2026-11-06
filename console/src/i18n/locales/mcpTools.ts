@@ -1,5 +1,5 @@
 export const mcpToolsZh = {
-  title: '企业工具权限', hint: '对所有使用此服务器的助手生效。',
+  title: '企业工具权限', hint: '按工具名称授权，对所有使用此服务器的助手生效；描述和参数更新不影响授权。',
   allSummary: '不限制工具，目录更新后新增工具也可用。',
   chooseTools: '选择工具', chooseForServer: '为 {name} 选择工具', searchTools: '搜索工具名或用途', selectedOnly: '仅看已选', selectedState: '已选', unselectedState: '未选',
   selectionStatus: '已选 {selected} 项 · 可用 {available} 项', selectionDraftHint: '修改加入当前草稿，保存并发布后生效。', toolUnavailable: '当前不可用，原选择已保留', done: '完成',
@@ -29,7 +29,6 @@ export const mcpToolsZh = {
   notDiscovered: '尚未发现工具。请先保存连接，并将上游配置应用到运行时。', empty: '发现成功，此服务器当前没有工具。',
   count: '当前目录 {candidates} · 白名单 {allowed}', clear: '清空白名单',
   approval: '调用确认', confirm: '每次调用前确认', auto: '无需额外确认',
-  changed: '工具合同已变化，当前批准项不可发布。请审阅完整定义后重新批准，或取消选择。', reapprove: '批准当前定义',
   missing: '已批准工具不在当前目录中，请重新发现或移除。',
   unverified: '保留上次批准的定义；尚未发现当前目录，不能判断工具是否被删除。重新启用时，请发现并审核后再发布。',
   untrusted: '下列内容来自 MCP 服务器。annotations 为来源证据，不能替代权限审核。',
@@ -38,7 +37,7 @@ export const mcpToolsZh = {
   assistantTools: '此助手强制启用的 MCP', invalidRefs: '以下工具已不在服务器允许名单中，请移除或重新审核', invalidServer: '引用的服务器已删除或禁用', noServers: '暂无已启用的 MCP 服务器。',
 }
 export const mcpToolsEn = {
-  title: 'Enterprise tool permissions', hint: 'Applies to every assistant using this server.',
+  title: 'Enterprise tool permissions', hint: 'Authorize tools by name for every assistant using this server. Description and parameter updates do not change permissions.',
   allSummary: 'No tool restrictions. New tools become available as the catalog changes.',
   chooseTools: 'Choose tools', chooseForServer: 'Choose tools for {name}', searchTools: 'Search tool names or descriptions', selectedOnly: 'Selected only', selectedState: 'Selected', unselectedState: 'Not selected',
   selectionStatus: '{selected} selected · {available} available', selectionDraftHint: 'Changes join the current draft. Save and publish to apply them.', toolUnavailable: 'Unavailable; existing selection retained', done: 'Done',
@@ -68,7 +67,6 @@ export const mcpToolsEn = {
   notDiscovered: 'No catalog discovered yet. Save the connection and apply its upstream configuration first.', empty: 'Discovery succeeded. This server currently has no tools.',
   count: 'Catalog {candidates} · Allowlist {allowed}', clear: 'Clear allowlist',
   approval: 'Invocation confirmation', confirm: 'Confirm each invocation', auto: 'No additional confirmation',
-  changed: 'The tool contract changed. Review its full definition, then approve the current version or remove it before publishing.', reapprove: 'Approve current definition',
   missing: 'The approved tool is missing from the catalog. Discover again or remove it.',
   unverified: 'The approved definition is retained. The current catalog has not been discovered, so deletion is unconfirmed. Discover and review before republishing an enabled server.',
   untrusted: 'This content comes from the MCP server. Annotations are source evidence and do not grant permissions.',
@@ -81,14 +79,14 @@ export const mcpValidationZh = {
   missing_mcp_tool_bindings: '请明确编制助手强制项（可为空）；存量引用需要明确转换。',
   duplicate_mcp_tool: '服务器允许工具名称重复。', invalid_mcp_tool_grant: '工具定义、合同摘要或调用确认策略无效，请重新发现并审核。',
   invalid_mcp_tool_ref: '工具模式或白名单无效；指定工具至少选一项，并检查重复或越界引用。',
-  mcp_tool_review_required: '工具来源或合同已变化，请重新发现并审核变化或被删除的工具。',
+  mcp_tool_review_required: '工具来源已变化或工具已不存在，请重新发现并核对工具名称。',
 }
 export const mcpValidationEn = {
   missing_mcp_tool_grants: 'Choose All tools or Selected tools for the server.',
   missing_mcp_tool_bindings: 'Author the required MCP servers (an empty list is valid). Convert legacy references explicitly.',
   duplicate_mcp_tool: 'A server tool name is duplicated.', invalid_mcp_tool_grant: 'The definition, contract hash or confirmation policy is invalid. Discover and review it again.',
   invalid_mcp_tool_ref: 'Invalid tool selection. Select at least one tool for an allowlist and correct duplicate or out-of-scope references.',
-  mcp_tool_review_required: 'The source or tool contract changed. Discover again and review changed or removed tools.',
+  mcp_tool_review_required: 'The source changed or tools are missing. Discover again and check the tool names.',
 }
 export const mcpProblemsZh = {
   draft_changed_during_save: '保存期间草稿又有修改，编辑已保留；请再次保存后发现工具。',

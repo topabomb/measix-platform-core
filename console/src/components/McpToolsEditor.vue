@@ -55,7 +55,6 @@ const matchingGrants = computed(() => {
 const pageCount = computed(() => Math.max(1, Math.ceil(visible.value.length / pageSize)))
 const pageRows = computed(() => visible.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 function selected(tool: Tool) { return grants.value.some(grant => grant.name === tool.name) }
-function changed(tool: Tool) { return grants.value.some(grant => grant.name === tool.name && grant.contractHash !== tool.contractHash) }
 function select(tool: Tool, enabled: boolean) {
   if (locked.value || props.mcp.toolAccessMode !== 'ALLOWLIST') return
   props.mcp.allowedTools ??= []
@@ -64,7 +63,6 @@ function select(tool: Tool, enabled: boolean) {
   if (enabled) props.mcp.allowedTools.push({ ...structuredClone(toRaw(tool)), approvalPolicy })
   draft.markDirty()
 }
-function approve(tool: Tool) { select(tool, true) }
 function selectAll() {
   if (locked.value || props.mcp.toolAccessMode !== 'ALLOWLIST') return
   props.mcp.allowedTools ??= []
@@ -166,15 +164,11 @@ watch(page, async () => { await nextTick(); catalogTop.value?.scrollIntoView?.({
         <div class="row no-wrap items-center q-gutter-xs">
           <q-checkbox v-if="mcp.toolAccessMode === 'ALLOWLIST' && !missing && !unverified" :model-value="selected(tool)" :aria-label="tool.name" dense :disable="locked" data-cy="mcp-tool-select" @update:model-value="value => select(tool, Boolean(value))" />
           <McpToolSummary :name="tool.name" :description="tool.definition.description" :fallback="t('mcpTools.noDescription')" />
-          <q-select v-if="mcp.toolAccessMode === 'ALLOWLIST' && selected(tool)" v-model="grants.find(grant => grant.name === tool.name)!.approvalPolicy" dense outlined emit-value map-options :aria-label="`${tool.name}: ${t('mcpTools.approval')}`" :label="t('mcpTools.approval')" :options="[{ label: t('mcpTools.confirm'), value: 'REQUIRE_CONFIRMATION' }, { label: t('mcpTools.auto'), value: 'AUTO' }]" :disable="locked || changed(tool) || missing || unverified" data-cy="mcp-tool-approval" class="mcp-tool-approval" @update:model-value="draft.markDirty" />
+          <q-select v-if="mcp.toolAccessMode === 'ALLOWLIST' && selected(tool)" v-model="grants.find(grant => grant.name === tool.name)!.approvalPolicy" dense outlined emit-value map-options :aria-label="`${tool.name}: ${t('mcpTools.approval')}`" :label="t('mcpTools.approval')" :options="[{ label: t('mcpTools.confirm'), value: 'REQUIRE_CONFIRMATION' }, { label: t('mcpTools.auto'), value: 'AUTO' }]" :disable="locked || missing || unverified" data-cy="mcp-tool-approval" class="mcp-tool-approval" @update:model-value="draft.markDirty" />
           <q-btn flat round dense icon="info_outline" :aria-label="t('mcpTools.toolDetails', { name: tool.name })" data-cy="mcp-tool-details" @click="detail = tool" />
         </div>
           <q-banner v-if="missing" dense class="bg-red-1 text-negative" data-cy="mcp-tool-missing">{{ t('mcpTools.missing') }}<q-btn flat dense :label="t('common.remove')" :disable="locked" @click="remove(tool.name)" /></q-banner>
           <q-banner v-if="unverified" dense class="bg-orange-1" data-cy="mcp-tool-unverified">{{ t('mcpTools.unverified') }}<q-btn flat dense :label="t('common.remove')" :disable="locked" @click="remove(tool.name)" /></q-banner>
-          <div v-if="changed(tool)" class="text-negative text-body2" role="alert">{{ t('mcpTools.changed') }}</div>
-          <div class="row q-gutter-xs items-center q-mt-xs">
-            <q-btn v-if="changed(tool)" outline dense color="primary" :label="t('mcpTools.reapprove')" :disable="locked" data-cy="mcp-tool-reapprove" @click="approve(tool)" />
-          </div>
       </div>
       </div>
       <q-pagination v-if="pageCount > 1" v-model="page" :max="pageCount" :max-pages="3" :boundary-numbers="false" direction-links :disable="locked" :aria-label="t('mcpTools.catalogPages')" data-cy="mcp-tools-pages" class="q-mt-sm" />

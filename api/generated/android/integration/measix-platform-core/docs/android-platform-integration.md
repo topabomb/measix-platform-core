@@ -12,7 +12,7 @@ Android 的文件调整、BuildConfig 字段、最终 APK 核验、发行记录�
 
 以 Control Protocol §2.1、§10.10.3 为唯一语义。Client/Portal HTTP 响应及 Bridge v3 响应，在支持版本内递归忽略未知字段；包含 Snapshot v4/v5 的所有子对象。不维护未知字段白名单，不因字段新增使整份企业配置失败。解析模式应按边界设置：响应允许扩展；Admin/Client 写入、Enrollment 资料、Bridge 请求/params 和内部控制指令保持封闭。已知字段错型、必填/null、权限模式、工具策略、引用、重复键、大小限制、来源/身份/generation、ETag/body hash 仍须验证，不补默认值或降级。合法未知 schemaVersion 在 DTO 前分类为不兼容；配置错误不撤销有效企业身份，也不破坏个人空间、历史或退出。
 
-现有 v4/v5 descriptor、历史 bytes/hash 按原完整性合同保全；忽略未知字段不等于重算原始 JSON hash。Snapshot 按既有 ETag/body hash 合同验证；MCP Tool contractHash 仍覆盖完整原始 Tool JCS，不能删扩展字段。Bridge 返回按捕获的请求方法验证已知结果，result/error 必须互斥；未知能力声明只忽略，未知错误码保留为失败并中性提示，不能推断授权变化。
+现有 v4/v5 descriptor、历史 bytes/hash 按原完整性合同保全；忽略未知字段不等于重算原始 JSON hash。Snapshot 按既有 ETag/body hash 合同验证；Client MCP Tool grant 的 contractHash 接受空字符串和历史合法 SHA-256，两者均不作为授权或调用撤销条件。按服务器身份与准确名称授权，定义变化从目录刷新进入后续轮次，当前轮次不替换已捕获定义。Admin 发现证据摘要仍覆盖完整原始 Tool JCS。须先部署兼容 Android，再发布空哈希配置；旧 APK 不因此获得兼容性。Bridge 返回按捕获的请求方法验证已知结果，result/error 必须互斥；未知能力声明只忽略，未知错误码保留为失败并中性提示，不能推断授权变化。
 
 内容失败的技术信息提供稳定 code、非敏感 JSON 路径和原因，例如 /mcp/0/toolAccessMode：不支持的值；不记录原值、正文、凭据或内部地址。未知普通字段不产生错误。共享 snapshot-reception-cases 与 cases.json 包含正向扩展、已知错误、未知版本及历史版本测试；基础控制也须覆盖嵌套新增字段。
 

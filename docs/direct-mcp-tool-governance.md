@@ -12,12 +12,18 @@
 | `mcp_governance.go`、`mcp_json.go` | 来源指纹、发现 CAS、保存防伪、缺失/null 区分及发布校验 |
 | `mcp_projection.go`、`snapshot.go` | Client 投影、排序、发布差异和 v4 保全 |
 | `backend/internal/hub/httpapi/admin_capability.go` | Admin Session/CSRF 与稳定 Problem 映射 |
-| `console/src/components/McpToolsEditor.vue` | 服务器工具许可、发现、确认策略和合同重审 |
+| `console/src/components/McpToolsEditor.vue` | 服务器名称许可、发现和确认策略 |
 | `AssistantMcpToolsEditor.vue`、`AssistantMcpToolPicker.vue` | 助手服务器绑定及工具子集选择 |
 | `McpToolSummary.vue`、`McpToolDetailDialog.vue` | 共用紧凑行及只读完整定义详情 |
 | `console/src/stores/draft.ts` | 唯一草稿状态、保存/发现与迟到响应保护 |
 
-工具许可和发现证据存于现有 Managed Draft JSON；Release 保留审核定义，Client 投影只包含许可的 name/hash/approvalPolicy，排除定义、发现身份、来源指纹、上游地址和 Secret。不增加数据库表或改写既有 Release。发现时间和未选候选不计入发布差异。
+工具许可和发现证据存于现有 Managed Draft JSON；Release 保留发现定义，新 Client 投影只包含许可的 name/空 contractHash/approvalPolicy，排除定义、发现身份、来源指纹、上游地址和 Secret。不增加数据库表或改写既有 Release。发现时间、定义/证据摘要和未选候选不计入发布差异。
+
+## 下发兼容与部署顺序
+
+`McpToolGrant.contractHash` 保持 required string；Client 接受 `""` 或历史合法 SHA-256，缺失/null/坏格式仍拒绝。新编译的 v5 Snapshot 输出空字符串，Android 按服务身份和准确名称授权，不把任何兼容哈希作为禁用或撤销条件。Admin 发现/编制证据仍保留完整定义与非空 JCS 摘要，不向 Client 下发。
+
+先交付接受空字符串并取消哈希授权门禁的 Android，再部署此 Core 并发布新的企业配置。旧 Android 会拒绝空哈希，不能仅凭 Snapshot v5 或平台基线号认为兼容。本地生成/测试不代表设备部署或生产切换。历史 Release 的下载 bytes/hash 不改写；重新编译的新发布采用空哈希，必须遵守同一上线顺序。
 
 ## 发现与保存
 
@@ -31,7 +37,7 @@
 
 工具摘要使用完整原始 Tool JSON 的 RFC 8785 JCS UTF-8 bytes，经 SHA-256 编码为 `sha256:` 加小写十六进制。description、schema、annotations、`_meta` 和扩展均参与；对象 key 重排不改变摘要，数组顺序保留。JSON-RPC 信封及分页元数据不参与。
 
-网络 IO 不持事务。完成后在短事务中重查草稿 revision、来源配置及认证版本，再以 CAS 更新草稿。失败或迟到结果保全原目录、许可和 revision。普通 Save 必须回传服务器的只读发现记录；新增或重审许可必须匹配该来源的发现证据，旧批准项可保留以展示 drift。Validate/Preview/Publish 共用来源、合同和引用校验；停用服务器保留结构合法的名单，重新启用时恢复审核要求。
+网络 IO 不持事务。完成后在短事务中重查草稿 revision、来源配置及认证版本，再以 CAS 更新草稿。失败或迟到结果保全原目录、许可和 revision。普通 Save 必须回传服务器的只读发现记录；新增许可必须匹配该来源的发现证据，已有项保留原证据，修改确认策略不要求重新选择工具。Validate/Preview/Publish 校验来源、名称存在性和引用；同名 description、参数描述、schema 或扩展变化不阻断发布。停用服务器保留结构合法的名单，重新启用时复验来源及名称。
 
 ## Admin 操作与草稿保全
 
@@ -39,7 +45,7 @@
 
 工作区连接选择位于取得目录的操作中。点击发现后，`GET /api/admin/v1/remote-workspace/services/{workspaceServiceId}/workspaces?discoveryEligible=true` 只列出当前有效服务中、用户有效且已连接并持有 MCP 认证绑定的工作区；过滤先于分页，支持显示名、用户名及远端用户名搜索，不依赖 MCP 已发布。唯一连接自动使用并显示名称，多连接使用 `PagedEntityPicker`，没有连接时提供管理入口。选择仅存在于组件内存，成功发现沿用现有 `toolDiscovery.userId`，后端仍复验来源和凭据；助手运行时继续使用各用户自己的工作区。全部工具模式无需发现即可发布，不增加持久化字段或数据库迁移。
 
-服务器 ALL 默认收起只读目录；查看、搜索、发现不编制许可。只有明确切换 ALLOWLIST 后显示选择和确认设置。新批准默认 AUTO；批量选择只增加未选项，合同重审保留已有显式确认策略。清空名单保留 ALLOWLIST 错误，恢复全部须切换模式。
+服务器 ALL 默认收起只读目录；查看、搜索、发现不编制许可。只有明确切换 ALLOWLIST 后显示选择和确认设置。新批准默认 AUTO；批量选择只增加未选项，目录刷新保留已有名称授权及显式确认策略，不提供合同重批动作。清空名单保留 ALLOWLIST 错误，恢复全部须切换模式。
 
 助手开关表示“强制启用此 MCP”，默认 ALL；指定工具用独立窗口操作。未勾选不禁用服务器，界面说明手机端用户仍可选用。取消强制项同时解除该助手的工具子集限制，服务器权限继续生效；空强制集合与无人绑定的 enabled 服务器可正常保存、校验和发布，Snapshot 不丢弃这些服务器。选项来自服务器白名单或 ALL 的发现目录。窗口关闭、Escape 和完成保留当前草稿，生效仍需保存发布；不可用旧选择可移除，不能重新新增。旧服务器级引用由明确转换动作恢复原服务器并写 ALL。
 
@@ -49,7 +55,7 @@
 
 实际源码和消费者验证由 `rikkahub_mcp` 拥有。以下路径相对其 `app/src/main/java/net/weero/measix/pilot/`。本次 Core 修改保留字段结构，直接修订未正式发布的 v5 目标，产品版本、合同号、Snapshot 版本及数据库迁移不变；已发布 v4 继续保留原引用语义。不同 v5 候选仍需固定 source/包/材料摘要，schemaVersion 相同不证明兼容。Core 新包部署保持现有 active Release，不自动重新发布。
 
-当前 Android 源码仍把受管助手可用企业 MCP 限定为 binding：`AssistantUsagePreferences.resolveEnterpriseAssistantUsage` 只合并用户 MCP；`AssistantPreferenceMutation.requireMcpBinding` 拒绝未绑定企业服务；`AssistantMcpChoice.mcpChoices` 隐藏未绑定服务；`McpRuntimeCoordinator.withCurrent` 在受管助手缺少 binding 时拒绝执行。四处必须一起调整，不能只解除 UI 或执行层检查。本次仅交付 Core 合同、Console 和导出，Android 接线及实际消费尚未实施/验证。
+Android 的资源选择、工具投影与调用前准入必须消费同一名称授权规则，不能只解除 UI 或执行层检查。下表列出对接边界；实际 APK 的空哈希兼容和运行行为须由 Android 消费者验证，Core 导出不证明设备已支持。
 
 | owner | 接线工作 |
 | --- | --- |
@@ -58,8 +64,8 @@
 | `data/configuration/AssistantUsagePreferences.kt`、`ResolvedConfiguration.kt` | 派生强制项与真实额外选择的并集，再与当前获准服务相交；v5 未绑定服务可显式选用，v4 不放宽；同服务器去重且 binding 限制优先，失效引用保留原因 |
 | `data/datastore/AssistantPreferenceMutation.kt` | 复用现有 deployment/user/assistant 使用偏好；允许选用本域已下发 enabled 服务，强制项不可关；临时强制不抹掉真实偏好，渲染/点击强制项不制造偏好；旧页面差量编辑基于真实偏好和最新强制项复验；移除仅企业启用项恢复未选，保留原主动选择；重置只清除额外项 |
 | `service/AssistantMcpChoice.kt`、企业 MCP/助手设置页 | 展示全部本域可用企业服务及失效引用，区分强制只读与额外可选；allowLocalMcp/allowLocalAssistants 不禁止企业助手追加企业服务；说明取消强制项解除助手限制 |
-| `data/ai/mcp/McpProtocol.kt`、`McpCatalogWire.kt`、`McpCatalogStore.kt` | 保留完整原始 Tool，新增逐工具 JCS hash 校验；区分动态目录和发布许可，缓存恢复/刷新不能重写许可 |
-| `McpRuntimeCoordinator.kt`、`data/ai/tools/TurnToolSetFactory.kt` | 固定本轮工具交集、定义和确认策略；未绑定额外项仍受服务器许可/hash/approval 约束，强制项叠加助手限制且不能重复装配绕过；Master/Child/Target/辅助入口按目标助手配置复验，Caller 不能扩大 Target 能力 |
+| `data/ai/mcp/McpProtocol.kt`、`McpCatalogWire.kt`、`McpCatalogStore.kt` | 保留完整原始 Tool，保留目录摘要但移除执行授权的逐工具 hash 一致性校验；区分动态目录和发布许可，缓存恢复/刷新不能重写许可 |
+| `McpRuntimeCoordinator.kt`、`data/ai/tools/TurnToolSetFactory.kt` | 固定本轮工具交集、定义和确认策略；未绑定额外项仍受服务器名称许可/approval 约束，强制项叠加助手限制且不能重复装配绕过；Master/Child/Target/辅助入口按目标助手配置复验，Caller 不能扩大 Target 能力 |
 | `McpServerRuntime.kt`、`service/turn/ToolBatchRunner.kt` | 在原配置/Session gate 内复验许可、目录及 generation；仅 REQUIRE_CONFIRMATION 追加逐次确认，复用原暂停/继续 owner |
 
 运行准入、已承诺调用及未知结果沿原生命周期；停用、删除、Session 失效或撤权在原执行 gate 和版本屏障内阻断，配置失败保全 Applied、身份和历史，禁止降级解析、清库或自动重放。强制启用只影响装配和开关，不自动调用，也不保证连接/权限/目录可用，失败沿原诊断恢复。Direct 的过滤属于客户端执行合同，Relay 保持资源级准入及透明转发；Gateway 仍是独立 S0.3 目标。
@@ -70,7 +76,7 @@
 
 - 后端：在 `backend` 运行 `go test ./internal/hub/capability ./internal/hub/httpapi ./internal/contract -count=1`；完整回归见 [testing](testing.md)。
 - Admin：`pnpm -C console test`、`typecheck`、`e2e:typecheck`、`build`。
-- 浏览器：完成 production build 后运行 `node scripts/e2e-harness.mjs`，使用真实 Hub/Relay、隔离 SQLite 和确定性 MCP；`e2e/mcp-tool-governance.spec.ts` 覆盖发现/编制/确认/保存/发布、drift/失败/删除、长目录/分页和 320px；`admin-console-review.spec.ts` 覆盖 11 个管理路由及公告输入保护。
+- 浏览器：完成 production build 后运行 `node scripts/e2e-harness.mjs`，使用真实 Hub/Relay、隔离 SQLite 和确定性 MCP；`e2e/mcp-tool-governance.spec.ts` 覆盖发现/编制/确认/保存/发布、同名定义变更不阻断/失败/删除、长目录/分页和 320px；`admin-console-review.spec.ts` 覆盖 11 个管理路由及公告输入保护。
 - 启动脚本：`node --test scripts/real-device-preset.test.mjs scripts/admin-build-snapshot.test.mjs`；浏览器 harness 固定服务的 SPA 副本及 hash，设备 preset 回传同 ID 发现记录，验证构建身份并保全重启数据。
 
 运行日志、截图和构建身份留在本地 `.artifacts/`，提交和变更历史由 Git 保存。本文件不重复历史测试计数或移动候选的 PASS。Core 回归与导出不能替代 Android 原生 consumer/device、真实供应商执行或阶段 Freeze；发布流程见 [release](release.md)。

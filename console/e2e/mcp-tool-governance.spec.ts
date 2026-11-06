@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 
-test('Direct MCP allowlist, assistant subset, discovery failure, drift review and mobile interaction', async ({ page, request }) => {
+test('Direct MCP allowlist, assistant subset, discovery failure, definition refresh and mobile interaction', async ({ page, request }) => {
   const adapter = process.env.MEASIX_E2E_ADAPTER_URL!
   const mode = async (value: string) => { expect((await request.post(`${adapter}/__mcp_mode`, { data: { mode: value } })).ok()).toBe(true) }
   await page.goto('/admin/')
@@ -47,10 +47,10 @@ test('Direct MCP allowlist, assistant subset, discovery failure, drift review an
   await expect(tools.locator('[data-tool-name="tool-new"]')).toBeVisible()
   await mode('drift')
   await tools.locator('[data-cy="mcp-discover"]').click()
-  await expect(tools.locator('[data-cy="mcp-tool-reapprove"]')).toBeVisible()
+  await expect(tools.locator('[data-cy="mcp-tool-reapprove"]')).toHaveCount(0)
   await tools.locator('[data-cy="mcp-tools-select-all"]').click()
-  await expect(tools.locator('[data-cy="mcp-tool-reapprove"]')).toBeVisible()
-  await tools.locator('[data-cy="mcp-tool-reapprove"]').click()
+  await expect(tools.locator('[data-cy="mcp-tool-reapprove"]')).toHaveCount(0)
+  await expect(approval('tool-a').getByRole('combobox')).toBeEnabled()
   await expect(approval('tool-a')).toContainText('Confirm each invocation')
   await expect(approval('tool-new')).toContainText('No additional confirmation')
   await page.locator('[data-cy="draft-save-btn"]').click()

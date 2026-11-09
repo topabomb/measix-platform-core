@@ -1,0 +1,10 @@
+{
+  "userId": "usr_550e8400-e29b-41d4-a716-446655440000",
+  "username": "example-admin",
+  "displayName": "Example administrator",
+  "role": "ADMIN",
+  "status": "ACTIVE",
+  "passwordConfigured": true,
+  "createdAt": "2026-10-07T00:00:00Z",
+  "updatedAt": "2026-10-07T00:00:00Z"
+}

@@ -1,0 +1,1 @@
+import{describe,it,expect}from'vitest';import{ApiProblem}from'./client';describe('ApiProblem',()=>{it('keeps stable status and code',()=>{const e=new ApiProblem(409,'stale_draft_revision','conflict');expect(e.status).toBe(409);expect(e.code).toBe('stale_draft_revision')})})

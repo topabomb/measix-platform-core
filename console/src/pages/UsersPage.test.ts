@@ -1,0 +1,538 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import {
+  Quasar, QLayout, QPage, QPageContainer,
+  QCard, QCardSection, QCardActions, QInput, QBtn, QBanner,
+  QSelect, QDialog, QSeparator, QList, QItem, QItemSection, QItemLabel,
+  QChip, QSpinner, QIcon, QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown,
+  QTab, QTabs,
+  ClosePopup,
+} from 'quasar'
+import { createPinia, setActivePinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
+import { h } from 'vue'
+import UsersPage from './UsersPage.vue'
+import AdminAccountDialog from '../components/AdminAccountDialog.vue'
+import PageHeader from '../components/PageHeader.vue'
+import StatusChip from '../components/StatusChip.vue'
+import { useSessionStore } from '../stores/session'
+import * as client from '../api/client'
+import { useRemoteWorkspaceStore } from '../stores/remoteWorkspace'
+import QRCode from 'qrcode'
+
+// Mock qrcode — jsdom does not implement canvas getContext('2d')
+vi.mock('qrcode', () => ({
+  default: {
+    toCanvas: vi.fn().mockResolvedValue(undefined),
+  },
+}))
+
+function mountUsersPage(attach = false) {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/', component: { template: '<div/>' } }],
+  })
+  const wrapper = mount(
+    {
+      components: { UsersPage },
+      render() {
+        return h(QLayout, {}, () => [
+          h(QPageContainer, {}, () => [h(UsersPage)]),
+        ])
+      },
+    },
+    {
+      attachTo: attach ? document.body : undefined,
+      global: {
+        plugins: [[Quasar, {
+          components: {
+            QLayout, QPage, QPageContainer, QCard, QCardSection, QCardActions,
+            QInput, QBtn, QBanner, QSelect, QDialog, QSeparator, QList, QItem,
+            QItemSection, QItemLabel, QChip, QSpinner, QIcon, PageHeader, StatusChip,
+            QBreadcrumbs, QBreadcrumbsEl, QBtnDropdown,
+            QTab, QTabs,
+          },
+          directives: { ClosePopup },
+        }], pinia, router],
+      },
+    },
+  )
+  return { wrapper, pinia }
+}
+
+function setupSession(pinia: ReturnType<typeof createPinia>) {
+  const session = useSessionStore(pinia)
+  session.session = {
+    user: { userId: 'usr_001', displayName: 'Admin', role: 'ADMIN' as const },
+    csrfToken: 'test-csrf',
+    expiresAt: '2026-12-31T23:59:59Z',
+  }
+  return session
+}
+
+describe('UsersPage', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [], nextCursor: undefined })
+  })
+
+  it('keeps the role conflict visible after refreshing the target and list', async () => {
+    const user = { userId: 'usr_target', username: 'target', displayName: 'Target', role: 'MEMBER', status: 'ACTIVE', passwordConfigured: true }
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/users/usr_target') return user
+      if (path.includes('/users?')) return { items: [user] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="user-row"]').trigger('click')
+    const page = wrapper.findComponent(UsersPage)
+    await (page.vm as unknown as { beginAccountManagement: (mode: 'role') => Promise<void> }).beginAccountManagement('role')
+    page.findComponent(AdminAccountDialog).vm.$emit('conflict', user.userId, new client.ApiProblem(409, 'user_role_conflict', 'Role changed'))
+    await flushPromises()
+    expect(wrapper.text()).toContain('Someone changed this account’s role.')
+    wrapper.unmount()
+  })
+
+  it('keeps the first requested action while its account refresh is pending', async () => {
+    const user = { userId: 'usr_target', username: 'target', displayName: 'Target', role: 'MEMBER', status: 'ACTIVE', passwordConfigured: true }
+    let resolveUser!: (value: typeof user) => void
+    const pendingUser = new Promise<typeof user>(resolve => { resolveUser = resolve })
+    const fetchSpy = vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/users/usr_target') return pendingUser
+      if (path.includes('/users?')) return { items: [user] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="user-row"]').trigger('click')
+    const page = wrapper.findComponent(UsersPage)
+    const vm = page.vm as unknown as { beginAccountManagement: (mode: 'role' | 'password') => Promise<void> }
+    const roleOpen = vm.beginAccountManagement('role')
+    const passwordOpen = vm.beginAccountManagement('password')
+    resolveUser(user)
+    await Promise.all([roleOpen, passwordOpen])
+    await flushPromises()
+    expect(fetchSpy.mock.calls.filter(([path]) => path === '/api/admin/v1/users/usr_target')).toHaveLength(1)
+    expect(page.findComponent(AdminAccountDialog).props('mode')).toBe('role')
+    wrapper.unmount()
+  })
+
+  it('never turns a grant action into removal when the role changed during opening', async () => {
+    const user = { userId: 'usr_target', username: 'target', displayName: 'Target', role: 'MEMBER', status: 'ACTIVE', passwordConfigured: true }
+    let changed = false
+    vi.mocked(client.apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/admin/v1/users/usr_target') return { ...user, role: 'ADMIN' }
+      if (path.includes('/users?')) return { items: [{ ...user, role: changed ? 'ADMIN' : 'MEMBER' }] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.get('[data-cy="user-row"]').trigger('click')
+    changed = true
+    const page = wrapper.findComponent(UsersPage)
+    await (page.vm as unknown as { beginAccountManagement: (mode: 'role') => Promise<void> }).beginAccountManagement('role')
+    await flushPromises()
+    expect(page.findComponent(AdminAccountDialog).exists()).toBe(false)
+    expect(wrapper.text()).toContain('Someone changed this account’s role.')
+    expect(wrapper.get('[data-cy="user-detail"]').text()).toContain('Admin')
+    wrapper.unmount()
+  })
+
+
+  it('offers password reset and administrator assignment for another user', async () => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.includes('/devices')) return { items: [] }
+      if (path.startsWith('/api/admin/v1/users')) return { items: [{ userId: 'usr_target', username: 'target', displayName: 'Target', role: 'MEMBER', status: 'ACTIVE', passwordConfigured: false }] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage(true)
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.find('[data-cy="user-row"]').trigger('click')
+    await flushPromises()
+    wrapper.find('[data-cy="user-detail"]').findComponent(QBtnDropdown).vm.show()
+    await flushPromises()
+    await vi.waitFor(() => expect(document.querySelector('[data-cy="set-user-password"]')).not.toBeNull())
+    expect(document.querySelector('[data-cy="set-user-role"]')).not.toBeNull()
+    wrapper.unmount()
+  })
+
+  it('renders a user list with display name, role and status', async () => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/admin/v1/users')) {
+        return {
+          items: [
+            { userId: 'usr_001', username: 'admin', displayName: 'Admin User', role: 'ADMIN', status: 'ACTIVE' },
+            { userId: 'usr_002', username: 'member', displayName: 'Member User', role: 'MEMBER', status: 'DISABLED' },
+          ],
+          nextCursor: undefined,
+        }
+      }
+      return { items: [], nextCursor: undefined }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('Admin User')
+    expect(text).toContain('Member User')
+    expect(text).toContain('Admin')
+    expect(text).toContain('Member')
+    expect(text).not.toContain('ADMIN')
+    expect(text).not.toContain('MEMBER')
+  })
+
+  it('opens create user dialog with username, display name and role fields', async () => {
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    const createBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Create user'))
+    expect(createBtn).toBeTruthy()
+    await createBtn!.trigger('click')
+    await flushPromises()
+
+    const body = document.body.innerHTML
+    expect(body).toContain('Username')
+    expect(body).toContain('Display name')
+  })
+
+  it('creates a user via POST with username, displayName and role', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/api/admin/v1/users' && init?.method === 'POST') {
+        return { userId: 'usr_new', username: 'newuser', displayName: 'New User', role: 'MEMBER', status: 'ACTIVE' }
+      }
+      if (path.startsWith('/api/admin/v1/users')) return { items: [], nextCursor: undefined }
+      return { items: [], nextCursor: undefined }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    const createBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Create user'))
+    await createBtn!.trigger('click')
+    await flushPromises()
+
+    const inputs = wrapper.findAllComponents(QInput)
+    const usernameInput = inputs.find((i) => (i.props('label') ?? '') === 'Username')
+    const displayNameInput = inputs.find((i) => (i.props('label') ?? '') === 'Display name')
+    expect(usernameInput).toBeTruthy()
+    expect(displayNameInput).toBeTruthy()
+    await usernameInput!.setValue('newuser')
+    await displayNameInput!.setValue('New User')
+    await flushPromises()
+
+    const submitBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '') === 'Create')
+    expect(submitBtn).toBeTruthy()
+    await submitBtn!.trigger('click')
+    await flushPromises()
+
+    const createCall = fetchSpy.mock.calls.find((c) => c[0] === '/api/admin/v1/users' && c[1]?.method === 'POST')
+    expect(createCall).toBeDefined()
+    const body = JSON.parse((createCall![1] as RequestInit).body as string)
+    expect(body.username).toBe('newuser')
+    expect(body.displayName).toBe('New User')
+    expect(body.role).toBeDefined()
+  })
+
+  it('requires the exact username and a reason before permanently deleting a user', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') {
+        return { activationId: 'act_delete', kind: 'SECURITY_CHANGE', state: 'COMPLETED', controlRevision: 2, createdAt: '2026-09-20T00:00:00Z' }
+      }
+      if (path.includes('/devices')) return { items: [] }
+      if (path.includes('/usage/summary')) return { requestCount: 0, forwardedRequestCount: 0, requestBytes: 0, responseBytes: 0, semanticMeters: [], requestCompleteness: { exact: 0, partial: 0, unknown: 0 }, cost: { status: 'UNKNOWN' } }
+      if (path.endsWith('/budgets')) return { userId: 'usr_member', timezone: 'Asia/Shanghai', asOf: '2026-09-20T00:00:00Z', items: [] }
+      if (path.startsWith('/api/admin/v1/users')) return {
+        items: [{ userId: 'usr_member', username: 'member', displayName: 'Member User', role: 'MEMBER', status: 'ACTIVE' }],
+      }
+      return { items: [] }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+    const page = wrapper.findComponent(UsersPage)
+    ;(page.vm as unknown as { beginDeleteUser: () => void }).beginDeleteUser()
+    await flushPromises()
+
+    const confirm = document.querySelector('[data-cy="confirm-delete-user"]') as HTMLButtonElement
+    expect(confirm.disabled).toBe(true)
+    const inputs = wrapper.findAllComponents(QInput)
+    await inputs.find(input => String(input.props('label')).includes('Type username'))!.setValue('member')
+    await inputs.find(input => input.props('label') === 'Deletion reason')!.setValue('Employment ended')
+    await flushPromises()
+    expect(confirm.disabled).toBe(false)
+    confirm.click()
+    await flushPromises()
+
+    const call = fetchSpy.mock.calls.find(([, init]) => init?.method === 'DELETE')!
+    expect(call[0]).toBe('/api/admin/v1/users/usr_member')
+    expect(JSON.parse(String(call[1]?.body))).toEqual({ confirmationUsername: 'member', reason: 'Employment ended' })
+    expect((call[1]?.headers as Record<string, string>)['Idempotency-Key']).toBeTruthy()
+  })
+
+  it('generates an enrollment code and shows it in a dialog with copy button', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.startsWith('/api/admin/v1/users') && path.includes('/enrollments') && init?.method === 'POST') {
+        return { platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-CODE-12345', expiresAt: '2026-12-31T23:59:59Z' }
+      }
+      if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices')) {
+        return {
+          items: [{ userId: 'usr_001', username: 'admin', displayName: 'Admin User', role: 'ADMIN', status: 'ACTIVE' }],
+          nextCursor: undefined,
+        }
+      }
+      if (path.includes('/devices')) return { items: [], nextCursor: undefined }
+      return { items: [], nextCursor: undefined }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    // Open the persistent user detail workspace.
+    const userRow = wrapper.findComponent(QItem)
+    expect(userRow.exists()).toBe(true)
+    await userRow.trigger('click')
+    await flushPromises()
+
+    const enrollBtn = wrapper.get('[data-cy="generate-enrollment-btn"]')
+    expect(enrollBtn.text()).toContain('Generate Android enrollment material')
+    await enrollBtn.trigger('click')
+    await flushPromises()
+
+    const codeDetails = document.querySelector('[data-cy="enrollment-code-details"]') as HTMLDetailsElement
+    expect(codeDetails).not.toBeNull()
+    expect(codeDetails.open).toBe(false)
+
+    const enrollCall = fetchSpy.mock.calls.find((c) => c[0].includes('/enrollments') && c[1]?.method === 'POST')
+    expect(enrollCall).toBeDefined()
+
+    const body = document.body.innerHTML
+    expect(body).toContain('ENROLL-CODE-12345')
+    // Copy button should be present
+    expect(body).toContain('content_copy')
+    await vi.waitFor(() => expect(vi.mocked(QRCode.toCanvas)).toHaveBeenCalled())
+    const material = JSON.parse(String(vi.mocked(QRCode.toCanvas).mock.calls.at(-1)![1]))
+    expect(material).toMatchObject({ formatVersion: 1, kind: 'PLATFORM_ENROLLMENT', platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-CODE-12345' })
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    ;(document.querySelector('[data-cy="copy-enrollment-material"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(JSON.parse(writeText.mock.calls[0]![0])).toEqual(material)
+    expect(document.querySelector('[data-cy="enrollment-copy-result"]')?.textContent).toBe('Copied')
+    // Ordinary HTTP has no Async Clipboard API. Copy must still work from the dialog.
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
+    let copiedText = ''
+    const execCommand = vi.fn(() => {
+      copiedText = (document.activeElement as HTMLTextAreaElement).value
+      return true
+    })
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand })
+    ;(document.querySelector('[data-cy="copy-enrollment-material"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(execCommand).toHaveBeenCalledWith('copy')
+    expect(JSON.parse(copiedText)).toEqual(material)
+    expect(document.querySelector('body > textarea')).toBeNull()
+  })
+
+  it('shows enrollment code expiry time', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.includes('/enrollments') && init?.method === 'POST') {
+        return { platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-EXPIRY', expiresAt: '2026-12-31T23:59:59Z' }
+      }
+      if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices')) {
+        return {
+          items: [{ userId: 'usr_001', username: 'admin', displayName: 'Admin', role: 'ADMIN', status: 'ACTIVE' }],
+          nextCursor: undefined,
+        }
+      }
+      return { items: [], nextCursor: undefined }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-cy="generate-enrollment-btn"]').trigger('click')
+    await flushPromises()
+
+    const body = document.body.innerHTML
+    expect(body).toContain('2026-12-31T23:59:59Z')
+  })
+
+  it('renders a QR code canvas in the enrollment dialog', async () => {
+    const QRCode = (await import('qrcode')).default
+    const toCanvasSpy = vi.spyOn(QRCode, 'toCanvas')
+
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.includes('/enrollments') && init?.method === 'POST') {
+        return { platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-QR-CODE-67890', expiresAt: '2026-12-31T23:59:59Z' }
+      }
+      if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices')) {
+        return {
+          items: [{ userId: 'usr_001', username: 'admin', displayName: 'Admin User', role: 'ADMIN', status: 'ACTIVE' }],
+          nextCursor: undefined,
+        }
+      }
+      return { items: [], nextCursor: undefined }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-cy="generate-enrollment-btn"]').trigger('click')
+    await flushPromises()
+
+    // QRCode.toCanvas should have been called with the enrollment code
+    expect(toCanvasSpy).toHaveBeenCalled()
+    const callArgs = toCanvasSpy.mock.calls.at(-1)
+    expect(JSON.parse(String(callArgs?.[1]))).toMatchObject({ kind: 'PLATFORM_ENROLLMENT', platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-QR-CODE-67890' })
+
+    // The canvas element with data-cy should be present in the dialog
+    const qrCanvas = document.querySelector('[data-cy="enrollment-qr"]')
+    expect(qrCanvas).toBeTruthy()
+  })
+
+  it('shows enrollment code with one-time warning hint and copy button', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.includes('/enrollments') && init?.method === 'POST') {
+        return { platformUrl: 'http://192.168.1.20:9000', code: 'ENROLL-ONE-TIME-XYZ', expiresAt: '2026-12-31T23:59:59Z' }
+      }
+      if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices')) {
+        return {
+          items: [{ userId: 'usr_001', username: 'admin', displayName: 'Admin', role: 'ADMIN', status: 'ACTIVE' }],
+          nextCursor: undefined,
+        }
+      }
+      return { items: [], nextCursor: undefined }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-cy="generate-enrollment-btn"]').trigger('click')
+    await flushPromises()
+
+    const body = document.body.innerHTML
+    // The one-time code is shown
+    expect(body).toContain('ENROLL-ONE-TIME-XYZ')
+    // The one-time warning hint should be present
+    expect(body.toLowerCase()).toContain('shown once')
+    // Copy button with icon is present
+    expect(body).toContain('content_copy')
+    // Expiry time is shown
+    expect(body).toContain('2026-12-31T23:59:59Z')
+  })
+
+  it('lists devices for a selected user with status and revoke button', async () => {
+    const fetchSpy = vi.spyOn(client, 'apiFetch')
+    fetchSpy.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/admin/v1/users') && !path.includes('/devices') && !path.includes('/enrollments')) {
+        return {
+          items: [{ userId: 'usr_001', username: 'admin', displayName: 'Admin', role: 'ADMIN', status: 'ACTIVE' }],
+          nextCursor: undefined,
+        }
+      }
+      if (path.includes('/devices')) {
+        return {
+          items: [
+            { deviceId: 'dev_001', deviceName: 'Office phone', applicationState: 'APPLIED', targetManagedGeneration: 2, appliedManagedGeneration: 2, appliedReportedAt: '2026-09-18T12:00:00Z', status: 'ACTIVE', appVersion: '1.0.0', lastSeenAt: '2026-08-01T00:00:00Z' },
+            { deviceId: 'dev_002', deviceName: 'Old phone', applicationState: 'UNKNOWN', targetManagedGeneration: 2, status: 'REVOKED', appVersion: '0.9.0', lastSeenAt: '2026-07-01T00:00:00Z' },
+          ],
+          nextCursor: undefined,
+        }
+      }
+      return { items: [], nextCursor: undefined }
+    })
+
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    await wrapper.findComponent(QItem).trigger('click')
+    await flushPromises()
+
+    const detail = wrapper.get('[data-cy="user-detail"]')
+    const body = detail.text()
+    expect(body).toContain('dev_001')
+    expect(body).toContain('Office phone')
+    expect(body).toContain('dev_002')
+    expect(body).toContain('Reported applied')
+    expect(body).toContain('Application status unknown')
+    const identities = detail.findAll('details[data-cy="device-identity"]')
+    expect(identities).toHaveLength(2)
+    expect(identities[0]?.element.hasAttribute('open')).toBe(false)
+    // StatusChip renders status via i18n ("Active" / "Revoked")
+    expect(body.toLowerCase()).toContain('active')
+    expect(body.toLowerCase()).toContain('revoked')
+    // Revoke button should be present for non-revoked devices
+    expect(body).toContain('Revoke')
+  })
+
+  it('shows empty state when no users exist', async () => {
+    vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [], nextCursor: undefined })
+    const { wrapper, pinia } = mountUsersPage()
+    setupSession(pinia)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No enterprise users')
+  })
+
+  it('disables create user button when not authenticated', async () => {
+    const { wrapper } = mountUsersPage()
+    // No session setup - canMutate should be false
+    await flushPromises()
+
+    const createBtn = wrapper.findAllComponents(QBtn).find((b) => String(b.props('label') ?? '').includes('Create user'))
+    expect(createBtn).toBeTruthy()
+    expect(createBtn!.props('disable')).toBe(true)
+  })
+  it.each([['UNPROVISIONED', false], ['DISCONNECTED', true]])('with the service disabled, %s keeps only existing workspace management', async (state, visible) => {
+    vi.spyOn(client, 'apiFetch').mockImplementation(async (path: string) => {
+      if (path.endsWith('/remote-workspace/services')) return { items: [{ workspaceServiceId: 'wss_test', enabled: false, state: 'DISABLED' }] }
+      if (path.endsWith('/workspace')) return { state, bindingRevision: 1, mcpAvailable: false, filesAvailable: false }
+      if (path.startsWith('/api/admin/v1/users?')) return { items: [{ userId: 'usr_member', username: 'member', displayName: 'Member', role: 'MEMBER', status: 'ACTIVE' }] }
+      return { items: [] }
+    })
+    const { wrapper, pinia } = mountUsersPage(); setupSession(pinia); await flushPromises()
+    await wrapper.findComponent(QItem).trigger('click'); await flushPromises()
+    expect(wrapper.findAllComponents(QTab).some(tab => tab.props('name') === 'workspace')).toBe(visible)
+    if (!visible) {
+      const store = useRemoteWorkspaceStore(pinia)
+      store.current = { ...store.current!, enabled: true, state: 'ACTIVE' }; await flushPromises()
+      expect(wrapper.findAllComponents(QTab).some(tab => tab.props('name') === 'workspace')).toBe(true)
+    }
+    wrapper.unmount()
+  })
+
+})

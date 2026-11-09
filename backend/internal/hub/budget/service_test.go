@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"measix/platform/ent"
+	"measix/platform/ent/budgetaudit"
 	"measix/platform/ent/budgetbucket"
+	"measix/platform/ent/budgetreconciliation"
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/internal/hub/testutil"
 	"measix/platform/pkg/platformid"
@@ -615,6 +617,73 @@ func TestSettlementRevisionCorrectionAndAuditedManualResolution(t *testing.T) {
 	tokenBucket, err = f.client.BudgetBucket.Query().Where(budgetbucket.MeterEQ(budgetbucket.Meter(MeterTotalTokens))).Only(ctx)
 	if err != nil || tokenBucket.SettledQuantity != 70 {
 		t.Fatalf("late reliable correction bucket = %+v, %v", tokenBucket, err)
+	}
+}
+
+func TestReconciliationBatchReleasesSharedBucketAndRollsBackEveryChunk(t *testing.T) {
+	f := newBudgetFixture(t, "UTC")
+	ctx := context.Background()
+	const count = 2*reconciliationBatchSize + 21
+	if _, err := f.service.Put(ctx, PutBudgetInput{
+		UserID: f.userID, Capability: CapabilityModel, Mode: ModeLimited,
+		Scopes: []ScopeInput{{Period: PeriodLifetime, Limits: []LimitSpec{
+			{Meter: MeterRequests, Limit: count + 1}, {Meter: MeterTotalTokens, Limit: 3 * count},
+		}}}, ActorUserID: f.adminID, Reason: "batch budget",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	resource := platformid.New(platformid.Model)
+	for range count {
+		id := platformid.New(platformid.Request)
+		decision, err := f.service.Admit(ctx, f.admit(id, CapabilityModel, resource, ProtocolOpenAIChatCompletions,
+			[]MeterQuantity{{Meter: MeterTotalTokens, Quantity: 2}}, MeterRequests, MeterTotalTokens))
+		if err != nil || !decision.Allowed {
+			t.Fatalf("admission: %+v %v", decision, err)
+		}
+		if err := f.service.Start(ctx, LifecycleInput{RequestID: id, Revision: 1, OccurredAt: f.now, EventHash: testHash(id)}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.service.Settle(ctx, SettlementInput{RequestID: id, Revision: 1, ReportedBy: "relay",
+			Meters: []MeterQuantity{{Meter: MeterRequests, Quantity: 1}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	from, to := f.now, f.now.Add(time.Minute)
+	preview, err := f.service.ResolveReconciliationBatch(ctx, &from, &to, f.adminID, "", "")
+	if err != nil || preview.Matched != count {
+		t.Fatalf("preview with no RequestUsage projection: %+v %v", preview, err)
+	}
+	tokens := f.client.BudgetBucket.Query().Where(budgetbucket.MeterEQ(budgetbucket.Meter(MeterTotalTokens))).OnlyX(ctx)
+	if tokens.ReservedQuantity != 2*count {
+		t.Fatalf("reserved before batch: %d", tokens.ReservedQuantity)
+	}
+	const reason = "shared bucket reconciliation"
+	// Leave enough reserved for the first two chunks, but force the last one to fail.
+	f.client.BudgetBucket.UpdateOneID(tokens.ID).AddReservedQuantity(-1).SaveX(ctx)
+	if _, err := f.service.ResolveReconciliationBatch(ctx, &from, &to, f.adminID, reason, preview.PreviewHash); !errors.Is(err, ErrInvalidSettlement) {
+		t.Fatalf("batch with an inconsistent bucket: %v", err)
+	}
+	if pending := f.client.BudgetReconciliation.Query().Where(budgetreconciliation.StateEQ(budgetreconciliation.StateOPEN)).CountX(ctx); pending != count {
+		t.Fatalf("pending after rollback: %d", pending)
+	}
+	if bucket := f.client.BudgetBucket.GetX(ctx, tokens.ID); bucket.ReservedQuantity != 2*count-1 {
+		t.Fatalf("reserved after rollback: %d", bucket.ReservedQuantity)
+	}
+	audits := f.client.BudgetAudit.Query().Where(budgetaudit.ReasonEQ(reason))
+	if audits.CountX(ctx) != 0 {
+		t.Fatal("batch rollback left audits")
+	}
+	f.client.BudgetBucket.UpdateOneID(tokens.ID).AddReservedQuantity(1).SaveX(ctx)
+	if result, err := f.service.ResolveReconciliationBatch(ctx, &from, &to, f.adminID, reason, preview.PreviewHash); err != nil || result.Resolved != count {
+		t.Fatalf("resolved: %+v %v", result, err)
+	}
+	if bucket := f.client.BudgetBucket.GetX(ctx, tokens.ID); bucket.ReservedQuantity != 0 || bucket.SettledQuantity != 0 {
+		t.Fatalf("token bucket after commit: %+v", bucket)
+	}
+	calls := f.client.BudgetBucket.Query().Where(budgetbucket.MeterEQ(budgetbucket.Meter(MeterRequests))).OnlyX(ctx)
+	if calls.SettledQuantity != count || audits.CountX(ctx) != count {
+		t.Fatalf("settled calls or audits changed: calls %d, audits %d", calls.SettledQuantity, audits.CountX(ctx))
 	}
 }
 

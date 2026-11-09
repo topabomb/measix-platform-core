@@ -746,6 +746,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/usage/reconciliations:resolve-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Preview a pending scope, or resolve it atomically with the returned preview hash and a reason. */
+        post: operations["resolveUsageReconciliationBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/usage/reconciliations/{requestId}:resolve": {
         parameters: {
             query?: never;
@@ -2303,6 +2320,28 @@ export interface components {
             /** @enum {string} */
             action: "RELEASE_UNCERTAIN";
             reason: string;
+        };
+        ResolveReconciliationBatchRequest: {
+            /** @enum {string} */
+            scope: "ALL" | "REQUEST_TIME";
+            /**
+             * Format: date-time
+             * @description Inclusive request start time. Required only for REQUEST_TIME.
+             */
+            from?: string;
+            /**
+             * Format: date-time
+             * @description Exclusive request start time. Required only for REQUEST_TIME.
+             */
+            to?: string;
+            /** @description Omit with reason to preview. Send both to execute. */
+            previewHash?: string;
+            reason?: string;
+        };
+        ReconciliationBatchResult: {
+            matched: number;
+            resolved: number;
+            previewHash: string;
         };
         UsageSummary: {
             /** Format: date-time */
@@ -4545,6 +4584,37 @@ export interface operations {
             };
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
+        };
+    };
+    resolveUsageReconciliationBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveReconciliationBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Preview count or committed resolution count. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationBatchResult"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            500: components["responses"]["Problem"];
         };
     };
     resolveUsageReconciliation: {

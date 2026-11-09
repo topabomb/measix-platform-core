@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -32,16 +33,18 @@ type Services struct {
 
 type fullAdminHandler struct {
 	*adminHandler
-	services Services
+	services  Services
+	lifecycle context.Context
 }
 
-func RegisterFull(router chi.Router, services Services) {
+func RegisterFull(ctx context.Context, router chi.Router, services Services) {
 	if services.Capability != nil {
 		services.Capability.Secrets = services.Upstream
 	}
 	admin := &fullAdminHandler{
 		adminHandler: &adminHandler{identity: services.Identity},
 		services:     services,
+		lifecycle:    ctx,
 	}
 	client := &fullClientHandler{
 		clientHandler: &clientHandler{identity: services.Identity}, capability: services.Capability,
@@ -65,6 +68,6 @@ func clientBindingError(w http.ResponseWriter, r *http.Request, err error) {
 
 func NewFull(services Services) http.Handler {
 	router := chi.NewRouter()
-	RegisterFull(router, services)
+	RegisterFull(context.Background(), router, services)
 	return router
 }

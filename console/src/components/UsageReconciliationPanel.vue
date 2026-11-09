@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { ApiProblem, apiFetch, commandResultUncertain } from '../api/client'
 import { useCursorPager } from '../composables/useCursorPager'
 import CursorPager from './CursorPager.vue'
-import type { PricingMeter, ReconciliationPage, ReconciliationView, ResolveReconciliationRequest } from '../api/usageBudget'
+import type { PricingMeter, ReconciliationBatchResult, ReconciliationPage, ReconciliationView, ResolveReconciliationBatchRequest, ResolveReconciliationRequest } from '../api/usageBudget'
 import { formatMeter, type MeterUnitLabels } from '../usageFormatting'
 import { useSessionStore } from '../stores/session'
 import LoadingState from './LoadingState.vue'
@@ -37,6 +37,21 @@ let mounted = true
 const detail = ref<ReconciliationView>()
 const dialogOpen = ref(false)
 const reason = ref('')
+const scopedReview = ref(false)
+const scope = ref<ResolveReconciliationBatchRequest['scope']>('ALL')
+const fromLocal = ref('')
+const toLocal = ref('')
+const scopeResult = ref<ReconciliationBatchResult>()
+const scopeError = ref<unknown>()
+const scopeRequest = computed<ResolveReconciliationBatchRequest | undefined>(() => {
+  if (scope.value === 'ALL') return { scope: scope.value }
+  const from = Date.parse(fromLocal.value)
+  const to = Date.parse(toLocal.value)
+  if (Number.isFinite(from) && Number.isFinite(to) && from < to) {
+    return { scope: scope.value, from: new Date(from).toISOString(), to: new Date(to).toISOString() }
+  }
+})
+const canResolveScope = computed(() => Boolean(scopeResult.value?.matched && reason.value.trim() && !resolving.value && !completed.value))
 
 const canResolve = computed(() => Boolean(session.csrfToken && targets.value.length && reason.value.trim() && !completed.value && !resolving.value))
 const allSelected = computed({
@@ -44,6 +59,11 @@ const allSelected = computed({
   set: (value: boolean) => { selectedIds.value = value ? items.value.filter(item => item.state === 'PENDING').map(item => item.requestId) : [] },
 })
 watch(items, () => { selectedIds.value = selectedIds.value.filter(id => items.value.some(item => item.requestId === id && item.state === 'PENDING')) })
+watch([scope, fromLocal, toLocal], () => {
+  scopeResult.value = undefined
+  scopeError.value = undefined
+  uncertain.value = false
+})
 onBeforeUnmount(() => { mounted = false })
 
 function observedBusiness(item: ReconciliationView) { return item.observed.filter(meter => meter.meter !== 'REQUESTS') }
@@ -83,6 +103,7 @@ function openResolve(item: ReconciliationView) {
 }
 
 function openReviews(rows: ReconciliationView[], bulk = false) {
+  scopedReview.value = false
   bulkReview.value = bulk
   targets.value = [...rows]
   reason.value = ''
@@ -90,6 +111,44 @@ function openReviews(rows: ReconciliationView[], bulk = false) {
   completed.value = false
   uncertain.value = false
   dialogOpen.value = true
+}
+
+function openScopeReview() {
+  openReviews([])
+  scope.value = 'ALL'
+  fromLocal.value = ''
+  toLocal.value = ''
+  scopeResult.value = undefined
+  scopeError.value = undefined
+  scopedReview.value = true
+}
+
+async function submitScope(confirm: boolean) {
+  const csrf = session.csrfToken
+  const selection = scopeRequest.value
+  if (!csrf || !selection || resolving.value) return
+  const preview = scopeResult.value
+  if (confirm && (!preview || !canResolveScope.value)) return
+  const request: ResolveReconciliationBatchRequest = confirm && preview
+    ? { ...selection, previewHash: preview.previewHash, reason: reason.value.trim() }
+    : selection
+  scopeError.value = undefined
+  uncertain.value = false
+  resolving.value = true
+  try {
+    scopeResult.value = await apiFetch<ReconciliationBatchResult>('/api/admin/v1/usage/reconciliations:resolve-batch', { method: 'POST', body: JSON.stringify(request) }, csrf)
+    if (confirm) {
+      completed.value = true
+      if (mounted) await refresh()
+    }
+  } catch (cause) {
+    scopeResult.value = undefined
+    scopeError.value = cause
+    uncertain.value = confirm && commandResultUncertain(cause)
+    if (uncertain.value && mounted) await refresh()
+  } finally {
+    resolving.value = false
+  }
 }
 
 async function turnPage(next: boolean) {
@@ -148,12 +207,15 @@ onMounted(refresh)
   <DetailWorkspace :detail-open="Boolean(detail)" list-width="minmax(440px, 58%)">
     <template #list>
       <q-card flat bordered data-cy="usage-reconciliation-panel">
-        <q-card-section class="row items-center q-pb-xs">
+        <q-card-section class="row items-center q-col-gutter-sm q-pb-xs">
           <div class="col">
             <div class="text-subtitle1">{{ $t('usage.reconciliation.title') }}</div>
             <div class="text-caption text-grey-7">{{ $t('usage.reconciliation.subtitle') }}</div>
           </div>
-          <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" :disable="resolving" @click="refresh" />
+          <div class="row items-center q-gutter-xs">
+            <q-btn outline dense color="primary" :label="$t('usage.reconciliation.scopeTitle')" :disable="!session.csrfToken || loading || resolving" @click="openScopeReview" data-cy="reconciliation-scope-btn" />
+            <q-btn flat dense icon="refresh" :aria-label="$t('common.refresh')" :loading="loading" :disable="resolving" @click="refresh" />
+          </div>
         </q-card-section>
         <q-card-section v-if="items.length" class="row items-center q-gutter-sm q-py-xs">
           <q-checkbox v-model="allSelected" :label="$t('usage.reconciliation.selectPage')" :disable="loading || resolving" data-cy="reconciliation-select-page" />
@@ -248,10 +310,26 @@ onMounted(refresh)
   <q-dialog v-model="dialogOpen" persistent>
     <q-card class="reconciliation-dialog" data-cy="reconciliation-dialog">
       <q-card-section>
-        <div class="text-h6">{{ targets.length > 1 ? $t('usage.reconciliation.batchTitle', { count: targets.length }) : $t('usage.reconciliation.resolveTitle') }}</div>
+        <div class="text-h6">{{ scopedReview ? $t('usage.reconciliation.scopeTitle') : targets.length > 1 ? $t('usage.reconciliation.batchTitle', { count: targets.length }) : $t('usage.reconciliation.resolveTitle') }}</div>
         <div class="text-body2 text-grey-7 q-mt-xs">{{ $t('usage.reconciliation.resolveWarning') }}</div>
       </q-card-section>
-      <q-card-section v-if="targets.length" class="q-pt-none">
+      <q-card-section v-if="scopedReview" class="q-pt-none">
+        <div class="row q-gutter-sm" role="radiogroup" :aria-label="$t('usage.reconciliation.scopeTitle')">
+          <q-radio v-model="scope" val="ALL" :label="$t('usage.reconciliation.scopeAll')" :disable="resolving || completed" />
+          <q-radio v-model="scope" val="REQUEST_TIME" :label="$t('usage.reconciliation.scopeTime')" :disable="resolving || completed" data-cy="reconciliation-request-time" />
+        </div>
+        <div v-if="scope === 'REQUEST_TIME'" class="column q-gutter-sm q-mt-xs">
+          <q-input v-model="fromLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.startTime')" :disable="resolving || completed" data-cy="reconciliation-from" />
+          <q-input v-model="toLocal" type="datetime-local" outlined dense stack-label :label="$t('usage.filters.endTime')" :disable="resolving || completed" data-cy="reconciliation-to" />
+          <div class="text-caption text-grey-7">{{ $t('usage.reconciliation.scopeTimeHint') }}</div>
+        </div>
+        <div v-if="scopeResult" class="q-mt-sm" role="status">
+          {{ completed ? $t('usage.reconciliation.scopeResolved', { count: scopeResult.resolved }) : $t('usage.reconciliation.scopeMatched', { count: scopeResult.matched }) }}
+        </div>
+        <ProblemBanner :error="scopeError" class="q-mt-sm" />
+        <div v-if="uncertain" class="text-negative q-mt-sm">{{ $t('usage.reconciliation.scopeUncertain') }}</div>
+      </q-card-section>
+      <q-card-section v-else-if="targets.length" class="q-pt-none">
         <div v-if="resolving">{{ $t('usage.reconciliation.batchProgress', { done: resultCounts.success + resultCounts.failed, total: targets.length }) }}</div>
         <div v-if="completed" role="status">{{ $t('usage.reconciliation.batchResult', resultCounts) }}</div>
         <div v-if="uncertain" class="text-negative q-mt-sm">{{ $t('usage.reconciliation.batchUncertain') }}</div>
@@ -264,12 +342,13 @@ onMounted(refresh)
           </q-item>
         </q-list>
       </q-card-section>
-      <q-card-section class="q-pt-none q-gutter-sm">
+      <q-card-section v-if="!scopedReview || scopeResult?.matched" class="q-pt-none q-gutter-sm">
         <q-input v-model="reason" outlined autogrow :label="$t('usage.reconciliation.reason')" maxlength="500" counter :disable="resolving || completed" data-cy="reconciliation-reason" />
       </q-card-section>
       <q-card-actions align="right">
         <q-btn flat :label="completed ? $t('common.close') : $t('common.cancel')" v-close-popup :disable="resolving" />
-        <q-btn v-if="!completed" color="primary" :label="$t('usage.reconciliation.confirm')" :disable="!canResolve" :loading="resolving" data-cy="confirm-reconciliation" @click="resolve" />
+        <q-btn v-if="scopedReview && !scopeResult?.matched" color="primary" :label="$t('usage.reconciliation.scopePreview')" :disable="!scopeRequest || !session.csrfToken" :loading="resolving" data-cy="reconciliation-preview-scope" @click="submitScope(false)" />
+        <q-btn v-else-if="!completed" color="primary" :label="$t('usage.reconciliation.confirm')" :disable="scopedReview ? !canResolveScope || !session.csrfToken : !canResolve" :loading="resolving" data-cy="confirm-reconciliation" @click="scopedReview ? submitScope(true) : resolve()" />
       </q-card-actions>
     </q-card>
   </q-dialog>

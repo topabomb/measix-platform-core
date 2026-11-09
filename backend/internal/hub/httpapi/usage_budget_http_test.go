@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"measix/platform/ent/budgetaudit"
+	"measix/platform/ent/requestusage"
 	"measix/platform/internal/hub/budget"
 	"measix/platform/internal/hub/httpapi"
 	"measix/platform/internal/hub/identity"
@@ -66,6 +68,114 @@ func TestAdminUsageReconciliationHTTPClosedLoop(t *testing.T) {
 	decodeJSON(t, response, &page)
 	if len(page.Items) != 0 {
 		t.Fatalf("resolved record remained pending: %+v", page.Items)
+	}
+}
+
+func TestAdminUsageReconciliationBatch(t *testing.T) {
+	_, identities, _, ctx, adminID := setupFullHandler(t)
+	budgets, err := budget.NewService(identities.Client, "Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	budgetNow := identities.Now()
+	budgets.Now = func() time.Time { return budgetNow }
+	usageService := usage.NewService(identities.Client, budgets)
+	usageService.Now = identities.Now
+	handler := httpapi.NewFull(httpapi.Services{Identity: identities, Budget: budgets, Usage: usageService})
+	cookie, csrf := loginAdmin(t, handler)
+	headers := map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf}
+	seed := func(name string, at time.Time) string {
+		t.Helper()
+		previous := budgetNow
+		budgetNow = at
+		defer func() { budgetNow = previous }()
+		member, err := identities.CreateUser(ctx, name, name, "MEMBER")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return seedUsageRequest(t, ctx, identities, budgets, usageService, adminID, member.ID, nil, at, false)
+	}
+	from := identities.Now()
+	now := from.Add(time.Hour)
+	first := seed("batch-first", from)
+	second := seed("batch-second", now.Add(-time.Minute))
+	outside := seed("batch-outside", now)
+	budgetNow = now.Add(2 * time.Second)
+
+	const path = "/api/admin/v1/usage/reconciliations:resolve-batch"
+	for _, invalidHeaders := range []map[string]string{
+		{"X-CSRF-Token": csrf},
+		{"Cookie": cookie, "X-CSRF-Token": "invalid"},
+	} {
+		response := doJSON(t, handler, http.MethodPost, path, invalidHeaders, map[string]any{"scope": "ALL"})
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("batch authorization: %d %s", response.Code, response.Body)
+		}
+	}
+	batch := func(body map[string]any, wantStatus int) adminapi.ReconciliationBatchResult {
+		t.Helper()
+		response := doJSON(t, handler, http.MethodPost, path, headers, body)
+		if response.Code != wantStatus {
+			t.Fatalf("batch: %d, want %d: %s", response.Code, wantStatus, response.Body)
+		}
+		var result adminapi.ReconciliationBatchResult
+		if wantStatus == http.StatusOK {
+			decodeJSON(t, response, &result)
+		}
+		return result
+	}
+	batch(map[string]any{"scope": "REQUEST_TIME", "from": from}, http.StatusBadRequest)
+	batch(map[string]any{"scope": "ALL", "from": from}, http.StatusBadRequest)
+	scope := map[string]any{"scope": "REQUEST_TIME", "from": from, "to": now}
+	preview := batch(scope, http.StatusOK)
+	if preview.Matched != 2 || preview.Resolved != 0 || preview.PreviewHash == "" {
+		t.Fatalf("range preview: %+v", preview)
+	}
+	batch(map[string]any{"scope": "REQUEST_TIME", "from": from, "to": now,
+		"reason": "verified", "previewHash": strings.ToUpper(preview.PreviewHash)}, http.StatusBadRequest)
+	batch(map[string]any{"scope": "REQUEST_TIME", "from": from, "to": now,
+		"reason": strings.Repeat(" ", 500) + "x", "previewHash": preview.PreviewHash}, http.StatusBadRequest)
+	response := doJSON(t, handler, http.MethodPost, "/api/admin/v1/usage/reconciliations/"+second+":resolve", headers,
+		map[string]any{"expectedState": "PENDING", "action": "RELEASE_UNCERTAIN", "reason": "handled separately"})
+	if response.Code != http.StatusOK {
+		t.Fatalf("single resolve: %d %s", response.Code, response.Body)
+	}
+	replacement := seed("batch-replacement", now.Add(-time.Second))
+	const reason = "checked range in bulk"
+	scope["reason"], scope["previewHash"] = reason, preview.PreviewHash
+	batch(scope, http.StatusConflict) // Same count, different pending records.
+	delete(scope, "reason")
+	delete(scope, "previewHash")
+	preview = batch(scope, http.StatusOK)
+	scope["reason"], scope["previewHash"] = reason, preview.PreviewHash
+	if result := batch(scope, http.StatusOK); result.Matched != 2 || result.Resolved != 2 {
+		t.Fatalf("range result: %+v", result)
+	}
+	batch(scope, http.StatusConflict)
+	audits, err := identities.Client.BudgetAudit.Query().Where(budgetaudit.ReasonEQ(reason)).All(ctx)
+	if err != nil || len(audits) != 2 {
+		t.Fatalf("batch audit: %+v %v", audits, err)
+	}
+	wantIDs := map[string]bool{first: true, replacement: true}
+	for _, audit := range audits {
+		if audit.RequestID == nil || !wantIDs[*audit.RequestID] || audit.ActorUserID != adminID || audit.Action != budgetaudit.ActionRESOLVE_RECONCILIATION {
+			t.Fatalf("unexpected batch audit: %+v", audit)
+		}
+		usageRow, err := identities.Client.RequestUsage.Query().Where(requestusage.RequestIDEQ(*audit.RequestID)).Only(ctx)
+		if err != nil || usageRow.RequestCompleteness != "PARTIAL" {
+			t.Fatalf("batch changed request usage: %+v %v", usageRow, err)
+		}
+		delete(wantIDs, *audit.RequestID)
+	}
+	if _, err := budgets.GetOpenReconciliation(ctx, outside); err != nil {
+		t.Fatalf("end boundary should remain pending: %v", err)
+	}
+	preview = batch(map[string]any{"scope": "ALL"}, http.StatusOK)
+	if preview.Matched != 1 || preview.Resolved != 0 {
+		t.Fatalf("all preview: %+v", preview)
+	}
+	if result := batch(map[string]any{"scope": "ALL", "reason": "checked all", "previewHash": preview.PreviewHash}, http.StatusOK); result.Resolved != 1 {
+		t.Fatalf("all result: %+v", result)
 	}
 }
 

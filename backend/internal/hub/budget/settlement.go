@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"measix/platform/ent"
 	"measix/platform/ent/budgetallocation"
 	"measix/platform/ent/budgetaudit"
+	"measix/platform/ent/budgetbucket"
 	"measix/platform/ent/budgetreconciliation"
 	"measix/platform/ent/budgetrequest"
 	"measix/platform/ent/budgetsettlement"
@@ -84,14 +87,6 @@ func (s *Service) Resolve(ctx context.Context, input ResolveInput) error {
 	if err != nil {
 		return err
 	}
-	before, err := json.Marshal(map[string]any{
-		"requestId": input.RequestID, "state": request.State, "reconciliationId": reconciliation.ID,
-		"lastSettlementRevision": request.LastSettlementRevision,
-	})
-	if err != nil {
-		return err
-	}
-
 	switch input.Action {
 	case ResolutionConfirmUsage:
 		settlement := SettlementInput{
@@ -106,33 +101,37 @@ func (s *Service) Resolve(ctx context.Context, input ResolveInput) error {
 			return err
 		}
 	case ResolutionReleaseUncertain:
-		allocations, err := requestAllocations(ctx, tx, input.RequestID)
-		if err != nil {
-			return err
-		}
-		if err := releaseReservations(ctx, tx, allocations, now); err != nil {
-			return err
-		}
-		if _, err := tx.BudgetRequest.UpdateOneID(request.ID).
-			SetState(budgetrequest.State(RequestResolved)).
-			SetCompletedAt(now).
-			SetTerminalReason("uncertain usage released by authorized reconciliation").
-			SetUpdatedAt(now).
-			Save(ctx); err != nil {
-			return err
-		}
-		if err := closeReconciliation(ctx, tx, reconciliation.ID, input.ActorUserID, string(ResolutionReleaseUncertain), input.Reason, now); err != nil {
+		if err := resolveUncertain(ctx, tx, []string{request.ID}, []int{reconciliation.ID}, input.ActorUserID, input.Reason, now); err != nil {
 			return err
 		}
 	}
+	audit, err := resolutionAudit(tx, request, reconciliation.ID, input, now)
+	if err != nil {
+		return err
+	}
+	if err := audit.Exec(ctx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func resolutionAudit(tx *ent.Tx, request *ent.BudgetRequest, reconciliationID int, input ResolveInput, now time.Time) (*ent.BudgetAuditCreate, error) {
+	before, err := json.Marshal(map[string]any{
+		"requestId": input.RequestID, "state": request.State, "reconciliationId": reconciliationID,
+		"lastSettlementRevision": request.LastSettlementRevision,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	after, err := json.Marshal(map[string]any{
 		"requestId": input.RequestID, "action": input.Action, "reason": strings.TrimSpace(input.Reason),
 		"revision": input.Revision, "meters": input.Meters,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if _, err := tx.BudgetAudit.Create().
+	return tx.BudgetAudit.Create().
 		SetUserID(request.UserID).
 		SetCapability(budgetaudit.Capability(request.Capability)).
 		SetNillableUserBudgetID(request.UserBudgetID).
@@ -143,11 +142,7 @@ func (s *Service) Resolve(ctx context.Context, input ResolveInput) error {
 		SetReason(strings.TrimSpace(input.Reason)).
 		SetBeforeJSON(before).
 		SetAfterJSON(after).
-		SetCreatedAt(now).
-		Save(ctx); err != nil {
-		return err
-	}
-	return tx.Commit()
+		SetCreatedAt(now), nil
 }
 
 func applySettlement(
@@ -287,7 +282,7 @@ func applySettlement(
 	}
 	if input.Complete {
 		if err == nil {
-			if err := closeReconciliation(ctx, tx, open.ID, reportedBy, reconciliationAction, "reliable complete settlement", now); err != nil {
+			if err := closeReconciliations(ctx, tx, []int{open.ID}, reportedBy, reconciliationAction, "reliable complete settlement", now); err != nil {
 				return SettlementResult{}, err
 			}
 		}
@@ -345,41 +340,45 @@ func requestAllocations(ctx context.Context, tx *ent.Tx, requestID string) ([]*e
 }
 
 func releaseReservations(ctx context.Context, tx *ent.Tx, allocations []*ent.BudgetAllocation, now time.Time) error {
+	released := make(map[int]int64)
+	ids := make([]int, 0, len(allocations))
 	for _, allocation := range allocations {
 		if allocation.ReservationReleased {
 			continue
 		}
-		bucket, err := tx.BudgetBucket.Get(ctx, allocation.BudgetBucketID)
+		bucketID := allocation.BudgetBucketID
+		if released[bucketID] > math.MaxInt64-allocation.ReservedQuantity {
+			return ErrInvalidSettlement
+		}
+		released[bucketID] += allocation.ReservedQuantity
+		ids = append(ids, allocation.ID)
+	}
+	for bucketID, quantity := range released {
+		count, err := tx.BudgetBucket.Update().
+			Where(budgetbucket.IDEQ(bucketID), budgetbucket.ReservedQuantityGTE(quantity)).
+			AddReservedQuantity(-quantity).SetUpdatedAt(now).Save(ctx)
 		if err != nil {
 			return err
 		}
-		if bucket.ReservedQuantity < allocation.ReservedQuantity {
+		if count != 1 {
 			return ErrInvalidSettlement
 		}
-		if _, err := tx.BudgetBucket.UpdateOneID(bucket.ID).
-			SetReservedQuantity(bucket.ReservedQuantity - allocation.ReservedQuantity).
-			SetUpdatedAt(now).
-			Save(ctx); err != nil {
-			return err
-		}
-		if _, err := tx.BudgetAllocation.UpdateOneID(allocation.ID).
-			SetReservationReleased(true).
-			SetResolved(true).
-			SetUpdatedAt(now).
-			Save(ctx); err != nil {
+	}
+	for chunk := range slices.Chunk(ids, reconciliationBatchSize) {
+		if err := tx.BudgetAllocation.Update().Where(budgetallocation.IDIn(chunk...)).
+			SetReservationReleased(true).SetResolved(true).SetUpdatedAt(now).Exec(ctx); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func closeReconciliation(ctx context.Context, tx *ent.Tx, id int, actor, action, reason string, now time.Time) error {
-	_, err := tx.BudgetReconciliation.UpdateOneID(id).
+func closeReconciliations(ctx context.Context, tx *ent.Tx, ids []int, actor, action, reason string, now time.Time) error {
+	return tx.BudgetReconciliation.Update().Where(budgetreconciliation.IDIn(ids...)).
 		SetState(budgetreconciliation.StateRESOLVED).
 		SetResolvedAt(now).
 		SetResolvedByActor(actor).
 		SetResolutionAction(budgetreconciliation.ResolutionAction(action)).
 		SetResolutionReason(strings.TrimSpace(reason)).
-		Save(ctx)
-	return err
+		Exec(ctx)
 }

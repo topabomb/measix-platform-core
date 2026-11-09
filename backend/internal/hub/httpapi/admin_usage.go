@@ -1,10 +1,13 @@
 package httpapi
 
 import (
+	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -179,6 +182,50 @@ func (h *fullAdminHandler) ListUsageReconciliations(w http.ResponseWriter, r *ht
 		next = &page.NextCursor
 	}
 	writeJSON(w, http.StatusOK, adminapi.ReconciliationPage{Items: items, NextCursor: next})
+}
+
+func (h *fullAdminHandler) ResolveUsageReconciliationBatch(w http.ResponseWriter, r *http.Request, params adminapi.ResolveUsageReconciliationBatchParams) {
+	principal, err := h.authenticateAdmin(r, params.XCSRFToken, true)
+	if err != nil {
+		writeIdentityError(w, err)
+		return
+	}
+	var request adminapi.ResolveReconciliationBatchRequest
+	if decodeStrictJSON(r, &request) != nil || !request.Scope.Valid() ||
+		(request.Scope == adminapi.ResolveReconciliationBatchRequestScopeALL && (request.From != nil || request.To != nil)) ||
+		(request.Scope == adminapi.ResolveReconciliationBatchRequestScopeREQUESTTIME && (request.From == nil || request.To == nil)) ||
+		(request.PreviewHash == nil) != (request.Reason == nil) {
+		writeProblem(w, http.StatusBadRequest, "invalid_reconciliation_batch", "Invalid reconciliation scope or confirmation")
+		return
+	}
+	ctx := r.Context()
+	var previewHash, reason string
+	if request.PreviewHash != nil {
+		hash, err := hex.DecodeString(*request.PreviewHash)
+		if err != nil || len(hash) != 32 || strings.ToLower(*request.PreviewHash) != *request.PreviewHash {
+			writeProblem(w, http.StatusBadRequest, "invalid_reconciliation_batch", "Invalid reconciliation preview hash")
+			return
+		}
+		previewHash, reason = *request.PreviewHash, *request.Reason
+		// Detach from the browser, while bounding the time on Hub's sole DB connection
+		// and still cancelling the transaction during Hub shutdown.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(h.lifecycle, 5*time.Second)
+		defer cancel()
+	}
+	result, err := h.services.Budget.ResolveReconciliationBatch(ctx, request.From, request.To, principal.UserID, reason, previewHash)
+	switch {
+	case errors.Is(err, budget.ErrInvalidConfiguration):
+		writeProblem(w, http.StatusBadRequest, "invalid_reconciliation_batch", "Invalid reconciliation scope or reason")
+	case errors.Is(err, budget.ErrStaleReconciliationPreview):
+		writeProblem(w, http.StatusConflict, "stale_reconciliation_preview", "Pending reconciliations changed; preview again")
+	case err != nil:
+		writeProblem(w, http.StatusInternalServerError, "internal_error", "Reconciliation batch failed")
+	default:
+		writeJSON(w, http.StatusOK, adminapi.ReconciliationBatchResult{
+			Matched: result.Matched, Resolved: result.Resolved, PreviewHash: result.PreviewHash,
+		})
+	}
 }
 
 func (h *fullAdminHandler) ResolveUsageReconciliation(w http.ResponseWriter, r *http.Request, requestID adminapi.RequestId, params adminapi.ResolveUsageReconciliationParams) {

@@ -68,14 +68,14 @@ func run(args []string, log *slog.Logger) error {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
-	runtime, err := app.OpenRuntime(ctx, app.RuntimeOptions{Config: cfg, BuildVersion: buildVersion})
+	group, runCtx := errgroup.WithContext(ctx)
+	runtime, err := app.OpenRuntime(runCtx, app.RuntimeOptions{Config: cfg, BuildVersion: buildVersion})
 	if err != nil {
 		return err
 	}
 	defer runtime.Close()
 	log.Info("control hub started", "event", "service.started")
 	defer log.Info("control hub stopping", "event", "service.stopping")
-	group, runCtx := errgroup.WithContext(ctx)
 	group.Go(func() error { return server.New(cfg.ListenAddr, runtime.Handler).Run(runCtx, log) })
 	group.Go(func() error { return server.New(cfg.InternalListenAddr, runtime.InternalHandler).Run(runCtx, log) })
 	group.Go(func() error {

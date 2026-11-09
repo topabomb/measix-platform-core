@@ -210,7 +210,7 @@ func OpenRuntime(ctx context.Context, options RuntimeOptions) (*Runtime, error) 
 	h := &health.State{}
 	router.Get("/live", h.Live)
 	router.Get("/ready", h.Ready)
-	httpapi.RegisterFull(router, services)
+	httpapi.RegisterFull(ctx, router, services)
 	if portalHandler != nil {
 		router.Handle("/portal", portalHandler)
 		router.Handle("/portal/*", portalHandler)

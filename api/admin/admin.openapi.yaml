@@ -1592,6 +1592,35 @@ paths:
       parameters:
       - *id004
       - *id005
+  /api/admin/v1/usage/reconciliations:resolve-batch:
+    post:
+      operationId: resolveUsageReconciliationBatch
+      description: Preview a pending scope, or resolve it atomically with the returned preview hash and a reason.
+      parameters:
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveReconciliationBatchRequest'
+      responses:
+        '200':
+          description: Preview count or committed resolution count.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationBatchResult'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '500':
+          $ref: '#/components/responses/Problem'
   /api/admin/v1/usage/reconciliations/{requestId}:resolve:
     post:
       operationId: resolveUsageReconciliation
@@ -6092,6 +6121,43 @@ components:
         reason:
           type: string
           minLength: 1
+    ResolveReconciliationBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [scope]
+      properties:
+        scope:
+          type: string
+          enum: [ALL, REQUEST_TIME]
+        from:
+          description: Inclusive request start time. Required only for REQUEST_TIME.
+          type: string
+          format: date-time
+        to:
+          description: Exclusive request start time. Required only for REQUEST_TIME.
+          type: string
+          format: date-time
+        previewHash:
+          description: Omit with reason to preview. Send both to execute.
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    ReconciliationBatchResult:
+      type: object
+      additionalProperties: false
+      required: [matched, resolved, previewHash]
+      properties:
+        matched:
+          type: integer
+          minimum: 0
+        resolved:
+          type: integer
+          minimum: 0
+        previewHash:
+          type: string
     UsageSummary:
       type: object
       additionalProperties: false

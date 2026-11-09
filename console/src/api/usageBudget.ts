@@ -36,6 +36,8 @@ export type RequestUsageS02 = Schemas['RequestUsageView']
 export type ReconciliationView = Schemas['ReconciliationView']
 export type ReconciliationPage = Schemas['ReconciliationPage']
 export type ResolveReconciliationRequest = Schemas['ResolveReconciliationRequest']
+export type ResolveReconciliationBatchRequest = Schemas['ResolveReconciliationBatchRequest']
+export type ReconciliationBatchResult = Schemas['ReconciliationBatchResult']
 
 export const capabilities: BudgetCapability[] = ['MODEL', 'TTS', 'ASR', 'MCP', 'IMAGE_GENERATION']
 export const budgetPeriods: BudgetPeriod[] = ['DAY', 'WEEK', 'MONTH', 'LIFETIME']

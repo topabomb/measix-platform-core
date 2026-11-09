@@ -3,7 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import {
   ClosePopup, QBanner, QBtn, QCard, QCardActions, QCardSection, QChip,
   QDialog, QIcon, QInput, QItem, QItemLabel, QItemSection, QList, QMarkupTable,
-  QSpinner, Quasar, QCheckbox,
+  QSpinner, Quasar, QCheckbox, QRadio,
 } from 'quasar'
 import { createPinia, setActivePinia } from 'pinia'
 import { i18n } from '../i18n'
@@ -30,7 +30,7 @@ function mountPanel() {
           components: {
             QBanner, QBtn, QCard, QCardActions, QCardSection, QChip,
             QDialog, QIcon, QInput, QItem, QItemLabel, QItemSection, QList, QMarkupTable,
-            QSpinner, QCheckbox,
+            QSpinner, QCheckbox, QRadio,
           },
           directives: { ClosePopup },
         }],
@@ -43,6 +43,47 @@ function mountPanel() {
 }
 
 describe('UsageReconciliationPanel', () => {
+  it('previews a time range and confirms the whole scope with one command', async () => {
+    const batchPath = '/api/admin/v1/usage/reconciliations:resolve-batch'
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async (path, init) => {
+      if (path !== batchPath) return { items: [] }
+      const body = JSON.parse(String(init?.body))
+      return { matched: 123, resolved: body.reason ? 123 : 0, previewHash: 'preview-hash' }
+    })
+    const panel = mountPanel()
+    await flushPromises()
+    await panel.get('[data-cy="reconciliation-scope-btn"]').trigger('click')
+    await flushPromises()
+    const dialog = document.body.querySelector('[data-cy="reconciliation-dialog"]')!
+    const click = (selector: string) => dialog.querySelector<HTMLElement>(selector)!.click()
+    const fill = (selector: string, value: string) => {
+      const input = dialog.querySelector<HTMLInputElement>(selector)!
+      input.value = value
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    click('[data-cy="reconciliation-request-time"]')
+    await flushPromises()
+    const from = '2026-10-01T00:00'
+    const to = '2026-11-01T00:00'
+    fill('input[data-cy="reconciliation-from"]', from)
+    fill('input[data-cy="reconciliation-to"]', to)
+    await flushPromises()
+    click('[data-cy="reconciliation-preview-scope"]')
+    await flushPromises()
+    expect(dialog.textContent).toContain('123 pending requests match')
+    fill('textarea', 'Reviewed historical records')
+    await flushPromises()
+    click('[data-cy="confirm-reconciliation"]')
+    await flushPromises()
+    const scope = { scope: 'REQUEST_TIME', from: new Date(from).toISOString(), to: new Date(to).toISOString() }
+    const commands = fetch.mock.calls.filter(([, init]) => init?.method === 'POST')
+    expect(commands.map(([path, init, csrf]) => [path, JSON.parse(String(init?.body)), csrf])).toEqual([
+      [batchPath, scope, 'csrf'],
+      [batchPath, { ...scope, previewHash: 'preview-hash', reason: 'Reviewed historical records' }, 'csrf'],
+    ])
+    expect(dialog.textContent).toContain('123 requests reconciled')
+  })
+
   it('keeps the bulk result visible even when only one request was selected', async () => {
     let done = false
     vi.spyOn(client, 'apiFetch').mockImplementation(async (_path, init) => {
@@ -62,6 +103,23 @@ describe('UsageReconciliationPanel', () => {
     await flushPromises()
     expect(document.body.querySelector('[data-cy="reconciliation-dialog"]')).toBeTruthy()
     expect(document.body.textContent).toContain('1 succeeded · 0 failed · 0 not attempted')
+  })
+  it('can preview the same scope again after no requests matched', async () => {
+    const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async (_path, init) =>
+      init?.method === 'POST' ? { matched: 0, resolved: 0, previewHash: 'empty' } : { items: [] })
+    const panel = mountPanel()
+    await flushPromises()
+    await panel.get('[data-cy="reconciliation-scope-btn"]').trigger('click')
+    await flushPromises()
+    const dialog = document.body.querySelector('[data-cy="reconciliation-dialog"]')!
+    const preview = () => dialog.querySelector<HTMLButtonElement>('[data-cy="reconciliation-preview-scope"]')!.click()
+    preview()
+    await flushPromises()
+    expect(dialog.textContent).toContain('0 pending requests match')
+    expect(dialog.querySelector('[data-cy="confirm-reconciliation"]')).toBeNull()
+    preview()
+    await flushPromises()
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(2)
   })
   it('focuses the list on business usage instead of repeating one request per row', async () => {
     vi.spyOn(client, 'apiFetch').mockResolvedValue({ items: [{ requestId: 'req_1', userId: 'usr_1', resourceId: 'mdl_a', capability: 'MODEL', clientProtocol: 'OPENAI_CHAT_COMPLETIONS', state: 'PENDING', forwarded: true, observed: [{ meter: 'REQUESTS', quantity: '1' }], reservation: [], reconciliationReason: 'incomplete', admittedAt: '2026-10-08T00:00:00Z' }] })

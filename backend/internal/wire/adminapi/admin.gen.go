@@ -854,6 +854,24 @@ func (e RequestUsageViewTargetVersion) Valid() bool {
 	}
 }
 
+// Defines values for ResolveReconciliationBatchRequestScope.
+const (
+	ResolveReconciliationBatchRequestScopeALL         ResolveReconciliationBatchRequestScope = "ALL"
+	ResolveReconciliationBatchRequestScopeREQUESTTIME ResolveReconciliationBatchRequestScope = "REQUEST_TIME"
+)
+
+// Valid indicates whether the value is a known member of the ResolveReconciliationBatchRequestScope enum.
+func (e ResolveReconciliationBatchRequestScope) Valid() bool {
+	switch e {
+	case ResolveReconciliationBatchRequestScopeALL:
+		return true
+	case ResolveReconciliationBatchRequestScopeREQUESTTIME:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResolveReconciliationRequestAction.
 const (
 	RELEASEUNCERTAIN ResolveReconciliationRequestAction = "RELEASE_UNCERTAIN"
@@ -3192,6 +3210,13 @@ type PutPricingRequest struct {
 	Rules                   []PricingRule `json:"rules"`
 }
 
+// ReconciliationBatchResult defines model for ReconciliationBatchResult.
+type ReconciliationBatchResult struct {
+	Matched     int    `json:"matched"`
+	PreviewHash string `json:"previewHash"`
+	Resolved    int    `json:"resolved"`
+}
+
 // ReconciliationPage defines model for ReconciliationPage.
 type ReconciliationPage struct {
 	Items      []ReconciliationView `json:"items"`
@@ -3415,6 +3440,23 @@ type RequestUsageViewSettlementState string
 
 // RequestUsageViewTargetVersion defines model for RequestUsageView.TargetVersion.
 type RequestUsageViewTargetVersion int
+
+// ResolveReconciliationBatchRequest defines model for ResolveReconciliationBatchRequest.
+type ResolveReconciliationBatchRequest struct {
+	// From Inclusive request start time. Required only for REQUEST_TIME.
+	From *time.Time `json:"from,omitempty"`
+
+	// PreviewHash Omit with reason to preview. Send both to execute.
+	PreviewHash *string                                `json:"previewHash,omitempty"`
+	Reason      *string                                `json:"reason,omitempty"`
+	Scope       ResolveReconciliationBatchRequestScope `json:"scope"`
+
+	// To Exclusive request start time. Required only for REQUEST_TIME.
+	To *time.Time `json:"to,omitempty"`
+}
+
+// ResolveReconciliationBatchRequestScope defines model for ResolveReconciliationBatchRequest.Scope.
+type ResolveReconciliationBatchRequestScope string
 
 // ResolveReconciliationRequest defines model for ResolveReconciliationRequest.
 type ResolveReconciliationRequest struct {
@@ -4614,6 +4656,11 @@ type ResolveUsageReconciliationParams struct {
 	XCSRFToken string `json:"X-CSRF-Token"`
 }
 
+// ResolveUsageReconciliationBatchParams defines parameters for ResolveUsageReconciliationBatch.
+type ResolveUsageReconciliationBatchParams struct {
+	XCSRFToken string `json:"X-CSRF-Token"`
+}
+
 // ListUsageRequestsParams defines parameters for ListUsageRequests.
 type ListUsageRequestsParams struct {
 	Limit          *int                                 `form:"limit,omitempty" json:"limit,omitempty"`
@@ -4979,6 +5026,9 @@ type UpdateUpstreamJSONRequestBody = UpdateUpstreamRequest
 // ResolveUsageReconciliationJSONRequestBody defines body for ResolveUsageReconciliation for application/json ContentType.
 type ResolveUsageReconciliationJSONRequestBody = ResolveReconciliationRequest
 
+// ResolveUsageReconciliationBatchJSONRequestBody defines body for ResolveUsageReconciliationBatch for application/json ContentType.
+type ResolveUsageReconciliationBatchJSONRequestBody = ResolveReconciliationBatchRequest
+
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequest
 
@@ -5212,6 +5262,9 @@ type ServerInterface interface {
 
 	// (POST /api/admin/v1/usage/reconciliations/{requestId}:resolve)
 	ResolveUsageReconciliation(w http.ResponseWriter, r *http.Request, requestId RequestId, params ResolveUsageReconciliationParams)
+
+	// (POST /api/admin/v1/usage/reconciliations:resolve-batch)
+	ResolveUsageReconciliationBatch(w http.ResponseWriter, r *http.Request, params ResolveUsageReconciliationBatchParams)
 
 	// (GET /api/admin/v1/usage/requests)
 	ListUsageRequests(w http.ResponseWriter, r *http.Request, params ListUsageRequestsParams)
@@ -5652,6 +5705,11 @@ func (_ Unimplemented) ListUsageReconciliations(w http.ResponseWriter, r *http.R
 
 // (POST /api/admin/v1/usage/reconciliations/{requestId}:resolve)
 func (_ Unimplemented) ResolveUsageReconciliation(w http.ResponseWriter, r *http.Request, requestId RequestId, params ResolveUsageReconciliationParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/admin/v1/usage/reconciliations:resolve-batch)
+func (_ Unimplemented) ResolveUsageReconciliationBatch(w http.ResponseWriter, r *http.Request, params ResolveUsageReconciliationBatchParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -9079,6 +9137,51 @@ func (siw *ServerInterfaceWrapper) ResolveUsageReconciliation(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
+// ResolveUsageReconciliationBatch operation middleware
+func (siw *ServerInterfaceWrapper) ResolveUsageReconciliationBatch(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ResolveUsageReconciliationBatchParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-CSRF-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-CSRF-Token")]; found {
+		var XCSRFToken string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-CSRF-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-CSRF-Token", valueList[0], &XCSRFToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-CSRF-Token", Err: err})
+			return
+		}
+
+		params.XCSRFToken = XCSRFToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-CSRF-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-CSRF-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResolveUsageReconciliationBatch(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListUsageRequests operation middleware
 func (siw *ServerInterfaceWrapper) ListUsageRequests(w http.ResponseWriter, r *http.Request) {
 
@@ -11939,6 +12042,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/usage/reconciliations", wrapper.ListUsageReconciliations)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/admin/v1/usage/reconciliations:resolve-batch", wrapper.ResolveUsageReconciliationBatch)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/usage/reconciliations/{requestId}:resolve", wrapper.ResolveUsageReconciliation)

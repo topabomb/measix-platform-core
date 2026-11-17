@@ -113,6 +113,52 @@ Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/worksp
 
 视频使用原生 `<video>`，不读入完整 Blob、不转码。MP4/M4V/WebM/OGV 通过同源 Files GET/HEAD 的 `preview=video&expectedEtag=<strong ETag>` 获取固定媒体类型、inline 和 nosniff；Hub 将版本转换为 If-Match，Range/If-Range 仍由上游判断。缺少强 ETag 不启动预览，版本变化返回 412；浏览器不支持的编解码可下载。关闭、切用户/空间或撤销访问时取消媒体读取；普通下载及 HTML/SVG 仍为 attachment。
 
+## 媒体缩略图接入
+
+本节是 Core 的映射与实现机制；服务端媒体合同唯一由 Agent Space `docs/webdav.md`「媒体预览扩展 v1」拥有，平台授权/兼容语义由 S1 远程工作区合同拥有。原 Files/content、WorkspaceProjection、Snapshot 和 Relay DAV 路由不因预览而改义；Hub 不执行解码、不保存第二份媒体缓存或用户文件。
+
+新增资源为 `/api/client/v1/workspace/thumbnail` 和 `/api/admin/v1/users/{userId}/workspace/thumbnail`，支持 OPTIONS/GET/HEAD。每次都要求当前 WorkspaceProjection 的 agentSpaceId；GET/HEAD 额外接受 path、size、expectedEtag，参数与源/派生表示条件遵循媒体合同。OPTIONS 只接受 agentSpaceId，不将远端调用嵌入原工作区/目录查询。
+
+Hub 从生效的 davOrigin、已保存 remoteUsername 构建固定 `/u/{username}/previews` 后台资源，只发送对应 DAV key，不使用远端公开链接或用户提供 URL、不跟随重定向。所有响应都复核当前租约，成功响应的 Agent-Space-Id 必须等于预期空间，错误 MIME/非法 JSON/未知 schemaVersion/非法尺寸及越界正文均是 `preview_protocol_error`（503）。OPTIONS JSON 最多 16 KiB，图片正文最多 1 MiB；GET 成功只接受 image/webp，无像素解码地核验 RIFF/WebP 格式、单帧、正宽高且最长边不超过请求 size、源版本、按返回字节计算的 SHA-256 派生 ETag 和准确长度。HEAD/304 没有正文，只校验适用的表示/源版本/身份头，不冒充已经校验图像正文。不会把错误页作为缩略图返回。
+
+能力成功为 `{"schemaVersion":1,"supported":true,"sizes":[128,256,512],"contentType":"image/webp","mediaKinds":["IMAGE","VIDEO"]}`。旧服务 404/405 后，Hub 使用同一账号 key 对 DAV 根执行 PROPFIND Depth: 0；只有根读取成功才返回 `{"schemaVersion":1,"supported":false,"sizes":[],"contentType":"image/webp","mediaKinds":[]}`。根读取失败沿原 Files 错误语义，不把网络、鉴权或空间异常解释为不支持。能力对象是响应，不新增持久化配置或管理员手动版本选择。
+
+复用 Files 授权、预期空间和保护路径、绑定/凭据复验、在途取消及审计；预览读取/能力分别记为 THUMBNAIL/THUMBNAIL_OPTIONS，字节按实际向调用方交付记录。单独最多 4 个预览租约，普通 8 个文件请求名额独立；取消/撤销覆盖原文件与预览，不因释放 HTTP 等待者而遗留未受控解码。Client 身份仍来自企业 access token，Admin 仍用管理员 Cookie；不接受 Portal Cookie 代替 Client 身份。
+
+预览 400/404/412/413/415/422/429/503 的 code 保留服务端合同；远端401按 `dav_credential_unavailable`（503）观察当前凭据版本，远端403按 `file_forbidden`（403），不冒充 Core 登录失败。GET/HEAD 仅在独立 OPTIONS 和已认证 DAV 根核实服务缺失扩展后返回 `preview_not_supported`（501）；源文件404始终保留为文件不存在，不据此推断能力。其他未知远端错误转 `preview_unavailable`（503）；不得自动重放写操作。派生条件及源版本保持语义，所有响应 no-store/nosniff，成功 GET/HEAD 只输出固定安全 WebP inline 头，不透传 Cookie、WWW-Authenticate、Location 或解码器细节。
+
+Admin 首次打开当前空间时独立读取能力；只在 supported=true 且条目有强源 ETag 时懒加载可见图片/视频缩略图，单面板并发最多 2，离屏/页面隐藏/切空间/卸载取消并释放对象 URL。缓存按主体、spaceId、路径、源 ETag 和请求尺寸隔离；刷新发现源版本变化时淘汰旧结果。默认列表保留紧凑行，另提供“缩略图”视图，显示较大媒体卡片与视频标识；两种视图共用目录、筛选、文件菜单和预览入口。列表使用 128、缩略图视图使用 256，切换复用能力查询、取消旧尺寸读取，仅调度当前可见项。能力失败/不支持和单图失败保持图标，目录及既有预览/操作不等待；不批量下载原图兜底。点击原预览及下载、文本编辑、PDF/Markdown/HTML/SVG 策略保持原义。Tuck/Pilot 只交付协议样例和当前消费合同兼容证据，不修改其实现。
+
+### 客户端能力识别与会话复用
+
+当前客户端须知道上述 thumbnail 资源地址，然后用 OPTIONS 查询；这不是通用 DAV 根的自动发现。普通 WebDAV 客户端不会因此自动显示缩略图。Agent Space 的已知预览地址及认证方式由其扩展合同给出；本轮没有给 Relay 增加兄弟 `/previews` 路由，也没有实现根 OPTIONS 的 Link 发现。直接 DAV 客户端需要显式实现该扩展。
+
+将能力查询放在连接会话 owner，保存一个共享 Promise，包含在途请求、支持、不支持和失败结果；不要在目录行、每张图片或每次进入目录时创建发现器。缓存按服务入口、已认证主体/会话、空间和连接/绑定版本隔离。切主体、空间、连接配置或绑定版本时取消并销毁旧实例；同一主体的正常 access token 刷新不重做发现。错误不能转为“不支持”；需要重试时由原连接 owner 显式重建实例，避免一目录文件反复试探。
+
+[Node 接入样例](../scripts/examples/workspace-thumbnail-session.mjs)提供 `WorkspaceThumbnailSession({ endpoint, agentSpaceId, fetch })`，由调用方注入现有已认证 fetch；`capabilities()` 共享一次查询，`thumbnail({ path, expectedEtag, size }, { signal })` 获取有限字节的缩略图，`dispose()` 取消整条连接。单文件取消只停止自己的等待，不撤销其他文件共享的能力请求。样例不新增目录、鉴权或视图 owner，也不包含浏览器构建适配；浏览器/原生客户端应在其现有网络队列中采用同一生命周期。
+
+路径和强源 ETag 来自当前 Files 列举；ETag 保留引号，query 由 URLSearchParams 编码一次。仅调度可见项目，缓存 key 包含主体、空间、路径、源版本和尺寸，版本变化淘汰旧结果。复用原有队列，至多 2 个活动读取，429 采用共享退避及有限重试；取消后的传输收尾可能晚于 AbortSignal。文件 404/412/415 不改变能力结论，不自动下载原文件兜底。渲染层自己持有并回收对象 URL。
+
+可用 Node 22.17+ 执行[顺序获取样例](../scripts/examples/workspace-thumbnail-demo.mjs)，只获取配置明确选择的文件。私有配置示例：
+
+```json
+{
+  "endpoint": "https://core.example/api/client/v1/workspace/thumbnail",
+  "agentSpaceId": "<current-space-id>",
+  "accessTokenFile": "./client-access-token.private",
+  "items": [
+    { "path": "images/示例.png", "expectedEtag": "\"etag-from-current-list\"", "size": 256 },
+    { "path": "video.mp4", "expectedEtag": "\"another-current-etag\"", "size": 128 }
+  ]
+}
+```
+
+```text
+node scripts/examples/workspace-thumbnail-demo.mjs <private-config.json> <new-output-directory>
+```
+
+`accessTokenFile` 相对配置文件解析，只放现有 Client 会话的 access token；不放管理员 Cookie 或远端 DAV key。输出父目录须存在，目标目录必须全新；文件以编号保存，`result.json` 记录来源版本和结果，不写 token。样例每次请求读取已有 token 文件，刷新 token 不增加能力查询。它顺序执行而不自动重试；真实界面的可见队列和 429 退避仍由客户端原 owner 提供。
+
 ## 标准 WebDAV 资源
 
 服务持久拥有一个 `dav_*` 资源和 `rte_*` 路由。企业配置 WebDAV 分区只编辑名称和开关，不重复添加、删除或改来源；保存、校验、差异审查、快照预览及发布沿用原流程。旧编辑器漏传派生定义时拒绝保存，避免静默删除。HTTP/HTTPS、本机、局域网及 IPv4/IPv6 均受支持，不增加私网白名单。

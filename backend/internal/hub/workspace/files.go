@@ -20,9 +20,20 @@ type FileAccess struct {
 	Idle                              time.Duration
 	valid                             func(context.Context) bool
 	cancel                            context.CancelFunc
+	preview                           bool
 	auditID                           int
 	userID, davSecretID               string
 	bindingRevision, davSecretVersion int64
+}
+
+// Revalidate fences buffered responses against identity, binding or credential
+// changes which happened after admission and before the next cancellation sweep.
+func (access *FileAccess) Revalidate(ctx context.Context) error {
+	if access.Context.Err() != nil || ctx.Err() != nil || !access.valid(ctx) {
+		access.cancel()
+		return ErrUnavailable
+	}
+	return nil
 }
 
 func (s *Service) OpenFiles(ctx context.Context, actor, userID, expectedSpaceID, action, path string, authorize func(context.Context) error) (*FileAccess, error) {
@@ -34,8 +45,19 @@ func (s *Service) OpenFiles(ctx context.Context, actor, userID, expectedSpaceID,
 	}
 	s.fileMu.Lock()
 	defer s.fileMu.Unlock()
-	if len(s.files) >= 8 {
-		return nil, &remoteapi.Error{Code: "file_transfer_limit", Status: 429}
+	preview := action == "THUMBNAIL" || action == "THUMBNAIL_OPTIONS"
+	active := 0
+	for access := range s.files {
+		if access.preview == preview {
+			active++
+		}
+	}
+	limit, code := 8, "file_transfer_limit"
+	if preview {
+		limit, code = 4, "preview_busy"
+	}
+	if active >= limit {
+		return nil, &remoteapi.Error{Code: code, Status: 429}
 	}
 	if err := authorize(ctx); err != nil {
 		return nil, err
@@ -77,7 +99,7 @@ func (s *Service) OpenFiles(ctx context.Context, actor, userID, expectedSpaceID,
 		return nil, err
 	}
 	leaseCtx, cancel := context.WithCancel(ctx)
-	access := &FileAccess{Context: leaseCtx, Remote: remote, Username: row.RemoteUsername, Token: string(token), Idle: time.Duration(cfg.IdleTimeoutMs) * time.Millisecond, cancel: cancel, userID: userID, davSecretID: row.DavSecretID, bindingRevision: row.BindingRevision, davSecretVersion: row.DavSecretVersion}
+	access := &FileAccess{Context: leaseCtx, Remote: remote, Username: row.RemoteUsername, Token: string(token), Idle: time.Duration(cfg.IdleTimeoutMs) * time.Millisecond, cancel: cancel, preview: preview, userID: userID, davSecretID: row.DavSecretID, bindingRevision: row.BindingRevision, davSecretVersion: row.DavSecretVersion}
 	access.valid = func(checkCtx context.Context) bool {
 		if authorize(checkCtx) != nil {
 			return false

@@ -126,7 +126,7 @@ onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();docum
     <details v-if="view.agentSpaceId" class="text-caption text-grey-7 q-mt-sm"><summary>空间标识与最近观测</summary><div class="text-break">{{view.agentSpaceId}}</div><div>{{view.observedAt?new Date(view.observedAt).toLocaleString():'未观测'}} · 绑定版本 {{view.bindingRevision}}</div></details>
    </template>
   </q-card-section>
-  <WorkspaceFiles v-if="showFiles&&view?.agentSpaceId" :key="view.agentSpaceId" :base-url="url" :space-id="view.agentSpaceId" :available="serviceEnabled&&view.filesAvailable"/>
+  <WorkspaceFiles v-if="showFiles" :base-url="url" :space-id="view?.agentSpaceId??''" :available="serviceEnabled&&!!view?.agentSpaceId&&!!view?.filesAvailable"/>
   <details v-if="view?.webdav" class="workspace-details"><summary>客户端 WebDAV <span class="text-grey-7">{{view.webdav.available ? (view.webdav.accessMode==='READ_ONLY'?'只读':'完整') : workspaceLabel(view.webdav.reason)}}</span><q-chip v-if="view.fileExchangeWebdavResourceId" dense size="sm" color="blue-1">默认文件交换空间</q-chip></summary>
     <WorkspaceDAVAccess :key="userId" :workspace="view" :base-url="url" :disabled="busy || !!pendingOperation || !serviceEnabled || view.state !== 'CONNECTED'" @changed="refresh" />
   </details>

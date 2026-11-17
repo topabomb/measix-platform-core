@@ -1,6 +1,34 @@
 # 实现状态与历史证据索引
 
-最近维护日期：2026-10-26。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
+最近维护日期：2026-11-18。本文区分当前源码、固定 Preview 包与历史实际验证；阶段要求由架构 Testing Spec 拥有。历史测试计数和修复流水留在 Git/原始产物，不滚动抄为当前 PASS。
+
+## 媒体预览扩展实施与验收
+
+本轮修改 Agent Space/Runcove、Core（含 Admin）及架构合同；Tuck/Pilot 是兼容消费者，不在其仓库实现界面。沿用原 checkout，保留既有数据和 Agent Space 原有 ahead 提交；三个仓库的提交身份与推送状态由 Git 记录拥有。生产部署与发行不在本轮范围。协议权威为 Agent Space 的 `docs/webdav.md`「媒体预览扩展 v1」，平台边界由 S1 合同拥有。
+
+本次按下表顺序实施，每阶段由未参与实现的审查者关闭发现后进入下一阶段；最终又对三个仓库分别独立审查。以下保存本轮固定输入与验证结果，不新增长期交付流程。
+
+| 阶段 | 交付与必须证明的结果 | 状态 |
+| --- | --- | --- |
+| 1 协议文档 | 固定 Server/Standalone 预览合同、Core 映射、版本/鉴权/取消/错误/缓存/资源上限；标准 DAV 修复范围、Admin UX 和消费者兼容；链接及跨文档一致性检查；独立审查闭环 | 2026-11-17 完成；phase1_review 独立审查通过，4 项发现已修复；证据 `.artifacts/media-preview/stage1-document-check.json` |
+| 2 Agent Space | Red→Green 修复 OPTIONS/DAV/Allow/405 的实际声明；回归属性、锁、条件请求、Range/HEAD、多状态；真实图片/视频缩略图、源版本、缓存、限流、子进程取消；Server/Standalone 认证和文件链路、依赖打包与身份检查；回顾并审查现有三个构建脚本（docker/build.sh、docker/build-standalone.sh、images/desktop/build.sh）的需求、缓存/失败/身份和增量构建，修复并验证；独立审查闭环 | 2026-11-17 完成；phase1_review 整阶段独审通过，证据 `.artifacts/media-preview/build-qualification-20261117-ce8fb36c/` |
+| 3 Core/Admin | OpenAPI→fixtures→生成材料→失败测试→实现；Hub 固定后台目标和租约/审计/取消；Admin 可见区域懒加载与图标降级、列表/缩略图视图共享能力与操作；Go/Vue 回归、类型检查、生产构建、真实浏览器宽窄屏；独立审查闭环 | 2026-11-17 完成；phase1_review 整阶段独审通过；固定 SPA `b0c3b5aa…`，最终证据 `.artifacts/media-preview/stage3-browser-final-20261117-0fd58a/` |
+| 4 接入与兼容 | 可运行样例和自动验证；真实 Core↔Agent Space 图片/视频、旧服务缺失扩展、错误/撤销/版本变化、原 CRUD/Range/下载兼容；固定现有 Tuck 消费合同验证且保持其源码不变；合同/生成/适用完整检查及最终差异审计；独立审查闭环 | 2026-11-17 完成；phase1_review 整阶段独审通过；真实 API `690fb2`、标准 DAV 降级 `ce274d`、固定旧 Tuck `a091e3`，最终工具测试 134 项通过 |
+| 最终收尾 | 三仓独立审查、发现修复与受影响检查；清理本轮临时构建副本和资源，保留必要证据、合格镜像及既有数据 | 三仓最终独审通过；Core 导航失败恢复 P2 已修复复审；新 SPA `700dd18f…`、398 项 Console/135 项工具测试及真实双宽复验通过；清理边界见下文，提交身份以 Git 记录为准 |
+
+耐久机制已并入工作区/测试参考，本节仅保留范围、固定证据和未验证边界；fixture 不代替真实链路，不维护第二套协议。
+
+阶段 2 的固定源码摘要为 `d592ce82…`，WebDAV helper 为 `affe2fbf…`。三入口及各自重复构建身份一致，正式 Server/Standalone 公开协议、实际 guest 解码与取消、原 DAV 兼容、50 个旧卷和既有容器保全均通过；独立审查已关闭全部必修项。完整身份和当前结果见 `.artifacts/media-preview/build-qualification-20261117-ce8fb36c/final-build-qualification.json`，源码检查索引为 `.artifacts/media-preview/stage2-source-check.json`。宿主存储中断及受控取消失败记录保留，不能将成功续跑改写为首次全程成功；未执行生产部署或断网资格。
+
+阶段 3 完成全量 Go 测试/vet、系统 smoke、396 项 Console 测试、类型检查、生产构建和 431 个生成文件重复生成一致。最终生产 SPA 的桌面/390px 各 12 组真实业务检查通过，8 次迟到响应先核实真实 200、正文和身份再验证取消丢弃。空间重建导致草稿卸载、空空间 ID 派发及验收脚本错误就绪的发现均已修复复审。活动读取最多 2；原始网络计时保留已取消请求的收尾，不能写成传输层始终最多 2。页面隐藏为明确的 `document.hidden` 事件注入，迟到为真实成功响应的路由延迟，不冒充原生 OS 隐藏或上游慢解码。最终输入、全量前端结果与源码摘要见 `.artifacts/media-preview/stage3-admin-final-ui.json`，本轮容器/卷已清，既有 50 卷和 1 容器保全。
+
+阶段 4 的 Node 会话样例、CLI 和固定消费者入口已并入[工作区接入](remote-workspace-implementation.md#客户端能力识别与会话复用)及[验证说明](testing.md#媒体缩略图验证)。真实 API 6 组证明 Client/Admin OPTIONS/GET/HEAD/304、图/视频且仅一次能力查询、版本/格式/文件错误、原 CRUD/Range，以及自己账号真实改 DAV key 后的精确撤除/恢复和另一用户保全。标准 DAV 4 组区分原生缺失端点404、明确注入405/403与真实根认证207；没有使用历史 Runcove 发行镜像替代这些边界说明。固定 Tuck `dc9f109…` 实际消费当前 Client 三份原始响应，旧解析/Handle、路径保护及 Range/条件/CRUD/ZIP/取消通过，源码、HEAD、状态及四文件摘要未变；不是桌面真实联网或新缩略图 UI 接入声明。
+
+阶段 4 证据分别为 `.artifacts/media-preview/stage4-real-api-final-20261117-690fb2/`、`stage4-legacy-dav-20261117-ce274d/`、`stage4-tuck-compat-20261117-a091e3/` 和 `stage4-tooling-final.*`。原 Tuck 捕获来自先前 `stage4-real-api-20261117-a091e3/`，该轮联合覆盖文字由旁侧说明收窄，后续补齐 Admin HEAD/304；两轮后端源码/二进制与 SPA 完全一致，原始捕获未改。所有 lane 成功前及清理后均复核中断标记，真实输入快照保留。新工具测试在全新证据目录初始化的发现已修复；每轮本身清理成功，既有容器/卷保全，可再生缓存的清理与保留边界归下述收尾记录。
+
+逐仓最终审查发现并修复了目录导航失败时旧目录缩略图需求被清空的恢复问题。当前失败回调只在原请求仍有效时恢复同一 owner 的需求，不重置能力、限流或主体。新输入见 `.artifacts/media-preview/final-review-admin-ui.json`，完整 398 项 Console 测试/类型检查/构建及 135 项工具测试通过；`final-review-browser-20261117-790de4/` 两宽各 13 组与 10 次真实 held-200 取消通过，包含真实目录删除后404、旧列表/错误保留、图/视频自动恢复和仅一次 OPTIONS。当前 SPA 为 `700dd18f…`，旧 `b0c3b5aa…` 保留为历史资格；后台源码与 Hub/Relay 二进制逐字相同，原 API/legacy/Tuck 后台证明仍有效。
+
+清理结果见 `.artifacts/media-preview/final-cleanup-result.json`：已移除约 1.7 GiB 的本轮 Linux 冻结构建副本、一次性合同生成器和包管理器 shim；合格镜像、必要原始证据及旧失败记录保留。约 3.3 MB 可再生测试缓存因执行工具策略保留，不进入源码提交。原 1 个容器和 50 个卷精确保全，无运行容器，未移动文件到 C 盘。
 
 ## 固定 S0.2 Preview 组合
 

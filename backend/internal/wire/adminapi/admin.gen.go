@@ -4,6 +4,7 @@
 package adminapi
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1859,6 +1860,75 @@ func (e WorkspaceServiceCheckFilesStatus) Valid() bool {
 	}
 }
 
+// Defines values for WorkspaceThumbnailCapabilitiesContentType.
+const (
+	Imagewebp WorkspaceThumbnailCapabilitiesContentType = "image/webp"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceThumbnailCapabilitiesContentType enum.
+func (e WorkspaceThumbnailCapabilitiesContentType) Valid() bool {
+	switch e {
+	case Imagewebp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceThumbnailCapabilitiesMediaKinds.
+const (
+	WorkspaceThumbnailCapabilitiesMediaKindsIMAGE WorkspaceThumbnailCapabilitiesMediaKinds = "IMAGE"
+	WorkspaceThumbnailCapabilitiesMediaKindsVIDEO WorkspaceThumbnailCapabilitiesMediaKinds = "VIDEO"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceThumbnailCapabilitiesMediaKinds enum.
+func (e WorkspaceThumbnailCapabilitiesMediaKinds) Valid() bool {
+	switch e {
+	case WorkspaceThumbnailCapabilitiesMediaKindsIMAGE:
+		return true
+	case WorkspaceThumbnailCapabilitiesMediaKindsVIDEO:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceThumbnailCapabilitiesSchemaVersion.
+const (
+	WorkspaceThumbnailCapabilitiesSchemaVersionN1 WorkspaceThumbnailCapabilitiesSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceThumbnailCapabilitiesSchemaVersion enum.
+func (e WorkspaceThumbnailCapabilitiesSchemaVersion) Valid() bool {
+	switch e {
+	case WorkspaceThumbnailCapabilitiesSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkspaceThumbnailCapabilitiesSizes.
+const (
+	WorkspaceThumbnailCapabilitiesSizesN128 WorkspaceThumbnailCapabilitiesSizes = 128
+	WorkspaceThumbnailCapabilitiesSizesN256 WorkspaceThumbnailCapabilitiesSizes = 256
+	WorkspaceThumbnailCapabilitiesSizesN512 WorkspaceThumbnailCapabilitiesSizes = 512
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceThumbnailCapabilitiesSizes enum.
+func (e WorkspaceThumbnailCapabilitiesSizes) Valid() bool {
+	switch e {
+	case WorkspaceThumbnailCapabilitiesSizesN128:
+		return true
+	case WorkspaceThumbnailCapabilitiesSizesN256:
+		return true
+	case WorkspaceThumbnailCapabilitiesSizesN512:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SystemEventsParamsService.
 const (
 	SystemEventsParamsServiceHUB   SystemEventsParamsService = "HUB"
@@ -2300,6 +2370,48 @@ const (
 func (e HeadAdminWorkspaceFileParamsPreview) Valid() bool {
 	switch e {
 	case HeadAdminWorkspaceFileParamsPreviewVideo:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetAdminWorkspaceThumbnailParamsSize.
+const (
+	GetAdminWorkspaceThumbnailParamsSizeN128 GetAdminWorkspaceThumbnailParamsSize = 128
+	GetAdminWorkspaceThumbnailParamsSizeN256 GetAdminWorkspaceThumbnailParamsSize = 256
+	GetAdminWorkspaceThumbnailParamsSizeN512 GetAdminWorkspaceThumbnailParamsSize = 512
+)
+
+// Valid indicates whether the value is a known member of the GetAdminWorkspaceThumbnailParamsSize enum.
+func (e GetAdminWorkspaceThumbnailParamsSize) Valid() bool {
+	switch e {
+	case GetAdminWorkspaceThumbnailParamsSizeN128:
+		return true
+	case GetAdminWorkspaceThumbnailParamsSizeN256:
+		return true
+	case GetAdminWorkspaceThumbnailParamsSizeN512:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HeadAdminWorkspaceThumbnailParamsSize.
+const (
+	HeadAdminWorkspaceThumbnailParamsSizeN128 HeadAdminWorkspaceThumbnailParamsSize = 128
+	HeadAdminWorkspaceThumbnailParamsSizeN256 HeadAdminWorkspaceThumbnailParamsSize = 256
+	HeadAdminWorkspaceThumbnailParamsSizeN512 HeadAdminWorkspaceThumbnailParamsSize = 512
+)
+
+// Valid indicates whether the value is a known member of the HeadAdminWorkspaceThumbnailParamsSize enum.
+func (e HeadAdminWorkspaceThumbnailParamsSize) Valid() bool {
+	switch e {
+	case HeadAdminWorkspaceThumbnailParamsSizeN128:
+		return true
+	case HeadAdminWorkspaceThumbnailParamsSizeN256:
+		return true
+	case HeadAdminWorkspaceThumbnailParamsSizeN512:
 		return true
 	default:
 		return false
@@ -4349,6 +4461,28 @@ type WorkspaceTarget struct {
 	WorkspaceServiceId WorkspaceServiceId `json:"workspaceServiceId"`
 }
 
+// WorkspaceThumbnailCapabilities Optional thumbnail protocol capability, independent of directory listing and filesAvailable. supported=true requires all v1 sizes and media kinds; supported=false requires empty arrays. Capability does not prove current decoder or VM health. Unknown response fields may be ignored.
+type WorkspaceThumbnailCapabilities struct {
+	ContentType          WorkspaceThumbnailCapabilitiesContentType   `json:"contentType"`
+	MediaKinds           []WorkspaceThumbnailCapabilitiesMediaKinds  `json:"mediaKinds"`
+	SchemaVersion        WorkspaceThumbnailCapabilitiesSchemaVersion `json:"schemaVersion"`
+	Sizes                []WorkspaceThumbnailCapabilitiesSizes       `json:"sizes"`
+	Supported            bool                                        `json:"supported"`
+	AdditionalProperties map[string]interface{}                      `json:"-"`
+}
+
+// WorkspaceThumbnailCapabilitiesContentType defines model for WorkspaceThumbnailCapabilities.ContentType.
+type WorkspaceThumbnailCapabilitiesContentType string
+
+// WorkspaceThumbnailCapabilitiesMediaKinds defines model for WorkspaceThumbnailCapabilities.MediaKinds.
+type WorkspaceThumbnailCapabilitiesMediaKinds string
+
+// WorkspaceThumbnailCapabilitiesSchemaVersion defines model for WorkspaceThumbnailCapabilities.SchemaVersion.
+type WorkspaceThumbnailCapabilitiesSchemaVersion int
+
+// WorkspaceThumbnailCapabilitiesSizes defines model for WorkspaceThumbnailCapabilities.Sizes.
+type WorkspaceThumbnailCapabilitiesSizes int
+
 // ListBudgetTemplatesParams defines parameters for ListBudgetTemplates.
 type ListBudgetTemplatesParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
@@ -4923,6 +5057,60 @@ type GetAdminWorkspaceResourcesParams struct {
 	AgentSpaceId string `form:"agentSpaceId" json:"agentSpaceId"`
 }
 
+// GetAdminWorkspaceThumbnailParams defines parameters for GetAdminWorkspaceThumbnail.
+type GetAdminWorkspaceThumbnailParams struct {
+	// AgentSpaceId Expected current space from WorkspaceProjection; mismatch is 409. Never selects another user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+
+	// Path Nonempty workspace-relative source path, encoded once.
+	Path string `form:"path" json:"path"`
+
+	// Size Maximum thumbnail edge; no upscaling.
+	Size *GetAdminWorkspaceThumbnailParamsSize `form:"size,omitempty" json:"size,omitempty"`
+
+	// ExpectedEtag Single quoted strong source ETag. This is independent of derived representation conditions in HTTP headers.
+	ExpectedEtag string `form:"expectedEtag" json:"expectedEtag"`
+
+	// IfMatch Standard condition on the derived thumbnail ETag, including standard lists and wildcard semantics.
+	IfMatch *string `json:"If-Match,omitempty"`
+
+	// IfNoneMatch Standard condition on the derived thumbnail ETag, including standard lists and wildcard semantics.
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
+// GetAdminWorkspaceThumbnailParamsSize defines parameters for GetAdminWorkspaceThumbnail.
+type GetAdminWorkspaceThumbnailParamsSize int
+
+// HeadAdminWorkspaceThumbnailParams defines parameters for HeadAdminWorkspaceThumbnail.
+type HeadAdminWorkspaceThumbnailParams struct {
+	// AgentSpaceId Expected current space from WorkspaceProjection; mismatch is 409. Never selects another user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+
+	// Path Nonempty workspace-relative source path, encoded once.
+	Path string `form:"path" json:"path"`
+
+	// Size Maximum thumbnail edge; no upscaling.
+	Size *HeadAdminWorkspaceThumbnailParamsSize `form:"size,omitempty" json:"size,omitempty"`
+
+	// ExpectedEtag Single quoted strong source ETag. This is independent of derived representation conditions in HTTP headers.
+	ExpectedEtag string `form:"expectedEtag" json:"expectedEtag"`
+
+	// IfMatch Standard condition on the derived thumbnail ETag, including standard lists and wildcard semantics.
+	IfMatch *string `json:"If-Match,omitempty"`
+
+	// IfNoneMatch Standard condition on the derived thumbnail ETag, including standard lists and wildcard semantics.
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
+// HeadAdminWorkspaceThumbnailParamsSize defines parameters for HeadAdminWorkspaceThumbnail.
+type HeadAdminWorkspaceThumbnailParamsSize int
+
+// GetAdminWorkspaceThumbnailCapabilitiesParams defines parameters for GetAdminWorkspaceThumbnailCapabilities.
+type GetAdminWorkspaceThumbnailCapabilitiesParams struct {
+	// AgentSpaceId Expected current space from WorkspaceProjection; mismatch is 409. Never selects another user.
+	AgentSpaceId AgentSpaceId `form:"agentSpaceId" json:"agentSpaceId"`
+}
+
 // DisableUserParams defines parameters for DisableUser.
 type DisableUserParams struct {
 	XCSRFToken     string         `json:"X-CSRF-Token"`
@@ -5058,6 +5246,128 @@ type SetPasswordJSONRequestBody = SetPasswordRequest
 
 // SetUserRoleJSONRequestBody defines body for SetUserRole for application/json ContentType.
 type SetUserRoleJSONRequestBody = SetUserRoleRequest
+
+// Getter for additional properties for WorkspaceThumbnailCapabilities. Returns the specified
+// element and whether it was found
+func (a WorkspaceThumbnailCapabilities) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for WorkspaceThumbnailCapabilities
+func (a *WorkspaceThumbnailCapabilities) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for WorkspaceThumbnailCapabilities to handle AdditionalProperties
+func (a *WorkspaceThumbnailCapabilities) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["contentType"]; found {
+		err = json.Unmarshal(raw, &a.ContentType)
+		if err != nil {
+			return fmt.Errorf("error reading 'contentType': %w", err)
+		}
+		delete(object, "contentType")
+	}
+
+	if raw, found := object["mediaKinds"]; found {
+		err = json.Unmarshal(raw, &a.MediaKinds)
+		if err != nil {
+			return fmt.Errorf("error reading 'mediaKinds': %w", err)
+		}
+		delete(object, "mediaKinds")
+	}
+
+	if raw, found := object["schemaVersion"]; found {
+		err = json.Unmarshal(raw, &a.SchemaVersion)
+		if err != nil {
+			return fmt.Errorf("error reading 'schemaVersion': %w", err)
+		}
+		delete(object, "schemaVersion")
+	}
+
+	if raw, found := object["sizes"]; found {
+		err = json.Unmarshal(raw, &a.Sizes)
+		if err != nil {
+			return fmt.Errorf("error reading 'sizes': %w", err)
+		}
+		delete(object, "sizes")
+	}
+
+	if raw, found := object["supported"]; found {
+		err = json.Unmarshal(raw, &a.Supported)
+		if err != nil {
+			return fmt.Errorf("error reading 'supported': %w", err)
+		}
+		delete(object, "supported")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for WorkspaceThumbnailCapabilities to handle AdditionalProperties
+func (a WorkspaceThumbnailCapabilities) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["contentType"], err = json.Marshal(a.ContentType)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'contentType': %w", err)
+	}
+
+	if a.MediaKinds != nil {
+		object["mediaKinds"], err = json.Marshal(a.MediaKinds)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'mediaKinds': %w", err)
+		}
+	}
+
+	object["schemaVersion"], err = json.Marshal(a.SchemaVersion)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'schemaVersion': %w", err)
+	}
+
+	if a.Sizes != nil {
+		object["sizes"], err = json.Marshal(a.Sizes)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'sizes': %w", err)
+		}
+	}
+
+	object["supported"], err = json.Marshal(a.Supported)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'supported': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -5352,6 +5662,15 @@ type ServerInterface interface {
 
 	// (GET /api/admin/v1/users/{userId}/workspace/resources)
 	GetAdminWorkspaceResources(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceResourcesParams)
+
+	// (GET /api/admin/v1/users/{userId}/workspace/thumbnail)
+	GetAdminWorkspaceThumbnail(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceThumbnailParams)
+
+	// (HEAD /api/admin/v1/users/{userId}/workspace/thumbnail)
+	HeadAdminWorkspaceThumbnail(w http.ResponseWriter, r *http.Request, userId UserId, params HeadAdminWorkspaceThumbnailParams)
+
+	// (OPTIONS /api/admin/v1/users/{userId}/workspace/thumbnail)
+	GetAdminWorkspaceThumbnailCapabilities(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceThumbnailCapabilitiesParams)
 
 	// (POST /api/admin/v1/users/{userId}:disable)
 	DisableUser(w http.ResponseWriter, r *http.Request, userId UserId, params DisableUserParams)
@@ -5855,6 +6174,21 @@ func (_ Unimplemented) RevealWorkspaceMCP(w http.ResponseWriter, r *http.Request
 
 // (GET /api/admin/v1/users/{userId}/workspace/resources)
 func (_ Unimplemented) GetAdminWorkspaceResources(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceResourcesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/admin/v1/users/{userId}/workspace/thumbnail)
+func (_ Unimplemented) GetAdminWorkspaceThumbnail(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceThumbnailParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (HEAD /api/admin/v1/users/{userId}/workspace/thumbnail)
+func (_ Unimplemented) HeadAdminWorkspaceThumbnail(w http.ResponseWriter, r *http.Request, userId UserId, params HeadAdminWorkspaceThumbnailParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (OPTIONS /api/admin/v1/users/{userId}/workspace/thumbnail)
+func (_ Unimplemented) GetAdminWorkspaceThumbnailCapabilities(w http.ResponseWriter, r *http.Request, userId UserId, params GetAdminWorkspaceThumbnailCapabilitiesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -11459,6 +11793,290 @@ func (siw *ServerInterfaceWrapper) GetAdminWorkspaceResources(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminWorkspaceThumbnail operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminWorkspaceThumbnail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminWorkspaceThumbnailParams
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "size", r.URL.Query(), &params.Size, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "expectedEtag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedEtag", r.URL.Query(), &params.ExpectedEtag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedEtag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedEtag", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminWorkspaceThumbnail(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// HeadAdminWorkspaceThumbnail operation middleware
+func (siw *ServerInterfaceWrapper) HeadAdminWorkspaceThumbnail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params HeadAdminWorkspaceThumbnailParams
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "size", r.URL.Query(), &params.Size, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "expectedEtag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedEtag", r.URL.Query(), &params.ExpectedEtag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedEtag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedEtag", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-None-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-None-Match", Err: err})
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.HeadAdminWorkspaceThumbnail(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminWorkspaceThumbnailCapabilities operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminWorkspaceThumbnailCapabilities(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminWorkspaceThumbnailCapabilitiesParams
+
+	// ------------- Required query parameter "agentSpaceId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "agentSpaceId", r.URL.Query(), &params.AgentSpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agentSpaceId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agentSpaceId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminWorkspaceThumbnailCapabilities(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DisableUser operation middleware
 func (siw *ServerInterfaceWrapper) DisableUser(w http.ResponseWriter, r *http.Request) {
 
@@ -12156,6 +12774,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/files", wrapper.MutateAdminWorkspaceFile)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/thumbnail", wrapper.GetAdminWorkspaceThumbnail)
+	})
+	r.Group(func(r chi.Router) {
+		r.Head(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/thumbnail", wrapper.HeadAdminWorkspaceThumbnail)
+	})
+	r.Group(func(r chi.Router) {
+		r.Options(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/thumbnail", wrapper.GetAdminWorkspaceThumbnailCapabilities)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/admin/v1/users/{userId}/workspace/content", wrapper.DownloadAdminWorkspaceFile)

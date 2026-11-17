@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { Quasar, QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog, QSpinner, ClosePopup } from 'quasar'
+import { Quasar, QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog, QSpinner, QFile, QCheckbox, QSeparator, QLinearProgress, QList, QItem, QItemSection, QItemLabel, QIcon, QMenu, ClosePopup } from 'quasar'
 import WorkspacePanel from './WorkspacePanel.vue'
+import WorkspaceTextEditor from './WorkspaceTextEditor.vue'
 import * as client from '../api/client'
 import { useSessionStore } from '../stores/session'
 import { useRemoteWorkspaceStore, type WorkspaceService } from '../stores/remoteWorkspace'
@@ -189,6 +190,52 @@ describe('workspace MCP and desktop credentials', () => {
 })
 
 describe('workspace file prerequisites', () => {
+  it.each(['direct replacement', 'deleted projection without a space'])('retains an actual unsaved editor through same-user %s without rebinding its write target', async transition => {
+    const pinia = createPinia()
+    useSessionStore(pinia).session = { user: { userId: 'usr_admin', displayName: 'Admin', role: 'ADMIN' }, csrfToken: 'test-csrf', expiresAt: '2030-01-01T00:00:00Z' }
+    let next: components['schemas']['WorkspaceProjection'] = {
+      schemaVersion: 1, state: 'CONNECTED', serviceState: 'ENABLED', bindingRevision: 1,
+      agentSpaceId: 'spc_original', mcpAvailable: false, mcpReason: 'mcp_not_published', filesAvailable: true, filesReason: 'available',
+    }
+    const listings = vi.spyOn(client, 'apiFetch').mockImplementation(async path => path.includes('/files?') ? { entries: [] } as never : next as never)
+    const requests = vi.spyOn(client, 'apiResponse').mockImplementation(async () => new Response(JSON.stringify({ schemaVersion: 1, supported: false, sizes: [], contentType: 'image/webp', mediaKinds: [] }), { headers: { 'Content-Type': 'application/json', 'Agent-Space-Id': next.agentSpaceId ?? '' } }))
+    const wrapper = mount(WorkspacePanel, {
+      props: { userId: 'usr_same', serviceEnabled: true },
+      global: {
+        plugins: [pinia, [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog, QSpinner, QFile, QCheckbox, QSeparator, QLinearProgress, QList, QItem, QItemSection, QItemLabel, QIcon, QMenu }, directives: { ClosePopup } }]],
+        stubs: { WorkspaceResources: true, WorkspaceDAVAccess: true, ProblemBanner: true, QDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } },
+      },
+    })
+    try {
+      await flushPromises()
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '浏览文件')!.trigger('click'); await flushPromises()
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '新建文本')!.trigger('click'); await flushPromises()
+      const editor = wrapper.getComponent(WorkspaceTextEditor)
+      await editor.findAllComponents(QInput).find(input => input.props('label') === '文本内容')!.setValue('unsaved original-space draft')
+      if (transition === 'deleted projection without a space') {
+        const filesBefore = listings.mock.calls.filter(([path]) => path.includes('/files?')).length
+        const optionsBefore = requests.mock.calls.length
+        next = { ...next, state: 'DELETED', agentSpaceId: undefined, filesAvailable: false, filesReason: 'workspace_not_provisioned', bindingRevision: 2 }
+        await wrapper.get('[aria-label="刷新工作区"]').trigger('click'); await flushPromises()
+        expect(wrapper.findComponent(WorkspaceTextEditor).exists()).toBe(true)
+        const boundCalls = [...listings.mock.calls, ...requests.mock.calls].filter(([path]) => /\/(files|thumbnail)\?/.test(path))
+        expect(boundCalls.filter(([path]) => new URL(path, 'http://localhost').searchParams.get('agentSpaceId') === '')).toEqual([])
+        expect(listings.mock.calls.filter(([path]) => path.includes('/files?'))).toHaveLength(filesBefore)
+        expect(requests).toHaveBeenCalledTimes(optionsBefore)
+      }
+      next = { ...next, state: 'CONNECTED', agentSpaceId: 'spc_replacement', filesAvailable: true, filesReason: 'available', bindingRevision: 3 }
+      await wrapper.get('[aria-label="刷新工作区"]').trigger('click'); await flushPromises()
+      const retained = wrapper.findComponent(WorkspaceTextEditor)
+      expect(retained.exists()).toBe(true)
+      expect(retained.props()).toMatchObject({ baseUrl: '/api/admin/v1/users/usr_same/workspace', spaceId: 'spc_original', available: false })
+      expect(retained.findAllComponents(QInput).find(input => input.props('label') === '文本内容')!.props('modelValue')).toBe('unsaved original-space draft')
+      const save = retained.findAllComponents(QBtn).find(button => button.props('label') === '保存并关闭')!
+      expect(save.props('disable')).toBe(true)
+      await save.trigger('click'); await flushPromises()
+      expect(requests.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+    } finally { wrapper.unmount() }
+  })
+
   it.each(['already displayed', 'still pending'])('discards %s credentials when the independent DAV revision changes', async timing => {
     const pinia = createPinia()
     useSessionStore(pinia).session = { csrfToken: 'test-csrf' } as components['schemas']['AdminSession']

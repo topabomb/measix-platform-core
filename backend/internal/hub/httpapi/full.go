@@ -51,8 +51,20 @@ func RegisterFull(ctx context.Context, router chi.Router, services Services) {
 		enterpriseUpdate: services.EnterpriseUpdate, budget: services.Budget, usage: services.Usage,
 		workspace: services.Workspace,
 	}
-	adminapi.HandlerFromMux(admin, router)
-	clientapi.HandlerWithOptions(client, clientapi.ChiServerOptions{BaseRouter: router, ErrorHandlerFunc: clientBindingError})
+	adminapi.HandlerWithOptions(admin, adminapi.ChiServerOptions{BaseRouter: router, ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+		if thumbnailPath(r.URL.Path) {
+			admin.adminWorkspaceThumbnail(w, r, chi.URLParam(r, "userId"))
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}})
+	clientapi.HandlerWithOptions(client, clientapi.ChiServerOptions{BaseRouter: router, ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+		if thumbnailPath(r.URL.Path) {
+			client.clientWorkspaceThumbnail(w, r)
+			return
+		}
+		clientBindingError(w, r, err)
+	}})
 }
 
 // Required security-header binding failures retain the Portal protocol's 403,

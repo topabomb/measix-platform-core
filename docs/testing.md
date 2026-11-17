@@ -130,6 +130,33 @@ node scripts/workspace-integration.mjs --config <local-config.json> --output <ne
 
 `--ui-only --output <directory>` 建立未配置环境供真实网页操作；`--keep-ui` 在通过后保留审查用户。登录资料写私有 `ui-env.json`，不输出到终端。脚本不安装第三方服务，不代替生产版本核验、浏览器或 Android 验收；完整 S1 compute/storage 计量仍按阶段权威推进。间歇传输失败记录与未确认根因见[历史证据和风险](s0-execution-progress.md#保留的失败边界)。
 
+### 媒体缩略图验证
+
+能力复用与取消样例见[工作区接入说明](remote-workspace-implementation.md#客户端能力识别与会话复用)。单元验证不启动 Docker：
+
+```text
+node --test scripts/examples/workspace-thumbnail-session.test.mjs scripts/examples/workspace-thumbnail-demo.test.mjs scripts/workspace-thumbnail-browser.test.mjs
+python3 -B scripts/fixtures/workspace-preview-service.test.py
+```
+
+Python unittest 核对精确身份预检、证据不可覆盖和启动失败后的 owner 清理，不以替身证明媒体生成。真实浏览器入口如下（Windows D 盘、Ubuntu WSL Docker 集成与 `/dev/kvm` 可用，WSL 有 Python 3、Pillow、FFmpeg；已有生产 SPA 及明确资格镜像；参数摘要从独立构建记录取得）：
+
+```text
+node scripts/workspace-thumbnail-browser.mjs --agent-space-source /home/hualei/msb_demo/agent-space --image sha256:<qualified-server-image> --expected-source <source-sha256> --expected-helper <helper-build-id> --expected-workspace sha256:<workspace-image-id> --admin-build sha256:<admin-build-hash> --output D:\RustProject\measix\measix-platform-core\.artifacts\media-preview\<new-run>
+```
+
+入口拒绝占用证据目录及低于 5 GiB 的 D 盘容量，固定镜像、helper、后端源码、验证源码和 SPA 副本。复用现有 Hub/Relay harness 与 Agent Space FixtureOwner；业务对象经 Admin API 创建/删除，临时凭据单独保护，不读写既有业务库。桌面/390px 同时验证列表128/卡片256、可见队列、能力复用、版本、原预览/CRUD/文本草稿、撤销及取消。每个迟到注入先记录真实 200 正文/空间/源版本/摘要；页面隐藏明确使用事件注入，不能冒称 OS 隐藏。活动读取与取消后原始网络收尾分别保留。结束核对本轮进程/容器/卷清理和原资源保全，日志/失败与成功证据不覆盖；private-temp 可再生缓存留待统一清理。
+
+同入口增加 `--api-only` 执行真实 Client/Admin API、接入样例、原 CRUD/Range 与凭据隔离，并捕获 Client 原始合同正文；此模式要求明确的 Workspace 镜像身份，不启动 Playwright。`--legacy-only --admin-build sha256:<admin-build-hash> --output <new-run>` 使用真实标准 DAV 文件服务和明确的管理替身，原生缺失资源为404，405及403由限定回环代理注入；记录每次根认证与预览路径请求，验证不支持和权限失败分别处理。该 lane 不作为历史 Runcove 发行镜像验证。
+
+固定旧 Tuck 兼容入口只回放当前 Core 真实 Client API 的原始响应，不替换 Tuck 源文件：
+
+```text
+node scripts/verify-tuck-workspace-compat.mjs --tuck <fixed-clean-tuck-checkout> --baseline <consumer-baseline.json> --manifest <client-contract-cases/manifest.json> --output <new-evidence-directory>
+```
+
+baseline 固定消费者 HEAD、干净状态和四个消费者文件的 SHA；manifest 固定真实 Client workspace、根及非空子目录的 200 原始正文、路径、长度/摘要和 Core/Provider 身份。入口拒绝 Admin 替代响应、逃逸路径、错误摘要及占用输出。Go overlay 在证据目录提供外部测试，调用旧版真实 `responseJSON`/合同和 `EnterpriseWorkspace.Handle`，执行路径保护负例及既有 Range/条件/CRUD/ZIP/取消测试；`-mod=readonly`，TEMP/GOTMPDIR 归本轮，前后复核源树和捕获不变。这证明固定旧消费者解析/处理回放兼容，不宣称 Tuck 桌面真实联网或其新缩略图界面已实现。
+
 ### WebDAV、实际旧库与大文件验证
 
 `scripts/webdav-acceptance.mjs` 用固定旧 Hub 二进制建立有用户、空间、文件、SecretVersion、Release、未发布草稿及显式撤销的库，再备份、升级两次并逐表比较原列。另恢复备份运行旧版 check 和业务读取。必须传新的输出目录，失败证据不覆盖。

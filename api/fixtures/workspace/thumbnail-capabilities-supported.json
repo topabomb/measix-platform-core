@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "supported": true,
+  "sizes": [
+    128,
+    256,
+    512
+  ],
+  "contentType": "image/webp",
+  "mediaKinds": [
+    "IMAGE",
+    "VIDEO"
+  ]
+}

@@ -1218,6 +1218,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/v1/users/{userId}/workspace/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read a bounded fixed-source-version WebP thumbnail. Unknown or duplicate query parameters are rejected. Range is ignored. Responses are no-store and nosniff; ordinary content, download and video semantics stay unchanged. No request body is accepted. */
+        get: operations["getAdminWorkspaceThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        /** @description Query optional thumbnail protocol without reading a source file. Only agentSpaceId is accepted. Confirmed old services return supported=false; network, identity and protocol failures remain errors. No request body is accepted. */
+        options: operations["getAdminWorkspaceThumbnailCapabilities"];
+        /** @description Read a bounded fixed-source-version WebP thumbnail. Unknown or duplicate query parameters are rejected. Range is ignored. Responses are no-store and nosniff; ordinary content, download and video semantics stay unchanged. No request body is accepted. Every HEAD response is bodyless, including failures. */
+        head: operations["headAdminWorkspaceThumbnail"];
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/v1/users/{userId}/workspace/content": {
         parameters: {
             query?: never;
@@ -1276,6 +1295,18 @@ export interface components {
             agentSpaceId: components["schemas"]["AgentSpaceId"];
             remoteUsername: string;
             bindingRevision: number;
+        };
+        /** @description Optional thumbnail protocol capability, independent of directory listing and filesAvailable. supported=true requires all v1 sizes and media kinds; supported=false requires empty arrays. Capability does not prove current decoder or VM health. Unknown response fields may be ignored. */
+        WorkspaceThumbnailCapabilities: {
+            /** @enum {integer} */
+            schemaVersion: 1;
+            supported: boolean;
+            sizes: (128 | 256 | 512)[];
+            /** @enum {string} */
+            contentType: "image/webp";
+            mediaKinds: ("IMAGE" | "VIDEO")[];
+        } & {
+            [key: string]: unknown;
         };
         WorkspaceFileEntry: {
             path: string;
@@ -5822,6 +5853,477 @@ export interface operations {
                 };
             };
             default: components["responses"]["Problem"];
+        };
+    };
+    getAdminWorkspaceThumbnail: {
+        parameters: {
+            query: {
+                /** @description Expected current space from WorkspaceProjection; mismatch is 409. Never selects another user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
+                /** @description Nonempty workspace-relative source path, encoded once. */
+                path: string;
+                /** @description Maximum thumbnail edge; no upscaling. */
+                size?: 128 | 256 | 512;
+                /** @description Single quoted strong source ETag. This is independent of derived representation conditions in HTTP headers. */
+                expectedEtag: string;
+            };
+            header?: {
+                /** @description Standard condition on the derived thumbnail ETag, including standard lists and wildcard semantics. */
+                "If-Match"?: string;
+                /** @description Standard condition on the derived thumbnail ETag, including standard lists and wildcard semantics. */
+                "If-None-Match"?: string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Complete derived thumbnail or HEAD metadata. */
+            200: {
+                headers: {
+                    /** @description Authenticated expected workspace identity. */
+                    "Agent-Space-Id"?: string;
+                    /** @description Exact strong source version requested in expectedEtag. */
+                    "Preview-Source-ETag"?: string;
+                    /** @description Quoted SHA-256 of the derived WebP bytes; never the source ETag. */
+                    ETag?: string;
+                    /** @description Full derived representation length when present, at most 1048576 bytes. HEAD and 304 carry no response body. */
+                    "Content-Length"?: string;
+                    /** @description Fixed safe inline thumbnail.webp filename. */
+                    "Content-Disposition"?: string;
+                    "Cache-Control"?: "no-store";
+                    "X-Content-Type-Options"?: "nosniff";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": string;
+                };
+            };
+            /** @description Not modified after current source version and authority checks; no body. */
+            304: {
+                headers: {
+                    /** @description Authenticated expected workspace identity. */
+                    "Agent-Space-Id"?: string;
+                    /** @description Exact strong source version requested in expectedEtag. */
+                    "Preview-Source-ETag"?: string;
+                    /** @description Quoted SHA-256 of the derived WebP bytes; never the source ETag. */
+                    ETag?: string;
+                    /** @description Full derived representation length when present, at most 1048576 bytes. HEAD and 304 carry no response body. */
+                    "Content-Length"?: string;
+                    /** @description Fixed safe inline thumbnail.webp filename. */
+                    "Content-Disposition"?: string;
+                    "Cache-Control"?: "no-store";
+                    "X-Content-Type-Options"?: "nosniff";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invalid_preview_request or existing protected-path validation; correct the request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core authentication invalid; use the existing session lifecycle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core permission denied or file_forbidden; does not prove the DAV key invalid. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_not_found; never infer unsupported capability from this status alone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_space_mismatch; refresh the current workspace target. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_version_conflict for source or derived conditions; refresh metadata before a new request. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_source_limit; keep the file icon. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_unsupported_media for this file; retain the service capability. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_decode_failed for this file; keep the file icon. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_busy; honor Retry-After without blocking ordinary file requests. */
+            429: {
+                headers: {
+                    "Retry-After"?: "1";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_not_supported, only after independent capability and authenticated DAV-root confirmation. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_unavailable, preview_timeout, preview_dependency_unavailable, preview_protocol_error, dav_credential_unavailable or workspace_unavailable. Preview failures do not otherwise withdraw Files. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAdminWorkspaceThumbnailCapabilities: {
+        parameters: {
+            query: {
+                /** @description Expected current space from WorkspaceProjection; mismatch is 409. Never selects another user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
+            };
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Valid v1 capability; supported=false is a confirmed optional-extension absence. */
+            200: {
+                headers: {
+                    /** @description Current authenticated workspace identity. */
+                    "Agent-Space-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceThumbnailCapabilities"];
+                };
+            };
+            /** @description invalid_preview_request or existing protected-path validation; correct the request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core authentication invalid; use the existing session lifecycle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Core permission denied or file_forbidden; does not prove the DAV key invalid. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_not_found; never infer unsupported capability from this status alone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description workspace_space_mismatch; refresh the current workspace target. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description file_version_conflict for source or derived conditions; refresh metadata before a new request. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_source_limit; keep the file icon. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_unsupported_media for this file; retain the service capability. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_decode_failed for this file; keep the file icon. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_busy; honor Retry-After without blocking ordinary file requests. */
+            429: {
+                headers: {
+                    "Retry-After"?: "1";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_not_supported, only after independent capability and authenticated DAV-root confirmation. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description preview_unavailable, preview_timeout, preview_dependency_unavailable, preview_protocol_error, dav_credential_unavailable or workspace_unavailable. Preview failures do not otherwise withdraw Files. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    headAdminWorkspaceThumbnail: {
+        parameters: {
+            query: {
+                /** @description Expected current space from WorkspaceProjection; mismatch is 409. Never selects another user. */
+                agentSpaceId: components["schemas"]["AgentSpaceId"];
+                /** @description Nonempty workspace-relative source path, encoded once. */
+                path: string;
+                /** @description Maximum thumbnail edge; no upscaling. */
+                size?: 128 | 256 | 512;
+                /** @description Single quoted strong source ETag. This is independent of derived representation conditions in HTTP headers. */
+                expectedEtag: string;
+            };
+            header?: {
+                /** @description Standard condition on the derived thumbnail ETag, including standard lists and wildcard semantics. */
+                "If-Match"?: string;
+                /** @description Standard condition on the derived thumbnail ETag, including standard lists and wildcard semantics. */
+                "If-None-Match"?: string;
+            };
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Complete derived thumbnail or HEAD metadata. */
+            200: {
+                headers: {
+                    /** @description Authenticated expected workspace identity. */
+                    "Agent-Space-Id"?: string;
+                    /** @description Exact strong source version requested in expectedEtag. */
+                    "Preview-Source-ETag"?: string;
+                    /** @description Quoted SHA-256 of the derived WebP bytes; never the source ETag. */
+                    ETag?: string;
+                    /** @description Full derived representation length when present, at most 1048576 bytes. HEAD and 304 carry no response body. */
+                    "Content-Length"?: string;
+                    /** @description Fixed safe inline thumbnail.webp filename. */
+                    "Content-Disposition"?: string;
+                    "Cache-Control"?: "no-store";
+                    "X-Content-Type-Options"?: "nosniff";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not modified after current source version and authority checks; no body. */
+            304: {
+                headers: {
+                    /** @description Authenticated expected workspace identity. */
+                    "Agent-Space-Id"?: string;
+                    /** @description Exact strong source version requested in expectedEtag. */
+                    "Preview-Source-ETag"?: string;
+                    /** @description Quoted SHA-256 of the derived WebP bytes; never the source ETag. */
+                    ETag?: string;
+                    /** @description Full derived representation length when present, at most 1048576 bytes. HEAD and 304 carry no response body. */
+                    "Content-Length"?: string;
+                    /** @description Fixed safe inline thumbnail.webp filename. */
+                    "Content-Disposition"?: string;
+                    "Cache-Control"?: "no-store";
+                    "X-Content-Type-Options"?: "nosniff";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invalid_preview_request or existing protected-path validation; correct the request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Core authentication invalid; use the existing session lifecycle. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Core permission denied or file_forbidden; does not prove the DAV key invalid. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description file_not_found; never infer unsupported capability from this status alone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description workspace_space_mismatch; refresh the current workspace target. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description file_version_conflict for source or derived conditions; refresh metadata before a new request. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description preview_source_limit; keep the file icon. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description preview_unsupported_media for this file; retain the service capability. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description preview_decode_failed for this file; keep the file icon. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description preview_busy; honor Retry-After without blocking ordinary file requests. */
+            429: {
+                headers: {
+                    "Retry-After"?: "1";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description preview_not_supported, only after independent capability and authenticated DAV-root confirmation. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description preview_unavailable, preview_timeout, preview_dependency_unavailable, preview_protocol_error, dav_credential_unavailable or workspace_unavailable. Preview failures do not otherwise withdraw Files. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description HEAD failure metadata without a response body. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     downloadAdminWorkspaceFile: {

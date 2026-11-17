@@ -28,6 +28,8 @@ type Error struct {
 	Unknown bool
 	// ContentRange contains only a validated unsatisfied byte range from DAV.
 	ContentRange string
+	// RetryAfter is set to the preview protocol's fixed one-second busy delay.
+	RetryAfter string
 }
 
 func (e *Error) Error() string  { return "agent space: " + e.Code }

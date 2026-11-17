@@ -6,7 +6,7 @@
 
 本轮修改 Agent Space/Runcove、Core（含 Admin）及架构合同；Tuck/Pilot 是兼容消费者，不在其仓库实现界面。沿用原 checkout，保留既有数据和 Agent Space 原有 ahead 提交；三个仓库的提交身份与推送状态由 Git 记录拥有。生产部署与发行不在本轮范围。协议权威为 Agent Space 的 `docs/webdav.md`「媒体预览扩展 v1」，平台边界由 S1 合同拥有。
 
-本次按下表顺序实施，每阶段由未参与实现的审查者关闭发现后进入下一阶段；最终又对三个仓库分别独立审查。以下保存本轮固定输入与验证结果，不新增长期交付流程。
+2026-11-17 按下表顺序实施，每阶段由未参与实现的审查者关闭发现后进入下一阶段；最终又对三个仓库分别独立审查。以下保存当轮固定输入与验证结果，次日完整复审另记于下文，不新增长期交付流程。
 
 | 阶段 | 交付与必须证明的结果 | 状态 |
 | --- | --- | --- |
@@ -26,9 +26,19 @@
 
 阶段 4 证据分别为 `.artifacts/media-preview/stage4-real-api-final-20261117-690fb2/`、`stage4-legacy-dav-20261117-ce274d/`、`stage4-tuck-compat-20261117-a091e3/` 和 `stage4-tooling-final.*`。原 Tuck 捕获来自先前 `stage4-real-api-20261117-a091e3/`，该轮联合覆盖文字由旁侧说明收窄，后续补齐 Admin HEAD/304；两轮后端源码/二进制与 SPA 完全一致，原始捕获未改。所有 lane 成功前及清理后均复核中断标记，真实输入快照保留。新工具测试在全新证据目录初始化的发现已修复；每轮本身清理成功，既有容器/卷保全，可再生缓存的清理与保留边界归下述收尾记录。
 
-逐仓最终审查发现并修复了目录导航失败时旧目录缩略图需求被清空的恢复问题。当前失败回调只在原请求仍有效时恢复同一 owner 的需求，不重置能力、限流或主体。新输入见 `.artifacts/media-preview/final-review-admin-ui.json`，完整 398 项 Console 测试/类型检查/构建及 135 项工具测试通过；`final-review-browser-20261117-790de4/` 两宽各 13 组与 10 次真实 held-200 取消通过，包含真实目录删除后404、旧列表/错误保留、图/视频自动恢复和仅一次 OPTIONS。当前 SPA 为 `700dd18f…`，旧 `b0c3b5aa…` 保留为历史资格；后台源码与 Hub/Relay 二进制逐字相同，原 API/legacy/Tuck 后台证明仍有效。
+逐仓最终审查发现并修复了目录导航失败时旧目录缩略图需求被清空的恢复问题。当前失败回调只在原请求仍有效时恢复同一 owner 的需求，不重置能力、限流或主体。新输入见 `.artifacts/media-preview/final-review-admin-ui.json`，完整 398 项 Console 测试/类型检查/构建及 135 项工具测试通过；`final-review-browser-20261117-790de4/` 两宽各 13 组与 10 次真实 held-200 取消通过，包含真实目录删除后404、旧列表/错误保留、图/视频自动恢复和仅一次 OPTIONS。该轮 SPA 为 `700dd18f…`，旧 `b0c3b5aa…` 保留为历史资格；后台源码与 Hub/Relay 二进制逐字相同，原 API/legacy/Tuck 后台证明仍有效。
 
 清理结果见 `.artifacts/media-preview/final-cleanup-result.json`：已移除约 1.7 GiB 的本轮 Linux 冻结构建副本、一次性合同生成器和包管理器 shim；合格镜像、必要原始证据及旧失败记录保留。约 3.3 MB 可再生测试缓存因执行工具策略保留，不进入源码提交。原 1 个容器和 50 个卷精确保全，无运行容器，未移动文件到 C 盘。
+
+**2026-11-18 完整复审与性能验证。** 子代理逐文件审查 Core 56、Agent Space 39、架构 4 个原始变更文件，并交叉复审新增修复。修复 Host 四个预览名额被已取消、未轮询正文长期占用；Admin 在同空间服务/配置/DAV 修订变化后保留旧会话；以及运行中低盘导致最终验收证据未写入。URL 热路径优化另经 cached/streaming 两个真实 Red 修正可变 Entry 的源版本围栏，旧 URL 与迟到正文均不能跨版本采用。首图持续采样、严格原生 Range 重叠等验收工具发现也已 Red→Green 并独立复审。
+
+视频 CLI 对照保持相同输出摘要，普通 MP4 / 透明 VP9 的媒体子进程分别从 4/5 个降为 3 个；Admin 同 tick 多属性更新的 OPTIONS 从 4 次降为 2 次（含各自初始发现），600k 次 URL helper 查询省去 120 万次序列化。微基准与 CLI 结果不代表整体 UI 加速。三入口新镜像及各一次增量重复、Standalone/Server 实际公开协议均通过；Agent Space 新输入 `70ae0aeb…`、helper `56fedcba…`，完整身份和受控取消后的成功续跑记录归其 `docs/evidence/media-preview-20261118/qualification.json`。
+
+本轮最终 SPA 为 `48956b18…`：412 项 Console 测试、类型检查、生产构建，完整 Go tests/vet、150 项工具测试、E2E 类型检查及 431 个生成材料字节不变检查通过。真实 API 6 组、旧服务 404/405/403 降级、固定旧 Tuck 对当前 Client 三份原始正文的消费回放，以及 1280/390px 各 13 组功能和共 10 次真实 held-200 取消通过。双宽负载各遍历 40 张不同 PNG/JPEG（0.3–7.7 MP）和两个视频，8 阶段可见渲染覆盖均为 100%、能力查询各 1 次、活动读取最多 2；各 1 次 429 后按合同退避，零普通错误/未结束请求。1 MiB 原文件 Range 均为 206、摘要正确，原生读取正重叠约 106/103 ms；不据此推断解码数、缓存命中或服务端 IO 调度。
+
+本轮固定证据见 `.artifacts/media-preview/audit-20261118/final-audit.json`，详细 lane 分别为 `audit-api-20261118-418e/`、`audit-browser-20261118-826d/`、`audit-performance-20261118-dd24/`、`audit-tuck-20261118-243c/`、`audit-legacy-v2-20261118-d2cf/`；Runcove 原始小证据另保留于 `runcove-qualification-20261118-70ae0aeb/`。旧失败与旧 SPA 资格未覆写，最终提交/推送身份归 Git 和同目录 `delivery.json`。基础 WebDAV 的 Basic/Bearer、无 Digest 的既有符合性边界已明确记录；没有扩展为完整 RFC 4918、生产部署、镜像 registry 推送或 Tuck/Pilot 新 UI 验收。
+
+本轮验收结束后仅定向删除已核实归属的 Linux 冻结构建副本和固定 base 临时 tar，释放约 1.19 GiB WSL 可用空间；原 1 个容器、50 个卷、全部合格镜像和必要日志保全，不移动到 C 盘，不执行全局 prune。清理原始记录及逐文件 SHA 索引随上述 Runcove 小证据保留。
 
 ## 固定 S0.2 Preview 组合
 

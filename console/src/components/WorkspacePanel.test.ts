@@ -24,6 +24,37 @@ describe('workspace MCP and desktop credentials', () => {
   const projection = { schemaVersion: 1, state: 'CONNECTED', serviceState: 'ENABLED', bindingRevision: 1, agentSpaceId: 'spc_test', mcpAvailable: false, mcpReason: 'mcp_not_published', filesAvailable: false }
   const credentials = { mcpUrl: 'https://space.test/u/test/mcp', username: 'test', token: 'key_fixture.secret' }
   const desktopService = (origin: string): WorkspaceService => ({ workspaceServiceId: 'wss_test', type: 'AGENT_SPACE', name: 'Space', configRevision: 1, activeConfigRevision: 1, enabled: true, state: 'ACTIVE', mcpServerId: 'mcp_test', mcpPublished: false, config: { adminOrigin: origin, mcpOrigin: origin, managementSecret: { secretId: 'sec_test', secretVersion: 1 }, connectTimeoutMs: 90000, idleTimeoutMs: 120000 } })
+  it.each(['binding', 'dav', 'config'])('invalidates pending thumbnail discovery when the same-space %s revision changes without an unavailable poll', async change => {
+    const pinia = createPinia()
+    const service = desktopService('http://space.test')
+    useRemoteWorkspaceStore(pinia).current = service
+    useSessionStore(pinia).session = { user: { userId: 'usr_admin', displayName: 'Admin', role: 'ADMIN' }, csrfToken: 'test-csrf', expiresAt: '2030-01-01T00:00:00Z' }
+    let next = { ...projection, filesAvailable: true, webdav: { resourceId: 'dav_test', available: true, reason: 'available', accessMode: 'FULL', desiredAccessMode: 'FULL', bindingRevision: 1, desiredBindingRevision: 1 } }
+    vi.spyOn(client, 'apiFetch').mockImplementation(async path => (path.includes('/links?') ? { mcpUrl: 'https://space.test/u/test/mcp' } : path.includes('/files?') ? { entries: [] } : next) as never)
+    const optional = vi.spyOn(client, 'apiResponse').mockImplementation(() => new Promise<Response>(() => {}))
+    const wrapper = mount(WorkspacePanel, {
+      props: { userId: 'usr_test', serviceEnabled: true },
+      global: { plugins: [pinia, [Quasar, { components: { QCard, QCardSection, QCardActions, QInput, QBtn, QBanner, QChip, QDialog, QSpinner, QFile, QCheckbox, QSeparator, QLinearProgress, QList, QItem, QItemSection, QItemLabel, QIcon, QMenu }, directives: { ClosePopup } }]], stubs: { WorkspaceResources: true, ProblemBanner: true, QDialog: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' } } },
+    })
+    try {
+      await flushPromises()
+      await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '浏览文件')!.trigger('click'); await flushPromises()
+      expect(optional).toHaveBeenCalledTimes(1)
+      const original = wrapper.getComponent({ name: 'WorkspaceFiles' }).vm.$.uid
+      const signal = optional.mock.calls[0]![1]!.signal as AbortSignal
+      if (change === 'config') useRemoteWorkspaceStore(pinia).current = { ...service, configRevision: 2, activeConfigRevision: 2 }
+      else {
+        next = change === 'binding' ? { ...next, bindingRevision: 2 } : { ...next, webdav: { ...next.webdav, bindingRevision: 2, desiredBindingRevision: 2 } }
+        await wrapper.get('[aria-label="刷新工作区"]').trigger('click')
+      }
+      await flushPromises()
+      expect(wrapper.getComponent({ name: 'WorkspaceFiles' }).vm.$.uid).toBe(original)
+      expect(signal.aborted).toBe(true)
+      expect(optional).toHaveBeenCalledTimes(2)
+      await wrapper.get('[aria-label="刷新工作区"]').trigger('click'); await flushPromises()
+      expect(optional).toHaveBeenCalledTimes(2)
+    } finally { wrapper.unmount() }
+  })
   it.each(['http://192.168.1.20:8932', 'http://127.0.0.1:18932'])('uses advertised public desktop links with backend origin %s', async origin => {
     const fetch = vi.spyOn(client, 'apiFetch').mockImplementation(async path =>
       (path.includes('/links?') ? { mcpUrl: 'https://space.example:8443/u/adopted-alice/mcp' } : projection) as never)

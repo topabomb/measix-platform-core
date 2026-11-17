@@ -29,6 +29,7 @@ const connectionOpen=ref(false),connection=ref<components['schemas']['WorkspaceD
 const davConnection=computed(()=>connection.value&&'davUrl' in connection.value?connection.value:undefined)
 const mcpConnection=computed(()=>connection.value&&'mcpUrl' in connection.value?connection.value:undefined)
 const showFiles=ref(false),showToken=ref(false),showResources=ref(false)
+const thumbnailRevision=computed(()=>JSON.stringify([remoteWorkspace.current?.workspaceServiceId,remoteWorkspace.current?.activeConfigRevision,view.value?.bindingRevision,view.value?.webdav?.desiredBindingRevision,view.value?.webdav?.bindingRevision]))
 const recoveryBearer=ref(''),recoverySecret=ref<components['schemas']['SecretRef']>()
 const url=computed(()=>`/api/admin/v1/users/${encodeURIComponent(props.userId)}/workspace`)
 const labels:Record<string,string>={UNPROVISIONED:'未开通',CONNECTING:'开通中',CONNECTED:'已开通',DISCONNECTING:'断开中',DISCONNECTED:'已断开',RESTORING:'恢复中',DELETING:'删除中',DELETED:'已删除',NEEDS_ATTENTION:'需要处理'}
@@ -126,7 +127,7 @@ onBeforeUnmount(()=>{alive=false;controller.abort();invalidateConnection();docum
     <details v-if="view.agentSpaceId" class="text-caption text-grey-7 q-mt-sm"><summary>空间标识与最近观测</summary><div class="text-break">{{view.agentSpaceId}}</div><div>{{view.observedAt?new Date(view.observedAt).toLocaleString():'未观测'}} · 绑定版本 {{view.bindingRevision}}</div></details>
    </template>
   </q-card-section>
-  <WorkspaceFiles v-if="showFiles" :base-url="url" :space-id="view?.agentSpaceId??''" :available="serviceEnabled&&!!view?.agentSpaceId&&!!view?.filesAvailable"/>
+  <WorkspaceFiles v-if="showFiles" :base-url="url" :space-id="view?.agentSpaceId??''" :thumbnail-revision="thumbnailRevision" :available="serviceEnabled&&!!view?.agentSpaceId&&!!view?.filesAvailable"/>
   <details v-if="view?.webdav" class="workspace-details"><summary>客户端 WebDAV <span class="text-grey-7">{{view.webdav.available ? (view.webdav.accessMode==='READ_ONLY'?'只读':'完整') : workspaceLabel(view.webdav.reason)}}</span><q-chip v-if="view.fileExchangeWebdavResourceId" dense size="sm" color="blue-1">默认文件交换空间</q-chip></summary>
     <WorkspaceDAVAccess :key="userId" :workspace="view" :base-url="url" :disabled="busy || !!pendingOperation || !serviceEnabled || view.state !== 'CONNECTED'" @changed="refresh" />
   </details>

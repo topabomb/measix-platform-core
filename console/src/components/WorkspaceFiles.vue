@@ -10,7 +10,7 @@ import WorkspaceTextEditor from './WorkspaceTextEditor.vue'
 const WorkspacePreview=defineAsyncComponent(()=>import('./WorkspacePreview.vue'))
 type Entry=components['schemas']['WorkspaceFileEntry']
 type Mutation=components['schemas']['WorkspaceFileMutation']
-const props=withDefaults(defineProps<{baseUrl:string;spaceId:string;available?:boolean}>(),{available:true}),session=useSessionStore()
+const props=withDefaults(defineProps<{baseUrl:string;spaceId:string;available?:boolean;thumbnailRevision?:string}>(),{available:true,thumbnailRevision:''}),session=useSessionStore()
 const fileScope=()=>JSON.stringify([props.baseUrl,props.spaceId,session.user?.userId??''])
 const fileUrl=(resource:'files'|'content',path='')=>workspaceFileUrl(props.baseUrl,props.spaceId,resource,path)
 const editor=ref<{path:string;create:boolean;baseUrl:string;spaceId:string;identity:string}>()
@@ -26,7 +26,7 @@ const preview=ref<Entry>(),selected=ref<Entry>(),action=ref<Mutation['action']>(
 const result=ref<components['schemas']['WorkspaceFileResult']>(),uploadFile=ref<File>(),progress=ref<number>(),transfer=ref('')
 let controller=new AbortController();let transferController:AbortController|undefined,xhr:XMLHttpRequest|undefined,alive=true,listRevision=0
 const entries=computed(()=>[...(list.value?.entries??[])].filter(e=>e.path.split('/').pop()!.toLocaleLowerCase().includes((search.value??'').toLocaleLowerCase())).sort((a,b)=>a.kind===b.kind?a.path.localeCompare(b.path):a.kind==='DIRECTORY'?-1:1))
-const thumbnails=useWorkspaceThumbnails({identity:()=>session.user?.userId??'',baseUrl:()=>props.baseUrl,spaceId:()=>props.spaceId,available:()=>props.available,entries:()=>entries.value,size:()=>viewMode.value==='list'?128:256})
+const thumbnails=useWorkspaceThumbnails({identity:()=>session.user?.userId??'',baseUrl:()=>props.baseUrl,spaceId:()=>props.spaceId,revision:()=>props.thumbnailRevision,available:()=>props.available,entries:()=>entries.value,size:()=>viewMode.value==='list'?128:256})
 const name=(path:string)=>path.split('/').filter(Boolean).pop()??path
 const join=(value:string)=>directory.value?directory.value+'/'+value:value
 watch([uploadFile,directory,()=>list.value?.entries.find(e=>e.path===join(uploadFile.value?.name??''))?.etag], () => { uploadOverwrite.value=false })

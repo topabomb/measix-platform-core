@@ -100,6 +100,53 @@ describe('workspace optional thumbnail lifecycle', () => {
     expect(Object.fromEntries(url.searchParams)).toEqual({ agentSpaceId: space, path: 'photo.png', expectedEtag: '"source-1"', size: '128' })
   })
 
+  it('coalesces same-tick target changes into one discovery of the final scope', async () => {
+    const fetch = vi.fn().mockImplementation(() => new Promise<Response>(() => {}))
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper } = render(); await flushPromises()
+    const previous = fetch.mock.calls[0]![1].signal as AbortSignal
+    await wrapper.setProps({ baseUrl: '/api/admin/v1/users/usr_next/workspace', spaceId: 'spc_next', thumbnailRevision: 'next-connection' }); await flushPromises()
+    expect(previous.aborted).toBe(true)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(String(fetch.mock.calls[1]![0])).toBe('/api/admin/v1/users/usr_next/workspace/thumbnail?agentSpaceId=spc_next')
+  })
+
+  it('coalesces rapid synchronous scope and access changes while cancelling the previous discovery immediately', async () => {
+    const fetch = vi.fn().mockImplementation(() => new Promise<Response>(() => {}))
+    vi.stubGlobal('fetch', fetch)
+    const state = ref({ base, space, available: true, revision: 'initial' })
+    const Harness = defineComponent({
+      setup() {
+        const thumbnails = useWorkspaceThumbnails({ identity: () => 'usr_admin', baseUrl: () => state.value.base, spaceId: () => state.value.space, available: () => state.value.available, revision: () => state.value.revision, entries: () => [] })
+        return { thumbnails }
+      },
+      render() { return h('div') },
+    })
+    const wrapper = mount(Harness); wrappers.push(wrapper); await flushPromises()
+    const previous = fetch.mock.calls[0]![1].signal as AbortSignal
+    state.value.base = '/intermediate/workspace'
+    expect(previous.aborted).toBe(true)
+    state.value.available = false
+    state.value.space = 'spc_next'
+    state.value.revision = 'next'
+    state.value.base = '/final/workspace'
+    state.value.available = true
+    expect(fetch).toHaveBeenCalledTimes(1)
+    await flushPromises()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(String(fetch.mock.calls[1]![0])).toBe('/final/workspace/thumbnail?agentSpaceId=spc_next')
+  })
+
+  it.each(['hidden', 'unmount'])('does not start queued discovery when %s happens before its microtask', async change => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(capability()))
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper } = render()
+    if (change === 'hidden') { vi.spyOn(document, 'hidden', 'get').mockReturnValue(true); document.dispatchEvent(new Event('visibilitychange')) }
+    else wrapper.unmount()
+    await flushPromises()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it.each(['baseUrl', 'spaceId', 'identity'])('discards a late old listing after changing %s', async change => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(capability(unsupported)))
     const pending = deferred<unknown>()
@@ -165,7 +212,56 @@ describe('workspace optional thumbnail lifecycle', () => {
     expect(fetch.mock.calls.filter(([, init]) => init.method === 'OPTIONS')).toHaveLength(1)
   })
 
-  it.each(['hidden', 'available', 'space', 'base', 'identity', 'directory', 'unmount'])('aborts a pending image and releases URLs on %s', async change => {
+  it('does not return a newly cached thumbnail to an old entry for the same path', async () => {
+    const fetch = vi.fn((url: string, init: RequestInit) => Promise.resolve(init.method === 'OPTIONS' ? capability() : thumbnail(new URL(url, 'http://localhost').searchParams.get('expectedEtag')!)))
+    vi.stubGlobal('fetch', fetch)
+    const oldEntry = image(), currentEntry = image('photo.png', '"source-2"')
+    const entries = ref<Entry[]>([])
+    const Harness = defineComponent({
+      setup() {
+        const thumbnails = useWorkspaceThumbnails({ identity: () => 'usr_admin', baseUrl: () => base, spaceId: () => space, available: () => true, entries: () => entries.value })
+        return { thumbnails }
+      },
+      render() { return h('div', entries.value.map(entry => h('span', { 'data-thumbnail-path': entry.path, ref: element => this.thumbnails.bind(entry, element) }))) },
+    })
+    const wrapper = mount(Harness); wrappers.push(wrapper); await flushPromises()
+    entries.value = [oldEntry]; await flushPromises(); show(); await flushPromises()
+    expect(wrapper.vm.thumbnails.url(oldEntry)).toBe('blob:thumbnail')
+    entries.value = [currentEntry]; await flushPromises(); show(); await flushPromises()
+    expect(wrapper.vm.thumbnails.url(currentEntry)).toBe('blob:thumbnail')
+    expect(wrapper.vm.thumbnails.url(oldEntry)).toBeUndefined()
+    expect(wrapper.vm.thumbnails.url(directory)).toBeUndefined()
+    expect(gets(fetch)).toHaveLength(2)
+  })
+
+  it.each(['cached', 'streaming'])('does not reuse a stale URL after an in-place ETag change in the %s state', async state => {
+    let bodyController: ReadableStreamDefaultController<Uint8Array> | undefined
+    const body = state === 'streaming' ? new ReadableStream<Uint8Array>({ start(controller) { bodyController = controller; controller.enqueue(new Uint8Array([82, 73, 70, 70])) } }) : new Uint8Array([82, 73, 70, 70])
+    const fetch = vi.fn((_url: string, init: RequestInit) => Promise.resolve(init.method === 'OPTIONS' ? capability() : thumbnail('"source-1"', body)))
+    vi.stubGlobal('fetch', fetch)
+    const entries = ref<Entry[]>([])
+    const Harness = defineComponent({
+      setup() {
+        const thumbnails = useWorkspaceThumbnails({ identity: () => 'usr_admin', baseUrl: () => base, spaceId: () => space, available: () => true, entries: () => entries.value })
+        return { thumbnails }
+      },
+      render() { return h('div', entries.value.map(entry => h('span', { 'data-thumbnail-path': entry.path, ref: element => this.thumbnails.bind(entry, element) }))) },
+    })
+    const wrapper = mount(Harness); wrappers.push(wrapper); await flushPromises()
+    entries.value = [image()]; await flushPromises(); show(); await flushPromises()
+    const originalArray = entries.value, sameEntry = entries.value[0]!
+    expect(wrapper.vm.thumbnails.url(sameEntry)).toBe(state === 'cached' ? 'blob:thumbnail' : undefined)
+    expect(new URL(String(gets(fetch)[0]![0]), 'http://localhost').searchParams.get('expectedEtag')).toBe('"source-1"')
+    sameEntry.etag = '"source-2"'; await flushPromises()
+    bodyController?.close(); await flushPromises()
+    expect(entries.value).toBe(originalArray)
+    expect(entries.value[0]).toBe(sameEntry)
+    expect(wrapper.vm.thumbnails.url(sameEntry)).toBeUndefined()
+    expect(gets(fetch)).toHaveLength(1)
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(state === 'cached' ? 1 : 0)
+  })
+
+  it.each(['hidden', 'available', 'space', 'base', 'identity', 'revision', 'directory', 'unmount'])('aborts a pending image and releases URLs on %s', async change => {
     const pending = deferred<Response>(); let index = 0
     const fetch = vi.fn((_url: string, init: RequestInit) => init.method === 'OPTIONS' ? Promise.resolve(capability()) : index++ === 0 ? Promise.resolve(thumbnail()) : pending.promise)
     vi.stubGlobal('fetch', fetch)
@@ -177,6 +273,7 @@ describe('workspace optional thumbnail lifecycle', () => {
     if (change === 'space') await wrapper.setProps({ spaceId: 'spc_next' })
     if (change === 'base') await wrapper.setProps({ baseUrl: '/another/workspace' })
     if (change === 'identity') session.session = { ...session.session!, user: { ...session.user!, userId: 'usr_next' } }
+    if (change === 'revision') await wrapper.setProps({ thumbnailRevision: 'next-connection' })
     if (change === 'directory') await wrapper.get('[aria-label="打开目录 folder"]').trigger('click')
     if (change === 'unmount') wrapper.unmount()
     await flushPromises(); expect(signal.aborted).toBe(true)
@@ -248,6 +345,55 @@ describe('workspace optional thumbnail lifecycle', () => {
     expect(signal.aborted).toBe(true)
     pending.resolve(capability()); await flushPromises(); show(); await flushPromises()
     expect(fetch).toHaveBeenCalledTimes(2)
+    expect(gets(fetch)).toHaveLength(0)
+  })
+
+  it('rediscovers a previously unsupported connection revision without changing the file target or directory', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(capability(unsupported)).mockImplementation((_url: string, init: RequestInit) => Promise.resolve(init.method === 'OPTIONS' ? capability() : thumbnail()))
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper, listing } = render(); await flushPromises(); show(); await flushPromises()
+    expect(gets(fetch)).toHaveLength(0)
+    await wrapper.setProps({ thumbnailRevision: 'next-connection' }); await flushPromises(); show(); await flushPromises()
+    expect(fetch.mock.calls.filter(([, init]) => init.method === 'OPTIONS')).toHaveLength(2)
+    expect(gets(fetch)).toHaveLength(1)
+    expect(listing).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('img.workspace-thumbnail').exists()).toBe(true)
+  })
+
+  it('releases and reloads a stable visible row on a revision-only change while preserving the open editor draft', async () => {
+    const fetch = vi.fn((_url: string, init: RequestInit) => Promise.resolve(init.method === 'OPTIONS' ? capability() : thumbnail()))
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper, listing } = render(); await flushPromises(); show(); await flushPromises()
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+    await wrapper.findAllComponents(QBtn).find(button => button.props('label') === '新建文本')!.trigger('click'); await flushPromises()
+    const editor = wrapper.getComponent(WorkspaceTextEditor)
+    const originalEditor = editor.vm.$.uid
+    await editor.findAllComponents(QInput).find(input => input.props('label') === '文本内容')!.setValue('connection change keeps this draft')
+    await wrapper.setProps({ thumbnailRevision: 'next-connection' }); await flushPromises()
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('img.workspace-thumbnail').exists()).toBe(false)
+    show(); await flushPromises()
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls.filter(([, init]) => init.method === 'OPTIONS')).toHaveLength(2)
+    expect(gets(fetch)).toHaveLength(2)
+    expect(listing).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('img.workspace-thumbnail').exists()).toBe(true)
+    const retained = wrapper.getComponent(WorkspaceTextEditor)
+    expect(retained.vm.$.uid).toBe(originalEditor)
+    expect(retained.props()).toMatchObject({ baseUrl: base, spaceId: space, available: true })
+    expect(retained.findAllComponents(QInput).find(input => input.props('label') === '文本内容')!.props('modelValue')).toBe('connection change keeps this draft')
+  })
+
+  it('discards late discovery from an old connection revision while retaining one new attempt', async () => {
+    const pending = deferred<Response>()
+    const fetch = vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValue(capability(unsupported))
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper } = render(); await flushPromises()
+    const oldSignal = fetch.mock.calls[0]![1].signal as AbortSignal
+    await wrapper.setProps({ thumbnailRevision: 'next-connection' }); await flushPromises()
+    expect(oldSignal.aborted).toBe(true)
+    pending.resolve(capability()); await flushPromises(); show(); await flushPromises()
+    expect(fetch.mock.calls.filter(([, init]) => init.method === 'OPTIONS')).toHaveLength(2)
     expect(gets(fetch)).toHaveLength(0)
   })
 

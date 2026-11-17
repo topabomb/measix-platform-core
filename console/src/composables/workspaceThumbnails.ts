@@ -4,12 +4,13 @@ import type { components } from '../api/generated'
 
 type Entry = components['schemas']['WorkspaceFileEntry']
 type Capabilities = components['schemas']['WorkspaceThumbnailCapabilities']
-type Demand = { entry: Entry; key: string; visible: boolean; failed: boolean; retries: number; job?: Job }
+type Demand = { entry: Entry; readonly sourceETag: string; key: string; visible: boolean; failed: boolean; retries: number; job?: Job }
 type Job = { controller: AbortController }
 type Options = {
   identity: () => string
   baseUrl: () => string
   spaceId: () => string
+  revision?: () => string
   available: () => boolean
   entries: () => Entry[]
   size?: () => 128 | 256
@@ -55,18 +56,20 @@ async function boundedBytes(response: Response, limit: number, signal: AbortSign
 
 export function useWorkspaceThumbnails(options: Options) {
   const urls = shallowReactive(new Map<string, string>())
-  const demands = new Map<string, Demand>()
+  // A changed demand must rebind its row even before any URL is available.
+  const demands = shallowReactive(new Map<string, Demand>())
   const targets = new Map<string, Element>()
   const jobs = new Set<Job>()
   let observer: IntersectionObserver | undefined
   let capability: Capabilities | undefined
   let capabilityController: AbortController | undefined
   let capabilityAttempted = false
+  let discoveryQueued = false
   let mounted = false, alive = true, scopeEpoch = 0
   let concurrency = 2, cooldownUntil = 0
   let cooldownTimer: ReturnType<typeof setTimeout> | undefined
   const size = () => options.size?.() ?? 128
-  const scope = () => JSON.stringify([options.identity(), options.baseUrl(), options.spaceId()])
+  const scope = () => JSON.stringify([options.identity(), options.baseUrl(), options.spaceId(), options.revision?.() ?? ''])
   const key = (entry: Entry) => JSON.stringify([scope(), entry.path, entry.etag, size()])
   const enabled = () => alive && mounted && !!options.identity() && !!options.spaceId() && options.available() && !document.hidden
 
@@ -105,19 +108,19 @@ export function useWorkspaceThumbnails(options: Options) {
       }
     }
     for (const entry of entries) {
-      if (!demands.has(entry.path)) demands.set(entry.path, { entry, key: key(entry), visible: false, failed: false, retries: 0 })
+      if (!demands.has(entry.path)) demands.set(entry.path, { entry, sourceETag: entry.etag!, key: key(entry), visible: false, failed: false, retries: 0 })
     }
     pump()
   }
   function valid(demand: Demand, job: Job, epoch: number) {
-    return enabled() && !job.controller.signal.aborted && epoch === scopeEpoch && demands.get(demand.entry.path) === demand && demand.visible
+    return enabled() && !job.controller.signal.aborted && epoch === scopeEpoch && demands.get(demand.entry.path) === demand && demand.visible && demand.sourceETag === demand.entry.etag
   }
   async function load(demand: Demand, job: Job, epoch: number) {
     try {
-      const query = new URLSearchParams({ agentSpaceId: options.spaceId(), path: demand.entry.path, expectedEtag: demand.entry.etag!, size: String(size()) })
+      const query = new URLSearchParams({ agentSpaceId: options.spaceId(), path: demand.entry.path, expectedEtag: demand.sourceETag, size: String(size()) })
       const response = await apiResponse(`${options.baseUrl()}/thumbnail?${query}`, { signal: job.controller.signal })
       if (!valid(demand, job, epoch)) { await response.body?.cancel(); return }
-      if (response.status !== 200 || response.headers.get('Content-Type')?.split(';')[0]?.trim() !== 'image/webp' || response.headers.get('Agent-Space-Id') !== options.spaceId() || response.headers.get('Preview-Source-ETag') !== demand.entry.etag) {
+      if (response.status !== 200 || response.headers.get('Content-Type')?.split(';')[0]?.trim() !== 'image/webp' || response.headers.get('Agent-Space-Id') !== options.spaceId() || response.headers.get('Preview-Source-ETag') !== demand.sourceETag) {
         await response.body?.cancel(); throw new Error('Invalid thumbnail response')
       }
       const bytes = await boundedBytes(response, bodyLimit, job.controller.signal)
@@ -143,7 +146,7 @@ export function useWorkspaceThumbnails(options: Options) {
     if (!enabled() || cooldownUntil > Date.now() || !capability?.supported || !capability.sizes.includes(size())) return
     for (const demand of demands.values()) {
       if (jobs.size >= concurrency) break
-      if (!demand.visible || demand.failed || demand.job || urls.has(demand.key) || !capability.mediaKinds.includes(mediaKind(demand.entry)!)) continue
+      if (!demand.visible || demand.failed || demand.job || demand.sourceETag !== demand.entry.etag || urls.has(demand.key) || !capability.mediaKinds.includes(mediaKind(demand.entry)!)) continue
       const job = { controller: new AbortController() }
       demand.job = job; jobs.add(job)
       void load(demand, job, scopeEpoch)
@@ -170,13 +173,20 @@ export function useWorkspaceThumbnails(options: Options) {
     } catch { /* Optional capability errors leave the original file list usable. */ }
     finally { if (capabilityController === controller) capabilityController = undefined }
   }
+  function queueDiscovery() {
+    if (discoveryQueued) return
+    discoveryQueued = true
+    queueMicrotask(() => { discoveryQueued = false; void discover() })
+  }
   function resetScope() {
     scopeEpoch++
     stopCooldown(); cooldownUntil = 0; concurrency = 2
     capabilityController?.abort(); capabilityController = undefined
     capability = undefined; capabilityAttempted = false
     clearDirectory(); syncEntries()
-    void discover()
+    // Revoke synchronously, but only query the final target after Vue applies
+    // all props in this turn. Demands stay synchronous for render-time refs.
+    queueDiscovery()
   }
   function bind(entry: Entry, value: Element | ComponentPublicInstance | null) {
     if (!(value instanceof Element) || !mediaKind(entry) || !demands.has(entry.path)) return
@@ -195,7 +205,7 @@ export function useWorkspaceThumbnails(options: Options) {
     } else {
       resumeCooldown()
       for (const target of targets.values()) observer?.observe(target)
-      void discover()
+      queueDiscovery()
     }
   }
   watch([scope, options.available], resetScope, { flush: 'sync' })
@@ -223,5 +233,9 @@ export function useWorkspaceThumbnails(options: Options) {
     if (!demand || demand.key !== key(entry) || (event.target as HTMLImageElement).getAttribute('src') !== urls.get(demand.key)) return
     demand.failed = true; release(demand)
   }
-  return { bind, clearDirectory, restoreDirectory: syncEntries, failed, url: (entry: Entry) => urls.get(key(entry)) }
+  function url(entry: Entry) {
+    const demand = demands.get(entry.path)
+    return demand && demand.sourceETag === entry.etag ? urls.get(demand.key) : undefined
+  }
+  return { bind, clearDirectory, restoreDirectory: syncEntries, failed, url }
 }

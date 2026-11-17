@@ -74,9 +74,8 @@ export async function holdPreview(page,path,size,proofs) {
 export function validateInputs(options) {
   for (const key of (options.legacyOnly?['adminBuild']:['image','adminBuild'])) assert.match(options[key]??'', /^sha256:[0-9a-f]{64}$/, `Exact ${key} required`)
   if(!options.legacyOnly)for (const key of ['expectedSource','expectedHelper']) assert.match(options[key]??'', /^[0-9a-f]{64}$/, `Independent ${key} required`)
-  if(options.apiOnly||options.expectedWorkspace)assert.match(options.expectedWorkspace??'',/^sha256:[0-9a-f]{64}$/,'Independent Workspace identity required')
-  assert.ok(!(options.apiOnly&&options.setupOnly),'Choose API-only or setup-only')
-  assert.ok(!(options.legacyOnly&&(options.apiOnly||options.setupOnly)),'Choose exactly one validation lane')
+  assert.ok(['apiOnly','legacyOnly','setupOnly','performanceOnly'].filter(name=>options[name]).length<=1,'Choose exactly one validation lane')
+  if(options.apiOnly||options.performanceOnly||options.expectedWorkspace)assert.match(options.expectedWorkspace??'',/^sha256:[0-9a-f]{64}$/,'Independent Workspace identity required')
   if(!options.legacyOnly)assert.match(options.agentSpaceSource??'', /^\/(?!\/)[^\r\n]+$/, 'Pass an explicit WSL Agent Space source directory')
   const parent = resolve(root,'.artifacts/media-preview'), output = resolve(options.output??'')
   assert.equal(output.slice(0,2).toUpperCase(),'D:','Evidence must stay on D:')
@@ -84,10 +83,32 @@ export function validateInputs(options) {
   assert.ok(!existsSync(output),'Occupied evidence directory is never reused')
   return {...options, output}
 }
-function checkDisk() {
-  const state=statfsSync(root,{bigint:true}), free=state.bavail*state.bsize
+export function validatePerformanceViewport(viewport,adminBuild) {
+  assert.ok(viewport.passed&&viewport.servedAdminBuild===adminBuild)
+  assert.equal(viewport.summary.capabilityQueries,1)
+  assert.equal(viewport.summary.phases.length,8)
+  assert.ok(viewport.summary.phases.every(phase=>phase.visible>0&&phase.coverage===1))
+  assert.ok(viewport.io.length>0&&viewport.io.every(value=>value.status===206&&value.overlappingThumbnailRequests>0))
+  assert.ok(viewport.io.every(value=>Number.isFinite(value.overlapMs)&&value.overlapMs>0),'Range requires positive native overlap')
+}
+function checkDisk(state=statfsSync(root,{bigint:true})) {
+  const free=state.bavail*state.bsize
   assert.ok(free>=floor,`D: free space below the 5 GiB acceptance floor (${free} bytes)`)
   return Number(free)
+}
+export function writeAcceptanceEvidence(out,report,readDisk=()=>statfsSync(root,{bigint:true})) {
+  try {
+    const state=readDisk(),free=state.bavail*state.bsize
+    report.diskFreeEnd=Number(free)
+    if(free<floor)report.diskFailure??=`D: free space below the 5 GiB acceptance floor (${free} bytes)`
+  } catch(error) {
+    report.diskFreeEnd=null
+    report.diskReadFailure=/^[A-Z_]+$/.test(error.code??'')?error.code:'UNKNOWN'
+    report.diskFailure??='Final disk state could not be read'
+  }
+  if(report.diskFailure){report.passed=false;report.failure??=report.diskFailure}
+  report.finishedAt=new Date().toISOString()
+  writeFileSync(join(out,'evidence.json'),JSON.stringify(report,null,2)+'\n',{flag:'wx'})
 }
 function wslPath(path) {
   const absolute=resolve(path)
@@ -126,7 +147,10 @@ export async function run(input) {
   const privateTemp=join(out,'private-temp');mkdirSync(privateTemp)
   process.env.TEMP=privateTemp;process.env.TMP=privateTemp;process.env.TMPDIR=privateTemp;process.env.GOTMPDIR=privateTemp
   const report={passed:false,cleanupPassed:false,startedAt:new Date().toISOString(),expected:options,checks:[],diskFreeStart:checkDisk()}
-  const sourcePaths=['scripts/workspace-thumbnail-browser.mjs','scripts/fixtures/workspace-preview-service.py','console/e2e/workspace-thumbnails.spec.ts',...(options.apiOnly?['scripts/workspace-thumbnail-api.mjs','scripts/examples/workspace-thumbnail-session.mjs']:[]),...(options.legacyOnly?['scripts/workspace-thumbnail-legacy.mjs','scripts/examples/workspace-thumbnail-session.mjs','scripts/fixtures/workspace-dav-server/main.go','scripts/fixtures/workspace-dav-server/go.mod','scripts/fixtures/workspace-dav-server/go.sum']:[])]
+  const sourcePaths=['scripts/workspace-thumbnail-browser.mjs','scripts/fixtures/workspace-preview-service.py',
+    ...(options.performanceOnly?['scripts/workspace-thumbnail-performance.mjs','console/e2e/workspace-thumbnail-performance.spec.ts']:['console/e2e/workspace-thumbnails.spec.ts']),
+    ...(options.apiOnly?['scripts/workspace-thumbnail-api.mjs','scripts/examples/workspace-thumbnail-session.mjs']:[]),
+    ...(options.legacyOnly?['scripts/workspace-thumbnail-legacy.mjs','scripts/examples/workspace-thumbnail-session.mjs','scripts/fixtures/workspace-dav-server/main.go','scripts/fixtures/workspace-dav-server/go.mod','scripts/fixtures/workspace-dav-server/go.sum']:[])]
   const sourceSnapshot=join(out,'validation-source');mkdirSync(sourceSnapshot)
   report.sources=Object.fromEntries(sourcePaths.map(path=>{
     const source=join(root,path),copy=join(sourceSnapshot,path.replaceAll('/','__'))
@@ -225,7 +249,12 @@ export async function run(input) {
       users.push(user);await command(user,'CREATE');user.spaceId=(await api(workspace(user))).agentSpaceId
     }
     const media=join(out,'agent-space/media')
-    if(!options.legacyOnly){
+    let performanceFixture
+    if(options.performanceOnly){
+      for(const user of users)await api(workspace(user)+'/files?'+new URLSearchParams({agentSpaceId:user.spaceId}),'POST',{action:'MKCOL',path:'thumbnail-performance'})
+      const {seedThumbnailPerformance}=await import('./workspace-thumbnail-performance.mjs')
+      performanceFixture=await seedThumbnailPerformance({out,mediaDirectory:media,users,put})
+    }else if(!options.legacyOnly){
     const image=readFileSync(join(media,'image.png'))
     for(const user of users) {
       await api(workspace(user)+'/files?'+new URLSearchParams({agentSpaceId:user.spaceId}),'POST',{action:'MKCOL',path:'nested'})
@@ -246,7 +275,7 @@ export async function run(input) {
     }
     }
     report.checks.push(options.legacyOnly?'real Hub/Relay with standard DAV fixture and explicit management substitute; all business objects use Admin API':'real Hub/Relay and approved SPA; service/users/spaces/files created through Admin API')
-    if(!options.legacyOnly)writeFileSync(join(out,'browser-input.private.json'),JSON.stringify({baseURL,users,mediaDirectory:media,output:out,adminBuild:build.buildHash}),{flag:'wx',mode:0o600})
+    if(!options.legacyOnly)writeFileSync(join(out,'browser-input.private.json'),JSON.stringify({baseURL,users,mediaDirectory:media,output:out,adminBuild:build.buildHash,...(performanceFixture?{performance:performanceFixture}:{})}),{flag:'wx',mode:0o600})
     if(options.legacyOnly){
       assert.ok(sourcesUnchanged(),'Validation source changed after its pre-execution snapshot')
       const {runLegacyAPI}=await import('./workspace-thumbnail-legacy.mjs')
@@ -260,17 +289,22 @@ export async function run(input) {
       report.checks.push('real Client/Admin API lane passed; see api checks and client-contract-cases/manifest.json')
     }else if(!options.setupOnly) {
       assert.ok(sourcesUnchanged(),'Validation source changed after its pre-execution snapshot')
-      browser=spawn(process.execPath,[join(root,'console/node_modules/@playwright/test/cli.js'),'test','workspace-thumbnails.spec.ts','--output='+join(out,'playwright-results')],{cwd:join(root,'console'),windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,MEASIX_E2E_BASE_URL:baseURL,MEASIX_E2E_ADMIN_PASSWORD:env.adminPassword,MEASIX_THUMBNAIL_BROWSER_INPUT:join(out,'browser-input.private.json'),PLAYWRIGHT_JSON_OUTPUT_FILE:join(out,'playwright.json'),PLAYWRIGHT_HTML_REPORT:join(out,'playwright-report')}})
+      browser=spawn(process.execPath,[join(root,'console/node_modules/@playwright/test/cli.js'),'test',options.performanceOnly?'workspace-thumbnail-performance.spec.ts':'workspace-thumbnails.spec.ts','--output='+join(out,'playwright-results')],{cwd:join(root,'console'),windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,MEASIX_E2E_BASE_URL:baseURL,MEASIX_E2E_ADMIN_PASSWORD:env.adminPassword,MEASIX_THUMBNAIL_BROWSER_INPUT:join(out,'browser-input.private.json'),PLAYWRIGHT_JSON_OUTPUT_FILE:join(out,'playwright.json'),PLAYWRIGHT_HTML_REPORT:join(out,'playwright-report')}})
       const log=logStream('playwright');browser.stdout.pipe(log);browser.stderr.pipe(log)
       diskTimer=setInterval(()=>{try{checkDisk()}catch(error){report.diskFailure=error.message;browser.kill('SIGTERM')}},1000)
       const [code]=await once(browser,'exit');assert.equal(code,0,'Browser acceptance failed; inspect playwright.log/report')
       const result=JSON.parse(readFileSync(join(out,'playwright.json'),'utf8'))
       assert.equal(result.stats.expected,2);assert.equal(result.stats.skipped,0);assert.equal(result.stats.unexpected,0);assert.equal(result.stats.flaky,0)
-      report.browser={stats:result.stats,viewports:[1280,390].map(width=>({width,...JSON.parse(readFileSync(join(out,String(width),'browser-network.json'),'utf8'))}))}
-      for(const viewport of report.browser.viewports){assert.equal(viewport.heldResponses.length,5);assert.ok(viewport.heldResponses.every(proof=>proof.status===200&&proof.byteLength>0&&proof.sourceETag&&proof.spaceId&&proof.bodySHA256))}
+      if(options.performanceOnly){
+        report.performance={stats:result.stats,viewports:[1280,390].map(width=>({width,...JSON.parse(readFileSync(join(out,String(width),'performance.json'),'utf8'))}))}
+        for(const viewport of report.performance.viewports)validatePerformanceViewport(viewport,build.buildHash)
+      }else{
+        report.browser={stats:result.stats,viewports:[1280,390].map(width=>({width,...JSON.parse(readFileSync(join(out,String(width),'browser-network.json'),'utf8'))}))}
+        for(const viewport of report.browser.viewports){assert.equal(viewport.heldResponses.length,5);assert.ok(viewport.heldResponses.every(proof=>proof.status===200&&proof.byteLength>0&&proof.sourceETag&&proof.spaceId&&proof.bodySHA256))}
+      }
       assert.ok(!report.diskFailure&&!interrupted,'Acceptance interrupted')
       assert.ok(sourcesUnchanged(),'Validation source changed during browser execution')
-      report.checks.push('production Admin browser acceptance passed; see playwright.json and browser-network.json')
+      report.checks.push(options.performanceOnly?'production Admin workload performance passed; see playwright.json and per-viewport performance.json':'production Admin browser acceptance passed; see playwright.json and browser-network.json')
     }
     assert.ok(!interrupted,'Acceptance interrupted')
     report.passed=true
@@ -301,14 +335,15 @@ export async function run(input) {
     for(const kind of['containers','volumes'])for(const item of baseline[kind])if(!after[kind].includes(item))cleanupErrors.push('Existing Docker resource lost: '+kind)
     if(fixtureReady?.owner&&docker('ps','-aq','--filter','label=io.runcove.preview-qualification='+fixtureReady.owner))cleanupErrors.push('Owned Docker container survived')
     if(fixtureReady?.owner&&docker('volume','ls','-q','--filter','label=io.runcove.preview-qualification='+fixtureReady.owner))cleanupErrors.push('Owned Docker volume survived')
-    report.cleanupErrors=cleanupErrors;report.cleanupPassed=cleanupErrors.length===0;report.diskFreeEnd=checkDisk();report.finishedAt=new Date().toISOString()
+    report.cleanupErrors=cleanupErrors;report.cleanupPassed=cleanupErrors.length===0
     report.interrupted=interrupted;if(interrupted)report.passed=false
     report.validationSourcesUnchanged=sourcesUnchanged()
-    writeFileSync(join(out,'evidence.json'),JSON.stringify(report,null,2)+'\n',{flag:'wx'})
+    writeAcceptanceEvidence(out,report)
     for(const stream of logs)stream.end()
     process.off('SIGINT',onSignal);process.off('SIGTERM',onSignal)
     console.log('Evidence: '+out)
     if(!report.cleanupPassed)throw Error('Acceptance cleanup failed; inspect evidence.json')
+    assert.ok(!report.diskFailure,'Acceptance disk guard failed; inspect evidence.json')
     assert.ok(!interrupted,'Acceptance interrupted')
   }
 }
@@ -316,6 +351,6 @@ export async function run(input) {
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url) {
   const options={}
   const names={'--output':'output','--image':'image','--expected-source':'expectedSource','--expected-helper':'expectedHelper','--expected-workspace':'expectedWorkspace','--admin-build':'adminBuild','--agent-space-source':'agentSpaceSource'}
-  for(let index=2;index<process.argv.length;index++){const name=process.argv[index];if(name==='--setup-only'){options.setupOnly=true;continue}if(name==='--api-only'){options.apiOnly=true;continue}if(name==='--legacy-only'){options.legacyOnly=true;continue}assert.ok(names[name],'Unknown argument '+name);options[names[name]]=process.argv[++index]}
+  for(let index=2;index<process.argv.length;index++){const name=process.argv[index];if(name==='--setup-only'){options.setupOnly=true;continue}if(name==='--api-only'){options.apiOnly=true;continue}if(name==='--legacy-only'){options.legacyOnly=true;continue}if(name==='--performance-only'){options.performanceOnly=true;continue}assert.ok(names[name],'Unknown argument '+name);options[names[name]]=process.argv[++index]}
   await run(options)
 }

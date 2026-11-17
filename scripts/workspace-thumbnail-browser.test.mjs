@@ -1,8 +1,52 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { maximumConcurrentTransfers, thumbnailReadInterval, holdPreview } from './workspace-thumbnail-browser.mjs'
-import { readFileSync } from 'node:fs'
+import { maximumConcurrentTransfers, thumbnailReadInterval, holdPreview, writeAcceptanceEvidence, validateInputs, validatePerformanceViewport } from './workspace-thumbnail-browser.mjs'
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const performanceInputs={image:'sha256:'+'1'.repeat(64),adminBuild:'sha256:'+'2'.repeat(64),expectedSource:'3'.repeat(64),expectedHelper:'4'.repeat(64),agentSpaceSource:'/source',output:'unused'}
+test('performance lane cannot be combined with another acceptance lane',()=>{
+  for(const flag of ['apiOnly','legacyOnly','setupOnly'])assert.throws(()=>validateInputs({...performanceInputs,performanceOnly:true,[flag]:true}),/Choose exactly one/)
+})
+test('performance lane requires an independently pinned Workspace image before startup',()=>{
+  assert.throws(()=>validateInputs({...performanceInputs,performanceOnly:true}),/Independent Workspace identity required/)
+})
+
+test('performance evidence requires positive native overlap rather than callback overlap alone',()=>{
+  const adminBuild=performanceInputs.adminBuild
+  const valid={passed:true,servedAdminBuild:adminBuild,summary:{capabilityQueries:1,phases:Array.from({length:8},()=>({visible:1,coverage:1}))},io:[{status:206,overlappingThumbnailRequests:1,overlapMs:2.5}]}
+  validatePerformanceViewport(valid,adminBuild)
+  for(const overlapMs of [0,-1,NaN,undefined])assert.throws(()=>validatePerformanceViewport({...valid,io:[{...valid.io[0],overlapMs}]},adminBuild),/positive native/)
+})
+
+test('low disk cleanup still persists the original failed acceptance evidence',t=>{
+  const out=mkdtempSync(join(tmpdir(),'thumbnail-low-disk-'))
+  t.after(()=>rmSync(out,{recursive:true,force:true}))
+  const report={passed:false,failure:'Browser stopped by disk guard',diskFailure:'low disk',cleanupPassed:true}
+  writeAcceptanceEvidence(out,report,()=>({bavail:1n,bsize:1024n}))
+  const saved=JSON.parse(readFileSync(join(out,'evidence.json'),'utf8'))
+  assert.equal(saved.failure,report.failure);assert.equal(saved.diskFailure,'low disk')
+  assert.equal(saved.passed,false);assert.equal(saved.cleanupPassed,true);assert.equal(saved.diskFreeEnd,1024)
+})
+
+test('a final low disk reading cannot mark an otherwise successful acceptance passed',t=>{
+  const out=mkdtempSync(join(tmpdir(),'thumbnail-final-disk-'))
+  t.after(()=>rmSync(out,{recursive:true,force:true}))
+  writeAcceptanceEvidence(out,{passed:true,cleanupPassed:true},()=>({bavail:1n,bsize:1024n}))
+  const saved=JSON.parse(readFileSync(join(out,'evidence.json'),'utf8'))
+  assert.equal(saved.passed,false);assert.match(saved.diskFailure,/5 GiB/)
+})
+
+test('a failed final disk measurement is recorded without losing acceptance evidence',t=>{
+  const out=mkdtempSync(join(tmpdir(),'thumbnail-disk-read-'))
+  t.after(()=>rmSync(out,{recursive:true,force:true}))
+  writeAcceptanceEvidence(out,{passed:false,failure:'original failure',cleanupPassed:true},()=>{throw Object.assign(Error('disk read failed'),{code:'EIO'})})
+  const saved=JSON.parse(readFileSync(join(out,'evidence.json'),'utf8'))
+  assert.equal(saved.failure,'original failure');assert.equal(saved.passed,false)
+  assert.equal(saved.diskFreeEnd,null);assert.equal(saved.diskReadFailure,'EIO')
+})
 
 function heldFixture() {
   let handler

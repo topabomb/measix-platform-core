@@ -135,6 +135,7 @@ node scripts/workspace-integration.mjs --config <local-config.json> --output <ne
 能力复用与取消样例见[工作区接入说明](remote-workspace-implementation.md#客户端能力识别与会话复用)。单元验证不启动 Docker：
 
 ```text
+go test ./internal/relay/runtime -run '^TestDAV' -count=1  # backend/
 node --test scripts/examples/workspace-thumbnail-session.test.mjs scripts/examples/workspace-thumbnail-demo.test.mjs scripts/workspace-thumbnail-browser.test.mjs scripts/workspace-thumbnail-performance.test.mjs
 python3 -B scripts/fixtures/workspace-preview-service.test.py
 ```
@@ -147,7 +148,9 @@ node scripts/workspace-thumbnail-browser.mjs --agent-space-source /home/hualei/m
 
 入口拒绝占用证据目录及低于 5 GiB 的 D 盘容量，固定镜像、helper、后端源码、验证源码和 SPA 副本。复用现有 Hub/Relay harness 与 Agent Space FixtureOwner；业务对象经 Admin API 创建/删除，临时凭据单独保护，不读写既有业务库。桌面/390px 同时验证列表128/卡片256、可见队列、能力复用、版本、原预览/CRUD/文本草稿、撤销及取消。每个迟到注入先记录真实 200 正文/空间/源版本/摘要；页面隐藏明确使用事件注入，不能冒称 OS 隐藏。活动读取与取消后原始网络收尾分别保留。结束核对本轮进程/容器/卷清理和原资源保全，日志/失败与成功证据不覆盖；private-temp 可再生缓存留待统一清理。
 
-同入口增加 `--api-only` 执行真实 Client/Admin API、接入样例、原 CRUD/Range 与凭据隔离，并捕获 Client 原始合同正文；此模式要求明确的 Workspace 镜像身份，不启动 Playwright。`--legacy-only --admin-build sha256:<admin-build-hash> --output <new-run>` 使用真实标准 DAV 文件服务和明确的管理替身，原生缺失资源为404，405及403由限定回环代理注入；记录每次根认证与预览路径请求，验证不支持和权限失败分别处理。该 lane 不作为历史 Runcove 发行镜像验证。
+同入口增加 `--api-only` 执行真实 Client/Admin API、接入样例、原 CRUD/Range 与凭据隔离，并捕获 Client 原始合同正文。此模式还通过真实发布的 DAV 绑定跑 Relay → 固定 Runcove 镜像。两用户在空空间发 OPTIONS 并核对 VM 状态，生成真实图片和视频缩略图，核对范围、版本、跨用户拒绝及发布关闭时独立的 Hub Files。回环代理收到并检查真实 Runcove 200 后才延迟交付，逐个占满 Relay 预览槽，验证普通 DAV Range 和凭据换钥取消；该场景验证 Relay 的在途转发，不计作 Runcove 解码并发或旧响应直接从 Runcove 延迟。API 模式要求明确的 Workspace 镜像身份。
+
+媒体扩展以当前 Runcove v1 为验收基线。`--legacy-only --admin-build sha256:<admin-build-hash> --output <new-run>` 单独验证无媒体扩展的普通 WebDAV。它使用真实标准 DAV 文件服务和明确的管理替身，原生缺失资源为 404，405 和 403 由限定回环代理注入。核对 Hub 的判定和 Relay 透传状态，再由客户端对 404/405 执行同绑定认证根探测。
 
 同入口增加 `--performance-only`（与其他 lane 互斥，同样要求独立 Workspace 身份）运行宽/窄屏媒体负载：40 张内容不同、0.3–7.7 MP 的 PNG/JPEG 和两个真实视频，8 个阶段覆盖冷表示缓存、滚动、返回顶部及 128/256 切换；期间由页面 fetch 读取普通 Files 的 1 MiB Range 并核对正文摘要，以原生 ResourceTiming 和缩略图 AbortSignal 截断后的区间验证正时长重叠。逐视口 `performance.json` 分开记录成功、429、取消、错误，首图/全部可见耗时、可见渲染覆盖、一次能力查询及原生读取并发；不从请求数推断解码数、缓存命中或服务端 IO 调度。请求耗时按 Playwright 回调记录，渲染在 action 期间持续按 50–200 ms 间隔采样（实际调度可能延迟），不设绝对时延门槛；素材是确定性渐变/几何图案，不能代表照片语料或冷 VM 启动。运行中低盘或最终磁盘查询失败仍写入失败证据并以非零状态退出；启动前低盘直接拒绝，不创建输出目录。
 

@@ -37,8 +37,12 @@ func (p *davBufferPool) Put(b []byte) {
 var davBuffers davBufferPool
 
 func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *control.State, claims *accessClaims, resourceID, requestID string) {
+	preview := false
 	fail := func(status int, code string) {
-		writeProblem(w, status, code, http.StatusText(status), requestID, nil, false)
+		if preview {
+			w.Header().Set("Cache-Control", "no-store")
+		}
+		writeDAVProblem(w, r.Method, status, code, requestID, false)
 	}
 	resource, ok := state.Resources[resourceID]
 	if !ok || resource.Kind != "WEBDAV" {
@@ -55,6 +59,8 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 		fail(403, "workspace_not_connected")
 		return
 	}
+	spaceRoot := runtimePrefix + resourceID + "/spaces/" + binding.Target.AgentSpaceId + "/"
+	preview = r.URL.EscapedPath() == spaceRoot+"previews"
 	stats := &davTransferStats{started: h.store.Now()}
 	observer, ok := w.(*responseObserver)
 	if !ok {
@@ -71,6 +77,11 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 			panic(cause)
 		}
 	}()
+	if preview && r.Method != "OPTIONS" && r.Method != "GET" && r.Method != "HEAD" {
+		w.Header().Set("Allow", "OPTIONS, GET, HEAD")
+		fail(405, "preview_method_not_allowed")
+		return
+	}
 	if _, allowed := route.AllowedMethods[r.Method]; !allowed {
 		methods := make([]string, 0, len(route.AllowedMethods))
 		for method := range route.AllowedMethods {
@@ -101,49 +112,78 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 		fail(503, "runtime_control_unavailable")
 		return
 	}
-	root := runtimePrefix + resourceID + "/spaces/" + binding.Target.AgentSpaceId + "/dav/"
-	mapper := davMapper{publicRoot: root, publicHost: r.Host, publicScheme: "http", upstream: upstream}
+	mapper := davMapper{publicRoot: spaceRoot + "dav/", publicHost: r.Host, publicScheme: "http", upstream: upstream}
 	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		mapper.publicScheme = "https"
 	}
 	if r.URL.Scheme != "" {
 		mapper.publicScheme = r.URL.Scheme
 	}
-	target, err := mapper.toUpstream(r.URL)
-	if err != nil {
-		fail(403, "dav_target_outside_workspace")
-		return
-	}
-	if target.Path == upstream.Path || target.Path == strings.TrimSuffix(upstream.Path, "/") {
-		switch r.Method {
-		case "PUT", "DELETE", "MKCOL", "MOVE":
+	var target *url.URL
+	var destination, condition string
+	if preview {
+		if !mapper.sameOrigin(r.URL) {
+			fail(403, "dav_target_outside_workspace")
+			return
+		}
+		if r.ContentLength != 0 || len(r.TransferEncoding) != 0 || (r.Body != nil && r.Body != http.NoBody) {
+			fail(400, "invalid_preview_request")
+			return
+		}
+		if !davPreviewOriginAllowed(r.Header, mapper.publicScheme+"://"+mapper.publicHost) {
+			fail(403, "invalid_origin")
+			return
+		}
+		previewTarget := *upstream
+		previewTarget.Path = strings.TrimSuffix(upstream.Path, "dav/") + "previews"
+		previewTarget.RawQuery = r.URL.RawQuery
+		previewTarget.ForceQuery = r.URL.ForceQuery
+		target = &previewTarget
+	} else {
+		target, err = mapper.toUpstream(r.URL)
+		if err != nil {
+			fail(403, "dav_target_outside_workspace")
+			return
+		}
+		if target.Path == upstream.Path || target.Path == strings.TrimSuffix(upstream.Path, "/") {
+			switch r.Method {
+			case "PUT", "DELETE", "MKCOL", "MOVE":
+				fail(403, "dav_target_outside_workspace")
+				return
+			}
+		}
+		if raw := r.Header.Get("Destination"); raw != "" {
+			u, e := url.Parse(raw)
+			if e != nil {
+				fail(400, "invalid_destination")
+				return
+			}
+			u, e = mapper.toUpstream(u)
+			if e != nil || u.Path == upstream.Path || u.Path == strings.TrimSuffix(upstream.Path, "/") {
+				fail(403, "dav_target_outside_workspace")
+				return
+			}
+			destination = u.String()
+		}
+		condition, err = mapper.mapIf(r.Header.Get("If"))
+		if err != nil {
 			fail(403, "dav_target_outside_workspace")
 			return
 		}
 	}
-	destination := ""
-	if raw := r.Header.Get("Destination"); raw != "" {
-		u, e := url.Parse(raw)
-		if e != nil {
-			fail(400, "invalid_destination")
-			return
-		}
-		u, e = mapper.toUpstream(u)
-		if e != nil || u.Path == upstream.Path || u.Path == strings.TrimSuffix(upstream.Path, "/") {
-			fail(403, "dav_target_outside_workspace")
-			return
-		}
-		destination = u.String()
-	}
-	condition, err := mapper.mapIf(r.Header.Get("If"))
-	if err != nil {
-		fail(403, "dav_target_outside_workspace")
-		return
+	slots := h.davSlots
+	if preview {
+		slots = h.davPreviewSlots
 	}
 	select {
-	case h.davSlots <- struct{}{}:
-		defer func() { <-h.davSlots }()
+	case slots <- struct{}{}:
+		defer func() { <-slots }()
 	default:
+		if preview {
+			w.Header().Set("Retry-After", "1")
+			fail(429, "preview_busy")
+			return
+		}
 		fail(503, "dav_busy")
 		return
 	}
@@ -188,25 +228,25 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 	defer cancel()
 	r = r.WithContext(lease)
 	idle := time.Duration(route.TimeoutPolicy.IdleMs) * time.Millisecond
-	watch := newDAVActivity(idle, cancel, w)
+	watch := newDAVActivity(idle, lease, cancel, w, !preview)
 	defer watch.close()
 	cancellationDone := make(chan struct{})
 	stopCancellation := context.AfterFunc(lease, func() {
 		defer close(cancellationDone)
-		controller := http.NewResponseController(w)
-		_ = controller.SetReadDeadline(time.Now())
-		_ = controller.SetWriteDeadline(time.Now())
+		watch.interrupt()
 	})
 	defer func() {
 		if !stopCancellation() {
 			<-cancellationDone
 		}
 	}()
-	if r.Body != nil {
+	if r.Body != nil && r.Body != http.NoBody {
 		r.Body = &davActivityBody{ReadCloser: r.Body, activity: watch, bytes: &stats.requestBytes}
 	}
-	writer := &davActivityWriter{ResponseWriter: w, activity: watch, idle: idle}
-	_ = http.NewResponseController(w).EnableFullDuplex()
+	writer := &davActivityWriter{ResponseWriter: w, activity: watch}
+	if !preview {
+		_ = http.NewResponseController(w).EnableFullDuplex()
+	}
 	proxy := &httputil.ReverseProxy{
 		BufferPool: &davBuffers,
 		Transport:  h.transportFor(route.TimeoutPolicy),
@@ -219,6 +259,16 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 			p.Out.Header.Del("X-Method-Override")
 			p.Out.Header.Del("X-HTTP-Method")
 			p.Out.Header.Set("Authorization", "Bearer "+binding.Token)
+			if preview {
+				for name := range p.Out.Header {
+					if strings.HasPrefix(strings.ToLower(name), "sec-fetch-") {
+						delete(p.Out.Header, name)
+					}
+				}
+				p.Out.Header.Del("Origin")
+				p.Out.Header.Del("Destination")
+				p.Out.Header.Del("If")
+			}
 			if destination != "" {
 				p.Out.Header.Set("Destination", destination)
 			}
@@ -235,6 +285,13 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 			}
 			response.Header.Del("Set-Cookie")
 			response.Header.Del("WWW-Authenticate")
+			if preview {
+				if err := validateDAVPreviewResponse(response, binding.Target.AgentSpaceId); err != nil {
+					return err
+				}
+				response.Body = &davActivityBody{ReadCloser: response.Body, activity: watch}
+				return nil
+			}
 			for _, header := range []string{"Location", "Content-Location"} {
 				if raw := response.Header.Get(header); raw != "" {
 					mapped, e := mapper.fromUpstream(raw, target)
@@ -253,7 +310,7 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 			}
 			return nil
 		},
-		ErrorHandler: func(writer http.ResponseWriter, request *http.Request, err error) {
+		ErrorHandler: func(_ http.ResponseWriter, request *http.Request, err error) {
 			code := "upstream_unavailable"
 			status := 502
 			if errors.Is(err, errDAVCredential) {
@@ -264,10 +321,49 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 				status = 504
 			}
 			stats.errorCode = code
-			writeProblem(writer, status, code, http.StatusText(status), requestID, nil, true)
+			if preview {
+				w.Header().Set("Cache-Control", "no-store")
+			}
+			writeDAVProblem(w, request.Method, status, code, requestID, true)
 		},
 	}
 	proxy.ServeHTTP(writer, r)
+}
+
+func writeDAVProblem(w http.ResponseWriter, method string, status int, code, requestID string, forwarded bool) {
+	if method == http.MethodHead {
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.Header().Set("X-Measix-Request-Id", requestID)
+		w.WriteHeader(status)
+		return
+	}
+	writeProblem(w, status, code, http.StatusText(status), requestID, nil, forwarded)
+}
+
+func davPreviewOriginAllowed(header http.Header, publicOrigin string) bool {
+	origins := header.Values("Origin")
+	if len(origins) > 1 || (len(origins) == 1 && !strings.EqualFold(origins[0], publicOrigin)) {
+		return false
+	}
+	sites := header.Values("Sec-Fetch-Site")
+	return len(sites) == 0 || len(sites) == 1 && (sites[0] == "same-origin" || sites[0] == "none")
+}
+
+func validateDAVPreviewResponse(response *http.Response, agentSpaceID string) error {
+	status := response.StatusCode
+	if status == http.StatusSwitchingProtocols || (status >= 300 && status < 400 && status != http.StatusNotModified) {
+		return errors.New("unexpected DAV preview redirect or upgrade")
+	}
+	if status >= 200 && status < 300 || status == http.StatusNotModified {
+		spaces := response.Header.Values("Agent-Space-Id")
+		if len(spaces) != 1 || spaces[0] != agentSpaceID {
+			return errors.New("unexpected DAV preview space")
+		}
+	}
+	response.Header.Del("Location")
+	response.Header.Del("Content-Location")
+	response.Header.Set("Cache-Control", "no-store")
+	return nil
 }
 
 type davMapper struct {
@@ -293,8 +389,18 @@ func davRelative(escaped, root string) (string, error) {
 	return tail, nil
 }
 
+func (m davMapper) sameOrigin(u *url.URL) bool {
+	if u.User != nil || u.Fragment != "" {
+		return false
+	}
+	if u.Host == "" {
+		return u.Scheme == ""
+	}
+	return strings.EqualFold(u.Host, m.publicHost) && u.Scheme == m.publicScheme
+}
+
 func (m davMapper) toUpstream(u *url.URL) (*url.URL, error) {
-	if u.User != nil || u.Fragment != "" || (u.Host != "" && (!strings.EqualFold(u.Host, m.publicHost) || u.Scheme != m.publicScheme)) || (u.Host == "" && u.Scheme != "") {
+	if !m.sameOrigin(u) {
 		return nil, errors.New("outside DAV origin")
 	}
 	tail, err := davRelative(u.EscapedPath(), m.publicRoot)
@@ -385,52 +491,93 @@ func (m davMapper) mapIf(raw string) (string, error) {
 }
 
 type davActivity struct {
-	mu         sync.Mutex
-	timer      *time.Timer
-	closed     bool
-	idle       time.Duration
-	cancel     context.CancelFunc
-	writer     http.ResponseWriter
-	generation uint64
+	mu          sync.Mutex
+	timer       *time.Timer
+	deadline    time.Time
+	closed      bool
+	interrupted bool
+	idle        time.Duration
+	lease       context.Context
+	cancel      context.CancelFunc
+	writer      http.ResponseWriter
+	watchRead   bool
 }
 
-func newDAVActivity(idle time.Duration, cancel context.CancelFunc, w http.ResponseWriter) *davActivity {
-	a := &davActivity{idle: idle, cancel: cancel, writer: w}
-	a.touch()
+func newDAVActivity(idle time.Duration, lease context.Context, cancel context.CancelFunc, w http.ResponseWriter, watchRead bool) *davActivity {
+	a := &davActivity{idle: idle, lease: lease, cancel: cancel, writer: w, watchRead: watchRead, deadline: time.Now().Add(idle)}
+	a.mu.Lock()
+	a.timer = time.AfterFunc(idle, a.expire)
+	a.mu.Unlock()
 	return a
 }
+
 func (a *davActivity) touch() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.closed {
+	if !a.closed && !a.interrupted {
+		a.deadline = time.Now().Add(a.idle)
+	}
+}
+
+func (a *davActivity) expire() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed || a.interrupted {
 		return
 	}
-	if a.timer != nil {
-		a.timer.Stop()
+	if remaining := time.Until(a.deadline); remaining > 0 {
+		a.timer.Reset(remaining)
+		return
 	}
-	a.generation++
-	generation := a.generation
-	a.timer = time.AfterFunc(a.idle, func() {
-		a.mu.Lock()
-		defer a.mu.Unlock()
-		if a.closed || generation != a.generation {
-			return
-		}
-		a.cancel()
-		controller := http.NewResponseController(a.writer)
-		_ = controller.SetWriteDeadline(time.Now())
-		_ = controller.SetReadDeadline(time.Now())
-	})
+	a.cancel()
+	a.interruptLocked()
 }
+
+func (a *davActivity) interrupt() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.interruptLocked()
+}
+
+func (a *davActivity) interruptLocked() {
+	if a.closed || a.interrupted {
+		return
+	}
+	a.interrupted = true
+	a.timer.Stop()
+	controller := http.NewResponseController(a.writer)
+	deadline := time.Now()
+	_ = controller.SetWriteDeadline(deadline)
+	// A bodyless preview has no upload to interrupt. Expiring the HTTP/1 read
+	// deadline would cancel the background reader for the keep-alive connection.
+	if a.watchRead {
+		_ = controller.SetReadDeadline(deadline)
+	}
+}
+
+func (a *davActivity) beforeWrite() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.lease.Err(); err != nil {
+		return err
+	}
+	if a.interrupted || a.closed {
+		return context.Canceled
+	}
+	_ = http.NewResponseController(a.writer).SetWriteDeadline(time.Now().Add(a.idle))
+	return nil
+}
+
 func (a *davActivity) close() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.closed = true
-	if a.timer != nil {
-		a.timer.Stop()
+	a.timer.Stop()
+	controller := http.NewResponseController(a.writer)
+	_ = controller.SetWriteDeadline(time.Time{})
+	if a.watchRead {
+		_ = controller.SetReadDeadline(time.Time{})
 	}
-	_ = http.NewResponseController(a.writer).SetWriteDeadline(time.Time{})
-	_ = http.NewResponseController(a.writer).SetReadDeadline(time.Time{})
 }
 
 type davActivityBody struct {
@@ -453,12 +600,13 @@ func (b *davActivityBody) Read(p []byte) (int, error) {
 type davActivityWriter struct {
 	http.ResponseWriter
 	activity *davActivity
-	idle     time.Duration
 }
 
 func (w *davActivityWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 func (w *davActivityWriter) Write(p []byte) (int, error) {
-	_ = http.NewResponseController(w.ResponseWriter).SetWriteDeadline(time.Now().Add(w.idle))
+	if err := w.activity.beforeWrite(); err != nil {
+		return 0, err
+	}
 	n, e := w.ResponseWriter.Write(p)
 	if n > 0 {
 		w.activity.touch()

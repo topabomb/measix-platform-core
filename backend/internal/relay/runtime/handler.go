@@ -24,12 +24,13 @@ import (
 )
 
 type Handler struct {
-	store         *control.Store
-	recorder      UsageRecorder
-	budget        relaybudget.Client
-	baseTransport *http.Transport
-	transports    sync.Map
-	davSlots      chan struct{}
+	store           *control.Store
+	recorder        UsageRecorder
+	budget          relaybudget.Client
+	baseTransport   *http.Transport
+	transports      sync.Map
+	davSlots        chan struct{}
+	davPreviewSlots chan struct{}
 }
 
 const (
@@ -55,7 +56,7 @@ func NewHandler(store *control.Store, recorder UsageRecorder, budgetClient relay
 	if base.MaxIdleConnsPerHost < runtimeMaxIdleConnectionsPerHost {
 		base.MaxIdleConnsPerHost = runtimeMaxIdleConnectionsPerHost
 	}
-	return &Handler{store: store, recorder: recorder, budget: budgetClient, baseTransport: base, davSlots: make(chan struct{}, 64)}
+	return &Handler{store: store, recorder: recorder, budget: budgetClient, baseTransport: base, davSlots: make(chan struct{}, 64), davPreviewSlots: make(chan struct{}, 16)}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

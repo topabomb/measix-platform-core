@@ -115,7 +115,7 @@ Admin `/api/admin/v1/users/{userId}/workspace` 和 Client `/api/client/v1/worksp
 
 ## 媒体缩略图接入
 
-本节是 Core 的映射与实现机制；服务端媒体合同唯一由 Agent Space `docs/webdav.md`「媒体预览扩展 v1」拥有，平台授权/兼容语义由 S1 远程工作区合同拥有。原 Files/content、WorkspaceProjection、Snapshot 和 Relay DAV 路由不因预览而改义；Hub 不执行解码、不保存第二份媒体缓存或用户文件。
+本节说明 Core 的两条映射。服务端媒体合同由 Agent Space `docs/webdav.md`「媒体预览扩展 v1」拥有，平台授权和兼容语义由 S1 远程工作区合同拥有。Hub 提供 Admin/Client Files 入口，Relay 转发已发布平台 DAV 的同级预览资源。Agent Space 负责解码和缓存。
 
 新增资源为 `/api/client/v1/workspace/thumbnail` 和 `/api/admin/v1/users/{userId}/workspace/thumbnail`，支持 OPTIONS/GET/HEAD。每次都要求当前 WorkspaceProjection 的 agentSpaceId；GET/HEAD 额外接受 path、size、expectedEtag，参数与源/派生表示条件遵循媒体合同。OPTIONS 只接受 agentSpaceId，不将远端调用嵌入原工作区/目录查询。
 
@@ -133,7 +133,11 @@ Admin 首次打开当前空间时独立读取能力；只在 supported=true 且�
 
 ### 客户端能力识别与会话复用
 
-当前客户端须知道上述 thumbnail 资源地址，然后用 OPTIONS 查询；这不是通用 DAV 根的自动发现。普通 WebDAV 客户端不会因此自动显示缩略图。Agent Space 的已知预览地址及认证方式由其扩展合同给出；本轮没有给 Relay 增加兄弟 `/previews` 路由，也没有实现根 OPTIONS 的 Link 发现。直接 DAV 客户端需要显式实现该扩展。
+Hub Files 客户端用上述 thumbnail 资源地址发起 OPTIONS。平台 DAV 客户端以现有 `/runtime/v1/resources/{resourceId}/spaces/{agentSpaceId}/dav/` 为基址解析 `../previews`，用同一企业 Bearer 发认证 OPTIONS。DAV 根 OPTIONS 仅用于标准 DAV，扩展发现以同级地址为准。按主体会话、资源、空间、绑定版本共享能力结果和在途请求，切目录复用，绑定变化则取消并清除。遇到旧 Relay 的 `dav_target_outside_workspace` 可报告平台入口未提供预览。对未实现扩展的普通 WebDAV，只有 Relay 转发所得的 OPTIONS 404/405 且同一 DAV 根认证读取成功，才回到标准文件操作。文件 GET 404、权限拒绝、绑定失效、网络和协议错误保留原义。
+
+Relay 将精准匹配的 `/previews` 转给已验证绑定的 `/u/{username}/previews`，换用绑定的 DAV key。`READ_ONLY` 和 `FULL` 按同一只读方法集工作，拒绝正文。先按 Core 入口校验浏览器来源，再清除跨跳身份、Cookie、Origin 和 Fetch Metadata。上游负责解析查询和条件头、生成 WebP、返回源与派生 ETag。Relay 检查成功或 304 的空间身份，保留 HEAD/304、412、429/Retry-After 等表示语义并发送 `no-store`。预览用独立的有界转发槽，普通 DAV 仍走原文件树映射和并发槽。两条路径复用租约和 statistics-only 记录。Hub Files 使用自己的会话和授权，即使平台 DAV 尚未发布或已关闭也能独立提供缩略图。
+
+Relay 每进程最多接纳 16 个预览转发和 64 个普通 DAV 转发。传输按最后一次实际字节进展更新空闲期限，每个请求复用一个计时器。租约取消与写期限更新串行处理，已撤销的请求终止响应。预览请求没有上传正文，取消时保留 HTTP/1 连接读侧，以便下一个请求使用新绑定。
 
 将能力查询放在连接会话 owner，保存一个共享 Promise，包含在途请求、支持、不支持和失败结果；不要在目录行、每张图片或每次进入目录时创建发现器。缓存按服务入口、已认证主体/会话、空间和连接/绑定版本隔离。切主体、空间、连接配置或绑定版本时取消并销毁旧实例；同一主体的正常 access token 刷新不重做发现。错误不能转为“不支持”；需要重试时由原连接 owner 显式重建实例，避免一目录文件反复试探。
 

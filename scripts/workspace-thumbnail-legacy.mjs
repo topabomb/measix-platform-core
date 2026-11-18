@@ -11,6 +11,7 @@ import { randomUUID,createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { freePort,waitFor } from './lib/harness.mjs'
 import { WorkspaceThumbnailSession } from './examples/workspace-thumbnail-session.mjs'
+import { openPlatformDAV, publishWorkspaceDAV } from './workspace-thumbnail-relay.mjs'
 
 export function createLegacyPreviewProxy({target,mode,observed}) {
   const origin=new URL(target)
@@ -92,6 +93,24 @@ export async function runLegacyAPI({root,env,users,api,raw,put,workspace,provide
   response=await clientFetch(base);assert.equal((await response.json()).filesAvailable,true)
   response=await clientFetch(file);assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes)
   checks.push('explicitly injected preview 403 stays file_forbidden without withdrawing DAV, leaking headers or breaking original files')
+  console.log('PASS LEGACY '+checks.at(-1))
+  await publishWorkspaceDAV(api, true)
+  const dav = await openPlatformDAV({ api, env, user, accessToken })
+  for (const status of [404, 405, 403]) {
+    provider.mode.previewStatus = status === 404 ? 0 : status
+    const before = provider.observed.length
+    response = await dav.send(dav.preview, { method: 'OPTIONS' })
+    assert.equal(response.status, status)
+    await response.arrayBuffer()
+    assert.equal(provider.observed.length, before + 1, 'Relay passes the capability status without another upstream probe')
+    assert.equal(provider.observed.at(-1).status, status)
+    if (status === 403) continue
+    response = await dav.send(dav.file(), { method: 'PROPFIND', headers: { Depth: '0' } })
+    assert.equal(response.status, 207)
+    await response.arrayBuffer()
+    assert.equal(provider.observed.at(-1).status, 207)
+  }
+  checks.push('Relay preserves legacy 404/405 and explicit 403; the client verifies the same authenticated DAV root only for 404/405')
   console.log('PASS LEGACY '+checks.at(-1))
   provider.mode.previewStatus=0
   return {checks,provider:provider.identity,requests:provider.observed,limitations:['Management is a deterministic substitute; this is not a tested old Runcove release.','404 is returned by the existing standard DAV fixture; 405 and 403 are explicit local preview-response injections.']}

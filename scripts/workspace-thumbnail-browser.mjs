@@ -150,7 +150,8 @@ export async function run(input) {
   const sourcePaths=['scripts/workspace-thumbnail-browser.mjs','scripts/fixtures/workspace-preview-service.py',
     ...(options.performanceOnly?['scripts/workspace-thumbnail-performance.mjs','console/e2e/workspace-thumbnail-performance.spec.ts']:['console/e2e/workspace-thumbnails.spec.ts']),
     ...(options.apiOnly?['scripts/workspace-thumbnail-api.mjs','scripts/examples/workspace-thumbnail-session.mjs']:[]),
-    ...(options.legacyOnly?['scripts/workspace-thumbnail-legacy.mjs','scripts/examples/workspace-thumbnail-session.mjs','scripts/fixtures/workspace-dav-server/main.go','scripts/fixtures/workspace-dav-server/go.mod','scripts/fixtures/workspace-dav-server/go.sum']:[])]
+    ...(options.legacyOnly?['scripts/workspace-thumbnail-legacy.mjs','scripts/examples/workspace-thumbnail-session.mjs','scripts/fixtures/workspace-dav-server/main.go','scripts/fixtures/workspace-dav-server/go.mod','scripts/fixtures/workspace-dav-server/go.sum']:[]),
+    ...(options.apiOnly||options.legacyOnly?['scripts/workspace-thumbnail-relay.mjs']:[])]
   const sourceSnapshot=join(out,'validation-source');mkdirSync(sourceSnapshot)
   report.sources=Object.fromEntries(sourcePaths.map(path=>{
     const source=join(root,path),copy=join(sourceSnapshot,path.replaceAll('/','__'))
@@ -240,14 +241,17 @@ export async function run(input) {
     const login=await fetch(baseURL+'/api/admin/v1/session/login',{method:'POST',headers:{'Content-Type':'application/json',Origin:baseURL},body:JSON.stringify({username:'admin',password:env.adminPassword})})
     assert.equal(login.status,200);session=await login.json();cookie=login.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ')
     const token=legacyProvider?.managementToken??readFileSync(join(out,'agent-space/management-token.private'),'utf8').trim()
+    const relayValidation=options.apiOnly?await import('./workspace-thumbnail-relay.mjs'):undefined
+    const relayFixture=await relayValidation?.startPreviewResponseGate(fixtureReady.davOrigin,server=>servers.push(server))
     const secret=await api('/api/admin/v1/secrets','POST',{name:'Isolated browser fixture management',value:token})
-    const service=await api('/api/admin/v1/remote-workspace/services','POST',{name:'Thumbnail browser fixture',expectedRevision:0,config:{adminOrigin:fixtureReady.adminOrigin,mcpOrigin:fixtureReady.mcpOrigin,davOrigin:fixtureReady.davOrigin,managementSecret:{secretId:secret.secretId,secretVersion:secret.secretVersion},connectTimeoutMs:90000,idleTimeoutMs:120000}},{'Idempotency-Key':key()})
+    const service=await api('/api/admin/v1/remote-workspace/services','POST',{name:'Thumbnail browser fixture',expectedRevision:0,config:{adminOrigin:fixtureReady.adminOrigin,mcpOrigin:fixtureReady.mcpOrigin,davOrigin:relayFixture?.origin??fixtureReady.davOrigin,managementSecret:{secretId:secret.secretId,secretVersion:secret.secretVersion},connectTimeoutMs:90000,idleTimeoutMs:120000}},{'Idempotency-Key':key()})
     await api('/api/admin/v1/remote-workspace/services/'+service.workspaceServiceId+'/check','POST')
     await complete(await api('/api/admin/v1/remote-workspace/services/'+service.workspaceServiceId+'/apply','POST',{expectedConfigRevision:service.configRevision},{'Idempotency-Key':key()}))
     for(const name of ['A','B']) {
       const user=await api('/api/admin/v1/users','POST',{username:'thumbnail_'+name.toLowerCase()+'_'+randomUUID().slice(0,8),displayName:'Thumbnail Browser '+name,role:'MEMBER'})
       users.push(user);await command(user,'CREATE');user.spaceId=(await api(workspace(user))).agentSpaceId
     }
+    if(relayValidation)report.relayCold=await relayValidation.checkColdPlatformDAV({api,env,users,workspace})
     const media=join(out,'agent-space/media')
     let performanceFixture
     if(options.performanceOnly){
@@ -285,8 +289,9 @@ export async function run(input) {
       assert.ok(sourcesUnchanged(),'Validation source changed after its pre-execution snapshot')
       const {runThumbnailAPI}=await import('./workspace-thumbnail-api.mjs')
       report.api=await runThumbnailAPI({out,env,options,users,api,raw,command,put,workspace,fixtureReady,managementToken:token,core:{backendSource:report.backendSource,binaries:report.binaries,adminBuildHash:build.buildHash}})
+      report.relay=await relayValidation.runRelayDAVPreview({out,env,users,api,raw,command,put,workspace,gate:relayFixture.gate})
       assert.ok(sourcesUnchanged(),'Validation source changed during API execution')
-      report.checks.push('real Client/Admin API lane passed; see api checks and client-contract-cases/manifest.json')
+      report.checks.push('real Client/Admin and platform DAV Relay API lane passed; see api, relayCold and relay checks')
     }else if(!options.setupOnly) {
       assert.ok(sourcesUnchanged(),'Validation source changed after its pre-execution snapshot')
       browser=spawn(process.execPath,[join(root,'console/node_modules/@playwright/test/cli.js'),'test',options.performanceOnly?'workspace-thumbnail-performance.spec.ts':'workspace-thumbnails.spec.ts','--output='+join(out,'playwright-results')],{cwd:join(root,'console'),windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,MEASIX_E2E_BASE_URL:baseURL,MEASIX_E2E_ADMIN_PASSWORD:env.adminPassword,MEASIX_THUMBNAIL_BROWSER_INPUT:join(out,'browser-input.private.json'),PLAYWRIGHT_JSON_OUTPUT_FILE:join(out,'playwright.json'),PLAYWRIGHT_HTML_REPORT:join(out,'playwright-report')}})

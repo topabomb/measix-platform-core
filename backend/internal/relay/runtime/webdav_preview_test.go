@@ -130,13 +130,20 @@ func (r *previewDeadlineRecorder) SetReadDeadline(deadline time.Time) error {
 	return nil
 }
 
-func TestDAVPreviewRevocationLeavesConnectionReadSideAvailable(t *testing.T) {
+func TestDAVBodylessRevocationLeavesConnectionReadSideAvailable(t *testing.T) {
+	for _, endpoint := range []string{"previews", "dav/file"} {
+		t.Run(endpoint, func(t *testing.T) { testDAVBodylessRevocation(t, endpoint) })
+	}
+}
+
+func testDAVBodylessRevocation(t *testing.T, endpoint string) {
+	t.Helper()
 	started := make(chan struct{})
 	h, token, root, store, state := davFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(started)
 		<-r.Context().Done()
 	}), "FULL")
-	r := httptest.NewRequest("GET", strings.TrimSuffix(root, "dav/")+"previews", nil)
+	r := httptest.NewRequest("GET", strings.TrimSuffix(root, "dav/")+endpoint, nil)
 	r.Header.Set("Authorization", "Bearer "+token)
 	w := &previewDeadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
 	finished := make(chan struct{})
@@ -161,7 +168,75 @@ func TestDAVPreviewRevocationLeavesConnectionReadSideAvailable(t *testing.T) {
 		t.Fatal("revocation did not cancel the preview")
 	}
 	if w.readInterrupted.Load() {
-		t.Fatal("canceling a bodyless preview must not interrupt the HTTP connection's read side")
+		t.Fatal("canceling a bodyless DAV request interrupted the HTTP connection's read side")
+	}
+}
+
+func TestDAVPreviewAcceptsBodylessHTTP2(t *testing.T) {
+	var space string
+	h, token, root, _, state := davFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Agent-Space-Id", space)
+		w.WriteHeader(200)
+	}), "READ_ONLY")
+	space = (*state.DavBindings)[0].Target.AgentSpaceId
+	server := httptest.NewUnstartedServer(h)
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	t.Cleanup(server.Close)
+	endpoint := server.URL + strings.TrimSuffix(root, "dav/") + "previews"
+	for _, test := range []struct {
+		method, body string
+		status       int
+	}{{"OPTIONS", "", 200}, {"GET", "", 200}, {"HEAD", "", 200}, {"GET", "payload", 400}} {
+		r, err := http.NewRequest(test.method, endpoint, strings.NewReader(test.body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Header.Set("Authorization", "Bearer "+token)
+		response, err := server.Client().Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.ProtoMajor != 2 || response.StatusCode != test.status {
+			t.Fatalf("%s: got HTTP/%d %d, want HTTP/2 %d", test.method, response.ProtoMajor, response.StatusCode, test.status)
+		}
+	}
+}
+
+type davTestTransport func(*http.Request) (*http.Response, error)
+
+func (f davTestTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestDAVPreviewWithholdsHeadersAfterLeaseRevocation(t *testing.T) {
+	for _, test := range []struct {
+		method string
+		status int
+	}{{"HEAD", 200}, {"GET", 304}} {
+		t.Run(test.method, func(t *testing.T) {
+			h, token, root, store, state := davFixture(t, nil, "READ_ONLY")
+			policy := state.Routes[0].TimeoutPolicy
+			fake := davTestTransport(func(r *http.Request) (*http.Response, error) {
+				state.ControlRevision++
+				(*state.DavBindings)[0].Target.BindingRevision++
+				state.BundleHash, _ = control.HashDescriptor(state)
+				if _, err := store.Apply(state); err != nil {
+					t.Fatal(err)
+				}
+				header := make(http.Header)
+				header.Set("Agent-Space-Id", (*state.DavBindings)[0].Target.AgentSpaceId)
+				header.Set("ETag", `"old"`)
+				return &http.Response{StatusCode: test.status, Header: header, Body: http.NoBody}, nil
+			})
+			h.(*Handler).transports.Store(transportKey{connectMs: policy.ConnectMs, responseHeaderMs: policy.ResponseHeaderMs}, fake)
+			r := httptest.NewRequest(test.method, strings.TrimSuffix(root, "dav/")+"previews", nil)
+			r.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != 502 || w.Header().Get("ETag") != "" {
+				t.Fatalf("revoked response headers escaped: %d %v", w.Code, w.Header())
+			}
+		})
 	}
 }
 

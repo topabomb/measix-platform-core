@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -126,7 +127,7 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 			fail(403, "dav_target_outside_workspace")
 			return
 		}
-		if r.ContentLength != 0 || len(r.TransferEncoding) != 0 || (r.Body != nil && r.Body != http.NoBody) {
+		if !davPreviewEmptyFraming(r) {
 			fail(400, "invalid_preview_request")
 			return
 		}
@@ -187,6 +188,13 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 		fail(503, "dav_busy")
 		return
 	}
+	if preview && r.Body != nil && r.Body != http.NoBody {
+		if !finishEmptyDAVPreviewStream(w, r.Body) {
+			fail(400, "invalid_preview_request")
+			return
+		}
+		r.Body = http.NoBody
+	}
 	lease, release, err := h.store.Register(r.Context(), func(current *control.State) bool {
 		// Authentication was checked at admission. Rechecking a now-expired short
 		// JWT would abort valid large transfers on unrelated control updates.
@@ -228,7 +236,8 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 	defer cancel()
 	r = r.WithContext(lease)
 	idle := time.Duration(route.TimeoutPolicy.IdleMs) * time.Millisecond
-	watch := newDAVActivity(idle, lease, cancel, w, !preview)
+	watchRead := r.ContentLength != 0 && r.Body != nil && r.Body != http.NoBody
+	watch := newDAVActivity(idle, lease, cancel, w, watchRead)
 	defer watch.close()
 	cancellationDone := make(chan struct{})
 	stopCancellation := context.AfterFunc(lease, func() {
@@ -240,7 +249,7 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 			<-cancellationDone
 		}
 	}()
-	if r.Body != nil && r.Body != http.NoBody {
+	if watchRead {
 		r.Body = &davActivityBody{ReadCloser: r.Body, activity: watch, bytes: &stats.requestBytes}
 	}
 	writer := &davActivityWriter{ResponseWriter: w, activity: watch}
@@ -279,6 +288,9 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 		ModifyResponse: func(response *http.Response) error {
 			status := response.StatusCode
 			stats.upstreamStatus = &status
+			if err := lease.Err(); err != nil {
+				return err
+			}
 			if response.StatusCode == 401 {
 				response.Body.Close()
 				return errDAVCredential
@@ -328,6 +340,38 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 		},
 	}
 	proxy.ServeHTTP(writer, r)
+}
+
+func davPreviewEmptyFraming(r *http.Request) bool {
+	if r.ContentLength != 0 || len(r.TransferEncoding) != 0 || len(r.Trailer) != 0 {
+		return false
+	}
+	lengths := r.Header.Values("Content-Length")
+	if len(lengths) > 1 {
+		return false
+	}
+	if len(lengths) == 1 {
+		size, err := strconv.ParseUint(lengths[0], 10, 64)
+		if err != nil || size != 0 {
+			return false
+		}
+	}
+	return r.Body == nil || r.Body == http.NoBody || r.ProtoMajor == 2
+}
+
+func finishEmptyDAVPreviewStream(w http.ResponseWriter, body io.ReadCloser) bool {
+	// net/http gives HTTP/2 requests a Body even when HEADERS ends the stream.
+	// Bound the confirmation of EOF in case an explicitly empty stream stays open.
+	const emptyStreamTimeout = time.Second
+	controller := http.NewResponseController(w)
+	if err := controller.SetReadDeadline(time.Now().Add(emptyStreamTimeout)); err != nil {
+		return false
+	}
+	defer controller.SetReadDeadline(time.Time{})
+	defer body.Close()
+	var firstByte [1]byte
+	n, err := io.ReadFull(body, firstByte[:])
+	return n == 0 && err == io.EOF
 }
 
 func writeDAVProblem(w http.ResponseWriter, method string, status int, code, requestID string, forwarded bool) {
@@ -548,7 +592,7 @@ func (a *davActivity) interruptLocked() {
 	controller := http.NewResponseController(a.writer)
 	deadline := time.Now()
 	_ = controller.SetWriteDeadline(deadline)
-	// A bodyless preview has no upload to interrupt. Expiring the HTTP/1 read
+	// A bodyless request has no upload to interrupt. Expiring the HTTP/1 read
 	// deadline would cancel the background reader for the keep-alive connection.
 	if a.watchRead {
 		_ = controller.SetReadDeadline(deadline)

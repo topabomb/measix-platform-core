@@ -1,0 +1,193 @@
+package contract_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"math"
+	"net/url"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/getkin/kin-openapi/openapi3"
+	"measix/platform/internal/hub/capability"
+	"measix/platform/internal/wire/clientapi"
+)
+
+func TestClientIntegrationSharedWireCases(t *testing.T) {
+	root := filepath.Join(fixtureRoot(t), "client-integration")
+	raw, err := os.ReadFile(filepath.Join(root, "cases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Name   string
+		Schema string
+		Valid  bool
+		Value  any
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) < 20 {
+		t.Fatal("incomplete integration cases")
+	}
+	doc, err := openapi3.NewLoader().LoadFromFile(filepath.Join(fixtureRoot(t), "..", "client", "client-control.openapi.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			schema := doc.Components.Schemas[c.Schema]
+			if schema == nil {
+				t.Fatal("missing schema", c.Schema)
+			}
+			err := schema.Value.VisitJSON(c.Value)
+			if (err == nil) != c.Valid {
+				t.Fatalf("expected valid=%v: %v", c.Valid, err)
+			}
+		})
+	}
+	for _, file := range []string{"snapshot-v5.json", "snapshot-v4.json", "snapshot-v4-dashscope-image.json", "snapshot-v4-denied.json"} {
+		raw, err := os.ReadFile(filepath.Join(root, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var s capability.Snapshot
+		if err := json.Unmarshal(raw, &s); err != nil {
+			t.Fatal(err)
+		}
+		hash, err := capability.HashSnapshot(s)
+		if err != nil || hash != s.SnapshotHash {
+			t.Fatalf("compiler hash mismatch: %s %v", file, err)
+		}
+		if len(s.Models) == 0 || len(s.Tts) == 0 || len(s.Asr) == 0 || len(s.Mcp) == 0 || len(s.Assistants) < 2 || len(s.Starters) < 3 {
+			t.Fatal("incomplete v4 profile")
+		}
+	}
+}
+
+// These vectors specify receiver expectations for Android; checking their
+// consistency here is not evidence that an Android receiver already exists.
+func TestSharedSnapshotReceptionAndRuntimeExamples(t *testing.T) {
+	read := func(name string, target any) {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(fixtureRoot(t), "client-integration", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = json.Unmarshal(raw, target); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var cases []struct {
+		Name    string
+		Outcome string
+		Context struct {
+			DeploymentID string
+			Generation   int
+			Etag         string
+		}
+		Snapshot map[string]any
+	}
+	read("snapshot-reception-cases.json", &cases)
+	doc, err := openapi3.NewLoader().LoadFromFile(filepath.Join(fixtureRoot(t), "..", "client", "client-control.openapi.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			seen[c.Name] = true
+			outcome := "invalid_configuration"
+			version, numeric := c.Snapshot["schemaVersion"].(float64)
+			if numeric && version > 0 && math.Trunc(version) == version && version != 4 && version != 5 {
+				outcome = "unsupported_version"
+			} else if version == 4 || version == 5 {
+				schema := "ManagedSnapshot"
+				if version == 4 {
+					schema = "ManagedSnapshotV4"
+				}
+				if doc.Components.Schemas[schema].Value.VisitJSON(c.Snapshot) == nil &&
+					c.Snapshot["deploymentId"] == c.Context.DeploymentID &&
+					c.Snapshot["managedGeneration"] == float64(c.Context.Generation) &&
+					c.Context.Etag == fmt.Sprintf("\"%v\"", c.Snapshot["snapshotHash"]) {
+					outcome = "accepted"
+				}
+			}
+			if outcome != c.Outcome {
+				t.Fatalf("reception outcome=%s want %s", outcome, c.Outcome)
+			}
+		})
+	}
+	for _, name := range []string{"accept", "accept-v5", "future-v6", "future-v7", "missing-version", "null-version", "string-version", "fractional-version", "zero-version", "known-version-unknown-field"} {
+		if !seen[name] {
+			t.Errorf("missing receiver case %s", name)
+		}
+	}
+	var snapshot clientapi.ManagedSnapshot
+	read("snapshot-v4.json", &snapshot)
+	var dashScopeImageSnapshot clientapi.ManagedSnapshot
+	read("snapshot-v4-dashscope-image.json", &dashScopeImageSnapshot)
+	var asrSnapshot clientapi.ManagedSnapshot
+	read("snapshot-v4-asr.json", &asrSnapshot)
+	var examples []struct {
+		ResourceID, Protocol, Method, URL, ContentType, ResponseKind string
+		Headers                                                      map[string]string
+		Body, Fields, ResponseBody                                   map[string]any
+	}
+	read("runtime-examples.json", &examples)
+	resources := map[string]string{}
+	resources[snapshot.Models[0].ModelId] = snapshot.Models[0].RuntimePath
+	resources[(*snapshot.ImageGenerators)[0].ImageId] = (*snapshot.ImageGenerators)[0].RuntimePath
+	resources[(*dashScopeImageSnapshot.ImageGenerators)[0].ImageId] = (*dashScopeImageSnapshot.ImageGenerators)[0].RuntimePath
+	resources[snapshot.Tts[0].TtsId] = snapshot.Tts[0].RuntimePath
+	resources[snapshot.Asr[0].AsrId] = snapshot.Asr[0].RuntimePath
+	resources[asrSnapshot.Asr[1].AsrId] = asrSnapshot.Asr[1].RuntimePath
+	resources[snapshot.Mcp[0].McpServerId] = snapshot.Mcp[0].RuntimePath
+	if len(examples) != 7 {
+		t.Fatal("missing Runtime profile")
+	}
+	for _, example := range examples {
+		parsed, err := url.Parse(example.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path, ok := resources[example.ResourceID]
+		if !ok || parsed.Scheme != "https" || parsed.Host != "platform.example.invalid" || parsed.Path != "/runtime/v1/resources/"+example.ResourceID+path || example.Method != "POST" {
+			t.Fatalf("invalid public runtime request: %+v", example)
+		}
+		if example.Headers["X-Measix-Managed-Generation"] != fmt.Sprint(snapshot.ManagedGeneration) || example.Headers["Authorization"] != "Bearer synthetic.access.token" || example.Headers["X-Measix-Interaction-Id"] == "" {
+			t.Fatal("invalid Runtime auth/generation")
+		}
+		if example.ResourceID == snapshot.Models[0].ModelId && example.Body["model"] != snapshot.Models[0].UpstreamModelKey {
+			t.Fatal("wire ID used as model key")
+		}
+		if example.ResourceID == (*snapshot.ImageGenerators)[0].ImageId && example.Body["model"] != (*snapshot.ImageGenerators)[0].UpstreamModelKey {
+			t.Fatal("image wire ID used as upstream model key")
+		}
+		if example.ResourceID == (*dashScopeImageSnapshot.ImageGenerators)[0].ImageId {
+			parameters, ok := example.Body["parameters"].(map[string]any)
+			if example.Protocol != "DASHSCOPE_MULTIMODAL_GENERATION" || example.Body["model"] != (*dashScopeImageSnapshot.ImageGenerators)[0].UpstreamModelKey || !ok || parameters["size"] != "1024*1024" || parameters["n"] != float64(1) || parameters["watermark"] != false {
+				t.Fatal("invalid DashScope image request vector")
+			}
+			output, ok := example.ResponseBody["output"].(map[string]any)
+			if !ok || output["choices"] == nil {
+				t.Fatal("missing DashScope image response vector")
+			}
+		}
+		delete(resources, example.ResourceID)
+	}
+	if len(resources) != 0 {
+		t.Fatal("Runtime profile coverage incomplete")
+	}
+	// Load the copied schema directly: all refs must resolve in the export.
+	path := filepath.Join(fixtureRoot(t), "../generated/android/integration/measix-platform-core/api/generated/android/client-control.openapi.yaml")
+	doc, err = openapi3.NewLoader().LoadFromFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.Components.Schemas["ManagedSnapshot"] == nil {
+		t.Fatal("missing exported snapshot schema")
+	}
+}

@@ -1,0 +1,149 @@
+{
+  "providers": [
+    {
+      "providerId": "prv_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "displayName": "OpenAI Managed Provider",
+      "clientProtocol": "OPENAI_CHAT_COMPLETIONS",
+      "enabled": true
+    }
+  ],
+  "models": [
+    {
+      "modelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "providerId": "prv_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "displayName": "GPT-4o Managed",
+      "upstreamModelKey": "gpt-4o",
+      "runtimePath": "/v1/chat/completions",
+      "inputModalities": [
+        "TEXT",
+        "IMAGE"
+      ],
+      "outputModalities": [
+        "TEXT"
+      ],
+      "capabilities": [
+        "TOOL",
+        "REASONING"
+      ],
+      "enabled": true
+    }
+  ],
+  "imageGenerators": [
+    {
+      "imageId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
+      "displayName": "Managed Image Generator",
+      "clientProtocol": "OPENAI_IMAGES_GENERATIONS",
+      "upstreamModelKey": "gpt-image-1",
+      "runtimePath": "/v1/images/generations",
+      "maxImagesPerRequest": 4,
+      "allowedSizes": [
+        "1024x1024"
+      ],
+      "enabled": true
+    }
+  ],
+  "tts": [
+    {
+      "ttsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "displayName": "OpenAI TTS",
+      "clientProtocol": "OPENAI_AUDIO_SPEECH",
+      "upstreamModelKey": "tts-1",
+      "voice": "alloy",
+      "runtimePath": "/v1/audio/speech",
+      "enabled": true
+    }
+  ],
+  "asr": [
+    {
+      "asrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "displayName": "OpenAI ASR",
+      "clientProtocol": "OPENAI_AUDIO_TRANSCRIPTIONS",
+      "upstreamModelKey": "whisper-1",
+      "language": "en",
+      "runtimePath": "/v1/audio/transcriptions",
+      "enabled": true
+    }
+  ],
+  "mcp": [
+    {
+      "mcpServerId": "mcp_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      "displayName": "Enterprise MCP Server",
+      "clientProtocol": "MCP_STREAMABLE_HTTP",
+      "runtimePath": "/mcp/v1",
+      "authOwnership": "ENTERPRISE_MANAGED",
+      "enabled": true
+    }
+  ],
+  "bindings": [],
+  "policy": {
+    "policyId": "pol_550e8400-e29b-41d4-a716-446655440000",
+    "allowLocalProviders": true,
+    "allowLocalTts": true,
+    "allowLocalAsr": true,
+    "allowLocalMcp": true,
+    "defaultModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "defaultFastModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "defaultTitleModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "defaultAttachmentInspectionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "defaultSuggestionModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "defaultCompressModelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "defaultImageGenerationId": "img_ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "defaultTtsId": "tts_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "defaultAsrId": "asr_dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "defaultAssistantId": "asd_11111111-1111-4111-8111-111111111111",
+    "allowLocalAssistants": true
+  },
+  "assistants": [
+    {
+      "assistantDefinitionId": "asd_11111111-1111-4111-8111-111111111111",
+      "displayName": "企业工作助手",
+      "description": "共享 v4 接入资料",
+      "systemPrompt": "按企业规范回答。",
+      "modelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "memorySeed": [
+        "先确认事实",
+        "再说明依据"
+      ],
+      "mcpServerIds": [
+        "mcp_eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+      ],
+      "enabled": true
+    },
+    {
+      "assistantDefinitionId": "asd_22222222-2222-4222-8222-222222222222",
+      "displayName": "企业写作助手",
+      "systemPrompt": "帮助用户整理周报。",
+      "modelId": "mdl_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "memorySeed": [],
+      "mcpServerIds": [],
+      "enabled": true
+    }
+  ],
+  "starters": [
+    {
+      "starterId": "str_11111111-1111-4111-8111-111111111111",
+      "assistantDefinitionId": "asd_11111111-1111-4111-8111-111111111111",
+      "title": "查询企业信息",
+      "description": "用户确认后发送",
+      "prompt": "请查询企业最新信息。",
+      "sortOrder": 20,
+      "enabled": true
+    },
+    {
+      "starterId": "str_22222222-2222-4222-8222-222222222222",
+      "assistantDefinitionId": "asd_22222222-2222-4222-8222-222222222222",
+      "title": "整理周报",
+      "prompt": "请帮我整理本周工作。",
+      "sortOrder": 10,
+      "enabled": true
+    },
+    {
+      "starterId": "str_33333333-3333-4333-8333-333333333333",
+      "assistantDefinitionId": "asd_11111111-1111-4111-8111-111111111111",
+      "title": "已停用入口",
+      "prompt": "不能自动显示或发送。",
+      "sortOrder": 0,
+      "enabled": false
+    }
+  ]
+}

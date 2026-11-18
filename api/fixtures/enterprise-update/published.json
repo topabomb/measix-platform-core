@@ -1,0 +1,13 @@
+{
+  "enterpriseUpdateId": "eup_550e8400-e29b-41d4-a716-446655440000",
+  "title": "Q3 Company Update",
+  "content": "## Platform Upgrade\n\nWe are excited to announce that our platform has been **upgraded** with new enterprise features including:\n\n- Managed assistants\n- Enterprise updates\n- Managed memory seed\n\nVisit the [documentation](https://docs.example.com) for details.",
+  "contentFormat": "MARKDOWN",
+  "category": "ANNOUNCEMENT",
+  "severity": "INFO",
+  "status": "PUBLISHED",
+  "publishedAt": "2026-08-28T10:00:00Z",
+  "feedRevision": 1,
+  "createdAt": "2026-08-28T09:00:00Z",
+  "updatedAt": "2026-08-28T10:00:00Z"
+}

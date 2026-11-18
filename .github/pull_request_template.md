@@ -38,7 +38,7 @@ For a TDD-exempt change (docs-only, formatting, deterministic regeneration), exp
 
 ## Database / operations
 
-- Migration impact: <!-- none / migration + tests -->
+- Current schema impact: <!-- none / initialization SQL + identity/tests -->
 - Configuration/operations impact: <!-- none / docs updated -->
 - Release/RC impact: <!-- none / required gates -->
 

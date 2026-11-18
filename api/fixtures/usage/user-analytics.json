@@ -1,0 +1,101 @@
+{
+  "items": [
+    {
+      "userId": "usr_11111111-1111-4111-8111-111111111111",
+      "userDisplayName": "Example member",
+      "requestCount": 3,
+      "forwardedRequestCount": 2,
+      "errorRequestCount": 1,
+      "semanticMeters": [
+        {
+          "meter": "REQUESTS",
+          "quantity": "3",
+          "confidence": "EXACT"
+        }
+      ],
+      "cost": {
+        "status": "KNOWN",
+        "amounts": [
+          {
+            "currency": "CNY",
+            "amount": "0.25"
+          }
+        ],
+        "amount": "0.25",
+        "currency": "CNY",
+        "pricedRequests": 2,
+        "partialRequests": 0,
+        "unknownRequests": 0,
+        "missingPricingRequests": 0,
+        "unknownMeterRequests": 0
+      },
+      "budget": {
+        "userId": "usr_11111111-1111-4111-8111-111111111111",
+        "timezone": "UTC",
+        "asOf": "2026-09-28T10:00:00Z",
+        "items": [
+          {
+            "capability": "MODEL",
+            "mode": "UNLIMITED",
+            "source": "DEFAULT",
+            "revision": 0,
+            "effectiveFrom": "2026-09-28T10:00:00Z",
+            "asOf": "2026-09-28T10:00:00Z",
+            "inFlightRequests": 0,
+            "limits": [],
+            "usageMeters": [],
+            "status": "AVAILABLE"
+          },
+          {
+            "capability": "TTS",
+            "mode": "UNLIMITED",
+            "source": "DEFAULT",
+            "revision": 0,
+            "effectiveFrom": "2026-09-28T10:00:00Z",
+            "asOf": "2026-09-28T10:00:00Z",
+            "inFlightRequests": 0,
+            "limits": [],
+            "usageMeters": [],
+            "status": "AVAILABLE"
+          },
+          {
+            "capability": "ASR",
+            "mode": "UNLIMITED",
+            "source": "DEFAULT",
+            "revision": 0,
+            "effectiveFrom": "2026-09-28T10:00:00Z",
+            "asOf": "2026-09-28T10:00:00Z",
+            "inFlightRequests": 0,
+            "limits": [],
+            "usageMeters": [],
+            "status": "AVAILABLE"
+          },
+          {
+            "capability": "MCP",
+            "mode": "UNLIMITED",
+            "source": "DEFAULT",
+            "revision": 0,
+            "effectiveFrom": "2026-09-28T10:00:00Z",
+            "asOf": "2026-09-28T10:00:00Z",
+            "inFlightRequests": 0,
+            "limits": [],
+            "usageMeters": [],
+            "status": "AVAILABLE"
+          },
+          {
+            "capability": "IMAGE_GENERATION",
+            "mode": "UNLIMITED",
+            "source": "DEFAULT",
+            "revision": 0,
+            "effectiveFrom": "2026-09-28T10:00:00Z",
+            "asOf": "2026-09-28T10:00:00Z",
+            "inFlightRequests": 0,
+            "limits": [],
+            "usageMeters": [],
+            "status": "AVAILABLE"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -2,15 +2,17 @@ package workspace
 
 import (
 	"context"
-	"entgo.io/ent/dialect/sql"
 	"errors"
+	"time"
+
+	"entgo.io/ent/dialect/sql"
+
 	"measix/platform/ent"
 	"measix/platform/ent/agentspace"
 	"measix/platform/ent/user"
 	remoteapi "measix/platform/internal/hub/agentspace"
 	"measix/platform/internal/wire/adminapi"
 	"measix/platform/pkg/platformid"
-	"time"
 )
 
 type FileAccess struct {
@@ -20,7 +22,7 @@ type FileAccess struct {
 	Idle                              time.Duration
 	valid                             func(context.Context) bool
 	cancel                            context.CancelFunc
-	preview                           bool
+	slots                             chan struct{}
 	auditID                           int
 	userID, davSecretID               string
 	bindingRevision, davSecretVersion int64
@@ -29,7 +31,7 @@ type FileAccess struct {
 // Revalidate fences buffered responses against identity, binding or credential
 // changes which happened after admission and before the next cancellation sweep.
 func (access *FileAccess) Revalidate(ctx context.Context) error {
-	if access.Context.Err() != nil || ctx.Err() != nil || !access.valid(ctx) {
+	if ctx.Err() != nil || access.Context.Err() != nil || !access.valid(ctx) || access.Context.Err() != nil {
 		access.cancel()
 		return ErrUnavailable
 	}
@@ -43,92 +45,93 @@ func (s *Service) OpenFiles(ctx context.Context, actor, userID, expectedSpaceID,
 	if _, err := remoteapi.FilePath(path, false); err != nil {
 		return nil, err
 	}
-	s.fileMu.Lock()
-	defer s.fileMu.Unlock()
-	preview := action == "THUMBNAIL" || action == "THUMBNAIL_OPTIONS"
-	active := 0
-	for access := range s.files {
-		if access.preview == preview {
-			active++
-		}
+	slots, code := s.fileSlots, "file_transfer_limit"
+	if action == "THUMBNAIL" || action == "THUMBNAIL_OPTIONS" {
+		slots, code = s.previewSlots, "preview_busy"
 	}
-	limit, code := 8, "file_transfer_limit"
-	if preview {
-		limit, code = 4, "preview_busy"
-	}
-	if active >= limit {
+	select {
+	case slots <- struct{}{}:
+	default:
 		return nil, &remoteapi.Error{Code: code, Status: 429}
 	}
-	if err := authorize(ctx); err != nil {
-		return nil, err
-	}
-	projection, err := s.Projection(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if str(projection.AgentSpaceId) != expectedSpaceID {
-		return nil, &remoteapi.Error{Code: "workspace_space_mismatch", Status: 409}
-	}
-	if !projection.FilesAvailable {
-		return nil, ErrUnavailable
-	}
-	row, err := s.Client.AgentSpace.Get(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if row.AgentSpaceID != expectedSpaceID {
-		return nil, &remoteapi.Error{Code: "workspace_space_mismatch", Status: 409}
-	}
-	workspaceService, err := s.Client.WorkspaceService.Get(ctx, row.WorkspaceServiceID)
-	if err != nil {
-		return nil, err
-	}
-	if workspaceService.ActiveConfigRevision == nil {
-		return nil, ErrUnavailable
-	}
-	cfg, err := s.config(ctx, workspaceService.ID, *workspaceService.ActiveConfigRevision)
-	if err != nil {
-		return nil, err
-	}
-	remote, err := s.adapter(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	token, err := s.Secrets.ResolveSecret(ctx, row.DavSecretID, int(row.DavSecretVersion))
-	if err != nil {
-		return nil, err
-	}
 	leaseCtx, cancel := context.WithCancel(ctx)
-	access := &FileAccess{Context: leaseCtx, Remote: remote, Username: row.RemoteUsername, Token: string(token), Idle: time.Duration(cfg.IdleTimeoutMs) * time.Millisecond, cancel: cancel, preview: preview, userID: userID, davSecretID: row.DavSecretID, bindingRevision: row.BindingRevision, davSecretVersion: row.DavSecretVersion}
+	access := &FileAccess{Context: leaseCtx, cancel: cancel, slots: slots}
+	admitted := false
+	defer func() {
+		if !admitted {
+			s.releaseFileAccess(access)
+		}
+	}()
+	if err := authorize(leaseCtx); err != nil {
+		return nil, err
+	}
+	row, err := s.Client.AgentSpace.Get(leaseCtx, userID)
+	if ent.IsNotFound(err) || err == nil && row.AgentSpaceID != expectedSpaceID {
+		return nil, &remoteapi.Error{Code: "workspace_space_mismatch", Status: 409}
+	}
+	if err != nil {
+		return nil, err
+	}
+	workspaceService, err := s.Client.WorkspaceService.Get(leaseCtx, row.WorkspaceServiceID)
+	if err != nil {
+		return nil, err
+	}
+	if !s.fileWorkspaceConnected(leaseCtx, row, workspaceService) {
+		return nil, ErrUnavailable
+	}
+	cfg, err := s.config(leaseCtx, workspaceService.ID, *workspaceService.ActiveConfigRevision)
+	if err != nil {
+		return nil, err
+	}
+	if !filesAvailable(row, cfg) {
+		return nil, ErrUnavailable
+	}
+	remote, err := s.adapter(leaseCtx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	token, err := s.Secrets.ResolveSecret(leaseCtx, row.DavSecretID, int(row.DavSecretVersion))
+	if err != nil {
+		return nil, err
+	}
+	access.Remote, access.Username, access.Token = remote, row.RemoteUsername, string(token)
+	access.Idle = time.Duration(cfg.IdleTimeoutMs) * time.Millisecond
+	access.userID, access.davSecretID = userID, row.DavSecretID
+	access.bindingRevision, access.davSecretVersion = row.BindingRevision, row.DavSecretVersion
 	access.valid = func(checkCtx context.Context) bool {
 		if authorize(checkCtx) != nil {
 			return false
 		}
 		current, e := s.Client.AgentSpace.Get(checkCtx, userID)
-		if e != nil || current.BindingRevision != row.BindingRevision || current.AgentSpaceID != row.AgentSpaceID || current.DavSecretID != row.DavSecretID || current.DavSecretVersion != row.DavSecretVersion {
+		if e != nil || current.BindingRevision != row.BindingRevision || current.AgentSpaceID != row.AgentSpaceID ||
+			current.WorkspaceServiceID != row.WorkspaceServiceID || current.RemoteUsername != row.RemoteUsername ||
+			current.DavSecretID != row.DavSecretID || current.DavSecretVersion != row.DavSecretVersion || !filesAvailable(current, cfg) {
 			return false
 		}
-		config, e := s.Client.WorkspaceService.Get(checkCtx, workspaceService.ID)
-		if e != nil || config.ActiveConfigRevision == nil || *config.ActiveConfigRevision != *workspaceService.ActiveConfigRevision {
-			return false
-		}
-		view, e := s.Projection(checkCtx, userID)
-		return e == nil && view.FilesAvailable
+		service, e := s.Client.WorkspaceService.Get(checkCtx, workspaceService.ID)
+		return e == nil && service.ActiveConfigRevision != nil && *service.ActiveConfigRevision == *workspaceService.ActiveConfigRevision &&
+			s.fileWorkspaceConnected(checkCtx, current, service)
 	}
+	// Register first, then recheck. A revocation either sees this entry or
+	// finishes before this check and is already reflected in the durable state.
+	s.fileMu.Lock()
 	s.files[access] = struct{}{}
-	if !access.valid(ctx) {
-		delete(s.files, access)
-		cancel()
-		return nil, ErrUnavailable
+	s.fileMu.Unlock()
+	if err := access.Revalidate(leaseCtx); err != nil {
+		return nil, err
 	}
-	audit, err := s.Client.WorkspaceAudit.Create().SetRequestID(platformid.New(platformid.Request)).SetActorID(actor).SetUserID(userID).SetAgentSpaceID(row.AgentSpaceID).SetAction(action).SetPath(path).SetOutcome("STARTED").SetBytes(0).SetCreatedAt(s.Now().UTC()).Save(ctx)
+	audit, err := s.Client.WorkspaceAudit.Create().SetRequestID(platformid.New(platformid.Request)).SetActorID(actor).SetUserID(userID).SetAgentSpaceID(row.AgentSpaceID).SetAction(action).SetPath(path).SetOutcome("STARTED").SetBytes(0).SetCreatedAt(s.Now().UTC()).Save(leaseCtx)
 	if err != nil {
-		delete(s.files, access)
-		cancel()
 		return nil, err
 	}
 	access.auditID = audit.ID
+	admitted = true
 	return access, nil
+}
+
+func (s *Service) fileWorkspaceConnected(ctx context.Context, row *ent.AgentSpace, service *ent.WorkspaceService) bool {
+	active, err := s.Client.User.Query().Where(user.IDEQ(row.ID), user.StatusEQ("ACTIVE")).Exist(ctx)
+	return workspaceConnected(row, service, err == nil && active)
 }
 
 // ObserveFileError invalidates only the exact DAV credential which failed. A
@@ -141,21 +144,41 @@ func (s *Service) ObserveFileError(ctx context.Context, access *FileAccess, err 
 	_, _ = s.Client.AgentSpace.Update().Where(agentspace.IDEQ(access.userID), agentspace.BindingRevisionEQ(access.bindingRevision), agentspace.DavSecretIDEQ(access.davSecretID), agentspace.DavSecretVersionEQ(access.davSecretVersion)).SetDavConfirmed(false).SetDiagnosticCode(remote.Code).Save(ctx)
 }
 
-func (s *Service) CloseFiles(access *FileAccess, outcome string, bytes int64) {
+func (s *Service) releaseFileAccess(access *FileAccess) bool {
 	s.fileMu.Lock()
+	slots := access.slots
+	access.slots = nil
 	delete(s.files, access)
 	s.fileMu.Unlock()
+	if slots == nil {
+		return false
+	}
 	access.cancel()
+	<-slots
 	access.Token = ""
+	return true
+}
+
+func (s *Service) CloseFiles(access *FileAccess, outcome string, bytes int64) {
+	if !s.releaseFileAccess(access) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, _ = s.Client.WorkspaceAudit.UpdateOneID(access.auditID).SetOutcome(outcome).SetBytes(bytes).SetCompletedAt(s.Now().UTC()).Save(ctx)
 }
 func (s *Service) CancelInvalidFiles(ctx context.Context) {
 	s.fileMu.Lock()
-	defer s.fileMu.Unlock()
+	active := make([]*FileAccess, 0, len(s.files))
 	for access := range s.files {
-		if !access.valid(ctx) {
+		active = append(active, access)
+	}
+	s.fileMu.Unlock()
+	for _, access := range active {
+		if ctx.Err() != nil {
+			return
+		}
+		if access.Context.Err() == nil && !access.valid(ctx) && ctx.Err() == nil {
 			access.cancel()
 		}
 	}

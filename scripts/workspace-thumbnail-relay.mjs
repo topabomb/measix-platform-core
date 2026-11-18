@@ -232,6 +232,14 @@ export async function runRelayDAVPreview({ out, env, users, api, raw, command, p
   await checkCapabilities(await b.send(b.preview, { method: 'OPTIONS' }), otherUser.spaceId)
   proof('two enterprise Bearers cannot access each other’s endpoints and a missing source is an ordinary 404')
 
+  const otherURL = url(b, '00-image.png', otherETag)
+  const readA = async () => inspect(await a.send(currentURL), user.spaceId, original)
+  const readB = async () => inspect(await b.send(otherURL), otherUser.spaceId, otherETag)
+  const otherPreview = await readB()
+  const parallel = await Promise.all([readA(), readA(), readB(), readB()])
+  assert.deepEqual(parallel, [changed, changed, otherPreview, otherPreview])
+  proof('four parallel warm Relay preview requests across two spaces preserve both identities and representations')
+
   const payload = Buffer.alloc(2 * 1024 * 1024, 0x42)
   await put(user, 'relay-range.bin', payload)
   const heldRequests = []

@@ -3,10 +3,85 @@ package workspace
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	remoteapi "measix/platform/internal/hub/agentspace"
 )
+
+func TestFileAdmissionDoesNotHoldTheLeaseRegistryDuringAuthorization(t *testing.T) {
+	s, _, actor, user := lifecycleFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	runCommand(t, s, actor, user, "CREATE")
+	space := s.Client.AgentSpace.GetX(ctx, user).AgentSpaceID
+	var revoked atomic.Bool
+	access, err := s.OpenFiles(ctx, actor, user, space, "THUMBNAIL", "picture.png", func(context.Context) error {
+		if revoked.Load() {
+			return ErrUnavailable
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.CloseFiles(access, "CANCELLED", 0)
+
+	entered, finished := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(finished)
+		_, _ = s.OpenFiles(ctx, actor, user, space, "THUMBNAIL", "another.png", func(ctx context.Context) error {
+			close(entered)
+			<-ctx.Done()
+			return ctx.Err()
+		})
+	}()
+	defer func() { cancel(); <-finished }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("second admission did not begin")
+	}
+	revoked.Store(true)
+	swept := make(chan struct{})
+	go func() { s.CancelInvalidFiles(ctx); close(swept) }()
+	select {
+	case <-swept:
+		if access.Context.Err() == nil {
+			t.Error("revoked lease was not cancelled")
+		}
+	case <-time.After(time.Second):
+		t.Error("slow admission blocked revocation of a registered lease")
+		cancel()
+		<-swept
+	}
+}
+
+func TestFilesReuseTransportAcrossDAVCredentialRotation(t *testing.T) {
+	s, _, actor, user := lifecycleFixture(t)
+	ctx := context.Background()
+	runCommand(t, s, actor, user, "CREATE")
+	space := s.Client.AgentSpace.GetX(ctx, user).AgentSpaceID
+	open := func() *FileAccess {
+		t.Helper()
+		access, err := s.OpenFiles(ctx, actor, user, space, "THUMBNAIL", "picture.png", func(context.Context) error { return nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { s.CloseFiles(access, "SUCCEEDED", 0) })
+		return access
+	}
+	first := open()
+	runCommand(t, s, actor, user, "SET_DAV")
+	second := open()
+	if first.Token == second.Token || first.Revalidate(ctx) == nil {
+		t.Fatal("rotation must invalidate the old lease and use a fresh credential")
+	}
+	if first.Remote.HTTP.Transport != second.Remote.HTTP.Transport {
+		t.Fatal("requests with the same transport policy cannot reuse DAV connections")
+	}
+}
 
 func TestPreviewLeasesHaveIndependentFourSlotBudget(t *testing.T) {
 	s, _, actor, user := lifecycleFixture(t)

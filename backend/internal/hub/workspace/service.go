@@ -42,10 +42,17 @@ type Service struct {
 	mu           sync.Mutex
 	fileMu       sync.Mutex
 	files        map[*FileAccess]struct{}
+	fileSlots    chan struct{}
+	previewSlots chan struct{}
+	transportMu  sync.Mutex
+	transports   []workspaceTransport
 }
 
 func NewService(client *ent.Client, secrets *upstream.Service) *Service {
-	return &Service{Client: client, Secrets: secrets, Now: time.Now, files: make(map[*FileAccess]struct{})}
+	return &Service{
+		Client: client, Secrets: secrets, Now: time.Now,
+		files: make(map[*FileAccess]struct{}), fileSlots: make(chan struct{}, 8), previewSlots: make(chan struct{}, 4),
+	}
 }
 func ptr[T any](v T) *T { return &v }
 func str(v *string) string {
@@ -77,15 +84,41 @@ func (s *Service) adapter(ctx context.Context, cfg adminapi.AgentSpaceConfig) (*
 	if err != nil {
 		return nil, err
 	}
-	client, err := remoteapi.New(cfg.AdminOrigin, cfg.McpOrigin, str(cfg.DavOrigin), string(token))
+	client, err := remoteapi.NewWithTransport(cfg.AdminOrigin, cfg.McpOrigin, str(cfg.DavOrigin), string(token), s.transportFor(cfg.ConnectTimeoutMs))
 	if err != nil {
 		return nil, err
 	}
-	transport := client.HTTP.Transport.(*http.Transport)
-	transport.DialContext = (&net.Dialer{Timeout: time.Duration(cfg.ConnectTimeoutMs) * time.Millisecond, KeepAlive: 30 * time.Second}).DialContext
-	transport.ResponseHeaderTimeout = time.Duration(cfg.ConnectTimeoutMs) * time.Millisecond
 	client.DAVIdleTimeout = time.Duration(cfg.IdleTimeoutMs) * time.Millisecond
 	return client, nil
+}
+
+type workspaceTransport struct {
+	connectMs int
+	pool      *http.Transport
+}
+
+func (s *Service) transportFor(connectMs int) *http.Transport {
+	const retainedPolicies = 8
+	s.transportMu.Lock()
+	defer s.transportMu.Unlock()
+	for _, entry := range s.transports {
+		if entry.connectMs == connectMs {
+			return entry.pool
+		}
+	}
+	timeout := time.Duration(connectMs) * time.Millisecond
+	pool := http.DefaultTransport.(*http.Transport).Clone()
+	pool.DialContext = (&net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second}).DialContext
+	pool.ResponseHeaderTimeout = timeout
+	pool.MaxIdleConns = 32
+	pool.MaxIdleConnsPerHost = cap(s.fileSlots) + cap(s.previewSlots)
+	if len(s.transports) == retainedPolicies {
+		s.transports[0].pool.CloseIdleConnections()
+		copy(s.transports, s.transports[1:])
+		s.transports = s.transports[:retainedPolicies-1]
+	}
+	s.transports = append(s.transports, workspaceTransport{connectMs: connectMs, pool: pool})
+	return pool
 }
 func (s *Service) validateConfig(ctx context.Context, cfg adminapi.AgentSpaceConfig) error {
 	if cfg.ConnectTimeoutMs < 1000 || cfg.ConnectTimeoutMs > 120000 || cfg.IdleTimeoutMs < 1000 || cfg.IdleTimeoutMs > 600000 {
@@ -343,6 +376,15 @@ func diagnostic(err error) string {
 	}
 	return "workspace_unavailable"
 }
+func workspaceConnected(row *ent.AgentSpace, service *ent.WorkspaceService, userActive bool) bool {
+	return userActive && service.Enabled && service.State == "ACTIVE" && service.ActiveConfigRevision != nil &&
+		row.Intent == "CONNECTED" && row.State == "CONNECTED" && row.RemoteActive && !row.StopPending
+}
+
+func filesAvailable(row *ent.AgentSpace, cfg adminapi.AgentSpaceConfig) bool {
+	return str(cfg.DavOrigin) != "" && row.DavConfirmed && row.DavSecretID != ""
+}
+
 func (s *Service) Projection(ctx context.Context, userID string) (adminapi.WorkspaceProjection, error) {
 	out := adminapi.WorkspaceProjection{SchemaVersion: 1, ServiceState: "NOT_CONFIGURED", State: "UNPROVISIONED", McpReason: "not_provisioned", FilesReason: "not_provisioned"}
 	row, err := s.Client.AgentSpace.Get(ctx, userID)
@@ -388,7 +430,7 @@ func (s *Service) Projection(ctx context.Context, userID string) (adminapi.Works
 	}
 	reason := "workspace_not_connected"
 	user, e := s.Client.User.Get(ctx, userID)
-	eligible := e == nil && user.Status == "ACTIVE" && workspaceService.Enabled && workspaceService.State == "ACTIVE" && workspaceService.ActiveConfigRevision != nil && row.Intent == "CONNECTED" && row.State == "CONNECTED" && row.RemoteActive && !row.StopPending
+	eligible := workspaceConnected(row, workspaceService, e == nil && user.Status == "ACTIVE")
 	if !workspaceService.Enabled || workspaceService.State != "ACTIVE" {
 		reason = "workspace_service_unavailable"
 	} else if e != nil || user.Status != "ACTIVE" {
@@ -406,7 +448,7 @@ func (s *Service) Projection(ctx context.Context, userID string) (adminapi.Works
 		if e != nil {
 			return out, e
 		}
-		out.FilesAvailable = str(cfg.DavOrigin) != "" && row.DavConfirmed && row.DavSecretID != ""
+		out.FilesAvailable = filesAvailable(row, cfg)
 		out.FilesReason = "dav_credential_unavailable"
 		if str(cfg.DavOrigin) == "" {
 			out.FilesReason = "dav_not_configured"

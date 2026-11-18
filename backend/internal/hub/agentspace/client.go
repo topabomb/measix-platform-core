@@ -74,6 +74,12 @@ func origin(raw string) (*url.URL, error) {
 	return u, nil
 }
 func New(admin, mcp, dav, credential string) (*Client, error) {
+	return NewWithTransport(admin, mcp, dav, credential, nil)
+}
+
+// NewWithTransport accepts a shared, already configured connection pool.
+// Credentials stay on the adapter and are attached per request.
+func NewWithTransport(admin, mcp, dav, credential string, transport *http.Transport) (*Client, error) {
 	a, err := origin(admin)
 	if err != nil {
 		return nil, err
@@ -92,8 +98,10 @@ func New(admin, mcp, dav, credential string) (*Client, error) {
 	if credential == "" || strings.ContainsAny(credential, "\r\n") {
 		return nil, &Error{Code: "invalid_credential"}
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.ResponseHeaderTimeout = 90 * time.Second
+	if transport == nil {
+		transport = http.DefaultTransport.(*http.Transport).Clone()
+		transport.ResponseHeaderTimeout = 90 * time.Second
+	}
 	return &Client{admin: a, dav: d, credential: credential, HTTP: &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func Username(userID string) (string, error) {

@@ -148,7 +148,7 @@ node scripts/workspace-thumbnail-browser.mjs --agent-space-source /home/hualei/m
 
 入口拒绝占用证据目录及低于 5 GiB 的 D 盘容量，固定镜像、helper、后端源码、验证源码和 SPA 副本。复用现有 Hub/Relay harness 与 Agent Space FixtureOwner；业务对象经 Admin API 创建/删除，临时凭据单独保护，不读写既有业务库。桌面/390px 同时验证列表128/卡片256、可见队列、能力复用、版本、原预览/CRUD/文本草稿、撤销及取消。每个迟到注入先记录真实 200 正文/空间/源版本/摘要；页面隐藏明确使用事件注入，不能冒称 OS 隐藏。活动读取与取消后原始网络收尾分别保留。结束核对本轮进程/容器/卷清理和原资源保全，日志/失败与成功证据不覆盖；private-temp 可再生缓存留待统一清理。
 
-同入口增加 `--api-only` 执行真实 Client/Admin API、接入样例、原 CRUD/Range 与凭据隔离，并捕获 Client 原始合同正文。此模式还通过真实发布的 DAV 绑定跑 Relay → 固定 Runcove 镜像。两用户在空空间发 OPTIONS 并核对 VM 状态，生成真实图片和视频缩略图，核对范围、版本、跨用户拒绝及发布关闭时独立的 Hub Files。回环代理收到并检查真实 Runcove 200 后才延迟交付，逐个占满 Relay 预览槽，验证普通 DAV Range 和凭据换钥取消；该场景验证 Relay 的在途转发，不计作 Runcove 解码并发或旧响应直接从 Runcove 延迟。API 模式要求明确的 Workspace 镜像身份。
+同入口增加 `--api-only` 执行真实 Client/Admin API、接入样例、原 CRUD/Range 与凭据隔离，并捕获 Client 原始合同正文。此模式还通过真实发布的 DAV 绑定跑 Relay → 固定 Runcove 镜像。两用户在空空间发 OPTIONS 并核对 VM 状态，生成真实图片和视频缩略图，核对范围、版本、跨用户拒绝及发布关闭时独立的 Hub Files。两空间各发两路并行暖读，逐条核对空间、源版本和派生摘要。回环代理收到并检查真实 Runcove 200 后才延迟交付，逐个占满 Relay 预览槽，验证普通 DAV Range 和凭据换钥取消；该场景验证 Relay 的在途转发，不计作 Runcove 解码并发或旧响应直接从 Runcove 延迟。API 模式要求明确的 Workspace 镜像身份。
 
 媒体扩展以当前 Runcove v1 为验收基线。`--legacy-only --admin-build sha256:<admin-build-hash> --output <new-run>` 单独验证无媒体扩展的普通 WebDAV。它使用真实标准 DAV 文件服务和明确的管理替身，原生缺失资源为 404，405 和 403 由限定回环代理注入。核对 Hub 的判定和 Relay 透传状态，再由客户端对 404/405 执行同绑定认证根探测。
 

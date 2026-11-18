@@ -16,6 +16,8 @@ type Options = {
   size?: () => 128 | 256
 }
 const bodyLimit = 1024 * 1024
+const recentLimit = 64
+const recentForMs = 2 * 60 * 1000
 
 export function thumbnailMediaKind(path: string): 'IMAGE' | 'VIDEO' | undefined {
   const ext = path.split('.').pop()?.toLowerCase()
@@ -60,13 +62,17 @@ export function useWorkspaceThumbnails(options: Options) {
   const demands = shallowReactive(new Map<string, Demand>())
   const targets = new Map<string, Element>()
   const jobs = new Set<Job>()
+  // Retain only recent representation keys after their URLs are released.
+  // A matching key may still be hot upstream, where cold jobs are serialized.
+  const recentlyLoaded = new Map<string, number>()
   let observer: IntersectionObserver | undefined
   let capability: Capabilities | undefined
   let capabilityController: AbortController | undefined
   let capabilityAttempted = false
+  let capabilityRetried = false
   let discoveryQueued = false
   let mounted = false, alive = true, scopeEpoch = 0
-  let concurrency = 2, cooldownUntil = 0
+  let allowParallel = true, cooldownUntil = 0
   let cooldownTimer: ReturnType<typeof setTimeout> | undefined
   const size = () => options.size?.() ?? 128
   const scope = () => JSON.stringify([options.identity(), options.baseUrl(), options.spaceId(), options.revision?.() ?? ''])
@@ -82,7 +88,11 @@ export function useWorkspaceThumbnails(options: Options) {
     if (!enabled()) return
     const remaining = cooldownUntil - Date.now()
     if (remaining > 0) cooldownTimer = setTimeout(resumeCooldown, Math.min(remaining, 2147483647))
-    else { cooldownUntil = 0; pump() }
+    else { cooldownUntil = 0; queueDiscovery(); pump() }
+  }
+  function backOff(error: ApiProblem) {
+    cooldownUntil = Math.max(cooldownUntil, Date.now() + (error.retryAfterSeconds ?? 1) * 1000)
+    resumeCooldown()
   }
 
   function release(demand: Demand) {
@@ -127,13 +137,18 @@ export function useWorkspaceThumbnails(options: Options) {
       if (!bytes.length) throw new Error('Empty thumbnail response')
       if (!valid(demand, job, epoch)) return
       urls.set(demand.key, URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'image/webp' })))
+      recentlyLoaded.delete(demand.key)
+      recentlyLoaded.set(demand.key, Date.now() + recentForMs)
+      if (recentlyLoaded.size > recentLimit) {
+        const oldest = recentlyLoaded.keys().next()
+        if (!oldest.done) recentlyLoaded.delete(oldest.value)
+      }
     } catch (error) {
       if (valid(demand, job, epoch)) {
         if (error instanceof ApiProblem && error.status === 429) {
-          concurrency = 1
+          allowParallel = false
           demand.failed = demand.retries++ >= 2
-          cooldownUntil = Math.max(cooldownUntil, Date.now() + (error.retryAfterSeconds ?? 1) * 1000)
-          resumeCooldown()
+          backOff(error)
         } else demand.failed = true
       }
     } finally {
@@ -143,17 +158,19 @@ export function useWorkspaceThumbnails(options: Options) {
     }
   }
   function pump() {
-    if (!enabled() || cooldownUntil > Date.now() || !capability?.supported || !capability.sizes.includes(size())) return
+    const now = Date.now()
+    if (!enabled() || cooldownUntil > now || !capability?.supported || !capability.sizes.includes(size())) return
     for (const demand of demands.values()) {
-      if (jobs.size >= concurrency) break
+      if (jobs.size >= (allowParallel ? 2 : 1)) break
       if (!demand.visible || demand.failed || demand.job || demand.sourceETag !== demand.entry.etag || urls.has(demand.key) || !capability.mediaKinds.includes(mediaKind(demand.entry)!)) continue
+      if (jobs.size > 0 && (recentlyLoaded.get(demand.key) ?? 0) <= now) continue
       const job = { controller: new AbortController() }
       demand.job = job; jobs.add(job)
       void load(demand, job, scopeEpoch)
     }
   }
   async function discover() {
-    if (!enabled() || capabilityAttempted) return
+    if (!enabled() || capabilityAttempted || cooldownUntil > Date.now()) return
     capabilityAttempted = true
     const epoch = scopeEpoch, controller = new AbortController()
     capabilityController = controller
@@ -170,7 +187,13 @@ export function useWorkspaceThumbnails(options: Options) {
       if (candidate?.schemaVersion !== 1 || typeof candidate.supported !== 'boolean' || candidate.contentType !== 'image/webp' || !Array.isArray(candidate.sizes) || !candidate.sizes.every(n => [128, 256, 512].includes(n)) || !Array.isArray(candidate.mediaKinds) || !candidate.mediaKinds.every(kind => kind === 'IMAGE' || kind === 'VIDEO')) return
       capability = candidate
       pump()
-    } catch { /* Optional capability errors leave the original file list usable. */ }
+    } catch (error) {
+      if (!controller.signal.aborted && epoch === scopeEpoch && !capabilityRetried && error instanceof ApiProblem && error.status === 429) {
+        capabilityRetried = true
+        capabilityAttempted = false
+        backOff(error)
+      }
+    }
     finally { if (capabilityController === controller) capabilityController = undefined }
   }
   function queueDiscovery() {
@@ -180,9 +203,10 @@ export function useWorkspaceThumbnails(options: Options) {
   }
   function resetScope() {
     scopeEpoch++
-    stopCooldown(); cooldownUntil = 0; concurrency = 2
+    stopCooldown(); cooldownUntil = 0; allowParallel = true
+    recentlyLoaded.clear()
     capabilityController?.abort(); capabilityController = undefined
-    capability = undefined; capabilityAttempted = false
+    capability = undefined; capabilityAttempted = false; capabilityRetried = false
     clearDirectory(); syncEntries()
     // Revoke synchronously, but only query the final target after Vue applies
     // all props in this turn. Demands stay synchronous for render-time refs.

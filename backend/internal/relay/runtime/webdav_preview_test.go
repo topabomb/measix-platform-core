@@ -1,7 +1,9 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +13,72 @@ import (
 
 	"measix/platform/internal/relay/control"
 )
+
+func TestDAVPreviewLimitsUpstreamBodiesAndPreservesOrdinaryDAV(t *testing.T) {
+	const metadataLimit = 16 << 10
+	const webpLimit = 1 << 20
+	var space string
+	h, token, root, _, state := davFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Agent-Space-Id", space)
+		switch r.URL.Query().Get("case") {
+		case "metadata":
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Content-Length", "16385")
+		case "declared":
+			w.Header().Set("Content-Type", "image/webp")
+			w.Header().Set("Content-Length", "1048577")
+		case "wrong-type":
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte("<html>"))
+			return
+		default:
+			w.Header().Set("Content-Type", "image/webp")
+			w.(http.Flusher).Flush()
+			size := webpLimit
+			if r.URL.Query().Get("case") == "chunked" || !strings.HasSuffix(r.URL.Path, "/previews") {
+				size++
+			}
+			w.Write(bytes.Repeat([]byte{'x'}, size))
+			return
+		}
+	}), "READ_ONLY")
+	space = (*state.DavBindings)[0].Target.AgentSpaceId
+	server := httptest.NewServer(h)
+	defer server.Close()
+	preview := server.URL + strings.TrimSuffix(root, "dav/") + "previews?case="
+	for _, tc := range []struct {
+		name, method, url string
+		status, bytes     int
+		truncated         bool
+	}{
+		{"metadata", "OPTIONS", preview + "metadata", 502, -1, false},
+		{"declared", "GET", preview + "declared", 502, -1, false},
+		{"wrong type", "GET", preview + "wrong-type", 502, -1, false},
+		{"exact limit", "GET", preview + "exact", 200, webpLimit, false},
+		{"chunked overflow", "GET", preview + "chunked", 200, webpLimit, true},
+		{"ordinary download", "GET", server.URL + root + "large.webp", 200, webpLimit + 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request, err := http.NewRequest(tc.method, tc.url, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Header.Set("Authorization", "Bearer "+token)
+			response, err := server.Client().Do(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			read, readErr := io.Copy(io.Discard, io.LimitReader(response.Body, webpLimit+2))
+			if response.StatusCode != tc.status || (tc.bytes >= 0 && read != int64(tc.bytes)) || (readErr != nil) != tc.truncated {
+				t.Fatalf("status=%d bytes=%d readErr=%v", response.StatusCode, read, readErr)
+			}
+			if tc.name == "metadata" && read > metadataLimit {
+				t.Fatalf("metadata reached client: %d bytes", read)
+			}
+		})
+	}
+}
 
 func TestDAVPreviewPreservesUpstreamProtocol(t *testing.T) {
 	var space string
@@ -176,7 +244,13 @@ func TestDAVPreviewAcceptsBodylessHTTP2(t *testing.T) {
 	var space string
 	h, token, root, _, state := davFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Agent-Space-Id", space)
-		w.WriteHeader(200)
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("{}"))
+			return
+		}
+		w.Header().Set("Content-Type", "image/webp")
+		w.Write([]byte("webp"))
 	}), "READ_ONLY")
 	space = (*state.DavBindings)[0].Target.AgentSpaceId
 	server := httptest.NewUnstartedServer(h)
@@ -260,6 +334,28 @@ func TestDAVActivityTouchReusesTimer(t *testing.T) {
 	defer activity.close()
 	if allocations := testing.AllocsPerRun(100, activity.touch); allocations != 0 {
 		t.Fatalf("progress tracking allocated %.2f times per chunk", allocations)
+	}
+}
+
+func TestDAVPreviewDeliveryDeadlineSurvivesProgress(t *testing.T) {
+	lease, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	activity := newDAVActivity(time.Hour, lease, cancel, httptest.NewRecorder(), false)
+	defer activity.close()
+	activity.startDelivery(30 * time.Millisecond)
+	pulse := time.NewTicker(time.Millisecond)
+	defer pulse.Stop()
+	timeout := time.NewTimer(time.Second)
+	defer timeout.Stop()
+	for {
+		select {
+		case <-lease.Done():
+			return
+		case <-pulse.C:
+			activity.touch()
+		case <-timeout.C:
+			t.Fatal("progress extended the absolute preview delivery deadline")
+		}
 	}
 }
 

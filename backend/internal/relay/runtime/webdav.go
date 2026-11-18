@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -20,6 +21,12 @@ import (
 )
 
 var errDAVCredential = errors.New("workspace_credential_unavailable")
+
+const (
+	davPreviewMediaLimit       = 1 << 20
+	davPreviewMetadataLimit    = 16 << 10
+	davPreviewDeliveryDeadline = 30 * time.Second
+)
 
 type davBufferPool struct{ pool sync.Pool }
 
@@ -277,6 +284,7 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 				p.Out.Header.Del("Origin")
 				p.Out.Header.Del("Destination")
 				p.Out.Header.Del("If")
+				p.Out.Header.Set("Accept-Encoding", "identity")
 			}
 			if destination != "" {
 				p.Out.Header.Set("Destination", destination)
@@ -298,9 +306,10 @@ func (h *Handler) serveDAV(w http.ResponseWriter, r *http.Request, state *contro
 			response.Header.Del("Set-Cookie")
 			response.Header.Del("WWW-Authenticate")
 			if preview {
-				if err := validateDAVPreviewResponse(response, binding.Target.AgentSpaceId); err != nil {
+				if err := limitDAVPreviewResponse(response, r.Method, binding.Target.AgentSpaceId); err != nil {
 					return err
 				}
+				watch.startDelivery(davPreviewDeliveryDeadline)
 				response.Body = &davActivityBody{ReadCloser: response.Body, activity: watch}
 				return nil
 			}
@@ -393,10 +402,13 @@ func davPreviewOriginAllowed(header http.Header, publicOrigin string) bool {
 	return len(sites) == 0 || len(sites) == 1 && (sites[0] == "same-origin" || sites[0] == "none")
 }
 
-func validateDAVPreviewResponse(response *http.Response, agentSpaceID string) error {
+func limitDAVPreviewResponse(response *http.Response, method, agentSpaceID string) error {
 	status := response.StatusCode
 	if status == http.StatusSwitchingProtocols || (status >= 300 && status < 400 && status != http.StatusNotModified) {
 		return errors.New("unexpected DAV preview redirect or upgrade")
+	}
+	if status > http.StatusOK && status < 300 {
+		return errors.New("unexpected DAV preview success status")
 	}
 	if status >= 200 && status < 300 || status == http.StatusNotModified {
 		spaces := response.Header.Values("Agent-Space-Id")
@@ -404,10 +416,50 @@ func validateDAVPreviewResponse(response *http.Response, agentSpaceID string) er
 			return errors.New("unexpected DAV preview space")
 		}
 	}
+	limit := int64(davPreviewMetadataLimit)
+	if status == http.StatusOK {
+		expected := "application/json"
+		if method != http.MethodOptions {
+			expected = "image/webp"
+			limit = davPreviewMediaLimit
+		}
+		media, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+		encoding := response.Header.Get("Content-Encoding")
+		if err != nil || media != expected || (encoding != "" && !strings.EqualFold(encoding, "identity")) {
+			return errors.New("unexpected DAV preview representation")
+		}
+	}
+	if status != http.StatusNotModified && response.ContentLength > limit {
+		return errors.New("DAV preview response exceeds its byte limit")
+	}
+	if method != http.MethodHead && status != http.StatusNotModified && response.Body != nil {
+		response.Body = &davPreviewBody{ReadCloser: response.Body, remaining: limit}
+	}
 	response.Header.Del("Location")
 	response.Header.Del("Content-Location")
 	response.Header.Set("Cache-Control", "no-store")
 	return nil
+}
+
+type davPreviewBody struct {
+	io.ReadCloser
+	remaining int64
+}
+
+func (b *davPreviewBody) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if b.remaining == 0 {
+		var extra [1]byte
+		if n, err := io.ReadFull(b.ReadCloser, extra[:]); n == 0 {
+			return 0, err
+		}
+		return 0, errors.New("DAV preview response exceeds its byte limit")
+	}
+	n, err := b.ReadCloser.Read(p[:min(int64(len(p)), b.remaining)])
+	b.remaining -= int64(n)
+	return n, err
 }
 
 type davMapper struct {
@@ -538,6 +590,7 @@ type davActivity struct {
 	mu          sync.Mutex
 	timer       *time.Timer
 	deadline    time.Time
+	deliveryEnd time.Time
 	closed      bool
 	interrupted bool
 	idle        time.Duration
@@ -559,8 +612,27 @@ func (a *davActivity) touch() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if !a.closed && !a.interrupted {
-		a.deadline = time.Now().Add(a.idle)
+		a.deadline = a.progressDeadline()
 	}
+}
+
+func (a *davActivity) progressDeadline() time.Time {
+	idleEnd := time.Now().Add(a.idle)
+	if !a.deliveryEnd.IsZero() && a.deliveryEnd.Before(idleEnd) {
+		return a.deliveryEnd
+	}
+	return idleEnd
+}
+
+func (a *davActivity) startDelivery(budget time.Duration) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed || a.interrupted {
+		return
+	}
+	a.deliveryEnd = time.Now().Add(budget)
+	a.deadline = a.progressDeadline()
+	a.timer.Reset(time.Until(a.deadline))
 }
 
 func (a *davActivity) expire() {
@@ -608,7 +680,7 @@ func (a *davActivity) beforeWrite() error {
 	if a.interrupted || a.closed {
 		return context.Canceled
 	}
-	_ = http.NewResponseController(a.writer).SetWriteDeadline(time.Now().Add(a.idle))
+	_ = http.NewResponseController(a.writer).SetWriteDeadline(a.progressDeadline())
 	return nil
 }
 
